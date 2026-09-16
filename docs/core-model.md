@@ -248,11 +248,11 @@ repeat operations with uncertain outcomes.
 
 ### Turn input progress
 
-| Boundary                      | Meaning                                                                                                                    |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Boundary                      | Meaning                                                                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `inputAfterSequence`          | Fixed boundary from this agent's preceding turn in its current participation, or just before the activity introducing that participation. |
-| `acceptedThroughSequence`     | Relevant input for which this turn has accepted responsibility.                                                            |
-| `incorporatedThroughSequence` | Relevant input confirmed incorporated through the harness contract.                                                        |
+| `acceptedThroughSequence`     | Relevant input for which this turn has accepted responsibility.                                                                           |
+| `incorporatedThroughSequence` | Relevant input confirmed incorporated through the harness contract.                                                                       |
 
 ```text
 inputAfterSequence <= incorporatedThroughSequence <= acceptedThroughSequence
@@ -2192,16 +2192,16 @@ notifications preserve that selection; later participant changes do not change h
 recipients. A participant that should receive an assignment or triage notification must be
 present before or consistently with recording the activity that selects it.
 
-| Activity                                        | Recipient rule                                                                                                                                |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Message published                               | Explicitly mentioned participants, or all current participants if there are no mentions. This applies equally to user and assistant messages. |
-| Turn created, started, completed, failed, or cancellation activity | All current thread participants.                                                                                                             |
-| Explicit retry requested                        | The agent whose earlier attempt is referenced.                                                                                                |
-| Explicit agent work request                     | The agent being asked to act.                                                                                                                 |
-| Result of an explicit agent work request         | The requesting agent, through the request reference and current participation rules.                                                          |
-| Task entered triage                             | The thread's triage participant.                                                                                                              |
-| Task assigned to a workspace member             | The assignee, including when already participating in the thread.                                                                             |
-| Task requirement, bookkeeping, stop, or resumption changes | All current thread participants; handling depends on the change's meaning and origin.                                                         |
+| Activity                                                           | Recipient rule                                                                                                                                |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Message published                                                  | Explicitly mentioned participants, or all current participants if there are no mentions. This applies equally to user and assistant messages. |
+| Turn created, started, completed, failed, or cancellation activity | All current thread participants.                                                                                                              |
+| Explicit retry requested                                           | The agent whose earlier attempt is referenced.                                                                                                |
+| Explicit agent work request                                        | The agent being asked to act.                                                                                                                 |
+| Result of an explicit agent work request                           | The requesting agent, through the request reference and current participation rules.                                                          |
+| Task entered triage                                                | The thread's triage participant.                                                                                                              |
+| Task assigned to a workspace member                                | The assignee, including when already participating in the thread.                                                                             |
+| Task requirement, bookkeeping, stop, or resumption changes         | All current thread participants; handling depends on the change's meaning and origin.                                                         |
 
 Task assignment is the work request. Adding the assignee to the thread can accompany it,
 but an assignment must still notify someone already participating in the thread. Likewise, entering
@@ -2212,21 +2212,21 @@ triage triggers evaluation even when triage already participates in the thread.
 Receiving a notification is not itself an instruction to invoke a harness. The handler
 uses the activity type and its recorded meaning to decide what to do.
 
-| Recipient          | Activity                                        | Handling                                                                                          |
-| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Human using amends | Activity selected for notification              | Receive and acknowledge the notification.                                                         |
-| External contact   | Published message selected for outward delivery | Create or reuse the channel delivery and acknowledge with its reference.                          |
-| Agent              | User message addressed to it                    | Accept the input into an existing turn or its next turn.                                          |
-| Agent              | Assistant message published                     | Discard without starting a turn or adding input to one.                                           |
-| Agent              | Informational turn status                       | Acknowledge or discard as informational; do not start another turn merely because a turn started. |
-| Agent              | Explicit retry addressed to it                  | Accept the retry request through normal batching; wait if cancellation is pending.                |
-| Agent              | Explicit work request addressed to it, or result of its request | Accept the request or result as new input through normal batching.                              |
-| Agent              | Task assigned to it                             | Accept the assignment as work through the turn handoff.                                           |
-| Agent              | Task requirement change for its assigned task | Incorporate when the task permits work, except for edits originating in that same turn.            |
-| Agent              | Instruction to stop, hold, or dismiss affected work | Apply the task lifecycle change and cancel affected execution.                                  |
-| Agent              | Explicit resumption of its assigned work      | Accept the resumption as new input.                                                               |
-| Agent              | Task bookkeeping or requirement change for another assignee | Settle as informational unless the operation explicitly requests work.                          |
-| Triage participant | Task entered triage                             | Evaluate the workspace triage policy and record a decision.                                       |
+| Recipient          | Activity                                                        | Handling                                                                                          |
+| ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Human using amends | Activity selected for notification                              | Receive and acknowledge the notification.                                                         |
+| External contact   | Published message selected for outward delivery                 | Create or reuse the channel delivery and acknowledge with its reference.                          |
+| Agent              | User message addressed to it                                    | Accept the input into an existing turn or its next turn.                                          |
+| Agent              | Assistant message published                                     | Discard without starting a turn or adding input to one.                                           |
+| Agent              | Informational turn status                                       | Acknowledge or discard as informational; do not start another turn merely because a turn started. |
+| Agent              | Explicit retry addressed to it                                  | Accept the retry request through normal batching; wait if cancellation is pending.                |
+| Agent              | Explicit work request addressed to it, or result of its request | Accept the request or result as new input through normal batching.                                |
+| Agent              | Task assigned to it                                             | Accept the assignment as work through the turn handoff.                                           |
+| Agent              | Task requirement change for its assigned task                   | Incorporate when the task permits work, except for edits originating in that same turn.           |
+| Agent              | Instruction to stop, hold, or dismiss affected work             | Apply the task lifecycle change and cancel affected execution.                                    |
+| Agent              | Explicit resumption of its assigned work                        | Accept the resumption as new input.                                                               |
+| Agent              | Task bookkeeping or requirement change for another assignee     | Settle as informational unless the operation explicitly requests work.                            |
+| Triage participant | Task entered triage                                             | Evaluate the workspace triage policy and record a decision.                                       |
 
 The assistant-message discard rule applies to message-publication activity whose author
 is an agent. It does not discard every kind of activity caused by an agent: for example,
@@ -2332,11 +2332,11 @@ it is created but not yet processing.
 These are agreed design fields, not claims about an implemented schema. All refer to the
 thread timeline's sequence numbers, rather than positions in the turn's own event log.
 
-| Field                         | Meaning                                                                                                                | When it changes                                                               |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `inputAfterSequence`          | The boundary from prior work in the current participation, or from the activity introducing that participation.       | Fixed at turn creation.                                                       |
-| `acceptedThroughSequence`     | The turn has durably accepted responsibility for every relevant input through this position.                           | Set at creation and advanced when more input is accepted.                     |
-| `incorporatedThroughSequence` | Every relevant input after the starting boundary and through this position has been incorporated.                     | Initialized at the starting boundary and advanced on confirmed incorporation. |
+| Field                         | Meaning                                                                                                         | When it changes                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `inputAfterSequence`          | The boundary from prior work in the current participation, or from the activity introducing that participation. | Fixed at turn creation.                                                       |
+| `acceptedThroughSequence`     | The turn has durably accepted responsibility for every relevant input through this position.                    | Set at creation and advanced when more input is accepted.                     |
+| `incorporatedThroughSequence` | Every relevant input after the starting boundary and through this position has been incorporated.               | Initialized at the starting boundary and advanced on confirmed incorporation. |
 
 At creation, obtain `inputAfterSequence` from the confirmed incorporation progress of the
 preceding turn for the same agent on the same thread within its current participation. For
