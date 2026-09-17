@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · configure</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Accounts</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Who the workspace is, to somebody else. An account is a provider, an identity on that provider, and a credential in the vault — nothing more. What may be done with it is a connection, and that is a separate page on purpose.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="7">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};flex:none;">{{ n.glyph }}</span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Acme Finance</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.4px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:44px;height:44px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;margin-right:6px;">&#9776;</span>
+            </sc-if>
+            <sc-for list="{{ crumbs }}" as="b" hint-placeholder-count="2">
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ b.ink }};border-bottom:{{ b.line }};">{{ b.label }}</span>
+                <sc-if value="{{ b.more }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.62 0.014 84);">/</span>
+                </sc-if>
+              </span>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-wrap:nowrap;align-items:center;gap:12px 16px;">
+            <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.12;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pageTitle }}</span>
+            <span style="display:inline-flex;align-items:center;gap:10px;flex:none;">
+              <sc-if value="{{ hasBadge }}" hint-placeholder-val="{{ false }}">
+                <span role="img" aria-label="{{ badgeLabel }}" title="{{ badgeLabel }}" style="display:inline-flex;align-items:center;gap:9px;padding:{{ badgePad }};border-radius:999px;background:{{ badgeBg }};flex:none;">
+                  <span style="width:{{ badgeDotSize }};height:{{ badgeDotSize }};border-radius:50%;background:{{ badgeDot }};flex:none;"></span>
+                  <sc-if value="{{ showBadgeText }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ badgeInk }};white-space:nowrap;">{{ badgeLabel }}</span>
+                  </sc-if>
+                </span>
+              </sc-if>
+              <button type="button" onClick="{{ primaryAction }}" aria-label="{{ primaryLabel }}" title="{{ primaryLabel }}" style="display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:{{ primarySize }};padding:{{ primaryPad }};min-width:{{ primaryMin }};min-height:{{ btnMin }};border:{{ primaryBorder }};border-radius:999px;background:{{ primaryBg }};color:{{ primaryInk }};flex:none;white-space:nowrap;">{{ primaryFace }}</button>
+            </span>
+          </div>
+
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ metaInk }};">{{ headerMeta }}</span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;gap:26px;">
+
+          <sc-if value="{{ showList }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Connected</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ liveCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">credentials in the vault</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ live }}" as="a" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ a.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:6px 14px;padding:14px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                      <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ a.dot }};flex:none;"></span>
+                        <span style="font-size:14.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.label }}</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:oklch(0.5 0.014 84);border:1px dashed oklch(0.8 0.016 84);border-radius:4px;padding:1px 5px;flex:none;">{{ a.auth }}</span>
+                      </span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:17px;">{{ a.identity }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ a.kind }}</span>
+                      <span>{{ a.credential }}</span>
+                      <span style="color:{{ a.usesInk }};">{{ a.uses }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+
+            <sc-if value="{{ hasRevoked }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:11px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Revoked</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ revokedCount }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ revoked }}" as="a" hint-placeholder-count="1">
+                    <button type="button" onClick="{{ a.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:6px 14px;padding:14px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                      <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                        <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                          <span style="width:7px;height:7px;border-radius:50%;background:{{ a.dot }};flex:none;"></span>
+                          <span style="font-size:14.5px;font-weight:600;color:oklch(0.5 0.014 84);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.label }}</span>
+                        </span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:17px;">{{ a.identity }}</span>
+                      </span>
+                      <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                        <span>{{ a.kind }}</span>
+                        <span>{{ a.credential }}</span>
+                        <span>{{ a.uses }}</span>
+                      </span>
+                    </button>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">A revoked account keeps its row so sessions that ran through it still name what they used. Its connections were closed on revocation and cannot reopen.</span>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ showNew }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Provider</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ catalogNote }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <input type="text" value="{{ query }}" onInput="{{ setQuery }}" placeholder="Search 213 providers" style="width:100%;max-width:420px;box-sizing:border-box;padding:11px 13px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-size:14.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ catalog }}" as="k" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ k.onPick }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:4px 14px;padding:12px 10px;margin:0 -10px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:{{ k.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ k.dot }};flex:none;"></span>
+                      <span style="font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ k.name }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ k.id }}</span>
+                      <span>{{ k.auth }}</span>
+                      <span style="color:{{ k.protocolInk }};">{{ k.protocol }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ noMatches }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Nothing in the catalog matches that. The catalog is generated, so a provider missing from it cannot be connected yet.</span>
+              </sc-if>
+
+              <sc-if value="{{ picked }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:18px;padding-top:8px;">
+                  <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+
+                  <div style="display:grid;grid-template-columns:{{ pairGrid }};gap:20px;">
+                    <div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+                      <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Label</label>
+                      <input type="text" value="{{ draftLabel }}" onInput="{{ setLabel }}" placeholder="{{ labelHint }}" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-size:15px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                      <span style="font-size:12.5px;line-height:1.55;color:oklch(0.5 0.014 84);">Yours, not theirs. How this account is named everywhere it is referenced.</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+                      <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">{{ identityLabel }}</label>
+                      <sc-if value="{{ identityTyped }}" hint-placeholder-val="{{ true }}">
+                        <input type="text" value="{{ draftIdentity }}" onInput="{{ setIdentity }}" placeholder="{{ identityHint }}" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-family:'IBM Plex Mono',monospace;font-size:13px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                      </sc-if>
+                      <sc-if value="{{ identityGiven }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);padding:11px 0;">{{ identityHint }}</span>
+                      </sc-if>
+                      <span style="font-size:12.5px;line-height:1.55;color:oklch(0.5 0.014 84);">{{ identityNote }}</span>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Credential</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ authKind }}</span>
+                      <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                    </div>
+                    <sc-if value="{{ isKeyAuth }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;flex-direction:column;gap:8px;max-width:440px;">
+                        <input type="password" value="{{ draftKey }}" onInput="{{ setKey }}" placeholder="{{ keyHint }}" style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-family:'IBM Plex Mono',monospace;font-size:13px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                        <span style="font-size:12.5px;line-height:1.55;color:oklch(0.5 0.014 84);">Written to the vault and never read back — not by this screen, not by an agent, not into a session log.</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ isOauth }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;">
+                        <button type="button" onClick="{{ doOauth }}" style="display:inline-flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ oauthBg }};color:{{ oauthInk }};flex:none;">{{ oauthLabel }}</button>
+                        <span style="font-size:12.5px;line-height:1.55;color:oklch(0.5 0.014 84);flex:1;min-width:220px;">{{ oauthNote }}</span>
+                      </div>
+                    </sc-if>
+                  </div>
+
+                  <sc-if value="{{ hasDescriptor }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Descriptor</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">what this provider's strategy needs</span>
+                        <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                      </div>
+                      <div style="display:flex;flex-direction:column;">
+                        <sc-for list="{{ descriptorFields }}" as="d" hint-placeholder-count="2">
+                          <div style="display:grid;grid-template-columns:{{ descGrid }};align-items:center;gap:5px 14px;padding:10px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                            <span style="grid-column:1;font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.41 0.014 84);">{{ d.k }}</span>
+                            <input type="text" value="{{ d.v }}" onInput="{{ d.onInput }}" placeholder="{{ d.hint }}" style="grid-column:2;width:100%;box-sizing:border-box;padding:9px 11px;border:1.4px dashed oklch(0.8 0.016 84);border-radius:8px;background:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                          </div>
+                        </sc-for>
+                      </div>
+                      <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:620px;">Non-secret. It is metadata the strategy needs to reach the provider at all — a region, a base URL, a deployment name.</span>
+                    </div>
+                  </sc-if>
+
+                  <div style="display:flex;flex-direction:column;gap:12px;">
+                    <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                      <button type="button" onClick="{{ onConnect }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ connectBg }};color:{{ connectInk }};">connect account</button>
+                      <button type="button" onClick="{{ onCancel }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">cancel</button>
+                    </div>
+                    <span style="font-size:13px;line-height:1.6;color:oklch(0.44 0.014 84);max-width:640px;">{{ connectNote }}</span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ isRevoked }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px;border-radius:12px;background:oklch(0.24 0.014 84 / 0.06);">
+                <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.62 0.014 84);flex:none;"></span>
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.35 0.014 84);flex:1;min-width:220px;">{{ revokedNote }}</span>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">The account</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ facts }}" as="f" hint-placeholder-count="7">
+                  <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:10px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ f.ink }};text-align:right;word-break:break-all;">{{ f.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">The credential itself is not here and cannot be shown. What you can see is when it was written and when it last changed.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Connections on it</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ connCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ conns }}" as="c" hint-placeholder-count="2">
+                  <button type="button" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:4px 14px;padding:11px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.9 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }};flex:none;"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:{{ c.ink }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.purpose }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ c.scope }}</span>
+                      <span>{{ c.state }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ noConns }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);max-width:620px;">Nothing is authorised on this account yet. It holds a credential and reaches nothing until a connection says what it is for.</span>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ canManage }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                  <button type="button" onClick="{{ onRotate }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">{{ rotateLabel }}</button>
+                  <button type="button" onClick="{{ onRevoke }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.68 0.09 28);border-radius:999px;background:none;color:oklch(0.45 0.15 28);">revoke this account</button>
+                </div>
+                <span style="font-size:13px;line-height:1.6;color:oklch(0.44 0.014 84);max-width:640px;">{{ manageNote }}</span>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:48px 24px 32px;text-align:center;">
+              <svg viewBox="0 0 240 170" width="230" height="163" fill="none" role="img" aria-label="A spool with no thread wound on it">
+                <path d="M84 44 H156 M84 126 H156" stroke="oklch(0.72 0.016 84)" stroke-width="1.4" stroke-linecap="round"></path>
+                <path d="M96 44 V126 M144 44 V126" stroke="oklch(0.78 0.016 84)" stroke-width="1.2" stroke-linecap="round"></path>
+                <path d="M120 44 V126" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="4 7"></path>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:440px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">No accounts</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">The workspace has no identity anywhere else yet — no model to call, no repository to read, no inbox to answer.</span>
+              </div>
+              <button type="button" onClick="{{ primaryAction }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 20px;min-height:44px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">connect the first account</button>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A credential is never displayed, and the screen says so rather than showing a masked field that implies it could be revealed. What is visible is when it was written and when it last changed.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Rotate and revoke sit side by side because the difference matters and is easy to get wrong: rotating replaces the secret and every connection keeps working; revoking closes all of them at once.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The provider list is the catalog, searched rather than scrolled — 213 entries is a search field, not a dropdown. A provider absent from the catalog cannot be connected, and the empty result says that instead of nothing.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The form changes shape with the provider's auth: a key field for a key, a handoff button for OAuth, where the identity comes back from them rather than being typed. The descriptor appears only for providers whose strategy needs one.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">05</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">An account with no connections is a normal state, not a warning. It holds a credential and reaches nothing — which is exactly what it should do until somebody says what it is for.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const OK = "oklch(0.52 0.14 148)";
+const WARN = "oklch(0.58 0.12 78)";
+const BAD = "oklch(0.51 0.17 28)";
+const IDLE = "oklch(0.62 0.014 84)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 940 },
+  laptop: { label: "laptop", width: 1180, height: 880 },
+  tablet: { label: "tablet", width: 834, height: 820 },
+  phone: { label: "phone", width: 390, height: 800 }
+};
+
+const STATES = [
+  ["list", "accounts"],
+  ["one", "one account"],
+  ["keyNew", "connect \u00b7 api key"],
+  ["oauthNew", "connect \u00b7 oauth"],
+  ["revoked", "revoked account"],
+  ["empty", "none yet"]
+];
+
+// kind is a catalog provider id; the strategy, protocol and what each provider calls
+// its own identity all come from the catalog. Last field: the identity example.
+const CATALOG = [
+  ["anthropic", "Anthropic", "key", "anthropic", "sk-ant-\u2026", null, "org_4f21c"],
+  ["openai", "OpenAI", "key", "openai", "sk-proj-\u2026", null, "org-9Kp2x"],
+  ["openrouter", "OpenRouter", "key", "openai", "sk-or-\u2026", null, "acme"],
+  ["azure", "Azure OpenAI", "key", "openai", "\u2026", ["resource", "deployment"], "tenant_8a01"],
+  ["bedrock", "Amazon Bedrock", "key", "bedrock", "AKIA\u2026", ["region"], "1240-9911-3320"],
+  ["github", "GitHub", "oauth", null, "", null, "acme-finance"],
+  ["slack", "Slack", "oauth", null, "", null, "T02F9LKQ3"],
+  ["postmark", "Postmark", "key", null, "\u2026", ["stream"], "billing@acme.test"],
+  ["stripe", "Stripe", "key", null, "sk_live_\u2026", null, "acct_1P9x"],
+  ["google", "Google", "oauth", null, "", null, "acme-reporting"]
+];
+
+const ACCOUNTS = {
+  acc_anthropic: { kind: "anthropic", label: "Anthropic · acme-platform",
+    externalId: "org_4f21c", connectedBy: "Jo Mercer", connectedAt: "12 Jul",
+    rotatedAt: "2 Sep", revokedAt: null, descriptor: null },
+  acc_github: { kind: "github", label: "GitHub · acme-finance",
+    externalId: "acme-finance", connectedBy: "Jo Mercer", connectedAt: "12 Jul",
+    rotatedAt: null, revokedAt: null, descriptor: null },
+  acc_openai: { kind: "openai", label: "OpenAI · acme",
+    externalId: "org-9Kp2x", connectedBy: "Kit Nakano", connectedAt: "9 Sep",
+    rotatedAt: null, revokedAt: null, descriptor: null },
+  acc_openrouter: { kind: "openrouter", label: "OpenRouter · acme",
+    externalId: "acme", connectedBy: "Kit Nakano", connectedAt: "3 Sep",
+    rotatedAt: null, revokedAt: null, descriptor: null },
+  acc_postmark: { kind: "postmark", label: "Postmark · billing",
+    externalId: "billing@acme.test", connectedBy: "Jo Mercer", connectedAt: "12 Jul",
+    rotatedAt: null, revokedAt: null, descriptor: "{ \"stream\": \"outbound\" }" },
+  acc_postmark_support: { kind: "postmark", label: "Postmark · support",
+    externalId: "support@acme.test", connectedBy: "Jo Mercer", connectedAt: "12 Jul",
+    rotatedAt: null, revokedAt: null, descriptor: "{ \"stream\": \"outbound\" }" },
+  acc_postmark_hello: { kind: "postmark", label: "Postmark · hello",
+    externalId: "hello@acme.test", connectedBy: "Kit Nakano", connectedAt: "9 Sep",
+    rotatedAt: null, revokedAt: null, descriptor: "{ \"stream\": \"outbound\" }" },
+  acc_slack: { kind: "slack", label: "Slack · acme",
+    externalId: "T02F9LKQ3", connectedBy: "Kit Nakano", connectedAt: "3 Sep",
+    rotatedAt: null, revokedAt: null, descriptor: null },
+  acc_stripe: { kind: "stripe", label: "Stripe · acme-live",
+    externalId: "acct_1P9x", connectedBy: "Kit Nakano", connectedAt: "19 Jul",
+    rotatedAt: null, revokedAt: null, descriptor: null },
+  // Connected yesterday, authorised for nothing yet — the honest unconnected case.
+  acc_bedrock: { kind: "bedrock", label: "Amazon Bedrock · acme",
+    externalId: "1240-9911-3320", connectedBy: "Kit Nakano", connectedAt: "11 Sep",
+    rotatedAt: null, revokedAt: null, descriptor: "{ \"region\": \"eu-west-1\" }" },
+  acc_google: { kind: "google", label: "Google · acme-reporting",
+    externalId: "acme-reporting", connectedBy: "Kit Nakano", connectedAt: "4 Jul",
+    rotatedAt: null, revokedAt: "28 Aug", descriptor: null }
+};
+
+// ONE connection registry, mirroring the one on Connections. Each account's list is
+// derived from it, so the two screens can no longer drift a row at a time.
+const CONNECTIONS = {
+  con_inf_1: { account: "acc_anthropic", purpose: "inference", scope: null },
+  con_inf_2: { account: "acc_openrouter", purpose: "inference", scope: null },
+  con_inf_3: { account: "acc_openai", purpose: "inference", scope: null },
+  con_src_1: { account: "acc_github", purpose: "source", scope: "acme/ledger" },
+  con_tool_1: { account: "acc_github", purpose: "tool", scope: "acme/ledger" },
+  con_tool_2: { account: "acc_stripe", purpose: "tool", scope: "read-only" },
+  con_tool_3: { account: "acc_google", purpose: "tool", scope: "acme-reporting" },
+  con_ch_1: { account: "acc_postmark", purpose: "channel", scope: "billing@acme.test" },
+  con_ch_2: { account: "acc_postmark_support", purpose: "channel", scope: "support@acme.test" },
+  con_ch_3: { account: "acc_slack", purpose: "channel", scope: "finance" },
+  con_ch_4: { account: "acc_postmark_hello", purpose: "channel", scope: "hello@acme.test" }
+};
+
+// An inference connection has no scope of its own — it is whatever the account allows.
+const connsOf = (accountId, revoked) => Object.keys(CONNECTIONS)
+  .filter((k) => CONNECTIONS[k].account === accountId)
+  .map((k) => {
+    const c = CONNECTIONS[k];
+    return [c.purpose, c.scope || "whatever the account allows",
+      revoked ? "closed on revocation" : "open"];
+  });
+
+class Component extends DCLogic {
+  state = {
+    at: "list", view: "desktop", available: 0,
+    account: "acc_anthropic",
+    query: "", kind: "", label: "", identity: "", key: "",
+    descriptor: {}, oauthDone: false,
+    rotated: {}, revoked: {}
+  };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const touch = isPhone || isTablet;
+    const narrow = isPhone || isTablet;
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const isEmpty = at === "empty";
+    const isNew = at === "keyNew" || at === "oauthNew";
+    const detail = at === "one" || at === "revoked";
+    // The subject is always whichever account is selected — never derived from the
+    // state name, or a destructive action confirms with the wrong record.
+    const id = s.account;
+    const acc = ACCOUNTS[id];
+    const revokedAt = s.revoked[id] || acc.revokedAt;
+    const rotatedAt = s.rotated[id] || acc.rotatedAt;
+    const isRevoked = !!revokedAt;
+    const accConns = connsOf(id, isRevoked);
+
+    const entry = CATALOG.find((c) => c[0] === s.kind);
+    const isOauth = !!entry && entry[2] === "oauth";
+    const isKeyAuth = !!entry && entry[2] === "key";
+    const descFields = entry && entry[5] ? entry[5] : [];
+    const identityGiven = isOauth;
+    const readyToConnect = !!entry && !!s.label.trim()
+      && (isOauth ? s.oauthDone : !!s.key.trim() && !!s.identity.trim())
+      && descFields.every((f) => !!(s.descriptor[f] || "").trim());
+
+    const q = s.query.trim().toLowerCase();
+    const matches = CATALOG.filter((c) =>
+      !q || c[0].indexOf(q) >= 0 || c[1].toLowerCase().indexOf(q) >= 0);
+
+    const liveIds = Object.keys(ACCOUNTS).filter((k) =>
+      !(s.revoked[k] || ACCOUNTS[k].revokedAt));
+    const revokedIds = Object.keys(ACCOUNTS).filter((k) =>
+      !!(s.revoked[k] || ACCOUNTS[k].revokedAt));
+
+    const rowOf = (k) => {
+      const a = ACCOUNTS[k];
+      const cat = CATALOG.find((c) => c[0] === a.kind);
+      const rev = s.revoked[k] || a.revokedAt;
+      const rot = s.rotated[k] || a.rotatedAt;
+      const open = rev ? 0 : connsOf(k, false).length;
+      return {
+        label: a.label, identity: a.externalId, kind: a.kind,
+        auth: cat ? cat[2] : "key",
+        credential: rev ? "revoked " + rev : rot ? "rotated " + rot : "written " + a.connectedAt,
+        uses: rev ? "connections closed"
+          : open === 0 ? "no connections"
+          : open === 1 ? "1 connection" : open + " connections",
+        // The wording carries the emphasis; the ink stays at the 5.25:1 token.
+        usesInk: DIM,
+        dot: rev ? IDLE : OK,
+        onOpen: () => set({ at: rev ? "revoked" : "one", account: k })
+      };
+    };
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage" },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Agents", rows: [
+        { glyph: "a", label: "Ada", avatar: true },
+        { glyph: "r", label: "Rae", avatar: true }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u25CE", label: "Agents" },
+        { glyph: "\u2261", label: "Policy" },
+        { glyph: "\u229E", label: "Accounts", active: true },
+        { glyph: "\u26AD", label: "Connections" },
+        { glyph: "\u25A3", label: "Environments" }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({
+          at: x[0],
+          account: x[0] === "revoked" ? "acc_google"
+            : x[0] === "one" ? "acc_anthropic" : s.account,
+          query: "",
+          kind: x[0] === "keyNew" ? "anthropic" : x[0] === "oauthNew" ? "github" : "",
+          label: "", identity: "", key: "", descriptor: {}, oauthDone: false
+        })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      headerPad: isPhone ? "16px 18px 12px" : "24px 30px 14px",
+      bodyPad: isPhone ? "4px 18px 22px" : "6px 30px 28px",
+      titleSize: isPhone ? "26px" : "34px",
+      chipMin: touch ? "44px" : "34px",
+      btnMin: touch ? "44px" : "40px",
+      rowGrid: isPhone ? "minmax(0,1fr)" : "minmax(0,1fr) auto",
+      metaCol: isPhone ? "1" : "2",
+      rowIndent: isPhone ? "17px" : "0",
+      pairGrid: narrow ? "minmax(0,1fr)" : "minmax(0,1fr) minmax(0,1fr)",
+      descGrid: isPhone ? "minmax(0,1fr)" : "120px minmax(0,1fr)",
+
+      crumbs: (detail
+        ? [["Accounts", true], [acc.label, false]]
+        : isNew
+        ? [["Accounts", true], ["connect", false]]
+        : [["Configure", true], ["Accounts", false]]
+      ).map((b, i, arr) => ({
+        label: b[0],
+        ink: b[1] ? DIM : INK,
+        line: b[1] ? "1px dashed oklch(0.78 0.016 84)" : "none",
+        more: i < arr.length - 1
+      })),
+      pageTitle: isEmpty ? "Accounts"
+        : isNew ? "Connect an account"
+        : detail ? acc.label : "Accounts",
+      headerMeta: isEmpty ? "none connected"
+        : isNew ? (entry ? entry[1] + " · " + entry[2] + " auth" : "pick a provider")
+        : detail
+        ? acc.kind + " · " + acc.externalId + " · connected " + acc.connectedAt + " by " + acc.connectedBy
+        : liveIds.length + " connected · " + revokedIds.length + " revoked",
+      metaInk: DIM,
+
+      hasBadge: detail,
+      badgeLabel: isRevoked ? "revoked" : rotatedAt ? "rotated" : "active",
+      badgeDot: isRevoked ? IDLE : OK,
+      badgeBg: isRevoked ? "oklch(0.24 0.014 84 / 0.06)" : "oklch(0.52 0.14 148 / 0.1)",
+      badgeInk: isRevoked ? DIM : "oklch(0.36 0.1 148)",
+      showBadgeText: !isPhone,
+      badgePad: isPhone ? "10px" : "8px 14px",
+      badgeDotSize: isPhone ? "9px" : "7px",
+
+      primaryLabel: isEmpty ? "connect an account"
+        : isNew ? "cancel"
+        : detail ? "back to accounts" : "connect an account",
+      primaryFace: !isPhone
+        ? (isEmpty ? "connect an account"
+          : isNew ? "cancel"
+          : detail ? "back to accounts" : "connect an account")
+        : (isNew || detail ? "\u2190" : "+"),
+      primaryBg: isNew || detail ? "transparent" : INK,
+      primaryInk: isNew || detail ? INK : "oklch(0.97 0.01 90)",
+      primaryBorder: isNew || detail ? "1.3px dashed oklch(0.74 0.016 84)" : "none",
+      primarySize: isPhone ? "15px" : "12.5px",
+      primaryPad: isPhone ? "0 12px" : "9px 19px",
+      primaryMin: isPhone ? "44px" : "0",
+      primaryAction: () => {
+        if (isNew || detail) return set({ at: "list" });
+        set({ at: "keyNew", kind: "", query: "", label: "", identity: "",
+          key: "", descriptor: {}, oauthDone: false });
+      },
+
+      showList: at === "list",
+      showNew: isNew,
+      showDetail: detail,
+      showEmpty: isEmpty,
+
+      liveCount: liveIds.length === 1 ? "1 account" : liveIds.length + " accounts",
+      live: liveIds.map(rowOf),
+      hasRevoked: revokedIds.length > 0,
+      revokedCount: String(revokedIds.length),
+      revoked: revokedIds.map(rowOf),
+
+      catalogNote: entry ? entry[1] + " selected" : "the catalog decides what can be connected",
+      query: s.query,
+      setQuery: (e) => set({ query: e.target.value }),
+      catalog: matches.slice(0, 6).map((c) => ({
+        id: c[0], name: c[1], auth: c[2] + " auth",
+        protocol: c[3] ? "speaks " + c[3] : "not routable for inference",
+        protocolInk: c[3] ? DIM : "oklch(0.45 0.1 78)",
+        dot: s.kind === c[0] ? OK : IDLE,
+        bg: s.kind === c[0] ? "oklch(0.24 0.014 84 / 0.07)" : "none",
+        onPick: () => set({
+          kind: c[0], at: c[2] === "oauth" ? "oauthNew" : "keyNew",
+          label: "", identity: "", key: "", descriptor: {}, oauthDone: false
+        })
+      })),
+      noMatches: matches.length === 0,
+      picked: !!entry,
+
+      draftLabel: s.label,
+      setLabel: (e) => set({ label: e.target.value }),
+      labelHint: entry ? entry[1] + " · acme" : "",
+      identityLabel: identityGiven ? "Identity they gave us" : "Identity on the provider",
+      identityTyped: !identityGiven,
+      identityGiven: identityGiven,
+      draftIdentity: s.identity,
+      setIdentity: (e) => set({ identity: e.target.value }),
+      identityHint: identityGiven
+        ? (s.oauthDone ? s.identity + " · returned by " + entry[1] : "arrives when you authorise")
+        : entry ? entry[6] : "",
+      identityNote: identityGiven
+        ? "Provider-assigned. We store what they hand back — an organisation, a team, an inbox."
+        : "Whatever this provider calls the thing the credential belongs to: an organisation, a team, an inbox.",
+
+      authKind: entry ? (isOauth ? "oauth · " + entry[1] : "api key") : "",
+      isKeyAuth: isKeyAuth,
+      isOauth: isOauth,
+      draftKey: s.key,
+      setKey: (e) => set({ key: e.target.value }),
+      keyHint: entry ? entry[4] : "",
+      oauthLabel: s.oauthDone ? "authorised" : "authorise with " + (entry ? entry[1] : ""),
+      oauthBg: s.oauthDone ? "oklch(0.52 0.14 148 / 0.12)" : INK,
+      oauthInk: s.oauthDone ? "oklch(0.3 0.1 148)" : "oklch(0.97 0.01 90)",
+      oauthNote: s.oauthDone
+        ? "Authorised. The token is in the vault and the identity came back with it."
+        : "Opens " + (entry ? entry[1] : "the provider") + " in a new tab. Nothing is stored until they send us back.",
+      doOauth: () => {
+        if (!entry) return;
+        set({
+          oauthDone: true,
+          identity: entry[6],
+          label: s.label || entry[1] + " · " + entry[6]
+        });
+      },
+
+      hasDescriptor: descFields.length > 0,
+      descriptorFields: descFields.map((f) => ({
+        k: f, v: s.descriptor[f] || "",
+        hint: f === "region" ? "eu-west-1" : f === "resource" ? "acme-openai" : f === "deployment" ? "gpt-5" : "outbound",
+        onInput: (e) => set({
+          descriptor: Object.assign({}, s.descriptor, { [f]: e.target.value })
+        })
+      })),
+
+      connectBg: readyToConnect ? INK : "oklch(0.24 0.014 84 / 0.15)",
+      connectInk: readyToConnect ? "oklch(0.97 0.01 90)" : DIM,
+      connectNote: !entry ? "Pick a provider to begin."
+        : readyToConnect
+        ? "Connecting stores the credential in the vault and records who did it. It authorises nothing on its own — a connection does that."
+        : isOauth && !s.oauthDone
+        ? "Authorise with " + entry[1] + " to continue."
+        : descFields.length > 0 && !descFields.every((f) => !!(s.descriptor[f] || "").trim())
+        ? "This provider's strategy needs its descriptor filled in before it can reach anything."
+        : "A label, an identity and a credential are all required.",
+      onConnect: () => { if (readyToConnect) set({ at: "list" }); },
+      onCancel: () => set({ at: "list" }),
+
+      isRevoked: isRevoked,
+      revokedNote: (revokedAt === "today" ? "Revoked today" : "Revoked on " + revokedAt)
+        + ". The credential is gone from the vault and its " + accConns.length
+        + " connection" + (accConns.length === 1 ? " was" : "s were")
+        + " closed. The row stays so sessions that ran through it still name what they used.",
+      facts: [
+        ["account", id],
+        ["kind", acc.kind],
+        ["external id", acc.externalId],
+        ["label", acc.label],
+        ["descriptor", acc.descriptor || "none"],
+        ["credential", isRevoked ? "removed from the vault" : "in the vault"],
+        ["connected", acc.connectedAt + " by " + acc.connectedBy],
+        ["rotated", rotatedAt || "never"],
+        ["revoked", revokedAt || "—"]
+      ].map((f) => ({
+        k: f[0], v: f[1],
+        ink: f[1] === "none" || f[1] === "never" || f[1] === "—" ? DIM : INK
+      })),
+
+      connCount: accConns.length === 0 ? "none"
+        : accConns.length === 1 ? "1" : String(accConns.length),
+      conns: accConns.map((c) => ({
+        purpose: c[0], scope: "scope · " + c[1],
+        state: isRevoked ? "closed on revocation" : c[2],
+        dot: isRevoked ? IDLE : OK,
+        ink: isRevoked ? DIM : INK
+      })),
+      noConns: accConns.length === 0,
+
+      canManage: detail && !isRevoked,
+      rotateLabel: rotatedAt ? "rotate again" : "rotate the credential",
+      onRotate: () => set({ rotated: Object.assign({}, s.rotated, { [id]: "today" }) }),
+      onRevoke: () => set({
+        at: "revoked", account: id,
+        revoked: Object.assign({}, s.revoked, { [id]: "today" })
+      }),
+      manageNote: accConns.length === 0
+        ? "Rotating replaces a secret nothing is using yet. Revoking simply removes it — there are no connections to close, so nothing stops working."
+        : "Rotating replaces the secret in the vault; every connection on this account keeps working. Revoking removes it and closes "
+          + (accConns.length === 1
+            ? "its one connection — anything using it stops reaching"
+            : "all " + accConns.length + " of them at once — anything using them stops reaching")
+          + ", which is the point.",
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label,
+        hasLabel: !!sec.label,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" }, { glyph: "\u27C1" }, { glyph: "\u2317" },
+        { glyph: "\u25CE" }, { glyph: "\u2261" },
+        { glyph: "\u229E", active: true }, { glyph: "\u26AD" }
+      ].map((n) => ({
+        glyph: n.glyph,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

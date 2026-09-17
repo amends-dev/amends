@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · screen 03 of 12</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Policy</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Where routing rules are written and where every past version stays readable. A version is immutable once published, so editing is always working on a draft of the next one — and every decision keeps pointing at the version that made it.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="5">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:{{ iconSize }};height:{{ iconSize }};border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="6">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};flex:none;">{{ n.glyph }}</span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:{{ iconSize }};height:{{ iconSize }};border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Acme Finance</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.2px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                    <sc-if value="{{ n.hasCount }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.72 0.008 86);flex:none;">{{ n.count }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="padding:8px;">
+            <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;">
+              <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.62 0.01 85);flex:none;text-align:center;">&#9881;</span>
+              <span style="font-size:14px;color:oklch(0.82 0.008 88);">Settings</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <sc-for list="{{ crumbs }}" as="b" hint-placeholder-count="2">
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ b.ink }};border-bottom:{{ b.line }};">{{ b.label }}</span>
+                <sc-if value="{{ b.more }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.62 0.014 84);">/</span>
+                </sc-if>
+              </span>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:40px;height:40px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;">&#9776;</span>
+            </sc-if>
+            <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.1;flex:1;min-width:0;">{{ pageTitle }}</span>
+            <sc-if value="{{ hasPrimary }}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{ primaryAction }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ primaryBg }};color:{{ primaryInk }};flex:none;">{{ primaryLabel }}</button>
+            </sc-if>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ metaInk }};">{{ headerMeta }}</span>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;gap:24px;">
+
+          <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:52px 24px 36px;text-align:center;">
+              <svg viewBox="0 0 240 170" width="230" height="163" fill="none" role="img" aria-label="Cloth marked with pins where seams should go, but no stitches yet">
+                <path d="M30 44 L212 34 L206 132 L36 142 Z" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                <path d="M74 56 L66 128" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 7" stroke-linecap="round"></path>
+                <path d="M124 52 L120 132" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 7" stroke-linecap="round"></path>
+                <path d="M174 48 L172 130" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 7" stroke-linecap="round"></path>
+                <circle cx="74" cy="56" r="3.4" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></circle>
+                <circle cx="124" cy="52" r="3.4" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></circle>
+                <circle cx="174" cy="48" r="3.4" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></circle>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:440px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">No policy yet</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Nothing routes itself. Every task that arrives will sit in triage until somebody places it by hand.</span>
+              </div>
+              <button type="button" onClick="{{ startFirst }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 20px;min-height:44px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">write the first rule</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showRules }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">{{ rulesHeading }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ rulesCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:30px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">first match wins</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;">
+              <sc-for list="{{ rules }}" as="r" hint-placeholder-count="5">
+                <div style="border-radius:10px;background:{{ r.cardBg }};border-bottom:{{ r.seam }};display:flex;flex-direction:column;">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:{{ r.pad }};">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.41 0.014 84);width:16px;flex:none;">{{ r.n }}</span>
+                    <span style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px;">
+                      <span style="font-size:14.5px;line-height:1.5;">{{ r.sentence }}</span>
+                      <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:9px;">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ r.name }}</span>
+                        <sc-if value="{{ r.incomplete }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.45 0.15 28);"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.51 0.17 28);flex:none;"></span>needs a reason</span>
+                        </sc-if>
+                        <sc-if value="{{ r.changed }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.1 78);">{{ r.changedNote }}</span>
+                        </sc-if>
+                      </span>
+                    </span>
+                    <sc-if value="{{ editable }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:inline-flex;gap:6px;flex:none;">
+                        <button type="button" onClick="{{ r.onEdit }}" aria-label="{{ r.editLabel }}" style="width:{{ iconSize }};height:{{ iconSize }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:{{ r.editBg }};font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.24 0.014 84);">{{ r.editGlyph }}</button>
+                        <button type="button" onClick="{{ r.onUp }}" aria-label="Move earlier" style="width:{{ iconSize }};height:{{ iconSize }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ r.upInk }};">&#8593;</button>
+                        <button type="button" onClick="{{ r.onDown }}" aria-label="Move later" style="width:{{ iconSize }};height:{{ iconSize }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ r.downInk }};">&#8595;</button>
+                      </span>
+                    </sc-if>
+                  </div>
+
+                  <sc-if value="{{ r.editing }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:2px 14px 18px;display:flex;flex-direction:column;gap:18px;">
+                      <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+
+                      <div style="display:flex;flex-direction:column;gap:7px;">
+                        <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Name</label>
+                        <input type="text" value="{{ r.rawName }}" onInput="{{ setName }}" placeholder="What this rule is for" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-size:15px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                      </div>
+
+                      <div style="display:flex;flex-direction:column;gap:10px;">
+                        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">When</span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ conditionNote }}</span>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                          <sc-for list="{{ fieldChips }}" as="f" hint-placeholder-count="6">
+                            <button type="button" onClick="{{ f.onToggle }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ f.line }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};">{{ f.label }}</button>
+                          </sc-for>
+                        </div>
+
+                        <sc-for list="{{ conditions }}" as="c" hint-placeholder-count="2">
+                          <div style="display:flex;flex-direction:column;gap:9px;padding:4px 0 14px;border-bottom:1px dashed oklch(0.86 0.016 86);">
+                            <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;">
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;">{{ c.field }}</span>
+                              <span style="font-size:13px;color:oklch(0.41 0.014 84);flex:1;min-width:140px;">{{ c.hint }}</span>
+                            </div>
+                            <sc-if value="{{ c.isChips }}" hint-placeholder-val="{{ true }}">
+                              <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                                <sc-for list="{{ c.options }}" as="o" hint-placeholder-count="3">
+                                  <button type="button" onClick="{{ o.onToggle }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 12px;min-height:{{ chipMin }};border:1.3px dashed {{ o.line }};border-radius:999px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button>
+                                </sc-for>
+                              </div>
+                            </sc-if>
+                            <sc-if value="{{ c.isText }}" hint-placeholder-val="{{ false }}">
+                              <input type="text" value="{{ c.textValue }}" onInput="{{ c.onText }}" placeholder="invoice, statement" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-size:15px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                            </sc-if>
+                            <sc-if value="{{ c.isBool }}" hint-placeholder-val="{{ false }}">
+                              <div style="display:inline-flex;align-self:flex-start;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+                                <sc-for list="{{ c.choices }}" as="ch" hint-placeholder-count="2">
+                                  <button type="button" onClick="{{ ch.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:none;border-radius:999px;background:{{ ch.bg }};color:{{ ch.fg }};">{{ ch.label }}</button>
+                                </sc-for>
+                              </div>
+                            </sc-if>
+                            <sc-if value="{{ c.isRange }}" hint-placeholder-val="{{ false }}">
+                              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+                                <input type="range" min="0.1" max="1" step="0.05" value="{{ c.rangeValue }}" onInput="{{ c.onRange }}" style="flex:1;min-width:160px;accent-color:oklch(0.24 0.014 84);">
+                                <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;">{{ c.rangeLabel }}</span>
+                              </div>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+
+                      <div style="display:flex;flex-direction:column;gap:10px;">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Then</span>
+                        <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                          <sc-for list="{{ actionChips }}" as="a" hint-placeholder-count="4">
+                            <button type="button" onClick="{{ a.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ a.line }};border-radius:999px;background:{{ a.bg }};color:{{ a.fg }};">{{ a.label }}</button>
+                          </sc-for>
+                        </div>
+                        <sc-if value="{{ needsAgent }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                            <sc-for list="{{ agentChips }}" as="g" hint-placeholder-count="2">
+                              <button type="button" onClick="{{ g.onPick }}" style="display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px 7px 7px;min-height:{{ chipMin }};border:1.3px dashed {{ g.line }};border-radius:999px;background:{{ g.bg }};color:{{ g.fg }};">
+                                <span style="width:20px;height:20px;border-radius:50%;border:1.3px dashed oklch(0.66 0.016 84);font-size:9.5px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ g.initial }}</span>{{ g.label }}
+                              </button>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ needsReason }}" hint-placeholder-val="{{ false }}">
+                          <input type="text" value="{{ reasonValue }}" onInput="{{ setReason }}" placeholder="{{ reasonHint }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.4px dashed {{ reasonLine }};border-radius:10px;background:none;font-size:15px;">
+                        </sc-if>
+                        <sc-if value="{{ reasonMissing }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:oklch(0.45 0.15 28);"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.51 0.17 28);flex:none;"></span>A dismissal has to say why. It is the only action that cannot be silent.</span>
+                        </sc-if>
+                      </div>
+
+                      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                        <button type="button" onClick="{{ closeEdit }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ doneBg }};color:{{ doneInk }};">done</button>
+                        <button type="button" onClick="{{ r.onDelete }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.68 0.09 28);border-radius:999px;background:none;color:oklch(0.45 0.15 28);">delete rule</button>
+                        <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);flex:1;min-width:180px;">{{ doneNote }}</span>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              </div>
+
+              <sc-if value="{{ editable }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:4px;">
+                  <button type="button" onClick="{{ addRule }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;color:oklch(0.24 0.014 84);">new rule</button>
+                  <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);flex:1;min-width:220px;">A rule with no conditions matches every task — legitimate as the last rule, a trap anywhere else.</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ showChangeSummary }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:11px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">What publishing would change</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;border-radius:10px;overflow:hidden;">
+                  <sc-for list="{{ changes }}" as="d" hint-placeholder-count="2">
+                    <div style="display:flex;gap:11px;padding:9px 13px;background:{{ d.bg }};">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ d.markInk }};width:10px;flex:none;">{{ d.mark }}</span>
+                      <span style="font-size:13.5px;line-height:1.5;color:oklch(0.24 0.014 84);flex:1;min-width:0;">{{ d.text }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);">Decisions already made keep pointing at version 7. Publishing never rewrites the past.</span>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ showVersions }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Versions</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ versionCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:30px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">newest first</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ versions }}" as="v" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ v.onOpen }}" style="display:grid;grid-template-columns:{{ versionGrid }};align-items:center;gap:6px 14px;padding:14px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.88 0.014 86);border-radius:0;background:{{ v.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="display:inline-flex;align-items:center;gap:9px;">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ v.dot }};border:{{ v.ring }};flex:none;"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;">{{ v.label }}</span>
+                    </span>
+                    <span style="font-size:13.5px;min-width:0;">{{ v.summary }}</span>
+                    <span style="grid-column:{{ versionMetaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">
+                      <span>{{ v.when }}</span>
+                      <span>{{ v.by }}</span>
+                      <span>{{ v.rules }}</span>
+                      <span>{{ v.decisions }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);">Every version stays readable. A decision made under version 5 still shows the rules as they were then.</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showVersionDiff }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">{{ diffHeading }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:30px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;border-radius:10px;overflow:hidden;">
+                <sc-for list="{{ versionDiff }}" as="d" hint-placeholder-count="3">
+                  <div style="display:flex;gap:11px;padding:9px 13px;background:{{ d.bg }};">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ d.markInk }};width:10px;flex:none;">{{ d.mark }}</span>
+                    <span style="font-size:13.5px;line-height:1.5;color:oklch(0.24 0.014 84);flex:1;min-width:0;">{{ d.text }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ noVersionDiff }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">This is the first published version, so there is nothing before it to compare against.</span>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Most recent decisions under this version</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ versionDecisions }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:30px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ pastDecisions }}" as="p" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:{{ pastGrid }};align-items:center;gap:5px 12px;padding:10px 2px;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ p.dot }};"></span>
+                    <span style="font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.title }}</span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">
+                      <span>{{ p.when }}</span>
+                      <span>{{ p.move }}</span>
+                      <span>{{ p.rule }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The rule sentence is generated from the conditions, never typed. It cannot drift from what will actually be evaluated, which is the whole reason the trace on Triage can be trusted.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Reordering is a change, not a preference — so a move shows in the publish summary in the same language as an edit. Order is the only thing that decides which of two matching rules wins.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A past version is read-only and carries the decisions it made. That is the point of keeping them: you can ask why something was routed in August and get the August answer.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Two marks to add to the glyph table, which is at 26: <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">&#8801;</span> for policy, an ordered set of lines, and <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">&#9998;</span> for edit. Neither collides with an existing mark — <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">/</span> keeps command.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">05</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Open question: reverting. Right now the only honest revert is publishing a new version whose rules match an old one — there is no way to un-publish. Say if you want a one-click "restore version 6" that does exactly that.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const OK = "oklch(0.52 0.14 148)";
+const NEUTRAL = "oklch(0.62 0.014 84)";
+const WARN = "oklch(0.58 0.12 78)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 880 },
+  laptop: { label: "laptop", width: 1180, height: 820 },
+  tablet: { label: "tablet", width: 834, height: 780 },
+  phone: { label: "phone", width: 390, height: 760 }
+};
+
+const STATES = [
+  ["published", "published v7"],
+  ["editing", "editing a draft"],
+  ["versions", "version history"],
+  ["version", "an old version"],
+  ["empty", "no policy yet"]
+];
+
+const CHANNELS = ["billing@acme.test", "support@acme.test", "finance/slack"];
+const KINDS = ["billing", "invoicing", "refund", "access", "unknown"];
+const SENDERS = ["Ravi Kaur", "Jo Mercer", "Kit Nakano"];
+const AGENTS = ["Ada", "Rae"];
+const FIELDS = ["channel", "kind", "from", "text", "tried", "duplicate"];
+
+// One rule library, so a version is an ordered selection from it rather than a retelling.
+const URGENT_WIDE = { name: "Urgent billing to Rae",
+  when: { channel: ["billing@acme.test", "support@acme.test", "finance/slack"], text: ["urgent"] },
+  then: { type: "assign", agent: "Rae" } };
+const URGENT = { name: "Urgent billing to Rae",
+  when: { channel: ["billing@acme.test", "finance/slack"], text: ["urgent"] },
+  then: { type: "assign", agent: "Rae" } };
+const FOLD = { name: "Fold duplicates into the open task",
+  when: { duplicate: 0.6 },
+  then: { type: "dismiss", reason: "duplicate of an open task" } };
+const BILLING = { name: "Billing to Ada",
+  when: { kind: ["billing", "invoicing"], tried: false },
+  then: { type: "assign", agent: "Ada" } };
+const ASK_ADA = { name: "Ask Ada where this goes",
+  when: { kind: ["unknown"] },
+  then: { type: "refer", agent: "Ada" } };
+const REFUND = { name: "Ask before acting on refunds",
+  when: { text: ["refund"] },
+  then: { type: "refer", agent: "Rae" } };
+
+const VERSION_RULES = {
+  1: [BILLING],
+  2: [BILLING, ASK_ADA],
+  3: [URGENT_WIDE, BILLING, ASK_ADA],
+  4: [URGENT_WIDE, FOLD, BILLING, ASK_ADA],
+  5: [URGENT, FOLD, BILLING, ASK_ADA],
+  6: [URGENT, FOLD, REFUND, BILLING, ASK_ADA],
+  7: [URGENT, FOLD, BILLING, ASK_ADA, REFUND]
+};
+const CURRENT = 7;
+
+const VERSION_META = {
+  7: { summary: "moved the refund referral below billing", when: "12 Sep 09:02", by: "Jo Mercer", decisions: 148 },
+  6: { summary: "added the refund referral", when: "4 Sep 14:20", by: "Jo Mercer", decisions: 312 },
+  5: { summary: "narrowed urgent billing to two channels", when: "28 Aug 11:47", by: "Kit Nakano", decisions: 204 },
+  4: { summary: "started dismissing duplicates", when: "19 Aug 16:05", by: "Jo Mercer", decisions: 96 },
+  3: { summary: "put urgent billing first", when: "11 Aug 10:12", by: "Kit Nakano", decisions: 141 },
+  2: { summary: "added the referral for unknown kinds", when: "2 Aug 15:38", by: "Jo Mercer", decisions: 118 },
+  1: { summary: "first rule — billing to Ada", when: "24 Jul 09:55", by: "Jo Mercer", decisions: 82 }
+};
+
+// Keyed by rule name, so a version only shows decisions its own rules could have made.
+const PAST_DECISIONS = [
+  ["8 Sep 14:02", "August totals do not reconcile", "assigned Ada", "Billing to Ada", OK],
+  ["7 Sep 11:31", "Refund taken twice on the same card", "held for a person", "Ask before acting on refunds", WARN],
+  ["6 Sep 09:18", "Duplicate of the July close", "dismissed", "Fold duplicates into the open task", NEUTRAL],
+  ["5 Sep 16:44", "Where do data residency questions go?", "assigned Rae", "Ask Ada where this goes", OK]
+];
+
+const list = (items, join) => {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return items[0] + " " + join + " " + items[1];
+  return items.slice(0, -1).join(", ") + " " + join + " " + items[items.length - 1];
+};
+const quoted = (items) => list(items.map((t) => "\u201C" + t + "\u201D"), "or");
+
+const clauseOf = (field, value) => {
+  if (field === "channel") return "it arrives on " + list(value, "or");
+  if (field === "kind") return "the kind is " + list(value, "or");
+  if (field === "from") return "it comes from " + list(value, "or");
+  if (field === "text") {
+    return value.length === 0 ? "the text mentions nothing yet" : "the text mentions " + quoted(value);
+  }
+  if (field === "tried") return value ? "somebody has already tried it" : "nobody has tried it";
+  if (field === "duplicate") return "an unsettled task is " + Math.round(value * 100) + "% similar by title";
+  return "";
+};
+
+const actionOf = (then) => {
+  if (then.type === "assign") return "assign it to " + then.agent + ".";
+  if (then.type === "refer") return "refer the decision to " + then.agent + ".";
+  if (then.type === "hold") return then.reason ? "hold it for a person \u2014 " + then.reason + "." : "hold it for a person.";
+  return then.reason ? "dismiss it as " + then.reason + "." : "dismiss it.";
+};
+
+const sentenceOf = (rule) => {
+  const clauses = FIELDS.filter((f) => rule.when[f] !== undefined).map((f) => clauseOf(f, rule.when[f]));
+  const head = clauses.length === 0 ? "For every task, " : "When " + list(clauses, "and") + ", ";
+  return head + actionOf(rule.then);
+};
+
+const rulesOf = (v) => (VERSION_RULES[v] || []).map((r) => ({
+  name: r.name, when: Object.assign({}, r.when), then: Object.assign({}, r.then), id: r.name
+}));
+
+// One diff, used for both a published version and the unpublished draft.
+const diffRules = (baseline, current) => {
+  const lines = [];
+  const posIn = (arr, name) => arr.findIndex((r) => r.name === name);
+  current.forEach((rule, pos) => {
+    const was = posIn(baseline, rule.name);
+    if (was < 0) {
+      lines.push(["+", "rule " + pos + " · " + (rule.name || "unnamed rule") + " added."]);
+    } else if (was !== pos) {
+      lines.push(["~", "rule " + pos + " · " + rule.name + " moved from position " + was + "."]);
+    } else if (sentenceOf(rule) !== sentenceOf(baseline[was])) {
+      lines.push(["~", "rule " + pos + " · " + rule.name + " conditions changed."]);
+    }
+  });
+  baseline.forEach((r, i) => {
+    if (posIn(current, r.name) < 0) {
+      lines.push(["-", "rule " + i + " · " + r.name + " removed."]);
+    }
+  });
+  const unchanged = current.filter((rule, pos) => {
+    const was = posIn(baseline, rule.name);
+    return was === pos && sentenceOf(rule) === sentenceOf(baseline[was]);
+  }).length;
+  if (unchanged > 0 && lines.length > 0) {
+    lines.push([" ", unchanged === 1 ? "1 rule unchanged." : unchanged + " rules unchanged."]);
+  }
+  return lines;
+};
+
+class Component extends DCLogic {
+  state = {
+    at: "published", view: "desktop", available: 0,
+    viewing: CURRENT, baseVersion: CURRENT, draft: rulesOf(CURRENT), editAt: null
+  };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  patchRule(at, patch) {
+    const draft = this.state.draft.slice();
+    draft[at] = Object.assign({}, draft[at], patch);
+    this.setState({ draft: draft, dirty: true });
+  }
+
+  patchWhen(at, field, value) {
+    const when = Object.assign({}, this.state.draft[at].when);
+    if (value === undefined) delete when[field]; else when[field] = value;
+    this.patchRule(at, { when: when });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const editing = at === "editing";
+    const oldVersion = at === "version";
+    const isEmpty = at === "empty";
+    // The baseline is held in state, not derived from the current view — opening the
+    // editor must not silently change what the draft is being compared against.
+    const baseVersion = s.baseVersion;
+    const baseline = rulesOf(baseVersion);
+    const source = editing ? s.draft : rulesOf(s.viewing);
+    const meta = VERSION_META[s.viewing] || VERSION_META[CURRENT];
+    const nextVersion = baseVersion + 1;
+
+    const edited = editing && s.editAt !== null ? s.draft[s.editAt] : null;
+    const VOCAB = { channel: CHANNELS, kind: KINDS, from: SENDERS };
+    const HINTS = {
+      channel: "matches any listed channel",
+      kind: "matches any listed kind",
+      from: "matches any listed requester",
+      text: "case-insensitive, across title, description and messages",
+      tried: "whether the task has any recorded turns",
+      duplicate: "shared unique words over the smaller unique-word count"
+    };
+    const reasonNeeded = !!edited && (edited.then.type === "hold" || edited.then.type === "dismiss");
+    const reasonEmpty = !!edited && edited.then.type === "dismiss" && !(edited.then.reason || "").trim();
+    const broken = s.draft
+      .map((r, i) => ({ r: r, i: i }))
+      .filter((x) => x.r.then.type === "dismiss" && !(x.r.then.reason || "").trim());
+
+    const originalAt = (rule) => baseline.findIndex((r) => r.name === rule.name);
+    const changeLines = diffRules(baseline, s.draft).filter((d) => d[0] !== " ");
+    // Dirty is derived, so moving a rule down and back is genuinely not a change.
+    const dirty = changeLines.length > 0;
+    const priorVersion = s.viewing - 1;
+    const versionDiff = priorVersion >= 1
+      ? diffRules(rulesOf(priorVersion), rulesOf(s.viewing)) : [];
+
+    const versionList = [];
+    for (let n = CURRENT; n >= 1; n--) versionList.push(n);
+    const totalDecisions = versionList.reduce((a, n) => a + VERSION_META[n].decisions, 0);
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage", count: "4" },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Channels", rows: [
+        { glyph: "#", label: "billing@acme.test" },
+        { glyph: "#", label: "support@acme.test" }
+      ] },
+      { label: "Agents", rows: [
+        { glyph: "a", label: "Ada", avatar: true },
+        { glyph: "r", label: "Rae", avatar: true }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u2261", label: "Policy", active: true },
+        { glyph: "\u25A3", label: "Environments" },
+        { glyph: "\u26AD", label: "Connections" }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({
+          at: x[0],
+          viewing: x[0] === "version" ? 6 : CURRENT,
+          baseVersion: x[0] === "empty" ? 0 : CURRENT,
+          draft: x[0] === "empty" ? [] : rulesOf(CURRENT),
+          editAt: x[0] === "editing" ? 2 : null
+        })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      headerPad: isPhone ? "16px 18px 10px" : "24px 30px 14px",
+      bodyPad: isPhone ? "6px 18px 20px" : "8px 30px 30px",
+      titleSize: isPhone ? "27px" : "34px",
+      metaCol: isPhone ? "2" : "auto",
+      // measure.ts assumes a finger below 1024, so every control grows to meet one.
+      iconSize: isTablet || isPhone ? "44px" : "36px",
+      chipMin: isTablet || isPhone ? "44px" : "36px",
+      btnMin: isTablet || isPhone ? "44px" : "40px",
+      // One explicit column on phone, and the meta placed back into it, so all three
+      // children stack instead of grid inventing an implicit second track.
+      versionGrid: isPhone ? "minmax(0,1fr)" : "112px minmax(0,1fr) auto",
+      versionMetaCol: isPhone ? "1" : "auto",
+      pastGrid: isPhone ? "7px minmax(0,1fr)" : "7px minmax(0,1fr) auto",
+
+      crumbs: (oldVersion
+        ? [["Triage", true], ["Policy", true], ["version " + s.viewing, false]]
+        : [["Triage", true], ["Policy", false]]
+      ).map((b, i, arr) => ({
+        label: b[0],
+        ink: b[1] ? DIM : INK,
+        line: b[1] ? "1px dashed oklch(0.78 0.016 84)" : "none",
+        more: i < arr.length - 1
+      })),
+      pageTitle: oldVersion ? "Version " + s.viewing
+        : at === "versions" ? "Policy versions" : "Policy",
+      headerMeta: isEmpty ? "no rules · nothing routes automatically"
+        : oldVersion ? "published " + meta.when + " by " + meta.by + " · read-only"
+        : at === "versions" ? CURRENT + " versions · " + totalDecisions.toLocaleString("en-US") + " decisions in total"
+        : editing
+        ? (broken.length > 0
+            ? "rule " + broken[0].i + " is incomplete"
+            : "draft of version " + nextVersion + (dirty ? " · unpublished changes" : " · no changes yet"))
+        : "published " + meta.when + " by " + meta.by + " · " + meta.decisions + " decisions",
+      metaInk: editing && broken.length > 0 ? "oklch(0.45 0.15 28)" : DIM,
+
+      hasPrimary: !isEmpty,
+      primaryLabel: oldVersion ? "back to current"
+        : at === "versions" ? "current version"
+        : editing ? "publish version " + nextVersion
+        : "edit the policy",
+      primaryBg: editing && (broken.length > 0 || !dirty)
+        ? "oklch(0.24 0.014 84 / 0.15)" : INK,
+      primaryInk: editing && (broken.length > 0 || !dirty)
+        ? DIM : "oklch(0.97 0.01 90)",
+      primaryAction: () => {
+        if (oldVersion || at === "versions") {
+          return set({ at: "published", viewing: CURRENT, baseVersion: CURRENT, editAt: null });
+        }
+        if (!editing) {
+          return set({ at: "editing", baseVersion: CURRENT, draft: rulesOf(CURRENT), editAt: null });
+        }
+        if (broken.length > 0) return set({ editAt: broken[0].i });
+        if (dirty) {
+          set({ at: "published", viewing: CURRENT, baseVersion: CURRENT,
+            draft: rulesOf(CURRENT), editAt: null });
+        }
+      },
+      startFirst: () => set({ at: "editing", baseVersion: 0, draft: [], editAt: null }),
+
+      showEmpty: isEmpty,
+      showRules: !isEmpty && at !== "versions",
+      showVersions: at === "versions",
+      showVersionDiff: oldVersion,
+      showChangeSummary: editing && changeLines.length > 0,
+      editable: editing,
+
+      rulesHeading: oldVersion ? "Rules as they were" : editing ? "Draft rules" : "Rules",
+      rulesCount: source.length === 1 ? "1 rule" : source.length + " rules",
+
+      rules: source.map((rule, pos) => {
+        const was = originalAt(rule);
+        const moved = editing && was >= 0 && was !== pos;
+        const added = editing && was < 0;
+        return {
+          n: String(pos),
+          name: rule.name || "unnamed rule",
+          rawName: rule.name,
+          sentence: sentenceOf(rule),
+          incomplete: rule.then.type === "dismiss" && !(rule.then.reason || "").trim(),
+          changed: moved || added,
+          changedNote: added ? "new" : "moved from " + was,
+          editing: editing && s.editAt === pos,
+          // Rules sit on the page, separated by the seam. Only an open editor gets a
+          // surface, because then it is holding a form rather than a line of text.
+          cardBg: editing && s.editAt === pos ? "oklch(0.945 0.014 88)" : "transparent",
+          seam: editing && s.editAt === pos ? "none" : "1px dashed oklch(0.88 0.014 86)",
+          pad: editing && s.editAt === pos ? "14px" : "14px 4px",
+          editLabel: editing && s.editAt === pos ? "Close this rule" : "Edit this rule",
+          editGlyph: editing && s.editAt === pos ? "\u2715" : "\u270E",
+          editBg: editing && s.editAt === pos ? "oklch(0.24 0.014 84 / 0.07)" : "transparent",
+          upInk: pos === 0 ? "oklch(0.74 0.016 84)" : INK,
+          downInk: pos === source.length - 1 ? "oklch(0.74 0.016 84)" : INK,
+          onEdit: () => set({ editAt: s.editAt === pos ? null : pos }),
+          onUp: () => {
+            if (pos === 0) return;
+            const next = s.draft.slice();
+            next[pos] = next[pos - 1];
+            next[pos - 1] = rule;
+            set({ draft: next, dirty: true, editAt: s.editAt === pos ? pos - 1 : s.editAt });
+          },
+          onDown: () => {
+            if (pos === source.length - 1) return;
+            const next = s.draft.slice();
+            next[pos] = next[pos + 1];
+            next[pos + 1] = rule;
+            set({ draft: next, dirty: true, editAt: s.editAt === pos ? pos + 1 : s.editAt });
+          },
+          onDelete: () => set({
+            draft: s.draft.filter((x, i) => i !== pos), dirty: true, editAt: null
+          })
+        };
+      }),
+
+      setName: (e) => this.patchRule(s.editAt, { name: e.target.value }),
+      conditionNote: edited && Object.keys(edited.when).length === 0
+        ? "no conditions · matches every task" : "all of them must match",
+      fieldChips: FIELDS.map((f) => {
+        const on = !!edited && edited.when[f] !== undefined;
+        return {
+          label: f,
+          bg: on ? INK : "transparent",
+          fg: on ? "oklch(0.97 0.01 90)" : INK,
+          line: on ? INK : "oklch(0.8 0.016 84)",
+          onToggle: () => {
+            if (on) return this.patchWhen(s.editAt, f, undefined);
+            const seed = f === "tried" ? false : f === "duplicate" ? 0.6
+              : f === "text" ? [] : [VOCAB[f][0]];
+            this.patchWhen(s.editAt, f, seed);
+          }
+        };
+      }),
+      conditions: !edited ? [] : FIELDS.filter((f) => edited.when[f] !== undefined).map((f) => {
+        const value = edited.when[f];
+        return {
+          field: f, hint: HINTS[f],
+          isChips: f === "channel" || f === "kind" || f === "from",
+          isText: f === "text", isBool: f === "tried", isRange: f === "duplicate",
+          options: (VOCAB[f] || []).map((o) => {
+            const on = value.indexOf(o) >= 0;
+            return {
+              label: o,
+              bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+              fg: on ? INK : DIM,
+              line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+              onToggle: () => {
+                const next = on ? value.filter((x) => x !== o) : value.concat([o]);
+                this.patchWhen(s.editAt, f, next.length ? next : [o]);
+              }
+            };
+          }),
+          textValue: f === "text" ? value.join(", ") : "",
+          onText: (e) => this.patchWhen(s.editAt, "text",
+            e.target.value.split(",").map((x) => x.trim()).filter(Boolean)),
+          choices: [["already tried", true], ["not tried", false]].map((c) => ({
+            label: c[0],
+            bg: value === c[1] ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+            fg: value === c[1] ? INK : DIM,
+            onPick: () => this.patchWhen(s.editAt, "tried", c[1])
+          })),
+          rangeValue: f === "duplicate" ? String(value) : "0.6",
+          rangeLabel: f === "duplicate" ? Math.round(value * 100) + "% or better" : "",
+          onRange: (e) => this.patchWhen(s.editAt, "duplicate", Number(e.target.value))
+        };
+      }),
+      actionChips: ["assign", "refer", "hold", "dismiss"].map((a) => {
+        const on = !!edited && edited.then.type === a;
+        return {
+          label: a,
+          bg: on ? INK : "transparent",
+          fg: on ? "oklch(0.97 0.01 90)" : INK,
+          line: on ? INK : "oklch(0.8 0.016 84)",
+          onPick: () => this.patchRule(s.editAt, {
+            then: a === "assign" || a === "refer"
+              ? { type: a, agent: (edited && edited.then.agent) || "Ada" }
+              : { type: a, reason: (edited && edited.then.reason) || "" }
+          })
+        };
+      }),
+      needsAgent: !!edited && (edited.then.type === "assign" || edited.then.type === "refer"),
+      agentChips: AGENTS.map((g) => {
+        const on = !!edited && edited.then.agent === g;
+        return {
+          label: g, initial: g[0].toLowerCase(),
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          onPick: () => this.patchRule(s.editAt, {
+            then: Object.assign({}, edited.then, { agent: g })
+          })
+        };
+      }),
+      needsReason: reasonNeeded,
+      reasonMissing: reasonEmpty,
+      reasonValue: edited && reasonNeeded ? (edited.then.reason || "") : "",
+      reasonHint: edited && edited.then.type === "dismiss"
+        ? "duplicate of an open task" : "why a person should look",
+      reasonLine: reasonEmpty ? "oklch(0.6 0.14 28)" : "oklch(0.78 0.016 84)",
+      setReason: (e) => this.patchRule(s.editAt, {
+        then: Object.assign({}, edited.then, { reason: e.target.value })
+      }),
+      closeEdit: () => { if (!reasonEmpty) set({ editAt: null }); },
+      doneBg: reasonEmpty ? "oklch(0.24 0.014 84 / 0.15)" : INK,
+      doneInk: reasonEmpty ? DIM : "oklch(0.97 0.01 90)",
+      doneNote: reasonEmpty
+        ? "Give the dismissal a reason before closing this rule."
+        : "Nothing takes effect until the version is published.",
+      addRule: () => {
+        const next = s.draft.concat([{ name: "", when: {}, then: { type: "assign", agent: "Ada" }, id: null }]);
+        set({ draft: next, dirty: true, editAt: next.length - 1 });
+      },
+
+      changes: changeLines.map((d) => ({
+        mark: d[0], text: d[1],
+        bg: d[0] === "+" ? "oklch(0.52 0.14 148 / 0.09)"
+          : d[0] === "-" ? "oklch(0.51 0.17 28 / 0.09)" : "oklch(0.58 0.12 78 / 0.11)",
+        markInk: d[0] === "+" ? "oklch(0.38 0.1 148)"
+          : d[0] === "-" ? "oklch(0.45 0.15 28)" : "oklch(0.45 0.1 78)"
+      })),
+
+      versionCount: CURRENT + " published",
+      versions: versionList.map((n) => {
+        const m = VERSION_META[n];
+        const count = (VERSION_RULES[n] || []).length;
+        const current = n === CURRENT;
+        return {
+          label: "version " + n, summary: m.summary, when: m.when, by: m.by,
+          rules: count === 1 ? "1 rule" : count + " rules",
+          decisions: m.decisions + " decisions",
+          dot: current ? OK : "transparent",
+          ring: current ? "none" : "1.2px dashed oklch(0.74 0.016 84)",
+          bg: "transparent",
+          onOpen: () => set({
+            at: current ? "published" : "version", viewing: n, editAt: null
+          })
+        };
+      }),
+      diffHeading: priorVersion >= 1
+        ? "Changed from version " + priorVersion : "The first version",
+      versionDecisions: String(meta.decisions),
+      hasVersionDiff: versionDiff.length > 0,
+      noVersionDiff: versionDiff.length === 0,
+      versionDiff: versionDiff.map((d) => ({
+        mark: d[0] === " " ? "" : d[0], text: d[1],
+        bg: d[0] === "+" ? "oklch(0.52 0.14 148 / 0.09)"
+          : d[0] === "-" ? "oklch(0.51 0.17 28 / 0.09)"
+          : d[0] === "~" ? "oklch(0.58 0.12 78 / 0.11)" : "oklch(0.94 0.014 88)",
+        markInk: d[0] === "+" ? "oklch(0.38 0.1 148)"
+          : d[0] === "-" ? "oklch(0.45 0.15 28)" : "oklch(0.45 0.1 78)"
+      })),
+      pastDecisions: PAST_DECISIONS
+        .map((p) => ({
+          when: p[0], title: p[1], move: p[2], dot: p[4],
+          at: (VERSION_RULES[s.viewing] || []).findIndex((r) => r.name === p[3])
+        }))
+        .filter((p) => p.at >= 0)
+        .map((p) => ({ when: p.when, title: p.title, move: p.move, dot: p.dot, rule: "rule " + p.at })),
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label,
+        hasLabel: !!sec.label,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          count: n.count || "", hasCount: !!n.count,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" }, { glyph: "\u27C1" }, { glyph: "\u2317" },
+        { glyph: "\u25CE" }, { glyph: "\u2261", active: true }, { glyph: "\u26AD" }
+      ].map((n) => ({
+        glyph: n.glyph,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

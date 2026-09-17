@@ -2,6 +2,8 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "ignorePatterns": [
     "repos/**",
+    "design-system/*.dc.html",
+    "design-system/support.js",
     "**/node_modules/**",
     "**/dist/**",
     "**/out/**",

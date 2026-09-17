@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · configure</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Channels</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Where a conversation happening somewhere else becomes a thread here. Someone emails an inbox; a thread appears, a task goes to triage, and whatever the agent says back leaves the same way it arrived. They stay in their inbox and never learn any of this happened.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="7">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};flex:none;">{{ n.glyph }}</span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Acme Finance</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.4px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                    <sc-if value="{{ n.hasCount }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.72 0.008 86);flex:none;">{{ n.count }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:44px;height:44px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;margin-right:6px;">&#9776;</span>
+            </sc-if>
+            <sc-for list="{{ crumbs }}" as="b" hint-placeholder-count="2">
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ b.ink }};border-bottom:{{ b.line }};">{{ b.label }}</span>
+                <sc-if value="{{ b.more }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.62 0.014 84);">/</span>
+                </sc-if>
+              </span>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-wrap:nowrap;align-items:center;gap:12px 16px;">
+            <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.12;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pageTitle }}</span>
+            <span style="display:inline-flex;align-items:center;gap:10px;flex:none;">
+              <sc-if value="{{ hasBadge }}" hint-placeholder-val="{{ false }}">
+                <span role="img" aria-label="{{ badgeLabel }}" title="{{ badgeLabel }}" style="display:inline-flex;align-items:center;gap:9px;padding:{{ badgePad }};border-radius:999px;background:{{ badgeBg }};flex:none;">
+                  <span style="width:{{ badgeDotSize }};height:{{ badgeDotSize }};border-radius:50%;background:{{ badgeDot }};flex:none;"></span>
+                  <sc-if value="{{ showBadgeText }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ badgeInk }};white-space:nowrap;">{{ badgeLabel }}</span>
+                  </sc-if>
+                </span>
+              </sc-if>
+              <button type="button" onClick="{{ primaryAction }}" aria-label="{{ primaryLabel }}" title="{{ primaryLabel }}" style="display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:{{ primarySize }};padding:{{ primaryPad }};min-width:{{ primaryMin }};min-height:{{ btnMin }};border:{{ primaryBorder }};border-radius:999px;background:{{ primaryBg }};color:{{ primaryInk }};flex:none;white-space:nowrap;">{{ primaryFace }}</button>
+            </span>
+          </div>
+
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ metaInk }};">{{ headerMeta }}</span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;gap:26px;">
+
+          <sc-if value="{{ showList }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Answering</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ liveCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">today</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ channels }}" as="c" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ c.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:6px 14px;padding:14px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                      <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }};flex:none;"></span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:{{ c.titleInk }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.address }}</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:oklch(0.5 0.014 84);border:1px dashed oklch(0.8 0.016 84);border-radius:4px;padding:1px 5px;flex:none;">{{ c.medium }}</span>
+                      </span>
+                      <span style="font-size:13px;line-height:1.5;color:oklch(0.41 0.014 84);padding-left:17px;">{{ c.answeredBy }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ c.threads }}</span>
+                      <span>{{ c.open }}</span>
+                      <span style="color:{{ c.stateInk }};">{{ c.state }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">Each of these sits on a channel connection. Close that connection and the channel stops receiving — the threads it already made stay where they are.</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showThreads }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ isPaused }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px;border-radius:12px;background:oklch(0.58 0.12 78 / 0.11);">
+                <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;"></span>
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.35 0.014 84);flex:1;min-width:240px;">{{ pausedNote }}</span>
+              </div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <input type="text" value="{{ tQuery }}" onInput="{{ setTQuery }}" placeholder="Search subjects and contacts" style="width:100%;max-width:420px;box-sizing:border-box;padding:11px 13px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-size:14.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <sc-for list="{{ threadFilters }}" as="f" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ f.onPick }}" style="display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ f.line }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};">
+                    {{ f.label }}<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ f.countInk }};">{{ f.count }}</span>
+                  </button>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ contactFilterNote }}</span>
+                <sc-for list="{{ contactFilters }}" as="c" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ c.onPick }}" style="display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:6px 13px 6px 6px;min-height:{{ chipMin }};border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">
+                    <span style="width:20px;height:20px;border-radius:50%;border:1.3px solid oklch(0.72 0.016 84);font-size:9px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ c.initials }}</span>{{ c.label }}
+                  </button>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ shownCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">newest first</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ allThreads }}" as="t" hint-placeholder-count="8">
+                  <button type="button" onClick="{{ t.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:5px 14px;padding:13px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.9 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                      <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};flex:none;"></span>
+                        <span style="font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.subject }}</span>
+                      </span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:17px;">{{ t.contact }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ t.when }}</span>
+                      <span>{{ t.messages }}</span>
+                      <span>{{ t.tasks }}</span>
+                      <span style="color:{{ t.stateInk }};">{{ t.state }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{ noThreads }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:40px 20px;text-align:center;">
+                  <svg viewBox="0 0 240 150" width="200" height="125" fill="none" role="img" aria-label="An empty hoop of cloth with no stitches in it">
+                    <circle cx="120" cy="76" r="56" stroke="oklch(0.74 0.016 84)" stroke-width="1.4"></circle>
+                    <circle cx="120" cy="76" r="48" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 8"></circle>
+                  </svg>
+                  <div style="display:flex;flex-direction:column;gap:8px;max-width:380px;">
+                    <span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:1.2;">No threads match</span>
+                    <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Nothing on this channel fits all of those at once.</span>
+                  </div>
+                  <button type="button" onClick="{{ clearFilters }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 18px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">clear the filters</button>
+                </div>
+              </sc-if>
+
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">{{ filterSummary }}</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showTrace }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">{{ traceHeading }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ traceNote }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+
+              <sc-if value="{{ noTrace }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:40px 20px;text-align:center;">
+                  <svg viewBox="0 0 240 150" width="200" height="125" fill="none" role="img" aria-label="A finished seam with no needle left in it">
+                    <path d="M26 76 H214" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linecap="round"></path>
+                    <path d="M40 62 h16 M72 62 h16 M104 62 h16 M136 62 h16 M168 62 h16" stroke="oklch(0.86 0.016 84)" stroke-width="1.3" stroke-linecap="round"></path>
+                  </svg>
+                  <div style="display:flex;flex-direction:column;gap:8px;max-width:420px;">
+                    <span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:1.2;">No detailed trace</span>
+                    <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">{{ noTraceNote }}</span>
+                  </div>
+                  <button type="button" onClick="{{ primaryAction }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 18px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">back to threads</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ hasTrace }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <sc-for list="{{ stepChips }}" as="p" hint-placeholder-count="7">
+                  <button type="button" onClick="{{ p.onPick }}" style="display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ p.line }};border-radius:999px;background:{{ p.bg }};color:{{ p.fg }};">
+                    <span style="width:6px;height:6px;border-radius:50%;background:{{ p.dot }};flex:none;"></span>{{ p.label }}
+                  </button>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ trace }}" as="t" hint-placeholder-count="6">
+                  <div style="display:grid;grid-template-columns:{{ traceGrid }};align-items:start;gap:8px 16px;padding:15px 0;border-bottom:1px dashed {{ t.seam }};opacity:{{ t.opacity }};">
+                    <span style="grid-column:1;display:flex;align-items:center;gap:10px;min-width:0;">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ t.arrowInk }};width:14px;flex:none;">{{ t.arrow }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);flex:none;">{{ t.at }}</span>
+                    </span>
+                    <span style="grid-column:{{ traceBodyCol }};display:flex;flex-direction:column;gap:6px;min-width:0;">
+                      <span style="display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 11px;">
+                        <span style="font-size:13.5px;font-weight:600;">{{ t.who }}</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ t.role }}</span>
+                      </span>
+                      <span style="font-size:14.5px;line-height:1.6;color:oklch(0.28 0.014 84);">{{ t.text }}</span>
+                      <sc-if value="{{ t.hasEffect }}" hint-placeholder-val="{{ true }}">
+                        <span style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;">
+                          <sc-for list="{{ t.effects }}" as="f" hint-placeholder-count="2">
+                            <span style="display:inline-flex;align-items:center;gap:7px;color:{{ f.ink }};">
+                              <span style="width:6px;height:6px;border-radius:50%;background:{{ f.dot }};flex:none;"></span>{{ f.label }}
+                            </span>
+                          </sc-for>
+                        </span>
+                      </sc-if>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px;border-radius:12px;background:oklch(0.24 0.014 84 / 0.05);">
+                <span style="width:7px;height:7px;border-radius:50%;background:{{ verdictDot }};flex:none;"></span>
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.35 0.014 84);flex:1;min-width:240px;">{{ verdict }}</span>
+              </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ isPaused }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px;border-radius:12px;background:oklch(0.58 0.12 78 / 0.11);">
+                <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;"></span>
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.35 0.014 84);flex:1;min-width:240px;">{{ pausedNote }}</span>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">How it reaches out</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ facts }}" as="f" hint-placeholder-count="7">
+                  <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:10px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ f.ink }};text-align:right;word-break:break-all;">{{ f.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">The channel holds no credential. It names a connection, and the connection's account is what actually authenticates when a reply goes out.</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Recent threads</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ threadCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ threads }}" as="t" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ openTrace }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:5px 14px;padding:13px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.9 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                      <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};flex:none;"></span>
+                        <span style="font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.subject }}</span>
+                      </span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:17px;">{{ t.contact }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ t.messages }}</span>
+                      <span>{{ t.tasks }}</span>
+                      <span style="color:{{ t.stateInk }};">{{ t.state }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                <button type="button" onClick="{{ seeAll }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 18px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">{{ seeAllLabel }}</button>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);flex:1;min-width:220px;">A thread is one conversation, however long it runs. A message arriving after the last task settled opens a new task on the same thread rather than a second thread.</span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Contacts it has met</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ contactFilterNote }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ contacts }}" as="p" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:4px 14px;padding:11px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="grid-column:1;display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                      <span style="width:22px;height:22px;border-radius:50%;border:1.3px solid oklch(0.72 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ p.initials }}</span>
+                      <span style="font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.name }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ contactIndent }};">
+                      <span>{{ p.address }}</span>
+                      <span>{{ p.threads }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">A contact is somebody outside the workspace. They have no account here and cannot be assigned work — they are who a thread is with.</span>
+            </div>
+
+            <sc-if value="{{ canManage }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                  <button type="button" onClick="{{ onPause }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">{{ pauseLabel }}</button>
+                  <button type="button" onClick="{{ onEdit }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">change who answers</button>
+                </div>
+                <span style="font-size:13px;line-height:1.6;color:oklch(0.44 0.014 84);max-width:660px;">{{ manageNote }}</span>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ showNew }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:20px;">
+
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Connection</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ connNote }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ connRows }}" as="c" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ c.onPick }}" disabled="{{ c.disabled }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:4px 14px;padding:12px 10px;margin:0 -10px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:{{ c.bg }};text-align:left;width:100%;opacity:{{ c.opacity }};cursor:{{ c.cursor }};">
+                      <span style="grid-column:1;display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }};flex:none;"></span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.scope }}</span>
+                      </span>
+                      <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                        <span>{{ c.account }}</span>
+                        <span style="color:{{ c.whyInk }};">{{ c.why }}</span>
+                      </span>
+                    </button>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">Only channel-purpose connections appear. A channel is the one thing that cannot be configured before the connection exists, because its address comes from the account.</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Who answers</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ answerNote }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                  <sc-for list="{{ answerChips }}" as="a" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ a.onPick }}" style="display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 14px 7px 8px;min-height:{{ chipMin }};border:1.3px dashed {{ a.line }};border-radius:999px;background:{{ a.bg }};color:{{ a.fg }};">
+                      <sc-if value="{{ a.hasAvatar }}" hint-placeholder-val="{{ true }}">
+                        <span style="width:20px;height:20px;border-radius:50%;border:1.3px dashed oklch(0.66 0.016 84);font-size:9.5px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ a.initial }}</span>
+                      </sc-if>{{ a.label }}
+                    </button>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">{{ answerBlurb }}</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">What arriving messages do</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:inline-flex;align-self:flex-start;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+                  <sc-for list="{{ intakeChips }}" as="i" hint-placeholder-count="2">
+                    <button type="button" onClick="{{ i.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 14px;min-height:{{ chipMin }};border:none;border-radius:999px;background:{{ i.bg }};color:{{ i.fg }};">{{ i.label }}</button>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:660px;">{{ intakeNote }}</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                  <button type="button" onClick="{{ onCreate }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ createBg }};color:{{ createInk }};">{{ createLabel }}</button>
+                  <button type="button" onClick="{{ onCancel }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">cancel</button>
+                </div>
+                <span style="font-size:13px;line-height:1.6;color:oklch(0.44 0.014 84);max-width:660px;">{{ createNote }}</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:48px 24px 32px;text-align:center;">
+              <svg viewBox="0 0 240 170" width="230" height="163" fill="none" role="img" aria-label="A threaded needle resting beside cloth it has not entered">
+                <path d="M34 112 L206 96" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linecap="round"></path>
+                <path d="M56 60 L188 48" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                <ellipse cx="62" cy="60" rx="2.6" ry="5" transform="rotate(-5 62 60)" stroke="oklch(0.24 0.014 84)" stroke-width="1.2"></ellipse>
+                <path d="M62 66 C88 82 44 92 74 104" stroke="oklch(0.24 0.014 84)" stroke-width="1.4" stroke-dasharray="7 6" stroke-linecap="round"></path>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:440px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">No channels</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Nothing reaches this workspace from outside. Every thread here was started by somebody who already has an account.</span>
+              </div>
+              <button type="button" onClick="{{ primaryAction }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 20px;min-height:44px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">open the first channel</button>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Direction is the primary mark on every row of the trace: an arrow in, an arrow out. It is the one thing that makes a channel legible — you can see at a glance that the agent's question left the building and the answer came back.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Each step shows what it did to the task, not just what was said. The reply that arrives while work is held is the interesting one: it records a message and returns the task to ready, which is two effects from one email.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">An externally requested task completes on success. There is no review step, because the person who asked is outside the workspace and cannot accept anything — the agent finishing is the whole outcome.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A contact is not a principal. They appear in threads, they are named, and they can hold no tier, own no task and take no turn — which is why they get a solid avatar ring where agents get a dashed one.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">05</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Pausing stops intake and leaves outbound alive, so an agent mid-question can still deliver it. Closing the underlying connection is the blunt instrument and lives on Connections, not here.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const OK = "oklch(0.52 0.14 148)";
+const WARN = "oklch(0.58 0.12 78)";
+const BAD = "oklch(0.51 0.17 28)";
+const IDLE = "oklch(0.62 0.014 84)";
+const WORK = "oklch(0.41 0.014 84)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 940 },
+  laptop: { label: "laptop", width: 1180, height: 880 },
+  tablet: { label: "tablet", width: 834, height: 820 },
+  phone: { label: "phone", width: 390, height: 800 }
+};
+
+const STATES = [
+  ["list", "channels"],
+  ["threads", "a channel's threads"],
+  ["trace", "one conversation"],
+  ["one", "one channel"],
+  ["newChan", "open one"],
+  ["paused", "paused"],
+  ["empty", "none yet"]
+];
+
+const CHANNELS = {
+  ch_billing: { address: "billing@acme.test", medium: "email", conn: "con_ch_1",
+    account: "Postmark · billing", answeredBy: "Ada answers, or triage decides",
+    agent: "Ada", intake: "task", threads: 148, open: 4, contacts: 62,
+    opened: "12 Jul", by: "Jo Mercer", paused: false },
+  ch_support: { address: "support@acme.test", medium: "email", conn: "con_ch_2",
+    account: "Postmark · support", answeredBy: "triage decides every time",
+    agent: "nobody", intake: "task", threads: 311, open: 9, contacts: 140,
+    opened: "12 Jul", by: "Jo Mercer", paused: false },
+  ch_finance: { address: "finance", medium: "slack", conn: "con_ch_3",
+    account: "Slack · acme", answeredBy: "Rae answers when mentioned",
+    agent: "Rae", intake: "thread", threads: 74, open: 2, contacts: 11,
+    opened: "3 Sep", by: "Kit Nakano", paused: false }
+};
+
+// The six steps of the worked example, each with what it did to the task.
+const TRACE = [
+  { dir: "in", at: "09:02", who: "Ravi Kaur", role: "contact · billing@acme.test",
+    text: "My invoice total is wrong. The September statement says 41,283.21 but our records say 41,283.19.",
+    effects: [["contact recorded", IDLE], ["thread created", IDLE], ["task in triage", WARN]] },
+  { dir: "none", at: "09:02", who: "Policy", role: "version 7 · rule 2",
+    text: "The kind is billing and nobody has tried it, so assign it to Ada.",
+    effects: [["task ready", OK], ["assigned Ada", OK]] },
+  { dir: "none", at: "09:03", who: "Ada", role: "agent · attempt 1",
+    text: "Reading the September statement against the ledger export.",
+    effects: [["task working", WORK], ["session running", WORK]] },
+  { dir: "out", at: "09:11", who: "Ada", role: "agent · asked",
+    text: "Which invoice number is this on? The statement covers fourteen.",
+    effects: [["task held", BAD], ["turn paused", WARN], ["sent by email", IDLE]] },
+  { dir: "in", at: "10:48", who: "Ravi Kaur", role: "contact · reply",
+    text: "INV-20411. Sorry, should have said.",
+    effects: [["same thread", IDLE], ["answer recorded", OK], ["task ready", OK]] },
+  { dir: "none", at: "10:49", who: "Ada", role: "agent · attempt 2",
+    text: "Found it — a rounding difference on one line, corrected against the April rebuild.",
+    effects: [["task working", WORK], ["new session", WORK]] },
+  { dir: "out", at: "10:56", who: "Ada", role: "agent · finished",
+    text: "That was a rounding difference on INV-20411. The corrected total is 41,283.19, matching your records. The statement has been reissued.",
+    effects: [["task succeeded", OK], ["no review step", IDLE], ["sent by email", IDLE]] }
+];
+
+// subject, contact, messages, tasks, state, dot, when
+const THREADS = [
+  ["Invoice total is wrong", "Ravi Kaur", 4, 1, "succeeded", "10:56"],
+  ["Refund taken twice on the same card", "Mei Lin", 6, 1, "held", "10:31"],
+  ["Can you resend the July statement?", "Tom Aldridge", 2, 1, "working", "09:48"],
+  ["Duplicate of the July close", "Ravi Kaur", 3, 1, "dismissed", "09:12"],
+  ["Statement shows a line we never ordered", "Mei Lin", 5, 1, "working", "yesterday"],
+  ["Wrong VAT rate on the August invoice", "Tom Aldridge", 3, 1, "held", "yesterday"],
+  ["Change our billing address", "Priya Raman", 2, 1, "succeeded", "yesterday"],
+  ["Payment failed but the card is fine", "Ravi Kaur", 7, 3, "succeeded", "10 Sep"],
+  ["Do you support purchase orders?", "Dan Okafor", 2, 1, "dismissed", "10 Sep"],
+  ["Credit note never arrived", "Priya Raman", 4, 1, "failed", "9 Sep"],
+  ["Invoice 20390 is a duplicate", "Mei Lin", 2, 1, "dismissed", "9 Sep"],
+  ["Annual renewal quote", "Dan Okafor", 5, 2, "succeeded", "8 Sep"]
+];
+
+const THREAD_STATES = {
+  held: { dot: BAD, open: true },
+  working: { dot: WORK, open: true },
+  succeeded: { dot: OK, open: false },
+  failed: { dot: BAD, open: false },
+  dismissed: { dot: IDLE, open: false }
+};
+
+const CONTACTS = [
+  ["Ravi Kaur", "RK", "ravi@northgate.test"],
+  ["Mei Lin", "ML", "mei@northgate.test"],
+  ["Tom Aldridge", "TA", "tom@harrowfield.test"],
+  ["Priya Raman", "PR", "priya@calderwell.test"],
+  ["Dan Okafor", "DO", "dan@calderwell.test"]
+];
+const CONTACT_NAMES = CONTACTS.map((c) => c[0]);
+
+// Whether a connection is free is derived from CHANNELS, never asserted here.
+const CONNS = [
+  ["con_ch_1", "billing@acme.test", "Postmark · billing"],
+  ["con_ch_2", "support@acme.test", "Postmark · support"],
+  ["con_ch_3", "finance", "Slack · acme"],
+  ["con_ch_4", "hello@acme.test", "Postmark · hello"]
+];
+
+class Component extends DCLogic {
+  state = {
+    at: "list", view: "desktop", available: 0,
+    chan: "ch_billing", step: 0,
+    conn: "", agent: "Ada", intake: "task", pausedIds: {},
+    tFilter: "all", tContact: "", tQuery: "",
+    thread: "Invoice total is wrong"
+  };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const touch = isPhone || isTablet;
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const isEmpty = at === "empty";
+    // Editing and creating share one form, so the flag has to distinguish them:
+    // an edit began from a connection this very channel already answers on.
+    const onForm = at === "newChan";
+    const editing = onForm && !!s.conn && Object.keys(CHANNELS)
+      .some((k) => k === s.chan && CHANNELS[k].conn === s.conn);
+    const isNew = onForm;
+    const isTrace = at === "trace";
+    const isThreads = at === "threads";
+    // Which thread the trace is for comes from the click, never from the state name.
+    // Only the invoice thread has authored step data; the rest say so rather than
+    // borrowing someone else's conversation.
+    const thread = THREADS.filter((t) => t[0] === s.thread)[0] || THREADS[0];
+    const hasTrace = thread[0] === "Invoice total is wrong";
+    const detail = at === "one" || at === "paused";
+    const id = s.chan;
+    const chan = CHANNELS[id];
+    const isPaused = !!s.pausedIds[id] || (at === "paused" && chan.paused);
+
+    // How far through the conversation we are reading. Everything past it is dimmed,
+    // so the trace can be walked a step at a time rather than read as a finished log.
+    const upto = s.step;
+
+    const rowOf = (k) => {
+      const c = CHANNELS[k];
+      const off = !!s.pausedIds[k];
+      return {
+        address: c.address, medium: c.medium, answeredBy: c.answeredBy,
+        threads: c.threads + " threads",
+        open: c.open === 0 ? "nothing open" : c.open + " open",
+        state: off ? "paused" : "answering",
+        stateInk: off ? "oklch(0.45 0.1 78)" : DIM,
+        dot: off ? WARN : OK,
+        titleInk: off ? DIM : INK,
+        // Clicking a channel goes to its threads; settings is one step further.
+        onOpen: () => set({ at: "threads", chan: k, tFilter: "all", tContact: "", tQuery: "" })
+      };
+    };
+
+    // Open means a task on the thread still needs somebody. Derived from the state,
+    // never asserted per row.
+    const matchFilter = (t, f) => {
+      const spec = THREAD_STATES[t[4]];
+      if (f === "all") return true;
+      if (f === "open") return spec.open;
+      if (f === "settled") return !spec.open;
+      return t[4] === f;
+    };
+    const q = s.tQuery.trim().toLowerCase();
+    const shown = THREADS.filter((t) =>
+      matchFilter(t, s.tFilter)
+      && (!s.tContact || t[1] === s.tContact)
+      && (!q || t[0].toLowerCase().indexOf(q) >= 0 || t[1].toLowerCase().indexOf(q) >= 0));
+
+    const threadRow = (t) => ({
+      subject: t[0], contact: t[1],
+      messages: t[2] + (t[2] === 1 ? " message" : " messages"),
+      tasks: t[3] === 0 ? "never assigned" : t[3] === 1 ? "1 task" : t[3] + " tasks",
+      when: t[5],
+      state: t[4],
+      dot: THREAD_STATES[t[4]].dot,
+      stateInk: THREAD_STATES[t[4]].dot === BAD ? "oklch(0.45 0.15 28)"
+        : THREAD_STATES[t[4]].dot === OK ? "oklch(0.36 0.1 148)" : DIM,
+      onOpen: () => set({ at: "trace", thread: t[0], step: TRACE.length - 1 })
+    });
+
+    const liveIds = Object.keys(CHANNELS);
+    // A connection is free unless some channel already answers on it — except the one
+    // this edit began from, which is legitimately still its own.
+    const takenBy = (k) => liveIds.filter((x) => CHANNELS[x].conn === k)[0];
+    const freeFor = (k) => {
+      const owner = takenBy(k);
+      return !owner || (detail && owner === id) || (isNew && s.conn === k && owner === id);
+    };
+    const eligible = CONNS.filter((c) => freeFor(c[0]));
+    const ready = !!s.conn;
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage", count: "4" },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Channels", rows: [
+        { glyph: "#", label: "billing@acme.test", active: detail || isTrace || isThreads },
+        { glyph: "#", label: "support@acme.test" },
+        { glyph: "#", label: "finance" }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u25CE", label: "Agents" },
+        { glyph: "\u2261", label: "Policy" },
+        { glyph: "\u229E", label: "Accounts" },
+        { glyph: "\u26AD", label: "Connections" },
+        { glyph: "\u2709", label: "Channels", active: !detail && !isTrace && !isThreads },
+        { glyph: "\u25A3", label: "Environments" }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({
+          at: x[0],
+          chan: "ch_billing",
+          step: x[0] === "trace" ? TRACE.length - 1 : 0,
+          thread: "Invoice total is wrong",
+          tFilter: "all", tContact: "", tQuery: "",
+          pausedIds: x[0] === "paused" ? { ch_billing: true } : {},
+          conn: "", agent: "Ada", intake: "task"
+        })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      headerPad: isPhone ? "16px 18px 12px" : "24px 30px 14px",
+      bodyPad: isPhone ? "4px 18px 22px" : "6px 30px 28px",
+      titleSize: isPhone ? "26px" : "34px",
+      chipMin: touch ? "44px" : "34px",
+      btnMin: touch ? "44px" : "40px",
+      rowGrid: isPhone ? "minmax(0,1fr)" : "minmax(0,1fr) auto",
+      metaCol: isPhone ? "1" : "2",
+      rowIndent: isPhone ? "17px" : "0",
+      contactIndent: isPhone ? "32px" : "0",
+      traceGrid: isPhone ? "minmax(0,1fr)" : "108px minmax(0,1fr)",
+      traceBodyCol: isPhone ? "1" : "2",
+
+      crumbs: (isThreads
+        ? [["Channels", true], [chan.address, true], ["threads", false]]
+        : isTrace
+        ? [["Channels", true], [chan.address, true], [thread[0], false]]
+        : detail
+        ? [["Channels", true], [chan.address, false]]
+        : isNew
+        ? [["Channels", true], [editing ? chan.address : "open one", false]]
+        : [["Configure", true], ["Channels", false]]
+      ).map((b, i, arr) => ({
+        label: b[0],
+        ink: b[1] ? DIM : INK,
+        line: b[1] ? "1px dashed oklch(0.78 0.016 84)" : "none",
+        more: i < arr.length - 1
+      })),
+      pageTitle: isEmpty ? "Channels"
+        : isNew ? (editing ? "Change who answers" : "Open a channel")
+        : isTrace ? thread[0]
+        : isThreads ? chan.address
+        : detail ? chan.address : "Channels",
+      headerMeta: isEmpty ? "nothing arrives from outside"
+        : isNew
+        ? (editing
+          ? chan.address + " · answering since " + chan.opened + " · " + chan.threads + " threads"
+          : eligible.length + " of " + CONNS.length + " channel connections available")
+        : isTrace
+        ? thread[1] + " · " + thread[2] + " messages · "
+          + (thread[3] === 0 ? "never assigned" : thread[3] === 1 ? "1 task" : thread[3] + " tasks")
+          + " · " + thread[4]
+        : isThreads
+        ? chan.threads + " threads · " + chan.open + " open · " + chan.contacts + " contacts"
+        : detail
+        ? chan.medium + " · " + chan.account + " · opened " + chan.opened + " by " + chan.by
+        : liveIds.length + " channels · " + liveIds.reduce((n, k) => n + CHANNELS[k].open, 0) + " threads open",
+      metaInk: DIM,
+
+      // Intake being stopped is a headline fact, and threads is now the first screen
+      // a channel click reaches — so the badge and banner both belong here too.
+      hasBadge: detail || isThreads,
+      badgeLabel: isPaused ? "paused" : "answering",
+      badgeDot: isPaused ? WARN : OK,
+      badgeBg: isPaused ? "oklch(0.58 0.12 78 / 0.13)" : "oklch(0.52 0.14 148 / 0.1)",
+      badgeInk: isPaused ? "oklch(0.42 0.1 78)" : "oklch(0.36 0.1 148)",
+      showBadgeText: !isPhone,
+      badgePad: isPhone ? "10px" : "8px 14px",
+      badgeDotSize: isPhone ? "9px" : "7px",
+
+      primaryLabel: isTrace ? "back to threads"
+        : isThreads ? "channel settings"
+        : isNew || detail ? "back to channels" : "open a channel",
+      primaryFace: !isPhone
+        ? (isTrace ? "back to threads"
+          : isThreads ? "channel settings"
+          : isNew || detail ? "back to channels" : "open a channel")
+        : (isNew || detail || isTrace || isThreads ? "\u2190" : "+"),
+      primaryBg: isNew || detail || isTrace || isThreads ? "transparent" : INK,
+      primaryInk: isNew || detail || isTrace || isThreads ? INK : "oklch(0.97 0.01 90)",
+      primaryBorder: isNew || detail || isTrace || isThreads ? "1.3px dashed oklch(0.74 0.016 84)" : "none",
+      primarySize: isPhone ? "15px" : "12.5px",
+      primaryPad: isPhone ? "0 12px" : "9px 19px",
+      primaryMin: isPhone ? "44px" : "0",
+      primaryAction: () => {
+        if (isTrace) return set({ at: "threads" });
+        if (isThreads) return set({ at: "one" });
+        if (isNew || detail) return set({ at: "list" });
+        set({ at: "newChan", conn: "", agent: "Ada", intake: "task" });
+      },
+
+      showList: at === "list",
+      showThreads: isThreads,
+      showTrace: isTrace,
+      showDetail: detail,
+      showNew: isNew,
+      showEmpty: isEmpty,
+
+      liveCount: liveIds.length + " channels",
+      channels: liveIds.map(rowOf),
+
+      noTrace: !hasTrace,
+      traceHeading: hasTrace ? "One conversation, end to end" : "This thread",
+      traceNote: !hasTrace ? "no steps recorded"
+        : upto === TRACE.length - 1 ? "the whole round trip"
+        : "step " + (upto + 1) + " of " + TRACE.length,
+      stepChips: TRACE.map((t, i) => ({
+        label: t.dir === "in" ? "in" : t.dir === "out" ? "out" : "here",
+        dot: t.dir === "in" ? WORK : t.dir === "out" ? OK : IDLE,
+        bg: upto === i ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+        fg: upto === i ? INK : DIM,
+        line: upto === i ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+        onPick: () => set({ step: i })
+      })),
+      trace: TRACE.map((t, i) => ({
+        at: t.at, who: t.who, role: t.role, text: t.text,
+        arrow: t.dir === "in" ? "\u2192" : t.dir === "out" ? "\u2190" : "\u00b7",
+        arrowInk: t.dir === "in" ? WORK : t.dir === "out" ? "oklch(0.36 0.1 148)" : IDLE,
+        opacity: i <= upto ? "1" : "0.32",
+        seam: i === upto ? "oklch(0.7 0.016 84)" : "oklch(0.9 0.014 86)",
+        hasEffect: t.effects.length > 0,
+        effects: t.effects.map((f) => ({
+          label: f[0], dot: f[1],
+          ink: f[1] === BAD ? "oklch(0.45 0.15 28)"
+            : f[1] === WARN ? "oklch(0.45 0.1 78)"
+            : f[1] === OK ? "oklch(0.36 0.1 148)" : DIM
+        }))
+      })),
+      verdict: [
+        "Nothing exists here yet except a contact and a thread. The task is in triage because no rule has looked at it.",
+        "Routing decided, so the task is ready and owned. No message left the building — policy is internal.",
+        "Ada is working. Ravi has heard nothing since his own email, which is correct: he is not told that work started.",
+        "The ask tool succeeded, which is what held the task. That success is also what sent an email — the question left as a reply on his original message.",
+        "One email, two effects: it is recorded as a message on the same thread, and it answers the held question, which returns the task to ready.",
+        "A second attempt, a second session. The first sandbox is long gone; only the conversation carried over.",
+        "Succeeded, not in review. Ravi asked for this from outside, so there is nobody inside to accept it — the agent finishing is the outcome, and his closing message is what he actually receives."
+      ][upto],
+      verdictDot: [WARN, OK, WORK, BAD, OK, WORK, OK][upto],
+
+      isPaused: isPaused,
+      pausedNote: "Paused. Arriving messages are held at the provider and nothing new becomes a thread. Replies still go out, so an agent mid-question can finish asking it.",
+      facts: [
+        ["channel", id],
+        ["medium", chan.medium],
+        ["address", chan.address],
+        ["connection", chan.conn],
+        ["account", chan.account],
+        ["credential", "in the vault · not held here"],
+        ["answers", chan.agent === "nobody" ? "triage decides" : chan.agent],
+        ["arriving message", chan.intake === "task" ? "creates a task" : "creates a thread only"],
+        ["opened", chan.opened + " by " + chan.by],
+        ["state", isPaused ? "paused" : "answering"]
+      ].map((f) => ({
+        k: f[0], v: f[1],
+        ink: f[0] === "state" && isPaused ? "oklch(0.42 0.1 78)" : INK
+      })),
+
+      threadCount: chan.threads + " in total",
+      threads: THREADS.slice(0, 4).map(threadRow),
+      seeAllLabel: "see all " + chan.threads + " threads",
+      seeAll: () => set({ at: "threads", tFilter: "all", tContact: "", tQuery: "" }),
+      hasTrace: hasTrace,
+      // No open/settled rule here — a trace either exists for a conversation or does
+      // not, and this prototype only carries the one.
+      noTraceNote: "The messages are on the thread itself. This view reconstructs a "
+        + "conversation step by step from what the channel recorded, and for "
+        + thread[0].toLowerCase() + " there is nothing recorded to reconstruct.",
+
+      threadFilters: [["all", "all"], ["open", "open"], ["held", "held"],
+        ["working", "working"], ["settled", "settled"]].map((f) => {
+        const n = THREADS.filter((t) => matchFilter(t, f[0])).length;
+        const on = s.tFilter === f[0];
+        return {
+          label: f[1], count: String(n),
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          countInk: on ? WORK : DIM,
+          onPick: () => set({ tFilter: f[0] })
+        };
+      }),
+      contactFilterNote: "most recent of " + chan.contacts + ":",
+      contactFilters: CONTACT_NAMES.map((c) => {
+        const on = s.tContact === c;
+        return {
+          label: c,
+          initials: c.split(" ").map((w) => w[0]).join(""),
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          onPick: () => set({ tContact: on ? "" : c })
+        };
+      }),
+      tQuery: s.tQuery,
+      setTQuery: (e) => set({ tQuery: e.target.value }),
+      allThreads: shown.map(threadRow),
+      shownCount: shown.length === THREADS.length
+        ? "showing " + THREADS.length + " of " + chan.threads
+        : shown.length + " of " + THREADS.length + " loaded",
+      noThreads: shown.length === 0,
+      clearFilters: () => set({ tFilter: "all", tContact: "", tQuery: "" }),
+      filterSummary: s.tFilter === "all" && !s.tContact && !s.tQuery.trim()
+        ? "Newest first. Only the last page is loaded; scrolling fetches the rest."
+        : "Filtered. " + (s.tContact ? s.tContact + " · " : "")
+          + (s.tFilter !== "all" ? s.tFilter + " · " : "")
+          + shown.length + (shown.length === 1 ? " thread" : " threads"),
+
+      contactCount: chan.contacts + " met",
+      contacts: CONTACTS.map((c) => {
+        const n = THREADS.filter((t) => t[1] === c[0]).length;
+        return {
+          name: c[0], initials: c[1], address: c[2],
+          threads: n === 1 ? "1 thread" : n + " threads"
+        };
+      }),
+
+      canManage: detail,
+      pauseLabel: isPaused ? "resume answering" : "pause intake",
+      onPause: () => {
+        const next = Object.assign({}, s.pausedIds);
+        if (isPaused) delete next[id]; else next[id] = true;
+        set({ pausedIds: next, at: isPaused ? "one" : "paused" });
+      },
+      onEdit: () => set({ at: "newChan", conn: chan.conn, agent: chan.agent, intake: chan.intake }),
+      manageNote: isPaused
+        ? "Resuming lets the held messages through. They arrive in order and each becomes a thread as though nothing had happened."
+        : "Pausing stops intake only. To stop it reaching out as well, close " + chan.conn + " on Connections — that is the blunt instrument, and it is deliberately not here.",
+
+      connNote: s.conn ? "selected" : "a channel needs one",
+      connRows: CONNS.map((c) => {
+        const free = freeFor(c[0]);
+        const owner = takenBy(c[0]);
+        return {
+          scope: c[1], account: c[2],
+          why: free
+            ? (owner === id ? "this channel answers on it" : "free")
+            : "a channel already answers on it",
+          whyInk: free ? DIM : "oklch(0.45 0.1 78)",
+          dot: !free ? IDLE : s.conn === c[0] ? OK : IDLE,
+          bg: s.conn === c[0] ? "oklch(0.24 0.014 84 / 0.07)" : "none",
+          disabled: !free,
+          opacity: free ? "1" : "0.55",
+          cursor: free ? "pointer" : "not-allowed",
+          onPick: () => { if (free) set({ conn: c[0] }); }
+        };
+      }),
+
+      answerNote: s.agent === "nobody" ? "every message goes to triage" : "with triage as the fallback",
+      answerChips: ["Ada", "Rae", "nobody"].map((a) => {
+        const on = s.agent === a;
+        return {
+          label: a === "nobody" ? "triage decides" : a,
+          hasAvatar: a !== "nobody",
+          initial: a === "nobody" ? "" : a[0].toLowerCase(),
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          onPick: () => set({ agent: a })
+        };
+      }),
+      answerBlurb: s.agent === "nobody"
+        ? "Every arriving message creates a task in triage and waits for a rule or a person to place it."
+        : s.agent + " is assigned directly, skipping triage. A policy rule can still override this — the rule wins, because it saw the message.",
+
+      intakeChips: [["task", "create a task"], ["thread", "thread only"]].map((i) => ({
+        label: i[1],
+        bg: s.intake === i[0] ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.intake === i[0] ? INK : DIM,
+        onPick: () => set({ intake: i[0] })
+      })),
+      intakeNote: s.intake === "task"
+        ? "The ordinary choice for an inbox: somebody wrote in wanting something done, so a task is the honest record of it."
+        : "For a room you want to read but not act on. Messages become threads and nothing is ever assigned — useful for a busy channel you only sometimes answer.",
+
+      createBg: ready ? INK : "oklch(0.24 0.014 84 / 0.15)",
+      createInk: ready ? "oklch(0.97 0.01 90)" : DIM,
+      createLabel: editing ? "save changes" : "start answering",
+      createNote: !ready
+        ? "Pick the connection this channel answers on. Its address comes from the account behind it."
+        : editing
+        ? "Applies to messages arriving from now on. The " + chan.threads + " threads this channel already made keep whoever answered them."
+        : "From the next message onwards, this address produces threads here. Anything sent before now stays wherever it already is.",
+      onCreate: () => { if (ready) set({ at: "list" }); },
+      onCancel: () => set({ at: "list" }),
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label,
+        hasLabel: !!sec.label,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          count: n.count || "", hasCount: !!n.count,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" }, { glyph: "\u27C1" }, { glyph: "\u2317" },
+        { glyph: "\u25CE" }, { glyph: "\u2261" }, { glyph: "\u229E" },
+        { glyph: "\u2709", active: true }
+      ].map((n) => ({
+        glyph: n.glyph,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

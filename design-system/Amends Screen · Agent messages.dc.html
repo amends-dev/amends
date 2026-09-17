@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+    @keyframes stitch{to{stroke-dashoffset:-26}}
+    svg[data-stitch] [data-seam]{animation:stitch 2.6s linear infinite;}
+    @media (prefers-reduced-motion: reduce){svg[data-stitch] [data-seam]{animation:none}}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · screen 08 of 12</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Messages with an agent</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">One stream, read like any channel. Writing in the page composer starts a new thread; the agent answers inside it. Replying to something already said continues that thread instead. The two are different actions because the backend will never merge two threads just for sharing participants.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="6">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};flex:none;">{{ n.glyph }}</span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Acme Finance</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.2px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                    <sc-if value="{{ n.hasDot }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ n.dot }};flex:none;"></span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+        <div style="flex:1;min-height:0;display:flex;gap:0;">
+
+          <sc-if value="{{ showStream }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+            <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:10px;flex:none;">
+              <div style="display:flex;flex-wrap:nowrap;align-items:center;gap:11px;">
+                <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+                  <span style="width:44px;height:44px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;">&#9776;</span>
+                </sc-if>
+                <span style="width:{{ avatarSize }};height:{{ avatarSize }};border-radius:50%;border:1.4px dashed oklch(0.64 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">a</span>
+                <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+                  <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Ada</span>
+                  <span style="display:inline-flex;align-items:center;gap:9px;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ statusDot }};flex:none;"></span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ statusLine }}</span>
+                  </span>
+                </span>
+                <button type="button" aria-label="Configure this agent" title="Configure this agent" style="display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:{{ iconFont }};padding:{{ ghostPad }};min-width:{{ iconMin }};min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;flex:none;white-space:nowrap;">{{ configureFace }}</button>
+              </div>
+            </div>
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:{{ streamPad }};display:flex;flex-direction:column;">
+
+              <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:28px 20px;text-align:center;">
+                  <svg data-stitch="on" viewBox="0 0 240 160" width="220" height="147" fill="none" role="img" aria-label="Clean cloth with a threaded needle resting on it, nothing stitched yet">
+                    <path d="M28 44 L208 34 L202 128 L34 138 Z" stroke="oklch(0.76 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                    <path d="M48 108 L214 28" stroke="oklch(0.28 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                    <ellipse cx="208" cy="31" rx="4.6" ry="2.4" transform="rotate(-26 208 31)" stroke="oklch(0.28 0.014 84)" stroke-width="1.2"></ellipse>
+                  </svg>
+                  <div style="display:flex;flex-direction:column;gap:9px;max-width:420px;">
+                    <span style="font-family:'Instrument Serif',serif;font-size:28px;line-height:1.15;">Nothing said yet</span>
+                    <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">You have not written to Ada directly. She has still done 214 turns of assigned work — that lives with the tasks, not here.</span>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-for list="{{ stream }}" as="e" hint-placeholder-count="5">
+
+                <sc-if value="{{ e.isDay }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:12px;padding:16px 0 10px;">
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:oklch(0.5 0.014 84);">{{ e.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ e.isPost }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:12px;padding:13px 0;">
+                    <span style="width:30px;height:30px;border-radius:{{ e.radius }};border:{{ e.border }};background:{{ e.fill }};font-family:{{ e.markFont }};font-size:11px;font-weight:{{ e.markWeight }};color:{{ e.markInk }};display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ e.initial }}</span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
+                      <span style="display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 11px;">
+                        <span style="font-size:14px;font-weight:600;">{{ e.who }}</span>
+                        <sc-if value="{{ e.isAgent }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:oklch(0.5 0.014 84);border:1px dashed oklch(0.78 0.016 84);border-radius:4px;padding:1px 5px;">agent</span>
+                        </sc-if>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ e.when }}</span>
+                      </span>
+                      <span style="font-size:14.5px;line-height:1.62;color:oklch(0.28 0.014 84);">{{ e.text }}</span>
+
+                      <sc-if value="{{ e.hasQuote }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;flex-direction:column;gap:6px;padding:11px 0 11px 14px;border-left:2px solid oklch(0.56 0.13 42);">
+                          <span style="font-size:13.5px;font-weight:600;color:oklch(0.24 0.014 84);">{{ e.quoteTitle }}</span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.45 0.014 84);">{{ e.quoteMeta }}</span>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ e.hasThread }}" hint-placeholder-val="{{ true }}">
+                        <button type="button" onClick="{{ e.onOpen }}" style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;padding:7px 11px;margin-left:-11px;border:none;border-radius:999px;background:{{ e.threadBg }};text-align:left;min-height:{{ chipMin }};" style-hover="background:oklch(0.24 0.014 84 / 0.07)">
+                          <span style="display:inline-flex;align-items:center;gap:-6px;flex:none;">
+                            <span style="width:20px;height:20px;border-radius:50%;border:1.4px dashed oklch(0.64 0.016 84);background:oklch(0.955 0.012 88);font-family:'IBM Plex Mono',monospace;font-size:9px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">a</span>
+                          </span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.47 0.12 40);">{{ e.threadCount }}</span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ e.threadWhen }}</span>
+                          <sc-if value="{{ e.threadWaiting }}" hint-placeholder-val="{{ false }}">
+                            <span style="display:inline-flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.42 0.1 78);">
+                              <span style="width:6px;height:6px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;"></span>{{ e.threadWaitLabel }}
+                            </span>
+                          </sc-if>
+                        </button>
+                      </sc-if>
+
+                      <sc-if value="{{ e.hasNoThread }}" hint-placeholder-val="{{ false }}">
+                        <button type="button" onClick="{{ e.onOpen }}" style="display:inline-flex;align-self:flex-start;align-items:center;gap:10px;padding:7px 11px;margin-left:-11px;border:none;border-radius:999px;background:none;min-height:{{ chipMin }};" style-hover="background:oklch(0.24 0.014 84 / 0.06)">
+                          <sc-if value="{{ e.threadWaiting }}" hint-placeholder-val="{{ false }}">
+                            <span style="display:inline-flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.42 0.1 78);">
+                              <span style="width:6px;height:6px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;"></span>{{ e.threadWaitLabel }}
+                            </span>
+                          </sc-if>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ e.noReplyLabel }}</span>
+                        </button>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ e.isWorking }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:12px;padding:13px 0;">
+                    <span style="width:30px;height:30px;border-radius:50%;border:1.4px dashed oklch(0.64 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">a</span>
+                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
+                      <span style="display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 11px;">
+                        <span style="font-size:14px;font-weight:600;">Ada</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.41 0.014 84);">{{ e.label }}</span>
+                      </span>
+                      <svg data-stitch="on" viewBox="0 0 240 8" width="140" height="8" fill="none"><path d="M2 4 H238" stroke="oklch(0.41 0.014 84)" stroke-width="1.7" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path></svg>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ e.note }}</span>
+                    </div>
+                  </div>
+                </sc-if>
+
+              </sc-for>
+            </div>
+
+            <div style="flex:none;padding:{{ composerPad }};display:flex;flex-direction:column;gap:10px;">
+              <div style="border:1.4px dashed {{ pageLine }};border-radius:12px;padding:4px 4px 4px 2px;display:flex;flex-direction:column;gap:2px;">
+                <textarea rows="2" value="{{ draft }}" onInput="{{ setDraft }}" onFocus="{{ focusPage }}" onBlur="{{ blurPage }}" placeholder="Message Ada. @ to mention, / for a command." style="width:100%;box-sizing:border-box;padding:10px 12px;border:none;background:none;font-size:15px;line-height:1.55;resize:vertical;font-family:'IBM Plex Sans',sans-serif;"></textarea>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 8px 4px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);">@</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);">/</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);">&#8853;</span>
+                  <button type="button" onClick="{{ onSend }}" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:8px 18px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ sendBg }};color:{{ sendInk }};" style-hover="background:oklch(0.16 0.012 84)">send message</button>
+                </div>
+              </div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">Starts a new thread. Ada answers inside it, and her reply is a turn with a session.</span>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ showThread }}" hint-placeholder-val="{{ false }}">
+          <div style="width:{{ threadWidth }};flex:{{ threadFlex }};min-width:0;display:flex;flex-direction:column;background:oklch(0.978 0.008 92);border-left:{{ threadEdge }};">
+            <div style="flex:none;display:flex;flex-wrap:nowrap;align-items:center;gap:10px;padding:{{ threadHeadPad }};">
+              <sc-if value="{{ narrowThread }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ onClose }}" aria-label="Back to the stream" title="Back to the stream" style="width:44px;height:44px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;background:none;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;">&#8592;</button>
+              </sc-if>
+              <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+                <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.15;">Thread</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ threadMeta }}</span>
+              </span>
+              <sc-if value="{{ wideThread }}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{ onClose }}" aria-label="Close thread" title="Close thread" style="width:34px;height:34px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;background:none;font-family:'IBM Plex Mono',monospace;font-size:13px;flex:none;">&#10005;</button>
+              </sc-if>
+            </div>
+
+            <div style="flex:1;min-height:0;overflow-y:auto;padding:{{ threadPad }};display:flex;flex-direction:column;">
+              <sc-for list="{{ threadMessages }}" as="m" hint-placeholder-count="3">
+                <div style="display:flex;gap:11px;padding:12px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                  <span style="width:26px;height:26px;border-radius:{{ m.radius }};border:{{ m.border }};background:{{ m.fill }};font-family:{{ m.markFont }};font-size:10px;font-weight:{{ m.markWeight }};color:{{ m.markInk }};display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ m.initial }}</span>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
+                    <span style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;">
+                      <span style="font-size:13.5px;font-weight:600;">{{ m.who }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ m.when }}</span>
+                      <sc-if value="{{ m.hasTag }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ m.tagInk }};">{{ m.tag }}</span>
+                      </sc-if>
+                    </span>
+                    <span style="font-size:14px;line-height:1.6;color:oklch(0.28 0.014 84);">{{ m.text }}</span>
+                    <sc-if value="{{ m.hasExec }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;flex-direction:column;gap:8px;">
+                        <button type="button" onClick="{{ m.onToggle }}" style="display:inline-flex;align-self:flex-start;align-items:center;gap:9px;padding:6px 0;border:none;background:none;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);text-align:left;">
+                          <span style="width:9px;flex:none;">{{ m.chevron }}</span>{{ m.execSummary }}
+                        </button>
+                        <sc-if value="{{ m.open }}" hint-placeholder-val="{{ false }}">
+                          <div style="display:flex;flex-direction:column;gap:9px;padding:0 0 4px 18px;">
+                            <div style="display:flex;flex-direction:column;">
+                              <sc-for list="{{ m.steps }}" as="st" hint-placeholder-count="3">
+                                <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 11px;padding:7px 0;border-bottom:1px dashed oklch(0.91 0.014 86);">
+                                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);width:46px;flex:none;">{{ st.when }}</span>
+                                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.28 0.014 84);flex:1;min-width:110px;">{{ st.text }}</span>
+                                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ st.outcome }}</span>
+                                </div>
+                              </sc-for>
+                            </div>
+                            <button type="button" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:8px 14px;min-height:{{ chipMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">open the session log</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+
+              <sc-if value="{{ threadWorking }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:11px;padding:14px 0;">
+                  <span style="width:26px;height:26px;border-radius:50%;border:1.4px dashed oklch(0.64 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:10px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">a</span>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.41 0.014 84);">{{ workingLabel }}</span>
+                    <svg data-stitch="on" viewBox="0 0 240 8" width="120" height="8" fill="none"><path d="M2 4 H238" stroke="oklch(0.41 0.014 84)" stroke-width="1.7" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path></svg>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ workingNote }}</span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="flex:none;padding:{{ threadComposerPad }};display:flex;flex-direction:column;gap:10px;">
+              <div style="border:1.4px dashed {{ threadLine }};border-radius:12px;padding:4px 4px 4px 2px;display:flex;flex-direction:column;gap:2px;">
+                <textarea rows="2" value="{{ threadDraft }}" onInput="{{ setThreadDraft }}" onFocus="{{ focusThread }}" onBlur="{{ blurThread }}" placeholder="{{ threadHint }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:none;background:none;font-size:14.5px;line-height:1.55;resize:vertical;font-family:'IBM Plex Sans',sans-serif;"></textarea>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 8px 4px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);">@</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);">/</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.5 0.014 84);">&#8853;</span>
+                  <button type="button" onClick="{{ onThreadSend }}" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 17px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ threadSendBg }};color:{{ threadSendInk }};" style-hover="background:oklch(0.16 0.012 84)">{{ threadSendLabel }}</button>
+                </div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 16px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">{{ trackLabel }}</button>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;color:oklch(0.5 0.014 84);flex:1;min-width:180px;">{{ threadNote }}</span>
+              </div>
+            </div>
+          </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The page composer and the thread composer do different things, and each says which. Writing on the page starts a thread; writing in the panel continues one. Nothing merges two threads because they share the same two participants.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Replies live in the thread, not the stream. The stream stays a list of openings, so a long exchange about one script cannot bury everything else.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Every agent reply carries a one-line execution summary you can open. Answering "how are you" still ran a turn, a session and a cost; that is true and quietly available rather than hidden or shouted.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A message sent while Ada is mid-turn says where it went: into the execution already running, between prompts. It does not start a second one.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">05</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Work can come out of a conversation without leaving it. <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">track as a task</span> creates a task referencing this thread; until somebody does that, nothing here has a status, an owner or a due date.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const OK = "oklch(0.52 0.14 148)";
+const IDLE = "oklch(0.62 0.014 84)";
+const WORK = "oklch(0.41 0.014 84)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 900 },
+  laptop: { label: "laptop", width: 1180, height: 860 },
+  tablet: { label: "tablet", width: 834, height: 800 },
+  phone: { label: "phone", width: 390, height: 780 }
+};
+
+// The principal mark, lifted verbatim from the components pages: filled = person,
+// dashed outline = agent, squared = outside contact.
+const KIND = {
+  user: { radius: "50%", border: "none", fill: "oklch(0.88 0.018 86)", markInk: "oklch(0.32 0.014 84)",
+    markFont: "'IBM Plex Sans',sans-serif", markWeight: 600 },
+  agent: { radius: "50%", border: "1.4px dashed oklch(0.64 0.016 84)", fill: "transparent", markInk: "oklch(0.41 0.014 84)",
+    markFont: "'IBM Plex Mono',monospace", markWeight: 400 },
+  contact: { radius: "7px", border: "none", fill: "oklch(0.9 0.014 88)", markInk: "oklch(0.41 0.014 84)",
+    markFont: "'IBM Plex Sans',sans-serif", markWeight: 600 }
+};
+
+const STATES = [
+  ["stream", "the stream"],
+  ["thread", "a thread open"],
+  ["replying", "Ada replying"],
+  ["midturn", "message mid-turn"],
+  ["sent", "just sent"],
+  ["empty", "never talked"]
+];
+
+const REPLY_STEPS = [
+  ["+0.3s", "read own instructions", "ok"],
+  ["+0.6s", "read thread context", "4 messages"],
+  ["+1.1s", "model · compose reply", "end_turn"]
+];
+
+const LONG_STEPS = [
+  ["+0.4s", "read_file scripts/reconcile.ts", "ok · 182 lines"],
+  ["+2.2s", "read_file notes/close.md", "ok"],
+  ["+3.0s", "model · compose reply", "end_turn"]
+];
+
+// Each stream post is the opening message of its own thread.
+const POSTS = [
+  { id: "p1", day: "Monday", who: "Jo Mercer", initial: "JM", when: "09:14",
+    text: "Can you look at the supplier terms when you get a moment? I will send the contract after the close.",
+    replies: 0, waiting: "waiting on you" },
+  { id: "p2", day: "Tuesday", who: "Jo Mercer", initial: "JM", when: "13:58",
+    text: "Explain the reconcile script to me — what is it actually comparing?",
+    replies: 3, last: "14:05" },
+  { id: "p3", day: "Tuesday", who: "Ada", initial: "a", when: "15:31", agent: true,
+    text: "Heads up: the September close is still open and the receipts question from this morning is unanswered.",
+    quoteTitle: "Backfill the archived delivery receipts",
+    quoteMeta: "task · held · attempt 1 paused",
+    replies: 1, last: "15:36" },
+  { id: "p4", day: "Tuesday", who: "Jo Mercer", initial: "JM", when: "16:20",
+    text: "How are you?",
+    replies: 1, last: "16:22" }
+];
+
+const THREADS = {
+  p1: { meta: "1 message · no reply yet", messages: [
+    ["Jo Mercer", "JM", "09:14", "Can you look at the supplier terms when you get a moment? I will send the contract after the close.", null]
+  ] },
+  p2: { meta: "4 messages · 3 reply turns", messages: [
+    ["Jo Mercer", "JM", "13:58", "Explain the reconcile script to me — what is it actually comparing?", null],
+    ["Ada", "a", "14:02", "It walks the ledger rows for the quarter and matches each to a receipt by invoice number, then compares the net against the April rebuild rather than the original export. Rows differing by under a cent are rounding, and it fixes those in place.",
+      ["reply turn · done · 3 tools · 4.1s · $0.06", LONG_STEPS]],
+    ["Jo Mercer", "JM", "14:04", "And if a receipt has no ledger row at all?", null],
+    ["Ada", "a", "14:05", "It reports it as missing and stops rather than inventing a row. That is what happened with the 812 pre-March receipts.",
+      ["reply turn · done · 1 tool · 1.8s · $0.03", REPLY_STEPS]]
+  ] },
+  p3: { meta: "2 messages · 1 reply turn", messages: [
+    ["Ada", "a", "15:31", "Heads up: the September close is still open and the receipts question from this morning is unanswered.",
+      ["reply turn · done · 2 tools · 1.2s · $0.02", REPLY_STEPS]],
+    ["Jo Mercer", "JM", "15:36", "Noted. I will answer it before the end of the day.", null]
+  ] },
+  p4: { meta: "2 messages · 1 reply turn", messages: [
+    ["Jo Mercer", "JM", "16:20", "How are you?", null],
+    ["Ada", "a", "16:22", "Busy but fine. Two backfills running and one waiting on you — the September receipts question from this morning.",
+      ["reply turn · done · 2 tools · 40s · $0.04", REPLY_STEPS]]
+  ] }
+};
+
+class Component extends DCLogic {
+  state = {
+    at: "stream", view: "desktop", available: 0,
+    thread: "p4", draft: "", threadDraft: "", openExec: null,
+    // The message just posted, which becomes a thread of its own.
+    sentPost: null,
+    // A reply typed into a thread: { id, text, intoTurn }.
+    threadReply: null,
+    pageFocus: false, threadFocus: false
+  };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const touch = isPhone || isTablet;
+    const narrow = isPhone || isTablet;
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const isEmpty = at === "empty";
+    const justSent = !!s.sentPost;
+    const replying = at === "replying" || at === "midturn";
+    const midturn = at === "midturn";
+    const threadOpen = at === "thread" || replying;
+    // The open thread has a turn running — drives the indicator and the composer alike.
+    const turnHere = replying || s.thread === "sent";
+
+    const posts = isEmpty ? [] : POSTS.slice();
+    const stream = [];
+    let day = null;
+    posts.forEach((p) => {
+      if (p.day !== day) {
+        day = p.day;
+        stream.push({ isDay: true, label: p.day });
+      }
+      const mark = p.agent ? KIND.agent : KIND.user;
+      stream.push({
+        isPost: true,
+        who: p.who, initial: p.initial, when: p.when, text: p.text,
+        isAgent: !!p.agent,
+        radius: mark.radius, border: mark.border, fill: mark.fill,
+        markInk: mark.markInk, markFont: mark.markFont, markWeight: mark.markWeight,
+        hasQuote: !!p.quoteTitle,
+        quoteTitle: p.quoteTitle || "", quoteMeta: p.quoteMeta || "",
+        hasThread: p.replies > 0,
+        hasNoThread: p.replies === 0,
+        threadCount: p.replies === 1 ? "1 reply" : p.replies + " replies",
+        threadWhen: p.last ? "last at " + p.last : "",
+        threadWaiting: !!p.waiting,
+        threadWaitLabel: p.waiting || "",
+        noReplyLabel: "reply in thread",
+        threadBg: !narrow && threadOpen && s.thread === p.id
+          ? "oklch(0.24 0.014 84 / 0.07)" : "none",
+        onOpen: () => set({ at: "thread", thread: p.id, threadDraft: "", openExec: null })
+      });
+    });
+
+    // What the user just posted becomes a thread of its own, openable like any other.
+    if (justSent && !isEmpty) {
+      stream.push({
+        isPost: true, who: "Jo Mercer", initial: "JM", when: "16:26",
+        text: s.sentPost,
+        isAgent: false, hasQuote: false,
+        radius: KIND.user.radius, border: KIND.user.border, fill: KIND.user.fill,
+        markInk: KIND.user.markInk, markFont: KIND.user.markFont, markWeight: KIND.user.markWeight,
+        hasThread: false, hasNoThread: true,
+        threadCount: "", threadWhen: "",
+        threadWaiting: true, threadWaitLabel: "Ada is replying",
+        noReplyLabel: "open thread",
+        threadBg: "none",
+        onOpen: () => set({ at: "thread", thread: "sent", threadDraft: "", openExec: null })
+      });
+      stream.push({
+        isWorking: true,
+        label: "replying in a new thread",
+        note: "A reply turn is starting, with its own session."
+      });
+    }
+
+    const sentThread = s.sentPost
+      ? { meta: "1 message · reply turn running",
+          messages: [["Jo Mercer", "JM", "16:26", s.sentPost, null]] }
+      : null;
+    const t = (s.thread === "sent" && sentThread) || THREADS[s.thread] || THREADS.p4;
+    let threadMessages = t.messages.map((m, i) => {
+      const key = s.thread + "-" + i;
+      const e = m[4];
+      const mark = m[0] === "Ada" ? KIND.agent : KIND.user;
+      return {
+        who: m[0], initial: m[1], when: m[2], text: m[3],
+        radius: mark.radius, border: mark.border, fill: mark.fill,
+        markInk: mark.markInk, markFont: mark.markFont, markWeight: mark.markWeight,
+        hasTag: false, tag: "", tagInk: DIM,
+        hasExec: !!e,
+        execSummary: e ? e[0] : "",
+        steps: e ? e[1].map((x) => ({ when: x[0], text: x[1], outcome: x[2] })) : [],
+        open: s.openExec === key,
+        chevron: s.openExec === key ? "\u2013" : "+",
+        onToggle: () => set({ openExec: s.openExec === key ? null : key })
+      };
+    });
+
+    // A reply stays in the thread it was written in.
+    const reply = s.threadReply;
+    if (reply && reply.id === s.thread) {
+      threadMessages = threadMessages.concat([{
+        who: "Jo Mercer", initial: "JM", when: "16:24", text: reply.text,
+        radius: KIND.user.radius, border: KIND.user.border, fill: KIND.user.fill,
+        markInk: KIND.user.markInk, markFont: KIND.user.markFont, markWeight: KIND.user.markWeight,
+        hasTag: reply.intoTurn, tag: "added to the turn already running",
+        tagInk: "oklch(0.42 0.1 78)",
+        hasExec: false, steps: [], open: false, chevron: "+", onToggle: () => {}
+      }]);
+    }
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage" },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Channels", rows: [
+        { glyph: "#", label: "billing@acme.test" },
+        { glyph: "#", label: "support@acme.test" }
+      ] },
+      { label: "Agents", rows: [
+        { glyph: "a", label: "Ada", avatar: true, active: true, dot: replying ? WORK : null },
+        { glyph: "r", label: "Rae", avatar: true, dot: WORK },
+        { glyph: "s", label: "Sol", avatar: true }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u25CE", label: "Agents" },
+        { glyph: "\u2261", label: "Policy" }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({
+          at: x[0], draft: "", threadDraft: "", openExec: null,
+          sentPost: x[0] === "sent"
+            ? "Also \u2014 is the April rebuild the one with the corrected VAT?" : null,
+          threadReply: x[0] === "midturn"
+            ? { id: "p4", text: "Also \u2014 is the April rebuild the one with the corrected VAT?",
+                intoTurn: true }
+            : null,
+          thread: x[0] === "thread" || x[0] === "replying" || x[0] === "midturn" ? "p4" : s.thread
+        })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone && !(narrow && threadOpen),
+      headerPad: isPhone ? "14px 18px 10px" : "20px 30px 12px",
+      streamPad: isPhone ? "0 18px" : "0 30px",
+      composerPad: isPhone ? "10px 18px 16px" : "12px 30px 22px",
+      titleSize: isPhone ? "24px" : "28px",
+      avatarSize: isPhone ? "34px" : "40px",
+      chipMin: touch ? "44px" : "32px",
+      btnMin: touch ? "44px" : "38px",
+      iconFont: isPhone ? "15px" : "12.5px",
+      iconMin: isPhone ? "44px" : "0",
+      ghostPad: isPhone ? "0 12px" : "9px 17px",
+
+      isEmpty: isEmpty,
+      showStream: !narrow || !threadOpen,
+      showThread: threadOpen,
+      narrowThread: narrow,
+      wideThread: !narrow,
+      // The drawer is a sibling of the whole stream column, so it runs the full
+      // height of the frame and narrows the main view rather than sitting under it.
+      threadEdge: narrow ? "none" : "1px dashed oklch(0.85 0.016 86)",
+      threadWidth: narrow ? "100%" : "400px",
+      threadFlex: narrow ? "1" : "none",
+      threadHeadPad: isPhone ? "14px 18px 8px" : "20px 24px 10px",
+      threadPad: isPhone ? "0 18px" : "0 24px",
+      threadComposerPad: isPhone ? "10px 18px 16px" : "12px 24px 22px",
+
+      statusDot: replying ? WORK : IDLE,
+      statusLine: isPhone
+        ? (replying ? "replying now" : "2 of 3 running")
+        : replying ? "replying now · finance agent"
+        : "finance agent · 2 of 3 turns running on tasks",
+      configureFace: isPhone ? "\u270E" : "configure",
+
+      stream: stream,
+
+      threadMeta: t.meta,
+      threadMessages: threadMessages,
+      threadWorking: turnHere,
+      workingLabel: midturn ? "still working · your message added" : "working",
+      workingNote: midturn
+        ? "Your message went into the turn already running, between prompts. No second turn."
+        : "A reply turn is running, with its own session.",
+      onClose: () => set({ at: "stream", threadDraft: "", openExec: null }),
+
+      draft: s.draft,
+      setDraft: (e) => set({ draft: e.target.value }),
+      // The composer shell owns the border, as in Conversation and Work.
+      focusPage: () => set({ pageFocus: true }),
+      blurPage: () => set({ pageFocus: false }),
+      pageLine: s.pageFocus ? "oklch(0.24 0.014 84)" : "oklch(0.78 0.016 84)",
+      sendBg: s.draft.trim() ? INK : "oklch(0.24 0.014 84 / 0.15)",
+      sendInk: s.draft.trim() ? "oklch(0.97 0.01 90)" : DIM,
+      onSend: () => {
+        if (s.draft.trim()) set({ at: "sent", sentPost: s.draft.trim(), draft: "" });
+      },
+
+      threadDraft: s.threadDraft,
+      setThreadDraft: (e) => set({ threadDraft: e.target.value }),
+      threadHint: turnHere
+        ? "Add something to the turn Ada is running"
+        : "Reply in this thread",
+      focusThread: () => set({ threadFocus: true }),
+      blurThread: () => set({ threadFocus: false }),
+      threadLine: turnHere ? "oklch(0.6 0.1 78)"
+        : s.threadFocus ? "oklch(0.24 0.014 84)" : "oklch(0.78 0.016 84)",
+      threadSendLabel: turnHere ? "add to this turn" : "reply",
+      threadSendBg: s.threadDraft.trim() ? INK : "oklch(0.24 0.014 84 / 0.15)",
+      threadSendInk: s.threadDraft.trim() ? "oklch(0.97 0.01 90)" : DIM,
+      onThreadSend: () => {
+        if (!s.threadDraft.trim()) return;
+        set({
+          at: turnHere ? "midturn" : "replying",
+          threadReply: { id: s.thread, text: s.threadDraft.trim(), intoTurn: turnHere },
+          threadDraft: ""
+        });
+      },
+      threadNote: turnHere
+        ? "Ada is mid-turn. This goes to the execution already running rather than starting another."
+        : "Replying here stays in this thread. Ada's answer is a turn with a session.",
+      trackLabel: s.thread === "p3" ? "1 task from this thread" : "track as a task",
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label,
+        hasLabel: !!sec.label,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          hasDot: !!n.dot, dot: n.dot || IDLE,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" }, { glyph: "\u27C1" }, { glyph: "\u2317" },
+        { glyph: "a", active: true }, { glyph: "\u25CE" }, { glyph: "\u2261" }
+      ].map((n) => ({
+        glyph: n.glyph,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+    @keyframes stitch{to{stroke-dashoffset:-26}}
+    svg[data-stitch] [data-seam]{animation:stitch 2.6s linear infinite;}
+    @media (prefers-reduced-motion: reduce){svg[data-stitch] [data-seam]{animation:none}}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · screen 01 of 12</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Home</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">What you see when you open the workspace: what is waiting on you, what is running without you, and what happened today. Six states. Five carry a drawing, because the illustration is the state rather than decoration on top of it; the populated state carries none, since the work is already the picture.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="6">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};position:relative;flex:none;">
+              {{ n.glyph }}
+              <sc-if value="{{ n.hasCount }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:oklch(0.7 0.14 44);"></span>
+              </sc-if>
+            </span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+      <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+        <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+            <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ workspaceName }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+          </span>
+          <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+        <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+        <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+          <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  <sc-if value="{{ sec.hasAction }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.7 0.01 85);">{{ sec.action }}</span>
+                  </sc-if>
+                </div>
+              </sc-if>
+              <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                  <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                    <span style="width:16px;height:16px;border-radius:50%;border:1.2px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                  </sc-if>
+                  <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                    <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                  </sc-if>
+                  <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                  <sc-if value="{{ n.hasCount }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.72 0.008 86);flex:none;">{{ n.count }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+        <div style="padding:8px;">
+          <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;">
+            <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.62 0.01 85);flex:none;text-align:center;">&#9881;</span>
+            <span style="font-size:14px;color:oklch(0.82 0.008 88);">Settings</span>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:7px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:40px;height:40px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;">&#9776;</span>
+            </sc-if>
+            <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.1;flex:1;min-width:0;">{{ greeting }}</span>
+            <sc-if value="{{ hasPrimary }}" hint-placeholder-val="{{ true }}">
+              <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);flex:none;">new task</button>
+            </sc-if>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);">{{ headerMeta }}</span>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;gap:26px;">
+
+          <sc-if value="{{ showFirstRun }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:56px 24px 40px;text-align:center;">
+              <svg data-stitch="on" viewBox="0 0 240 180" width="240" height="180" fill="none" role="img" aria-label="An empty embroidery hoop with the very first stitch being made">
+                <circle cx="112" cy="92" r="66" stroke="oklch(0.72 0.016 84)" stroke-width="1.4"></circle>
+                <circle cx="112" cy="92" r="58" stroke="oklch(0.8 0.016 84)" stroke-width="1.2"></circle>
+                <path d="M100 26 h24 a5 5 0 0 1 0 10 h-24 a5 5 0 0 1 0 -10 Z" stroke="oklch(0.72 0.016 84)" stroke-width="1.3" stroke-linejoin="round"></path>
+                <path d="M84 100 H140" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path>
+                <path d="M140 100 L196 66" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                <ellipse cx="190" cy="70" rx="5" ry="2.5" transform="rotate(-31 190 70)" stroke="oklch(0.24 0.014 84)" stroke-width="1.2"></ellipse>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:420px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">Nothing here yet</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Three things and the workspace starts running on its own.</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px;width:100%;max-width:460px;text-align:left;">
+                <sc-for list="{{ setupSteps }}" as="st" hint-placeholder-count="3">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 4px;border-bottom:1px dashed oklch(0.87 0.014 86);">
+                    <span style="width:22px;height:22px;border-radius:999px;border:{{ st.boxBorder }};background:{{ st.boxFill }};color:{{ st.markInk }};font-family:'IBM Plex Mono',monospace;font-size:11.5px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ st.mark }}</span>
+                    <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:160px;">
+                      <span style="font-size:14.5px;color:{{ st.ink }};">{{ st.label }}</span>
+                      <span style="font-size:12.5px;line-height:1.5;color:oklch(0.5 0.014 84);">{{ st.note }}</span>
+                    </span>
+                    <sc-if value="{{ st.actionable }}" hint-placeholder-val="{{ true }}">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;background:{{ st.btnBg }};color:{{ st.btnInk }};border:{{ st.btnBorder }};flex:none;">{{ st.action }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showOffline }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:56px 24px 40px;text-align:center;">
+              <svg viewBox="0 0 240 180" width="240" height="180" fill="none" role="img" aria-label="A needle with an empty eye, its thread lying loose beside it">
+                <path d="M62 40 L152 118" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                <ellipse cx="68" cy="46" rx="3" ry="6" transform="rotate(41 68 46)" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></ellipse>
+                <path d="M34 132 C66 120 96 146 128 134 C152 125 168 140 190 132" stroke="oklch(0.66 0.016 84)" stroke-width="1.5" stroke-dasharray="7 6" stroke-linecap="round"></path>
+                <path d="M186 44 L214 44 M200 30 L200 58" stroke="oklch(0.72 0.016 84)" stroke-width="1.3" stroke-linecap="round"></path>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:420px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">The workspace is unreachable</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Runs already in flight keep going on the server. This view is stale, not empty.</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);">last heard from · 14:22</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:9px;justify-content:center;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">retry</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showNeedsYou }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Needs you</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">2</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+              </div>
+              <div style="display:grid;grid-template-columns:{{ cardGrid }};gap:12px;">
+                <div style="background:oklch(0.945 0.014 88);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;"></span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.41 0.014 84);">review</span>
+                    <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">Attempt 2 · 4m ago</span>
+                  </div>
+                  <span style="font-size:15px;font-weight:600;line-height:1.35;">Ada finished the September reconciliation.</span>
+                  <span style="font-size:13.5px;line-height:1.55;color:oklch(0.41 0.014 84);">Four rows differ, all on the invoice-date rule. Totals agree once it is applied.</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:2px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">accept</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">request changes</span>
+                  </div>
+                </div>
+                <div style="background:oklch(0.945 0.014 88);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;"></span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.41 0.014 84);">held</span>
+                    <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">Rae · 2h ago</span>
+                  </div>
+                  <span style="font-family:'Instrument Serif',serif;font-style:italic;font-size:20px;line-height:1.28;">&#8220;Is this refund inside the 30-day window, or an exception?&#8221;</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:2px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">answer</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">open</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showNeedsYouEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Needs you</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">0</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:26px;padding:14px 2px 18px;">
+                <svg data-stitch="on" viewBox="0 0 200 130" width="150" height="98" fill="none" style="flex:none;" role="img" aria-label="A needle standing upright in cloth with its thread hanging loose">
+                  <path d="M24 106 H176" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linecap="round"></path>
+                  <path d="M100 22 V106" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                  <ellipse cx="100" cy="31" rx="2.8" ry="5.4" stroke="oklch(0.24 0.014 84)" stroke-width="1.2"></ellipse>
+                  <path d="M100 38 C70 52 132 68 94 90" stroke="oklch(0.24 0.014 84)" stroke-width="1.5" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path>
+                </svg>
+                <div style="display:flex;flex-direction:column;gap:7px;flex:1;min-width:220px;">
+                  <span style="font-family:'Instrument Serif',serif;font-size:23px;line-height:1.2;">Nothing needs you</span>
+                  <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">{{ needsYouNote }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showWorking }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Working</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">3</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ working }}" as="w" hint-placeholder-count="3">
+                  <sc-if value="{{ actWide }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:grid;grid-template-columns:7px 44px minmax(0,1fr) 88px 84px;align-items:center;gap:6px 12px;padding:12px 2px;border-bottom:1px dashed oklch(0.88 0.014 86);">
+                      <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.41 0.014 84);"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ w.since }}</span>
+                      <span style="font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ w.title }}</span>
+                      <svg data-stitch="on" viewBox="0 0 120 8" width="88" height="8" fill="none"><path d="M2 4 H118" stroke="oklch(0.55 0.016 84)" stroke-width="1.5" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path></svg>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ w.who }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ actNarrow }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:grid;grid-template-columns:7px minmax(0,1fr);align-items:center;gap:5px 12px;padding:12px 2px;border-bottom:1px dashed oklch(0.88 0.014 86);">
+                      <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.41 0.014 84);"></span>
+                      <span style="font-size:14px;line-height:1.4;min-width:0;">{{ w.title }}</span>
+                      <span style="grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">
+                        <span>{{ w.since }}</span>
+                        <span>{{ w.who }}</span>
+                        <svg data-stitch="on" viewBox="0 0 120 8" width="72" height="8" fill="none"><path d="M2 4 H118" stroke="oklch(0.55 0.016 84)" stroke-width="1.5" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path></svg>
+                      </span>
+                    </div>
+                  </sc-if>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showSettled }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:48px 24px 36px;text-align:center;">
+              <svg viewBox="0 0 240 170" width="230" height="163" fill="none" role="img" aria-label="Two pieces of cloth joined by a finished cross-stitched seam">
+                <path d="M26 40 H104 V136 H26 Z" stroke="oklch(0.72 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                <path d="M136 36 H214 V132 H136 Z" stroke="oklch(0.72 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                <path d="M104 50 L136 66 M136 50 L104 66 M104 76 L136 92 M136 76 L104 92 M104 102 L136 118 M136 102 L104 118" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:420px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">All mended</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Nothing waiting, nothing running. Eleven tasks settled today.</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:9px;justify-content:center;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">see what settled</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showIdle }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Ready</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">4</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:22px;padding:12px 2px 16px;">
+                <svg viewBox="0 0 200 120" width="130" height="78" fill="none" style="flex:none;" role="img" aria-label="A needle laid at rest across folded cloth beside a coil of thread">
+                  <path d="M26 74 L96 66 L172 74 L100 84 Z" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                  <path d="M34 62 L98 55 L164 62" stroke="oklch(0.82 0.016 84)" stroke-width="1.2" stroke-linejoin="round"></path>
+                  <path d="M52 44 H150" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                  <ellipse cx="58" cy="44" rx="2.6" ry="5" stroke="oklch(0.24 0.014 84)" stroke-width="1.2"></ellipse>
+                  <circle cx="164" cy="34" r="11" stroke="oklch(0.24 0.014 84)" stroke-width="1.4"></circle>
+                  <circle cx="164" cy="34" r="4.5" stroke="oklch(0.74 0.016 84)" stroke-width="1.2"></circle>
+                </svg>
+                <div style="display:flex;flex-direction:column;gap:7px;flex:1;min-width:220px;">
+                  <span style="font-family:'Instrument Serif',serif;font-size:22px;line-height:1.2;">Nothing running</span>
+                  <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">No agent has picked anything up since 09:40. Both are available, so these four are waiting on nothing.</span>
+                </div>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:8px 16px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);flex:none;">start one</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ ready }}" as="r" hint-placeholder-count="4">
+                  <div style="display:grid;grid-template-columns:{{ grids.ready }};align-items:center;gap:6px 14px;padding:12px 2px;border-bottom:1px dashed oklch(0.88 0.014 86);">
+                    <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.78 0.016 84);flex:none;"></span>
+                    <span style="font-size:14.5px;min-width:0;">{{ r.title }}</span>
+                    <span style="display:grid;grid-column:{{ metaCol }};grid-template-columns:26px 84px 44px;align-items:center;gap:0 12px;">
+                      <span style="display:inline-flex;gap:3px;align-items:flex-end;height:12px;">
+                        <sc-for list="{{ r.marks }}" as="m" hint-placeholder-count="2">
+                          <span style="width:3px;background:oklch(0.24 0.014 84);border-radius:2px;height:{{ m.h }};"></span>
+                        </sc-for>
+                      </span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);">{{ r.who }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ r.waited }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showActivity }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Today</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ activityCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:30px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">tasks, turns, messages, routing</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ activity }}" as="r" hint-placeholder-count="6">
+                  <sc-if value="{{ actWide }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:grid;grid-template-columns:7px 40px 118px minmax(0,1fr) 88px;align-items:center;gap:6px 12px;padding:9px 2px;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ r.dot }};"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ r.time }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;">{{ r.event }}</span>
+                      <span style="font-size:13.5px;color:oklch(0.41 0.014 84);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.subject }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ r.who }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ actNarrow }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:grid;grid-template-columns:7px minmax(0,1fr);align-items:center;gap:5px 12px;padding:10px 2px;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ r.dot }};"></span>
+                      <span style="font-size:13.5px;line-height:1.4;min-width:0;">{{ r.subject }}</span>
+                      <span style="grid-column:2;display:flex;flex-wrap:wrap;gap:2px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">
+                        <span>{{ r.time }}</span>
+                        <span>{{ r.event }}</span>
+                        <span>{{ r.who }}</span>
+                      </span>
+                    </div>
+                  </sc-if>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+        </div>
+
+        <sc-if value="{{ showBottomNav }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;background:oklch(0.2 0.008 84);display:flex;">
+            <sc-for list="{{ bottomRows }}" as="b" hint-placeholder-count="4">
+              <span style="flex:1;min-height:56px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ b.ink }};position:relative;">
+                  {{ b.glyph }}
+                  <sc-if value="{{ b.hasCount }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;top:-2px;right:-7px;width:6px;height:6px;border-radius:50%;background:oklch(0.7 0.14 44);"></span>
+                  </sc-if>
+                </span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ b.ink }};">{{ b.label }}</span>
+              </span>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">An empty bucket keeps its heading and gets a short drawing inline. Only an empty <em>screen</em> earns the full centred treatment — otherwise every quiet morning looks like a broken app.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The greeting carries the count, so the headline is the only place that says how much is waiting. Buckets below just organise it.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Offline says the runs continue on the server. A stale view that looks empty is worse than an error, because you would go and start the work again.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Three drawings added here: first run as an empty hoop, nothing running as a parked needle, disconnected as a needle with an empty eye. One still owed — no results, which belongs to a search screen we do not have yet.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const OK = "oklch(0.52 0.14 148)";
+const BAD = "oklch(0.51 0.17 28)";
+const WARN = "oklch(0.58 0.12 78)";
+const NEUTRAL = "oklch(0.62 0.014 84)";
+const WORK = "oklch(0.41 0.014 84)";
+
+const STATES = [
+  ["busy", "two waiting"],
+  ["quiet", "nothing needs you"],
+  ["idle", "nothing running"],
+  ["settled", "all mended"],
+  ["first", "first run"],
+  ["offline", "unreachable"]
+];
+
+const WORKING = [
+  ["Backfill the archived delivery receipts", "Ada", "15:55"],
+  ["Reconcile the September invoice totals", "Ada", "16:02"],
+  ["Seat count off by one after invite", "Rae", "15:31"]
+];
+
+const ACTIVITY = [
+  ["16:08", "task accepted", "Reconcile the September invoice totals", "Jo Mercer", OK],
+  ["16:06", "attempt done", "Reconcile the September invoice totals", "Ada", OK],
+  ["16:02", "attempt started", "Reconcile the September invoice totals", "Ada", WORK],
+  ["16:02", "answered", "Reconcile the September invoice totals", "Jo Mercer", NEUTRAL],
+  ["15:41", "task held", "Refund webhook retries forever", "Rae", WARN],
+  ["15:31", "routed", "billing → Ada", "policy", NEUTRAL],
+  ["15:12", "attempt failed", "Review the retry policy change", "Rae", BAD],
+  ["14:58", "message", "billing@acme.test", "Ravi Kaur", NEUTRAL]
+];
+
+const READY = [
+  ["Refund webhook retries forever", "unassigned", "6h", 1],
+  ["Seat count off by one after invite", "Ada", "4h", 2],
+  ["SSO metadata refresh fails silently", "Rae", "2h", 3],
+  ["Archive the August statements", "Ada", "35m", 1]
+];
+
+const SETUP = [
+  ["Connect a channel", "Somewhere work can arrive from — an inbox or a Slack workspace.", "connect", true],
+  ["Define an agent", "Give it a model, an environment and what it may do unattended.", "define", false],
+  ["Write one routing rule", "So arriving work reaches somebody without you moving it.", "write", false]
+];
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 880 },
+  laptop: { label: "laptop", width: 1180, height: 820 },
+  tablet: { label: "tablet", width: 834, height: 780 },
+  phone: { label: "phone", width: 390, height: 760 }
+};
+
+const BOTTOM = [
+  ["home", "\u2302", "home", false],
+  ["triage", "\u27C1", "triage", true],
+  ["tasks", "\u2317", "tasks", false],
+  ["agents", "\u25CE", "agents", false]
+];
+
+class Component extends DCLogic {
+  state = { at: "busy", view: "desktop", available: 0 };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const empty = at === "first";
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const nav = [
+      { label: "", rows: [
+        { id: "home", glyph: "\u2302", label: "Home", active: true },
+        { id: "triage", glyph: "\u27C1", label: "Triage", count: empty ? "" : "4" },
+        { id: "tasks", glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Channels", action: "+ channel", rows: empty
+        ? [{ id: "c0", glyph: "+", label: "Connect a channel", muted: true }]
+        : [
+          { id: "c1", glyph: "#", label: "billing@acme.test" },
+          { id: "c2", glyph: "#", label: "support@acme.test" }
+        ] },
+      { label: "Agents", action: "+ agent", rows: empty
+        ? [{ id: "a0", glyph: "+", label: "Define an agent", muted: true }]
+        : [
+          { id: "ada", glyph: "a", label: "Ada", avatar: true },
+          { id: "rae", glyph: "r", label: "Rae", avatar: true }
+        ] },
+      { label: "Configure", rows: [
+        { id: "policy", glyph: "\u2261", label: "Policy" },
+        { id: "env", glyph: "\u25A3", label: "Environments" },
+        { id: "con", glyph: "\u26AD", label: "Connections" }
+      ] }
+    ];
+
+    const greeting = at === "busy" ? "Two things need you"
+      : at === "quiet" ? "Nothing needs you"
+      : at === "idle" ? "Nothing is running"
+      : at === "settled" ? "All mended"
+      : at === "first" ? "Welcome to Amends"
+      : "Cannot reach the workspace";
+
+    const headerMeta = at === "first" ? "nothing set up yet"
+      : at === "offline" ? "showing what we last knew"
+      : at === "settled" ? "11 settled today"
+      : at === "idle" ? "4 ready · none running"
+      : "3 running · 11 settled today";
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? "oklch(0.24 0.014 84)" : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : "oklch(0.24 0.014 84)",
+        line: at === x[0] ? "oklch(0.24 0.014 84)" : "oklch(0.8 0.016 84)",
+        onPick: () => set({ at: x[0] })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? "oklch(0.24 0.014 84)" : "oklch(0.5 0.014 84)",
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1
+        ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      showBottomNav: isPhone,
+      headerPad: isPhone ? "16px 18px 10px" : "24px 30px 14px",
+      bodyPad: isPhone ? "6px 18px 20px" : "8px 30px 30px",
+      titleSize: isPhone ? "27px" : "34px",
+      cardGrid: isPhone || isTablet ? "minmax(0,1fr)" : "repeat(auto-fit,minmax(320px,1fr))",
+      // Rows are grids at every width. On phone they become two lines: the subject or
+      // title first, then the metadata as one block in column two, so it hangs under
+      // the text rather than under the status dot.
+      actWide: !isPhone,
+      actNarrow: isPhone,
+      metaCol: isPhone ? "2" : "auto",
+      grids: {
+        working: isPhone ? "7px minmax(0,1fr)" : "7px minmax(0,1fr) auto",
+        ready: isPhone ? "7px minmax(0,1fr)" : "7px minmax(0,1fr) auto"
+      },
+      railRows: [
+        { glyph: "\u2302", active: true },
+        { glyph: "\u27C1", count: !empty },
+        { glyph: "\u2317" },
+        { glyph: "\u25CE" },
+        { glyph: "\u2261" },
+        { glyph: "\u25A3" },
+        { glyph: "\u26AD" }
+      ].map((n) => ({
+        glyph: n.glyph, hasCount: !!n.count,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      })),
+      bottomRows: BOTTOM.map((b) => ({
+        glyph: b[1], label: b[2],
+        hasCount: b[3] && !empty,
+        ink: b[0] === "home" ? "oklch(0.97 0.008 90)" : "oklch(0.7 0.01 85)"
+      })),
+
+      workspaceName: at === "first" ? "Acme Finance" : "Acme Finance",
+      navGroups: nav.map((sec) => ({
+        label: sec.label, action: sec.action || "",
+        hasLabel: !!sec.label, hasAction: !!sec.action,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          count: n.count || "", hasCount: !!n.count,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : n.muted ? "oklch(0.62 0.01 84)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+
+      greeting: greeting,
+      headerMeta: headerMeta,
+      hasPrimary: at !== "first" && at !== "offline" && !isPhone,
+
+      showFirstRun: at === "first",
+      showOffline: at === "offline",
+      showNeedsYou: at === "busy",
+      showNeedsYouEmpty: at === "quiet" || at === "idle",
+      needsYouNote: at === "idle"
+        ? "Nothing is waiting on you and nothing is running. Four tasks are ready to be picked up."
+        : "Three runs are still going. They will land here if they get stuck or finish.",
+      showWorking: at === "busy" || at === "quiet",
+      showSettled: at === "settled",
+      showActivity: at === "busy" || at === "quiet" || at === "settled" || at === "idle",
+      showIdle: at === "idle",
+
+      working: WORKING.map((w) => ({ title: w[0], who: w[1], since: w[2] })),
+      ready: READY.map((r) => ({
+        title: r[0], who: r[1], waited: r[2],
+        marks: ["5px", "8px", "11px"].slice(0, r[3]).map((h, i) => ({ h: h, key: i }))
+      })),
+      activityCount: at === "settled" ? "24 events" : at === "idle" ? "9 events" : "18 events",
+      activity: ACTIVITY.map((r) => ({
+        time: r[0], event: r[1], subject: r[2], who: r[3], dot: r[4]
+      })),
+      // Step one is the current step: filled ink, so its numeral takes the onFill value.
+      setupSteps: SETUP.map((st, i) => ({
+        label: st[0], note: st[1], action: st[2],
+        actionable: true,
+        mark: String(i + 1),
+        boxFill: i === 0 ? "oklch(0.24 0.014 84)" : "transparent",
+        boxBorder: i === 0 ? "none" : "1.4px dashed oklch(0.74 0.016 84)",
+        markInk: i === 0 ? "oklch(0.97 0.01 90)" : "oklch(0.41 0.014 84)",
+        ink: i === 0 ? "oklch(0.24 0.014 84)" : "oklch(0.41 0.014 84)",
+        btnBg: st[3] ? "oklch(0.24 0.014 84)" : "transparent",
+        btnInk: st[3] ? "oklch(0.97 0.01 90)" : "oklch(0.41 0.014 84)",
+        btnBorder: st[3] ? "none" : "1.3px dashed oklch(0.78 0.016 84)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

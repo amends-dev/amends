@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · configure</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Settings</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Who is in the workspace and what each of them may do. A role is the thing you set; the tier is what gets checked when a request arrives or a tool is offered. You can never grant a role above your own, and somebody always has to own the place.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:{{ wsMarkBg }};color:{{ wsMarkInk }};font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ wsMarkLetter }}</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="6">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};flex:none;">{{ n.glyph }}</span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ meInitials }}</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:36px;height:36px;border-radius:8px;background:{{ wsMarkBg }};color:{{ wsMarkInk }};font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ wsMarkLetter }}</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ wsLabel }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">{{ meRoleLabel }}</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ meInitials }}</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.4px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:44px;height:44px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;margin-right:6px;">&#9776;</span>
+            </sc-if>
+            <sc-for list="{{ crumbs }}" as="b" hint-placeholder-count="2">
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ b.ink }};border-bottom:{{ b.line }};">{{ b.label }}</span>
+                <sc-if value="{{ b.more }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.62 0.014 84);">/</span>
+                </sc-if>
+              </span>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-wrap:nowrap;align-items:center;gap:12px 16px;">
+            <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.12;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pageTitle }}</span>
+            <span style="display:inline-flex;align-items:center;gap:10px;flex:none;">
+              <sc-if value="{{ hasBadge }}" hint-placeholder-val="{{ false }}">
+                <span role="img" aria-label="{{ badgeLabel }}" title="{{ badgeLabel }}" style="display:inline-flex;align-items:center;gap:9px;padding:{{ badgePad }};border-radius:999px;background:{{ badgeBg }};flex:none;">
+                  <span style="width:{{ badgeDotSize }};height:{{ badgeDotSize }};border-radius:50%;background:{{ badgeDot }};flex:none;"></span>
+                  <sc-if value="{{ showBadgeText }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ badgeInk }};white-space:nowrap;">{{ badgeLabel }}</span>
+                  </sc-if>
+                </span>
+              </sc-if>
+              <sc-if value="{{ hasPrimary }}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{ primaryAction }}" aria-label="{{ primaryLabel }}" title="{{ primaryLabel }}" style="display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:{{ primarySize }};padding:{{ primaryPad }};min-width:{{ primaryMin }};min-height:{{ btnMin }};border:{{ primaryBorder }};border-radius:999px;background:{{ primaryBg }};color:{{ primaryInk }};flex:none;white-space:nowrap;">{{ primaryFace }}</button>
+              </sc-if>
+            </span>
+          </div>
+
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ metaInk }};">{{ headerMeta }}</span>
+
+          <div style="display:inline-flex;align-self:flex-start;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+            <sc-for list="{{ sectionChips }}" as="t" hint-placeholder-count="3">
+              <button type="button" onClick="{{ t.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 14px;min-height:{{ chipMin }};border:none;border-radius:999px;background:{{ t.bg }};color:{{ t.fg }};">{{ t.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;gap:{{ columnGap }};padding:{{ bodyPad }};">
+
+          <sc-if value="{{ showMain }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:26px;">
+
+            <sc-if value="{{ readOnly }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:14px;border-radius:12px;background:oklch(0.24 0.014 84 / 0.06);">
+                <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.62 0.014 84);flex:none;"></span>
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.35 0.014 84);flex:1;min-width:240px;">{{ readOnlyNote }}</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showPeople }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:11px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">People</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ activeCount }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ ownerNote }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ people }}" as="p" hint-placeholder-count="5">
+                    <button type="button" onClick="{{ p.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:5px 14px;padding:13px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:{{ p.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                      <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                        <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                          <span style="width:26px;height:26px;border-radius:50%;border:1.3px solid oklch(0.72 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:10px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ p.initials }}</span>
+                          <span style="font-size:14.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.name }}</span>
+                          <sc-if value="{{ p.isMe }}" hint-placeholder-val="{{ false }}">
+                            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:oklch(0.5 0.014 84);border:1px dashed oklch(0.8 0.016 84);border-radius:4px;padding:1px 5px;flex:none;">you</span>
+                          </sc-if>
+                        </span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:36px;">{{ p.email }}</span>
+                      </span>
+                      <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                        <span style="color:{{ p.roleInk }};">{{ p.role }}</span>
+                        <span>{{ p.tier }}</span>
+                        <span>{{ p.joined }}</span>
+                      </span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{ hasRemoved }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:11px;">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Removed</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ removedCount }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;">
+                    <sc-for list="{{ removed }}" as="p" hint-placeholder-count="1">
+                      <button type="button" onClick="{{ p.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:5px 14px;padding:13px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:{{ p.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                        <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                          <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                            <span style="width:26px;height:26px;border-radius:50%;border:1.3px dashed oklch(0.78 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:10px;color:oklch(0.5 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ p.initials }}</span>
+                            <span style="font-size:14.5px;font-weight:600;color:oklch(0.5 0.014 84);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.name }}</span>
+                          </span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:36px;">{{ p.email }}</span>
+                        </span>
+                        <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                          <span>was {{ p.role }}</span>
+                          <span>{{ p.joined }}</span>
+                        </span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">A removed person keeps their row. Everything they said, assigned or accepted still names them, so the history stays readable after they leave.</span>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{ showInvites }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:11px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Invites</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ inviteCount }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">single use</span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ invites }}" as="i" hint-placeholder-count="4">
+                    <div style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:5px 14px;padding:13px 0;border-bottom:1px dashed oklch(0.89 0.014 86);">
+                      <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                        <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                          <span style="width:7px;height:7px;border-radius:50%;background:{{ i.dot }};flex:none;"></span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ i.codeInk }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ i.code }}</span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ i.stateInk }};border:1px dashed {{ i.stateLine }};border-radius:4px;padding:1px 5px;flex:none;">{{ i.state }}</span>
+                        </span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:17px;">{{ i.detail }}</span>
+                      </span>
+                      <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-left:{{ rowIndent }};">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">grants {{ i.role }}</span>
+                        <sc-if value="{{ i.canRevoke }}" hint-placeholder-val="{{ false }}">
+                          <button type="button" onClick="{{ i.onRevoke }}" style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;flex:none;">revoke</button>
+                        </sc-if>
+                      </span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">A code works once. Accepting it creates the membership and records which invite was used, so a person's row can always say how they got in.</span>
+              </div>
+
+              <sc-if value="{{ canInvite }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">New invite</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:10px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Role it grants</span>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                      <sc-for list="{{ inviteRoles }}" as="r" hint-placeholder-count="4">
+                        <button type="button" onClick="{{ r.onPick }}" style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:9px 15px;min-height:{{ chipMin }};border:1.3px dashed {{ r.line }};border-radius:14px;background:{{ r.bg }};color:{{ r.fg }};text-align:left;">
+                          <span>{{ r.label }}</span>
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ r.subInk }};">{{ r.sub }}</span>
+                        </button>
+                      </sc-for>
+                    </div>
+                    <sc-if value="{{ ceilingHit }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:flex;align-items:flex-start;gap:9px;font-size:12.5px;line-height:1.6;color:oklch(0.45 0.1 78);"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.58 0.12 78);flex:none;margin-top:6px;"></span>{{ ceilingNote }}</span>
+                    </sc-if>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:10px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Expires</span>
+                    <div style="display:inline-flex;align-self:flex-start;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+                      <sc-for list="{{ expiryChips }}" as="e" hint-placeholder-count="3">
+                        <button type="button" onClick="{{ e.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 14px;min-height:{{ chipMin }};border:none;border-radius:999px;background:{{ e.bg }};color:{{ e.fg }};">{{ e.label }}</button>
+                      </sc-for>
+                    </div>
+                    <span style="font-size:12.5px;line-height:1.55;color:oklch(0.5 0.014 84);">{{ expiryNote }}</span>
+                  </div>
+
+                  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                    <button type="button" onClick="{{ onCreateInvite }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">create the invite</button>
+                    <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);flex:1;min-width:220px;">{{ createNote }}</span>
+                  </div>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{ showWorkspace }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:14px;max-width:520px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Name and mark</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:16px;">
+                  <span style="width:56px;height:56px;border-radius:12px;background:{{ markBg }};color:{{ markInk }};font-family:'Instrument Serif',serif;font-size:28px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ markLetter }}</span>
+                  <span style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;">
+                    <sc-if value="{{ canRename }}" hint-placeholder-val="{{ true }}">
+                      <input type="text" value="{{ draftName }}" onInput="{{ setName }}" placeholder="Acme Finance" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.4px dashed {{ nameLine }};border-radius:10px;background:none;font-size:16px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                    </sc-if>
+                    <sc-if value="{{ cannotRename }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:16px;font-weight:600;">{{ draftName }}</span>
+                    </sc-if>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ markNote }}</span>
+                  </span>
+                </div>
+
+                <sc-if value="{{ canRename }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">mark colour</span>
+                    <span style="display:inline-flex;flex-wrap:wrap;gap:8px;">
+                      <sc-for list="{{ markColours }}" as="c" hint-placeholder-count="3">
+                        <button type="button" onClick="{{ c.onPick }}" aria-label="{{ c.label }}" title="{{ c.label }}" style="display:inline-flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 13px 6px 6px;min-height:{{ chipMin }};border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">
+                          <span style="width:22px;height:22px;border-radius:6px;background:{{ c.swatch }};flex:none;"></span>{{ c.label }}
+                        </button>
+                      </sc-for>
+                    </span>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ nameDirty }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                    <button type="button" onClick="{{ onSaveName }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ saveBg }};color:{{ saveInk }};">save</button>
+                    <button type="button" onClick="{{ onRevertName }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">revert</button>
+                    <span style="font-size:12.5px;line-height:1.6;color:{{ saveNoteInk }};flex:1;min-width:200px;">{{ saveNote }}</span>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:11px;max-width:520px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Founding</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ wsFacts }}" as="f" hint-placeholder-count="3">
+                    <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:10px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.24 0.014 84);text-align:right;">{{ f.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);">Set once when the workspace was created, and never editable. The founder holds owner from the start, which is why there is always at least one.</span>
+              </div>
+            </sc-if>
+
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ showAside }}" hint-placeholder-val="{{ true }}">
+          <div style="width:{{ asideWidth }};flex:none;overflow-y:auto;display:flex;flex-direction:column;gap:24px;">
+
+            <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+              <sc-if value="{{ showBack }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ onBack }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 17px;min-height:44px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">&#8592; {{ backLabel }}</button>
+              </sc-if>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">{{ selHeading }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="width:38px;height:38px;border-radius:50%;border:1.3px {{ selAvatarStyle }} oklch(0.72 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ selInitials }}</span>
+                  <span style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                    <span style="font-size:15px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ selName }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ selEmail }}</span>
+                  </span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ selFacts }}" as="f" hint-placeholder-count="5">
+                    <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:9px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ f.ink }};text-align:right;word-break:break-all;">{{ f.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{ canSetRole }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:11px;">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Role</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;">
+                    <sc-for list="{{ roleRows }}" as="r" hint-placeholder-count="4">
+                      <button type="button" onClick="{{ r.onPick }}" style="display:grid;grid-template-columns:7px minmax(0,1fr) auto;align-items:center;gap:4px 11px;padding:11px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.9 0.014 86);border-radius:8px;background:{{ r.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                        <span style="grid-column:1;width:7px;height:7px;border-radius:50%;background:{{ r.dot }};"></span>
+                        <span style="grid-column:2;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:{{ r.ink }};min-width:0;">{{ r.label }}</span>
+                        <span style="grid-column:3;font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ r.tierInk }};">{{ r.tier }}</span>
+                        <span style="grid-column:2 / span 2;font-size:12.5px;line-height:1.5;color:{{ r.whyInk }};">{{ r.why }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ hasRefusal }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:flex;align-items:flex-start;gap:9px;font-size:12.5px;line-height:1.6;color:{{ refusalInk }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ refusalDot }};flex:none;margin-top:6px;"></span>{{ refusal }}</span>
+                  </sc-if>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:11px;">
+                  <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                  <button type="button" onClick="{{ onRemove }}" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 17px;min-height:{{ btnMin }};border:1.3px dashed {{ removeLine }};border-radius:999px;background:none;color:{{ removeInk }};">{{ removeLabel }}</button>
+                  <span style="font-size:12.5px;line-height:1.6;color:oklch(0.44 0.014 84);">{{ removeNote }}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isRemovedSel }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:11px;">
+                  <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                  <button type="button" onClick="{{ onRestore }}" style="align-self:flex-start;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 17px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">restore as {{ restoreRole }}</button>
+                  <span style="font-size:12.5px;line-height:1.6;color:oklch(0.44 0.014 84);">Restoring reuses the same row rather than making a second one, so their history stays attached to one person.</span>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Roles and tiers</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+                    <div style="display:flex;flex-direction:column;gap:3px;padding:11px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 11px;">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:oklch(0.24 0.014 84);flex:1;min-width:0;">{{ l.role }}</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ l.tier }}</span>
+                      </span>
+                      <span style="font-size:12.5px;line-height:1.55;color:oklch(0.41 0.014 84);">{{ l.what }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);">Each tier includes the ones below it. An agent can hold the first three; <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;">own</span> is the one thing only a person can have.</span>
+              </div>
+            </sc-if>
+
+          </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Both names are shown, because both are real: the role is what you set, and the tier is what an incoming request or an offered tool is checked against. Hiding the tier would make the permission errors elsewhere unreadable.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A role above your own is visible but unusable, with the reason attached. Hiding it would leave an admin wondering whether owner exists at all; showing it greyed says the rule out loud — you cannot grant past yourself.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The last owner cannot be demoted or removed, and the refusal is stated before it is attempted rather than as an error afterwards. Promote somebody else first and the block lifts on its own.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">An invite carries its own four states, and they are not interchangeable. Expired and revoked look the same from a distance but mean different things: one lapsed, one was taken back, and only the second was a decision.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">05</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The workspace mark is the first letter of its name rather than an upload, because the record has a name and nothing else. If you want a real logo it needs a field on <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">Workspace</span> and somewhere to keep the file — worth deciding before the screen promises it.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">06</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">How somebody joined is kept and shown — founded it, invited by a code, or added by hand. Restoring a removed person reuses their row, so a workspace never accumulates two of the same human.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const OK = "oklch(0.52 0.14 148)";
+const WARN = "oklch(0.58 0.12 78)";
+const BAD = "oklch(0.51 0.17 28)";
+const IDLE = "oklch(0.62 0.014 84)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 940 },
+  laptop: { label: "laptop", width: 1180, height: 880 },
+  tablet: { label: "tablet", width: 834, height: 820 },
+  phone: { label: "phone", width: 390, height: 800 }
+};
+
+const STATES = [
+  ["people", "people"],
+  ["one", "one person"],
+  ["asAdmin", "acting as an admin"],
+  ["invites", "invites"],
+  ["lastOwner", "the last owner"],
+  ["asViewer", "acting as a viewer"],
+  ["workspace", "the workspace itself"]
+];
+
+// Workspace.name is the only editable field on the record. The mark is a monogram
+// derived from it — the schema has no icon field, so the colour is the only choice.
+const MARKS = [
+  ["persimmon", "oklch(0.56 0.13 42)", "oklch(0.99 0.01 90)"],
+  ["kakishibu", "oklch(0.42 0.11 40)", "oklch(0.99 0.01 90)"],
+  ["ink", "oklch(0.24 0.014 84)", "oklch(0.97 0.01 90)"]
+];
+
+// Ascending, matching identity/tier.ts. A role maps to exactly one tier, and
+// mayGrant stops at the caller's own index.
+const ROLES = ["viewer", "member", "admin", "owner"];
+const TIER_OF = { viewer: "read", member: "work", admin: "manage", owner: "own" };
+const WHAT = {
+  viewer: "Reads everything. Cannot send, assign or change anything.",
+  member: "Does the work: sends messages, takes tasks, accepts results.",
+  admin: "Also configures — agents, policy, accounts, connections, channels.",
+  owner: "Also manages people and owns the workspace itself."
+};
+
+const rank = (r) => ROLES.indexOf(r);
+const mayGrant = (held, role) => rank(held) >= rank(role);
+
+// id, name, email, role, via, joined, removedAt
+const MEMBERS = [
+  ["jo", "Jo Mercer", "jo@acme.test", "owner", "founded it", "12 Jul", null],
+  ["kit", "Kit Nakano", "kit@acme.test", "admin", "invite F3K9QM21XA04", "19 Jul", null],
+  ["sam", "Sam Oyelaran", "sam@acme.test", "member", "invite B7L2WN88ZC13", "3 Sep", null],
+  ["nia", "Nia Bello", "nia@acme.test", "member", "added by Jo Mercer", "8 Sep", null],
+  ["ade", "Ade Farrow", "ade@acme.test", "viewer", "invite Q1X4TR55YD62", "10 Sep", null],
+  ["pete", "Pete Lund", "pete@acme.test", "member", "invite M8N3KP77VB29", "22 Jul", "1 Sep"]
+];
+
+// code, role, state, detail, revocable
+const INVITES = [
+  ["H4T9RX21MC08", "member", "pending", "created today by Jo Mercer · expires in 7 days", true],
+  ["W2L8KN44PD71", "admin", "pending", "created 10 Sep by Jo Mercer · never expires", true],
+  ["B7L2WN88ZC13", "member", "accepted", "taken by Sam Oyelaran on 3 Sep", false],
+  ["V5G1HQ63JF90", "viewer", "expired", "created 2 Aug · lapsed 9 Aug, never taken", false],
+  ["Z9C6BM02LT35", "admin", "revoked", "revoked 4 Sep by Jo Mercer", false]
+];
+
+class Component extends DCLogic {
+  state = {
+    at: "people", view: "desktop", available: 0,
+    me: "jo", sel: null, tab: "list", section: "people",
+    roles: {}, removed: {}, inviteRole: "member", expiry: "7 days",
+    refusal: null, revoked: {},
+    wsName: "Acme Finance", draftName: "Acme Finance", mark: "persimmon"
+  };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const touch = isPhone || isTablet;
+    const narrow = isPhone || isTablet;
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    // Acting identity lives in state, not derived from `at` — leaving the asAdmin
+    // view for invites must not silently hand you the owner's permissions.
+    const meId = s.me;
+    const fixture = (id) => MEMBERS.find((m) => m[0] === id) || [];
+    const roleOf = (id) => s.roles[id] || fixture(id)[3];
+    // Presence, not truthiness: a restore writes null, and null must beat the
+    // fixture's removal date rather than falling through to it.
+    const removedOf = (id) =>
+      Object.prototype.hasOwnProperty.call(s.removed, id) ? s.removed[id] : fixture(id)[6];
+    const myRole = roleOf(meId);
+    const meRow = MEMBERS.find((m) => m[0] === meId);
+
+    // mayGrant is the real rule: manage tier and above can add, change and invite,
+    // each capped at their own role. Only the read tier can do nothing.
+    const canManagePeople = rank(myRole) >= rank("admin");
+    const readOnly = !canManagePeople;
+    const capped = ROLES.filter((r) => !mayGrant(myRole, r));
+
+    const activeIds = MEMBERS.map((m) => m[0]).filter((id) => !removedOf(id));
+    const removedIds = MEMBERS.map((m) => m[0]).filter((id) => !!removedOf(id));
+    const owners = activeIds.filter((id) => roleOf(id) === "owner");
+
+    const section = at === "invites" ? "invites"
+      : at === "workspace" ? "workspace" : s.section;
+    const onInvites = section === "invites";
+    const onWorkspace = section === "workspace";
+    const mark = MARKS.find((m) => m[0] === s.mark) || MARKS[0];
+    const trimmed = s.draftName.trim();
+    const nameDirty = trimmed !== s.wsName;
+    // Renaming is an owner-tier change, and a blank name is refused by the record.
+    const canRename = myRole === "owner";
+    const nameValid = trimmed.length > 0;
+    const selId = s.sel || (at === "one" ? "sam" : at === "lastOwner" ? "jo" : null);
+    const sel = selId ? MEMBERS.find((m) => m[0] === selId) : null;
+    const selRole = sel ? roleOf(selId) : null;
+    const selRemoved = sel ? removedOf(selId) : null;
+    // The last owner is load-bearing: demoting or removing them would leave the
+    // workspace unowned, which the backend refuses.
+    const isLastOwner = !!sel && selRole === "owner" && owners.length === 1;
+
+    const initialsOf = (name) => name.split(" ").map((w) => w[0]).join("");
+
+    const rowOf = (id) => {
+      const m = MEMBERS.find((x) => x[0] === id);
+      const r = roleOf(id);
+      const gone = removedOf(id);
+      return {
+        name: m[1], email: m[2], initials: initialsOf(m[1]),
+        role: r, tier: TIER_OF[r],
+        roleInk: r === "owner" ? INK : DIM,
+        joined: gone ? "removed " + gone : "joined " + m[5],
+        isMe: id === meId,
+        bg: id === selId ? "oklch(0.24 0.014 84 / 0.07)" : "none",
+        onOpen: () => set({ sel: id, tab: "detail", refusal: null })
+      };
+    };
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage" },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Agents", rows: [
+        { glyph: "a", label: "Ada", avatar: true },
+        { glyph: "r", label: "Rae", avatar: true }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u25CE", label: "Agents" },
+        { glyph: "\u2261", label: "Policy" },
+        { glyph: "\u229E", label: "Accounts" },
+        { glyph: "\u26AD", label: "Connections" },
+        { glyph: "\u2699", label: "Settings", active: true }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({
+          at: x[0],
+          me: x[0] === "asAdmin" ? "kit" : x[0] === "asViewer" ? "ade" : "jo",
+          sel: x[0] === "one" ? "sam" : x[0] === "lastOwner" ? "jo" : null,
+          section: x[0] === "invites" ? "invites"
+            : x[0] === "workspace" ? "workspace" : "people",
+          tab: "list", refusal: null, roles: {}, removed: {}, revoked: {},
+          inviteRole: "member", expiry: "7 days",
+          draftName: s.wsName
+        })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      headerPad: isPhone ? "16px 18px 12px" : "24px 30px 14px",
+      bodyPad: isPhone ? "4px 18px 22px" : "6px 30px 28px",
+      titleSize: isPhone ? "26px" : "34px",
+      columnGap: narrow ? "0" : "34px",
+      asideWidth: narrow ? "100%" : "310px",
+      chipMin: touch ? "44px" : "34px",
+      btnMin: touch ? "44px" : "40px",
+      rowGrid: isPhone ? "minmax(0,1fr)" : "minmax(0,1fr) auto",
+      metaCol: isPhone ? "1" : "2",
+      rowIndent: isPhone ? "36px" : "0",
+
+      wsLabel: s.wsName,
+      wsMarkBg: mark[1],
+      wsMarkInk: mark[2],
+      wsMarkLetter: (s.wsName.trim()[0] || "A").toUpperCase(),
+      meInitials: initialsOf(meRow[1]),
+      meRoleLabel: myRole + " · " + TIER_OF[myRole],
+
+      showMain: !narrow || s.tab === "list",
+      showAside: (!narrow || s.tab === "detail") && !onWorkspace,
+
+      sectionChips: [["people", "people"], ["invites", "invites"],
+        ["workspace", "workspace"]].map((t) => ({
+        label: t[1],
+        bg: section === t[0] ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: section === t[0] ? INK : DIM,
+        onPick: () => set({
+          section: t[0],
+          at: at === "asAdmin" || at === "asViewer" ? at : t[0],
+          sel: null, tab: "list", refusal: null
+        })
+      })),
+
+      showWorkspace: onWorkspace,
+      markBg: mark[1],
+      markInk: mark[2],
+      markLetter: (trimmed[0] || "A").toUpperCase(),
+      draftName: s.draftName,
+      setName: (e) => set({ draftName: e.target.value }),
+      nameLine: nameDirty && !nameValid ? "oklch(0.6 0.14 28)" : "oklch(0.78 0.016 84)",
+      canRename: canRename,
+      cannotRename: !canRename,
+      markNote: canRename
+        ? "The mark is the first letter of the name. There is no icon field on the record yet, so the colour is the only part you choose."
+        : "Renaming the workspace needs the own tier.",
+      markColours: MARKS.map((m) => {
+        const on = s.mark === m[0];
+        return {
+          label: m[0], swatch: m[1],
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          onPick: () => set({ mark: m[0] })
+        };
+      }),
+      nameDirty: nameDirty,
+      saveBg: nameValid ? INK : "oklch(0.24 0.014 84 / 0.15)",
+      saveInk: nameValid ? "oklch(0.97 0.01 90)" : DIM,
+      saveNote: nameValid
+        ? "Renames the workspace everywhere it appears, including the rail."
+        : "A workspace has to have a name.",
+      saveNoteInk: nameValid ? DIM : "oklch(0.45 0.15 28)",
+      onSaveName: () => { if (nameValid) set({ wsName: trimmed, draftName: trimmed }); },
+      onRevertName: () => set({ draftName: s.wsName }),
+      wsFacts: [
+        ["founded", "12 Jul 2026"],
+        ["founded by", "Jo Mercer"],
+        ["members since", activeIds.length + " active, " + removedIds.length + " removed"]
+      ].map((f) => ({ k: f[0], v: f[1] })),
+
+      crumbs: [["Configure", true],
+        [onWorkspace ? "Workspace" : onInvites ? "Invites" : "Settings", false]]
+        .map((b, i, arr) => ({
+          label: b[0],
+          ink: b[1] ? DIM : INK,
+          line: b[1] ? "1px dashed oklch(0.78 0.016 84)" : "none",
+          more: i < arr.length - 1
+        })),
+      pageTitle: onWorkspace ? s.wsName : onInvites ? "Invites" : "People",
+      headerMeta: (onWorkspace
+        ? "founded 12 Jul 2026 by Jo Mercer"
+        : onInvites
+        ? INVITES.filter((i) => i[2] === "pending" && !s.revoked[i[0]]).length
+          + " pending · " + INVITES.length + " in total"
+        : activeIds.length + " active · " + removedIds.length + " removed")
+        + " · acting as " + meRow[1] + " (" + myRole + ")",
+      metaInk: DIM,
+
+      hasBadge: capped.length > 0,
+      badgeLabel: readOnly ? "read only" : "cannot grant " + capped.join(" or "),
+      badgeDot: IDLE,
+      badgeBg: "oklch(0.24 0.014 84 / 0.06)",
+      badgeInk: DIM,
+      showBadgeText: !isPhone,
+      badgePad: isPhone ? "10px" : "8px 14px",
+      badgeDotSize: isPhone ? "9px" : "7px",
+
+      hasPrimary: !onWorkspace && canManagePeople,
+      primaryLabel: onInvites ? "new invite" : "invite somebody",
+      primaryFace: !isPhone ? (onInvites ? "new invite" : "invite somebody") : "+",
+      primaryBg: INK,
+      primaryInk: "oklch(0.97 0.01 90)",
+      primaryBorder: "none",
+      primarySize: isPhone ? "17px" : "12.5px",
+      primaryPad: isPhone ? "0 12px" : "9px 19px",
+      primaryMin: isPhone ? "44px" : "0",
+      primaryAction: () => set({
+        section: "invites",
+        at: at === "asAdmin" || at === "asViewer" ? at : "invites",
+        sel: null, tab: "list", refusal: null
+      }),
+
+      readOnly: capped.length > 0,
+      readOnlyNote: readOnly
+        ? "You hold " + myRole + ", which maps to the " + TIER_OF[myRole]
+          + " tier. You can see who is here and what they hold, and change none of it."
+        : "You hold " + myRole + ", which maps to the " + TIER_OF[myRole]
+          + " tier. You can add, change and invite up to " + myRole + " — "
+          + capped.join(" and ") + " is beyond what you can grant.",
+
+      showPeople: section === "people",
+      showInvites: onInvites,
+
+      activeCount: activeIds.length === 1 ? "1 person" : activeIds.length + " people",
+      ownerNote: owners.length === 1 ? "1 owner" : owners.length + " owners",
+      people: activeIds.map(rowOf),
+      hasRemoved: removedIds.length > 0,
+      removedCount: String(removedIds.length),
+      removed: removedIds.map(rowOf),
+
+      inviteCount: INVITES.length + " in total",
+      invites: INVITES.map((i) => {
+        const st = s.revoked[i[0]] ? "revoked" : i[2];
+        const dot = st === "pending" ? WARN : st === "accepted" ? OK : IDLE;
+        return {
+          code: i[0], role: i[1], state: st,
+          detail: s.revoked[i[0]] ? "revoked just now by " + meRow[1] : i[3],
+          dot: dot,
+          codeInk: st === "pending" ? INK : DIM,
+          stateInk: st === "pending" ? "oklch(0.42 0.1 78)"
+            : st === "accepted" ? "oklch(0.36 0.1 148)" : DIM,
+          stateLine: st === "pending" ? "oklch(0.72 0.09 78)" : "oklch(0.8 0.016 84)",
+          canRevoke: st === "pending" && i[4] && canManagePeople,
+          onRevoke: () => set({ revoked: Object.assign({}, s.revoked, { [i[0]]: true }) })
+        };
+      }),
+      canInvite: canManagePeople,
+      inviteRoles: ROLES.map((r) => {
+        const allowed = mayGrant(myRole, r);
+        const on = s.inviteRole === r;
+        return {
+          label: r,
+          sub: allowed ? TIER_OF[r] + " tier" : "above your role",
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: allowed ? (on ? INK : DIM) : DIM,
+          subInk: DIM,
+          line: on ? "oklch(0.42 0.016 84)"
+            : allowed ? "oklch(0.82 0.016 84)" : "oklch(0.88 0.014 86)",
+          onPick: () => set({ inviteRole: allowed ? r : s.inviteRole })
+        };
+      }),
+      ceilingHit: capped.length > 0,
+      ceilingNote: "You hold " + myRole + ", so you can invite at " + myRole
+        + " and below. " + capped.join(" and ")
+        + " is greyed because an invite cannot grant more than the person who made it.",
+      expiryChips: ["7 days", "30 days", "never"].map((e) => ({
+        label: e,
+        bg: s.expiry === e ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.expiry === e ? INK : DIM,
+        onPick: () => set({ expiry: e })
+      })),
+      expiryNote: s.expiry === "never"
+        ? "An invite with no expiry stays usable until it is taken or revoked."
+        : "After " + s.expiry + " the code stops working on its own. It can still be revoked before then.",
+      createNote: "Creates one code granting " + s.inviteRole + " ("
+        + TIER_OF[s.inviteRole] + " tier). It works once, and records you as the inviter.",
+      onCreateInvite: () => set({ at: "invites", sel: null }),
+
+      hasSelection: !!sel && !onWorkspace,
+      noSelection: !sel || onWorkspace,
+      // Narrow shows one pane at a time, so the detail pane owns its own way out.
+      showBack: narrow,
+      backLabel: onInvites ? "invites" : "people",
+      onBack: () => set({ sel: null, tab: "list", refusal: null }),
+      selHeading: selRemoved ? "Removed person" : "Person",
+      selName: sel ? sel[1] : "",
+      selEmail: sel ? sel[2] : "",
+      selInitials: sel ? initialsOf(sel[1]) : "",
+      selAvatarStyle: selRemoved ? "dashed" : "solid",
+      selFacts: !sel ? [] : [
+        ["principal", "usr_" + sel[0]],
+        ["role", selRole],
+        ["tier", TIER_OF[selRole]],
+        ["joined", sel[5]],
+        ["how", sel[4]],
+        ["removed", selRemoved || "—"]
+      ].map((f) => ({
+        k: f[0], v: f[1], ink: f[1] === "—" ? DIM : INK
+      })),
+
+      canSetRole: !!sel && !selRemoved && canManagePeople,
+      isRemovedSel: !!sel && !!selRemoved && canManagePeople,
+      restoreRole: sel ? selRole : "",
+      onRestore: () => {
+        if (!sel) return;
+        const next = Object.assign({}, s.removed);
+        next[selId] = null;
+        set({ removed: next, refusal: null });
+      },
+
+      roleRows: ROLES.map((r) => {
+        const current = r === selRole;
+        const grantable = mayGrant(myRole, r);
+        // Demoting the sole owner is refused; promoting them is a no-op.
+        const wouldUnown = isLastOwner && r !== "owner";
+        const usable = grantable && !wouldUnown && !current;
+        return {
+          label: r, tier: TIER_OF[r],
+          why: current ? "what they hold now"
+            : !grantable ? "above your own role"
+            : wouldUnown ? "would leave nobody owning the workspace"
+            : WHAT[r],
+          dot: current ? INK : usable ? IDLE : "transparent",
+          ink: current || usable ? INK : DIM,
+          tierInk: DIM,
+          whyInk: current ? DIM
+            : !grantable || wouldUnown ? "oklch(0.45 0.1 78)" : DIM,
+          bg: current ? "oklch(0.24 0.014 84 / 0.07)" : "none",
+          onPick: () => {
+            if (current) return;
+            if (!grantable) {
+              return set({ refusal: "notGrantable", pendingRole: r });
+            }
+            if (wouldUnown) return set({ refusal: "lastOwner" });
+            set({ roles: Object.assign({}, s.roles, { [selId]: r }), refusal: null });
+          }
+        };
+      }),
+      hasRefusal: !!s.refusal || isLastOwner,
+      refusal: s.refusal === "notGrantable"
+        ? "Refused: you hold " + myRole + " and cannot grant above your own role."
+        : s.refusal === "lastOwner" || isLastOwner
+        ? (sel && selId === meId
+          ? "You are the only owner. Promote somebody else to owner first, then this opens up — including removing yourself."
+          : "This is the only owner. Somebody has to own the workspace, so both demotion and removal are refused until there is a second one.")
+        : "",
+      refusalInk: s.refusal === "notGrantable" ? "oklch(0.45 0.15 28)" : "oklch(0.45 0.1 78)",
+      refusalDot: s.refusal === "notGrantable" ? BAD : WARN,
+
+      removeLabel: isLastOwner ? "cannot remove the last owner"
+        : selId === meId ? "leave the workspace" : "remove from the workspace",
+      removeLine: isLastOwner ? "oklch(0.8 0.016 84)" : "oklch(0.68 0.09 28)",
+      removeInk: isLastOwner ? DIM : "oklch(0.45 0.15 28)",
+      removeNote: isLastOwner
+        ? "Blocked for the same reason demotion is: the workspace would have no owner."
+        : "Their row stays, and so does everything attached to it. They lose access immediately and can be restored later.",
+      onRemove: () => {
+        if (!sel) return;
+        if (isLastOwner) return set({ refusal: "lastOwner" });
+        set({
+          removed: Object.assign({}, s.removed, { [selId]: "just now" }),
+          refusal: null
+        });
+      },
+
+      legend: ROLES.map((r) => ({
+        role: r, tier: TIER_OF[r] + " tier", what: WHAT[r]
+      })),
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label,
+        hasLabel: !!sec.label,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" }, { glyph: "\u27C1" }, { glyph: "\u2317" },
+        { glyph: "\u25CE" }, { glyph: "\u2261" }, { glyph: "\u2699", active: true }
+      ].map((n) => ({
+        glyph: n.glyph,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

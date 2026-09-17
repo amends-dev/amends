@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · screen 11 of 12</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Environments</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">A program, and a place to run it. The harness is the program that runs the loop; the sandbox is compute with a filesystem, started from a base. Both live here as values on one record, because the binary lives in the image and the two are coupled through it.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="7">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};flex:none;">{{ n.glyph }}</span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Acme Finance</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.4px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:44px;height:44px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;margin-right:6px;">&#9776;</span>
+            </sc-if>
+            <sc-for list="{{ crumbs }}" as="b" hint-placeholder-count="2">
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ b.ink }};border-bottom:{{ b.line }};">{{ b.label }}</span>
+                <sc-if value="{{ b.more }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.62 0.014 84);">/</span>
+                </sc-if>
+              </span>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;flex-wrap:nowrap;align-items:center;gap:12px 16px;">
+            <sc-if value="{{ titleEditable }}" hint-placeholder-val="{{ false }}">
+              <input type="text" value="{{ draftLabel }}" onInput="{{ setLabel }}" placeholder="node20-finance" style="flex:1;min-width:0;box-sizing:border-box;padding:6px 0;border:none;border-bottom:1.4px dashed oklch(0.78 0.016 84);background:none;font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.12;" style-focus="border-color:oklch(0.24 0.014 84)">
+            </sc-if>
+            <sc-if value="{{ titleStatic }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.12;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pageTitle }}</span>
+            </sc-if>
+            <span style="display:inline-flex;align-items:center;gap:10px;flex:none;">
+              <sc-if value="{{ hasBadge }}" hint-placeholder-val="{{ false }}">
+                <span role="img" aria-label="{{ badgeLabel }}" title="{{ badgeLabel }}" style="display:inline-flex;align-items:center;gap:9px;padding:{{ badgePad }};border-radius:999px;background:{{ badgeBg }};flex:none;">
+                  <span style="width:{{ badgeDotSize }};height:{{ badgeDotSize }};border-radius:50%;background:{{ badgeDot }};flex:none;"></span>
+                  <sc-if value="{{ showBadgeText }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ badgeInk }};white-space:nowrap;">{{ badgeLabel }}</span>
+                  </sc-if>
+                </span>
+              </sc-if>
+              <button type="button" onClick="{{ primaryAction }}" aria-label="{{ primaryLabel }}" title="{{ primaryLabel }}" style="display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:{{ primarySize }};padding:{{ primaryPad }};min-width:{{ primaryMin }};min-height:{{ btnMin }};border:{{ primaryBorder }};border-radius:999px;background:{{ primaryBg }};color:{{ primaryInk }};flex:none;white-space:nowrap;">{{ primaryFace }}</button>
+            </span>
+          </div>
+
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ metaInk }};">{{ headerMeta }}</span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;gap:26px;">
+
+          <sc-if value="{{ showList }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Environments</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">one program, one place, each</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ envs }}" as="e" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ e.onOpen }}" style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:6px 14px;padding:14px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:none;text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                    <span style="grid-column:1;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                      <span style="display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ e.dot }};flex:none;"></span>
+                        <span style="font-size:14.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ e.label }}</span>
+                        <sc-if value="{{ e.sealed }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:oklch(0.36 0.1 148);border:1px dashed oklch(0.62 0.1 148);border-radius:4px;padding:1px 5px;flex:none;">sealed</span>
+                        </sc-if>
+                      </span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:17px;">{{ e.harness }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ e.base }}</span>
+                      <span>{{ e.reach }}</span>
+                      <span>{{ e.users }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ false }}">
+
+            <sc-if value="{{ missing }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:12px;background:oklch(0.51 0.17 28 / 0.07);">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px 12px;">
+                  <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.51 0.17 28);flex:none;"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.42 0.14 28);">harness missing</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">last session failed before it started</span>
+                </div>
+                <span style="font-size:13.5px;line-height:1.62;color:oklch(0.32 0.014 84);max-width:640px;">{{ missingNote }}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                  <button type="button" onClick="{{ addInstall }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 17px;min-height:{{ btnMin }};border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">add it as a setup line</button>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.35 0.014 84);flex:1;min-width:200px;word-break:break-all;">{{ installHint }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Harness</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">the program that runs the loop</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ harnessRows }}" as="h" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ h.onPick }}" style="display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:13px 10px;margin:0 -10px;border:none;border-bottom:1px dashed oklch(0.89 0.014 86);border-radius:8px;background:{{ h.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                      <span style="display:flex;align-items:center;gap:10px;width:100%;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:{{ h.dot }};flex:none;"></span>
+                        <span style="font-size:14px;font-weight:600;flex:1;min-width:0;">{{ h.name }}</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);flex:none;">{{ h.speaks }}</span>
+                      </span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.44 0.014 84);padding-left:17px;">{{ h.command }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;max-width:480px;">
+                  <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Command {{ commandRequirement }}</label>
+                  <input type="text" value="{{ draftCommand }}" onInput="{{ setCommand }}" placeholder="{{ commandPlaceholder }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.4px dashed {{ commandLine }};border-radius:10px;background:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                  <span style="font-size:12.5px;line-height:1.55;color:{{ commandNoteInk }};">{{ commandNote }}</span>
+                </div>
+              </sc-if>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ harnessFacts }}" as="f" hint-placeholder-count="4">
+                  <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:9px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ f.ink }};text-align:right;word-break:break-all;">{{ f.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">{{ harnessNote }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Sandbox</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">where it runs</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                  <sc-for list="{{ providerChips }}" as="p" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ p.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ p.line }};border-radius:999px;background:{{ p.bg }};color:{{ p.fg }};">{{ p.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;max-width:480px;">
+                  <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Base</label>
+                  <input type="text" value="{{ draftBase }}" onInput="{{ setBase }}" placeholder="{{ basePlaceholder }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                  <span style="font-size:12.5px;line-height:1.55;color:oklch(0.5 0.014 84);">{{ baseNote }}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ reading }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ sandboxFacts }}" as="f" hint-placeholder-count="3">
+                    <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:9px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ f.ink }};text-align:right;word-break:break-all;">{{ f.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:13px 0;border-top:1px dashed oklch(0.89 0.014 86);border-bottom:1px dashed oklch(0.89 0.014 86);">
+                <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:200px;">
+                  <span style="font-size:14px;font-weight:600;">Sealed to approved destinations</span>
+                  <span style="font-size:12.5px;line-height:1.55;color:{{ sealNoteInk }};">{{ sealNote }}</span>
+                </span>
+                <sc-if value="{{ sealEditable }}" hint-placeholder-val="{{ false }}">
+                  <button type="button" onClick="{{ toggleSealed }}" aria-label="Sealed" style="display:inline-flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ sealLine }};border-radius:999px;background:{{ sealBg }};color:oklch(0.24 0.014 84);flex:none;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ sealDot }};flex:none;"></span>{{ sealLabel }}
+                  </button>
+                </sc-if>
+                <sc-if value="{{ sealBlocked }}" hint-placeholder-val="{{ false }}">
+                  <button type="button" disabled="disabled" aria-disabled="true" aria-label="Sealing unavailable on this provider" style="display:inline-flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed oklch(0.86 0.016 84);border-radius:999px;background:none;color:oklch(0.5 0.014 84);flex:none;cursor:not-allowed;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.74 0.016 84);flex:none;"></span>cannot seal
+                  </button>
+                </sc-if>
+                <sc-if value="{{ sealStatic }}" hint-placeholder-val="{{ true }}">
+                  <span role="img" aria-label="{{ sealLabel }}" style="display:inline-flex;align-items:center;gap:9px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);flex:none;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ sealDot }};flex:none;"></span>{{ sealLabel }}
+                  </span>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Setup</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ setupNote }}</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ setup }}" as="l" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:{{ setupGrid }};align-items:center;gap:4px 12px;padding:9px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="grid-column:1;grid-row:1;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ l.n }}</span>
+                      <span style="grid-column:2;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:{{ l.ink }};min-width:0;word-break:break-all;">{{ l.text }}</span>
+                      <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                        <button type="button" onClick="{{ l.onRemove }}" aria-label="Remove this line" style="grid-column:3;grid-row:1;width:{{ iconBtn }};height:{{ iconBtn }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;font-family:'IBM Plex Mono',monospace;font-size:12px;">&#10005;</button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center;">
+                    <input type="text" value="{{ newLine }}" onInput="{{ setNewLine }}" placeholder="{{ installHint }}" style="flex:1;min-width:200px;box-sizing:border-box;padding:10px 12px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-family:'IBM Plex Mono',monospace;font-size:12.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+                    <button type="button" onClick="{{ addLine }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 17px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">add line</button>
+                  </div>
+                </sc-if>
+                <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">Runs once when a sandbox is created, before the harness starts. Amends checks the harness is there — it never installs it.</span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Models it can think with</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ modelCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ models }}" as="m" hint-placeholder-count="4">
+                  <div style="display:grid;grid-template-columns:{{ rowGrid }};align-items:center;gap:4px 14px;padding:11px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="grid-column:1;display:inline-flex;align-items:center;gap:10px;min-width:0;">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ m.dot }};flex:none;"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:{{ m.ink }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ m.id }}</span>
+                    </span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);padding-left:{{ rowIndent }};">
+                      <span>{{ m.route }}</span>
+                      <span style="color:{{ m.stateInk }};">{{ m.state }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">{{ modelNote }}</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Reach</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">what a session may read and act through</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+              </div>
+              <div style="display:grid;grid-template-columns:{{ pairGrid }};gap:20px;">
+                <div style="display:flex;flex-direction:column;gap:10px;min-width:0;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.41 0.014 84);">sources</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                    <sc-for list="{{ sourceChips }}" as="c" hint-placeholder-count="2">
+                      <button type="button" onClick="{{ c.onToggle }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px;min-width:0;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.41 0.014 84);">tools</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                    <sc-for list="{{ toolChips }}" as="c" hint-placeholder-count="2">
+                      <button type="button" onClick="{{ c.onToggle }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 13px;min-height:{{ chipMin }};border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);max-width:640px;">Plus the built-in workspace tools its purpose and tier allow — asking a task question, creating an artifact — which need no connection.</span>
+            </div>
+
+            <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                  <button type="button" onClick="{{ onSave }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:none;border-radius:999px;background:{{ saveBg }};color:{{ saveInk }};">{{ saveLabel }}</button>
+                  <button type="button" onClick="{{ onCancel }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 19px;min-height:{{ btnMin }};border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;background:none;">cancel</button>
+                </div>
+                <span style="font-size:13px;line-height:1.6;color:oklch(0.44 0.014 84);max-width:640px;">{{ saveNote }}</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showUsers }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:11px;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Used by</span>
+                  <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:20px;"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ users }}" as="u" hint-placeholder-count="2">
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;padding:11px 0;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                      <span style="width:20px;height:20px;border-radius:50%;border:1.4px dashed oklch(0.64 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:9px;color:oklch(0.41 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ u.initial }}</span>
+                      <span style="font-size:13.5px;flex:1;min-width:100px;">{{ u.name }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ u.ink }};">{{ u.meta }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:48px 24px 32px;text-align:center;">
+              <svg viewBox="0 0 240 170" width="230" height="163" fill="none" role="img" aria-label="An empty embroidery hoop with no cloth in it">
+                <circle cx="120" cy="82" r="58" stroke="oklch(0.74 0.016 84)" stroke-width="1.4"></circle>
+                <circle cx="120" cy="82" r="49" stroke="oklch(0.84 0.016 84)" stroke-width="1.2"></circle>
+                <path d="M120 24 V16 M113 20 h14" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linecap="round"></path>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:440px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">No environments</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">An agent cannot run without one — there would be no program to start and nowhere to start it. Every agent points at exactly one.</span>
+              </div>
+              <button type="button" onClick="{{ primaryAction }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 20px;min-height:44px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">add an environment</button>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The harness is a value here, not a record elsewhere. It is a kind plus an optional command override — the binary itself lives in the base image, so the two are already coupled. Same place, two programs, means two environments.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">There is no "no sandbox" option. Every session runs somewhere; a host that wants this machine registers a local-process provider instead. Nowhere is not a place.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The model list is derived, never declared. A binary has no fixed model list; what is fixed per kind is the protocols it can be pointed at. Catalog providers that speak one of them, and their models, are what an agent here can choose.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Amends checks the harness is present; it never installs it. The install line sits beside the picker and in the failure, so the cost of a bare base is visible and the fix is one copyable line.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">05</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A model reachable through two providers is one model with two doors. The route is the workspace's business, ordered by when each connection was opened, so the list shows which door is in use rather than asking you to choose one.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const OK = "oklch(0.52 0.14 148)";
+const WARN = "oklch(0.58 0.12 78)";
+const BAD = "oklch(0.51 0.17 28)";
+const IDLE = "oklch(0.62 0.014 84)";
+const WORK = "oklch(0.41 0.014 84)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 940 },
+  laptop: { label: "laptop", width: 1180, height: 880 },
+  tablet: { label: "tablet", width: 834, height: 820 },
+  phone: { label: "phone", width: 390, height: 800 }
+};
+
+const STATES = [
+  ["list", "environments"],
+  ["one", "one environment"],
+  ["editing", "editing"],
+  ["new", "new environment"],
+  ["missing", "harness missing"],
+  ["empty", "none yet"]
+];
+
+// The harness catalog: a kind, the command it starts, the gateway protocols it can be
+// pointed at, and an install hint amends shows but never runs.
+const HARNESSES = {
+  opencode: { name: "opencode", command: "opencode acp",
+    speaks: ["anthropic", "openai"], install: "bun install -g opencode-ai@1.18.30",
+    pointing: "OPENCODE_CONFIG_CONTENT" },
+  "claude-code": { name: "Claude Code", command: "claude-code-acp",
+    speaks: ["anthropic"], install: "bun install -g claude-code-acp",
+    pointing: "ANTHROPIC_BASE_URL · ANTHROPIC_MODEL" },
+  codex: { name: "Codex", command: "codex-acp",
+    speaks: ["openai", "responses"], install: "bun install -g codex-acp",
+    pointing: "OPENAI_BASE_URL · -c model=" },
+  acp: { name: "Any ACP program", command: "", needsCommand: true,
+    speaks: ["anthropic", "openai", "responses"], install: "whatever your program needs",
+    pointing: "AMENDS_URL · AMENDS_TOKEN · AMENDS_MODEL" }
+};
+
+// Catalog providers carry the protocol they speak; null is not routable through us.
+const PROVIDERS = {
+  anthropic: { protocol: "anthropic", models: ["claude-sonnet-4-6", "claude-opus-4-2"] },
+  openai: { protocol: "openai", models: ["gpt-5", "gpt-5-mini"] },
+  openrouter: { protocol: "openai", models: ["claude-sonnet-4-6", "gpt-5"] },
+  google: { protocol: null, models: ["gemini-2.5-pro"] }
+};
+
+// Open inference connections, oldest first — the route is the head of the matches.
+const INFERENCE = [
+  ["con_anthropic_1", "anthropic", "12 Jul"],
+  ["con_openrouter_1", "openrouter", "3 Sep"]
+];
+
+const SANDBOX_PROVIDERS = {
+  "docker-local": { seals: true, base: "amends/opencode:1.18", note: "A container per session on this machine." },
+  "fly-machines": { seals: true, base: "registry.fly.io/acme-agents:latest", note: "A machine per session in the workspace region." },
+  "local-process": { seals: false, base: null, note: "This machine, as a process. Nothing is isolated, so nothing can be sealed." }
+};
+
+const CONNECTIONS = {
+  con_github_1: "github · acme/ledger",
+  con_stripe_1: "stripe · charges.read",
+  con_github_2: "github · acme/ledger",
+  con_sheets_1: "google · reporting"
+};
+const SOURCE_OPTIONS = ["con_github_1", "con_stripe_1"];
+const TOOL_OPTIONS = ["con_github_2", "con_sheets_1"];
+
+const ENVS = {
+  "node20-finance": {
+    harness: "opencode", command: "", provider: "docker-local",
+    base: "amends/opencode:1.18", sealed: true,
+    setup: ["bun install --frozen-lockfile", "bun run build:ledger"],
+    sources: ["con_github_1", "con_stripe_1"], tools: ["con_github_2"],
+    users: [["Ada", "a", "2 of 3 running"], ["Rae", "r", "1 of 1 running"]]
+  },
+  "claude-review": {
+    harness: "claude-code", command: "", provider: "fly-machines",
+    base: "", sealed: false,
+    setup: [],
+    sources: ["con_github_1"], tools: [],
+    users: [["Sol", "s", "idle"]]
+  },
+  "bare-debian": {
+    harness: "opencode", command: "", provider: "docker-local",
+    base: "debian:bookworm-slim", sealed: true,
+    setup: [],
+    sources: [], tools: [],
+    users: []
+  }
+};
+
+class Component extends DCLogic {
+  state = {
+    at: "list", view: "desktop", available: 0,
+    env: "node20-finance", draft: null, newLine: ""
+  };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  seed(name) {
+    const e = ENVS[name];
+    return {
+      label: name, harness: e.harness, command: e.command, provider: e.provider,
+      base: e.base, sealed: e.sealed, setup: e.setup.slice(),
+      sources: e.sources.slice(), tools: e.tools.slice()
+    };
+  }
+
+  blank() {
+    return { label: "", harness: "opencode", command: "", provider: "docker-local",
+      base: "", sealed: true, setup: [], sources: [], tools: [] };
+  }
+
+  patch(p) {
+    this.setState({ draft: Object.assign({}, this.state.draft, p) });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const touch = isPhone || isTablet;
+    const narrow = isPhone || isTablet;
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const isNew = at === "new";
+    const isEmpty = at === "empty";
+    const missing = at === "missing";
+    const editing = at === "editing" || isNew;
+    const detail = at === "one" || editing || missing;
+    const name = missing ? "bare-debian" : s.env;
+    const base = ENVS[name];
+    const live = editing && s.draft ? s.draft : this.seed(name);
+    const h = HARNESSES[live.harness];
+    const sp = SANDBOX_PROVIDERS[live.provider];
+    // The acp kind IS its command — there is no default program to start.
+    const commanded = !h.needsCommand || !!(live.command || "").trim();
+    const named = (!isNew || !!(live.label || "").trim()) && commanded;
+
+    const dirty = isNew ? named : editing && s.draft
+      ? commanded && (s.draft.harness !== base.harness || s.draft.command !== base.command
+        || s.draft.provider !== base.provider
+        || s.draft.base !== base.base || s.draft.sealed !== base.sealed
+        || s.draft.setup.join("\n") !== base.setup.join("\n")
+        || s.draft.sources.join(",") !== base.sources.join(",")
+        || s.draft.tools.join(",") !== base.tools.join(","))
+      : false;
+
+    // Derived: providers whose protocol the harness speaks, then their models, then
+    // whichever open inference connection routes each one.
+    const speakable = Object.keys(PROVIDERS).filter((p) =>
+      PROVIDERS[p].protocol && h.speaks.indexOf(PROVIDERS[p].protocol) >= 0);
+    const ids = [];
+    speakable.forEach((p) => PROVIDERS[p].models.forEach((m) => {
+      if (ids.indexOf(m) < 0) ids.push(m);
+    }));
+    const routeOf = (id) => INFERENCE.filter((c) =>
+      speakable.indexOf(c[1]) >= 0 && PROVIDERS[c[1]].models.indexOf(id) >= 0);
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage" },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Agents", rows: [
+        { glyph: "a", label: "Ada", avatar: true },
+        { glyph: "r", label: "Rae", avatar: true }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u25CE", label: "Agents" },
+        { glyph: "\u2261", label: "Policy" },
+        { glyph: "\u229E", label: "Accounts" },
+        { glyph: "\u26AD", label: "Connections" },
+        { glyph: "\u25A3", label: "Environments", active: true }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({
+          at: x[0],
+          env: x[0] === "missing" ? "bare-debian" : x[0] === "empty" ? s.env : "node20-finance",
+          draft: x[0] === "editing" ? this.seed("node20-finance")
+            : x[0] === "new" ? this.blank() : null,
+          newLine: ""
+        })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      headerPad: isPhone ? "16px 18px 12px" : "24px 30px 14px",
+      bodyPad: isPhone ? "4px 18px 22px" : "6px 30px 28px",
+      titleSize: isPhone ? "26px" : "34px",
+      chipMin: touch ? "44px" : "34px",
+      btnMin: touch ? "44px" : "40px",
+      iconBtn: touch ? "44px" : "32px",
+      rowGrid: isPhone ? "minmax(0,1fr)" : "minmax(0,1fr) auto",
+      metaCol: isPhone ? "1" : "2",
+      rowIndent: isPhone ? "17px" : "0",
+      setupGrid: isPhone ? "20px minmax(0,1fr) auto" : "20px minmax(0,1fr) auto",
+      pairGrid: narrow ? "minmax(0,1fr)" : "minmax(0,1fr) minmax(0,1fr)",
+
+      crumbs: (detail
+        ? [["Environments", true], [isNew ? "new" : name, false]]
+        : [["Configure", true], ["Environments", false]]
+      ).map((b, i, arr) => ({
+        label: b[0],
+        ink: b[1] ? DIM : INK,
+        line: b[1] ? "1px dashed oklch(0.78 0.016 84)" : "none",
+        more: i < arr.length - 1
+      })),
+      titleEditable: isNew,
+      titleStatic: !isNew,
+      draftLabel: live.label || "",
+      setLabel: (e) => this.patch({ label: e.target.value }),
+      pageTitle: isEmpty ? "Environments" : detail ? name : "Environments",
+      headerMeta: isEmpty ? "none configured"
+        : isNew ? (named ? "not created yet" : "a name is required")
+        : editing ? (dirty ? "unsaved changes" : "no changes yet")
+        : detail ? h.name + " · " + live.provider
+        : Object.keys(ENVS).length + " environments · 3 sessions running",
+      metaInk: DIM,
+
+      hasBadge: detail && !isNew,
+      badgeLabel: missing ? "cannot start" : live.sealed && sp.seals ? "sealed" : "open",
+      badgeDot: missing ? BAD : live.sealed && sp.seals ? OK : IDLE,
+      badgeBg: missing ? "oklch(0.51 0.17 28 / 0.1)"
+        : live.sealed && sp.seals ? "oklch(0.52 0.14 148 / 0.1)" : "oklch(0.24 0.014 84 / 0.06)",
+      badgeInk: missing ? "oklch(0.42 0.14 28)"
+        : live.sealed && sp.seals ? "oklch(0.36 0.1 148)" : DIM,
+      showBadgeText: !isPhone,
+      badgePad: isPhone ? "10px" : "8px 14px",
+      badgeDotSize: isPhone ? "9px" : "7px",
+
+      primaryLabel: isEmpty ? "add an environment"
+        : isNew ? "cancel"
+        : editing ? "back to environments"
+        : detail ? "edit this environment"
+        : "new environment",
+      primaryFace: !isPhone
+        ? (isEmpty ? "add an environment"
+          : isNew ? "cancel"
+          : editing ? "back to environments"
+          : detail ? "edit this environment"
+          : "new environment")
+        : (editing ? "\u2190" : detail ? "\u270E" : "+"),
+      primaryBg: editing ? "transparent" : INK,
+      primaryInk: editing ? INK : "oklch(0.97 0.01 90)",
+      primaryBorder: editing ? "1.3px dashed oklch(0.74 0.016 84)" : "none",
+      primarySize: isPhone ? "15px" : "12.5px",
+      primaryPad: isPhone ? "0 12px" : "9px 19px",
+      primaryMin: isPhone ? "44px" : "0",
+      primaryAction: () => {
+        if (isEmpty || (!detail)) return set({ at: "new", draft: this.blank(), newLine: "" });
+        if (editing) return set({ at: "list", draft: null });
+        set({ at: "editing", draft: this.seed(name) });
+      },
+
+      showList: at === "list",
+      showDetail: detail,
+      showEmpty: isEmpty,
+      editing: editing,
+      reading: !editing,
+      missing: missing,
+
+      envs: Object.keys(ENVS).map((k) => {
+        const e = ENVS[k];
+        const running = e.users.filter((u) => u[2].indexOf("running") >= 0).length;
+        return {
+          label: k,
+          harness: HARNESSES[e.harness].name + " · " + (e.command || HARNESSES[e.harness].command),
+          base: e.base ? e.base : "provider default base",
+          reach: (e.sources.length + e.tools.length) === 0 ? "no reach"
+            : e.sources.length + " sources · " + e.tools.length + " tools",
+          users: e.users.length === 0 ? "no agents"
+            : e.users.length === 1 ? "1 agent" : e.users.length + " agents",
+          sealed: e.sealed && SANDBOX_PROVIDERS[e.provider].seals,
+          dot: running > 0 ? WORK : IDLE,
+          onOpen: () => set({ at: "one", env: k, draft: null })
+        };
+      }),
+
+      missingNote: "The sandbox started from " + (base.base || "the provider default")
+        + ", which has no " + h.command.split(" ")[0]
+        + " in it. Amends checks for the harness and stops rather than installing it — put the line in setup, or use a base image that already carries it.",
+      installHint: h.install,
+      addInstall: () => set({
+        at: "editing",
+        draft: Object.assign(this.seed("bare-debian"), {
+          setup: ENVS["bare-debian"].setup.concat([h.install])
+        })
+      }),
+
+      harnessRows: Object.keys(HARNESSES).map((k) => ({
+        name: HARNESSES[k].name,
+        command: HARNESSES[k].command,
+        speaks: "speaks " + HARNESSES[k].speaks.join(", "),
+        dot: live.harness === k ? WORK : IDLE,
+        bg: live.harness === k ? "oklch(0.24 0.014 84 / 0.07)" : "none",
+        onPick: () => this.patch({ harness: k })
+      })),
+      draftCommand: live.command || "",
+      setCommand: (e) => this.patch({ command: e.target.value }),
+      commandRequirement: h.needsCommand ? "· required" : "· optional",
+      commandPlaceholder: h.needsCommand ? "my-agent --acp" : h.command,
+      commandLine: h.needsCommand && !commanded
+        ? "oklch(0.6 0.14 28)" : "oklch(0.78 0.016 84)",
+      commandNote: h.needsCommand
+        ? (commanded
+          ? "This is the whole configuration for a bring-your-own program — it must read AMENDS_URL, AMENDS_TOKEN and AMENDS_MODEL."
+          : "A bring-your-own program has no default command. Name the executable that speaks ACP.")
+        : "Leave blank to start " + h.command + ". Override it only if your base installs it elsewhere.",
+      commandNoteInk: h.needsCommand && !commanded ? "oklch(0.45 0.15 28)" : DIM,
+      harnessFacts: [
+        ["kind", live.harness],
+        ["starts", live.command || h.command || "not set"],
+        ["speaks", h.speaks.join(", ")],
+        ["pointed by", h.pointing],
+        ["install", h.install]
+      ].map((f) => ({ k: f[0], v: f[1], ink: f[1] === "not set" ? BAD : INK })),
+      harnessNote: "Started inside the sandbox and pointed at the workspace gateway — "
+        + h.name + " never sees a provider key, only a token and one pinned model.",
+
+      providerChips: Object.keys(SANDBOX_PROVIDERS).map((p) => ({
+        label: p,
+        bg: live.provider === p ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+        fg: live.provider === p ? INK : DIM,
+        line: live.provider === p ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+        // Both capability-gated fields are cleared together: a provider that cannot
+        // seal loses the seal, and one that takes no base loses the base.
+        onPick: () => this.patch({
+          provider: p,
+          sealed: SANDBOX_PROVIDERS[p].seals ? live.sealed : false,
+          base: SANDBOX_PROVIDERS[p].base === null ? "" : live.base
+        })
+      })),
+      draftBase: live.base || "",
+      setBase: (e) => this.patch({ base: e.target.value }),
+      basePlaceholder: sp.base || "the provider decides",
+      baseNote: live.base
+        ? "Every sandbox starts from this. The harness has to be in it, or in a setup line."
+        : sp.base
+        ? "Left blank, the provider's default is used: " + sp.base + "."
+        : "This provider has no base to choose — it runs on the host as it is.",
+      sandboxFacts: [
+        ["provider", live.provider],
+        ["base", live.base || (sp.base ? sp.base + " · provider default" : "none")],
+        ["lifetime", "created per session, destroyed when it ends"]
+      ].map((f) => ({ k: f[0], v: f[1], ink: INK })),
+
+      sealEditable: editing && sp.seals,
+      sealBlocked: editing && !sp.seals,
+      sealStatic: !editing,
+      sealLabel: live.sealed ? "sealed" : sp.seals ? "open" : "cannot seal",
+      sealDot: live.sealed ? OK : IDLE,
+      sealBg: live.sealed ? "oklch(0.52 0.14 148 / 0.1)" : "transparent",
+      sealLine: live.sealed ? "oklch(0.5 0.12 148)" : "oklch(0.82 0.016 84)",
+      sealNote: !sp.seals
+        ? live.provider + " isolates nothing, so there is no boundary to seal."
+        : live.sealed
+        ? "Outbound traffic is limited to what its connections declare. Everything else is refused, and the refusal is logged."
+        : "The session can reach anything the host can.",
+      sealNoteInk: !sp.seals ? "oklch(0.45 0.1 78)" : DIM,
+      toggleSealed: () => {
+        if (!editing || !sp.seals) return;
+        this.patch({ sealed: !live.sealed });
+      },
+
+      setupNote: live.setup.length === 0 ? "nothing to prepare" : "runs once per sandbox",
+      setup: live.setup.map((text, i) => ({
+        n: String(i + 1), text: text,
+        ink: text === h.install ? "oklch(0.36 0.1 148)" : "oklch(0.28 0.014 84)",
+        onRemove: () => this.patch({ setup: live.setup.filter((x, j) => j !== i) })
+      })),
+      newLine: s.newLine,
+      setNewLine: (e) => set({ newLine: e.target.value }),
+      addLine: () => {
+        const v = s.newLine.trim();
+        if (!v) return;
+        this.patch({ setup: live.setup.concat([v]) });
+        set({ newLine: "" });
+      },
+
+      modelCount: ids.length === 1 ? "1 model" : ids.length + " models",
+      models: ids.map((id) => {
+        const routes = routeOf(id);
+        return {
+          id: id,
+          route: routes.length === 0 ? "no route"
+            : routes.length === 1 ? "via " + routes[0][1]
+            : "via " + routes[0][1] + " · " + (routes.length - 1) + " more",
+          state: routes.length === 0 ? "connect a provider" : "reachable",
+          stateInk: routes.length === 0 ? "oklch(0.45 0.1 78)" : DIM,
+          dot: routes.length === 0 ? WARN : OK,
+          ink: routes.length === 0 ? DIM : INK
+        };
+      }),
+      modelNote: h.name + " can be pointed at " + h.speaks.join(" or ")
+        + ", so only catalog providers speaking one of those appear. A model with two doors is one model — "
+        + "the route is the oldest open connection that serves it, and the rest stay as fallbacks.",
+
+      sourceChips: SOURCE_OPTIONS.map((id) => {
+        const on = live.sources.indexOf(id) >= 0;
+        return {
+          label: CONNECTIONS[id],
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          onToggle: () => {
+            if (!editing) return;
+            this.patch({
+              sources: on ? live.sources.filter((x) => x !== id) : live.sources.concat([id])
+            });
+          }
+        };
+      }),
+      toolChips: TOOL_OPTIONS.map((id) => {
+        const on = live.tools.indexOf(id) >= 0;
+        return {
+          label: CONNECTIONS[id],
+          bg: on ? "oklch(0.24 0.014 84 / 0.1)" : "transparent",
+          fg: on ? INK : DIM,
+          line: on ? "oklch(0.42 0.016 84)" : "oklch(0.82 0.016 84)",
+          onToggle: () => {
+            if (!editing) return;
+            this.patch({
+              tools: on ? live.tools.filter((x) => x !== id) : live.tools.concat([id])
+            });
+          }
+        };
+      }),
+
+      saveLabel: isNew ? "create environment" : "save changes",
+      saveBg: dirty ? INK : "oklch(0.24 0.014 84 / 0.15)",
+      saveInk: dirty ? "oklch(0.97 0.01 90)" : DIM,
+      saveNote: isNew
+        ? (named ? "Creating it makes the environment selectable by any agent."
+          : !commanded
+          ? "A bring-your-own program needs its command before this can be created."
+          : "An environment needs a name before it can be created.")
+        : !commanded
+        ? "Name the command this harness starts, or choose a kind that has one."
+        : dirty
+        ? "Applies to sandboxes created from now on. Sessions already running keep what they started with."
+        : "Nothing changed yet.",
+      onSave: () => { if (dirty) set({ at: isNew ? "list" : "one", draft: null }); },
+      onCancel: () => set({ at: isNew ? "list" : "one", draft: null }),
+
+      showUsers: detail && !isNew && base.users.length > 0,
+      users: base.users.map((u) => ({
+        name: u[0], initial: u[1], meta: u[2],
+        ink: u[2] === "idle" ? DIM : INK
+      })),
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label,
+        hasLabel: !!sec.label,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" }, { glyph: "\u27C1" }, { glyph: "\u2317" },
+        { glyph: "\u25CE" }, { glyph: "\u2261" }, { glyph: "\u229E" },
+        { glyph: "\u25A3", active: true }
+      ].map((n) => ({
+        glyph: n.glyph,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input,textarea{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+    @keyframes stitch{to{stroke-dashoffset:-26}}
+    svg[data-stitch] [data-seam]{animation:stitch 2.6s linear infinite;}
+    @media (prefers-reduced-motion: reduce){svg[data-stitch] [data-seam]{animation:none}}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · screen 02 of 12</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Triage</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Work that has arrived and not yet been placed. The queue is the left two thirds; the reasoning behind any one decision opens on the right. This is the screen where the promise about keeping reasoning is either visible or it is not.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="4">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;position:relative;">
+
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ false }}">
+        <div style="width:60px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;">
+          <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;color:oklch(0.68 0.01 85);flex:none;">&#9776;</span>
+          <span style="width:28px;border-top:1px dashed oklch(0.34 0.01 84);margin:4px 0;"></span>
+          <sc-for list="{{ railRows }}" as="n" hint-placeholder-count="6">
+            <span style="width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:{{ n.bg }};font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ n.glyphInk }};position:relative;flex:none;">
+              {{ n.glyph }}
+              <sc-if value="{{ n.hasCount }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:oklch(0.7 0.14 44);"></span>
+              </sc-if>
+            </span>
+          </sc-for>
+          <span style="flex:1;"></span>
+          <span style="width:28px;height:28px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+        <div style="width:256px;flex:none;background:oklch(0.2 0.008 84);display:flex;flex-direction:column;">
+          <div style="padding:16px 14px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="width:36px;height:36px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-size:14px;font-weight:600;color:oklch(0.95 0.006 90);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Acme Finance</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.62 0.01 85);">workspace</span>
+            </span>
+            <span style="width:26px;height:26px;border-radius:50%;background:oklch(0.32 0.01 84);font-size:10px;font-weight:600;color:oklch(0.88 0.008 88);display:inline-flex;align-items:center;justify-content:center;flex:none;">JM</span>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;">
+            <sc-for list="{{ navGroups }}" as="sec" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <sc-if value="{{ sec.hasLabel }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;padding:14px 10px 6px;">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.62 0.01 85);">{{ sec.label }}</span>
+                    <span style="flex:1;height:1px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+                    <sc-if value="{{ sec.hasAction }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.7 0.01 85);">{{ sec.action }}</span>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ sec.rows }}" as="n" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;background:{{ n.bg }};">
+                    <sc-if value="{{ n.isAvatar }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:16px;height:16px;border-radius:50%;border:1.2px dashed oklch(0.5 0.01 84);font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:oklch(0.72 0.008 86);display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <sc-if value="{{ n.isGlyph }}" hint-placeholder-val="{{ true }}">
+                      <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ n.glyphInk }};flex:none;text-align:center;">{{ n.glyph }}</span>
+                    </sc-if>
+                    <span style="font-size:14px;color:{{ n.ink }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.label }}</span>
+                    <sc-if value="{{ n.hasCount }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.72 0.008 86);flex:none;">{{ n.count }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <span style="margin:0 14px;border-top:1px dashed oklch(0.34 0.01 84);"></span>
+          <div style="padding:8px;">
+            <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;min-height:34px;border-radius:8px;">
+              <span style="width:16px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.62 0.01 85);flex:none;text-align:center;">&#9881;</span>
+              <span style="font-size:14px;color:oklch(0.82 0.008 88);">Settings</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+        <div style="padding:{{ headerPad }};display:flex;flex-direction:column;gap:7px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;">
+            <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+              <span style="width:40px;height:40px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:15px;flex:none;">&#9776;</span>
+            </sc-if>
+            <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.1;flex:1;min-width:0;">{{ pageTitle }}</span>
+            <sc-if value="{{ showPanelButton }}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{ togglePanel }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 17px;min-height:40px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;background:{{ panelBtnBg }};color:oklch(0.24 0.014 84);flex:none;">{{ panelBtnLabel }}</button>
+            </sc-if>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);">{{ headerMeta }}</span>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;gap:22px;">
+
+          <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:56px 24px 40px;text-align:center;">
+              <svg viewBox="0 0 240 170" width="230" height="163" fill="none" role="img" aria-label="Two neat stacks of folded cloth with nothing waiting between them">
+                <path d="M22 118 L86 108 L146 118 L82 130 Z" stroke="oklch(0.72 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                <path d="M28 104 L86 95 L140 104" stroke="oklch(0.8 0.016 84)" stroke-width="1.2" stroke-linejoin="round"></path>
+                <path d="M34 90 L86 82 L134 90" stroke="oklch(0.84 0.016 84)" stroke-width="1.2" stroke-linejoin="round"></path>
+                <path d="M150 122 L196 115 L222 122 L180 130 Z" stroke="oklch(0.72 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                <path d="M155 110 L196 103 L216 110" stroke="oklch(0.8 0.016 84)" stroke-width="1.2" stroke-linejoin="round"></path>
+                <path d="M96 44 H164" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-linecap="round"></path>
+                <ellipse cx="102" cy="44" rx="2.6" ry="5" stroke="oklch(0.24 0.014 84)" stroke-width="1.2"></ellipse>
+                <path d="M74 58 h10 M60 44 h10" stroke="oklch(0.84 0.016 84)" stroke-width="1.3" stroke-linecap="round"></path>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:9px;max-width:420px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:30px;line-height:1.15;">Everything is placed</span>
+                <span style="font-size:14.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Nothing is waiting on a routing decision. Twelve tasks were placed today, nine of them by policy.</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:9px;justify-content:center;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">see today's decisions</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">edit the policy</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showNoPolicy }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:24px;padding:20px 2px 8px;">
+              <svg viewBox="0 0 200 130" width="150" height="98" fill="none" style="flex:none;" role="img" aria-label="Cloth marked with pins where seams should go, but no stitches yet">
+                <path d="M24 34 L176 26 L170 108 L30 116 Z" stroke="oklch(0.74 0.016 84)" stroke-width="1.4" stroke-linejoin="round"></path>
+                <path d="M60 44 L52 100" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 7" stroke-linecap="round"></path>
+                <path d="M104 40 L100 104" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 7" stroke-linecap="round"></path>
+                <path d="M148 36 L146 102" stroke="oklch(0.86 0.016 84)" stroke-width="1.2" stroke-dasharray="3 7" stroke-linecap="round"></path>
+                <circle cx="60" cy="44" r="3.2" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></circle>
+                <circle cx="104" cy="40" r="3.2" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></circle>
+                <circle cx="148" cy="36" r="3.2" stroke="oklch(0.24 0.014 84)" stroke-width="1.3"></circle>
+              </svg>
+              <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:240px;">
+                <span style="font-family:'Instrument Serif',serif;font-size:24px;line-height:1.2;">No policy yet</span>
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">Four tasks have arrived and none of them can be placed automatically. Write one rule and the queue starts clearing itself.</span>
+              </div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:9px 19px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);flex:none;">write the first rule</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showQueue }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Undecided</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ queueCount }}</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);min-width:30px;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ queueNote }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ queue }}" as="q" hint-placeholder-count="4">
+                  <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{ q.onPick }}" style="display:grid;grid-template-columns:7px 44px minmax(0,1fr) 128px 152px;align-items:center;gap:6px 12px;padding:13px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.88 0.014 86);border-radius:0;background:{{ q.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ q.dot }};border:{{ q.ring }};"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ q.waited }}</span>
+                      <span style="font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ q.title }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ q.from }}</span>
+                      <span style="display:flex;align-items:center;gap:8px;min-width:0;">
+                        <sc-if value="{{ q.live }}" hint-placeholder-val="{{ false }}">
+                          <svg data-stitch="on" viewBox="0 0 80 8" width="52" height="8" fill="none" style="flex:none;"><path d="M2 4 H78" stroke="oklch(0.55 0.016 84)" stroke-width="1.5" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path></svg>
+                        </sc-if>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ q.moveInk }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ q.move }}</span>
+                      </span>
+                    </button>
+                  </sc-if>
+                  <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{ q.onPick }}" style="display:grid;grid-template-columns:7px minmax(0,1fr);align-items:center;gap:5px 12px;padding:13px 8px;margin:0 -8px;border:none;border-bottom:1px dashed oklch(0.88 0.014 86);border-radius:0;background:{{ q.bg }};text-align:left;width:100%;">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ q.dot }};border:{{ q.ring }};"></span>
+                      <span style="font-size:14px;line-height:1.4;min-width:0;">{{ q.title }}</span>
+                      <span style="grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">
+                        <span>{{ q.waited }}</span>
+                        <span>{{ q.from }}</span>
+                        <span style="color:{{ q.moveInk }};">{{ q.move }}</span>
+                      </span>
+                    </button>
+                  </sc-if>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Placed today</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">12</span>
+                <span style="flex:1;height:1px;border-top:1px dashed oklch(0.85 0.016 86);"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ placed }}" as="p" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:{{ placedGrid }};align-items:center;gap:5px 12px;padding:9px 2px;border-bottom:1px dashed oklch(0.9 0.014 86);">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ p.dot }};"></span>
+                    <span style="font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.title }}</span>
+                    <span style="grid-column:{{ metaCol }};display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">
+                      <span>{{ p.time }}</span>
+                      <span>{{ p.move }}</span>
+                      <span>{{ p.by }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+        </div>
+
+        <sc-if value="{{ showBottomNav }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;background:oklch(0.2 0.008 84);display:flex;">
+            <sc-for list="{{ bottomRows }}" as="b" hint-placeholder-count="4">
+              <span style="flex:1;min-height:56px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ b.ink }};position:relative;">
+                  {{ b.glyph }}
+                  <sc-if value="{{ b.hasCount }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;top:-2px;right:-7px;width:6px;height:6px;border-radius:50%;background:oklch(0.7 0.14 44);"></span>
+                  </sc-if>
+                </span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ b.ink }};">{{ b.label }}</span>
+              </span>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ showPanelColumn }}" hint-placeholder-val="{{ true }}">
+        <div style="width:400px;flex:none;background:oklch(0.978 0.008 92);display:flex;flex-direction:column;">
+          <div style="padding:20px 22px 12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decision</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ panelMeta }}</span>
+            </div>
+            <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.25;">{{ panelTitle }}</span>
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+              <span style="width:7px;height:7px;border-radius:50%;background:{{ panelDot }};border:{{ panelRing }};flex:none;"></span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ panelMoveInk }};">{{ panelMove }}</span>
+              <sc-if value="{{ panelLive }}" hint-placeholder-val="{{ false }}">
+                <svg data-stitch="on" viewBox="0 0 100 8" width="72" height="8" fill="none" style="flex:none;"><path d="M2 4 H98" stroke="oklch(0.5 0.016 84)" stroke-width="1.6" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path></svg>
+              </sc-if>
+            </div>
+          </div>
+          <span style="margin:0 22px;border-top:1px dashed oklch(0.87 0.014 86);"></span>
+
+          <div style="flex:1;overflow-y:auto;padding:14px 22px 20px;display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;">
+              <sc-for list="{{ panelFacts }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:8px 0;border-bottom:1px dashed oklch(0.89 0.014 86);">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ f.ink }};">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ panelHasTrace }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Trace · {{ traceCount }}</span>
+                <sc-for list="{{ trace }}" as="t" hint-placeholder-count="3">
+                  <div style="display:flex;flex-direction:column;">
+                    <button type="button" onClick="{{ t.onToggle }}" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 10px;padding:10px 2px;border:none;border-top:1px dashed oklch(0.89 0.014 86);background:none;text-align:left;width:100%;">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.5 0.014 84);width:10px;flex:none;">{{ t.caret }}</span>
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};border:{{ t.ring }};flex:none;align-self:flex-start;margin-top:5px;"></span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.5 0.014 84);flex:none;">{{ t.n }}</span>
+                      <span style="font-size:13px;flex:1;min-width:90px;">{{ t.name }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:{{ t.verdictInk }};flex:none;">{{ t.verdict }}</span>
+                    </button>
+                    <sc-if value="{{ t.open }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:0 2px 12px 24px;display:flex;flex-direction:column;gap:9px;">
+                        <sc-for list="{{ t.conditions }}" as="c" hint-placeholder-count="2">
+                          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 9px;">
+                            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:{{ c.markInk }};width:10px;flex:none;">{{ c.mark }}</span>
+                            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:oklch(0.41 0.014 84);width:56px;flex:none;">{{ c.field }}</span>
+                            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:120px;">
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.24 0.014 84);">{{ c.expected }}</span>
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ c.actual }}</span>
+                            </span>
+                          </div>
+                        </sc-for>
+                        <sc-if value="{{ t.hasConsult }}" hint-placeholder-val="{{ false }}">
+                          <div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:10px;background:oklch(0.945 0.014 88);">
+                            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Consultation</span>
+                            <span style="font-size:13px;line-height:1.55;">{{ t.consultText }}</span>
+                            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.41 0.014 84);border-bottom:1px dashed oklch(0.78 0.016 84);align-self:flex-start;">{{ t.consultSession }} &#8594;</span>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ panelNoTrace }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <span style="font-size:13.5px;line-height:1.6;color:oklch(0.41 0.014 84);">{{ panelNoTraceNote }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 16px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);align-self:flex-start;">{{ panelNoTraceAction }}</span>
+              </div>
+            </sc-if>
+
+            <span style="border-top:1px dashed oklch(0.89 0.014 86);"></span>
+            <div style="display:flex;flex-direction:column;gap:9px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Place it yourself</span>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">assign</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">hold</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:7px 15px;border-radius:999px;border:1.3px dashed oklch(0.68 0.09 28);color:oklch(0.45 0.15 28);">dismiss</span>
+              </div>
+              <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);">Placing it by hand records a decision with you as its author, not the policy.</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ panelOverlay }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;z-index:30;background:oklch(0.24 0.014 84 / 0.45);display:flex;justify-content:flex-end;">
+          <button type="button" onClick="{{ togglePanel }}" aria-label="Close panel" style="flex:1;border:none;background:none;"></button>
+          <div style="width:{{ overlayWidth }};max-width:94%;background:oklch(0.978 0.008 92);display:flex;flex-direction:column;">
+            <div style="padding:16px 20px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+              <span style="font-family:'Instrument Serif',serif;font-size:19px;line-height:1.2;flex:1;min-width:120px;">Decision</span>
+              <button type="button" onClick="{{ togglePanel }}" aria-label="Close" style="width:40px;height:40px;border:1.3px dashed oklch(0.76 0.016 84);border-radius:999px;background:none;font-family:'IBM Plex Mono',monospace;font-size:14px;flex:none;">&#10005;</button>
+            </div>
+            <span style="margin:0 20px;border-top:1px dashed oklch(0.87 0.014 86);"></span>
+            <div style="flex:1;overflow-y:auto;padding:14px 20px 20px;display:flex;flex-direction:column;gap:14px;">
+              <span style="font-size:15px;line-height:1.4;font-weight:500;">{{ panelTitle }}</span>
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+                <span style="width:7px;height:7px;border-radius:50%;background:{{ panelDot }};border:{{ panelRing }};flex:none;"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ panelMoveInk }};">{{ panelMove }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;">
+                <sc-for list="{{ panelFacts }}" as="f" hint-placeholder-count="4">
+                  <div style="display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:8px 0;border-bottom:1px dashed oklch(0.89 0.014 86);">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ f.k }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ f.ink }};">{{ f.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:8px 16px;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">assign</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:8px 16px;border-radius:999px;border:1.3px dashed oklch(0.72 0.016 84);">hold</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:16px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Decided on this screen</span>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">01</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">The queue shows the proposed move in the row, so you can scan what the policy wants to do without opening anything. The trace is one click away, never in your face.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">02</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">A consultation shows the travelling dash in the row and its session in the panel, because it is a real execution with a real cost — even though the task records no turn for it.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">03</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">With no policy the queue still lists everything and each row says so, rather than the screen going empty. An empty screen would suggest there is nothing to do, and there are four.</span></div>
+      <div style="display:flex;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.47 0.12 40);flex:none;">04</span><span style="font-size:14px;line-height:1.6;color:oklch(0.35 0.014 84);">Placing something by hand records you as the author of that decision. The trace for it is one line long, and that is the honest length.</span></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000}}">
+const FALLBACK_WIDTH = 640;
+const OK = "oklch(0.52 0.14 148)";
+const WARN = "oklch(0.58 0.12 78)";
+const NEUTRAL = "oklch(0.62 0.014 84)";
+const WORK = "oklch(0.41 0.014 84)";
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 880 },
+  laptop: { label: "laptop", width: 1180, height: 820 },
+  tablet: { label: "tablet", width: 834, height: 780 },
+  phone: { label: "phone", width: 390, height: 760 }
+};
+
+const STATES = [
+  ["queue", "queue"],
+  ["consulting", "consulting an agent"],
+  ["nopolicy", "no policy yet"],
+  ["empty", "everything placed"]
+];
+
+const QUEUE = [
+  { title: "September totals do not match the statement", from: "billing@acme.test", waited: "14m",
+    move: "assign Ada", kind: "assign", read: "msg_4411" },
+  { title: "Refund webhook retries forever", from: "support@acme.test", waited: "1h",
+    move: "hold for a person", kind: "hold", read: "msg_4502" },
+  { title: "Seat count off by one after invite", from: "created in app", waited: "3h",
+    move: "no rule matched", kind: "none", read: "msg_4530" },
+  { title: "Duplicate of the August close", from: "billing@acme.test", waited: "4h",
+    move: "dismiss as duplicate", kind: "dismiss", read: "msg_4390" }
+];
+
+// The referral needs a task no earlier rule claims — evaluation stops at the first
+// match, so a billing task could never reach rule 3.
+const CONSULT_ROW = { title: "Where should data residency questions go?", from: "support@acme.test",
+  waited: "3m", move: "consulting Ada", kind: "refer", read: "msg_4418" };
+
+const PLACED = [
+  ["16:02", "Reconcile the September invoice totals", "assigned Ada", "policy v7", OK],
+  ["15:41", "Review the retry policy change", "assigned Rae", "Ada consulted", OK],
+  ["15:12", "Archive the August statements", "assigned Ada", "policy v7", OK],
+  ["14:58", "Password reset loop", "dismissed", "Jo Mercer", NEUTRAL]
+];
+
+const TRACES = {
+  assign: [
+    { n: "rule 0", name: "Urgent billing to Rae", matched: false, verdict: "skipped",
+      conditions: [
+        ["channel", false, "expects billing@acme.test, finance/slack", "arrived on billing@acme.test"],
+        ["text", false, "expects \u201Curgent\u201D", "no match in title, description or messages"]
+      ] },
+    { n: "rule 1", name: "Fold duplicates into the open task", matched: false, verdict: "skipped",
+      conditions: [["duplicate", false, "expects similarity 0.60 or better", "best candidate TASK-390 at 0.42"]] },
+    { n: "rule 2", name: "Billing to Ada", matched: true, verdict: "matched",
+      conditions: [
+        ["kind", true, "expects billing, invoicing", "task kind is billing"],
+        ["text", true, "expects \u201Cinvoice\u201D, \u201Cstatement\u201D", "matched \u201Cstatement\u201D in title"],
+        ["tried", true, "expects no prior turns", "task has no turns"],
+        ["agent", true, "expects Ada available", "Ada busy 2 of 3, accepting work"]
+      ] }
+  ],
+  hold: [
+    { n: "rule 0", name: "Urgent billing to Rae", matched: false, verdict: "skipped",
+      conditions: [
+        ["channel", false, "expects billing@acme.test, finance/slack", "arrived on support@acme.test"],
+        ["text", false, "expects \u201Curgent\u201D", "no match in title, description or messages"]
+      ] },
+    { n: "rule 1", name: "Fold duplicates into the open task", matched: false, verdict: "skipped",
+      conditions: [["duplicate", false, "expects similarity 0.60 or better", "no candidates"]] },
+    { n: "rule 2", name: "Billing to Ada", matched: false, verdict: "skipped",
+      conditions: [["kind", false, "expects billing, invoicing", "task kind is refund"]] },
+    { n: "rule 3", name: "Ask Ada where this goes", matched: false, verdict: "skipped",
+      conditions: [["kind", false, "expects unknown", "task kind is refund"]] },
+    { n: "rule 4", name: "Ask before acting on refunds", matched: true, verdict: "matched",
+      conditions: [
+        ["text", true, "expects \u201Crefund\u201D", "matched in title"],
+        ["agent", true, "expects Rae available", "Rae available"]
+      ],
+      consult: { text: "Rae asked: \u201CIs this refund inside the 30-day window, or an exception?\u201D", session: "ses_8861" } }
+  ],
+  none: [
+    { n: "rule 0", name: "Urgent billing to Rae", matched: false, verdict: "skipped",
+      conditions: [["channel", false, "expects billing@acme.test, finance/slack", "created in the app, no channel"]] },
+    { n: "rule 1", name: "Fold duplicates into the open task", matched: false, verdict: "skipped",
+      conditions: [["duplicate", false, "expects similarity 0.60 or better", "no candidates"]] },
+    { n: "rule 2", name: "Billing to Ada", matched: false, verdict: "skipped",
+      conditions: [["kind", false, "expects billing, invoicing", "task kind is access"]] },
+    { n: "rule 3", name: "Ask Ada where this goes", matched: false, verdict: "skipped",
+      conditions: [["kind", false, "expects unknown", "task kind is access"]] },
+    { n: "rule 4", name: "Ask before acting on refunds", matched: false, verdict: "skipped",
+      conditions: [["text", false, "expects \u201Crefund\u201D", "no match"]] }
+  ],
+  dismiss: [
+    { n: "rule 0", name: "Urgent billing to Rae", matched: false, verdict: "skipped",
+      conditions: [
+        ["channel", true, "expects billing@acme.test, finance/slack", "arrived on billing@acme.test"],
+        ["text", false, "expects \u201Curgent\u201D", "no match in title, description or messages"]
+      ] },
+    { n: "rule 1", name: "Fold duplicates into the open task", matched: true, verdict: "matched",
+      conditions: [["duplicate", true, "expects similarity 0.60 or better", "TASK-402 at 0.81"]] }
+  ],
+  refer: [
+    { n: "rule 0", name: "Urgent billing to Rae", matched: false, verdict: "skipped",
+      conditions: [["channel", false, "expects billing@acme.test, finance/slack", "arrived on support@acme.test"]] },
+    { n: "rule 1", name: "Fold duplicates into the open task", matched: false, verdict: "skipped",
+      conditions: [["duplicate", false, "expects similarity 0.60 or better", "no candidates"]] },
+    { n: "rule 2", name: "Billing to Ada", matched: false, verdict: "skipped",
+      conditions: [["kind", false, "expects billing, invoicing", "task kind is unknown"]] },
+    { n: "rule 3", name: "Ask Ada where this goes", matched: true, verdict: "matched",
+      conditions: [
+        ["kind", true, "expects unknown", "task kind is unknown"],
+        ["agent", true, "expects Ada available", "Ada available"]
+      ],
+      consult: { text: "Consulting Ada now. It has read the thread and has not chosen yet.", session: "ses_8871" } }
+  ]
+};
+
+const BOTTOM = [
+  ["home", "\u2302", "home", false],
+  ["triage", "\u27C1", "triage", true],
+  ["tasks", "\u2317", "tasks", false],
+  ["agents", "\u25CE", "agents", false]
+];
+
+class Component extends DCLogic {
+  state = { at: "queue", view: "desktop", available: 0, pick: 0, open: [2], panel: true };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const isTablet = s.view === "tablet";
+    const isDesktop = s.view === "desktop";
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+
+    const noPolicy = at === "nopolicy";
+    const isEmpty = at === "empty";
+    const consulting = at === "consulting";
+
+    const dotFor = (kind) => kind === "assign" ? OK
+      : kind === "hold" ? WARN
+      : kind === "dismiss" ? NEUTRAL : "transparent";
+
+    // The consultation arrives as its own task at the head of the queue.
+    const displayed = consulting ? [CONSULT_ROW].concat(QUEUE) : QUEUE;
+    const rows = displayed.map((q, i) => {
+      const kind = noPolicy ? "none" : q.kind;
+      const move = noPolicy ? "no policy" : q.move;
+      return {
+        title: q.title, from: q.from, waited: q.waited, move: move,
+        dot: noPolicy ? "transparent" : kind === "refer" ? WORK : dotFor(kind),
+        ring: (noPolicy || kind === "none") ? "1.2px dashed oklch(0.74 0.016 84)" : "none",
+        moveInk: noPolicy || kind === "none" ? DIM : INK,
+        live: kind === "refer",
+        bg: s.pick === i ? "oklch(0.24 0.014 84 / 0.07)" : "transparent",
+        onPick: () => set({ pick: i, panel: true, open: [] })
+      };
+    });
+
+    const picked = displayed[Math.min(s.pick, displayed.length - 1)];
+    const traceKey = noPolicy ? null : picked.kind;
+    const trace = traceKey ? TRACES[traceKey] : [];
+
+    const panelMove = noPolicy ? "No action — there is no policy to evaluate"
+      : picked.kind === "refer" ? "Consulting Ada"
+      : picked.kind === "assign" ? "Assign to Ada"
+      : picked.kind === "hold" ? "Hold for a person"
+      : picked.kind === "dismiss" ? "Dismiss as a duplicate"
+      : "No action selected";
+
+    const RULE_LABEL = {
+      refer: ["rule 3 · ask Ada where this goes", "ses_8871 · running", INK],
+      assign: ["rule 2 · billing to Ada", "—", DIM],
+      hold: ["rule 4 · ask before acting on refunds", "ses_8861 · completed", INK],
+      dismiss: ["rule 1 · fold duplicates", "—", DIM],
+      none: ["none", "—", DIM]
+    };
+    const picked_rule = RULE_LABEL[picked.kind] || RULE_LABEL.none;
+    const facts = noPolicy
+      ? [["policy version", "none", DIM], ["selected rule", "none", DIM],
+         ["read through", picked.read, INK], ["consultation", "\u2014", DIM]]
+      : [["policy version", "7", INK],
+         ["selected rule", picked_rule[0], picked.kind === "none" ? DIM : INK],
+         ["read through", picked.read, INK],
+         ["consultation", picked_rule[1], picked_rule[2]]];
+
+    const nav = [
+      { label: "", rows: [
+        { glyph: "\u2302", label: "Home" },
+        { glyph: "\u27C1", label: "Triage", count: isEmpty ? "" : String(displayed.length), active: true },
+        { glyph: "\u2317", label: "Tasks" }
+      ] },
+      { label: "Channels", action: "+ channel", rows: [
+        { glyph: "#", label: "billing@acme.test" },
+        { glyph: "#", label: "support@acme.test" }
+      ] },
+      { label: "Agents", action: "+ agent", rows: [
+        { glyph: "a", label: "Ada", avatar: true },
+        { glyph: "r", label: "Rae", avatar: true }
+      ] },
+      { label: "Configure", rows: [
+        { glyph: "\u2261", label: "Policy" },
+        { glyph: "\u25A3", label: "Environments" },
+        { glyph: "\u26AD", label: "Connections" }
+      ] }
+    ];
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? INK : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? INK : "oklch(0.8 0.016 84)",
+        onPick: () => set({ at: x[0], pick: 0, open: x[0] === "queue" ? [2] : [0] })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k, panel: k === "desktop" })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1
+        ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      showSidebar: s.view === "desktop" || s.view === "laptop",
+      showRail: isTablet,
+      showMenu: isPhone,
+      showBottomNav: isPhone,
+      headerPad: isPhone ? "16px 18px 10px" : "24px 30px 14px",
+      bodyPad: isPhone ? "6px 18px 20px" : "8px 30px 30px",
+      titleSize: isPhone ? "27px" : "34px",
+      wide: !isPhone,
+      narrow: isPhone,
+      metaCol: isPhone ? "2" : "auto",
+      placedGrid: isPhone ? "7px minmax(0,1fr)" : "7px minmax(0,1fr) auto",
+
+      pageTitle: "Triage",
+      headerMeta: isEmpty ? "nothing waiting · 12 placed today"
+        : noPolicy ? "4 waiting · no policy"
+        : consulting ? "5 waiting · 1 being referred"
+        : "4 waiting · 12 placed today",
+
+      showEmpty: isEmpty,
+      showNoPolicy: noPolicy,
+      showQueue: !isEmpty,
+      queueCount: String(displayed.length),
+      queueNote: noPolicy ? "nothing can be placed automatically"
+        : consulting ? "one is being referred to an agent"
+        : "proposed by policy v7",
+      queue: rows,
+      placed: PLACED.map((p) => ({
+        time: p[0], title: p[1], move: p[2], by: p[3], dot: p[4]
+      })),
+
+      showPanelColumn: isDesktop && !isEmpty && s.panel,
+      showPanelButton: !isDesktop && !isEmpty,
+      panelOverlay: !isDesktop && !isEmpty && s.panel,
+      overlayWidth: isPhone ? "100%" : "420px",
+      togglePanel: () => set({ panel: !s.panel }),
+      panelBtnLabel: s.panel ? "hide decision" : "decision",
+      panelBtnBg: s.panel ? "oklch(0.24 0.014 84 / 0.07)" : "transparent",
+
+      panelTitle: picked.title,
+      panelMeta: noPolicy ? "not evaluated" : "decided " + picked.waited + " ago",
+      panelMove: panelMove,
+      panelDot: rows[s.pick].dot,
+      panelRing: rows[s.pick].ring,
+      panelMoveInk: noPolicy ? DIM : INK,
+      panelLive: consulting && s.pick === 0,
+      panelFacts: facts.map((f) => ({ k: f[0], v: f[1], ink: f[2] })),
+
+      panelHasTrace: trace.length > 0,
+      panelNoTrace: trace.length === 0,
+      panelNoTraceNote: "There is no policy, so nothing was evaluated and no trace exists. Once a version is published this task is re-evaluated automatically.",
+      panelNoTraceAction: "write the first rule",
+      traceCount: trace.length === 1 ? "1 rule" : trace.length + " rules",
+      trace: trace.map((t, i) => ({
+        n: t.n, name: t.name, verdict: t.verdict,
+        dot: t.matched ? OK : "transparent",
+        ring: t.matched ? "none" : "1.2px dashed oklch(0.74 0.016 84)",
+        verdictInk: t.matched ? "oklch(0.38 0.1 148)" : DIM,
+        open: s.open.indexOf(i) >= 0,
+        caret: s.open.indexOf(i) >= 0 ? "\u25BE" : "\u203A",
+        conditions: t.conditions.map((c) => ({
+          field: c[0], expected: c[2], actual: c[3],
+          mark: c[1] ? "\u2713" : "\u2715",
+          markInk: c[1] ? "oklch(0.38 0.1 148)" : "oklch(0.45 0.15 28)"
+        })),
+        hasConsult: !!t.consult,
+        consultText: t.consult ? t.consult.text : "",
+        consultSession: t.consult ? t.consult.session : "",
+        onToggle: () => set({
+          open: s.open.indexOf(i) >= 0 ? s.open.filter((x) => x !== i) : s.open.concat([i])
+        })
+      })),
+
+      navGroups: nav.map((sec) => ({
+        label: sec.label, action: sec.action || "",
+        hasLabel: !!sec.label, hasAction: !!sec.action,
+        rows: sec.rows.map((n) => ({
+          glyph: n.glyph, label: n.label,
+          count: n.count || "", hasCount: !!n.count,
+          isAvatar: !!n.avatar, isGlyph: !n.avatar,
+          bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+          ink: n.active ? "oklch(0.97 0.008 90)" : "oklch(0.82 0.008 88)",
+          glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.62 0.01 85)"
+        }))
+      })),
+      railRows: [
+        { glyph: "\u2302" },
+        { glyph: "\u27C1", active: true, count: !isEmpty },
+        { glyph: "\u2317" },
+        { glyph: "\u25CE" },
+        { glyph: "\u2261" },
+        { glyph: "\u25A3" },
+        { glyph: "\u26AD" }
+      ].map((n) => ({
+        glyph: n.glyph, hasCount: !!n.count,
+        bg: n.active ? "oklch(0.99 0.01 90 / 0.1)" : "transparent",
+        glyphInk: n.active ? "oklch(0.9 0.008 88)" : "oklch(0.68 0.01 85)"
+      })),
+      bottomRows: BOTTOM.map((b) => ({
+        glyph: b[1], label: b[2],
+        hasCount: b[3] && !isEmpty,
+        ink: b[0] === "triage" ? "oklch(0.97 0.008 90)" : "oklch(0.7 0.01 85)"
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>
