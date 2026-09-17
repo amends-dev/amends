@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { Deferred, Effect, Fiber, Option, Schema, Stream } from "effect";
+import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Fact } from "../src/journal/fact.ts";
 import { Journal } from "../src/journal/journal.ts";
 import { Log } from "../src/journal/log.ts";
@@ -23,13 +24,14 @@ const projection = Projection.make("counter", { version: 1 }).on(
 
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Log.Service | Transaction.Service | Counter>,
+  program: Effect.Effect<A, E, Log.Service | Transaction.Service | Counter | Checkpoint.Service>,
 ) =>
   Effect.runPromise(
     program.pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
       Effect.provideService(Counter, fixture.counter),
+      Effect.provideService(Checkpoint.Service, fixture.checkpoints),
     ),
   );
 

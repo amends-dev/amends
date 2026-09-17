@@ -1,7 +1,22 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { Codec } from "./codec.ts";
 import { Commit } from "./commit.ts";
 import { Entry } from "./entry.ts";
 import type { Fact } from "./fact.ts";
+import type { Log } from "./log.ts";
+
+/** The domain journal's log payload; execution logs use their own schemas. */
+export const Payload = Schema.Struct({
+  name: Schema.String,
+  version: Schema.Finite,
+  payload: Schema.Uint8Array,
+});
+export interface Payload extends Schema.Schema.Type<typeof Payload> {}
+
+export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Journal.FactMismatch", {
+  name: Schema.String,
+  version: Schema.Finite,
+}) {}
 
 export const Id = Entry.Id;
 export type Id = typeof Id.Type;
@@ -32,5 +47,19 @@ export const schema = <
     version: Schema.Literal(fact.version),
     payload: fact.payload,
   });
+
+/** Decode a recorded fact using its matching versioned definition. */
+export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Definition>(
+  fact: F,
+  entry: Log.Value<Payload>,
+) {
+  if (entry.payload.name !== fact.name || entry.payload.version !== fact.version) {
+    return yield* new FactMismatch({ name: fact.name, version: fact.version });
+  }
+  const payload = yield* Codec.make(fact).decode(entry.payload.payload);
+  return yield* Schema.decodeUnknownEffect(
+    Schema.toType(schema<F["name"], F["version"], F["payload"]>(fact)),
+  )({ ...entry, name: fact.name, version: fact.version, payload });
+});
 
 export * as Event from "./event.ts";

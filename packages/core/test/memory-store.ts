@@ -1,10 +1,12 @@
 import { Array, Context, DateTime, Effect, Option, Ref, Schema, Semaphore } from "effect";
 import { Commit } from "../src/journal/commit.ts";
+import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Entry } from "../src/journal/entry.ts";
 import { Store } from "../src/journal/store.ts";
 
 interface State {
   readonly logs: Map<Entry.LogId, Array<Store.Batch>>;
+  readonly checkpoints: Map<string, Checkpoint.Cursor>;
   value: number;
 }
 interface Session {
@@ -32,13 +34,20 @@ const cloneBatch = (batch: Store.Batch): Store.Batch =>
   });
 const cloneState = (state: State): State => ({
   value: state.value,
+  checkpoints: new Map([...state.checkpoints].map(([key, cursor]) => [key, cloneCursor(cursor)])),
   logs: new Map([...state.logs].map(([id, batches]) => [id, batches.map(cloneBatch)])),
+});
+const cloneCursor = (cursor: Checkpoint.Cursor): Checkpoint.Cursor => ({
+  position: cursor.position,
+  commitId: cursor.commitId,
+  index: cursor.index,
+  entryId: cursor.entryId,
 });
 
 /** A test adapter: staged log records and projection data share one snapshot. */
 export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   const owner = Symbol("memory store");
-  const state = yield* Ref.make<State>({ logs: new Map(), value: 0 });
+  const state = yield* Ref.make<State>({ logs: new Map(), checkpoints: new Map(), value: 0 });
   const attempts = yield* Ref.make(0);
   const uncertain = yield* Ref.make(false);
   const gate = yield* Semaphore.make(1);
@@ -212,9 +221,41 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
     get: Effect.map(view, (value) => value.value),
   });
 
+  const keyOf = (key: Checkpoint.Key) => JSON.stringify([key.logId, key.name, key.version]);
+  const checkpoints = Checkpoint.Service.of({
+    get: Effect.fn("JournalTest.checkpoint.get")(function* (key) {
+      return Option.map(
+        Option.fromUndefinedOr((yield* view).checkpoints.get(keyOf(key))),
+        cloneCursor,
+      );
+    }),
+    set: Effect.fn("JournalTest.checkpoint.set")(function* (key, cursor) {
+      const native = yield* Store.Transaction;
+      const current = yield* Effect.serviceOption(Current);
+      if (
+        Option.isNone(current) ||
+        current.value.owner !== owner ||
+        !current.value.active ||
+        native.id !== current.value.commit.id
+      ) {
+        return yield* new Store.Failure({
+          operation: "checkpoint.set",
+          cause: "missing transaction",
+        });
+      }
+      current.value.state.checkpoints.set(keyOf(key), {
+        position: cursor.position,
+        commitId: cursor.commitId,
+        index: cursor.index,
+        entryId: cursor.entryId,
+      });
+    }),
+  });
+
   return {
     store,
     counter,
+    checkpoints,
     attempts: Ref.get(attempts),
     snapshot: Effect.map(Ref.get(state), cloneState),
     loseNextAcknowledgment: Ref.set(uncertain, true),

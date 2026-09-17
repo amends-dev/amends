@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 
 export { Codec } from "./journal/codec.ts";
+export { Checkpoint } from "./journal/checkpoint.ts";
 export { Commit } from "./journal/commit.ts";
 export { Entry } from "./journal/entry.ts";
 export { Event } from "./journal/event.ts";
