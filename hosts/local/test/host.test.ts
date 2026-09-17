@@ -34,13 +34,13 @@ type Bound = Effect.Success<
   ReturnType<Effect.Success<ReturnType<typeof Storage.make>>["forWorkspace"]>
 >;
 const core = (bound: Bound) =>
-  WorkspaceCore.layer.pipe(Layer.provideMerge(Layer.succeedContext(bound.context)));
+  WorkspaceCore.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
+  );
 const inDatabase = <A, E>(filename: string, program: Effect.Effect<A, E, SqlClient.SqlClient>) =>
   Effect.runPromise(program.pipe(Effect.provide(Database.layer(filename))));
 const initialized = (bound: Bound, creator = alice.id) =>
-  WorkspaceInitialization.initialize(creator).pipe(
-    Effect.provide(Layer.mergeAll(core(bound), BunCrypto.layer)),
-  );
+  WorkspaceInitialization.initialize(creator).pipe(Effect.provide(core(bound)));
 const temporary = async (run: (filename: string) => Promise<void>) => {
   const directory = await mkdtemp(join(tmpdir(), "amends-host-"));
   try {
@@ -113,11 +113,11 @@ test("one host creates two isolated workspaces and uses each operation's authent
               },
             ]),
           );
-          expect(assignments).toHaveLength(2);
+          expect(assignments).toHaveLength(3);
           const batches = yield* bound.store.read(Log.Id.make("journal"), { limit: 10 });
           expect(batches).toHaveLength(1);
-          expect(batches[0]?.entries).toHaveLength(4);
-          expect(batches[0]?.commit.entryCount).toBe(4);
+          expect(batches[0]?.entries).toHaveLength(5);
+          expect(batches[0]?.commit.entryCount).toBe(5);
         }
       }),
     );
@@ -164,7 +164,7 @@ test("a failed final checkpoint rolls back workspace, membership, grants, log, a
           context: Context.add(bound.context, Checkpoint.Service, {
             ...bound.checkpoints,
             set: (key, cursor) =>
-              cursor.index === 3 ? Effect.fail(failure) : bound.checkpoints.set(key, cursor),
+              cursor.index === 4 ? Effect.fail(failure) : bound.checkpoints.set(key, cursor),
           }),
         };
         expect(yield* Effect.flip(initialized(broken))).toBe(failure);
@@ -197,7 +197,7 @@ test("interruption rolls back initialization and leaves the connection usable", 
               return yield* Effect.never;
             }),
           );
-        }).pipe(Effect.provide(Layer.mergeAll(core(bound), BunCrypto.layer)));
+        }).pipe(Effect.provide(core(bound)));
         const fiber = yield* program.pipe(Effect.forkChild);
         yield* Deferred.await(ready);
         yield* Fiber.interrupt(fiber);
@@ -402,7 +402,7 @@ test("independent hosts report a busy transaction without retrying and preserve 
                 return record;
               }),
             );
-          }).pipe(Effect.provide(Layer.mergeAll(core(a), BunCrypto.layer)), Effect.forkChild);
+          }).pipe(Effect.provide(core(a)), Effect.forkChild);
           yield* Deferred.await(ready);
           expect(yield* Effect.flip(initialized(b, bob.id))).toMatchObject({
             _tag: "JournalStore.Conflict",
@@ -445,7 +445,7 @@ test("replay rebuilds ownership, membership, and initial grants from persisted f
           value: { identity: alice, status: "active" },
         });
         expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toHaveLength(
-          2,
+          3,
         );
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toHaveLength(1);
       }),

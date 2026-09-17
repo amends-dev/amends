@@ -1,5 +1,6 @@
 import {
   AssignmentStore,
+  InvitationStore,
   Checkpoint,
   MemberStore,
   RoleStore,
@@ -11,6 +12,7 @@ import { Context, Effect } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { SqliteJournal } from "./journal-store.ts";
 import { SqliteDomains } from "./domain-stores.ts";
+import { SqliteInvitation } from "./invitation-store.ts";
 
 /** One database, with inexpensive workspace-bound views over the shared connection. */
 export const make = Effect.fn("Storage.make")(function* () {
@@ -20,14 +22,16 @@ export const make = Effect.fn("Storage.make")(function* () {
     function* (workspaceId: Workspace.Id) {
       const journal = yield* SqliteJournal.make(workspaceId, health);
       const domains = yield* SqliteDomains.make(workspaceId, journal);
+      const invitations = yield* SqliteInvitation.make(workspaceId, journal);
       const context = Context.make(Store.Service, journal.store).pipe(
         Context.add(Checkpoint.Service, journal.checkpoints),
         Context.add(MemberStore.Service, domains.members),
         Context.add(RoleStore.Service, domains.roles),
         Context.add(AssignmentStore.Service, domains.assignments),
         Context.add(WorkspaceStore.Service, domains.workspace),
+        Context.add(InvitationStore.Service, invitations),
       );
-      return { ...journal, ...domains, context };
+      return { ...journal, ...domains, invitations, context };
     },
     Effect.provideService(SqlClient.SqlClient, sql),
   );

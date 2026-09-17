@@ -531,7 +531,32 @@ its initial access both require the appropriate authority.
 Creating an agent establishes its workspace membership through the agent-creation flow.
 Its initial permissions must also be authorized. Permission to create agents does not
 include unrestricted authority to grant them access. Invitation delivery, expiry, revocation,
-and detailed membership lifecycle states remain open.
+and detailed membership lifecycle states are refined below for the first human admission flow.
+
+### First human invitations use named identities and direct initial grants
+
+An invitation identifies a human, its issuing member, explicit initial direct
+grants, and an expiry time. Issuance and revocation require `invitation.manage`
+on the workspace and an active current owner. Ownership is the first grant-authority
+policy: it permits selecting valid grants in that workspace. Possessing an action
+permission alone does not confer delegation authority.
+
+Acceptance receives the recipient's trusted authenticated human identity from the
+host. The invitation must name that identity, remain pending, and not have reached
+its expiry. The original inviter must still be the active owner with invitation
+permission. Membership creation, the stored initial grants, and acceptance are
+committed together. Existing active members cannot use another invitation to add
+access. Competing invitations cannot create duplicate active memberships.
+
+Invitation outcomes are pending, accepted, or revoked. Expiry is evaluated against
+the clock. Repeated acceptance of the same accepted invitation returns the recorded
+membership without creating grants again or reactivating a removed membership.
+Rejoining requires a fresh invitation and member ID. Revocation prevents pending
+acceptance; it does not undo an accepted membership. Repeating revocation is harmless.
+
+This first flow addresses known human identities. Delivery, unregistered email
+recipients, role-based initial access, and broader delegation policies remain
+subsequent work.
 
 ### Actions require permissions; roles bundle them
 

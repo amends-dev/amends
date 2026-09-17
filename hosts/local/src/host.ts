@@ -2,6 +2,9 @@ import {
   Actor,
   Commit,
   Identity,
+  Invitation,
+  InvitationApplication,
+  Journal,
   Member,
   MemberApplication,
   MemberStore,
@@ -36,9 +39,18 @@ export const make = Effect.fn("LocalHost.make")(function* () {
     const id = yield* Schema.decodeEffect(Workspace.Id)(workspaceId);
     const bound = yield* storage.forWorkspace(id);
     const services = WorkspaceCore.layer.pipe(
-      Layer.provideMerge(Layer.succeedContext(bound.context)),
+      Layer.provideMerge(
+        Layer.mergeAll(
+          Layer.succeedContext(bound.context),
+          Layer.succeed(Crypto.Crypto, cryptography),
+        ),
+      ),
     );
-    return yield* program.pipe(Effect.provide(services));
+    return yield* Effect.gen(function* () {
+      // New projections catch up before the host exposes application operations.
+      yield* (yield* Journal.Service).replay;
+      return yield* program;
+    }).pipe(Effect.provide(services));
   });
   const createWorkspace = Effect.fn("LocalHost.createWorkspace")(function* (
     creator: Identity.HumanId,
@@ -57,10 +69,10 @@ export const make = Effect.fn("LocalHost.make")(function* () {
       ),
     );
   });
-  const getMember = Effect.fn("LocalHost.getMember")(function* (
+  const asMember = Effect.fn("LocalHost.asMember")(function* <A, E, R>(
     workspaceId: Workspace.Id,
     authenticated: Identity.Reference,
-    memberId: Member.Id,
+    operation: Effect.Effect<A, E, R>,
   ) {
     const identity = yield* Schema.decodeEffect(Identity.Reference)(authenticated);
     return yield* inWorkspace(
@@ -69,13 +81,69 @@ export const make = Effect.fn("LocalHost.make")(function* () {
         const membership = yield* (yield* MemberStore.Service).findActive(identity);
         if (Option.isNone(membership)) return yield* new NotMember({ workspaceId });
         const actor = Actor.Value.make({ workspaceId, memberId: membership.value.id, identity });
-        return yield* (yield* MemberApplication.Service)
-          .get(memberId)
-          .pipe(Effect.provideService(Actor.Service, actor));
+        return yield* operation.pipe(Effect.provideService(Actor.Service, actor));
       }),
     );
   });
-  return { createWorkspace, getMember };
+  const getMember = Effect.fn("LocalHost.getMember")(function* (
+    workspaceId: Workspace.Id,
+    authenticated: Identity.Reference,
+    memberId: Member.Id,
+  ) {
+    return yield* asMember(
+      workspaceId,
+      authenticated,
+      Effect.flatMap(MemberApplication.Service, (service) => service.get(memberId)),
+    );
+  });
+  const invite = Effect.fn("LocalHost.invite")(function* (
+    workspaceId: Workspace.Id,
+    authenticated: Identity.Reference,
+    request: Invitation.Request,
+  ) {
+    return yield* asMember(
+      workspaceId,
+      authenticated,
+      Effect.flatMap(InvitationApplication.Service, (service) => service.issue(request)),
+    );
+  });
+  const acceptInvitation = Effect.fn("LocalHost.acceptInvitation")(function* (
+    workspaceId: Workspace.Id,
+    authenticated: Identity.HumanId,
+    invitationId: Invitation.Id,
+  ) {
+    return yield* inWorkspace(
+      workspaceId,
+      Effect.flatMap(InvitationApplication.Service, (service) =>
+        service.accept(invitationId, authenticated),
+      ),
+    );
+  });
+  const revokeInvitation = Effect.fn("LocalHost.revokeInvitation")(function* (
+    workspaceId: Workspace.Id,
+    authenticated: Identity.Reference,
+    invitationId: Invitation.Id,
+  ) {
+    return yield* asMember(
+      workspaceId,
+      authenticated,
+      Effect.flatMap(InvitationApplication.Service, (service) => service.revoke(invitationId)),
+    );
+  });
+  const enableInvitations = Effect.fn("LocalHost.enableInvitations")(function* (
+    workspaceId: Workspace.Id,
+    authenticated: Identity.Reference,
+  ) {
+    yield* asMember(workspaceId, authenticated, WorkspaceInitialization.enableInvitations());
+  });
+  return {
+    createWorkspace,
+    getMember,
+    invite,
+    acceptInvitation,
+    revokeInvitation,
+    enableInvitations,
+  };
 });
 
 /** These methods receive identities established by a trusted ingress, never client-asserted actors. */

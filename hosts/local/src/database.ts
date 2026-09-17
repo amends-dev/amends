@@ -17,6 +17,10 @@ const migrations = SqliteMigrator.fromRecord({
     yield* sql`CREATE TABLE log_entries (workspace_id TEXT NOT NULL, id TEXT NOT NULL, log_id TEXT NOT NULL, position INTEGER NOT NULL, commit_id TEXT NOT NULL, entry_index INTEGER NOT NULL, recorded_at TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(workspace_id, id), UNIQUE(workspace_id, log_id, position, entry_index))`;
     yield* sql`CREATE TABLE checkpoints (workspace_id TEXT NOT NULL, log_id TEXT NOT NULL, name TEXT NOT NULL, version REAL NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, log_id, name, version))`;
   }),
+  "0002_invitations": Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE invitations (workspace_id TEXT NOT NULL, id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
+  }),
 });
 
 /** One connection is shared by all workspace views. Transactions use BEGIN IMMEDIATE. */

@@ -37,3 +37,8 @@ export { Workspace } from "./workspace/workspace.ts";
 export { WorkspaceStore } from "./workspace/workspace-store.ts";
 export { WorkspaceInitialization } from "./workspace/workspace-initialization.ts";
 export { WorkspaceCore } from "./workspace/workspace-core.ts";
+export { Invitation } from "./workspace/invitation.ts";
+export { InvitationStore } from "./workspace/invitation-store.ts";
+export { InvitationPermissions } from "./workspace/invitation-permissions.ts";
+export { InvitationJournal } from "./workspace/invitation-journal.ts";
+export { InvitationApplication } from "./workspace/invitation-application.ts";

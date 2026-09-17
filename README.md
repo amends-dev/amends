@@ -12,8 +12,9 @@ bun run check
 
 `bun run start` runs the local Bun host's persistent two-workspace demonstration,
 and `bun run dev` reruns it when files change. Each demonstration creates two new
-workspaces. See the [local host guide](hosts/local/README.md) for individual
-creation/read commands, storage configuration, and the trusted local identity boundary.
+workspaces and exercises invitation, acceptance, limited access, and revocation.
+See the [local host guide](hosts/local/README.md) for individual commands, storage
+configuration, and the trusted local identity boundary.
 
 ## Workspace layout
 
