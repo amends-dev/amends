@@ -1,12 +1,23 @@
 import { Array, Context, DateTime, Deferred, Effect, Option, Ref, Schema, Semaphore } from "effect";
+import { Assignment } from "../src/authorization/assignment.ts";
+import { AssignmentStore } from "../src/authorization/assignment-store.ts";
+import { Role } from "../src/authorization/role.ts";
+import { RoleStore } from "../src/authorization/role-store.ts";
+import type { Scope } from "../src/authorization/scope.ts";
 import { Commit } from "../src/journal/commit.ts";
 import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Entry } from "../src/journal/entry.ts";
 import { Store } from "../src/journal/store.ts";
+import { Member } from "../src/workspace/member.ts";
+import { MemberStore } from "../src/workspace/member-store.ts";
+import type { Workspace } from "../src/workspace/workspace.ts";
 
 interface State {
   readonly logs: Map<Entry.LogId, Array<Store.Batch>>;
   readonly checkpoints: Map<string, Checkpoint.Cursor>;
+  readonly members: Map<string, Member.Record>;
+  readonly roles: Map<string, Role.Record>;
+  readonly assignments: Map<string, Assignment.Record>;
   value: number;
 }
 interface Session {
@@ -36,6 +47,38 @@ const cloneState = (state: State): State => ({
   value: state.value,
   checkpoints: new Map([...state.checkpoints].map(([key, cursor]) => [key, cloneCursor(cursor)])),
   logs: new Map([...state.logs].map(([id, batches]) => [id, batches.map(cloneBatch)])),
+  members: new Map([...state.members].map(([key, member]) => [key, cloneMember(member)])),
+  roles: new Map([...state.roles].map(([key, role]) => [key, cloneRole(role)])),
+  assignments: new Map(
+    [...state.assignments].map(([key, assignment]) => [key, cloneAssignment(assignment)]),
+  ),
+});
+const cloneMember = (member: Member.Record): Member.Record => ({
+  id: member.id,
+  workspaceId: member.workspaceId,
+  identity: { ...member.identity },
+  status: member.status,
+});
+const cloneRole = (role: Role.Record): Role.Record => ({
+  id: role.id,
+  workspaceId: role.workspaceId,
+  name: role.name,
+  permissions: [...role.permissions],
+});
+const cloneScope = (scope: Scope.Value): Scope.Value =>
+  scope._tag === "Workspace" ? { ...scope } : { ...scope, target: { ...scope.target } };
+const cloneAssignment = (assignment: Assignment.Record): Assignment.Record => ({
+  id: assignment.id,
+  workspaceId: assignment.workspaceId,
+  memberId: assignment.memberId,
+  status: assignment.status,
+  source:
+    assignment.source._tag === "Role"
+      ? { ...assignment.source, scope: cloneScope(assignment.source.scope) }
+      : {
+          ...assignment.source,
+          grant: { ...assignment.source.grant, scope: cloneScope(assignment.source.grant.scope) },
+        },
 });
 const cloneCursor = (cursor: Checkpoint.Cursor): Checkpoint.Cursor => ({
   position: cursor.position,
@@ -47,7 +90,14 @@ const cloneCursor = (cursor: Checkpoint.Cursor): Checkpoint.Cursor => ({
 /** A test adapter: staged log records and projection data share one snapshot. */
 export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   const owner = Symbol("memory store");
-  const state = yield* Ref.make<State>({ logs: new Map(), checkpoints: new Map(), value: 0 });
+  const state = yield* Ref.make<State>({
+    logs: new Map(),
+    checkpoints: new Map(),
+    members: new Map(),
+    roles: new Map(),
+    assignments: new Map(),
+    value: 0,
+  });
   const changes = yield* Ref.make(yield* Deferred.make<void>());
   const attempts = yield* Ref.make(0);
   const uncertain = yield* Ref.make(false);
@@ -267,10 +317,275 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
     }),
   });
 
+  const memberState = Effect.fnUntraced(function* (operation: string) {
+    const native = yield* Store.Transaction;
+    const current = yield* Effect.serviceOption(Current);
+    if (
+      Option.isNone(current) ||
+      current.value.owner !== owner ||
+      !current.value.active ||
+      native.id !== current.value.commit.id
+    )
+      return yield* new MemberStore.Failure({ operation, cause: "missing transaction" });
+    return current.value.state;
+  });
+  const members = (workspaceId: Workspace.Id): MemberStore.Interface => {
+    const keyOf = (id: Member.Id) => JSON.stringify([workspaceId, id]);
+    return MemberStore.Service.of({
+      workspaceId,
+      get: Effect.fn("JournalTest.members.get")(function* (id) {
+        return Option.map(
+          Option.fromUndefinedOr((yield* view).members.get(keyOf(id))),
+          cloneMember,
+        );
+      }),
+      findActive: Effect.fn("JournalTest.members.findActive")(function* (identity) {
+        return Option.map(
+          Array.findFirst(
+            [...(yield* view).members.values()],
+            (member) =>
+              member.workspaceId === workspaceId &&
+              member.status === "active" &&
+              member.identity._tag === identity._tag &&
+              member.identity.id === identity.id,
+          ),
+          cloneMember,
+        );
+      }),
+      insert: Effect.fn("JournalTest.members.insert")(function* (record) {
+        const target = yield* memberState("insert");
+        if (record.workspaceId !== workspaceId || record.status !== "active") {
+          return yield* new MemberStore.Conflict({
+            operation: "insert",
+            message: "Expected an active member in this workspace",
+          });
+        }
+        if (target.members.has(keyOf(record.id))) {
+          return yield* new MemberStore.Conflict({
+            operation: "insert",
+            message: "Member ID already exists",
+          });
+        }
+        if (
+          [...target.members.values()].some(
+            (member) =>
+              member.workspaceId === workspaceId &&
+              member.status === "active" &&
+              member.identity._tag === record.identity._tag &&
+              member.identity.id === record.identity.id,
+          )
+        ) {
+          return yield* new MemberStore.Conflict({
+            operation: "insert",
+            message: "Identity already has an active membership",
+          });
+        }
+        target.members.set(keyOf(record.id), cloneMember(record));
+      }),
+      markRemoved: Effect.fn("JournalTest.members.markRemoved")(function* (id) {
+        const target = yield* memberState("markRemoved");
+        const existing = target.members.get(keyOf(id));
+        if (existing === undefined || existing.status !== "active") {
+          return yield* new MemberStore.Conflict({
+            operation: "markRemoved",
+            message: "Expected an active membership",
+          });
+        }
+        target.members.set(keyOf(id), {
+          id: existing.id,
+          workspaceId,
+          identity: { ...existing.identity },
+          status: "removed",
+        });
+      }),
+    });
+  };
+
+  const authorizationView = Effect.gen(function* () {
+    const native = yield* Effect.serviceOption(Store.Transaction);
+    const current = yield* Effect.serviceOption(Current);
+    if (Option.isNone(native) && Option.isNone(current)) return yield* Ref.get(state);
+    if (
+      Option.isNone(native) ||
+      Option.isNone(current) ||
+      current.value.owner !== owner ||
+      !current.value.active ||
+      native.value.id !== current.value.commit.id
+    )
+      return yield* Effect.fail("missing, closed, or foreign transaction");
+    return current.value.state;
+  });
+  const authorizationWrite = Effect.gen(function* () {
+    yield* Store.Transaction;
+    return yield* authorizationView;
+  });
+
+  const decodeRole = Schema.decodeEffect(Role.Record);
+  const validateRole = Effect.fnUntraced(function* (operation: string, record: Role.Record) {
+    return yield* decodeRole(record).pipe(
+      Effect.mapError((error) => new RoleStore.Conflict({ operation, message: error.message })),
+    );
+  });
+  const roles = (workspaceId: Workspace.Id): RoleStore.Interface => {
+    const keyOf = (id: Role.Id) => JSON.stringify([workspaceId, id]);
+    const read = Effect.fnUntraced(function* (operation: string) {
+      return yield* authorizationView.pipe(
+        Effect.mapError((cause) => new RoleStore.Failure({ operation, cause })),
+      );
+    });
+    const write = Effect.fnUntraced(function* (operation: string) {
+      return yield* authorizationWrite.pipe(
+        Effect.mapError((cause) => new RoleStore.Failure({ operation, cause })),
+      );
+    });
+    return RoleStore.Service.of({
+      workspaceId,
+      get: Effect.fn("JournalTest.roles.get")(function* (id) {
+        return Option.map(
+          Option.fromUndefinedOr((yield* read("get")).roles.get(keyOf(id))),
+          cloneRole,
+        );
+      }),
+      insert: Effect.fn("JournalTest.roles.insert")(function* (record) {
+        const target = yield* write("insert");
+        const valid = yield* validateRole("insert", record);
+        if (valid.workspaceId !== workspaceId || target.roles.has(keyOf(valid.id))) {
+          return yield* new RoleStore.Conflict({
+            operation: "insert",
+            message: "Expected a fresh role ID in this workspace",
+          });
+        }
+        target.roles.set(keyOf(valid.id), cloneRole(valid));
+      }),
+      rename: Effect.fn("JournalTest.roles.rename")(function* (id, name) {
+        const target = yield* write("rename");
+        const existing = target.roles.get(keyOf(id));
+        if (existing === undefined)
+          return yield* new RoleStore.Conflict({
+            operation: "rename",
+            message: "Role does not exist",
+          });
+        const next = yield* validateRole("rename", {
+          id: existing.id,
+          workspaceId: existing.workspaceId,
+          name,
+          permissions: existing.permissions,
+        });
+        target.roles.set(keyOf(id), cloneRole(next));
+      }),
+      setPermissions: Effect.fn("JournalTest.roles.setPermissions")(function* (id, permissions) {
+        const target = yield* write("setPermissions");
+        const existing = target.roles.get(keyOf(id));
+        if (existing === undefined)
+          return yield* new RoleStore.Conflict({
+            operation: "setPermissions",
+            message: "Role does not exist",
+          });
+        const next = yield* validateRole("setPermissions", {
+          id: existing.id,
+          workspaceId: existing.workspaceId,
+          name: existing.name,
+          permissions,
+        });
+        target.roles.set(keyOf(id), cloneRole(next));
+      }),
+    });
+  };
+
+  const decodeAssignment = Schema.decodeEffect(Assignment.Record);
+  const assignments = (workspaceId: Workspace.Id): AssignmentStore.Interface => {
+    const keyOf = (id: Assignment.Id) => JSON.stringify([workspaceId, id]);
+    const read = Effect.fnUntraced(function* (operation: string) {
+      return yield* authorizationView.pipe(
+        Effect.mapError((cause) => new AssignmentStore.Failure({ operation, cause })),
+      );
+    });
+    const write = Effect.fnUntraced(function* (operation: string) {
+      return yield* authorizationWrite.pipe(
+        Effect.mapError((cause) => new AssignmentStore.Failure({ operation, cause })),
+      );
+    });
+    return AssignmentStore.Service.of({
+      workspaceId,
+      get: Effect.fn("JournalTest.assignments.get")(function* (id) {
+        return Option.map(
+          Option.fromUndefinedOr((yield* read("get")).assignments.get(keyOf(id))),
+          cloneAssignment,
+        );
+      }),
+      listActiveByMember: Effect.fn("JournalTest.assignments.listActiveByMember")(
+        function* (memberId) {
+          return [...(yield* read("listActiveByMember")).assignments.values()]
+            .filter(
+              (record) =>
+                record.workspaceId === workspaceId &&
+                record.status === "active" &&
+                record.memberId === memberId,
+            )
+            .map(cloneAssignment);
+        },
+      ),
+      listActiveByRole: Effect.fn("JournalTest.assignments.listActiveByRole")(function* (roleId) {
+        return [...(yield* read("listActiveByRole")).assignments.values()]
+          .filter(
+            (record) =>
+              record.workspaceId === workspaceId &&
+              record.status === "active" &&
+              record.source._tag === "Role" &&
+              record.source.roleId === roleId,
+          )
+          .map(cloneAssignment);
+      }),
+      insert: Effect.fn("JournalTest.assignments.insert")(function* (record) {
+        const target = yield* write("insert");
+        const valid = yield* decodeAssignment(record).pipe(
+          Effect.mapError(
+            (error) =>
+              new AssignmentStore.Conflict({ operation: "insert", message: error.message }),
+          ),
+        );
+        if (
+          valid.workspaceId !== workspaceId ||
+          valid.status !== "active" ||
+          target.assignments.has(keyOf(valid.id))
+        ) {
+          return yield* new AssignmentStore.Conflict({
+            operation: "insert",
+            message: "Expected an active assignment with a fresh ID in this workspace",
+          });
+        }
+        target.assignments.set(keyOf(valid.id), cloneAssignment(valid));
+      }),
+      markRevoked: Effect.fn("JournalTest.assignments.markRevoked")(function* (id) {
+        const target = yield* write("markRevoked");
+        const existing = target.assignments.get(keyOf(id));
+        if (existing === undefined || existing.status !== "active") {
+          return yield* new AssignmentStore.Conflict({
+            operation: "markRevoked",
+            message: "Expected an active assignment",
+          });
+        }
+        target.assignments.set(
+          keyOf(id),
+          cloneAssignment({
+            id: existing.id,
+            workspaceId: existing.workspaceId,
+            memberId: existing.memberId,
+            source: existing.source,
+            status: "revoked",
+          }),
+        );
+      }),
+    });
+  };
+
   return {
     store,
     counter,
     checkpoints,
+    members,
+    roles,
+    assignments,
     attempts: Ref.get(attempts),
     snapshot: Effect.map(Ref.get(state), cloneState),
     loseNextAcknowledgment: Ref.set(uncertain, true),

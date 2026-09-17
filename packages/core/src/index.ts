@@ -1,5 +1,23 @@
 import { Effect } from "effect";
 
+export { AssignmentFacts } from "./authorization/assignment-facts.ts";
+export { AssignmentProjection } from "./authorization/assignment-projection.ts";
+export { AssignmentStore } from "./authorization/assignment-store.ts";
+export { Assignment } from "./authorization/assignment.ts";
+export { Authorization } from "./authorization/authorization.ts";
+export { GrantResolver } from "./authorization/grant-resolver.ts";
+export { Grant } from "./authorization/grant.ts";
+export { PermissionCatalog } from "./authorization/permission-catalog.ts";
+export { Permission } from "./authorization/permission.ts";
+export { Requirement } from "./authorization/requirement.ts";
+export { RoleFacts } from "./authorization/role-facts.ts";
+export { RoleProjection } from "./authorization/role-projection.ts";
+export { RoleStore } from "./authorization/role-store.ts";
+export { Role } from "./authorization/role.ts";
+export { Scope } from "./authorization/scope.ts";
+export { Target } from "./authorization/target.ts";
+export { Actor } from "./identity/actor.ts";
+export { Identity } from "./identity/identity.ts";
 export { Codec } from "./journal/codec.ts";
 export { Checkpoint } from "./journal/checkpoint.ts";
 export { Commit } from "./journal/commit.ts";
@@ -11,5 +29,12 @@ export { Log } from "./journal/log.ts";
 export { Projection } from "./journal/projection.ts";
 export { Store } from "./journal/store.ts";
 export { Transaction } from "./journal/transaction.ts";
+export { MemberApplication } from "./workspace/member-application.ts";
+export { MemberFacts } from "./workspace/member-facts.ts";
+export { MemberPermissions } from "./workspace/member-permissions.ts";
+export { MemberProjection } from "./workspace/member-projection.ts";
+export { MemberStore } from "./workspace/member-store.ts";
+export { Member } from "./workspace/member.ts";
+export { Workspace } from "./workspace/workspace.ts";
 
 export const program = Effect.log("amends-v2 is running with Effect.");
