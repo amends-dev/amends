@@ -38,9 +38,12 @@ or apps. Shared packages cannot depend on hosts or apps.
 
 `tsconfig.base.json` supplies strict TypeScript and Effect tooling settings with
 no runtime globals. Hosts and apps enable their own runtime types. The root
-`tsconfig.json` checks repository scripts, and `bun run typecheck` also runs each
-workspace's `typecheck` script. Workspace exports point to TypeScript source,
+`tsconfig.json` checks repository scripts and core tests, and `bun run typecheck`
+also runs each workspace's `typecheck` script. Workspace exports point to TypeScript source,
 which Bun and future application bundlers can consume directly.
+
+The journal and execution-log design is described in [docs/journal.md](docs/journal.md).
+Run its behavioral checks with `bun test packages/core/test`.
 
 For a new workspace, add a manifest, source files, and a TypeScript configuration
 extending `../../tsconfig.base.json`, plus a `typecheck` script. Then run

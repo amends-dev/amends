@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["scripts/**/*.ts"],
+  "include": ["scripts/**/*.ts", "packages/core/test/**/*.ts"],
   "exclude": ["node_modules", "repos", "dist", "out", "coverage"]
 }
