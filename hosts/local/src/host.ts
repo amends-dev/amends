@@ -107,6 +107,17 @@ export const make = Effect.fn("LocalHost.make")(function* () {
       Effect.flatMap(InvitationApplication.Service, (service) => service.issue(request)),
     );
   });
+  const removeMember = Effect.fn("LocalHost.removeMember")(function* (
+    workspaceId: Workspace.Id,
+    authenticated: Identity.Reference,
+    memberId: Member.Id,
+  ) {
+    return yield* asMember(
+      workspaceId,
+      authenticated,
+      Effect.flatMap(MemberApplication.Service, (service) => service.remove(memberId)),
+    );
+  });
   const acceptInvitation = Effect.fn("LocalHost.acceptInvitation")(function* (
     workspaceId: Workspace.Id,
     authenticated: Identity.HumanId,
@@ -139,6 +150,7 @@ export const make = Effect.fn("LocalHost.make")(function* () {
   return {
     createWorkspace,
     getMember,
+    removeMember,
     invite,
     acceptInvitation,
     revokeInvitation,

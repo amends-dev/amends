@@ -1,8 +1,8 @@
 # Local host
 
 This Bun host serves multiple workspace contexts using one SQLite database. The
-current milestone provides workspace initialization, authorized membership reads,
-and invitations with direct initial grants. It includes a local CLI and an
+current milestone provides workspace initialization, invitations with direct initial
+grants, authorized membership reads, and removal. It includes a local CLI and an
 executable demonstration.
 
 ## Run
@@ -16,9 +16,10 @@ bun run start
 
 The default demonstration creates two new workspaces, performs concurrent member
 reads, checks workspace isolation, and lets Alice invite Bob with read access.
-It checks recipient identity, limited access, and revocation, closes the database,
-and opens it again to verify persisted membership and repeat acceptance. Each run creates another
-pair; it does not reset existing data. With this command the default database is
+It checks recipient identity, limited access, and revocation, then reopens the database
+to verify persisted membership and repeat acceptance. Alice removes Bob, and another
+reopen verifies that his access remains denied while his other workspace is unaffected.
+Each run creates another pair; it does not reset existing data. The default database is
 `hosts/local/amends.sqlite`.
 
 For individual operations, use an absolute database path so commands from
@@ -83,8 +84,8 @@ AMENDS_DATABASE=/tmp/amends.sqlite bun run hosts/local/src/index.ts revoke <work
 ```
 
 Repeating revocation is harmless. Revocation cannot undo an accepted membership;
-membership removal is the next application workflow. Expiry is checked against
-the clock, so no background task is required to change expired rows.
+use member removal for that. Expiry is checked against the clock, so no background
+task is required to change expired rows.
 
 Workspaces created before this feature have no invitation permission. Their active
 owner can explicitly enable it once:
@@ -98,6 +99,38 @@ existing assignments, including revoked ones. Startup never grants or restores
 invitation access. SQL migration creates the invitation table, and the host catches
 up the new projection before application operations run.
 
+## Remove a member
+
+Use the member ID returned by acceptance:
+
+```bash
+AMENDS_DATABASE=/tmp/amends.sqlite bun run hosts/local/src/index.ts remove <workspace-id> alice <member-id>
+```
+
+`remove` prints the membership with status `removed`. Core requires `member.remove`
+on that member; `member.read` is not required. Both workspace and exact-member grants
+work. Humans and agents follow the same rules. An authorized non-owner may remove
+their own membership. Ownership alone does not authorize removal, and the current
+owner cannot be removed even by an otherwise authorized member. Ownership transfer
+is a separate, unimplemented workflow.
+
+Removal also revokes every pending invitation for that human in this workspace,
+including expired invitations still recorded as pending. This is part of removal
+and requires no additional `invitation.manage` grant. Accepted receipts and
+invitations for other people or workspaces are preserved.
+
+Authorization, the ownership check, the removal and invitation revocation facts,
+projections, and checkpoints share one transaction. A failure rolls them back together. Repeating a
+removal returns `MemberApplication.AlreadyRemoved` without publishing another fact;
+the caller must still be active and authorized. Missing members return
+`MemberApplication.NotFound` only after authorization.
+
+The membership and its assignments remain historical records. Active-membership
+checks deny subsequent operations, including calls with an actor resolved before
+removal. Authorized readers can still inspect the removed record. Other workspace
+memberships are unaffected. An old accepted invitation cannot restore access;
+rejoining creates a fresh member ID with only the new invitation's grants.
+
 ## Initialization
 
 The host allocates the workspace ID and binds its storage views. Core initialization
@@ -109,8 +142,7 @@ The creator is a human and is recorded as the initial owner. Creation attributio
 is retained separately from current ownership. The initial explicit permissions
 are `member.read`, `member.remove`, and `invitation.manage` with workspace scope.
 Ownership supplies no implicit permission bypass;
-adding future permissions requires a deliberate bootstrap-policy update. The
-`member.remove` application operation is not implemented in this milestone.
+adding future permissions requires a deliberate bootstrap-policy update.
 
 Initialization requires an absent workspace record. A repeated call returns
 `WorkspaceInitialization.AlreadyInitialized` without replacing ownership or
@@ -165,7 +197,10 @@ connections, live tails, replay, uncertain commits, and reads from a fresh proce
 Invitation tests additionally verify recipient binding, expiry at the deadline,
 authority changes, revocation, duplicate acceptance, grant scope, atomic rollback,
 legacy-workspace enablement, replay, and commands across separate processes.
+Removal checks cover exact-target authority, owner protection, stale actors,
+pending invitation revocation, transaction rollback, concurrent removal, replay,
+and access denial after restart.
 
-Membership removal, ownership transfer, network login, external invitation delivery,
-and cloud deployment adapters remain subsequent work. The membership workflow now
-covers initialization, invitation, acceptance, and authorized reads.
+The local membership story now covers creation, invitation, acceptance, authorized
+reads, removal, and subsequent access denial. Ownership transfer, network login,
+external invitation delivery, and cloud deployment adapters remain subsequent work.

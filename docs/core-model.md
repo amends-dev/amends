@@ -494,8 +494,8 @@ Creation attribution and current ownership are separate. Ownership does not
 implicitly bypass permission checks; the initial owner receives explicit grants.
 The initial permission set and subsequent changes to it must be deliberate.
 Ordinary operations receive an actor specific to that operation and check current
-membership and permissions. Ownership transfer and the detailed removal workflow
-still require their application contracts.
+membership and permissions. Ownership transfer still requires its application contract;
+the first removal workflow is defined below.
 
 ### Humans and agents share membership
 
@@ -557,6 +557,27 @@ acceptance; it does not undo an accepted membership. Repeating revocation is har
 This first flow addresses known human identities. Delivery, unregistered email
 recipients, role-based initial access, and broader delegation policies remain
 subsequent work.
+
+### Removal ends workspace access while preserving membership history
+
+Removing an active human or agent member requires `member.remove` on that member.
+The current owner cannot be removed until ownership has been transferred. Ownership
+does not bypass the permission check. An authorized non-owner can remove their own
+membership; no separate read permission is required to perform removal.
+
+For a human, removal also revokes all pending invitations for that recipient in the
+same workspace. This is part of removal authority and requires no separate invitation
+permission. Accepted receipts and invitations in other workspaces are unchanged.
+
+Authorization, the current-owner check, and publication and projection of removal
+and invitation revocations share one journal commit. The member becomes removed; its record and permission
+assignments remain for history. Subsequent authorization rejects that membership,
+including an actor resolved before removal. Other workspace memberships are unchanged.
+Authorized readers may still inspect the historical record. Repeating removal of
+the same member returns `MemberApplication.AlreadyRemoved` without another fact.
+
+For humans, an old accepted invitation remains a receipt and cannot restore access.
+Rejoining requires a fresh invitation and member ID with newly authorized grants.
 
 ### Actions require permissions; roles bundle them
 

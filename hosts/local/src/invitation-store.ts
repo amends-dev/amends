@@ -33,6 +33,24 @@ export const make = Effect.fn("SqliteInvitation.make")(function* (
         );
       return Option.map(Array.head(rows), (row) => row.record);
     }),
+    listPendingByRecipient: Effect.fn("SqliteInvitation.listPendingByRecipient")(
+      function* (recipientId) {
+        const rows = yield* journal
+          .guard(
+            sql`SELECT record FROM invitations WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.details.recipientId') = ${recipientId} AND json_extract(record, '$.state._tag') = 'Pending' ORDER BY id`,
+          )
+          .pipe(
+            Effect.flatMap(
+              Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ record: codec }))),
+            ),
+            Effect.mapError(
+              (cause) =>
+                new InvitationStore.Failure({ operation: "listPendingByRecipient", cause }),
+            ),
+          );
+        return rows.map((row) => row.record);
+      },
+    ),
     insert: Effect.fn("SqliteInvitation.insert")(function* (record) {
       yield* Store.Transaction;
       if (record.details.workspaceId !== workspaceId || record.state._tag !== "Pending")

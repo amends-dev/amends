@@ -20,12 +20,15 @@ const program = Effect.gen(function* () {
     yield* Effect.sync(() => console.log(JSON.stringify(result)));
     return;
   }
-  if (command === "get" && args.length === 3) {
+  if ((command === "get" || command === "remove") && args.length === 3) {
     const workspaceId = yield* Schema.decodeUnknownEffect(Workspace.Id)(args[0]);
     const humanId = yield* Schema.decodeUnknownEffect(Identity.HumanId)(args[1]);
     const memberId = yield* Schema.decodeUnknownEffect(Member.Id)(args[2]);
+    const identity = Identity.Reference.cases.Human.make({ id: humanId });
     const result = yield* Effect.flatMap(LocalHost.Service, (host) =>
-      host.getMember(workspaceId, Identity.Reference.cases.Human.make({ id: humanId }), memberId),
+      command === "get"
+        ? host.getMember(workspaceId, identity, memberId)
+        : host.removeMember(workspaceId, identity, memberId),
     ).pipe(Effect.provide(LocalHost.layer(filename)));
     yield* Effect.sync(() => console.log(JSON.stringify(result)));
     return;
@@ -85,7 +88,7 @@ const program = Effect.gen(function* () {
   }
   return yield* new Usage({
     message:
-      "Commands: demo | create <human> | get <workspace> <human> <member> | invite <workspace> <issuer> <recipient> <expiry-ISO> [permissions,default=member.read; -=none] | accept <workspace> <recipient> <invitation> | revoke <workspace> <issuer> <invitation> | enable-invites <workspace> <owner>. Identities are trusted local assertions. AMENDS_DATABASE selects SQLite storage.",
+      "Commands: demo | create <human> | get <workspace> <human> <member> | remove <workspace> <human> <member> | invite <workspace> <issuer> <recipient> <expiry-ISO> [permissions,default=member.read; -=none] | accept <workspace> <recipient> <invitation> | revoke <workspace> <issuer> <invitation> | enable-invites <workspace> <owner>. Identities are trusted local assertions. AMENDS_DATABASE selects SQLite storage.",
   });
 });
 

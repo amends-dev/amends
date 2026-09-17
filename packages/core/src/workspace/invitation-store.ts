@@ -1,5 +1,6 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
+import type { Identity } from "../identity/identity.ts";
 import type { Store } from "../journal/store.ts";
 import type { Workspace } from "./workspace.ts";
 import type { Invitation } from "./invitation.ts";
@@ -18,6 +19,10 @@ export interface Interface {
   readonly workspaceId: Workspace.Id;
   /** Return an isolated record from the current transaction or committed state. */
   readonly get: (id: Invitation.Id) => Effect.Effect<Option.Option<Invitation.Record>, Failure>;
+  /** All Pending invitations for this human in this workspace, including expired ones. */
+  readonly listPendingByRecipient: (
+    recipientId: Identity.HumanId,
+  ) => Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
   /** Insert a valid Pending invitation with a fresh ID in this workspace; never upsert. */
   readonly insert: (
     record: Invitation.Record,

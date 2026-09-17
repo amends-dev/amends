@@ -1,5 +1,5 @@
 import { expect, expectTypeOf, test } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { AssignmentFacts } from "../src/authorization/assignment-facts.ts";
 import { AssignmentProjection } from "../src/authorization/assignment-projection.ts";
 import { AssignmentStore } from "../src/authorization/assignment-store.ts";
@@ -17,12 +17,14 @@ import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Journal } from "../src/journal/journal.ts";
 import { Log } from "../src/journal/log.ts";
 import { Store } from "../src/journal/store.ts";
+import { InvitationStore } from "../src/workspace/invitation-store.ts";
 import { MemberApplication } from "../src/workspace/member-application.ts";
 import { MemberFacts } from "../src/workspace/member-facts.ts";
 import { MemberPermissions } from "../src/workspace/member-permissions.ts";
 import { MemberProjection } from "../src/workspace/member-projection.ts";
 import { MemberStore } from "../src/workspace/member-store.ts";
 import { Member } from "../src/workspace/member.ts";
+import { WorkspaceStore } from "../src/workspace/workspace-store.ts";
 import { Workspace } from "../src/workspace/workspace.ts";
 import { make, type Fixture } from "./memory-store.ts";
 
@@ -48,18 +50,26 @@ const missingId = Member.Id.make("missing");
 const bobScope = Scope.Value.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: bob.id }),
 });
-const assignment = (id: string, scope: Scope.Value = bobScope) =>
+const assignment = (
+  id: string,
+  scope: Scope.Value = bobScope,
+  permission = MemberPermissions.Read,
+) =>
   Assignment.Record.make({
     id: Assignment.Id.make(id),
     workspaceId,
     memberId: alice.memberId,
     source: Assignment.Source.cases.Direct.make({
-      grant: Grant.make(MemberPermissions.Read, scope),
+      grant: Grant.make(permission, scope),
     }),
     status: "active",
   });
 
-const configured = (fixture: Fixture, overrides: Partial<MemberStore.Interface> = {}) => {
+const configured = (
+  fixture: Fixture,
+  overrides: Partial<MemberStore.Interface> = {},
+  workspaceOverrides: Partial<WorkspaceStore.Interface> = {},
+) => {
   const members = Layer.succeed(MemberStore.Service, {
     ...fixture.members(workspaceId),
     ...overrides,
@@ -78,25 +88,55 @@ const configured = (fixture: Fixture, overrides: Partial<MemberStore.Interface> 
   }).pipe(Layer.provide(Log.layer));
   const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
   const services = Layer.mergeAll(journal, authorization).pipe(Layer.provide(host));
+  const workspace = Layer.succeed(WorkspaceStore.Service, {
+    workspaceId,
+    get: () =>
+      Effect.succeedSome({
+        id: workspaceId,
+        createdBy: Identity.HumanId.make("alice"),
+        ownerMemberId: alice.memberId,
+      }),
+    insert: () => Effect.die("Workspace insertion is not used by membership operations"),
+    ...workspaceOverrides,
+  });
+  const invitations = Layer.succeed(InvitationStore.Service, {
+    workspaceId,
+    listPendingByRecipient: () => Effect.succeed([]),
+    get: () => Effect.die("Invitation lookup is not used in these member tests"),
+    insert: () => Effect.die("Invitation insertion is not used in these member tests"),
+    settle: () => Effect.die("These member tests have no pending invitations"),
+  });
   // Keep the journal available to exercise reads inside an outer application commit.
-  return MemberApplication.layer.pipe(Layer.provideMerge(services), Layer.provide(members));
+  return MemberApplication.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(services, workspace, invitations)),
+    Layer.provide(members),
+  );
 };
 const get = Effect.fn("MemberApplicationTest.get")(function* (id: Member.Id) {
   return yield* (yield* MemberApplication.Service).get(id);
+});
+const remove = Effect.fn("MemberApplicationTest.remove")(function* (id: Member.Id) {
+  return yield* (yield* MemberApplication.Service).remove(id);
 });
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
     A,
     E,
-    MemberApplication.Service | Journal.Service | Authorization.Service | Actor.Service
+    | MemberApplication.Service
+    | Journal.Service
+    | Authorization.Service
+    | WorkspaceStore.Service
+    | InvitationStore.Service
+    | Actor.Service
   >,
   actor: Actor.Value = alice,
   overrides: Partial<MemberStore.Interface> = {},
+  workspaceOverrides: Partial<WorkspaceStore.Interface> = {},
 ) =>
   Effect.runPromise(
     program.pipe(
-      Effect.provide(configured(fixture, overrides)),
+      Effect.provide(configured(fixture, overrides, workspaceOverrides)),
       Effect.provideService(Actor.Service, actor),
     ),
   );
@@ -121,7 +161,11 @@ const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = 
 
 test("member reads require only the current actor and leave the journal unchanged", async () => {
   expectTypeOf<Layer.Services<typeof MemberApplication.layer>>().toEqualTypeOf<
-    MemberStore.Service | Authorization.Service | Journal.Service
+    | MemberStore.Service
+    | WorkspaceStore.Service
+    | InvitationStore.Service
+    | Authorization.Service
+    | Journal.Service
   >();
   expectTypeOf<
     Layer.Error<typeof MemberApplication.layer>
@@ -328,4 +372,173 @@ test("member reads preserve storage failures and reject records outside the auth
         id === bob.id ? Effect.succeedSome(invalid) : fixture.members(workspaceId).get(id),
     }),
   ).toMatchObject({ _tag: "SchemaError" });
+});
+
+test("exact-target removal needs no read grant and rejects an actor retained before removal", async () => {
+  expectTypeOf<
+    Effect.Services<ReturnType<MemberApplication.Interface["remove"]>>
+  >().toEqualTypeOf<Actor.Service>();
+  const fixture = await Effect.runPromise(make());
+  await seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
+  const application = await run(fixture, MemberApplication.Service);
+  expect(await run(fixture, get(bob.id).pipe(Effect.flip))).toMatchObject({
+    _tag: "Authorization.Denied",
+  });
+  expect(await run(fixture, remove(agent.memberId).pipe(Effect.flip))).toMatchObject({
+    _tag: "Authorization.Denied",
+  });
+  const removed = await run(fixture, remove(bob.id));
+  expect(removed).toEqual({ id: bob.id, workspaceId, identity: bob.identity, status: "removed" });
+  expect(await Effect.runPromise(fixture.members(workspaceId).get(bob.id))).toEqual(
+    Option.some(removed),
+  );
+  const staleActor = Actor.Value.make({ workspaceId, memberId: bob.id, identity: bob.identity });
+  expect(
+    await Effect.runPromise(
+      application.get(bob.id).pipe(Effect.provideService(Actor.Service, staleActor), Effect.flip),
+    ),
+  ).toMatchObject({ _tag: "Authorization.InvalidActor", reason: "membership-removed" });
+  const beforeRepeat = await Effect.runPromise(fixture.snapshot);
+  expect(await run(fixture, remove(bob.id).pipe(Effect.flip))).toMatchObject({
+    _tag: "MemberApplication.AlreadyRemoved",
+  });
+  expect(await Effect.runPromise(fixture.snapshot)).toEqual(beforeRepeat);
+});
+
+test("removal checks permission before disclosing a missing target and protects the owner from any member", async () => {
+  const fixture = await Effect.runPromise(make());
+  await seed(fixture, [assignment("read-bob")]);
+  const before = await Effect.runPromise(fixture.snapshot);
+  // Ownership and read permission each confer no removal authority.
+  for (const id of [bob.id, missingId, alice.memberId]) {
+    expect(await run(fixture, remove(id).pipe(Effect.flip))).toMatchObject({
+      _tag: "Authorization.Denied",
+    });
+  }
+  expect(await Effect.runPromise(fixture.snapshot)).toEqual(before);
+  const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
+  const ownerGrant = assignment("remove-workspace", workspaceScope, MemberPermissions.Remove);
+  await Effect.runPromise(
+    fixture.store.transaction(
+      Effect.gen(function* () {
+        yield* fixture.assignments(workspaceId).insert(ownerGrant);
+        yield* fixture.assignments(workspaceId).insert({
+          id: Assignment.Id.make("agent-remove-workspace"),
+          workspaceId,
+          memberId: agent.memberId,
+          source: ownerGrant.source,
+          status: "active",
+        });
+      }),
+    ),
+  );
+  const authorized = await Effect.runPromise(fixture.snapshot);
+  expect(await run(fixture, remove(missingId).pipe(Effect.flip))).toMatchObject({
+    _tag: "MemberApplication.NotFound",
+  });
+  for (const actor of [alice, agent]) {
+    expect(await run(fixture, remove(alice.memberId).pipe(Effect.flip), actor)).toMatchObject({
+      _tag: "MemberApplication.OwnerProtected",
+      workspaceId,
+      memberId: alice.memberId,
+    });
+  }
+  expect(await Effect.runPromise(fixture.snapshot)).toEqual(authorized);
+  // An authorized non-owner, including an agent, can remove their own membership.
+  expect(await run(fixture, remove(agent.memberId), agent)).toMatchObject({
+    id: agent.memberId,
+    status: "removed",
+  });
+});
+
+test("removal fails closed when ownership cannot be read reliably", async () => {
+  const fixture = await Effect.runPromise(make());
+  await seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
+  const before = await Effect.runPromise(fixture.snapshot);
+  const responses: ReadonlyArray<{ get: WorkspaceStore.Interface["get"]; tag: string }> = [
+    { get: () => Effect.succeedNone, tag: "MemberApplication.InvalidResponse" },
+    {
+      get: () =>
+        Effect.succeedSome({
+          id: foreignWorkspaceId,
+          createdBy: Identity.HumanId.make("alice"),
+          ownerMemberId: alice.memberId,
+        }),
+      tag: "MemberApplication.WorkspaceMismatch",
+    },
+    {
+      get: () =>
+        Effect.fail(new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" })),
+      tag: "WorkspaceStore.Failure",
+    },
+  ];
+  for (const { get: readWorkspace, tag } of responses) {
+    expect(
+      await run(fixture, remove(bob.id).pipe(Effect.flip), alice, {}, { get: readWorkspace }),
+    ).toMatchObject({ _tag: tag });
+    expect(await Effect.runPromise(fixture.snapshot)).toEqual(before);
+  }
+  const composition = await run(
+    fixture,
+    MemberApplication.make().pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
+          Layer.succeed(WorkspaceStore.Service, {
+            workspaceId: foreignWorkspaceId,
+            get: () => Effect.succeedNone,
+            insert: () => Effect.die("Unexpected workspace insertion"),
+          }),
+        ),
+      ),
+      Effect.flip,
+    ),
+  );
+  expect(composition).toMatchObject({
+    _tag: "MemberApplication.WorkspaceMismatch",
+    actualWorkspaceId: foreignWorkspaceId,
+  });
+});
+
+test("removal joins an outer commit, sees staged permission, and rolls back with that commit", async () => {
+  const fixture = await Effect.runPromise(make());
+  await seed(fixture);
+  const granted = assignment("remove-bob", bobScope, MemberPermissions.Remove);
+  const program = Effect.gen(function* () {
+    const journal = yield* Journal.Service;
+    const application = yield* MemberApplication.Service;
+    return yield* journal.commit(
+      Effect.gen(function* () {
+        yield* journal.publish(AssignmentFacts.Created, {
+          assignmentId: granted.id,
+          workspaceId,
+          memberId: alice.memberId,
+          source: granted.source,
+        });
+        return yield* application.remove(bob.id);
+      }),
+    );
+  });
+  const before = await Effect.runPromise(fixture.snapshot);
+  const failure = await run(
+    fixture,
+    Effect.gen(function* () {
+      const journal = yield* Journal.Service;
+      return yield* journal.commit(
+        Effect.gen(function* () {
+          yield* program;
+          return yield* Effect.fail("abort");
+        }),
+      );
+    }).pipe(Effect.flip),
+  );
+  expect(failure).toBe("abort");
+  expect(await Effect.runPromise(fixture.snapshot)).toEqual(before);
+  const attempts = await Effect.runPromise(fixture.attempts);
+  expect(await run(fixture, program)).toMatchObject({ status: "removed" });
+  expect(await Effect.runPromise(fixture.attempts)).toBe(attempts + 1);
+  const snapshot = await Effect.runPromise(fixture.snapshot);
+  expect(
+    [...snapshot.logs.values()].flatMap((batches) => batches.flatMap((batch) => batch.entries)),
+  ).toHaveLength(2);
 });

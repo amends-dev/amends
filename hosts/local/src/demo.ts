@@ -101,10 +101,41 @@ export const run = Effect.fn("LocalDemo.run")(function* (filename: string) {
       if (receipt.id !== created.joined.id)
         return yield* new Failed({ message: "Repeated acceptance created a new membership" });
       yield* host.getMember(created.workspaces[0].id, bob, created.joined.id);
+      yield* host.removeMember(created.workspaces[0].id, alice, created.joined.id);
+      const denied = yield* host.getMember(created.workspaces[0].id, bob, created.joined.id).pipe(
+        Effect.match({
+          onFailure: (error) => error._tag === "LocalHost.NotMember",
+          onSuccess: () => false,
+        }),
+      );
+      if (!denied) return yield* new Failed({ message: "Removed member retained access" });
+    }).pipe(Effect.provide(LocalHost.layer(filename))),
+  );
+  yield* Effect.scoped(
+    Effect.gen(function* () {
+      const host = yield* LocalHost.Service;
+      const workspace = created.workspaces[0];
+      const historical = yield* host.getMember(workspace.id, alice, created.joined.id);
+      const receipt = yield* host.acceptInvitation(
+        workspace.id,
+        bob.id,
+        created.invitation.details.id,
+      );
+      const denied = yield* host.getMember(workspace.id, bob, created.joined.id).pipe(
+        Effect.match({
+          onFailure: (error) => error._tag === "LocalHost.NotMember",
+          onSuccess: () => false,
+        }),
+      );
+      if (!denied || historical.status !== "removed" || receipt.status !== "removed")
+        return yield* new Failed({
+          message: "Removal did not survive reopening and repeat acceptance",
+        });
+      yield* host.getMember(created.workspaces[1].id, bob, created.workspaces[1].ownerMemberId);
     }).pipe(Effect.provide(LocalHost.layer(filename))),
   );
   yield* Effect.log(
-    "Created two workspaces; verified isolation, invitation acceptance, limited access, revocation, and persistence after reopening.",
+    "Created two workspaces; verified invitation acceptance, limited access, revocation, member removal, and denied access after reopening. Other workspace access was preserved.",
     {
       database: filename,
       workspaces: created.workspaces,
