@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;-webkit-font-smoothing:antialiased;background:oklch(0.955 0.012 88);}
+    a{color:oklch(0.47 0.12 40);text-decoration:none;border-bottom:1px dashed oklch(0.47 0.12 40 / 0.45);}
+    a:hover{color:oklch(0.42 0.11 40);}
+    ::selection{background:oklch(0.56 0.13 42 / 0.18);}
+    button,input{font:inherit;color:inherit;}
+    button{cursor:pointer;}
+    :focus-visible{outline:2px solid oklch(0.24 0.014 84);outline-offset:2px;}
+    @keyframes stitch{to{stroke-dashoffset:-26}}
+    svg[data-stitch] [data-seam]{animation:stitch 2.6s linear infinite;}
+    @media (prefers-reduced-motion: reduce){svg[data-stitch] [data-seam]{animation:none}}
+  </style>
+</helmet>
+
+<div style="font-family:'IBM Plex Sans',system-ui,sans-serif;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);padding:48px 24px 96px;display:flex;justify-content:center;">
+<div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:36px;">
+
+  <header style="display:flex;flex-direction:column;gap:14px;max-width:720px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.47 0.12 40);">Amends design system · v2 · sign in and workspace picker</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:52px;line-height:1.02;">Sign in</h1>
+    <p style="margin:0;font-size:15.5px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Everything before a workspace exists. One identity can hold membership in several workspaces and an unaccepted invitation to others, so the picker is a real screen rather than a menu — it is the first place a person sees what is waiting on them, and the only place a removed membership can be explained.</p>
+    <p style="margin:0;font-size:13.5px;line-height:1.6;color:oklch(0.47 0.014 84);">No rail and no persimmon in the chrome: this is the one product surface with no workspace behind it yet.</p>
+  </header>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{ c.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 15px;min-height:36px;border:1.3px dashed {{ c.line }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:inline-flex;flex-wrap:wrap;gap:2px;border:1.3px dashed oklch(0.74 0.016 84);border-radius:999px;padding:3px;">
+        <sc-for list="{{ viewChips }}" as="v" hint-placeholder-count="4">
+          <button type="button" onClick="{{ v.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 15px;min-height:36px;border:none;border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};">{{ v.label }}</button>
+        </sc-for>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">{{ scaleNote }}</span>
+    </div>
+  </div>
+
+  <div ref="{{ stageRef }}" style="width:100%;height:{{ stageHeight }};overflow:hidden;border-radius:14px;">
+  <div style="width:{{ frameWidth }};height:{{ frameHeight }};transform:scale({{ frameScale }});transform-origin:top left;">
+    <div style="width:100%;height:100%;box-sizing:border-box;background:oklch(0.955 0.012 88);border:1px dashed oklch(0.8 0.016 84);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;">
+
+      <div style="flex:none;padding:{{ chromePad }};display:flex;align-items:center;gap:12px;">
+        <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <span style="width:32px;height:32px;border-radius:8px;background:oklch(0.56 0.13 42);color:oklch(0.99 0.01 90);font-family:'Instrument Serif',serif;font-size:18px;display:inline-flex;align-items:center;justify-content:center;flex:none;">A</span>
+          <span style="font-family:'Instrument Serif',serif;font-size:20px;">amends</span>
+        </span>
+        <sc-if value="{{ hasAccount }}" hint-placeholder-val="{{ false }}">
+          <span style="display:flex;align-items:center;gap:10px;flex:none;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);">{{ account }}</span>
+            <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:8px 14px;min-height:36px;border:1.3px dashed oklch(0.78 0.016 84);border-radius:999px;background:none;color:oklch(0.41 0.014 84);">sign out</button>
+          </span>
+        </sc-if>
+      </div>
+
+      <div style="flex:1;min-height:0;overflow-y:auto;padding:{{ bodyPad }};display:flex;flex-direction:column;align-items:center;justify-content:{{ bodyJustify }};">
+      <div style="width:100%;max-width:{{ columnWidth }};display:flex;flex-direction:column;gap:26px;">
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:{{ titleSize }};line-height:1.06;">{{ title }}</span>
+          <span style="font-size:14.5px;line-height:1.62;color:oklch(0.41 0.014 84);">{{ blurb }}</span>
+        </div>
+
+        <sc-if value="{{ atEmail }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Email</label>
+              <input type="email" value="{{ email }}" onInput="{{ setEmail }}" placeholder="you@where-you-work.com" style="width:100%;box-sizing:border-box;padding:13px 14px;min-height:48px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:10px;background:none;font-size:15.5px;" style-focus="border-color:oklch(0.24 0.014 84)">
+            </div>
+            <button type="button" onClick="{{ toCode }}" style="width:100%;padding:14px 20px;min-height:50px;border:none;border-radius:999px;background:{{ continueBg }};color:{{ continueInk }};font-family:'IBM Plex Mono',monospace;font-size:13.5px;">continue</button>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="flex:1;height:1px;border-top:1px dashed oklch(0.84 0.016 86);"></span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.56 0.014 84);">or</span>
+              <span style="flex:1;height:1px;border-top:1px dashed oklch(0.84 0.016 86);"></span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:9px;">
+              <button type="button" style="width:100%;padding:13px 18px;min-height:48px;border:1.4px dashed oklch(0.76 0.016 84);border-radius:999px;background:none;display:flex;align-items:center;justify-content:center;gap:10px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">use a passkey</span>
+              </button>
+              <button type="button" style="width:100%;padding:13px 18px;min-height:48px;border:1.4px dashed oklch(0.76 0.016 84);border-radius:999px;background:none;display:flex;align-items:center;justify-content:center;gap:10px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">continue with Google</span>
+              </button>
+            </div>
+            <span style="font-size:12.5px;line-height:1.6;color:oklch(0.5 0.014 84);">New here? The same button makes an account. By continuing you agree to the terms and the privacy notice.</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ atCode }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Six-digit code</label>
+              <div style="display:flex;gap:8px;">
+                <sc-for list="{{ codeBoxes }}" as="b" hint-placeholder-count="6">
+                  <span style="flex:1;height:56px;border:1.4px dashed {{ b.line }};border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:21px;color:oklch(0.24 0.014 84);background:{{ b.bg }};">{{ b.char }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:9px;">
+              <sc-for list="{{ keypad }}" as="k" hint-placeholder-count="4">
+                <button type="button" onClick="{{ k.onPick }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 16px;min-height:44px;border:1.3px dashed oklch(0.78 0.016 84);border-radius:999px;background:none;color:oklch(0.41 0.014 84);">{{ k.label }}</button>
+              </sc-for>
+            </div>
+            <span style="border-top:1px dashed oklch(0.86 0.016 86);"></span>
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.014 84);flex:1;min-width:140px;">code sent to {{ email }} · expires in 10 minutes</span>
+              <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:9px 15px;min-height:40px;border:1.3px dashed oklch(0.78 0.016 84);border-radius:999px;background:none;color:oklch(0.41 0.014 84);">send again</button>
+              <button type="button" onClick="{{ toEmail }}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:9px 15px;min-height:40px;border:none;border-radius:999px;background:none;color:oklch(0.47 0.12 40);">change email</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ atPicker }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div style="background:oklch(0.978 0.008 92);border-radius:14px;display:flex;flex-direction:column;">
+              <sc-for list="{{ workspaces }}" as="w" hint-placeholder-count="3">
+                <button type="button" onClick="{{ w.onPick }}" style="display:flex;align-items:center;gap:14px;padding:{{ rowPad }};min-height:64px;border:none;border-bottom:{{ w.seam }};border-radius:{{ w.radius }};background:{{ w.bg }};text-align:left;width:100%;" style-hover="background:oklch(0.24 0.014 84 / 0.05)">
+                  <span style="width:38px;height:38px;border-radius:9px;background:{{ w.markBg }};color:{{ w.markInk }};font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;">{{ w.mark }}</span>
+                  <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
+                    <span style="font-size:15.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ w.name }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;color:oklch(0.5 0.014 84);white-space:{{ metaWrap }};">{{ w.meta }}</span>
+                  </span>
+                  <sc-if value="{{ w.hasWaiting }}" hint-placeholder-val="{{ true }}">
+                    <span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:oklch(0.24 0.014 84);">{{ w.waiting }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:oklch(0.5 0.014 84);">waiting on you</span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{ w.hasRunning }}" hint-placeholder-val="{{ false }}">
+                    <svg data-stitch="on" viewBox="0 0 46 8" width="46" height="8" fill="none" style="flex:none;" aria-hidden="true">
+                      <path d="M2 4 H44" stroke="oklch(0.41 0.014 84)" stroke-width="1.7" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path>
+                    </svg>
+                  </sc-if>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:oklch(0.6 0.016 84);flex:none;">&rsaquo;</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ hasInvites }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.5 0.014 84);">Invited</span>
+                <div style="border:1.4px dashed oklch(0.78 0.016 84);border-radius:14px;padding:{{ rowPad }};display:flex;flex-wrap:wrap;align-items:center;gap:14px;">
+                  <span style="width:38px;height:38px;border-radius:9px;border:1.3px dashed oklch(0.7 0.016 84);font-family:'Instrument Serif',serif;font-size:19px;display:inline-flex;align-items:center;justify-content:center;flex:none;color:oklch(0.41 0.014 84);">F</span>
+                  <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px;">
+                    <span style="font-size:15.5px;font-weight:600;">Fold Studio</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">Dana Obi invited you · can be assigned work</span>
+                  </span>
+                  <span style="display:flex;gap:9px;flex:none;">
+                    <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 18px;min-height:44px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">accept</button>
+                    <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:10px 18px;min-height:44px;border:1.3px dashed oklch(0.78 0.016 84);border-radius:999px;background:none;color:oklch(0.41 0.014 84);">decline</button>
+                  </span>
+                </div>
+              </div>
+            </sc-if>
+
+            <button type="button" style="display:flex;align-items:center;gap:14px;padding:{{ rowPad }};min-height:60px;border:1.4px dashed oklch(0.78 0.016 84);border-radius:14px;background:none;text-align:left;width:100%;" style-hover="border-color:oklch(0.5 0.014 84)">
+              <span style="width:38px;height:38px;border-radius:9px;border:1.3px dashed oklch(0.74 0.016 84);font-family:'IBM Plex Mono',monospace;font-size:17px;color:oklch(0.5 0.014 84);display:inline-flex;align-items:center;justify-content:center;flex:none;">+</span>
+              <span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
+                <span style="font-size:15.5px;font-weight:600;">New workspace</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.5 0.014 84);">five steps, about two minutes</span>
+              </span>
+            </button>
+
+            <sc-if value="{{ showHints }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.56 0.014 84);">&uarr;&darr; to move · return to open · last one opens by default next time</span>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ atEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:22px;align-items:flex-start;">
+            <svg data-stitch="on" viewBox="0 0 200 130" width="196" height="127" fill="none" role="img" aria-label="An empty embroidery hoop with one stitch waiting at its centre">
+              <circle cx="100" cy="66" r="52" stroke="oklch(0.74 0.016 84)" stroke-width="1.4"></circle>
+              <circle cx="100" cy="66" r="44" stroke="oklch(0.82 0.016 86)" stroke-width="1.2"></circle>
+              <path d="M90 8 h20 a5 5 0 0 1 0 10 h-20 a5 5 0 0 1 0 -10 Z" stroke="oklch(0.74 0.016 84)" stroke-width="1.3" stroke-linejoin="round"></path>
+              <path d="M74 66 H126" stroke="oklch(0.24 0.014 84)" stroke-width="1.7" stroke-dasharray="7 6" stroke-linecap="round" data-seam="1"></path>
+            </svg>
+            <button type="button" style="padding:14px 24px;min-height:50px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);font-family:'IBM Plex Mono',monospace;font-size:13.5px;">make a workspace</button>
+            <span style="font-size:13px;line-height:1.6;color:oklch(0.5 0.014 84);">Waiting on an invitation instead? It will appear here once it is sent to this address.</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ atRemoved }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:20px;">
+            <div style="background:oklch(0.51 0.17 28 / 0.1);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:oklch(0.45 0.15 28);">no longer a member</span>
+              <span style="font-size:14.5px;line-height:1.6;">Your membership of Mercier &amp; Co ended on 12 September. The work you did stays on that workspace&rsquo;s record; you cannot open it.</span>
+            </div>
+            <span style="font-size:14.5px;line-height:1.62;color:oklch(0.41 0.014 84);">Rejoining needs a fresh invitation — an old link will not work.</span>
+            <div style="display:flex;flex-wrap:wrap;gap:9px;">
+              <button type="button" onClick="{{ toPicker }}" style="font-family:'IBM Plex Mono',monospace;font-size:13px;padding:12px 22px;min-height:48px;border:none;border-radius:999px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">your other workspaces</button>
+              <button type="button" style="font-family:'IBM Plex Mono',monospace;font-size:13px;padding:12px 22px;min-height:48px;border:1.3px dashed oklch(0.78 0.016 84);border-radius:999px;background:none;color:oklch(0.41 0.014 84);">ask Dana for access</button>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+      </div>
+
+      <div style="flex:none;padding:{{ chromePad }};display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;border-top:1px dashed oklch(0.86 0.016 86);">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.56 0.014 84);flex:1;min-width:120px;">{{ footNote }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.56 0.014 84);">terms</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.56 0.014 84);">privacy</span>
+      </div>
+
+    </div>
+  </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:18px;">
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
+      <h2 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:30px;">What the picker decides</h2>
+      <span style="flex:1;height:1px;border-top:1px dashed oklch(0.8 0.016 84);min-width:40px;"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:14px;">
+      <div style="background:oklch(0.978 0.008 92);border-radius:12px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:9px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.12 40);">01</span>
+        <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.2;">Membership is per workspace</span>
+        <span style="font-size:13px;line-height:1.6;color:oklch(0.41 0.014 84);">One identity, several memberships, each with its own permissions. The row shows the role because it changes what the person can do once inside.</span>
+      </div>
+      <div style="background:oklch(0.978 0.008 92);border-radius:12px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:9px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.12 40);">02</span>
+        <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.2;">Counts come from the timeline</span>
+        <span style="font-size:13px;line-height:1.6;color:oklch(0.41 0.014 84);">&ldquo;Waiting on you&rdquo; is unacknowledged notifications, not unread badges. The travelling dash means a turn is running in that workspace right now.</span>
+      </div>
+      <div style="background:oklch(0.978 0.008 92);border-radius:12px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:9px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.12 40);">03</span>
+        <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.2;">Invitations are not memberships</span>
+        <span style="font-size:13px;line-height:1.6;color:oklch(0.41 0.014 84);">An invitation sits in its own group with the inviter named and the role it grants, because accepting is the act that creates the membership.</span>
+      </div>
+      <div style="background:oklch(0.978 0.008 92);border-radius:12px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:9px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.12 40);">04</span>
+        <span style="font-family:'Instrument Serif',serif;font-size:20px;line-height:1.2;">Removal is explained once</span>
+        <span style="font-size:13px;line-height:1.6;color:oklch(0.41 0.014 84);">A removed membership keeps its history on the workspace and disappears from this list. The state exists so nobody meets a silent permission error.</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1400},&quot;showKeyboardHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Picker&quot;},&quot;showInvitation&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Picker&quot;}}">
+const INK = "oklch(0.24 0.014 84)";
+const DIM = "oklch(0.5 0.014 84)";
+const FALLBACK_WIDTH = 940;
+
+const VIEWS = {
+  desktop: { label: "desktop", width: 1440, height: 900 },
+  laptop: { label: "laptop", width: 1180, height: 820 },
+  tablet: { label: "tablet", width: 834, height: 800 },
+  phone: { label: "phone", width: 390, height: 800 }
+};
+
+const STATES = [
+  ["email", "email"],
+  ["code", "code sent"],
+  ["picker", "workspace picker"],
+  ["empty", "no workspaces"],
+  ["removed", "membership ended"]
+];
+
+const COPY = {
+  email: {
+    title: "Sign in to amends",
+    blurb: "One address, one identity. Whichever workspaces you belong to appear after this."
+  },
+  code: {
+    title: "Check your email",
+    blurb: "We sent a six-digit code. It works once, on this device."
+  },
+  picker: {
+    title: "Where are you working?",
+    blurb: "Three memberships and one invitation for this address."
+  },
+  empty: {
+    title: "Nothing here yet",
+    blurb: "You are signed in, but you do not belong to a workspace. Make one and it takes about two minutes to get an agent doing work."
+  },
+  removed: {
+    title: "That workspace is closed to you",
+    blurb: ""
+  }
+};
+
+const WORKSPACES = [
+  { mark: "H", name: "Home", meta: "just you · 2 agents · owner", waiting: "3", running: false, filled: true },
+  { mark: "M", name: "Mercier & Co", meta: "5 people · 6 agents · can be assigned work", waiting: "", running: true, filled: false },
+  { mark: "A", name: "Allotment", meta: "2 people · 1 agent · owner · quiet for 3 weeks", waiting: "", running: false, filled: false }
+];
+
+class Component extends DCLogic {
+  state = { at: "email", view: "desktop", available: 0, email: "jo@mercier.co", code: "4192" };
+
+  measure = (el) => {
+    if (!el) {
+      if (this._ro) this._ro.disconnect();
+      this._ro = null;
+      return;
+    }
+    const read = () => {
+      const w = el.clientWidth;
+      if (w > 0 && w !== this.state.available) this.setState({ available: w });
+    };
+    read();
+    if (typeof ResizeObserver === "function") {
+      if (this._ro) this._ro.disconnect();
+      this._ro = new ResizeObserver(read);
+      this._ro.observe(el);
+    }
+  };
+
+  componentWillUnmount() {
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (patch) => this.setState(patch);
+    const at = s.at;
+    const view = VIEWS[s.view];
+    const isPhone = s.view === "phone";
+    const scale = Math.min(1, (s.available || FALLBACK_WIDTH) / view.width);
+    const copy = COPY[at] || COPY.email;
+    const wide = at === "picker";
+
+    const code = s.code || "";
+    const codeBoxes = Array.from({ length: 6 }, (_, i) => ({
+      char: code[i] || "",
+      line: i === code.length ? INK : "oklch(0.8 0.016 84)",
+      bg: code[i] ? "oklch(0.978 0.008 92)" : "transparent"
+    }));
+
+    const setCode = (next) => set({ code: next.slice(0, 6) });
+
+    return {
+      stateChips: STATES.map((x) => ({
+        label: x[1],
+        bg: at === x[0] ? "oklch(0.24 0.014 84)" : "transparent",
+        fg: at === x[0] ? "oklch(0.97 0.01 90)" : INK,
+        line: at === x[0] ? "oklch(0.24 0.014 84)" : "oklch(0.76 0.016 84)",
+        onPick: () => set({ at: x[0] })
+      })),
+      viewChips: Object.keys(VIEWS).map((k) => ({
+        label: VIEWS[k].label,
+        bg: s.view === k ? "oklch(0.24 0.014 84 / 0.09)" : "transparent",
+        fg: s.view === k ? INK : DIM,
+        onPick: () => set({ view: k })
+      })),
+      stageRef: this.measure,
+      frameWidth: view.width + "px",
+      frameHeight: view.height + "px",
+      frameScale: String(scale),
+      stageHeight: Math.round(view.height * scale) + "px",
+      scaleNote: view.width + "px · " + (scale < 1 ? "shown at " + Math.round(scale * 100) + "%" : "full size"),
+
+      title: copy.title,
+      blurb: copy.blurb,
+      titleSize: isPhone ? "32px" : wide ? "40px" : "38px",
+      columnWidth: wide ? "560px" : "420px",
+      chromePad: isPhone ? "16px 18px" : "22px 26px",
+      bodyPad: isPhone ? "20px 18px 32px" : "32px 26px 44px",
+      bodyJustify: at === "picker" || at === "empty" ? "flex-start" : "center",
+      rowPad: isPhone ? "14px 16px" : "16px 18px",
+      metaWrap: isPhone ? "normal" : "nowrap",
+
+      atEmail: at === "email",
+      atCode: at === "code",
+      atPicker: at === "picker",
+      atEmpty: at === "empty",
+      atRemoved: at === "removed",
+
+      hasAccount: at === "picker" || at === "empty" || at === "removed",
+      account: s.email,
+      footNote: at === "email" || at === "code"
+        ? "amends keeps one identity per address"
+        : "signed in as " + s.email,
+
+      email: s.email,
+      setEmail: (e) => set({ email: e.target.value }),
+      continueBg: s.email ? INK : "oklch(0.86 0.014 86)",
+      continueInk: s.email ? "oklch(0.97 0.01 90)" : "oklch(0.56 0.014 84)",
+      toCode: () => set({ at: "code" }),
+      toEmail: () => set({ at: "email" }),
+      toPicker: () => set({ at: "picker" }),
+
+      codeBoxes,
+      keypad: [
+        { label: "type 5", onPick: () => setCode(code + "5") },
+        { label: "type 0", onPick: () => setCode(code + "0") },
+        { label: "back", onPick: () => setCode(code.slice(0, -1)) },
+        { label: "paste", onPick: () => setCode("419270") }
+      ],
+
+      showHints: !isPhone && (this.props.showKeyboardHints ?? true),
+      hasInvites: this.props.showInvitation ?? true,
+      workspaces: WORKSPACES.map((w, i) => ({
+        mark: w.mark,
+        name: w.name,
+        meta: w.meta,
+        waiting: w.waiting,
+        hasWaiting: !!w.waiting,
+        hasRunning: w.running,
+        markBg: w.filled ? INK : "oklch(0.925 0.014 88)",
+        markInk: w.filled ? "oklch(0.97 0.01 90)" : "oklch(0.41 0.014 84)",
+        bg: "transparent",
+        seam: i === WORKSPACES.length - 1 ? "none" : "1px dashed oklch(0.86 0.016 86)",
+        radius: i === 0 ? "14px 14px 0 0" : i === WORKSPACES.length - 1 ? "0 0 14px 14px" : "0",
+        onPick: () => set({ at: "picker" })
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
