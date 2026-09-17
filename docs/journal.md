@@ -8,7 +8,8 @@ execution entries through `Log`, without running domain projections.
 ## Ownership
 
 - **Fact** defines a domain statement's name, version, and payload schema.
-- **Log** provides typed appends, lookup, paged reads, and replay for a log ID.
+- **Log** provides typed appends, lookup, paged reads, finite streams, and live tails
+  for a log ID.
   Opening a handle performs no storage operation; the first append creates the
   log as needed. Reopening the same ID addresses the same history.
 - **Journal** binds a domain log to registered projections. Its public log view
@@ -27,10 +28,30 @@ execution entries through `Log`, without running domain projections.
 The core imports Effect only. Hosts choose storage and provide `Store.Service`,
 `Checkpoint.Service`, and the domain store services used by projection handlers.
 `Log.layer` builds the common log service and transaction coordinator from that
-store. `Journal.make` binds a journal to a log ID and projection definitions.
-Handler and schema-decoding services remain requirements of publication and replay.
-They resolve during execution, so a projection does not capture a stale transaction
-at setup. All normal writers to a domain log must use the same projection registrations.
+store. `Journal.layer({ logId, projections })` builds `Journal.Service`, whose
+interface stays the same as projections are added. `Journal.make` remains available
+as its constructor and returns that same interface.
+
+Projection handler and decoder dependencies are required when constructing the
+journal layer or binding a standalone projection runner. The constructed service
+supplies them during execution. Invocation context takes precedence over captured
+context, preserving the active host transaction and giving each operation its own
+scope. Projection dependencies do not appear on journal calls. A published fact's
+own schema requirements remain on that particular `publish` call.
+
+For example, `HostStores` below is a host layer supplying the storage services and
+all dependencies used by the domain-owned `AgentsProjection`. The shared log and
+transaction services stay exposed so execution-log writes can join journal commits:
+
+```ts
+const JournalLive = Journal.layer({
+  logId: Log.Id.make("domain"),
+  projections: [AgentsProjection],
+}).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostStores));
+```
+
+Domains obtain the configured implementation with `yield* Journal.Service`.
+All normal writers to a domain log must use the same projection registrations.
 
 ## Commits and positions
 
@@ -77,8 +98,11 @@ it does not undo external actions, which projections must not perform.
 
 The coordinator closes scopes, waits for accepted writes, and rejects late writes
 using an expired commit context. Callers must await their work within a commit.
-Projection failures retain their original typed errors when propagated; a caught
-failure is reported at the outer boundary as `Commit.Aborted`.
+Expected projection decoder and handler failures become `Projection.Failure`, with
+the projection key, source entry cursor, `decode` or `apply` phase, and the original
+error in `cause`. This keeps the journal's error contract independent of registered
+handlers. Defects and interruption keep their Effect causes. A caught failure is
+still reported at the outer commit boundary as `Commit.Aborted`.
 
 Adapters report unconfirmed commit outcomes with `Store.CommitUncertain`, including
 the commit ID for lookup and reconciliation. The core does not automatically retry
@@ -102,25 +126,63 @@ derivation. Rebuilding domain projections from the journal does not recreate tho
 separate logs. Notification generation still follows committed thread activity as
 defined in the core model; arbitrary log entries do not create notifications.
 
+## Live tailing
+
+`log.tail({ after, limit })` drains available history after the exclusive cursor,
+then waits for future committed batches. Omit `after` to start from the beginning,
+including when the log does not exist yet. `limit` bounds each read in batches;
+it does not limit the tail's lifetime. `journal.log.tail` exposes the same API for
+domain events. For a consumer-owned `handleBatch` effect:
+
+```ts
+const followJournal = Effect.gen(function* () {
+  const journal = yield* Journal.Service;
+  yield* journal.log.tail({ limit: 32 }).pipe(Stream.runForEach(handleBatch));
+});
+```
+
+A tail emits complete committed batches in position order, with independent
+cursors for each consumer. Backpressure controls reads, and slow consumers catch
+up from storage. The core does not queue future entries. Tailing does not apply
+projections or persist consumer progress; save a batch's position after handling
+the whole batch, then pass that position as `after` when reconnecting.
+
+Tail consumption must happen outside storage transactions. It fails with
+`Log.TailInTransaction` before reading or waiting if a `Store.Transaction` is
+present. This prevents provisional entries from escaping and avoids holding a
+transaction open while waiting for future commits. Constructing a tail is lazy;
+the consumption context determines this check.
+
+The host implements `Store.waitForAppend(logId, after)`. It must check committed
+state around wait registration so an append between an empty read and the wait
+cannot be missed. All writers must be observable, including other processes and
+commits whose acknowledgment was lost. Notifications, polling, or a combination
+can satisfy this contract. Wakeups are hints: the core always re-reads validated
+batches from storage and tolerates spurious wakeups. An adapter must avoid a busy
+loop when no new data exists and must release waiting resources on interruption.
+
+Use stream operators or interrupt the consuming fiber to stop a tail. Read,
+decode, and wait failures end it without automatic retries. Resume from the last
+successfully handled batch after recovery. The finite `stream` method continues
+to finish when it observes an empty page.
+
 ## Projection replay
 
 `journal.replay` catches up its registered projections. Call it when attaching a
 projection to existing history, before accepting publications with that registration.
-For example, with a domain-owned `AgentsProjection`:
+For example, using the host layer above:
 
 ```ts
-const makeJournal = Effect.gen(function* () {
-  const journal = yield* Journal.make({
-    logId: Log.Id.make("domain"),
-    projections: [AgentsProjection],
-  });
+const initialize = Effect.gen(function* () {
+  const journal = yield* Journal.Service;
   yield* journal.replay;
-  return journal;
-});
+}).pipe(Effect.provide(JournalLive));
 ```
 
-For individual control, `Projection.bind({ definition, log: journal.log })` returns
-a runner with `step`, `replay`, and `checkpoint` effects. `step` applies the next
+For individual control, `Projection.bind({ definition, log: journal.log })` acquires
+the definition's dependencies and returns a runner with `step`, `replay`, and
+`checkpoint` effects. These effects have no remaining service requirements.
+`step` applies the next
 source batch and persists progress in the same native transaction as its domain
 updates. It returns `Some(cursor)` on progress or `None` when caught up. `replay`
 drains until a step observes no pending batch, then returns the latest checkpoint.
@@ -165,6 +227,10 @@ reset stores, migrate schemas, or switch readers between projection versions.
 memory adapter, including cross-log atomicity, rollback, nested and concurrent
 publication, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version
-routing, and transitions between replay and live publication. The root type
-check includes these tests. Production storage adapters must satisfy the same
+routing, and transitions between replay and live publication. Service tests check
+dependency inference across different projections, the stable consumer interface,
+active transaction and scope preservation, and defect handling. The root type
+check includes these tests. Tail tests cover read/wait races, backpressure, commit
+visibility, rollback, independent consumers, cancellation, and wait failures.
+Production storage adapters must satisfy the same
 transaction and log contracts; no SQL or production memory adapter is selected yet.

@@ -1,4 +1,4 @@
-import { Array, Context, DateTime, Effect, Option, Ref, Schema, Semaphore } from "effect";
+import { Array, Context, DateTime, Deferred, Effect, Option, Ref, Schema, Semaphore } from "effect";
 import { Commit } from "../src/journal/commit.ts";
 import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Entry } from "../src/journal/entry.ts";
@@ -48,6 +48,7 @@ const cloneCursor = (cursor: Checkpoint.Cursor): Checkpoint.Cursor => ({
 export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   const owner = Symbol("memory store");
   const state = yield* Ref.make<State>({ logs: new Map(), checkpoints: new Map(), value: 0 });
+  const changes = yield* Ref.make(yield* Deferred.make<void>());
   const attempts = yield* Ref.make(0);
   const uncertain = yield* Ref.make(false);
   const gate = yield* Semaphore.make(1);
@@ -170,6 +171,10 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
             ),
           );
           yield* Ref.set(state, session.state);
+          if (session.commit.entryCount > 0) {
+            const previous = yield* Ref.getAndSet(changes, yield* Deferred.make<void>());
+            yield* Deferred.succeed(previous, undefined);
+          }
           if (yield* Ref.getAndSet(uncertain, false)) {
             return yield* new Store.CommitUncertain({
               commitId: session.commit.id,
@@ -198,6 +203,16 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
         .filter((batch) => options.after === undefined || batch.position > options.after)
         .slice(0, options.limit)
         .map(cloneBatch);
+    }),
+    waitForAppend: Effect.fn("JournalTest.waitForAppend")(function* (logId, after) {
+      while (true) {
+        // Observe the signal before checking committed state, closing the read/wait race.
+        const signal = yield* Ref.get(changes);
+        const last = Array.last((yield* Ref.get(state)).logs.get(logId) ?? []);
+        if (Option.isSome(last) && (Option.isNone(after) || last.value.position > after.value))
+          return;
+        yield* Deferred.await(signal);
+      }
     }),
   });
 

@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { Schema } from "effect";
 import { Codec } from "./codec.ts";
 import { Event } from "./event.ts";
@@ -9,30 +9,46 @@ import { Transaction } from "./transaction.ts";
 
 export { Payload, FactMismatch, decode } from "./event.ts";
 
-export interface Interface<E, R> {
+export interface Interface {
   readonly log: Log.Reader<typeof Event.Payload>;
   readonly commit: Transaction.Interface["run"];
   /** Catch up registered projections before accepting new publications. */
-  readonly replay: Effect.Effect<void, E | Projection.Error, Transaction.Remaining<R>>;
+  readonly replay: Effect.Effect<void, Projection.Error>;
   readonly publish: <F extends Fact.Definition>(
     fact: F,
     payload: Fact.Payload<NoInfer<F>>,
   ) => Effect.Effect<
     Event.Type<F>,
-    E | Projection.Error | Log.WriteError,
-    Transaction.Remaining<R | F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
+    Projection.Error | Log.WriteError,
+    Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
   >;
+}
+
+export class Service extends Context.Service<Service, Interface>()(
+  "@amends/core/journal/Service",
+) {}
+
+export interface Options<Requirements extends ReadonlyArray<unknown> = readonly []> {
+  readonly logId: Log.Id;
+  /** Infer each projection's requirements separately, then combine them at construction. */
+  readonly projections: {
+    readonly [Index in keyof Requirements]: Projection.Definition<
+      string,
+      number,
+      unknown,
+      Requirements[Index]
+    >;
+  };
 }
 
 /**
  * Bind a domain journal to a log and its projections. Definitions sharing a fact
- * name and version must share its payload schema. Handler services remain dynamic
- * requirements of publish, including the active host transaction's domain stores.
+ * name and version must share its payload schema. Projection dependencies are
+ * supplied here; the resulting service interface is independent of registration.
  */
-export const make = Effect.fn("Journal.make")(function* <E = never, R = never>(options: {
-  readonly logId: Log.Id;
-  readonly projections: ReadonlyArray<Projection.Definition<string, number, E, R>>;
-}) {
+export const make = Effect.fn("Journal.make")(function* <
+  const Requirements extends ReadonlyArray<unknown>,
+>(options: Options<Requirements>) {
   const logs = yield* Log.Service;
   const transaction = yield* Transaction.Service;
   const log = logs.open({ id: options.logId, schema: Event.Payload });
@@ -50,7 +66,7 @@ export const make = Effect.fn("Journal.make")(function* <E = never, R = never>(o
     }
     versions.set(fact.version, fact.payload);
   }
-  const runners: Array<Projection.Runner<E, R>> = [];
+  const runners: Array<Projection.Runner> = [];
   const keys = new Map<string, Set<number>>();
   for (const definition of options.projections) {
     if (keys.get(definition.name)?.has(definition.version)) {
@@ -61,7 +77,7 @@ export const make = Effect.fn("Journal.make")(function* <E = never, R = never>(o
     const versions = keys.get(definition.name) ?? new Set<number>();
     versions.add(definition.version);
     keys.set(definition.name, versions);
-    runners.push(yield* Projection.bind({ definition, log }));
+    runners.push(yield* Projection.bind<unknown, Requirements[number]>({ definition, log }));
   }
 
   const publish = Effect.fn("Journal.publish")(function* <F extends Fact.Definition>(
@@ -92,12 +108,17 @@ export const make = Effect.fn("Journal.make")(function* <E = never, R = never>(o
     get: log.get,
     read: log.read,
     stream: log.stream,
+    tail: log.tail,
   };
   const replay = Effect.forEach(runners, (runner) => runner.replay, { discard: true }).pipe(
     Effect.withSpan("Journal.replay"),
   );
-  const journal: Interface<E, R> = { log: reader, commit: transaction.run, replay, publish };
-  return journal;
+  return Service.of({ log: reader, commit: transaction.run, replay, publish });
 });
+
+/** Build the configured service from host storage and projection dependencies. */
+export const layer = <const Requirements extends ReadonlyArray<unknown>>(
+  options: Options<Requirements>,
+) => Layer.effect(Service, make(options));
 
 export * as Journal from "./journal.ts";

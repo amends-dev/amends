@@ -24,6 +24,11 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()("Log.
 }) {}
 export type WriteError = Transaction.Error | Schema.SchemaError | InvalidResponse;
 export type ReadError = Store.Failure | Schema.SchemaError;
+export class TailInTransaction extends Schema.TaggedError<TailInTransaction>()(
+  "Log.TailInTransaction",
+  {},
+) {}
+export type TailError = ReadError | TailInTransaction;
 
 export interface Handle<S extends Schema.Constraint> {
   readonly id: Id;
@@ -58,12 +63,20 @@ export interface Handle<S extends Schema.Constraint> {
   readonly stream: (
     options: Store.ReadOptions,
   ) => Stream.Stream<Batch<S["Type"]>, ReadError, S["DecodingServices"]>;
+  /**
+   * Drain history, then wait for new committed batches until interrupted or failed.
+   * Resume after a batch position; omitted after starts at the beginning. Consume
+   * outside a transaction. limit bounds each read, not the lifetime of the tail.
+   */
+  readonly tail: (
+    options: Store.ReadOptions,
+  ) => Stream.Stream<Batch<S["Type"]>, TailError, S["DecodingServices"]>;
 }
 
 /** Domain journals expose their underlying log through this read-only view. */
 export type Reader<S extends Schema.Constraint> = Pick<
   Handle<S>,
-  "id" | "schema" | "get" | "read" | "stream"
+  "id" | "schema" | "get" | "read" | "stream" | "tail"
 >;
 
 export interface Interface {
@@ -253,7 +266,27 @@ export const layer = Layer.effect(
           }),
         ).pipe(Stream.withSpan("Log.stream"));
 
-      return { id, schema, append, appendAll, get, read, stream };
+      const tail = (options: Store.ReadOptions) =>
+        Stream.paginate(
+          options,
+          Effect.fnUntraced(function* (cursor) {
+            if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+              return yield* new TailInTransaction({});
+            while (true) {
+              const batches = yield* read(cursor);
+              const last = Array.last(batches);
+              if (Option.isSome(last)) {
+                return [
+                  batches,
+                  Option.some({ after: last.value.position, limit: cursor.limit }),
+                ] as const;
+              }
+              yield* store.waitForAppend(id, Option.fromUndefinedOr(cursor.after));
+            }
+          }),
+        ).pipe(Stream.withSpan("Log.tail"));
+
+      return { id, schema, append, appendAll, get, read, stream, tail };
     };
 
     return Service.of({ open, commit: transaction.run });

@@ -1,4 +1,4 @@
-import { Array, Effect, Option, Schema } from "effect";
+import { Array, Context, Effect, Option, Schema } from "effect";
 import { Checkpoint } from "./checkpoint.ts";
 import { Event } from "./event.ts";
 import type { Fact } from "./fact.ts";
@@ -101,6 +101,13 @@ export class UnsupportedFactVersion extends Schema.TaggedError<UnsupportedFactVe
 export class Duplicate extends Schema.TaggedError<Duplicate>()("Projection.Duplicate", {
   key: Checkpoint.Key,
 }) {}
+/** An expected decoder or handler failure, preserving its original error. */
+export class Failure extends Schema.TaggedError<Failure>()("Projection.Failure", {
+  key: Checkpoint.Key,
+  cursor: Checkpoint.Cursor,
+  phase: Schema.Literals(["decode", "apply"]),
+  cause: Schema.Defect(),
+}) {}
 
 export type Error =
   | Transaction.Error
@@ -108,31 +115,24 @@ export type Error =
   | Event.FactMismatch
   | Behind
   | InvalidCheckpoint
-  | UnsupportedFactVersion;
+  | UnsupportedFactVersion
+  | Failure;
 
-export interface Runner<E, R> {
+export interface Runner {
   readonly key: Checkpoint.Key;
   readonly checkpoint: Effect.Effect<
     Option.Option<Checkpoint.Cursor>,
     Store.Failure | Schema.SchemaError
   >;
   /** Apply the next source batch and checkpoint it in one transaction. None means caught up. */
-  readonly step: Effect.Effect<
-    Option.Option<Checkpoint.Cursor>,
-    E | Error,
-    Transaction.Remaining<R>
-  >;
+  readonly step: Effect.Effect<Option.Option<Checkpoint.Cursor>, Error>;
   /** Drain until no pending batch is observed. Each step commits independently unless already in a commit. */
-  readonly replay: Effect.Effect<
-    Option.Option<Checkpoint.Cursor>,
-    E | Error,
-    Transaction.Remaining<R>
-  >;
+  readonly replay: Effect.Effect<Option.Option<Checkpoint.Cursor>, Error>;
   /** Journal integration: apply a newly appended, decoded event only when caught up. */
   readonly apply: (
     entry: Log.Value<Event.Payload>,
     event: unknown,
-  ) => Effect.Effect<void, E | Error, Transaction.Remaining<R> | Store.Transaction>;
+  ) => Effect.Effect<void, Error, Store.Transaction>;
 }
 
 const cursorOf = (entry: Log.Value<Event.Payload>): Checkpoint.Cursor => ({
@@ -143,9 +143,9 @@ const cursorOf = (entry: Log.Value<Event.Payload>): Checkpoint.Cursor => ({
 });
 
 /**
- * Bind a definition to its source log and host-owned checkpoint store. The domain
- * must supply the corresponding read-model store; a new version needs a fresh
- * target or a domain-managed migration. This never clears domain state.
+ * Bind a definition, its dependencies, and its host-owned checkpoint store.
+ * Invocation context takes precedence, preserving the current transaction and
+ * scope. A new version needs a fresh target or a domain-managed migration.
  */
 export const bind = Effect.fn("Projection.bind")(function* <E, R>(options: {
   readonly definition: Definition<string, number, E, R>;
@@ -153,6 +153,7 @@ export const bind = Effect.fn("Projection.bind")(function* <E, R>(options: {
 }) {
   const checkpoints = yield* Checkpoint.Service;
   const transaction = yield* Transaction.Service;
+  const services = yield* Effect.context<Transaction.Remaining<R>>();
   const { definition, log } = options;
   const key = yield* Schema.decodeEffect(Checkpoint.Key)({
     logId: log.id,
@@ -223,48 +224,71 @@ export const bind = Effect.fn("Projection.bind")(function* <E, R>(options: {
     return handlers;
   });
 
+  // Supply static requirements only after entering the operation's transaction.
+  // The invocation's context must win over any context present during binding.
+  const withServices = Effect.fnUntraced(function* <A, E2>(
+    program: Effect.Effect<A, E2, R | Store.Transaction>,
+  ) {
+    const native = yield* Store.Transaction;
+    return yield* program.pipe(
+      Effect.scoped,
+      Effect.provideService(Store.Transaction, native),
+      Effect.updateContext((current: Context.Context<never>) => Context.merge(services, current)),
+    );
+  });
+  const failed = (entry: Log.Value<Event.Payload>, phase: Failure["phase"]) => (cause: unknown) =>
+    new Failure({ key, cursor: cursorOf(entry), phase, cause });
+
   const apply = Effect.fn("Projection.apply")(function* (
     entry: Log.Value<Event.Payload>,
     event: unknown,
   ) {
     const native = yield* Store.Transaction;
     yield* transaction.operation(
-      Effect.gen(function* () {
-        if (entry.logId !== log.id || entry.commitId !== native.id)
-          return yield* new Transaction.Foreign({});
-        const pending = yield* next();
-        if (
-          Option.isNone(pending) ||
-          pending.value.length !== 1 ||
-          pending.value[0]?.id !== entry.id
-        )
-          return yield* new Behind({ key });
-        for (const handler of yield* handlersFor(entry)) yield* handler.apply(event);
-        yield* checkpoints.set(key, cursorOf(entry));
-      }),
+      withServices(
+        Effect.gen(function* () {
+          if (entry.logId !== log.id || entry.commitId !== native.id)
+            return yield* new Transaction.Foreign({});
+          const pending = yield* next();
+          if (
+            Option.isNone(pending) ||
+            pending.value.length !== 1 ||
+            pending.value[0]?.id !== entry.id
+          )
+            return yield* new Behind({ key });
+          for (const handler of yield* handlersFor(entry))
+            yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
+          yield* checkpoints.set(key, cursorOf(entry));
+        }),
+      ),
     );
   });
   const step = transaction
     .operation(
-      Effect.gen(function* () {
-        const pending = yield* next();
-        if (Option.isNone(pending)) return Option.none<Checkpoint.Cursor>();
-        for (const entry of pending.value) {
-          const handlers = yield* handlersFor(entry);
-          const first = Array.head(handlers);
-          if (Option.isSome(first)) {
-            const event = yield* first.value.decode(entry);
-            for (const handler of handlers) yield* handler.apply(event);
+      withServices(
+        Effect.gen(function* () {
+          const pending = yield* next();
+          if (Option.isNone(pending)) return Option.none<Checkpoint.Cursor>();
+          for (const entry of pending.value) {
+            const handlers = yield* handlersFor(entry);
+            const first = Array.head(handlers);
+            if (Option.isSome(first)) {
+              const event = yield* first.value
+                .decode(entry)
+                .pipe(Effect.mapError(failed(entry, "decode")));
+              for (const handler of handlers)
+                yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
+            }
           }
-        }
-        const last = Array.last(pending.value);
-        if (Option.isNone(last)) {
-          return yield* new InvalidCheckpoint({ key, message: "Source returned an empty batch" });
-        }
-        const cursor = cursorOf(last.value);
-        yield* checkpoints.set(key, cursor);
-        return Option.some(cursor);
-      }),
+          const last = Array.last(pending.value);
+          if (Option.isNone(last)) {
+            return yield* new InvalidCheckpoint({ key, message: "Source returned an empty batch" });
+          }
+          const cursor = cursorOf(last.value);
+          yield* checkpoints.set(key, cursor);
+          return Option.some(cursor);
+        }),
+      ),
     )
     .pipe(Effect.withSpan("Projection.step"));
   const replay = Effect.gen(function* () {
@@ -274,7 +298,7 @@ export const bind = Effect.fn("Projection.bind")(function* <E, R>(options: {
     }
   }).pipe(Effect.withSpan("Projection.replay"));
 
-  const runner: Runner<E, R> = { key, checkpoint, step, replay, apply };
+  const runner: Runner = { key, checkpoint, step, replay, apply };
   return runner;
 });
 

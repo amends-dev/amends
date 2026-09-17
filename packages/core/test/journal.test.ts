@@ -179,7 +179,11 @@ test("projections cannot recursively append execution or fact entries", async ()
       );
       const journal = yield* Journal.make({ logId: Log.Id.make("domain"), projections: [invalid] });
       const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
-      expect(failure._tag).toBe("Commit.WriteForbidden");
+      expect(failure).toMatchObject({
+        _tag: "Projection.Failure",
+        phase: "apply",
+        cause: { _tag: "Commit.WriteForbidden" },
+      });
       expect((yield* fixture.snapshot).logs.size).toBe(0);
     }),
   );

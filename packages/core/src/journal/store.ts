@@ -93,6 +93,20 @@ export interface Interface {
     logId: Entry.LogId,
     options: ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Batch>, Failure>;
+
+  /**
+   * Wait outside a transaction for committed entries beyond the exclusive cursor
+   * (None means any committed batch). Check durable state around subscribing so
+   * an append before or during registration cannot be missed. Observe all writers,
+   * including other processes and commits whose acknowledgment was lost. Hosts
+   * may use notifications, polling, or both; never hold a write transaction while
+   * waiting. Wakeups are hints: callers re-read the log. Coalesce notifications
+   * instead of buffering entries, and release waiting resources on interruption.
+   */
+  readonly waitForAppend: (
+    logId: Entry.LogId,
+    after: Option.Option<Entry.Position>,
+  ) => Effect.Effect<void, Failure>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(

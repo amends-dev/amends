@@ -92,7 +92,13 @@ test("a failed batch rolls back every handler and preserves previously committed
         event.payload.amount === 3 ? Effect.fail("rejected") : Effect.void,
       );
       const failed = yield* Projection.bind({ definition: rejecting, log: journal.log });
-      expect(yield* Effect.flip(failed.replay)).toBe("rejected");
+      expect(yield* Effect.flip(failed.replay)).toMatchObject({
+        _tag: "Projection.Failure",
+        phase: "apply",
+        cause: "rejected",
+        key: { logId, name: "counter", version: 1 },
+        cursor: { position: Log.Position.make(1), index: 1 },
+      });
       expect(yield* (yield* Counter).get).toBe(1);
       const cursor = yield* failed.checkpoint;
       expect(Option.isSome(cursor) && cursor.value.position).toBe(Log.Position.make(0));
@@ -316,7 +322,11 @@ test("replay handlers cannot append and a caught failure poisons the outer commi
       });
       const recursive = definition.on(Changed, () => turn.append("forbidden").pipe(Effect.asVoid));
       const bound = yield* Projection.bind({ definition: recursive, log: journal.log });
-      expect((yield* Effect.flip(bound.step))._tag).toBe("Commit.WriteForbidden");
+      expect(yield* Effect.flip(bound.step)).toMatchObject({
+        _tag: "Projection.Failure",
+        phase: "apply",
+        cause: { _tag: "Commit.WriteForbidden" },
+      });
       const result = yield* Effect.flip(
         journal.commit(bound.step.pipe(Effect.catch(() => Effect.void))),
       );
@@ -390,8 +400,10 @@ test("historical decoding resolves services, runs once per event, and cannot app
     fixture,
     Effect.gen(function* () {
       yield* (yield* source).publish(Decoded, 2).pipe(Effect.provideService(Decoder, decoder));
-      const journal = yield* Journal.make({ logId, projections: [decoded] });
-      yield* journal.replay.pipe(Effect.provideService(Decoder, decoder));
+      const journal = yield* Journal.make({ logId, projections: [decoded] }).pipe(
+        Effect.provideService(Decoder, decoder),
+      );
+      yield* journal.replay;
       yield* journal.publish(Decoded, 3).pipe(Effect.provideService(Decoder, decoder));
       expect(yield* (yield* Counter).get).toBe(5);
       expect(yield* Ref.get(decodes)).toBe(3);
@@ -404,18 +416,16 @@ test("historical decoding resolves services, runs once per event, and cannot app
           Effect.flatMap(Counter, (counter) => counter.add(event.payload)),
         ),
         log: journal.log,
-      });
-      const failure = yield* Effect.flip(
-        fresh.step.pipe(
-          Effect.provideService(Decoder, {
-            decode: (value) =>
-              turn.append("forbidden").pipe(
-                Effect.catch(() => Effect.void),
-                Effect.as(value),
-              ),
-          }),
-        ),
+      }).pipe(
+        Effect.provideService(Decoder, {
+          decode: (value) =>
+            turn.append("forbidden").pipe(
+              Effect.catch(() => Effect.void),
+              Effect.as(value),
+            ),
+        }),
       );
+      const failure = yield* Effect.flip(fresh.step);
       expect(failure._tag).toBe("Commit.Aborted");
       expect(yield* (yield* Counter).get).toBe(5);
       expect(Option.isNone(yield* fresh.checkpoint)).toBe(true);
@@ -439,7 +449,11 @@ test("corrupt fact payloads roll back earlier handlers in the same replay batch"
         { name: Changed.name, version: Changed.version, payload: new Uint8Array() },
       ]);
       const bound = yield* runner;
-      expect((yield* Effect.flip(bound.step))._tag).toBe("SchemaError");
+      expect(yield* Effect.flip(bound.step)).toMatchObject({
+        _tag: "Projection.Failure",
+        phase: "decode",
+        cause: { _tag: "SchemaError" },
+      });
       expect(yield* (yield* Counter).get).toBe(0);
       expect(Option.isNone(yield* bound.checkpoint)).toBe(true);
     }),
