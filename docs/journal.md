@@ -232,5 +232,7 @@ dependency inference across different projections, the stable consumer interface
 active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit
 visibility, rollback, independent consumers, cancellation, and wait failures.
-Production storage adapters must satisfy the same
-transaction and log contracts; no SQL or production memory adapter is selected yet.
+Storage adapters must satisfy the same transaction and log contracts. The
+[local host](../hosts/local/README.md) now supplies a SQLite adapter and tests those
+contracts against persistent storage and independent connections. The core's
+memory adapter remains test-only.

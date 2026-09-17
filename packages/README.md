@@ -17,5 +17,6 @@ Use `effect: "catalog:"` to share the root Effect version. Export source through
 `package.json` and import other packages by their declared workspace names;
 do not use relative paths across workspace boundaries.
 
-`@amends/core` currently exports only the starter Effect program. Add domain
-packages as their responsibilities are implemented.
+`@amends/core` exports the journal, identity, authorization, and workspace contracts
+and services. `WorkspaceCore.layer` composes the current domain projections and
+permission definitions from host-provided workspace storage views.

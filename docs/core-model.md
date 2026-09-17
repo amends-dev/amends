@@ -475,6 +475,30 @@ and the available retention-policy settings remain open.
 
 ## Agreed: workspace members share one permission model
 
+### Hosts route workspaces; core operates within one workspace
+
+A core context is bound to one workspace. A host can serve many such contexts
+within one process, and several host instances can serve the same workspace when
+their storage provides the required concurrency guarantees. Workspace contexts
+can be reconstructed from persistent state; they do not require a permanently
+running process per workspace.
+
+The host authenticates identities, checks workspace-creation entitlement, allocates
+workspace IDs, and binds storage. Core initialization atomically establishes the
+workspace record, the creator's human membership, initial ownership, and explicit
+initial permission assignments. Initialization receives trusted human identity
+before an ordinary member actor exists. Repeated initialization cannot replace
+ownership or grant additional access.
+
+Creation attribution and current ownership are separate. Ownership does not
+implicitly bypass permission checks; the initial owner receives explicit grants.
+The initial permission set and subsequent changes to it must be deliberate.
+Ordinary operations receive an actor specific to that operation and check current
+membership and permissions. Ownership transfer and the detailed removal workflow
+still require their application contracts.
+
+### Humans and agents share membership
+
 Humans and agents can both be workspace members. They use the same permission checks for
 the same actions, while retaining different identity types. A human authenticates and
 interacts directly. An agent has behavioral configuration and executes through turns.

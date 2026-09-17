@@ -10,14 +10,16 @@ bun run start
 bun run check
 ```
 
-`bun run start` starts the local Bun host, and `bun run dev` restarts it when files
-change. The host runs the shared starter program through `BunRuntime.runMain`.
+`bun run start` runs the local Bun host's persistent two-workspace demonstration,
+and `bun run dev` reruns it when files change. Each demonstration creates two new
+workspaces. See the [local host guide](hosts/local/README.md) for individual
+creation/read commands, storage configuration, and the trusted local identity boundary.
 
 ## Workspace layout
 
 ```text
 packages/
-  core/             @amends/core: portable starter Effect program
+  core/             @amends/core: portable journal and workspace domain services
 hosts/
   local/            @amends/host-local: Bun runtime entry point
 apps/               future user-facing clients, such as web and desktop
@@ -43,7 +45,7 @@ also runs each workspace's `typecheck` script. Workspace exports point to TypeSc
 which Bun and future application bundlers can consume directly.
 
 The journal and execution-log design is described in [docs/journal.md](docs/journal.md).
-Run its behavioral checks with `bun test packages/core/test`.
+Run core and persistent-host checks with `bun test packages/core/test hosts/local/test`.
 
 For a new workspace, add a manifest, source files, and a TypeScript configuration
 extending `../../tsconfig.base.json`, plus a `typecheck` script. Then run

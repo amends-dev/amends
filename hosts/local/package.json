@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@amends/core": "workspace:*",
-    "@effect/platform-bun": "catalog:"
+    "@effect/platform-bun": "catalog:",
+    "@effect/sql-sqlite-bun": "catalog:",
+    "effect": "catalog:"
   }
 }

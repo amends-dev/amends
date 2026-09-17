@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-
 export { AssignmentFacts } from "./authorization/assignment-facts.ts";
 export { AssignmentProjection } from "./authorization/assignment-projection.ts";
 export { AssignmentStore } from "./authorization/assignment-store.ts";
@@ -36,5 +34,6 @@ export { MemberProjection } from "./workspace/member-projection.ts";
 export { MemberStore } from "./workspace/member-store.ts";
 export { Member } from "./workspace/member.ts";
 export { Workspace } from "./workspace/workspace.ts";
-
-export const program = Effect.log("amends-v2 is running with Effect.");
+export { WorkspaceStore } from "./workspace/workspace-store.ts";
+export { WorkspaceInitialization } from "./workspace/workspace-initialization.ts";
+export { WorkspaceCore } from "./workspace/workspace-core.ts";
