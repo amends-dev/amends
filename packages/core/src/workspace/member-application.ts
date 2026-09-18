@@ -174,7 +174,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       ),
     ]);
     const member = yield* load(id);
-    const found = yield* workspace.get();
+    const found = yield* workspace.get;
     if (Option.isNone(found))
       return yield* new InvalidResponse({ message: "Workspace metadata is missing" });
     const record = yield* Schema.decodeEffect(Workspace.Record)(found.value);

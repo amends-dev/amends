@@ -90,12 +90,11 @@ const configured = (
   const services = Layer.mergeAll(journal, authorization).pipe(Layer.provide(host));
   const workspace = Layer.succeed(WorkspaceStore.Service, {
     workspaceId,
-    get: () =>
-      Effect.succeedSome({
-        id: workspaceId,
-        createdBy: Identity.HumanId.make("alice"),
-        ownerMemberId: alice.memberId,
-      }),
+    get: Effect.succeedSome({
+      id: workspaceId,
+      createdBy: Identity.HumanId.make("alice"),
+      ownerMemberId: alice.memberId,
+    }),
     insert: () => Effect.die("Workspace insertion is not used by membership operations"),
     ...workspaceOverrides,
   });
@@ -457,19 +456,17 @@ test("removal fails closed when ownership cannot be read reliably", async () => 
   await seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
   const before = await Effect.runPromise(fixture.snapshot);
   const responses: ReadonlyArray<{ get: WorkspaceStore.Interface["get"]; tag: string }> = [
-    { get: () => Effect.succeedNone, tag: "MemberApplication.InvalidResponse" },
+    { get: Effect.succeedNone, tag: "MemberApplication.InvalidResponse" },
     {
-      get: () =>
-        Effect.succeedSome({
-          id: foreignWorkspaceId,
-          createdBy: Identity.HumanId.make("alice"),
-          ownerMemberId: alice.memberId,
-        }),
+      get: Effect.succeedSome({
+        id: foreignWorkspaceId,
+        createdBy: Identity.HumanId.make("alice"),
+        ownerMemberId: alice.memberId,
+      }),
       tag: "MemberApplication.WorkspaceMismatch",
     },
     {
-      get: () =>
-        Effect.fail(new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" })),
+      get: Effect.fail(new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" })),
       tag: "WorkspaceStore.Failure",
     },
   ];
@@ -487,7 +484,7 @@ test("removal fails closed when ownership cannot be read reliably", async () => 
           Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
           Layer.succeed(WorkspaceStore.Service, {
             workspaceId: foreignWorkspaceId,
-            get: () => Effect.succeedNone,
+            get: Effect.succeedNone,
             insert: () => Effect.die("Unexpected workspace insertion"),
           }),
         ),

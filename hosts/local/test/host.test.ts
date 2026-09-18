@@ -93,7 +93,7 @@ test("one host creates two isolated workspaces and uses each operation's authent
         const storage = yield* Storage.make();
         for (const workspace of workspaces) {
           const bound = yield* storage.forWorkspace(workspace.id);
-          expect(yield* bound.workspace.get()).toEqual(Option.some(workspace));
+          expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
           const assignments = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
           expect(assignments.map((assignment) => assignment.source)).toEqual(
             expect.arrayContaining([
@@ -137,12 +137,12 @@ test("initialization commits once under competing requests and never replaces ow
         );
         expect(results.filter((result) => result._tag === "Success")).toHaveLength(1);
         expect(results.filter((result) => result._tag === "Failure")).toHaveLength(1);
-        const before = yield* bound.workspace.get();
+        const before = yield* bound.workspace.get;
         const log = yield* bound.store.read(Log.Id.make("journal"), { limit: 10 });
         expect(yield* Effect.flip(initialized(bound, bob.id))).toMatchObject({
           _tag: "WorkspaceInitialization.AlreadyInitialized",
         });
-        expect(yield* bound.workspace.get()).toEqual(before);
+        expect(yield* bound.workspace.get).toEqual(before);
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toEqual(log);
       }),
     );
@@ -168,7 +168,7 @@ test("a failed final checkpoint rolls back workspace, membership, grants, log, a
           }),
         };
         expect(yield* Effect.flip(initialized(broken))).toBe(failure);
-        expect(yield* bound.workspace.get()).toEqual(Option.none());
+        expect(yield* bound.workspace.get).toEqual(Option.none());
         expect(yield* bound.members.findActive(alice)).toEqual(Option.none());
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toEqual([]);
         const sql = yield* SqlClient.SqlClient;
@@ -201,7 +201,7 @@ test("interruption rolls back initialization and leaves the connection usable", 
         const fiber = yield* program.pipe(Effect.forkChild);
         yield* Deferred.await(ready);
         yield* Fiber.interrupt(fiber);
-        expect(yield* bound.workspace.get()).toEqual(Option.none());
+        expect(yield* bound.workspace.get).toEqual(Option.none());
         expect(yield* bound.members.findActive(alice)).toEqual(Option.none());
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toEqual([]);
         yield* initialized(bound);
@@ -221,7 +221,7 @@ test("workspace stores reject foreign and expired transactions, including escape
         expect(
           yield* Effect.flip(a.members.findActive(alice).pipe(Effect.provide(expired))),
         ).toMatchObject({ _tag: "MemberStore.Failure" });
-        expect(yield* Effect.flip(a.store.transaction(b.workspace.get()))).toMatchObject({
+        expect(yield* Effect.flip(a.store.transaction(b.workspace.get))).toMatchObject({
           _tag: "WorkspaceStore.Failure",
         });
         expect(
@@ -401,7 +401,7 @@ test("independent hosts report a busy transaction without retrying and preserve 
           expect(yield* Effect.flip(initialized(b, bob.id))).toMatchObject({
             _tag: "WorkspaceInitialization.AlreadyInitialized",
           });
-          expect(yield* b.workspace.get()).toEqual(Option.some(workspace));
+          expect(yield* b.workspace.get).toEqual(Option.some(workspace));
         }),
       ),
     );
@@ -424,11 +424,11 @@ test("replay rebuilds ownership, membership, and initial grants from persisted f
             yield* sql`DELETE FROM checkpoints`;
           }),
         );
-        expect(yield* bound.workspace.get()).toEqual(Option.none());
+        expect(yield* bound.workspace.get).toEqual(Option.none());
         yield* Effect.gen(function* () {
           yield* (yield* Journal.Service).replay;
         }).pipe(Effect.provide(core(bound)));
-        expect(yield* bound.workspace.get()).toEqual(Option.some(workspace));
+        expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
         expect(yield* bound.members.get(workspace.ownerMemberId)).toMatchObject({
           _tag: "Some",
           value: { identity: alice, status: "active" },
@@ -485,7 +485,7 @@ test("commit failure reports an uncertain outcome with its commit ID and never r
           commitId: expect.any(String),
         });
         expect(commits).toBe(1);
-        expect(yield* bound.workspace.get()).toEqual(Option.none());
+        expect(yield* bound.workspace.get).toEqual(Option.none());
         yield* initialized(bound);
       }),
     );

@@ -21,12 +21,11 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   const own = eq(workspaces.workspaceId, workspaceId);
   return WorkspaceStore.Service.of({
     workspaceId,
-    get: () =>
-      guard(db.select(record).from(workspaces).where(own)).pipe(
-        Effect.flatMap(decode),
-        Effect.map(Array.head),
-        Effect.mapError(storeFailure(WorkspaceStore, "get")),
-      ),
+    get: guard(db.select(record).from(workspaces).where(own)).pipe(
+      Effect.flatMap(decode),
+      Effect.map(Array.head),
+      Effect.mapError(storeFailure(WorkspaceStore, "get")),
+    ),
     insert: Effect.fn("Workspaces.insert")(function* (record) {
       yield* Store.Transaction;
       if (record.id !== workspaceId)

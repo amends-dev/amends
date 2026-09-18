@@ -123,7 +123,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   const authorizeOwner = Effect.fnUntraced(function* () {
     yield* authorization.require([manage]);
     const actor = yield* Actor.Service;
-    const found = yield* workspace.get();
+    const found = yield* workspace.get;
     if (Option.isNone(found) || found.value.id !== workspaceId)
       return yield* new InvalidResponse({ message: "Workspace metadata is missing or mismatched" });
     if (found.value.ownerMemberId !== actor.memberId) return yield* new NotOwner({ workspaceId });

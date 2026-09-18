@@ -231,15 +231,14 @@ export const make = Effect.fn("SqliteDomains.make")(function* (
 
   const workspace = WorkspaceStore.Service.of({
     workspaceId,
-    get: Effect.fn("SqliteWorkspace.get")(function* () {
-      return yield* records(
-        Workspace.Record,
-        guard(sql`SELECT record FROM workspaces WHERE workspace_id = ${workspaceId}`),
-      ).pipe(
-        Effect.map(Array.head),
-        Effect.mapError((cause) => new WorkspaceStore.Failure({ operation: "get", cause })),
-      );
-    }),
+    get: records(
+      Workspace.Record,
+      guard(sql`SELECT record FROM workspaces WHERE workspace_id = ${workspaceId}`),
+    ).pipe(
+      Effect.map(Array.head),
+      Effect.mapError((cause) => new WorkspaceStore.Failure({ operation: "get", cause })),
+      Effect.withSpan("SqliteWorkspace.get"),
+    ),
     insert: Effect.fn("SqliteWorkspace.insert")(function* (record) {
       yield* Store.Transaction;
       if (record.id !== workspaceId)

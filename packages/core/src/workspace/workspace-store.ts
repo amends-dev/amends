@@ -16,7 +16,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("WorkspaceStore.Con
 export interface Interface {
   readonly workspaceId: Workspace.Id;
   /** Read the current transaction, or committed state when called outside one. */
-  readonly get: () => Effect.Effect<Option.Option<Workspace.Record>, Failure>;
+  readonly get: Effect.Effect<Option.Option<Workspace.Record>, Failure>;
   /** Insert once, rejecting an existing record or a different workspace. Never overwrite ownership. */
   readonly insert: (
     record: Workspace.Record,

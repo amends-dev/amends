@@ -59,7 +59,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   const crypto = yield* Crypto.Crypto;
   return yield* journal.commit(
     Effect.gen(function* () {
-      if (Option.isSome(yield* workspace.get()))
+      if (Option.isSome(yield* workspace.get))
         return yield* new AlreadyInitialized({ workspaceId: workspace.workspaceId });
       const ownerMemberId = Member.Id.make(yield* crypto.randomUUIDv4);
       const record = Workspace.Record.make({ id: workspace.workspaceId, createdBy, ownerMemberId });
@@ -109,7 +109,7 @@ export const enableInvitations = Effect.fn("WorkspaceInitialization.enableInvita
       Effect.gen(function* () {
         yield* authorization.require([]);
         const actor = yield* Actor.Service;
-        const found = yield* workspace.get();
+        const found = yield* workspace.get;
         if (
           Option.isNone(found) ||
           found.value.id !== workspace.workspaceId ||
