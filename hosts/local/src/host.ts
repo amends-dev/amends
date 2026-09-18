@@ -13,7 +13,7 @@ export type Host = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unk
  * the CLI treats its arguments as local operator assertions, and the HTTP
  * server resolves bearer tokens before calling it.
  */
-export const layer = (filename: string): Host =>
+export const sqliteLayer = (filename: string): Host =>
   Gateway.layer.pipe(
     Layer.provideMerge(sqlite),
     Layer.provide(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),

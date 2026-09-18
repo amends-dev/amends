@@ -25,7 +25,7 @@ const server = (filename: string) =>
   HttpRouter.serve(LocalServer.routes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       Layer.mergeAll(
-        LocalHost.layer(filename),
+        LocalHost.sqliteLayer(filename),
         LocalSignIn.layer((email, code) => Effect.sync(() => delivered.set(email, code))).pipe(
           Layer.provide(BunCrypto.layer),
         ),

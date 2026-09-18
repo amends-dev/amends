@@ -14,7 +14,7 @@ const program = Effect.gen(function* () {
   );
   const port = yield* Config.Int("AMENDS_PORT").pipe(Config.withDefault(8787));
   const host = Option.match(url, {
-    onNone: () => LocalHost.layer(filename),
+    onNone: () => LocalHost.sqliteLayer(filename),
     onSome: LocalHost.postgresLayer,
   });
   return yield* Layer.launch(LocalServer.layer(host, port));
