@@ -47,7 +47,7 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
       .orderBy(asc(workspaces.workspaceId), asc(members.id))
       .pipe(
         Effect.flatMap((rows) =>
-          Schema.decodeUnknownEffect(Schema.Array(Membership))(
+          Schema.decodeEffect(Schema.Array(Membership))(
             rows.map(({ workspace, member, people }) => ({
               workspace,
               member: {

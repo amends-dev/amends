@@ -87,14 +87,13 @@ const host = (url: string, options: PostgresStorage.Options = {}) =>
     Layer.provideMerge(contracts(options)),
     Layer.provideMerge(Layer.mergeAll(database(url), BunCrypto.layer)),
   );
-const gateway = Effect.flatMap(Gateway.Service, (gateway) => Effect.succeed(gateway));
 const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
 
 it("the gateway runs the membership workflow over two isolated workspaces", async () =>
   withDatabase(async (url) => {
     const outcome = await Effect.runPromise(
       Effect.gen(function* () {
-        const entry = yield* gateway;
+        const entry = yield* Gateway.Service;
         const a = yield* entry.createWorkspace(alice.id);
         const b = yield* entry.createWorkspace(bob.id);
         const getMember = (workspace: Workspace.Record, identity: Identity.Reference) =>
