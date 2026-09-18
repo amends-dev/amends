@@ -1,6 +1,15 @@
-# Adapter construction conventions
+# Adapter conventions
 
-Read [README.md](./README.md) before changing constructors or service wiring.
+Read [README.md](./README.md) before changing adapters. Keep one focused module
+per store and consistent row, column, domain-record, and transaction names.
+Validate decoded records and edited fields against core schemas before storage
+conversion. Rejected writes are conflicts; malformed stored rows and infrastructure
+errors are failures. Preserve transaction guards and validate before any SQL write
+or conversion that drops domain information. Keep direct store-contract tests
+aligned across SQLite and PostgreSQL, including rejection without partial writes.
+Applied migrations, serialized fields, and service keys remain stable through
+source reorganizations. Keep bindings and raw table schemas internal.
+
 Keep initialization in `make` and have `layer` delegate to it. Database constructors
 prepare a supplied SQL client; database layers acquire the driver and own its scope.
 Workspace bindings and stores share that database and resolve active transactions

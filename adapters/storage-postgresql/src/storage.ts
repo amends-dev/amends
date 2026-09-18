@@ -19,7 +19,7 @@ export type Options = Binding.Options;
  *
  * @category layers
  */
-export const layerStores = Layer.mergeAll(
+const layerStores = Layer.mergeAll(
   Journal.layer,
   Checkpoints.layer,
   Workspaces.layer,

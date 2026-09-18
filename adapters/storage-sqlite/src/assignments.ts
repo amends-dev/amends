@@ -3,8 +3,10 @@ import { Store } from "@amends/core/journal";
 import { Array, Effect, Layer, Schema } from "effect";
 import type { Statement } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { makeRecordDecoder } from "./record-column.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Assignment.Record));
 
 const codec = Schema.fromJsonString(Assignment.Record);
 const decode = makeRecordDecoder(codec);
@@ -43,8 +45,11 @@ export const make = Effect.fn("Assignments.make")(function* () {
         "listActiveByRole",
         sql`SELECT record FROM assignments WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.source._tag') = 'Role' AND json_extract(record, '$.source.roleId') = ${roleId} AND json_extract(record, '$.status') = 'active'`,
       ),
-    insert: Effect.fn("Assignments.insert")(function* (record) {
+    insert: Effect.fn("Assignments.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(AssignmentStore, "insert")),
+      );
       if (record.workspaceId !== workspaceId || record.status !== "active")
         return yield* new AssignmentStore.Conflict({
           operation: "insert",

@@ -11,24 +11,24 @@ import { SqliteDatabase } from "./database.ts";
 import { isContention } from "./errors.ts";
 
 /** The native handle a session exposes to core. */
-export type Native = Context.Service.Shape<typeof Store.Transaction>;
+export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>;
 
 /** One open native transaction, closed when its program ends. */
-export interface Session {
-  readonly owner: SqliteDatabase.Database;
+export interface TransactionState {
+  readonly owner: SqliteDatabase.Interface;
   readonly workspaceId: Workspace.Id;
   readonly commit: Commit.Record;
   active: boolean;
 }
 
 /** The session a program runs under; statements check it against their own binding. */
-export class Current extends Context.Service<Current, Session>()(
+export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
   "@amends/storage-sqlite/binding/Current",
 ) {}
 
 export interface Interface {
   readonly workspaceId: Workspace.Id;
-  readonly database: SqliteDatabase.Database;
+  readonly database: SqliteDatabase.Interface;
   /**
    * Run a statement outside any transaction, or inside a live transaction of
    * this workspace on this database; anything else is a foreign or expired
@@ -44,7 +44,7 @@ export interface Interface {
    */
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
-    native: (session: Session) => Native,
+    native: (session: TransactionState) => TransactionHandle,
   ) => Effect.Effect<
     A,
     E | Store.Failure | Store.Conflict | Store.CommitUncertain,
@@ -77,7 +77,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
         operation: "transaction",
         cause: "Connection requires reopening after a failed transaction cleanup",
       });
-    const current = yield* Effect.serviceOption(Current);
+    const current = yield* Effect.serviceOption(CurrentTransaction);
     const native = yield* Effect.serviceOption(Store.Transaction);
     const connection = yield* Effect.serviceOption(sql.transactionService);
     if (Option.isNone(current) && Option.isNone(native) && Option.isNone(connection) && !write)
@@ -104,14 +104,14 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
     A,
     E,
     R,
-  >(program: Effect.Effect<A, E, R>, native: (session: Session) => Native) {
+  >(program: Effect.Effect<A, E, R>, native: (session: TransactionState) => TransactionHandle) {
     yield* check(false);
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* new Store.Failure({
         operation: "transaction",
         cause: "Native transactions cannot nest; use journal.commit",
       });
-    const session: Session = {
+    const session: TransactionState = {
       owner: database,
       workspaceId,
       active: true,
@@ -135,7 +135,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
             restore(
               program.pipe(
                 Effect.updateContext((context: Context.Context<R>) =>
-                  Context.add(context, Current, session),
+                  Context.add(context, CurrentTransaction, session),
                 ),
                 Effect.provideService(Store.Transaction, handle),
                 Effect.provideService(sql.transactionService, [connection, 0]),

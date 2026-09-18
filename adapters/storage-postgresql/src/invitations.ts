@@ -4,15 +4,17 @@ import { and, asc, eq, type SQL } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import type { PostgresDatabase } from "./database.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { invitationGrants, invitations } from "./schema.ts";
 import { ScopeColumns } from "./scope.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Invitation.Record));
 
 type InvitationRow = typeof invitations.$inferSelect;
 type GrantRow = typeof invitationGrants.$inferSelect;
 
 /** A row and its grants shaped as the record, with instants as strings for decoding. */
-const toRecord = (row: InvitationRow, grants: ReadonlyArray<GrantRow>) => {
+const toEncodedRecord = (row: InvitationRow, grants: ReadonlyArray<GrantRow>) => {
   const workspaceId = row.workspaceId as Workspace.Id;
   return {
     details: {
@@ -51,7 +53,7 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Invitation.Record));
  * The directory reads across workspaces through this as well.
  */
 export const select = (
-  db: PostgresDatabase.Database["db"],
+  db: PostgresDatabase.Interface["db"],
   where: SQL | undefined,
   order: ReadonlyArray<SQL>,
 ) =>
@@ -77,7 +79,9 @@ export const select = (
           grouped.set(key, entry);
         }
         return decode(
-          Array.fromIterable(grouped.values()).map(({ row, grants }) => toRecord(row, grants)),
+          Array.fromIterable(grouped.values()).map(({ row, grants }) =>
+            toEncodedRecord(row, grants),
+          ),
         );
       }),
     );
@@ -107,8 +111,11 @@ export const make = Effect.fn("Invitations.make")(function* () {
         [asc(invitations.id)],
       ),
     list: read("list", inWorkspace, [asc(invitations.issuedAt), asc(invitations.id)]),
-    insert: Effect.fn("Invitations.insert")(function* (record) {
+    insert: Effect.fn("Invitations.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(InvitationStore, "insert")),
+      );
       if (record.details.workspaceId !== workspaceId || record.state._tag !== "Pending")
         return yield* new InvitationStore.Conflict({
           operation: "insert",
@@ -141,8 +148,13 @@ export const make = Effect.fn("Invitations.make")(function* () {
           true,
         ).pipe(Effect.mapError(storeError(InvitationStore, "insert")));
     }),
-    settle: Effect.fn("Invitations.settle")(function* (id, state) {
+    settle: Effect.fn("Invitations.settle")(function* (id, input) {
       yield* Store.Transaction;
+      const state = yield* Schema.decodeEffect(
+        Schema.toType(
+          Schema.Union([Invitation.State.cases.Accepted, Invitation.State.cases.Revoked]),
+        ),
+      )(input).pipe(Effect.mapError(storeConflict(InvitationStore, "settle")));
       const rows = yield* guard(
         db
           .update(invitations)

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 /** Migrations generated from the schema by `bun run generate`; applied during construction. */
 export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
-export type Client = Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults>>;
+export type DrizzleClient = Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults>>;
 
 /**
  * One connected database: the Drizzle instance for typed statements, and the
@@ -16,12 +16,12 @@ export type Client = Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults
  * runs through that client, so a transaction the journal opens on a reserved
  * connection carries the Drizzle statements inside it.
  */
-export interface Database {
-  readonly db: Client;
+export interface Interface {
+  readonly db: DrizzleClient;
   readonly sql: SqlClient.SqlClient;
 }
 
-export class Service extends Context.Service<Service, Database>()(
+export class Service extends Context.Service<Service, Interface>()(
   "@amends/storage-postgresql/database/Service",
 ) {}
 

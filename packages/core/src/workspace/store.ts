@@ -17,7 +17,7 @@ export interface Interface {
   readonly workspaceId: Workspace.Id;
   /** Read the current transaction, or committed state when called outside one. */
   readonly get: Effect.Effect<Option.Option<Workspace.Record>, Failure>;
-  /** Insert once, rejecting an existing record or a different workspace. Never overwrite ownership. */
+  /** Insert once; invalid records, duplicate creation, and a different workspace conflict. Never overwrite ownership. */
   readonly insert: (
     record: Workspace.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;

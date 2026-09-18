@@ -2,8 +2,10 @@ import { Store } from "@amends/core/journal";
 import { Workspace, WorkspaceStore } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { makeRecordDecoder } from "./record-column.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Workspace.Record));
 
 const codec = Schema.fromJsonString(Workspace.Record);
 const decode = makeRecordDecoder(codec);
@@ -24,8 +26,11 @@ export const make = Effect.fn("Workspaces.make")(function* () {
       Effect.map(Array.head),
       Effect.mapError(storeFailure(WorkspaceStore, "get")),
     ),
-    insert: Effect.fn("Workspaces.insert")(function* (record) {
+    insert: Effect.fn("Workspaces.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(WorkspaceStore, "insert")),
+      );
       if (record.id !== workspaceId)
         return yield* new WorkspaceStore.Conflict({
           operation: "insert",

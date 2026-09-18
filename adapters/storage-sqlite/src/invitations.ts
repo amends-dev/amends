@@ -3,8 +3,10 @@ import { Invitation, InvitationStore } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import type { Statement } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { makeRecordDecoder } from "./record-column.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Invitation.Record));
 
 export const codec = Schema.fromJsonString(Invitation.Record);
 const decode = makeRecordDecoder(codec);
@@ -47,8 +49,11 @@ export const make = Effect.fn("Invitations.make")(function* () {
       "list",
       sql`SELECT record FROM invitations WHERE workspace_id = ${workspaceId} ORDER BY json_extract(record, '$.details.issuedAt'), id`,
     ),
-    insert: Effect.fn("Invitations.insert")(function* (record) {
+    insert: Effect.fn("Invitations.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(InvitationStore, "insert")),
+      );
       if (record.details.workspaceId !== workspaceId || record.state._tag !== "Pending")
         return yield* new InvitationStore.Conflict({
           operation: "insert",
@@ -65,7 +70,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
     settle: Effect.fn("Invitations.settle")(function* (id, state) {
       yield* Store.Transaction;
       const data = yield* encodeSettled(state).pipe(
-        Effect.mapError(storeFailure(InvitationStore, "settle")),
+        Effect.mapError(storeConflict(InvitationStore, "settle")),
       );
       const rows = yield* guard(
         sql`UPDATE invitations SET record = json_set(record, '$.state', json(${data})) WHERE workspace_id = ${workspaceId} AND id = ${id} AND json_extract(record, '$.state._tag') = 'Pending' RETURNING id`,

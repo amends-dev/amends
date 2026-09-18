@@ -3,11 +3,13 @@ import { Workspace, WorkspaceStore } from "@amends/core/workspace";
 import { eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { workspaces } from "./schema.ts";
 
+const validateRecord = Schema.decodeEffect(Schema.toType(Workspace.Record));
+
 /** Selected in the record's shape; decoding checks the brands. */
-const record = {
+const recordColumns = {
   id: workspaces.workspaceId,
   createdBy: workspaces.createdBy,
   ownerMemberId: workspaces.ownerMemberId,
@@ -25,13 +27,16 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   const own = eq(workspaces.workspaceId, workspaceId);
   return WorkspaceStore.Service.of({
     workspaceId,
-    get: guard(db.select(record).from(workspaces).where(own)).pipe(
+    get: guard(db.select(recordColumns).from(workspaces).where(own)).pipe(
       Effect.flatMap(decode),
       Effect.map(Array.head),
       Effect.mapError(storeFailure(WorkspaceStore, "get")),
     ),
-    insert: Effect.fn("Workspaces.insert")(function* (record) {
+    insert: Effect.fn("Workspaces.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(WorkspaceStore, "insert")),
+      );
       if (record.id !== workspaceId)
         return yield* new WorkspaceStore.Conflict({
           operation: "insert",

@@ -2,18 +2,17 @@ import { Commit, Entry, Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
 import type { SqlError } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
-const Headers = Schema.Array(
-  Schema.Struct({
-    logId: Entry.LogId,
-    position: Entry.Position,
-    id: Commit.Id,
-    recordedAt: Schema.DateTimeUtcFromString,
-    entryCount: Schema.Natural,
-  }),
-);
-const Entries = Schema.Array(Entry.Record);
+const BatchHeaderRow = Schema.Struct({
+  logId: Entry.LogId,
+  position: Entry.Position,
+  commitId: Commit.Id,
+  recordedAt: Schema.DateTimeUtcFromString,
+  entryCount: Schema.Natural,
+});
+const BatchHeaderRows = Schema.Array(BatchHeaderRow);
+const EntryRows = Schema.Array(Entry.Record);
 
 /**
  * The workspace's logs: appends inside a transaction, reads of committed batches, and waiting.
@@ -26,21 +25,23 @@ export const make = Effect.fn("Journal.make")(function* () {
 
   const entries = (logId: Entry.LogId, commitId: Commit.Id) =>
     sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${commitId} ORDER BY entry_index`.pipe(
-      Effect.flatMap(Schema.decodeUnknownEffect(Entries)),
+      Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)),
     );
 
   /** Complete batches for the selected headers, each with its entries in index order. */
   const batches = Effect.fnUntraced(function* (
     headers: Effect.Effect<ReadonlyArray<unknown>, SqlError.SqlError>,
   ) {
-    const selected = yield* headers.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Headers)));
+    const selected = yield* headers.pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(BatchHeaderRows)),
+    );
     return yield* Effect.forEach(
       selected,
       Effect.fnUntraced(function* (row): Effect.fn.Return<
         Store.Batch,
         SqlError.SqlError | Schema.SchemaError | Store.Failure
       > {
-        const values = yield* entries(row.logId, row.id);
+        const values = yield* entries(row.logId, row.commitId);
         if (!Array.isReadonlyArrayNonEmpty(values))
           return yield* new Store.Failure({
             operation: "read",
@@ -49,7 +50,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         return {
           logId: row.logId,
           position: row.position,
-          commit: { id: row.id, recordedAt: row.recordedAt, entryCount: row.entryCount },
+          commit: { id: row.commitId, recordedAt: row.recordedAt, entryCount: row.entryCount },
           entries: values,
         };
       }),
@@ -57,15 +58,18 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   const append = Effect.fn("Journal.append")(function* (
-    session: Binding.Session,
-    request: Store.AppendInput,
+    session: Binding.TransactionState,
+    input: Store.AppendInput,
   ) {
-    const current = yield* Effect.serviceOption(Binding.Current);
+    const current = yield* Effect.serviceOption(Binding.CurrentTransaction);
     if (!session.active || Option.isNone(current) || current.value !== session)
       return yield* new Store.Failure({
         operation: "append",
         cause: "Closed or foreign append handle",
       });
+    const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(input).pipe(
+      Effect.mapError(storeConflict(Store, "append")),
+    );
     const last =
       yield* sql`SELECT position, commit_id AS commitId FROM log_batches WHERE workspace_id = ${workspaceId} AND log_id = ${request.logId} ORDER BY position DESC LIMIT 1`.pipe(
         Effect.flatMap(
@@ -134,13 +138,13 @@ export const make = Effect.fn("Journal.make")(function* () {
     get: (logId, commitId) =>
       guard(
         batches(
-          sql`SELECT b.log_id AS logId, b.position, c.id, c.recorded_at AS recordedAt, c.entry_count AS entryCount FROM log_batches b JOIN commits c ON c.workspace_id = b.workspace_id AND c.id = b.commit_id WHERE b.workspace_id = ${workspaceId} AND b.log_id = ${logId} AND b.commit_id = ${commitId}`,
+          sql`SELECT b.log_id AS logId, b.position, c.id AS commitId, c.recorded_at AS recordedAt, c.entry_count AS entryCount FROM log_batches b JOIN commits c ON c.workspace_id = b.workspace_id AND c.id = b.commit_id WHERE b.workspace_id = ${workspaceId} AND b.log_id = ${logId} AND b.commit_id = ${commitId}`,
         ),
       ).pipe(Effect.map(Array.head), Effect.mapError(storeFailure(Store, "get"))),
     read: (logId, options) =>
       guard(
         batches(
-          sql`SELECT b.log_id AS logId, b.position, c.id, c.recorded_at AS recordedAt, c.entry_count AS entryCount FROM log_batches b JOIN commits c ON c.workspace_id = b.workspace_id AND c.id = b.commit_id WHERE b.workspace_id = ${workspaceId} AND b.log_id = ${logId} AND b.position > ${options.after ?? -1} ORDER BY b.position LIMIT ${options.limit}`,
+          sql`SELECT b.log_id AS logId, b.position, c.id AS commitId, c.recorded_at AS recordedAt, c.entry_count AS entryCount FROM log_batches b JOIN commits c ON c.workspace_id = b.workspace_id AND c.id = b.commit_id WHERE b.workspace_id = ${workspaceId} AND b.log_id = ${logId} AND b.position > ${options.after ?? -1} ORDER BY b.position LIMIT ${options.limit}`,
         ),
       ).pipe(Effect.mapError(storeFailure(Store, "read"))),
     waitForAppend: Effect.fn("Journal.waitForAppend")(function* (logId, after) {

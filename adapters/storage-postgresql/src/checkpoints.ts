@@ -2,7 +2,7 @@ import { Checkpoint, Store } from "@amends/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { checkpoints } from "./schema.ts";
 
 /**
@@ -39,8 +39,14 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
       );
       return Array.head(rows);
     }),
-    set: Effect.fn("Checkpoints.set")(function* (key, cursor) {
+    set: Effect.fn("Checkpoints.set")(function* (inputKey, inputCursor) {
       yield* Store.Transaction;
+      const key = yield* Schema.decodeEffect(Checkpoint.Key)(inputKey).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.set")),
+      );
+      const cursor = yield* Schema.decodeEffect(Schema.toType(Checkpoint.Cursor))(inputCursor).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.set")),
+      );
       const progress = {
         position: cursor.position,
         commitId: cursor.commitId,

@@ -1,10 +1,10 @@
 import { Checkpoint, Store } from "@amends/core/journal";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
-const cursor = Schema.fromJsonString(Checkpoint.Cursor);
-const Rows = Schema.Array(Schema.Struct({ record: cursor }));
+const cursorCodec = Schema.fromJsonString(Checkpoint.Cursor);
+const CheckpointRows = Schema.Array(Schema.Struct({ record: cursorCodec }));
 
 /**
  * Each projection version's progress through one log, written with the projection's rows.
@@ -19,13 +19,19 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
       guard(
         sql`SELECT record FROM checkpoints WHERE workspace_id = ${workspaceId} AND log_id = ${key.logId} AND name = ${key.name} AND version = ${key.version}`,
       ).pipe(
-        Effect.flatMap(Schema.decodeUnknownEffect(Rows)),
+        Effect.flatMap(Schema.decodeUnknownEffect(CheckpointRows)),
         Effect.map((rows) => Option.map(Array.head(rows), (row) => row.record)),
         Effect.mapError(storeFailure(Store, "checkpoint.get")),
       ),
-    set: Effect.fn("Checkpoints.set")(function* (key, value) {
+    set: Effect.fn("Checkpoints.set")(function* (inputKey, inputCursor) {
       yield* Store.Transaction;
-      const record = yield* Schema.encodeEffect(cursor)(value).pipe(
+      const key = yield* Schema.decodeEffect(Checkpoint.Key)(inputKey).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.set")),
+      );
+      const value = yield* Schema.decodeEffect(Schema.toType(Checkpoint.Cursor))(inputCursor).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.set")),
+      );
+      const record = yield* Schema.encodeEffect(cursorCodec)(value).pipe(
         Effect.mapError(storeFailure(Store, "checkpoint.set")),
       );
       yield* guard(

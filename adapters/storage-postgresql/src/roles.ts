@@ -3,8 +3,10 @@ import { Store } from "@amends/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { roles } from "./schema.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Role.Record));
 
 /** The table's columns already have the record's names; decoding checks brands and uniqueness. */
 const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
@@ -49,8 +51,11 @@ export const make = Effect.fn("Roles.make")(function* () {
         Effect.map(Array.head),
         Effect.mapError(storeFailure(RoleStore, "get")),
       ),
-    insert: Effect.fn("Roles.insert")(function* (record) {
+    insert: Effect.fn("Roles.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(RoleStore, "insert")),
+      );
       if (record.workspaceId !== workspaceId)
         return yield* new RoleStore.Conflict({
           operation: "insert",
@@ -66,9 +71,18 @@ export const make = Effect.fn("Roles.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(RoleStore, "insert")));
     }),
-    rename: (id, name) => edit("rename", id, { name }),
-    setPermissions: (id, permissions) =>
-      edit("setPermissions", id, { permissions: [...permissions] }),
+    rename: Effect.fn("Roles.rename")(function* (id, name) {
+      const validated = yield* Schema.decodeEffect(Role.Record.fields.name)(name).pipe(
+        Effect.mapError(storeConflict(RoleStore, "rename")),
+      );
+      yield* edit("rename", id, { name: validated });
+    }),
+    setPermissions: Effect.fn("Roles.setPermissions")(function* (id, permissions) {
+      const validated = yield* Schema.decodeEffect(Schema.toType(Role.Record.fields.permissions))(
+        permissions,
+      ).pipe(Effect.mapError(storeConflict(RoleStore, "setPermissions")));
+      yield* edit("setPermissions", id, { permissions: [...validated] });
+    }),
   });
 });
 

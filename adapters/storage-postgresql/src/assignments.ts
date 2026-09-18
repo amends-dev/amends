@@ -4,12 +4,14 @@ import type { Workspace } from "@amends/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { assignments } from "./schema.ts";
 import { ScopeColumns } from "./scope.ts";
 
+const validateRecord = Schema.decodeEffect(Schema.toType(Assignment.Record));
+
 /** A row is one of two source cases, so it is shaped in code before decoding checks it. */
-const toRecord = (row: typeof assignments.$inferSelect) => {
+const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
   const scope = ScopeColumns.decode(row.workspaceId as Workspace.Id, row);
   return {
     id: row.id,
@@ -35,7 +37,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
   const inWorkspace = eq(assignments.workspaceId, workspaceId);
   const select = (operation: string, where: SQL | undefined) =>
     guard(db.select().from(assignments).where(where).orderBy(assignments.id)).pipe(
-      Effect.flatMap((rows) => decode(rows.map(toRecord))),
+      Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
   return AssignmentStore.Service.of({
@@ -56,8 +58,11 @@ export const make = Effect.fn("Assignments.make")(function* () {
           eq(assignments.status, "active"),
         ),
       ),
-    insert: Effect.fn("Assignments.insert")(function* (record) {
+    insert: Effect.fn("Assignments.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(AssignmentStore, "insert")),
+      );
       if (record.workspaceId !== workspaceId || record.status !== "active")
         return yield* new AssignmentStore.Conflict({
           operation: "insert",

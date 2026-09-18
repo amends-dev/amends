@@ -3,8 +3,10 @@ import { Member, MemberStore } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import type { Statement } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { makeRecordDecoder } from "./record-column.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Member.Record));
 
 const codec = Schema.fromJsonString(Member.Record);
 const decode = makeRecordDecoder(codec);
@@ -45,8 +47,11 @@ export const make = Effect.fn("Members.make")(function* () {
       "list",
       sql`SELECT record FROM members WHERE workspace_id = ${workspaceId} ORDER BY id`,
     ),
-    insert: Effect.fn("Members.insert")(function* (record) {
+    insert: Effect.fn("Members.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(MemberStore, "insert")),
+      );
       if (record.workspaceId !== workspaceId || record.status !== "active")
         return yield* new MemberStore.Conflict({
           operation: "insert",

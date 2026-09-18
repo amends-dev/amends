@@ -16,6 +16,63 @@ storage contract at the edge.
 Each adapter extends `../../tsconfig.base.json`, enables its own runtime types, and
 provides a `typecheck` script.
 
+## Organization and naming
+
+Keep one focused module per store and matching filenames across adapters.
+Database setup, workspace binding, directory reads, and storage composition are
+separate responsibilities. Add a feature directory when a store needs several
+related modules. Database tables and migrations belong to the adapter; domain
+models and store contracts belong to core.
+
+Use the same representation vocabulary in both adapters:
+
+| Name                 | Meaning                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Interface`          | A context service's contract, including `SqliteDatabase.Interface` and `PostgresDatabase.Interface`. |
+| `DrizzleClient`      | PostgreSQL's Drizzle facade, distinct from its Effect SQL client.                                    |
+| `TransactionHandle`  | The native transaction handle exposed to core.                                                       |
+| `TransactionState`   | Mutable ownership and lifetime state for one transaction.                                            |
+| `CurrentTransaction` | The invocation context used by a workspace binding's guard.                                          |
+| `Row` / `Rows`       | A selected database row or collection, such as `BatchHeaderRow` and `EntryRows`.                     |
+| `Columns`            | A selection or write mapping, such as `recordColumns`.                                               |
+| `Record`             | A validated domain value from core.                                                                  |
+| `EncodedRecord`      | A record's encoded representation, assembled before schema decoding.                                 |
+
+Private row schemas do not need public schema identifiers. Conversion helpers
+such as `toEncodedRecord` assemble data; schema decoding validates it. Keep the
+distinction visible in names and return types.
+
+Package roots expose database, storage, directory, and composed layers. Workspace
+bindings, their transaction context, raw tables, and the intermediate store-layer
+merge remain internal. Use `Storage.layerWorkspace(...)` to build the complete
+set of stores over a binding. Preserve service keys, table names, encoded fields,
+and migration identifiers when reorganizing source.
+
+## Validation at the storage boundary
+
+Validate decoded domain records before converting them into JSON or SQL columns.
+Use the matching core schema through `Schema.decodeEffect(Schema.toType(...))`;
+a TypeScript type alone does not enforce schema refinements. Validate edited
+fields against the owning record's field schemas. Validate terminal invitation
+states, checkpoint keys/cursors, and native append input before writing them.
+
+Validation must precede any lossy mapping. PostgreSQL stores a scope's workspace
+on its containing row, so assignments and invitations must pass their complete
+record checks before that workspace ID is omitted from scope columns. Successful
+writes must preserve the submitted value's meaning.
+
+Rejected write values become the store's `Conflict` through `storeConflict`.
+Workspace mismatches, invalid initial states, and conditional-write conflicts
+also remain `Conflict`. Encoding failures after validation and infrastructure
+failures remain `Failure`; malformed stored rows fail during reads. Keep these
+categories consistent between adapters and with the core contracts.
+
+Run all writes under the active workspace transaction. Validation failures leave
+no partial rows; callers can handle a validation conflict before another write,
+while an unhandled failure rolls back the enclosing transaction. Database-rejected
+statements still follow the database's transaction semantics, including
+PostgreSQL's aborted-transaction behavior.
+
 ## Constructors and layers
 
 Follow the [shared-package conventions](../packages/README.md#constructors-and-layers):
@@ -44,7 +101,7 @@ Acquire the database once and share it across workspace views. Direct callers mu
 keep the client's owning scope alive while using the database, bindings, or stores.
 The database layer manages the driver scope when it opens the connection or pool.
 
-The storage modules export `layerStores` for the merged stores and
+The storage modules merge stores in a private `layerStores` composition and export
 `layerWorkspace(workspaceId, ...)` for stores over one binding. Their `make`
 constructs `WorkspaceStorage.Service`; `forWorkspace` builds these inexpensive
 views on demand. Those views acquire no resources of their own, so their build
@@ -61,3 +118,16 @@ Helpers that construct reusable values use specific names, such as
 error mappings retain their library or operation names. Workspace identity is
 captured during construction; the current transaction is checked during each
 operation. Constructors do not create workspaces or cache an actor or transaction.
+
+## Testing and migrations
+
+Tests are grouped by database construction, transactions, journal behavior,
+authorization, gateway workflows, and invitations. Each adapter owns its database
+fixtures in `test/support.ts`; database-specific behavior stays in that adapter's
+tests. Keep the scenarios in both `test/contracts.test.ts` files aligned. They
+exercise direct store calls, so core's application validation cannot hide an
+adapter's missing checks.
+
+Treat applied migrations as immutable. SQLite's migration declarations live in
+`src/migrations.ts`; PostgreSQL's generated migrations live in `drizzle/`.
+Source-only validation and naming changes do not rewrite existing migrations.

@@ -2,8 +2,10 @@ import { Role, RoleStore } from "@amends/core/authorization";
 import { Store } from "@amends/core/journal";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { makeRecordDecoder } from "./record-column.ts";
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Role.Record));
 
 const codec = Schema.fromJsonString(Role.Record);
 const decode = makeRecordDecoder(codec);
@@ -46,8 +48,11 @@ export const make = Effect.fn("Roles.make")(function* () {
         Effect.map(Array.head),
         Effect.mapError(storeFailure(RoleStore, "get")),
       ),
-    insert: Effect.fn("Roles.insert")(function* (record) {
+    insert: Effect.fn("Roles.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(RoleStore, "insert")),
+      );
       if (record.workspaceId !== workspaceId)
         return yield* new RoleStore.Conflict({
           operation: "insert",
@@ -59,10 +64,15 @@ export const make = Effect.fn("Roles.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(RoleStore, "insert")));
     }),
-    rename: (id, name) => edit("rename", id, "$.name", name),
+    rename: Effect.fn("Roles.rename")(function* (id, name) {
+      const validated = yield* Schema.decodeEffect(Role.Record.fields.name)(name).pipe(
+        Effect.mapError(storeConflict(RoleStore, "rename")),
+      );
+      yield* edit("rename", id, "$.name", validated);
+    }),
     setPermissions: Effect.fn("Roles.setPermissions")(function* (id, permissions) {
       const data = yield* encodePermissions(permissions).pipe(
-        Effect.mapError(storeFailure(RoleStore, "setPermissions")),
+        Effect.mapError(storeConflict(RoleStore, "setPermissions")),
       );
       yield* edit("setPermissions", id, "$.permissions", data, true);
     }),

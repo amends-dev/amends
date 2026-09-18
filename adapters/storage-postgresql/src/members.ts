@@ -3,11 +3,13 @@ import { Member, MemberStore } from "@amends/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { members } from "./schema.ts";
 
+const validateRecord = Schema.decodeEffect(Schema.toType(Member.Record));
+
 /** Selected in the record's shape; decoding checks the brands and the identity union. */
-const record = {
+const recordColumns = {
   id: members.id,
   workspaceId: members.workspaceId,
   identity: { _tag: members.identityKind, id: members.identityId },
@@ -25,7 +27,7 @@ export const make = Effect.fn("Members.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(members.workspaceId, workspaceId);
   const select = (operation: string, where: SQL | undefined) =>
-    guard(db.select(record).from(members).where(where).orderBy(members.id)).pipe(
+    guard(db.select(recordColumns).from(members).where(where).orderBy(members.id)).pipe(
       Effect.flatMap(decode),
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
@@ -46,8 +48,11 @@ export const make = Effect.fn("Members.make")(function* () {
         Array.head,
       ),
     list: select("list", inWorkspace),
-    insert: Effect.fn("Members.insert")(function* (record) {
+    insert: Effect.fn("Members.insert")(function* (input) {
       yield* Store.Transaction;
+      const record = yield* validateRecord(input).pipe(
+        Effect.mapError(storeConflict(MemberStore, "insert")),
+      );
       if (record.workspaceId !== workspaceId || record.status !== "active")
         return yield* new MemberStore.Conflict({
           operation: "insert",

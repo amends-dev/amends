@@ -1,3 +1,4 @@
+import type { Schema } from "effect";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { Cause, Option } from "effect";
 import { SqlError } from "effect/unstable/sql";
@@ -29,6 +30,12 @@ export interface StoreErrors<C, F> {
   readonly Conflict: new (fields: { readonly operation: string; readonly message: string }) => C;
   readonly Failure: new (fields: { readonly operation: string; readonly cause: unknown }) => F;
 }
+
+/** Reject invalid write input before any statement changes stored state. */
+export const storeConflict =
+  <C>(errors: Pick<StoreErrors<C, never>, "Conflict">, operation: string) =>
+  (cause: Schema.SchemaError): C =>
+    new errors.Conflict({ operation, message: cause.message });
 
 /** Report a read's failure as the store's own failure; reads never conflict. */
 export const storeFailure =

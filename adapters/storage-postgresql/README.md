@@ -26,10 +26,19 @@ it implements: `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`,
 `roles.ts`, `assignments.ts`, and `invitations.ts`. They share `binding.ts`,
 which is one workspace's view of the database: its identity, the transaction
 boundary, and the guard each statement runs under. `storage.ts` exports
-`layerStores` and `layerWorkspace(workspaceId, options)` to compose the store
-layers over a binding for the requested workspace; adding a store means adding
-its module and one line to that merge. `database.ts` connects and migrates,
-`directory.ts` reads across workspaces, and `schema.ts` holds the tables.
+`layerWorkspace(workspaceId, options)` to compose the store layers over a binding
+for the requested workspace. Its private `layerStores` merge registers each store.
+`database.ts` prepares an existing SQL client in `make` and acquires the pool in
+`layer`; `directory.ts` reads across workspaces, and `schema.ts` holds the tables.
+Bindings and raw tables are internal to the adapter's public package surface.
+
+Follow the [adapter naming and validation conventions](../README.md).
+`PostgresDatabase.Interface` holds the `DrizzleClient` and the Effect SQL client.
+Records are validated before converting them to columns, including scope/workspace
+consistency and invitation expiry. Edited fields use their core schemas.
+Invalid write values return the corresponding store's `Conflict` before any
+statement changes data. Query results are assembled as encoded records and then
+decoded with core schemas; corrupt rows remain `Failure` outcomes.
 
 ## Transactions
 
@@ -68,3 +77,11 @@ it afterwards. Without either, the tests skip. Each test creates its own databas
 and drops it when done.
 Construction tests cover both `make` and `layer`, including initialization of all
 stores and reopening without data loss.
+
+The suites separate database construction, transactions, journal behavior,
+authorization, gateway workflows, and invitations. Each file creates its fixture
+through `support.ts` and owns its test-cluster cleanup. `contracts.test.ts` runs
+the same direct-store rejection and round-trip scenarios as SQLite, including
+role validation, every foreign scope shape, invalid invitation expiry, checkpoint
+validation, and rollback. Engine-specific locking and aborted-transaction tests
+remain separate from these shared contract expectations.

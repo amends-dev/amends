@@ -40,7 +40,7 @@ export interface Interface {
 
   /**
    * Insert an active record belonging to this workspace. Fail with Conflict for a
-   * workspace mismatch, inactive record, reused member ID (including removed
+   * schema violation, workspace mismatch, inactive record, reused member ID (including removed
    * memberships), or an identity with an existing active membership. Never upsert.
    */
   readonly insert: (

@@ -2,17 +2,17 @@ import { Commit, Entry, Store } from "@amends/core/journal";
 import { and, asc, count, desc, eq, gt, inArray } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeError, storeFailure } from "./errors.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { commits, logBatches, logEntries } from "./schema.ts";
 
-const Header = Schema.Struct({
+const BatchHeaderRow = Schema.Struct({
   logId: Entry.LogId,
   position: Entry.Position,
   commitId: Commit.Id,
   recordedAt: Schema.DateTimeUtcFromDate,
   entryCount: Schema.Natural,
 });
-const Entries = Schema.Array(
+const EntryRows = Schema.Array(
   Schema.Struct({
     ...Entry.Metadata.fields,
     recordedAt: Schema.DateTimeUtcFromDate,
@@ -61,7 +61,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     selection: Effect.Effect<ReadonlyArray<unknown>, unknown>,
   ) {
     const selected = yield* selection.pipe(
-      Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(Header))),
+      Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(BatchHeaderRow))),
     );
     if (!Array.isReadonlyArrayNonEmpty(selected)) return [];
     const rows = yield* db
@@ -78,7 +78,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         ),
       )
       .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
-      .pipe(Effect.flatMap(Schema.decodeUnknownEffect(Entries)));
+      .pipe(Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)));
     const byPosition = Array.groupBy(rows, (row) => String(row.position));
     return yield* Effect.forEach(selected, (header) => {
       const values = byPosition[String(header.position)];
@@ -101,15 +101,18 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   const append = Effect.fn("Journal.append")(function* (
-    session: Binding.Session,
-    request: Store.AppendInput,
+    session: Binding.TransactionState,
+    input: Store.AppendInput,
   ) {
-    const current = yield* Effect.serviceOption(Binding.Current);
+    const current = yield* Effect.serviceOption(Binding.CurrentTransaction);
     if (!session.active || Option.isNone(current) || current.value !== session)
       return yield* new Store.Failure({
         operation: "append",
         cause: "Closed or foreign append handle",
       });
+    const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(input).pipe(
+      Effect.mapError(storeConflict(Store, "append")),
+    );
     const last = yield* db
       .select({ position: logBatches.position, commitId: logBatches.commitId })
       .from(logBatches)
