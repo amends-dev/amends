@@ -2,6 +2,7 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "ignorePatterns": [
     "repos/**",
+    "adapters/*/drizzle/**",
     "design-system/*.dc.html",
     "design-system/support.js",
     "**/node_modules/**",

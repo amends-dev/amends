@@ -32,8 +32,13 @@ currently run through TypeScript. Check compatibility before changing this setup
   directory. `api-http` is the HTTP contract shared by servers and clients, and
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
   over the same gateway rather than new gateway methods.
+- `adapters/*`: implementations of gateway contracts over one external system, with
+  that system's dependencies. `storage-postgresql` implements workspace storage and
+  the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one
+  column per record field. Hosts compose adapters; shared packages never depend on them.
 - `hosts/*`: runtime composition and adapters, such as the Bun host in `hosts/local`,
-  which serves the HTTP API over SQLite with development sign-in and credentials.
+  which serves the HTTP API over SQLite, or over PostgreSQL through the adapter when
+  `AMENDS_DATABASE_URL` is set, with development sign-in and credentials.
   Hosts may install their runtime's dependencies and consume shared packages. A host
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may

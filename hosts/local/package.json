@@ -12,6 +12,7 @@
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/server-http": "workspace:*",
+    "@amends/storage-postgresql": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
     "effect": "catalog:"

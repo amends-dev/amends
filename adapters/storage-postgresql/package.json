@@ -1,0 +1,25 @@
+{
+  "name": "@amends/storage-postgresql",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "generate": "drizzle-kit generate",
+    "test": "bun test test"
+  },
+  "dependencies": {
+    "@amends/core": "workspace:*",
+    "@amends/gateway": "workspace:*",
+    "@effect/sql-pg": "catalog:",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "catalog:",
+    "drizzle-kit": "1.0.0-rc.5-5935859"
+  }
+}
