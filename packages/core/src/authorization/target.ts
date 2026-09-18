@@ -1,5 +1,5 @@
 import { Record, Schema } from "effect";
-import { Member } from "../workspace/member.ts";
+import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
 
 /** A concrete authorization target within a workspace, not a grant's scope. */

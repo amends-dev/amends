@@ -1,23 +1,24 @@
 import { Array, Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import { Codec } from "./codec.ts";
 import { Commit } from "./commit.ts";
-import { Entry } from "./entry.ts";
+import { Entry as StoredEntry } from "./entry.ts";
 import { Store } from "./store.ts";
 import { Transaction } from "./transaction.ts";
 
-export const Id = Entry.LogId;
-export type Id = Entry.LogId;
-export const Position = Entry.Position;
-export type Position = Entry.Position;
+export const Id = StoredEntry.LogId;
+export type Id = StoredEntry.LogId;
+export const Position = StoredEntry.Position;
+export type Position = StoredEntry.Position;
 
-export interface Value<A> extends Entry.Metadata {
+/** A log entry with its payload decoded by the log's schema. */
+export interface Entry<A> extends StoredEntry.Metadata {
   readonly payload: A;
 }
 export interface Batch<A> {
   readonly logId: Id;
   readonly position: Position;
   readonly commit: Commit.Record;
-  readonly entries: ReadonlyArray<Value<A>>;
+  readonly entries: ReadonlyArray<Entry<A>>;
 }
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()("Log.InvalidResponse", {
   message: Schema.String,
@@ -37,7 +38,7 @@ export interface Handle<S extends Schema.Constraint> {
     value: S["Type"],
     options?: Store.AppendOptions,
   ) => Effect.Effect<
-    Value<S["Type"]>,
+    Entry<S["Type"]>,
     WriteError,
     Transaction.Remaining<S["EncodingServices"] | S["DecodingServices"]>
   >;
@@ -45,7 +46,7 @@ export interface Handle<S extends Schema.Constraint> {
     values: ReadonlyArray<S["Type"]>,
     options?: Store.AppendOptions,
   ) => Effect.Effect<
-    ReadonlyArray<Value<S["Type"]>>,
+    ReadonlyArray<Entry<S["Type"]>>,
     WriteError,
     Transaction.Remaining<S["EncodingServices"] | S["DecodingServices"]>
   >;
@@ -143,7 +144,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         batch.logId === id ? undefined : "Batch belongs to a different log",
       ),
     );
-    const decodeEntry = Effect.fnUntraced(function* (entry: Entry.Record) {
+    const decodeEntry = Effect.fnUntraced(function* (entry: StoredEntry.Record) {
       return {
         id: entry.id,
         logId: entry.logId,
@@ -172,12 +173,12 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
           const request = yield* validateAppend(options);
           const native = yield* Store.Transaction;
           const payloads = yield* Effect.forEach(values, codec.encode);
-          const responseSchema = Schema.Array(Schema.toType(Entry.Record)).check(
+          const responseSchema = Schema.Array(Schema.toType(StoredEntry.Record)).check(
             Schema.makeFilter((entries) => {
               if (entries.length !== payloads.length)
                 return "Append response count does not match the request";
               const ids = new Set<string>();
-              let previous: Entry.Record | undefined;
+              let previous: StoredEntry.Record | undefined;
               for (const [index, entry] of entries.entries()) {
                 const payload = payloads[index];
                 if (entry.logId !== id || entry.commitId !== native.id)

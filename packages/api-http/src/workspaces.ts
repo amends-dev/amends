@@ -7,7 +7,9 @@ import * as Errors from "./errors.ts";
 export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
   .add(
     HttpApiEndpoint.post("create", "/", {
-      success: Workspace.Record.pipe(HttpApiSchema.status(201)),
+      success: Workspace.Record.pipe(HttpApiSchema.status(201)).annotate({
+        identifier: "CreatedWorkspace",
+      }),
       error: [Errors.HumanRequired, Errors.Conflict, Errors.Uncertain, Errors.InvalidInput],
     }),
   )

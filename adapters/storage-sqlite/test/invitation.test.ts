@@ -16,7 +16,7 @@ import { Checkpoint, Journal, Log, Store } from "@amends/core/journal";
 import {
   Invitation,
   InvitationApplication,
-  InvitationJournal,
+  InvitationProjection,
   InvitationPermissions,
   InvitationStore,
   Member,
@@ -26,7 +26,9 @@ import {
   MemberProjection,
   MemberStore,
   Workspace,
+  WorkspaceFacts,
   WorkspaceInitialization,
+  WorkspaceProjection,
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Gateway, type WorkspaceStorage } from "@amends/gateway";
@@ -88,7 +90,7 @@ const request = (
   workspaceId: Workspace.Id,
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
-): Invitation.Request => ({
+): Invitation.IssueInput => ({
   recipientId,
   expiresAt,
   grants: [Grant.make(MemberPermissions.Read, scope(workspaceId))],
@@ -456,7 +458,7 @@ test("failed acceptance checkpoint rolls back membership, assignments, consumpti
           context: Context.add(bound.context, Checkpoint.Service, {
             ...bound.checkpoints,
             set: (key, cursor) =>
-              key.name === InvitationJournal.projection.name && cursor.index === 2
+              key.name === InvitationProjection.definition.name && cursor.index === 2
                 ? Effect.fail(error)
                 : bound.checkpoints.set(key, cursor),
           }),
@@ -533,7 +535,7 @@ test("removal and pending invitation revocation roll back together, commit once,
           context: Context.add(bound.context, Checkpoint.Service, {
             ...bound.checkpoints,
             set: (key, cursor) =>
-              key.name === InvitationJournal.projection.name && cursor.index === 2
+              key.name === InvitationProjection.definition.name && cursor.index === 2
                 ? Effect.fail(error)
                 : bound.checkpoints.set(key, cursor),
           }),
@@ -606,7 +608,7 @@ test("removal and pending invitation revocation roll back together, commit once,
           Effect.gen(function* () {
             yield* sql`DELETE FROM members WHERE workspace_id = ${workspace.id}`;
             yield* sql`DELETE FROM invitations WHERE workspace_id = ${workspace.id}`;
-            yield* sql`DELETE FROM checkpoints WHERE workspace_id = ${workspace.id} AND name IN (${MemberProjection.definition.name}, ${InvitationJournal.projection.name})`;
+            yield* sql`DELETE FROM checkpoints WHERE workspace_id = ${workspace.id} AND name IN (${MemberProjection.definition.name}, ${InvitationProjection.definition.name})`;
           }),
         );
         expect(yield* Operations.getMember(workspace.id, alice, member.id)).toMatchObject({
@@ -643,7 +645,7 @@ test("old workspaces explicitly enable invitations once and catch up the new pro
         const legacy = Journal.make({
           logId: Log.Id.make("journal"),
           projections: [
-            WorkspaceInitialization.projection,
+            WorkspaceProjection.definition,
             MemberProjection.definition,
             RoleProjection.definition,
             AssignmentProjection.definition,
@@ -653,7 +655,7 @@ test("old workspaces explicitly enable invitations once and catch up the new pro
           const journal = yield* legacy;
           yield* journal.commit(
             Effect.gen(function* () {
-              yield* journal.publish(WorkspaceInitialization.Initialized, {
+              yield* journal.publish(WorkspaceFacts.Initialized, {
                 id: workspaceId,
                 createdBy: alice.id,
                 ownerMemberId: memberId,

@@ -58,7 +58,7 @@ export const make = Effect.fn("Journal.make")(function* () {
 
   const append = Effect.fn("Journal.append")(function* (
     session: Binding.Session,
-    request: Store.Append,
+    request: Store.AppendInput,
   ) {
     const current = yield* Effect.serviceOption(Binding.Current);
     if (!session.active || Option.isNone(current) || current.value !== session)

@@ -46,7 +46,7 @@ export const removeMember = (
 export const invite = (
   workspaceId: Workspace.Id,
   identity: Identity.Reference,
-  request: Invitation.Request,
+  request: Invitation.IssueInput,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
     gateway.asMember(

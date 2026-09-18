@@ -1,14 +1,14 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Store } from "../journal/store.ts";
-import type { Member } from "../workspace/member.ts";
+import type { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
-import { AssignmentStore } from "./assignment-store.ts";
-import { Assignment } from "./assignment.ts";
+import { AssignmentStore } from "./assignment/store.ts";
+import { Assignment } from "./assignment/assignment.ts";
 import { Grant } from "./grant.ts";
 import { PermissionCatalog } from "./permission-catalog.ts";
 import type { Permission } from "./permission.ts";
-import { RoleStore } from "./role-store.ts";
-import { Role } from "./role.ts";
+import { RoleStore } from "./role/store.ts";
+import { Role } from "./role/role.ts";
 import type { Scope } from "./scope.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(

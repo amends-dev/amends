@@ -1,15 +1,15 @@
 import { Array, Context, DateTime, Deferred, Effect, Option, Ref, Schema, Semaphore } from "effect";
-import { Assignment } from "../src/authorization/assignment.ts";
-import { AssignmentStore } from "../src/authorization/assignment-store.ts";
-import { Role } from "../src/authorization/role.ts";
-import { RoleStore } from "../src/authorization/role-store.ts";
+import { Assignment } from "../src/authorization/assignment/assignment.ts";
+import { AssignmentStore } from "../src/authorization/assignment/store.ts";
+import { Role } from "../src/authorization/role/role.ts";
+import { RoleStore } from "../src/authorization/role/store.ts";
 import type { Scope } from "../src/authorization/scope.ts";
 import { Commit } from "../src/journal/commit.ts";
 import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Entry } from "../src/journal/entry.ts";
 import { Store } from "../src/journal/store.ts";
-import { Member } from "../src/workspace/member.ts";
-import { MemberStore } from "../src/workspace/member-store.ts";
+import { Member } from "../src/workspace/member/member.ts";
+import { MemberStore } from "../src/workspace/member/store.ts";
 import type { Workspace } from "../src/workspace/workspace.ts";
 
 interface State {

@@ -4,44 +4,50 @@
  * runs the application operations.
  */
 import { Layer } from "effect";
-import * as Authorization from "./authorization/index.ts";
-import * as Journal from "./journal/index.ts";
-import * as Workspace from "./workspace/index.ts";
+import { AssignmentProjection } from "./authorization/assignment/projection.ts";
+import { Authorization } from "./authorization/authorization.ts";
+import { GrantResolver } from "./authorization/grant-resolver.ts";
+import { PermissionCatalog } from "./authorization/permission-catalog.ts";
+import { RoleProjection } from "./authorization/role/projection.ts";
+import { Journal } from "./journal/journal.ts";
+import { Log } from "./journal/log.ts";
+import { InvitationApplication } from "./workspace/invitation/application.ts";
+import { InvitationPermissions } from "./workspace/invitation/permissions.ts";
+import { InvitationProjection } from "./workspace/invitation/projection.ts";
+import { MemberApplication } from "./workspace/member/application.ts";
+import { MemberPermissions } from "./workspace/member/permissions.ts";
+import { MemberProjection } from "./workspace/member/projection.ts";
+import { WorkspaceProjection } from "./workspace/projection.ts";
 
 /** Projections registered for journal publication, applied in this order. */
 const projections = [
-  Workspace.WorkspaceInitialization.projection,
-  Workspace.MemberProjection.definition,
-  Authorization.RoleProjection.definition,
-  Authorization.AssignmentProjection.definition,
-  Workspace.InvitationJournal.projection,
+  WorkspaceProjection.definition,
+  MemberProjection.definition,
+  RoleProjection.definition,
+  AssignmentProjection.definition,
+  InvitationProjection.definition,
 ] as const;
 
 /** Permissions the domains declare; requirements and grants must name one of these. */
 const permissions = [
-  Workspace.MemberPermissions.Read,
-  Workspace.MemberPermissions.Remove,
-  Workspace.InvitationPermissions.Manage,
+  MemberPermissions.Read,
+  MemberPermissions.Remove,
+  InvitationPermissions.Manage,
 ];
 
 /** The domain journal and its log, over host storage. */
-const journal = Journal.Journal.layer({ logId: Journal.Log.Id.make("journal"), projections }).pipe(
-  Layer.provideMerge(Journal.Log.layer),
+const journal = Journal.layer({ logId: Log.Id.make("journal"), projections }).pipe(
+  Layer.provideMerge(Log.layer),
 );
 
 /** Authorization for the acting member, with its grant resolution. */
-const authorization = Authorization.Authorization.layer.pipe(
-  Layer.provide(Authorization.GrantResolver.layer),
-);
+const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
 
 /**
  * Application operations, sharing one journal and one authorization check. These
  * are what hosts and protocols call; stores and the journal stay internal.
  */
-const operations = Layer.mergeAll(
-  Workspace.MemberApplication.layer,
-  Workspace.InvitationApplication.layer,
-);
+const operations = Layer.mergeAll(MemberApplication.layer, InvitationApplication.layer);
 
 /**
  * Complete core for one workspace: application operations over the journal,
@@ -51,7 +57,7 @@ const operations = Layer.mergeAll(
  */
 export const layer = operations.pipe(
   Layer.provideMerge(Layer.mergeAll(journal, authorization)),
-  Layer.provide(Authorization.PermissionCatalog.layer(permissions)),
+  Layer.provide(PermissionCatalog.layer(permissions)),
 );
 
 /**

@@ -625,7 +625,7 @@ it("invitations keep their grants, instants, and terminal states across settleme
             }),
           ),
         ];
-        const details = (id: string, granted = grants): Invitation.Details => ({
+        const details = (id: string, granted = grants): Invitation.Issuance => ({
           id: Invitation.Id.make(id),
           workspaceId,
           recipientId: bob.id,

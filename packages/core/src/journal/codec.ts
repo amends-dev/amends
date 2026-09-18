@@ -3,7 +3,7 @@ import { SchemaBinary } from "effect/unstable/encoding";
 import type { Fact } from "./fact.ts";
 
 /** The same schema-derived payload format is used by every kind of log. */
-export interface Value<S extends Schema.Constraint> {
+export interface PayloadCodec<S extends Schema.Constraint> {
   /** Produces an independently owned byte buffer for storage. */
   readonly encode: (
     payload: S["Type"],
@@ -14,7 +14,8 @@ export interface Value<S extends Schema.Constraint> {
   ) => Effect.Effect<S["Type"], Schema.SchemaError, S["DecodingServices"]>;
 }
 
-export interface Interface<F extends Fact.Definition> extends Value<F["payload"]> {
+/** A payload codec paired with the fact definition it encodes. */
+export interface FactCodec<F extends Fact.Definition> extends PayloadCodec<F["payload"]> {
   readonly fact: F;
 }
 
@@ -23,7 +24,7 @@ export interface Interface<F extends Fact.Definition> extends Value<F["payload"]
  *
  * @category constructors
  */
-export const makeForSchema = <S extends Schema.Constraint>(payload: S): Value<S> => {
+export const makeForSchema = <S extends Schema.Constraint>(payload: S): PayloadCodec<S> => {
   const schema = SchemaBinary.toCodec(payload);
   const encode = Schema.encodeEffect(schema);
   const decode = Schema.decodeUnknownEffect(schema);
@@ -45,7 +46,7 @@ export const makeForSchema = <S extends Schema.Constraint>(payload: S): Value<S>
  *
  * @category constructors
  */
-export const make = <F extends Fact.Definition>(fact: F): Interface<F> => ({
+export const make = <F extends Fact.Definition>(fact: F): FactCodec<F> => ({
   fact,
   ...makeForSchema<F["payload"]>(fact.payload),
 });

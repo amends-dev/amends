@@ -1,5 +1,5 @@
 import { Context, Schema } from "effect";
-import { Member } from "../workspace/member.ts";
+import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
 import { Identity } from "./identity.ts";
 

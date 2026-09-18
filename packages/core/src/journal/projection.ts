@@ -17,7 +17,7 @@ export interface Subscription<E, R> {
   ) => Effect.Effect<void, E | Schema.SchemaError, R | Store.Transaction>;
   /** Decode this fact version once before dispatching to its handlers. */
   readonly decode: (
-    entry: Log.Value<Event.Payload>,
+    entry: Log.Entry<Event.Envelope>,
   ) => Effect.Effect<unknown, Schema.SchemaError | Event.FactMismatch, R>;
 }
 
@@ -62,7 +62,7 @@ const makeDefinition = <Name extends string, Version extends number, E, R>(
     });
 
     const decode = Effect.fn(`${name}.decode.${fact.name}`)(function* (
-      entry: Log.Value<Event.Payload>,
+      entry: Log.Entry<Event.Envelope>,
     ) {
       return yield* Transaction.withoutAppends(
         Event.decode(fact, entry),
@@ -134,12 +134,12 @@ export interface Runner {
   readonly replay: Effect.Effect<Option.Option<Checkpoint.Cursor>, Error>;
   /** Journal integration: apply a newly appended, decoded event only when caught up. */
   readonly apply: (
-    entry: Log.Value<Event.Payload>,
+    entry: Log.Entry<Event.Envelope>,
     event: unknown,
   ) => Effect.Effect<void, Error, Store.Transaction>;
 }
 
-const cursorOf = (entry: Log.Value<Event.Payload>): Checkpoint.Cursor => ({
+const cursorOf = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
   position: entry.position,
   commitId: entry.commitId,
   index: entry.index,
@@ -155,7 +155,7 @@ const cursorOf = (entry: Log.Value<Event.Payload>): Checkpoint.Cursor => ({
  */
 export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(options: {
   readonly definition: Definition<string, number, E, R>;
-  readonly log: Log.Reader<typeof Event.Payload>;
+  readonly log: Log.Reader<typeof Event.Envelope>;
 }) {
   const checkpoints = yield* Checkpoint.Service;
   const transaction = yield* Transaction.Service;
@@ -216,7 +216,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
     );
     return Option.map(Array.head(batches), (batch) => batch.entries);
   });
-  const handlersFor = Effect.fnUntraced(function* (entry: Log.Value<Event.Payload>) {
+  const handlersFor = Effect.fnUntraced(function* (entry: Log.Entry<Event.Envelope>) {
     const versions = byName.get(entry.payload.name);
     if (versions === undefined) return [];
     const handlers = versions.get(entry.payload.version);
@@ -242,11 +242,11 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
       Effect.updateContext((current: Context.Context<never>) => Context.merge(services, current)),
     );
   });
-  const failed = (entry: Log.Value<Event.Payload>, phase: Failure["phase"]) => (cause: unknown) =>
+  const failed = (entry: Log.Entry<Event.Envelope>, phase: Failure["phase"]) => (cause: unknown) =>
     new Failure({ key, cursor: cursorOf(entry), phase, cause });
 
   const apply = Effect.fn("Projection.apply")(function* (
-    entry: Log.Value<Event.Payload>,
+    entry: Log.Entry<Event.Envelope>,
     event: unknown,
   ) {
     const native = yield* Store.Transaction;

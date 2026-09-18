@@ -7,10 +7,10 @@ import { Log } from "./log.ts";
 import { Projection } from "./projection.ts";
 import { Transaction } from "./transaction.ts";
 
-export { Payload, FactMismatch, decode } from "./event.ts";
+export { Envelope, FactMismatch, decode } from "./event.ts";
 
 export interface Interface {
-  readonly log: Log.Reader<typeof Event.Payload>;
+  readonly log: Log.Reader<typeof Event.Envelope>;
   readonly commit: Transaction.Interface["run"];
   /** Catch up registered projections before accepting new publications. */
   readonly replay: Effect.Effect<void, Projection.Error>;
@@ -53,7 +53,7 @@ export const make = Effect.fn("Journal.make")(function* <
 >(options: Options<Requirements>) {
   const logs = yield* Log.Service;
   const transaction = yield* Transaction.Service;
-  const log = logs.open({ id: options.logId, schema: Event.Payload });
+  const log = logs.open({ id: options.logId, schema: Event.Envelope });
   const subscriptions = options.projections.flatMap((projection) => projection.subscriptions);
   const definitions = new Map<string, Map<number, Schema.Constraint>>();
   for (const { fact } of subscriptions) {
@@ -104,7 +104,7 @@ export const make = Effect.fn("Journal.make")(function* <
     );
   });
 
-  const reader: Log.Reader<typeof Event.Payload> = {
+  const reader: Log.Reader<typeof Event.Envelope> = {
     id: log.id,
     schema: log.schema,
     get: log.get,

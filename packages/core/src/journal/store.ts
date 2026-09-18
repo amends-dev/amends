@@ -24,12 +24,12 @@ export const AppendOptions = Schema.Struct({
 });
 export interface AppendOptions extends Schema.Schema.Type<typeof AppendOptions> {}
 
-export const Append = Schema.Struct({
+export const AppendInput = Schema.Struct({
   logId: Entry.LogId,
   payloads: Schema.Array(Schema.Uint8Array),
   ...AppendOptions.fields,
 });
-export interface Append extends Schema.Schema.Type<typeof Append> {}
+export interface AppendInput extends Schema.Schema.Type<typeof AppendInput> {}
 
 export class Failure extends Schema.TaggedError<Failure>()("JournalStore.Failure", {
   operation: Schema.String,
@@ -60,7 +60,7 @@ export class Transaction extends Context.Service<
      * Copy input bytes and reject expired handles. Returned entries are provisional.
      */
     readonly append: (
-      request: Append,
+      request: AppendInput,
     ) => Effect.Effect<ReadonlyArray<Entry.Record>, Failure | Conflict>;
   }
 >()("@amends/core/journal/store/Transaction") {}

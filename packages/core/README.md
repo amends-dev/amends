@@ -4,6 +4,146 @@
 operations. Hosts supply storage and cryptography; the gateway supplies the actor
 for each protected operation. The root `layer` composes the workspace services.
 
+## Features and ownership
+
+A feature owns a coherent domain concept, its rules, and its lifecycle. Keep the
+models, operations, facts, projection, permissions, and storage contract that
+evolve together in one feature directory. Add files when those responsibilities
+exist; a small feature does not need an empty version of every module.
+
+The current domains contain these features:
+
+| Domain          | Ownership                                                                           |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/` and `invitation/` features.   |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features. |
+| `identity`      | Stable human and agent references and the actor resolved for an operation.          |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                     |
+
+Permission, grant, requirement, scope, and target remain focused modules within
+authorization. Future features such as thread and task belong beside these
+domains; workspace scoping alone does not make a feature part of workspace
+management.
+
+Membership demonstrates the feature layout:
+
+```text
+src/workspace/member/
+  id.ts
+  member.ts
+  application.ts
+  store.ts
+  facts.ts
+  projection.ts
+  permissions.ts
+```
+
+| Module           | Responsibility                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------ |
+| `<feature>.ts`   | Domain schemas, value types, and pure domain functions.                              |
+| `id.ts`          | An ID-only dependency when references between models would otherwise create a cycle. |
+| `application.ts` | Authorized operations and transactional workflow coordination.                       |
+| `store.ts`       | The persistence contract implemented by adapters.                                    |
+| `facts.ts`       | Versioned declarations of recorded domain changes.                                   |
+| `projection.ts`  | Replay those facts into the store; export the projection as `definition`.            |
+| `permissions.ts` | Permissions owned by this feature.                                                   |
+
+Workspace initialization lives in `workspace/initialization.ts`. Its facts and
+projection have the same separate modules as other features. Invitation facts
+are `InvitationFacts`; their projection is `InvitationProjection.definition`.
+
+Use short filenames within feature directories and descriptive module namespaces:
+`member/store.ts` exports `MemberStore`, and `member/application.ts` exports
+`MemberApplication`. Keep the named domain model file instead of collecting
+unrelated types in a general `schema.ts` or `types.ts` file.
+
+Core tests follow the domain and feature directories under `test/`. Tests that
+cover several authorization features live at `test/authorization/`; shared
+in-memory storage support remains in `test/memory-store.ts`.
+
+## Module dependencies and exports
+
+Models and ID modules are independent of application services, projections, and
+storage implementations. Facts depend on models and the fact declaration API.
+Projections depend on facts, store contracts, and projection machinery; they
+replay recorded outcomes without re-evaluating current authority or time.
+Application modules coordinate authorization, stores, and journal publication.
+
+A workflow may reference another feature's models, facts, or store contracts
+when it owns their coordination. For example, removing a member revokes pending
+invitations in the same commit. Keep that workflow in the responsible application
+module and preserve its authorization and transaction boundaries.
+
+Inside core, import the owning leaf module directly. Each leaf establishes its
+canonical ES module namespace with a self-export, and public barrels relay those
+names. Avoid importing an aggregate barrel from an internal module.
+
+```ts
+// Inside the member feature:
+import { MemberStore } from "./store.ts";
+
+// From another package:
+import { Member, MemberApplication } from "@amends/core/workspace";
+```
+
+The domain `index.ts` files define the public package surface. A feature folder
+does not automatically need its own barrel or package subpath. File moves retain
+the existing `@amends/core/workspace` and `@amends/core/authorization` imports.
+
+Workspace and member IDs live in small leaf modules and remain available as
+`Workspace.Id` and `Member.Id`. Use these ID leaves to avoid model dependency
+cycles. Reserve `Schema.suspend` for schemas that need deferred construction,
+such as genuinely recursive data.
+
+## Schema and type names
+
+Name an exported schema for its domain meaning and role. Read names with their
+module qualifier: `Member.Record`, `Identity.Reference`, and
+`Permission.Definition`. Ordinary records use `Schema.Struct` and a same-name
+interface; unions and scalar schemas use a same-name type. Keep `Id` capitalization
+consistent across modules. Typed errors retain tagged error schemas.
+
+| Name                 | Meaning and examples                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Record`             | A complete domain record with its identity and recorded fields: `Member.Record`, `Invitation.Record`, `Entry.Record`. Adapter-specific database row shapes stay in adapters.    |
+| `Value`              | The primary value object in a focused module: `Actor.Value`, `Grant.Value`, `Requirement.Value`, `Scope.Value`. Prefer a more specific noun when it clarifies the value's role. |
+| `Reference`          | Enough information to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                                   |
+| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                                             |
+| `<Operation>Input`   | Data supplied to a specific operation: `Invitation.IssueInput`, `Store.AppendInput`.                                                                                            |
+| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`, `Store.AppendOptions`.                                                                                                |
+| `State`              | A lifecycle variant with associated data: `Invitation.State`.                                                                                                                   |
+| `Status`             | A simple lifecycle label: `Member.Status`, `Assignment.Status`.                                                                                                                 |
+| `Interface`          | The contract implemented by a context service: `MemberApplication.Interface`, `MemberStore.Interface`.                                                                          |
+
+Supporting types name their actual role. `Invitation.Issuance` is the immutable
+issuance record retained through acceptance or revocation. `Event.Envelope`
+contains a fact's name, version, and encoded payload; `Fact.Payload<F>` is the
+decoded domain payload. `Log.Entry<A>` carries a decoded payload and entry
+metadata. `Codec.PayloadCodec<S>` handles a payload schema, while
+`Codec.FactCodec<F>` pairs that codec with its fact definition.
+
+Inline payload structs can stay inside their fact declarations. Obtain their
+types through `Fact.Payload<typeof MemberFacts.Added>` rather than adding a
+second exported schema name without a separate use case.
+
+Schemas used as public HTTP models carry stable identifiers for generated API
+documentation: `Workspace`, `WorkspaceMember`, `WorkspaceInvitation`,
+`WorkspaceInvitationIssueInput`, and `WorkspaceInvitationIssuance`. Add identifiers
+when a schema needs a named public representation or other tooling consumes it;
+module-local helper schemas do not need identifiers by default.
+
+HTTP status-specific schema variants are named in the HTTP contract:
+`CreatedWorkspace` and `IssuedWorkspaceInvitation` describe the 201 responses.
+Explicit variant names avoid generated numeric suffixes while keeping HTTP
+annotations out of core's models.
+
+Source names and serialized names are separate contracts. Preserve fact names,
+versions, brands, error tags, service keys, projection keys, and encoded fields
+during organizational changes. In particular, `Invitation.Record.details` still
+holds `Invitation.Issuance`; changing its TypeScript name does not rename the
+persisted or HTTP field. Contract changes require an explicit compatibility or
+migration decision.
+
 ## Constructors and layers
 
 Follow Effect's public library pattern: construction and service provision are
