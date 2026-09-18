@@ -1,5 +1,5 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-bun";
-import { Effect, Layer } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 
 const migrations = SqliteMigrator.fromRecord({
@@ -23,10 +23,33 @@ const migrations = SqliteMigrator.fromRecord({
   }),
 });
 
-/** One connection is shared by all workspace views. Transactions use BEGIN IMMEDIATE. */
+/**
+ * One SQLite connection, shared by every workspace view. A transaction whose
+ * rollback failed leaves the connection unusable; the flag records that so
+ * later transactions refuse rather than run on a connection in an unknown state.
+ */
+export interface Database {
+  readonly sql: SqlClient.SqlClient;
+  readonly health: { broken: boolean };
+}
+
+export class Service extends Context.Service<Service, Database>()(
+  "@amends/storage-sqlite/database/Service",
+) {}
+
+export const make = Effect.fn("SqliteDatabase.make")(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  return Service.of({ sql, health: { broken: false } });
+});
+
+/** Open the file, bring its schema up to date, and share the connection. Transactions use BEGIN IMMEDIATE. */
 export const layer = (filename: string) =>
-  SqliteMigrator.layer({ loader: migrations }).pipe(
-    Layer.provideMerge(SqliteClient.layer({ filename, busyTimeout: 0 })),
+  Layer.effect(Service, make()).pipe(
+    Layer.provideMerge(
+      SqliteMigrator.layer({ loader: migrations }).pipe(
+        Layer.provideMerge(SqliteClient.layer({ filename, busyTimeout: 0 })),
+      ),
+    ),
   );
 
-export * as Database from "./database.ts";
+export * as SqliteDatabase from "./database.ts";

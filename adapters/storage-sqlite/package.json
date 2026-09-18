@@ -1,0 +1,22 @@
+{
+  "name": "@amends/storage-sqlite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test test"
+  },
+  "dependencies": {
+    "@amends/core": "workspace:*",
+    "@amends/gateway": "workspace:*",
+    "@effect/sql-sqlite-bun": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "catalog:"
+  }
+}

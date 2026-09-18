@@ -30,6 +30,19 @@
         "drizzle-kit": "1.0.0-rc.5-5935859",
       },
     },
+    "adapters/storage-sqlite": {
+      "name": "@amends/storage-sqlite",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "@effect/sql-sqlite-bun": "catalog:",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-bun": "catalog:",
+      },
+    },
     "apps/ui": {
       "name": "@amends/ui",
       "version": "0.0.0",
@@ -92,8 +105,8 @@
         "@amends/gateway": "workspace:*",
         "@amends/server-http": "workspace:*",
         "@amends/storage-postgresql": "workspace:*",
+        "@amends/storage-sqlite": "workspace:*",
         "@effect/platform-bun": "catalog:",
-        "@effect/sql-sqlite-bun": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -161,6 +174,8 @@
     "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
 
     "@amends/storage-postgresql": ["@amends/storage-postgresql@workspace:adapters/storage-postgresql"],
+
+    "@amends/storage-sqlite": ["@amends/storage-sqlite@workspace:adapters/storage-sqlite"],
 
     "@amends/ui": ["@amends/ui@workspace:apps/ui"],
 

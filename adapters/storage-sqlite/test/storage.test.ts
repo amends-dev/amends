@@ -1,45 +1,69 @@
 import { expect, expectTypeOf, test } from "bun:test";
 import * as Core from "@amends/core";
-import { AssignmentFacts, Role, RoleFacts } from "@amends/core/authorization";
+import {
+  AssignmentFacts,
+  AssignmentStore,
+  Role,
+  RoleFacts,
+  RoleStore,
+} from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Journal, Log, Store } from "@amends/core/journal";
 import {
-  Member,
+  InvitationStore,
   MemberApplication,
   MemberPermissions,
+  MemberStore,
   Workspace,
   WorkspaceInitialization,
+  WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Gateway, type WorkspaceStorage } from "@amends/gateway";
+import { contracts, SqliteDatabase, SqliteStorage } from "../src/index.ts";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Database } from "../src/database.ts";
-import { LocalHost } from "../src/host.ts";
 import { Operations } from "./operations.ts";
-import { withServer } from "./server.ts";
-import { Storage } from "../src/storage.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
 const workspaceId = Workspace.Id.make("workspace-one");
 const otherWorkspaceId = Workspace.Id.make("workspace-two");
-type Bound = Effect.Success<
-  ReturnType<Effect.Success<ReturnType<typeof Storage.make>>["forWorkspace"]>
->;
+/** The bound stores by name, for direct assertions beside the context core receives. */
+const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
+  context,
+  store: Context.get(context, Store.Service),
+  checkpoints: Context.get(context, Checkpoint.Service),
+  workspace: Context.get(context, WorkspaceStore.Service),
+  members: Context.get(context, MemberStore.Service),
+  roles: Context.get(context, RoleStore.Service),
+  assignments: Context.get(context, AssignmentStore.Service),
+  invitations: Context.get(context, InvitationStore.Service),
+});
+type Bound = ReturnType<typeof bind>;
+const views = Effect.map(SqliteStorage.make(), (service) => ({
+  forWorkspace: (workspaceId: Workspace.Id) => Effect.map(service.forWorkspace(workspaceId), bind),
+}));
 const core = (bound: Bound) =>
   Core.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
   );
-const inDatabase = <A, E>(filename: string, program: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-  Effect.runPromise(program.pipe(Effect.provide(Database.layer(filename))));
+const inDatabase = <A, E>(
+  filename: string,
+  program: Effect.Effect<A, E, SqliteDatabase.Service | SqlClient.SqlClient>,
+) => Effect.runPromise(program.pipe(Effect.provide(SqliteDatabase.layer(filename))));
+const host = (filename: string) =>
+  Gateway.layer.pipe(
+    Layer.provideMerge(contracts),
+    Layer.provideMerge(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
+  );
 const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator).pipe(Effect.provide(core(bound)));
 const temporary = async (run: (filename: string) => Promise<void>) => {
-  const directory = await mkdtemp(join(tmpdir(), "amends-host-"));
+  const directory = await mkdtemp(join(tmpdir(), "amends-sqlite-"));
   try {
     await run(join(directory, "test.sqlite"));
   } finally {
@@ -85,12 +109,12 @@ test("one host creates two isolated workspaces and uses each operation's authent
           _tag: "MemberApplication.NotFound",
         });
         return [a, b];
-      }).pipe(Effect.provide(LocalHost.layer(filename))),
+      }).pipe(Effect.provide(host(filename))),
     );
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const storage = yield* Storage.make();
+        const storage = yield* views;
         for (const workspace of workspaces) {
           const bound = yield* storage.forWorkspace(workspace.id);
           expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
@@ -128,7 +152,7 @@ test("initialization commits once under competing requests and never replaces ow
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const storage = yield* Storage.make();
+        const storage = yield* views;
         const bound = yield* storage.forWorkspace(workspaceId);
         const results = yield* Effect.forEach(
           [alice.id, bob.id],
@@ -153,7 +177,7 @@ test("a failed final checkpoint rolls back workspace, membership, grants, log, a
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const storage = yield* Storage.make();
+        const storage = yield* views;
         const bound = yield* storage.forWorkspace(workspaceId);
         const failure = new Store.Failure({
           operation: "checkpoint.set",
@@ -186,7 +210,7 @@ test("interruption rolls back initialization and leaves the connection usable", 
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const bound = yield* (yield* Storage.make()).forWorkspace(workspaceId);
+        const bound = yield* (yield* views).forWorkspace(workspaceId);
         const ready = yield* Deferred.make<void>();
         const program = Effect.gen(function* () {
           const journal = yield* Journal.Service;
@@ -214,7 +238,7 @@ test("workspace stores reject foreign and expired transactions, including escape
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const storage = yield* Storage.make();
+        const storage = yield* views;
         const a = yield* storage.forWorkspace(workspaceId);
         const b = yield* storage.forWorkspace(otherWorkspaceId);
         const expired = yield* a.store.transaction(Effect.context<Store.Transaction>());
@@ -247,7 +271,7 @@ test("the persistent role and assignment projections support edits and independe
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const bound = yield* (yield* Storage.make()).forWorkspace(workspaceId);
+        const bound = yield* (yield* views).forWorkspace(workspaceId);
         const workspace = yield* initialized(bound);
         yield* Effect.gen(function* () {
           const journal = yield* Journal.Service;
@@ -290,36 +314,17 @@ test("the persistent role and assignment projections support edits and independe
     );
   }));
 
-test("the server entry point serves persisted memberships to another process, and denies another identity", async () =>
-  temporary(async (filename) => {
-    const workspace = await withServer(filename, async (call) => {
-      const created = await call(alice.id, "POST", "/workspaces");
-      expect(created.status).toBe(201);
-      return Schema.decodeUnknownSync(Workspace.Record)(created.body);
-    });
-    // A fresh server process reads what the previous one committed.
-    await withServer(filename, async (call) => {
-      const path = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
-      const read = await call(alice.id, "GET", path);
-      expect(read.status).toBe(200);
-      expect(Schema.decodeUnknownSync(Member.Record)(read.body).identity).toEqual(alice);
-      const denied = await call(bob.id, "GET", path);
-      expect(denied.status).toBe(403);
-      expect(denied.body).toMatchObject({ _tag: "Gateway.NotMember" });
-    });
-  }));
-
 test("separate connections observe live appends; identical log IDs stay isolated by workspace", async () =>
   temporary(async (filename) => {
     await inDatabase(
       filename,
       Effect.scoped(
         Effect.gen(function* () {
-          const storage = yield* Storage.make();
+          const storage = yield* views;
           const a = yield* storage.forWorkspace(workspaceId);
           const b = yield* storage.forWorkspace(otherWorkspaceId);
-          const otherContext = yield* Layer.build(Database.layer(filename));
-          const otherStorage = yield* Storage.make().pipe(Effect.provide(otherContext));
+          const otherContext = yield* Layer.build(SqliteDatabase.layer(filename));
+          const otherStorage = yield* views.pipe(Effect.provide(otherContext));
           const otherA = yield* otherStorage.forWorkspace(workspaceId);
           const open = (bound: Bound) =>
             Log.Service.pipe(
@@ -375,9 +380,9 @@ test("independent hosts report a busy transaction without retrying and preserve 
       filename,
       Effect.scoped(
         Effect.gen(function* () {
-          const a = yield* (yield* Storage.make()).forWorkspace(workspaceId);
-          const otherContext = yield* Layer.build(Database.layer(filename));
-          const other = yield* Storage.make().pipe(Effect.provide(otherContext));
+          const a = yield* (yield* views).forWorkspace(workspaceId);
+          const otherContext = yield* Layer.build(SqliteDatabase.layer(filename));
+          const other = yield* views.pipe(Effect.provide(otherContext));
           const b = yield* other.forWorkspace(workspaceId);
           const ready = yield* Deferred.make<void>();
           const release = yield* Deferred.make<void>();
@@ -412,7 +417,7 @@ test("replay rebuilds ownership, membership, and initial grants from persisted f
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const bound = yield* (yield* Storage.make()).forWorkspace(workspaceId);
+        const bound = yield* (yield* views).forWorkspace(workspaceId);
         const workspace = yield* initialized(bound);
         const sql = yield* SqlClient.SqlClient;
         // Clear only this temporary test database's read models to exercise recovery.
@@ -446,7 +451,8 @@ test("commit failure reports an uncertain outcome with its commit ID and never r
     await inDatabase(
       filename,
       Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
+        const database = yield* SqliteDatabase.Service;
+        const { sql } = database;
         let commits = 0;
         const failCommit = new Proxy(sql, {
           get(target, key, receiver) {
@@ -475,8 +481,8 @@ test("commit failure reports an uncertain outcome with its commit ID and never r
             return Reflect.get(target, key, receiver);
           },
         });
-        const storage = yield* Storage.make().pipe(
-          Effect.provideService(SqlClient.SqlClient, failCommit),
+        const storage = yield* views.pipe(
+          Effect.provideService(SqliteDatabase.Service, { ...database, sql: failCommit }),
         );
         const bound = yield* storage.forWorkspace(workspaceId);
         const failure = yield* Effect.flip(initialized(bound));

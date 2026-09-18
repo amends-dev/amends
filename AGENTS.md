@@ -33,11 +33,14 @@ currently run through TypeScript. Check compatibility before changing this setup
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
   over the same gateway rather than new gateway methods.
 - `adapters/*`: implementations of gateway contracts over one external system, with
-  that system's dependencies. `storage-postgresql` implements workspace storage and
-  the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one
-  column per record field. Hosts compose adapters; shared packages never depend on them.
-- `hosts/*`: runtime composition and adapters, such as the Bun host in `hosts/local`,
-  which serves the HTTP API over SQLite, or over PostgreSQL through the adapter when
+  that system's dependencies. `storage-sqlite` implements workspace storage and the
+  workspace directory over one SQLite file; `storage-postgresql` implements them over
+  PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field. Both
+  follow one shape: a module per store over a workspace binding, merged at the edge.
+  Hosts compose adapters and implement no storage themselves; shared packages never
+  depend on adapters.
+- `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves
+  the HTTP API over the SQLite adapter, or the PostgreSQL adapter when
   `AMENDS_DATABASE_URL` is set, with development sign-in and credentials.
   Hosts may install their runtime's dependencies and consume shared packages. A host
   implements gateway contracts and serves protocol handler packages; it does not

@@ -4,9 +4,11 @@ import {
   Assignment,
   AssignmentFacts,
   AssignmentProjection,
+  AssignmentStore,
   Grant,
   Permission,
   RoleProjection,
+  RoleStore,
   Scope,
 } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
@@ -16,46 +18,59 @@ import {
   InvitationApplication,
   InvitationJournal,
   InvitationPermissions,
+  InvitationStore,
   Member,
   MemberApplication,
   MemberFacts,
   MemberPermissions,
   MemberProjection,
+  MemberStore,
   Workspace,
   WorkspaceInitialization,
+  WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Gateway, type WorkspaceStorage } from "@amends/gateway";
+import { contracts, SqliteDatabase, SqliteStorage } from "../src/index.ts";
 import { BunCrypto } from "@effect/platform-bun";
-import { Clock, Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Clock, Context, DateTime, Effect, Layer, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Database } from "../src/database.ts";
 import { Operations } from "./operations.ts";
-import { withServer } from "./server.ts";
-import { Storage } from "../src/storage.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
 const charlie = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("charlie") });
-type Bound = Effect.Success<
-  ReturnType<Effect.Success<ReturnType<typeof Storage.make>>["forWorkspace"]>
->;
+/** The bound stores by name, for direct assertions beside the context core receives. */
+const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
+  context,
+  store: Context.get(context, Store.Service),
+  checkpoints: Context.get(context, Checkpoint.Service),
+  workspace: Context.get(context, WorkspaceStore.Service),
+  members: Context.get(context, MemberStore.Service),
+  roles: Context.get(context, RoleStore.Service),
+  assignments: Context.get(context, AssignmentStore.Service),
+  invitations: Context.get(context, InvitationStore.Service),
+});
+type Bound = ReturnType<typeof bind>;
+const views = Effect.map(SqliteStorage.make(), (service) => ({
+  forWorkspace: (workspaceId: Workspace.Id) => Effect.map(service.forWorkspace(workspaceId), bind),
+}));
 const core = (bound: Bound) =>
   Core.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
   );
 const runHost = <A, E>(
   filename: string,
-  program: Effect.Effect<A, E, Gateway.Service | SqlClient.SqlClient>,
+  program: Effect.Effect<A, E, Gateway.Service | SqliteDatabase.Service | SqlClient.SqlClient>,
 ) =>
   Effect.runPromise(
     program.pipe(
       Effect.provide(
         Gateway.layer.pipe(
-          Layer.provide(Storage.layer),
-          Layer.provideMerge(Layer.mergeAll(Database.layer(filename), BunCrypto.layer)),
+          Layer.provideMerge(contracts),
+          Layer.provideMerge(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
         ),
       ),
     ),
@@ -80,7 +95,7 @@ const request = (
 });
 const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
 const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
-  return yield* (yield* Storage.make()).forWorkspace(workspaceId);
+  return yield* (yield* views).forWorkspace(workspaceId);
 });
 const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>) =>
   Effect.clockWith((clock) =>
@@ -783,77 +798,4 @@ test("invitation replay restores pending, accepted, and revoked records without 
         ).toEqual(member);
       }),
     );
-  }));
-
-test("invitation, acceptance, revocation, and removal survive separate server processes", async () =>
-  temporary(async (filename) => {
-    const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
-    const first = await withServer(filename, async (call) => {
-      const created = await call(alice.id, "POST", "/workspaces");
-      expect(created.status).toBe(201);
-      const workspace = Schema.decodeUnknownSync(Workspace.Record)(created.body);
-      const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
-        recipientId: bob.id,
-        expiresAt,
-        grants: [
-          { permission: "member.read", scope: { _tag: "Workspace", workspaceId: workspace.id } },
-        ],
-      });
-      expect(issued.status).toBe(201);
-      const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
-      const accept = `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`;
-      expect((await call(charlie.id, "POST", accept)).status).toBe(403);
-      const accepted = await call(bob.id, "POST", accept);
-      expect(accepted.status).toBe(200);
-      return {
-        workspace,
-        invitation,
-        member: Schema.decodeUnknownSync(Member.Record)(accepted.body),
-      };
-    });
-    const { workspace, invitation, member } = first;
-    expect(member.identity).toEqual(bob);
-    await withServer(filename, async (call) => {
-      const owner = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
-      const accept = `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`;
-      expect((await call(bob.id, "GET", owner)).status).toBe(200);
-      // Repeating acceptance returns the recorded membership.
-      expect((await call(bob.id, "POST", accept)).body).toEqual(first.member);
-      const issuedAgain = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
-        recipientId: charlie.id,
-        expiresAt,
-        grants: [],
-      });
-      expect(issuedAgain.status).toBe(201);
-      const second = Schema.decodeUnknownSync(Invitation.Record)(issuedAgain.body);
-      const revoke = `/workspaces/${workspace.id}/invitations/${second.details.id}/revoke`;
-      expect((await call(alice.id, "POST", revoke)).status).toBe(200);
-      const revoked = await call(
-        charlie.id,
-        "POST",
-        `/workspaces/${workspace.id}/invitations/${second.details.id}/accept`,
-      );
-      expect(revoked.status).toBe(410);
-      expect(revoked.body).toMatchObject({
-        _tag: "InvitationApplication.Unavailable",
-        reason: "revoked",
-      });
-      expect((await call(bob.id, "DELETE", owner)).status).toBe(403);
-      expect((await call(alice.id, "DELETE", owner)).status).toBe(409);
-      const removed = await call(
-        alice.id,
-        "DELETE",
-        `/workspaces/${workspace.id}/members/${member.id}`,
-      );
-      expect(removed.status).toBe(200);
-      expect(removed.body).toMatchObject({ id: member.id, status: "removed" });
-      expect((await call(bob.id, "GET", owner)).status).toBe(403);
-      expect(
-        (await call(alice.id, "GET", `/workspaces/${workspace.id}/members/${member.id}`)).body,
-      ).toEqual(removed.body);
-      expect((await call(bob.id, "POST", accept)).body).toEqual(removed.body);
-      expect(
-        (await call(alice.id, "DELETE", `/workspaces/${workspace.id}/members/${member.id}`)).status,
-      ).toBe(409);
-    });
   }));

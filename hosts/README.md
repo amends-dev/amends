@@ -6,9 +6,10 @@ storage, transports, and other platform adapters. They may use dependencies need
 by their runtime.
 
 `local/` is the Bun host. Run it from the repository root with `bun run start`
-or `bun run dev`. It stores workspaces in SQLite, or in PostgreSQL through
-`@amends/storage-postgresql` when `AMENDS_DATABASE_URL` is set. A future
-Cloudflare host belongs in `hosts/cloudflare/`.
+or `bun run dev`. It implements no storage itself: it composes the SQLite
+adapter by default, or the PostgreSQL adapter when `AMENDS_DATABASE_URL` is
+set, and provides development sign-in and credentials. A future Cloudflare host
+belongs in `hosts/cloudflare/`.
 
 Each host extends `../../tsconfig.base.json`, enables its own runtime types, and
 provides a `typecheck` script. Shared packages cannot import hosts.
