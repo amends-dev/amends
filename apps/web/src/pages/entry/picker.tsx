@@ -209,7 +209,7 @@ function NewWorkspace(props: { onOpen: (workspaceId: string) => void }) {
   const [creating, create] = useAtom(() => ApiClient.mutation("workspaces", "create"), {
     mode: "promiseExit",
   });
-  const make = async () => {
+  const createWorkspace = async () => {
     const exit = await create({ reactivityKeys: ["me"] });
     if (Exit.isSuccess(exit)) props.onOpen(exit.value.id);
   };
@@ -219,7 +219,7 @@ function NewWorkspace(props: { onOpen: (workspaceId: string) => void }) {
         <Button
           variant="secondary"
           pending={AsyncResult.isWaiting(creating())}
-          onClick={() => void make()}
+          onClick={() => void createWorkspace()}
         >
           make a workspace
         </Button>
@@ -239,7 +239,7 @@ function Empty(props: { onOpen: (workspaceId: string) => void }) {
   const [creating, create] = useAtom(() => ApiClient.mutation("workspaces", "create"), {
     mode: "promiseExit",
   });
-  const make = async () => {
+  const createWorkspace = async () => {
     const exit = await create({ reactivityKeys: ["me"] });
     if (Exit.isSuccess(exit)) props.onOpen(exit.value.id);
   };
@@ -259,7 +259,7 @@ function Empty(props: { onOpen: (workspaceId: string) => void }) {
             variant="primary"
             size="touch"
             pending={AsyncResult.isWaiting(creating())}
-            onClick={() => void make()}
+            onClick={() => void createWorkspace()}
           >
             make a workspace
           </Button>
