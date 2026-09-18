@@ -15,6 +15,9 @@
     "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
+    "@amends/api-http": "workspace:*",
+    "@amends/core": "workspace:*",
+    "@amends/gateway": "workspace:*",
     "@amends/ui": "workspace:*",
     "@effect/atom-solid": "catalog:",
     "@solid-primitives/keyed": "catalog:",

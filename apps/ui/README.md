@@ -83,6 +83,14 @@ consistent. The consuming application supplies the mobile navigation button to `
 | `FormColumns`     | Related fields or static sections. Columns stack when their container is 560px or narrower; fields do not become tabs.                                                                 |
 | `InspectorLayout` | Contextual content opened from the page. Dock a 400px inspector when at least 560px remains for the main content; otherwise use a modal drawer from the right, full width below 768px. |
 
+`EntryShell` frames the screens before a workspace exists: sign-in, the picker,
+and membership explanations. It shows the mark as a home link, the signed-in
+address with sign-out when an account is supplied, a title and blurb, a reading
+column of 420px or 560px, and a footer note. It has no rail. `CodeField` is a
+one-time numeric code: one real input carries focus, keyboard entry, paste, and
+autofill, while the boxes are presentation. The caller keeps the digits and
+decides when the code is complete.
+
 Header actions start a flow or operate on the current resource: New task, Select tasks,
 Edit, and Stop session. Submission actions belong to `FormActions`, including Publish
 version. Use breadcrumbs for ancestry instead of adding a duplicate back button in

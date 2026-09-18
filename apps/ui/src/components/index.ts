@@ -20,6 +20,8 @@ export { Popover, type PopoverProps } from "./popover.tsx";
 export { Identity, type IdentityProps, type IdentityData } from "./identity.tsx";
 export { RadioCardGroup, type RadioCardGroupProps, type RadioCardOption } from "./radio-card.tsx";
 export { AppShell, type AppShellProps } from "./app-shell.tsx";
+export { EntryShell, type EntryShellProps, type EntryLinkProps } from "./entry-shell.tsx";
+export { CodeField, type CodeFieldProps } from "./code-field.tsx";
 export {
   NavigationItem,
   type NavigationItemProps,
