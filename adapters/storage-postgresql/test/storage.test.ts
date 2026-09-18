@@ -26,6 +26,7 @@ import {
 } from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory, type WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
+import { PgClient } from "@effect/sql-pg";
 import {
   Context,
   DateTime,
@@ -39,7 +40,7 @@ import {
   Stream,
 } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
-import { contracts, PostgresDatabase, PostgresStorage } from "../src/index.ts";
+import { layer, PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { acquire, temporary } from "./postgres.ts";
 
 const server = await acquire();
@@ -84,10 +85,41 @@ const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator).pipe(Effect.provide(core(bound)));
 const host = (url: string, options: PostgresStorage.Options = {}) =>
   Gateway.layer.pipe(
-    Layer.provideMerge(contracts(options)),
+    Layer.provideMerge(layer(options)),
     Layer.provideMerge(Layer.mergeAll(database(url), BunCrypto.layer)),
   );
 const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
+
+it.each(["make", "layer"] as const)(
+  "database %s initializes every store and preserves data when reopened",
+  async (construction) =>
+    withDatabase(async (url) => {
+      const program = Effect.gen(function* () {
+        const database = yield* PostgresDatabase.Service;
+        expect(database.sql).toBe(yield* SqlClient.SqlClient);
+        const bound = yield* (yield* views()).forWorkspace(workspaceId);
+        const record = yield* initialized(bound);
+        expect(yield* bound.invitations.list).toEqual([]);
+        return record;
+      });
+      const configured =
+        construction === "make"
+          ? Effect.flatMap(PostgresDatabase.make(), (database) =>
+              program.pipe(Effect.provideService(PostgresDatabase.Service, database)),
+            ).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })))
+          : program.pipe(Effect.provide(database(url)));
+      const record = await Effect.runPromise(configured);
+      await inDatabase(
+        url,
+        Effect.gen(function* () {
+          const bound = yield* (yield* views()).forWorkspace(workspaceId);
+          expect(yield* bound.workspace.get).toEqual(Option.some(record));
+          expect(yield* bound.members.list).toHaveLength(1);
+          expect(yield* bound.invitations.list).toEqual([]);
+        }),
+      );
+    }),
+);
 
 it("the gateway runs the membership workflow over two isolated workspaces", async () =>
   withDatabase(async (url) => {

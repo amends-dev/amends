@@ -5,7 +5,11 @@ import { Binding } from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { checkpoints } from "./schema.ts";
 
-/** Each projection version's progress through one log, written with the projection's rows. */
+/**
+ * Each projection version's progress through one log, written with the projection's rows.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Checkpoints.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
@@ -68,6 +72,11 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
   });
 });
 
+/**
+ * Provide Checkpoint.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Checkpoint.Service, make());
 
 export * as Checkpoints from "./checkpoints.ts";

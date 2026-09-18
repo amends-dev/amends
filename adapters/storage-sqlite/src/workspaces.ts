@@ -3,13 +3,17 @@ import { Workspace, WorkspaceStore } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
-import { recordColumn } from "./record-column.ts";
+import { makeRecordDecoder } from "./record-column.ts";
 
 const codec = Schema.fromJsonString(Workspace.Record);
-const decode = recordColumn(codec);
+const decode = makeRecordDecoder(codec);
 const encode = Schema.encodeEffect(codec);
 
-/** The workspace's own record, inserted once by initialization. */
+/**
+ * The workspace's own record, inserted once by initialization.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Workspaces.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
@@ -37,6 +41,11 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   });
 });
 
+/**
+ * Provide WorkspaceStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(WorkspaceStore.Service, make());
 
 export * as Workspaces from "./workspaces.ts";

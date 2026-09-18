@@ -1,6 +1,6 @@
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
-import { PostgresDatabase, contracts as postgres } from "@amends/storage-postgresql";
-import { SqliteDatabase, contracts as sqlite } from "@amends/storage-sqlite";
+import { PostgresDatabase, layer as postgres } from "@amends/storage-postgresql";
+import { SqliteDatabase, layer as sqlite } from "@amends/storage-sqlite";
 import { BunCrypto } from "@effect/platform-bun";
 import { Layer, type Redacted } from "effect";
 

@@ -62,6 +62,11 @@ const transactionError = (cause: SqlError.SqlError) =>
     ? new Store.Conflict({ operation: "transaction", message: cause.message })
     : new Store.Failure({ operation: "transaction", cause });
 
+/**
+ * Construct one workspace binding over the caller's database; transactions are resolved per operation.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.Id) {
   const database = yield* SqliteDatabase.Service;
   const { sql, health } = database;
@@ -169,6 +174,11 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
   return Service.of({ workspaceId, database, guard, transaction });
 });
 
+/**
+ * Provide Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = (workspaceId: Workspace.Id) => Layer.effect(Service, make(workspaceId));
 
 export * as Binding from "./binding.ts";

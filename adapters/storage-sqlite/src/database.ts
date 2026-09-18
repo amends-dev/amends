@@ -37,19 +37,25 @@ export class Service extends Context.Service<Service, Database>()(
   "@amends/storage-sqlite/database/Service",
 ) {}
 
+/**
+ * Construct the database service over the caller's SQL client, applying pending migrations.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("SqliteDatabase.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
+  yield* SqliteMigrator.run({ loader: migrations });
   return Service.of({ sql, health: { broken: false } });
 });
 
-/** Open the file, bring its schema up to date, and share the connection. Transactions use BEGIN IMMEDIATE. */
+/**
+ * Open the file, bring its schema up to date, and share the connection. Transactions use BEGIN IMMEDIATE.
+ *
+ * @category layers
+ */
 export const layer = (filename: string) =>
   Layer.effect(Service, make()).pipe(
-    Layer.provideMerge(
-      SqliteMigrator.layer({ loader: migrations }).pipe(
-        Layer.provideMerge(SqliteClient.layer({ filename, busyTimeout: 0 })),
-      ),
-    ),
+    Layer.provideMerge(SqliteClient.layer({ filename, busyTimeout: 0 })),
   );
 
 export * as SqliteDatabase from "./database.ts";

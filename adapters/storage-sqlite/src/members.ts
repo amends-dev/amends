@@ -4,13 +4,17 @@ import { Array, Effect, Layer, Schema } from "effect";
 import type { Statement } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
-import { recordColumn } from "./record-column.ts";
+import { makeRecordDecoder } from "./record-column.ts";
 
 const codec = Schema.fromJsonString(Member.Record);
-const decode = recordColumn(codec);
+const decode = makeRecordDecoder(codec);
 const encode = Schema.encodeEffect(codec);
 
-/** Memberships, active and removed; one active membership per identity. */
+/**
+ * Memberships, active and removed; one active membership per identity.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Members.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
@@ -69,6 +73,11 @@ export const make = Effect.fn("Members.make")(function* () {
   });
 });
 
+/**
+ * Provide MemberStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(MemberStore.Service, make());
 
 export * as Members from "./members.ts";

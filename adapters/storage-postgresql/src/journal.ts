@@ -20,7 +20,11 @@ const Entries = Schema.Array(
   }),
 );
 
-/** The workspace's logs: appends inside a transaction, reads of committed batches, and waiting. */
+/**
+ * The workspace's logs: appends inside a transaction, reads of committed batches, and waiting.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Journal.make")(function* () {
   const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Service;
   const { db, sql } = database;
@@ -253,6 +257,11 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 });
 
+/**
+ * Provide Store.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Store.Service, make());
 
 export * as Journal from "./journal.ts";

@@ -15,7 +15,11 @@ const record = {
 };
 const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
 
-/** Memberships, active and removed; one active membership per identity. */
+/**
+ * Memberships, active and removed; one active membership per identity.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Members.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
@@ -79,6 +83,11 @@ export const make = Effect.fn("Members.make")(function* () {
   });
 });
 
+/**
+ * Provide MemberStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(MemberStore.Service, make());
 
 export * as Members from "./members.ts";

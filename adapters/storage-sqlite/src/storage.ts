@@ -11,8 +11,13 @@ import { Members } from "./members.ts";
 import { Roles } from "./roles.ts";
 import { Workspaces } from "./workspaces.ts";
 
-/** Every store core requires, each over the same workspace binding. Adding a store adds a line here. */
-export const stores = Layer.mergeAll(
+/**
+ * Provide every store core requires over the same workspace binding.
+ * Adding a store adds a line here.
+ *
+ * @category layers
+ */
+export const layerStores = Layer.mergeAll(
   Journal.layer,
   Checkpoints.layer,
   Workspaces.layer,
@@ -22,13 +27,19 @@ export const stores = Layer.mergeAll(
   Invitations.layer,
 );
 
-/** The stores bound to one workspace, over the database in context. */
-export const workspace = (workspaceId: Workspace.Id) =>
-  stores.pipe(Layer.provide(Binding.layer(workspaceId)));
+/**
+ * Provide the stores bound to one workspace over the caller's database.
+ *
+ * @category layers
+ */
+export const layerWorkspace = (workspaceId: Workspace.Id) =>
+  layerStores.pipe(Layer.provide(Binding.layer(workspaceId)));
 
 /**
  * One connection, with inexpensive workspace-bound views over it. The stores
  * hold no resources, so the scope that builds them can close at once.
+ *
+ * @category constructors
  */
 export const make = Effect.fn("SqliteStorage.make")(function* () {
   const database = yield* SqliteDatabase.Service;
@@ -36,14 +47,18 @@ export const make = Effect.fn("SqliteStorage.make")(function* () {
     "SqliteStorage.forWorkspace",
   )(
     function* (workspaceId: Workspace.Id) {
-      return yield* Effect.scoped(Layer.build(workspace(workspaceId)));
+      return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId)));
     },
     Effect.provideService(SqliteDatabase.Service, database),
   );
   return WorkspaceStorage.Service.of({ forWorkspace });
 });
 
-/** Expose the workspace views to the gateway as its workspace storage contract. */
+/**
+ * Expose the workspace views to the gateway as its workspace storage contract.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(WorkspaceStorage.Service, make());
 
 export * as SqliteStorage from "./storage.ts";

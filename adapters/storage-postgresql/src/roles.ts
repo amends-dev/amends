@@ -9,7 +9,11 @@ import { roles } from "./schema.ts";
 /** The table's columns already have the record's names; decoding checks brands and uniqueness. */
 const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
 
-/** Named permission bundles; edits keep the role's identity. */
+/**
+ * Named permission bundles; edits keep the role's identity.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Roles.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
@@ -68,6 +72,11 @@ export const make = Effect.fn("Roles.make")(function* () {
   });
 });
 
+/**
+ * Provide RoleStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(RoleStore.Service, make());
 
 export * as Roles from "./roles.ts";

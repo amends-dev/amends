@@ -82,7 +82,11 @@ export const select = (
       }),
     );
 
-/** Invitations and their grants; settlement records who acted and when. */
+/**
+ * Invitations and their grants; settlement records who acted and when.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Invitations.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
@@ -168,6 +172,11 @@ export const make = Effect.fn("Invitations.make")(function* () {
   });
 });
 
+/**
+ * Provide InvitationStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(InvitationStore.Service, make());
 
 export * as Invitations from "./invitations.ts";

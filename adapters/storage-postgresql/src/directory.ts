@@ -17,6 +17,8 @@ const Membership = Schema.Struct({
  * One identity's workspaces, read from the projection tables across every
  * workspace in the database. This is host routing, not a core operation: it
  * reads read models directly and performs no authorization of its own.
+ *
+ * @category constructors
  */
 export const make = Effect.fn("PostgresDirectory.make")(function* () {
   const { db } = yield* PostgresDatabase.Service;
@@ -79,6 +81,11 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
   return WorkspaceDirectory.Service.of({ list });
 });
 
+/**
+ * Provide WorkspaceDirectory.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(WorkspaceDirectory.Service, make());
 
 export * as PostgresDirectory from "./directory.ts";

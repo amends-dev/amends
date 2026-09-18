@@ -3,16 +3,20 @@ import { Store } from "@amends/core/journal";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
-import { recordColumn } from "./record-column.ts";
+import { makeRecordDecoder } from "./record-column.ts";
 
 const codec = Schema.fromJsonString(Role.Record);
-const decode = recordColumn(codec);
+const decode = makeRecordDecoder(codec);
 const encode = Schema.encodeEffect(codec);
 const encodePermissions = Schema.encodeEffect(
   Schema.fromJsonString(Role.Record.fields.permissions),
 );
 
-/** Named permission bundles; edits keep the role's identity. */
+/**
+ * Named permission bundles; edits keep the role's identity.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Roles.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
@@ -65,6 +69,11 @@ export const make = Effect.fn("Roles.make")(function* () {
   });
 });
 
+/**
+ * Provide RoleStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(RoleStore.Service, make());
 
 export * as Roles from "./roles.ts";

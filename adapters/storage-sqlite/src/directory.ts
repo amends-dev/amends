@@ -4,7 +4,7 @@ import { WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { SqliteDatabase } from "./database.ts";
 import { Invitations } from "./invitations.ts";
-import { recordColumn } from "./record-column.ts";
+import { makeRecordDecoder } from "./record-column.ts";
 
 const Memberships = Schema.Array(
   Schema.Struct({
@@ -13,12 +13,14 @@ const Memberships = Schema.Array(
     people: Schema.Int,
   }),
 );
-const invitationRecords = recordColumn(Invitations.codec);
+const invitationRecords = makeRecordDecoder(Invitations.codec);
 
 /**
  * One identity's workspaces, read from the projection tables across every
  * workspace in the database. This is host routing, not a core operation: it
  * reads read models directly and performs no authorization of its own.
+ *
+ * @category constructors
  */
 export const make = Effect.fn("SqliteDirectory.make")(function* () {
   const { sql } = yield* SqliteDatabase.Service;
@@ -47,6 +49,11 @@ export const make = Effect.fn("SqliteDirectory.make")(function* () {
   return WorkspaceDirectory.Service.of({ list });
 });
 
+/**
+ * Provide WorkspaceDirectory.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(WorkspaceDirectory.Service, make());
 
 export * as SqliteDirectory from "./directory.ts";

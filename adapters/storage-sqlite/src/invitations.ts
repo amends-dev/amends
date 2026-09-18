@@ -4,10 +4,10 @@ import { Array, Effect, Layer, Schema } from "effect";
 import type { Statement } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
-import { recordColumn } from "./record-column.ts";
+import { makeRecordDecoder } from "./record-column.ts";
 
 export const codec = Schema.fromJsonString(Invitation.Record);
-const decode = recordColumn(codec);
+const decode = makeRecordDecoder(codec);
 const encode = Schema.encodeEffect(codec);
 const encodeSettled = Schema.encodeEffect(
   Schema.fromJsonString(
@@ -15,7 +15,11 @@ const encodeSettled = Schema.encodeEffect(
   ),
 );
 
-/** Invitations and their grants; settlement records who acted and when. */
+/**
+ * Invitations and their grants; settlement records who acted and when.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Invitations.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
@@ -76,6 +80,11 @@ export const make = Effect.fn("Invitations.make")(function* () {
   });
 });
 
+/**
+ * Provide InvitationStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(InvitationStore.Service, make());
 
 export * as Invitations from "./invitations.ts";

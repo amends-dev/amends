@@ -76,6 +76,11 @@ const transactionError = (cause: SqlError.SqlError) =>
 /** What the client reports for a control statement; the tag says what PostgreSQL actually did. */
 const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") }));
 
+/**
+ * Construct one workspace binding over the caller's database; transactions are resolved per operation.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Binding.make")(function* (
   workspaceId: Workspace.Id,
   options: Options = {},
@@ -204,6 +209,11 @@ export const make = Effect.fn("Binding.make")(function* (
   return Service.of({ workspaceId, database, pollInterval, guard, transaction });
 });
 
+/**
+ * Provide Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = (workspaceId: Workspace.Id, options: Options = {}) =>
   Layer.effect(Service, make(workspaceId, options));
 

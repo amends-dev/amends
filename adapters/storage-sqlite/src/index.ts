@@ -10,5 +10,7 @@ export { SqliteStorage } from "./storage.ts";
 /**
  * Both gateway contracts this adapter implements, over one open database.
  * A host provides SqliteDatabase.layer(filename) beneath, and the gateway above.
+ *
+ * @category layers
  */
-export const contracts = Layer.mergeAll(SqliteStorage.layer, SqliteDirectory.layer);
+export const layer = Layer.mergeAll(SqliteStorage.layer, SqliteDirectory.layer);

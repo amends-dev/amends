@@ -14,7 +14,11 @@ const record = {
 };
 const decode = Schema.decodeUnknownEffect(Schema.Array(Workspace.Record));
 
-/** The workspace's own record, inserted once by initialization. */
+/**
+ * The workspace's own record, inserted once by initialization.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Workspaces.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
@@ -45,6 +49,11 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   });
 });
 
+/**
+ * Provide WorkspaceStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(WorkspaceStore.Service, make());
 
 export * as Workspaces from "./workspaces.ts";

@@ -11,6 +11,8 @@ export * as schema from "./schema.ts";
 /**
  * Both gateway contracts this adapter implements, over one connected database.
  * A host provides PostgresDatabase.layer(config) beneath, and the gateway above.
+ *
+ * @category layers
  */
-export const contracts = (options: PostgresStorage.Options = {}) =>
+export const layer = (options: PostgresStorage.Options = {}) =>
   Layer.mergeAll(PostgresStorage.layer(options), PostgresDirectory.layer);

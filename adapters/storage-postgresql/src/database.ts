@@ -5,7 +5,7 @@ import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { fileURLToPath } from "node:url";
 
-/** Migrations generated from the schema by `bun run generate`; applied when the layer is built. */
+/** Migrations generated from the schema by `bun run generate`; applied during construction. */
 export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 export type Client = Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults>>;
@@ -25,6 +25,11 @@ export class Service extends Context.Service<Service, Database>()(
   "@amends/storage-postgresql/database/Service",
 ) {}
 
+/**
+ * Construct the database service over the caller's SQL client, applying pending migrations.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("PostgresDatabase.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const db = yield* PgDrizzle.makeWithDefaults();
@@ -32,7 +37,11 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
   return Service.of({ db, sql });
 });
 
-/** Connect a pool with the given configuration and bring the schema up to date. */
+/**
+ * Connect a pool with the given configuration and bring the schema up to date.
+ *
+ * @category layers
+ */
 export const layer = (config: PgClient.PgPoolConfig) =>
   Layer.effect(Service, make()).pipe(Layer.provideMerge(PgClient.layer(config)));
 

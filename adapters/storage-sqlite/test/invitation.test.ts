@@ -30,7 +30,7 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Gateway, type WorkspaceStorage } from "@amends/gateway";
-import { contracts, SqliteDatabase, SqliteStorage } from "../src/index.ts";
+import { layer, SqliteDatabase, SqliteStorage } from "../src/index.ts";
 import { BunCrypto } from "@effect/platform-bun";
 import { Clock, Context, DateTime, Effect, Layer, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -69,7 +69,7 @@ const runHost = <A, E>(
     program.pipe(
       Effect.provide(
         Gateway.layer.pipe(
-          Layer.provideMerge(contracts),
+          Layer.provideMerge(layer),
           Layer.provideMerge(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
         ),
       ),

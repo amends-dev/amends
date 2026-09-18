@@ -24,7 +24,11 @@ const toRecord = (row: typeof assignments.$inferSelect) => {
 };
 const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Record));
 
-/** Access assigned to memberships, by role or directly; revoked rows keep their source. */
+/**
+ * Access assigned to memberships, by role or directly; revoked rows keep their source.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Assignments.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
@@ -93,6 +97,11 @@ export const make = Effect.fn("Assignments.make")(function* () {
   });
 });
 
+/**
+ * Provide AssignmentStore.Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(AssignmentStore.Service, make());
 
 export * as Assignments from "./assignments.ts";
