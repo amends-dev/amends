@@ -2,8 +2,12 @@
 
 Use Bun for dependency installation, scripts, and application execution.
 Use TypeScript 7 for type-checking, Oxlint for linting, and Oxfmt for formatting.
-Run `bun run check` after changes and `bun run start` after changing runtime setup.
-Use `bun run format` and `bun run lint:fix` to apply formatting and safe lint fixes.
+Run `bun run check` after changes and `bun run test` after changing behavior.
+`bun run start` serves the local host on port 8787 and keeps running; after
+changing runtime setup, start it in the background with `AMENDS_PORT=0`, confirm
+the "Listening on" line, and stop it. The host tests also spawn the server entry
+point. Use `bun run format` and `bun run lint:fix` to apply formatting and safe
+lint fixes.
 
 `bun install` runs `effect-tsgo patch` and `lefthook install` through the `prepare`
 script. This enables Effect diagnostics in the TypeScript compiler and workspace
@@ -21,10 +25,19 @@ currently run through TypeScript. Check compatibility before changing this setup
 - `packages/*`: portable shared packages. Effect is their only external dependency.
   They may depend on other shared packages with `workspace:*`, but never hosts or
   apps. This applies to all dependency sections; development tools live at the root.
-- `hosts/*`: runtime composition and adapters, such as the Bun host in `hosts/local`.
+  `core` operates within one workspace with a trusted actor; its application
+  services are the operations. `gateway` is how a host enters core: it bootstraps
+  a workspace and resolves an authenticated identity into the actor, and it holds
+  the host contracts for storage, sign-in, and the workspace directory. `api-http`
+  is the HTTP contract shared by servers and clients, and `server-http` implements
+  it over the gateway. Another protocol adds its own contract and handler packages
+  over the same gateway rather than new gateway methods.
+- `hosts/*`: runtime composition and adapters, such as the Bun host in `hosts/local`,
+  which serves the HTTP API over SQLite with development sign-in and authentication.
   Hosts may install their runtime's dependencies and consume shared packages.
-- `apps/*`: user-facing clients, such as future web or desktop applications. Apps
-  may install UI dependencies and consume shared packages.
+- `apps/*`: user-facing clients. `ui` holds the design system's components, tokens,
+  and styles; `web` is the Solid application, which talks to a host only through
+  the HTTP contract. Apps may install UI dependencies and consume shared packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no
