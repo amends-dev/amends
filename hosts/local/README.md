@@ -1,15 +1,31 @@
 # Local host
 
 This Bun host runs the application on one machine: the HTTP API from
-`@amends/server-http` over one SQLite database, serving multiple workspaces to
-the web application. The current milestone provides sign-in, workspace
-initialization, invitations with direct initial grants, authorized membership
-reads and listing, and removal.
+`@amends/server-http` over SQLite by default, or PostgreSQL when configured,
+serving multiple workspaces to the web application. The current milestone provides
+sign-in, workspace initialization, invitations with direct initial grants,
+authorized membership reads and listing, and removal.
 
-The host composes `@amends/gateway` over its SQLite storage: `Storage.layer`
-supplies workspace-bound storage views, and `LocalHost.layer` builds
-`Gateway.Service` and the workspace directory from them. Every request enters a
-workspace through the gateway and runs one core application operation.
+`LocalHost.layerSqlite(filename)` and `LocalHost.layerPostgres(url)` compose
+`@amends/gateway` over the selected storage adapter's root `layer`. They provide
+`Gateway.Service` and the workspace directory, using Bun cryptography internally.
+Every request enters a workspace through the gateway and runs one core application
+operation.
+
+## Construction
+
+`LocalSignIn.make(deliver?)` constructs sign-in over `Crypto.Crypto`; its default
+delivery logs the code. Each acquisition owns a separate pending-code map.
+`LocalSignIn.makeCredentials()` synchronously constructs the development
+credential resolver. Both return gateway contract implementations, and neither
+needs HTTP services. `LocalSignIn.layerCredentials` provides the resolver through
+its constructor; `LocalSignIn.layer(deliver?)` provides both session services.
+
+`LocalServer.layerRoutes` combines the API routes and documentation.
+`LocalServer.layer(host, port)` supplies the session services and starts the Bun
+HTTP server. These are layer compositions with no separate service constructor.
+The entry point selects the storage implementation from Effect configuration
+and launches the completed server layer.
 
 ## Run
 
@@ -25,6 +41,7 @@ This listens on `http://127.0.0.1:8787` with the OpenAPI document at
 server proxies `/api` here. `AMENDS_DATABASE` selects the SQLite file, by
 default `./data/amends.sqlite` in the host directory; use an absolute path when
 running from elsewhere. `AMENDS_PORT` changes the port, and `0` picks a free one.
+`AMENDS_DATABASE_URL` selects PostgreSQL and takes precedence over the SQLite filename.
 `bun run dev` restarts the server when its source changes.
 
 ## Authentication
@@ -41,9 +58,9 @@ curl -X POST -H 'Authorization: Bearer alice' http://127.0.0.1:8787/workspaces
 curl -H 'Authorization: Bearer alice' http://127.0.0.1:8787/workspaces/<workspace-id>/members/<member-id>
 ```
 
-Nothing verifies that the person controls the address. Replace
-`LocalAuthentication` and `LocalSignIn` before exposing this server beyond the
-local machine. A network host must authenticate the caller and check
+Nothing verifies that the person controls the address. Replace the development
+sign-in and credential implementations in `LocalSignIn` before exposing this
+server beyond the local machine. A network host must authenticate the caller and check
 workspace-creation entitlement before entering the gateway.
 
 Requests without a token receive 401. Non-members receive 403 with
@@ -162,8 +179,9 @@ initialization. Concurrent initializers serialize or receive a storage conflict.
 
 ## Workspace and transaction boundaries
 
-`Storage.make` binds one SQL client. Its `forWorkspace` operation constructs
-workspace-specific views over that client; it creates no database or membership.
+`SqliteStorage.make` or `PostgresStorage.make` captures the adapter's database
+service. Its `forWorkspace` operation constructs workspace-specific views over
+that database; it creates no database or membership.
 The host constructs core layers for each operation using those views. No actor
 is cached, and no process or database connection is allocated per workspace.
 
@@ -217,6 +235,10 @@ enablement, and replay.
 Removal checks cover exact-target authority, owner protection, stale actors,
 pending invitation revocation, transaction rollback, concurrent removal, replay,
 and access denial after restart.
+
+Constructor tests exercise direct sign-in and credential construction alongside
+the combined layer. A test clock verifies the exact ten-minute expiry boundary;
+separate acquisitions must keep their pending codes isolated.
 
 The local membership story now covers sign-in, creation, invitation, acceptance,
 authorized reads and listing, removal, and subsequent access denial, all over

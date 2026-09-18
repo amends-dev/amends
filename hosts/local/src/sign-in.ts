@@ -13,13 +13,20 @@ export type Deliver = (email: SignIn.Email, code: SignIn.Code) => Effect.Effect<
 export const logDelivery: Deliver = (email, code) =>
   Effect.logInfo(`Sign-in code for ${email}: ${code}`);
 
+/** Codes expire ten minutes after issuance. */
+export const lifetime = Duration.minutes(10);
+
 /**
  * Development sign-in. Codes live in memory and expire after ten minutes; the
  * session token is the address itself, which credential resolution below
  * trusts as the human ID. Nothing here verifies that the person controls the
  * address.
+ *
+ * @category constructors
  */
-export const make = Effect.fn("LocalSignIn.make")(function* (deliver: Deliver) {
+export const make = Effect.fn("LocalSignIn.make")(function* (
+  deliver: Deliver = logDelivery,
+): Effect.fn.Return<SignIn.Interface, never, Crypto.Crypto> {
   const cryptography = yield* Crypto.Crypto;
   const pending = new Map<SignIn.Email, Pending>();
   const start: SignIn.Interface["start"] = Effect.fn("LocalSignIn.start")(function* (email) {
@@ -28,7 +35,7 @@ export const make = Effect.fn("LocalSignIn.make")(function* (deliver: Deliver) {
     const code = yield* Schema.decodeEffect(SignIn.Code)(
       String(view.getUint32(0) % 1_000_000).padStart(6, "0"),
     ).pipe(Effect.orDie);
-    pending.set(email, { code, expiresAt: DateTime.add(yield* DateTime.now, { minutes: 10 }) });
+    pending.set(email, { code, expiresAt: DateTime.addDuration(yield* DateTime.now, lifetime) });
     yield* deliver(email, code);
   });
   const complete: SignIn.Interface["complete"] = Effect.fn("LocalSignIn.complete")(
@@ -50,23 +57,31 @@ export const make = Effect.fn("LocalSignIn.make")(function* (deliver: Deliver) {
 /**
  * Development credentials: the token is the human ID it asserts, mirroring the
  * CLI's trusted local operator assertions. A network host must verify tokens.
+ *
+ * @category constructors
  */
-export const credentials = Layer.succeed(
-  Credentials.Service,
+export const makeCredentials = (): Credentials.Interface =>
   Credentials.Service.of({
     resolve: (token) =>
       Schema.decodeEffect(Identity.HumanId)(Redacted.value(token)).pipe(
         Effect.mapError(() => new Credentials.Rejected({ reason: "malformed" })),
         Effect.map((id) => Identity.Reference.cases.Human.make({ id })),
       ),
-  }),
-);
+  });
 
-/** Both halves of the session: issuing tokens and resolving them. */
-export const layer = (deliver: Deliver = logDelivery) =>
-  Layer.merge(Layer.effect(SignIn.Service, make(deliver)), credentials);
+/**
+ * Provide the development credential resolver using its synchronous constructor.
+ *
+ * @category layers
+ */
+export const layerCredentials = Layer.sync(Credentials.Service, makeCredentials);
 
-/** Codes expire ten minutes after delivery. */
-export const lifetime = Duration.minutes(10);
+/**
+ * Provide both session services: sign-in with fresh pending codes, and credential resolution.
+ *
+ * @category layers
+ */
+export const layer = (deliver?: Deliver) =>
+  Layer.merge(Layer.effect(SignIn.Service, make(deliver)), layerCredentials);
 
 export * as LocalSignIn from "./sign-in.ts";

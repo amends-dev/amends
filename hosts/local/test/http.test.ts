@@ -22,10 +22,10 @@ const asToken = (token: string) =>
 /** The real routes, gateway, and SQLite storage behind a Bun test server; codes are captured. */
 const delivered = new Map<string, string>();
 const server = (filename: string) =>
-  HttpRouter.serve(LocalServer.routes, { disableLogger: true, disableListenLog: true }).pipe(
+  HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       Layer.mergeAll(
-        LocalHost.sqliteLayer(filename),
+        LocalHost.layerSqlite(filename),
         LocalSignIn.layer((email, code) => Effect.sync(() => delivered.set(email, code))).pipe(
           Layer.provide(BunCrypto.layer),
         ),
@@ -154,11 +154,13 @@ test("email sign-in issues a session the server accepts, and the directory lists
         const anonymous = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken("")));
         const email = "jo@mercier.co";
         yield* anonymous.session.start({ payload: { email } });
-        const wrong = yield* Effect.flip(
-          anonymous.session.complete({ payload: { email, code: "000000" } }),
-        );
         const code = delivered.get(email);
         if (code === undefined) return yield* Effect.die("No code was delivered");
+        const wrong = yield* Effect.flip(
+          anonymous.session.complete({
+            payload: { email, code: code === "000000" ? "000001" : "000000" },
+          }),
+        );
         const session = yield* anonymous.session.complete({ payload: { email, code } });
         const reused = yield* Effect.flip(anonymous.session.complete({ payload: { email, code } }));
         const client = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(session.token)));

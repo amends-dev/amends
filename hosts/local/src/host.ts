@@ -12,15 +12,21 @@ export type Host = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unk
  * storage adapter. Callers supply identities established by a trusted ingress:
  * the CLI treats its arguments as local operator assertions, and the HTTP
  * server resolves bearer tokens before calling it.
+ *
+ * @category layers
  */
-export const sqliteLayer = (filename: string): Host =>
+export const layerSqlite = (filename: string): Host =>
   Gateway.layer.pipe(
     Layer.provideMerge(sqlite),
     Layer.provide(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
   );
 
-/** The same gateway and directory over a PostgreSQL database, through its adapter. */
-export const postgresLayer = (url: Redacted.Redacted<string>): Host =>
+/**
+ * Provide the gateway and directory over a PostgreSQL database through its adapter.
+ *
+ * @category layers
+ */
+export const layerPostgres = (url: Redacted.Redacted<string>): Host =>
   Gateway.layer.pipe(
     Layer.provideMerge(postgres()),
     Layer.provide(Layer.mergeAll(PostgresDatabase.layer({ url }), BunCrypto.layer)),
