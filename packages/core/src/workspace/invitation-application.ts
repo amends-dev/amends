@@ -79,6 +79,8 @@ export interface Interface {
     recipient: Identity.HumanId,
   ) => Effect.Effect<Member.Record, Error>;
   readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
+  /** Every invitation in the workspace in issue order; requires invitation.manage. */
+  readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/workspace/invitation-application/Service",
@@ -272,7 +274,21 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     return { details: invitation.details, state } satisfies Invitation.Record;
   }, journal.commit);
 
-  return Service.of({ issue, accept, revoke });
+  const list = Effect.gen(function* () {
+    yield* authorization.require([manage]);
+    const records: Array<Invitation.Record> = [];
+    for (const found of yield* invitations.list) {
+      const record = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(found);
+      if (record.details.workspaceId !== workspaceId)
+        return yield* new InvalidResponse({
+          message: "Invitation store returned another workspace's invitation",
+        });
+      records.push(record);
+    }
+    return records;
+  }).pipe(journal.commit, Effect.withSpan("InvitationApplication.list"));
+
+  return Service.of({ issue, accept, revoke, list });
 });
 
 export const layer = Layer.effect(Service, make());

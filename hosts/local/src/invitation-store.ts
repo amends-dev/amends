@@ -1,4 +1,5 @@
-import { Invitation, InvitationStore, Store, Workspace } from "@amends/core";
+import { Store } from "@amends/core/journal";
+import { Invitation, InvitationStore, Workspace } from "@amends/core/workspace";
 import { Array, Effect, Option, Schema } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
 import type { SqliteJournal } from "./journal-store.ts";
@@ -51,6 +52,15 @@ export const make = Effect.fn("SqliteInvitation.make")(function* (
         return rows.map((row) => row.record);
       },
     ),
+    list: journal
+      .guard(
+        sql`SELECT record FROM invitations WHERE workspace_id = ${workspaceId} ORDER BY json_extract(record, '$.details.issuedAt'), id`,
+      )
+      .pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ record: codec })))),
+        Effect.map((rows) => rows.map((row) => row.record)),
+        Effect.mapError((cause) => new InvitationStore.Failure({ operation: "list", cause })),
+      ),
     insert: Effect.fn("SqliteInvitation.insert")(function* (record) {
       yield* Store.Transaction;
       if (record.details.workspaceId !== workspaceId || record.state._tag !== "Pending")

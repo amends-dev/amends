@@ -1,21 +1,16 @@
 import { expect, expectTypeOf, test } from "bun:test";
+import * as Core from "@amends/core";
+import { AssignmentFacts, Role, RoleFacts } from "@amends/core/authorization";
+import { Actor, Identity } from "@amends/core/identity";
+import { Checkpoint, Journal, Log, Store } from "@amends/core/journal";
 import {
-  Actor,
-  AssignmentFacts,
-  Checkpoint,
-  Identity,
-  Journal,
-  Log,
   Member,
   MemberApplication,
   MemberPermissions,
-  Role,
-  RoleFacts,
-  Store,
   Workspace,
-  WorkspaceCore,
   WorkspaceInitialization,
-} from "@amends/core";
+} from "@amends/core/workspace";
+import { Gateway } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
@@ -24,6 +19,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "../src/database.ts";
 import { LocalHost } from "../src/host.ts";
+import { Operations } from "./operations.ts";
+import { withServer } from "./server.ts";
 import { Storage } from "../src/storage.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -34,7 +31,7 @@ type Bound = Effect.Success<
   ReturnType<Effect.Success<ReturnType<typeof Storage.make>>["forWorkspace"]>
 >;
 const core = (bound: Bound) =>
-  WorkspaceCore.layer.pipe(
+  Core.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
   );
 const inDatabase = <A, E>(filename: string, program: Effect.Effect<A, E, SqlClient.SqlClient>) =>
@@ -53,20 +50,19 @@ const temporary = async (run: (filename: string) => Promise<void>) => {
 test("one host creates two isolated workspaces and uses each operation's authenticated identity", async () =>
   temporary(async (filename) => {
     expectTypeOf<
-      Effect.Services<ReturnType<LocalHost.Interface["getMember"]>>
-    >().toEqualTypeOf<never>();
+      Effect.Services<ReturnType<typeof Operations.getMember>>
+    >().toEqualTypeOf<Gateway.Service>();
     expectTypeOf<
-      Effect.Services<ReturnType<LocalHost.Interface["createWorkspace"]>>
+      Effect.Services<ReturnType<Gateway.Interface["createWorkspace"]>>
     >().toEqualTypeOf<never>();
     const workspaces = await Effect.runPromise(
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const a = yield* host.createWorkspace(alice.id);
-        const b = yield* host.createWorkspace(bob.id);
+        const a = yield* Operations.createWorkspace(alice.id);
+        const b = yield* Operations.createWorkspace(bob.id);
         const requests = Array.from({ length: 20 }, (_, index) => {
           const [workspace, identity] =
             index % 2 === 0 ? ([a, alice] as const) : ([b, bob] as const);
-          return host.getMember(workspace.id, identity, workspace.ownerMemberId).pipe(
+          return Operations.getMember(workspace.id, identity, workspace.ownerMemberId).pipe(
             Effect.tap((record) => {
               expect(record.workspaceId).toBe(workspace.id);
               expect(record.identity).toEqual(identity);
@@ -75,13 +71,17 @@ test("one host creates two isolated workspaces and uses each operation's authent
           );
         });
         yield* Effect.all(requests, { concurrency: "unbounded" });
-        expect(yield* Effect.flip(host.getMember(b.id, alice, b.ownerMemberId))).toMatchObject({
-          _tag: "LocalHost.NotMember",
+        expect(
+          yield* Effect.flip(Operations.getMember(b.id, alice, b.ownerMemberId)),
+        ).toMatchObject({
+          _tag: "Gateway.NotMember",
         });
-        expect(yield* Effect.flip(host.getMember(a.id, bob, a.ownerMemberId))).toMatchObject({
-          _tag: "LocalHost.NotMember",
+        expect(yield* Effect.flip(Operations.getMember(a.id, bob, a.ownerMemberId))).toMatchObject({
+          _tag: "Gateway.NotMember",
         });
-        expect(yield* Effect.flip(host.getMember(a.id, alice, b.ownerMemberId))).toMatchObject({
+        expect(
+          yield* Effect.flip(Operations.getMember(a.id, alice, b.ownerMemberId)),
+        ).toMatchObject({
           _tag: "MemberApplication.NotFound",
         });
         return [a, b];
@@ -290,34 +290,23 @@ test("the persistent role and assignment projections support edits and independe
     );
   }));
 
-test("a new process can read persisted memberships, and another identity is denied", async () =>
+test("the server entry point serves persisted memberships to another process, and denies another identity", async () =>
   temporary(async (filename) => {
-    const invoke = async (...args: string[]) => {
-      const child = Bun.spawn([process.execPath, "hosts/local/src/index.ts", ...args], {
-        cwd: join(import.meta.dir, "../../.."),
-        env: { ...process.env, AMENDS_DATABASE: filename },
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      const [exit, output, error] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-      ]);
-      return { exit, output, error };
-    };
-    const created = await invoke("create", alice.id);
-    expect(created.exit).toBe(0);
-    const workspace = Schema.decodeSync(Schema.fromJsonString(Workspace.Record))(
-      created.output.trim(),
-    );
-    const reopened = await invoke("get", workspace.id, alice.id, workspace.ownerMemberId);
-    expect(reopened.exit).toBe(0);
-    const member = Schema.decodeSync(Schema.fromJsonString(Member.Record))(reopened.output.trim());
-    expect(member.identity).toEqual(alice);
-    const denied = await invoke("get", workspace.id, bob.id, workspace.ownerMemberId);
-    expect(denied.exit).toBe(1);
-    expect(denied.output + denied.error).toContain("LocalHost.NotMember");
+    const workspace = await withServer(filename, async (call) => {
+      const created = await call(alice.id, "POST", "/workspaces");
+      expect(created.status).toBe(201);
+      return Schema.decodeUnknownSync(Workspace.Record)(created.body);
+    });
+    // A fresh server process reads what the previous one committed.
+    await withServer(filename, async (call) => {
+      const path = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
+      const read = await call(alice.id, "GET", path);
+      expect(read.status).toBe(200);
+      expect(Schema.decodeUnknownSync(Member.Record)(read.body).identity).toEqual(alice);
+      const denied = await call(bob.id, "GET", path);
+      expect(denied.status).toBe(403);
+      expect(denied.body).toMatchObject({ _tag: "Gateway.NotMember" });
+    });
   }));
 
 test("separate connections observe live appends; identical log IDs stay isolated by workspace", async () =>

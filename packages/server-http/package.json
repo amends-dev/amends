@@ -1,0 +1,18 @@
+{
+  "name": "@amends/server-http",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/api-http": "workspace:*",
+    "@amends/core": "workspace:*",
+    "@amends/gateway": "workspace:*",
+    "effect": "catalog:"
+  }
+}

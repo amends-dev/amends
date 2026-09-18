@@ -69,6 +69,13 @@ export interface Interface {
    */
   readonly get: (memberId: Member.Id) => Effect.Effect<Member.Record, Error, Actor.Service>;
   /**
+   * List the memberships the actor may read, active and removed. Active
+   * membership is required; each record is then included only when member.read
+   * covers it, so a workspace-scoped grant sees everyone and an exact grant sees
+   * that member. Authorization and the listing share one journal transaction.
+   */
+  readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Error, Actor.Service>;
+  /**
    * Require member.remove on an active target, protect current ownership, and
    * publish its removal and revoke its human recipient's pending invitations in
    * one commit. Historical membership and grants remain;
@@ -136,6 +143,28 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     return yield* load(id);
   }, journal.commit);
 
+  const list = Effect.gen(function* () {
+    yield* authorization.require([]);
+    const readable: Array<Member.Record> = [];
+    for (const found of yield* members.list) {
+      const member = yield* decodeMember(found);
+      yield* requireWorkspace(workspaceId, member.workspaceId);
+      const allowed = yield* authorization
+        .require([
+          Requirement.make(
+            MemberPermissions.Read,
+            Target.Reference.cases.Member.make({ workspaceId, memberId: member.id }),
+          ),
+        ])
+        .pipe(
+          Effect.as(true),
+          Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
+        );
+      if (allowed) readable.push(member);
+    }
+    return readable;
+  }).pipe(journal.commit, Effect.withSpan("MemberApplication.list"));
+
   const remove = Effect.fn("MemberApplication.remove")(function* (memberId: Member.Id) {
     const id = yield* decodeId(memberId);
     yield* authorization.require([
@@ -185,7 +214,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     } satisfies Member.Record;
   }, journal.commit);
 
-  return Service.of({ workspaceId, get, remove });
+  return Service.of({ workspaceId, get, list, remove });
 });
 
 export const layer = Layer.effect(Service, make());

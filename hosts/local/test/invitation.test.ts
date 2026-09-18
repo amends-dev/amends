@@ -1,31 +1,30 @@
 import { expect, expectTypeOf, test } from "bun:test";
+import * as Core from "@amends/core";
 import {
-  Actor,
   Assignment,
   AssignmentFacts,
   AssignmentProjection,
-  Checkpoint,
   Grant,
-  Identity,
+  Permission,
+  RoleProjection,
+  Scope,
+} from "@amends/core/authorization";
+import { Actor, Identity } from "@amends/core/identity";
+import { Checkpoint, Journal, Log, Store } from "@amends/core/journal";
+import {
   Invitation,
   InvitationApplication,
   InvitationJournal,
   InvitationPermissions,
-  Journal,
-  Log,
   Member,
   MemberApplication,
   MemberFacts,
   MemberPermissions,
   MemberProjection,
-  Permission,
-  RoleProjection,
-  Scope,
-  Store,
   Workspace,
-  WorkspaceCore,
   WorkspaceInitialization,
-} from "@amends/core";
+} from "@amends/core/workspace";
+import { Gateway } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Clock, Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -33,7 +32,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "../src/database.ts";
-import { LocalHost } from "../src/host.ts";
+import { Operations } from "./operations.ts";
+import { withServer } from "./server.ts";
 import { Storage } from "../src/storage.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -43,17 +43,18 @@ type Bound = Effect.Success<
   ReturnType<Effect.Success<ReturnType<typeof Storage.make>>["forWorkspace"]>
 >;
 const core = (bound: Bound) =>
-  WorkspaceCore.layer.pipe(
+  Core.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
   );
 const runHost = <A, E>(
   filename: string,
-  program: Effect.Effect<A, E, LocalHost.Service | SqlClient.SqlClient>,
+  program: Effect.Effect<A, E, Gateway.Service | SqlClient.SqlClient>,
 ) =>
   Effect.runPromise(
     program.pipe(
       Effect.provide(
-        Layer.effect(LocalHost.Service, LocalHost.make()).pipe(
+        Gateway.layer.pipe(
+          Layer.provide(Storage.layer),
           Layer.provideMerge(Layer.mergeAll(Database.layer(filename), BunCrypto.layer)),
         ),
       ),
@@ -107,9 +108,8 @@ test("owner invites a reader; concurrent repeat acceptance grants once and never
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const invitation = yield* host.invite(
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const invitation = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, yield* future),
@@ -118,7 +118,7 @@ test("owner invites a reader; concurrent repeat acceptance grants once and never
         expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
         const accepted = yield* Effect.forEach(
           [1, 2],
-          () => host.acceptInvitation(workspace.id, bob.id, invitation.details.id),
+          () => Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id),
           { concurrency: "unbounded" },
         );
         const first = accepted[0];
@@ -126,38 +126,42 @@ test("owner invites a reader; concurrent repeat acceptance grants once and never
         expect(accepted[1]?.id).toBe(first.id);
         expect(yield* bound.assignments.listActiveByMember(first.id)).toHaveLength(1);
         expect(
-          (yield* host.getMember(workspace.id, bob, workspace.ownerMemberId)).identity,
+          (yield* Operations.getMember(workspace.id, bob, workspace.ownerMemberId)).identity,
         ).toEqual(alice);
         expect(
           yield* Effect.flip(
-            host.invite(workspace.id, bob, request(workspace.id, yield* future, charlie.id)),
+            Operations.invite(workspace.id, bob, request(workspace.id, yield* future, charlie.id)),
           ),
         ).toMatchObject({ _tag: "Authorization.Denied" });
-        expect(yield* Effect.flip(host.enableInvitations(workspace.id, bob))).toMatchObject({
+        expect(yield* Effect.flip(Operations.enableInvitations(workspace.id, bob))).toMatchObject({
           _tag: "WorkspaceInitialization.NotOwner",
         });
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
         expect(before).toHaveLength(3);
         expect(before[2]?.entries).toHaveLength(3);
-        yield* host.acceptInvitation(workspace.id, bob.id, invitation.details.id);
+        yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
-        yield* host.removeMember(workspace.id, alice, first.id);
+        yield* Operations.removeMember(workspace.id, alice, first.id);
         expect(
-          (yield* host.acceptInvitation(workspace.id, bob.id, invitation.details.id)).status,
+          (yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id)).status,
         ).toBe("removed");
         expect(
-          yield* Effect.flip(host.getMember(workspace.id, bob, workspace.ownerMemberId)),
-        ).toMatchObject({ _tag: "LocalHost.NotMember" });
-        const freshInvite = yield* host.invite(workspace.id, alice, {
+          yield* Effect.flip(Operations.getMember(workspace.id, bob, workspace.ownerMemberId)),
+        ).toMatchObject({ _tag: "Gateway.NotMember" });
+        const freshInvite = yield* Operations.invite(workspace.id, alice, {
           recipientId: bob.id,
           expiresAt: yield* future,
           grants: [],
         });
-        const rejoined = yield* host.acceptInvitation(workspace.id, bob.id, freshInvite.details.id);
+        const rejoined = yield* Operations.acceptInvitation(
+          workspace.id,
+          bob.id,
+          freshInvite.details.id,
+        );
         expect(rejoined.id).not.toBe(first.id);
         expect(yield* bound.assignments.listActiveByMember(rejoined.id)).toEqual([]);
         expect(
-          yield* Effect.flip(host.getMember(workspace.id, bob, workspace.ownerMemberId)),
+          yield* Effect.flip(Operations.getMember(workspace.id, bob, workspace.ownerMemberId)),
         ).toMatchObject({ _tag: "Authorization.Denied" });
       }),
     );
@@ -168,22 +172,21 @@ test("recipient identity and workspace binding protect pending and accepted invi
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const a = yield* host.createWorkspace(alice.id);
-        const b = yield* host.createWorkspace(charlie.id);
-        const invitation = yield* host.invite(a.id, alice, request(a.id, yield* future));
+        const a = yield* Operations.createWorkspace(alice.id);
+        const b = yield* Operations.createWorkspace(charlie.id);
+        const invitation = yield* Operations.invite(a.id, alice, request(a.id, yield* future));
         const bound = yield* boundTo(a.id);
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
         expect(
-          yield* Effect.flip(host.acceptInvitation(a.id, charlie.id, invitation.details.id)),
+          yield* Effect.flip(Operations.acceptInvitation(a.id, charlie.id, invitation.details.id)),
         ).toMatchObject({ _tag: "InvitationApplication.NotRecipient" });
         expect(
-          yield* Effect.flip(host.acceptInvitation(b.id, bob.id, invitation.details.id)),
+          yield* Effect.flip(Operations.acceptInvitation(b.id, bob.id, invitation.details.id)),
         ).toMatchObject({ _tag: "InvitationApplication.NotFound" });
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
-        yield* host.acceptInvitation(a.id, bob.id, invitation.details.id);
+        yield* Operations.acceptInvitation(a.id, bob.id, invitation.details.id);
         expect(
-          yield* Effect.flip(host.acceptInvitation(a.id, charlie.id, invitation.details.id)),
+          yield* Effect.flip(Operations.acceptInvitation(a.id, charlie.id, invitation.details.id)),
         ).toMatchObject({ _tag: "InvitationApplication.NotRecipient" });
         expect(yield* (yield* boundTo(b.id)).members.findActive(bob)).toEqual(Option.none());
       }),
@@ -195,21 +198,23 @@ test("expiry is checked against the operation clock, including the exact deadlin
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
+        const workspace = yield* Operations.createWorkspace(alice.id);
         const now = yield* DateTime.now;
         const expiresAt = DateTime.add(now, { seconds: 30 });
         expect(
-          yield* at(now, Effect.flip(host.invite(workspace.id, alice, request(workspace.id, now)))),
+          yield* at(
+            now,
+            Effect.flip(Operations.invite(workspace.id, alice, request(workspace.id, now))),
+          ),
         ).toMatchObject({ _tag: "InvitationApplication.InvalidExpiry" });
         const invitation = yield* at(
           now,
-          host.invite(workspace.id, alice, request(workspace.id, expiresAt)),
+          Operations.invite(workspace.id, alice, request(workspace.id, expiresAt)),
         );
         expect(
           yield* at(
             expiresAt,
-            Effect.flip(host.acceptInvitation(workspace.id, bob.id, invitation.details.id)),
+            Effect.flip(Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id)),
           ),
         ).toMatchObject({ _tag: "InvitationApplication.Unavailable", reason: "expired" });
         expect(yield* (yield* boundTo(workspace.id)).members.findActive(bob)).toEqual(
@@ -217,7 +222,7 @@ test("expiry is checked against the operation clock, including the exact deadlin
         );
         const revoked = yield* at(
           expiresAt,
-          host.revokeInvitation(workspace.id, alice, invitation.details.id),
+          Operations.revokeInvitation(workspace.id, alice, invitation.details.id),
         );
         expect(revoked.state._tag).toBe("Revoked");
       }),
@@ -229,17 +234,16 @@ test("revocation is persistent and idempotent; accepted invitations cannot be re
     const saved = await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const invitation = yield* host.invite(
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const invitation = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, yield* future),
         );
-        yield* host.revokeInvitation(workspace.id, alice, invitation.details.id);
+        yield* Operations.revokeInvitation(workspace.id, alice, invitation.details.id);
         const bound = yield* boundTo(workspace.id);
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
-        yield* host.revokeInvitation(workspace.id, alice, invitation.details.id);
+        yield* Operations.revokeInvitation(workspace.id, alice, invitation.details.id);
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
         return { workspace, invitation };
       }),
@@ -247,21 +251,20 @@ test("revocation is persistent and idempotent; accepted invitations cannot be re
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
         expect(
           yield* Effect.flip(
-            host.acceptInvitation(saved.workspace.id, bob.id, saved.invitation.details.id),
+            Operations.acceptInvitation(saved.workspace.id, bob.id, saved.invitation.details.id),
           ),
         ).toMatchObject({ _tag: "InvitationApplication.Unavailable", reason: "revoked" });
-        const replacement = yield* host.invite(
+        const replacement = yield* Operations.invite(
           saved.workspace.id,
           alice,
           request(saved.workspace.id, yield* future),
         );
-        yield* host.acceptInvitation(saved.workspace.id, bob.id, replacement.details.id);
+        yield* Operations.acceptInvitation(saved.workspace.id, bob.id, replacement.details.id);
         expect(
           yield* Effect.flip(
-            host.revokeInvitation(saved.workspace.id, alice, replacement.details.id),
+            Operations.revokeInvitation(saved.workspace.id, alice, replacement.details.id),
           ),
         ).toMatchObject({ _tag: "InvitationApplication.Unavailable", reason: "accepted" });
       }),
@@ -273,17 +276,16 @@ test("holding invitation permission does not confer ownership-based grant author
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const invitation = yield* host.invite(workspace.id, alice, {
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const invitation = yield* Operations.invite(workspace.id, alice, {
           recipientId: bob.id,
           expiresAt: yield* future,
           grants: [Grant.make(InvitationPermissions.Manage, scope(workspace.id))],
         });
-        yield* host.acceptInvitation(workspace.id, bob.id, invitation.details.id);
+        yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
         expect(
           yield* Effect.flip(
-            host.invite(workspace.id, bob, request(workspace.id, yield* future, charlie.id)),
+            Operations.invite(workspace.id, bob, request(workspace.id, yield* future, charlie.id)),
           ),
         ).toMatchObject({ _tag: "InvitationApplication.NotOwner" });
       }),
@@ -295,10 +297,9 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
         for (const change of ["permission", "membership", "ownership"] as const) {
-          const workspace = yield* host.createWorkspace(alice.id);
-          const invitation = yield* host.invite(
+          const workspace = yield* Operations.createWorkspace(alice.id);
+          const invitation = yield* Operations.invite(
             workspace.id,
             alice,
             request(workspace.id, yield* future),
@@ -313,7 +314,7 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
                 ),
               }),
             ).pipe(Effect.provide(core(bound)));
-            yield* host.enableInvitations(workspace.id, alice);
+            yield* Operations.enableInvitations(workspace.id, alice);
           } else if (change === "membership") {
             yield* Effect.flatMap(Journal.Service, (journal) =>
               journal.publish(MemberFacts.Removed, {
@@ -326,7 +327,7 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
             yield* sql`UPDATE workspaces SET record = json_set(record, '$.ownerMemberId', 'successor') WHERE workspace_id = ${workspace.id}`;
           }
           const failure = yield* Effect.flip(
-            host.acceptInvitation(workspace.id, bob.id, invitation.details.id),
+            Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id),
           );
           expect(failure._tag).toBe(
             change === "permission"
@@ -350,8 +351,7 @@ test("invalid grant names, target kinds, and foreign scopes never publish an inv
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
+        const workspace = yield* Operations.createWorkspace(alice.id);
         const bound = yield* boundTo(workspace.id);
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
         const invalid: ReadonlyArray<Grant.Value> = [
@@ -364,7 +364,7 @@ test("invalid grant names, target kinds, and foreign scopes never publish an inv
         ];
         for (const grant of invalid) {
           yield* Effect.flip(
-            host.invite(workspace.id, alice, {
+            Operations.invite(workspace.id, alice, {
               recipientId: bob.id,
               grants: [grant],
               expiresAt: yield* future,
@@ -374,7 +374,7 @@ test("invalid grant names, target kinds, and foreign scopes never publish an inv
         }
         expect(
           yield* Effect.flip(
-            host.invite(workspace.id, alice, request(workspace.id, yield* future, alice.id)),
+            Operations.invite(workspace.id, alice, request(workspace.id, yield* future, alice.id)),
           ),
         ).toMatchObject({ _tag: "InvitationApplication.AlreadyMember" });
       }),
@@ -386,14 +386,23 @@ test("competing invitations cannot create two active memberships or combine thei
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const a = yield* host.invite(workspace.id, alice, request(workspace.id, yield* future));
-        const b = yield* host.invite(workspace.id, alice, request(workspace.id, yield* future));
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const a = yield* Operations.invite(
+          workspace.id,
+          alice,
+          request(workspace.id, yield* future),
+        );
+        const b = yield* Operations.invite(
+          workspace.id,
+          alice,
+          request(workspace.id, yield* future),
+        );
         const results = yield* Effect.forEach(
           [a, b],
           (invitation) =>
-            host.acceptInvitation(workspace.id, bob.id, invitation.details.id).pipe(Effect.result),
+            Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id).pipe(
+              Effect.result,
+            ),
           { concurrency: "unbounded" },
         );
         expect(results.filter((value) => value._tag === "Success")).toHaveLength(1);
@@ -415,9 +424,8 @@ test("failed acceptance checkpoint rolls back membership, assignments, consumpti
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const invitation = yield* host.invite(
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const invitation = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, yield* future),
@@ -452,7 +460,7 @@ test("failed acceptance checkpoint rolls back membership, assignments, consumpti
         expect(
           yield* sql`SELECT COUNT(*) AS count FROM assignments WHERE workspace_id = ${workspace.id}`,
         ).toEqual([{ count: 3 }]);
-        yield* host.acceptInvitation(workspace.id, bob.id, invitation.details.id);
+        yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
       }),
     );
   }));
@@ -462,27 +470,38 @@ test("removal and pending invitation revocation roll back together, commit once,
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const other = yield* host.createWorkspace(alice.id);
-        const otherInvite = yield* host.invite(other.id, alice, request(other.id, yield* future));
-        const otherPending = yield* host.invite(other.id, alice, request(other.id, yield* future));
-        yield* host.acceptInvitation(other.id, bob.id, otherInvite.details.id);
-        const invitation = yield* host.invite(
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const other = yield* Operations.createWorkspace(alice.id);
+        const otherInvite = yield* Operations.invite(
+          other.id,
+          alice,
+          request(other.id, yield* future),
+        );
+        const otherPending = yield* Operations.invite(
+          other.id,
+          alice,
+          request(other.id, yield* future),
+        );
+        yield* Operations.acceptInvitation(other.id, bob.id, otherInvite.details.id);
+        const invitation = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, yield* future),
         );
         const expiresAt = yield* future;
         const pending = yield* Effect.forEach([1, 2], () =>
-          host.invite(workspace.id, alice, request(workspace.id, expiresAt)),
+          Operations.invite(workspace.id, alice, request(workspace.id, expiresAt)),
         );
-        const unrelated = yield* host.invite(
+        const unrelated = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, yield* future, charlie.id),
         );
-        const member = yield* host.acceptInvitation(workspace.id, bob.id, invitation.details.id);
+        const member = yield* Operations.acceptInvitation(
+          workspace.id,
+          bob.id,
+          invitation.details.id,
+        );
         const bound = yield* boundTo(workspace.id);
         const logId = Log.Id.make("journal");
         const before = yield* bound.store.read(logId, { limit: 20 });
@@ -516,7 +535,7 @@ test("removal and pending invitation revocation roll back together, commit once,
           Effect.flip,
         );
         expect(failure).toBe(error);
-        expect(yield* host.getMember(workspace.id, bob, member.id)).toEqual(member);
+        expect(yield* Operations.getMember(workspace.id, bob, member.id)).toEqual(member);
         expect(yield* bound.store.read(logId, { limit: 20 })).toEqual(before);
         for (const record of pending)
           expect(yield* bound.invitations.get(record.details.id)).toEqual(Option.some(record));
@@ -525,11 +544,11 @@ test("removal and pending invitation revocation roll back together, commit once,
         ).toEqual(checkpoints);
         // A member ID from another workspace cannot be addressed through this context.
         expect(
-          yield* Effect.flip(host.removeMember(workspace.id, alice, other.ownerMemberId)),
+          yield* Effect.flip(Operations.removeMember(workspace.id, alice, other.ownerMemberId)),
         ).toMatchObject({ _tag: "MemberApplication.NotFound" });
         const results = yield* Effect.forEach(
           [1, 2],
-          () => host.removeMember(workspace.id, alice, member.id).pipe(Effect.result),
+          () => Operations.removeMember(workspace.id, alice, member.id).pipe(Effect.result),
           { concurrency: "unbounded" },
         );
         expect(results.filter((result) => result._tag === "Success")).toHaveLength(1);
@@ -546,7 +565,9 @@ test("removal and pending invitation revocation roll back together, commit once,
             value: { state: { _tag: "Revoked", revokedBy: workspace.ownerMemberId } },
           });
           expect(
-            yield* Effect.flip(host.acceptInvitation(workspace.id, bob.id, record.details.id)),
+            yield* Effect.flip(
+              Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
+            ),
           ).toMatchObject({
             _tag: "InvitationApplication.Unavailable",
             reason: "revoked",
@@ -557,10 +578,14 @@ test("removal and pending invitation revocation roll back together, commit once,
           Option.some(otherPending),
         );
         expect(yield* bound.assignments.listActiveByMember(member.id)).toEqual(grants);
-        expect(yield* Effect.flip(host.getMember(workspace.id, bob, member.id))).toMatchObject({
-          _tag: "LocalHost.NotMember",
+        expect(
+          yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
+        ).toMatchObject({
+          _tag: "Gateway.NotMember",
         });
-        expect((yield* host.getMember(other.id, bob, other.ownerMemberId)).status).toBe("active");
+        expect((yield* Operations.getMember(other.id, bob, other.ownerMemberId)).status).toBe(
+          "active",
+        );
         // Rebuild the affected read models from the recorded outcomes.
         yield* sql.withTransaction(
           Effect.gen(function* () {
@@ -569,17 +594,21 @@ test("removal and pending invitation revocation roll back together, commit once,
             yield* sql`DELETE FROM checkpoints WHERE workspace_id = ${workspace.id} AND name IN (${MemberProjection.definition.name}, ${InvitationJournal.projection.name})`;
           }),
         );
-        expect(yield* host.getMember(workspace.id, alice, member.id)).toMatchObject({
+        expect(yield* Operations.getMember(workspace.id, alice, member.id)).toMatchObject({
           id: member.id,
           status: "removed",
         });
-        expect(yield* Effect.flip(host.getMember(workspace.id, bob, member.id))).toMatchObject({
-          _tag: "LocalHost.NotMember",
+        expect(
+          yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
+        ).toMatchObject({
+          _tag: "Gateway.NotMember",
         });
         expect(yield* bound.store.read(logId, { limit: 20 })).toEqual(after);
         for (const record of pending)
           expect(
-            yield* Effect.flip(host.acceptInvitation(workspace.id, bob.id, record.details.id)),
+            yield* Effect.flip(
+              Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
+            ),
           ).toMatchObject({
             _tag: "InvitationApplication.Unavailable",
             reason: "revoked",
@@ -627,20 +656,21 @@ test("old workspaces explicitly enable invitations once and catch up the new pro
         }).pipe(
           Effect.provide(Log.layer.pipe(Layer.provideMerge(Layer.succeedContext(bound.context)))),
         );
-        const host = yield* LocalHost.Service;
         expect(
-          yield* Effect.flip(host.invite(workspaceId, alice, request(workspaceId, yield* future))),
+          yield* Effect.flip(
+            Operations.invite(workspaceId, alice, request(workspaceId, yield* future)),
+          ),
         ).toMatchObject({ _tag: "Authorization.Denied" });
-        yield* host.enableInvitations(workspaceId, alice);
+        yield* Operations.enableInvitations(workspaceId, alice);
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
-        yield* host.enableInvitations(workspaceId, alice);
+        yield* Operations.enableInvitations(workspaceId, alice);
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
-        const invitation = yield* host.invite(
+        const invitation = yield* Operations.invite(
           workspaceId,
           alice,
           request(workspaceId, yield* future),
         );
-        yield* host.acceptInvitation(workspaceId, bob.id, invitation.details.id);
+        yield* Operations.acceptInvitation(workspaceId, bob.id, invitation.details.id);
         expect(yield* bound.assignments.listActiveByMember(memberId)).toHaveLength(3);
       }),
     );
@@ -651,9 +681,8 @@ test("exact-target grants remain limited to that member after acceptance", async
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
-        const invitation = yield* host.invite(workspace.id, alice, {
+        const workspace = yield* Operations.createWorkspace(alice.id);
+        const invitation = yield* Operations.invite(workspace.id, alice, {
           recipientId: bob.id,
           expiresAt: yield* future,
           grants: [
@@ -667,9 +696,15 @@ test("exact-target grants remain limited to that member after acceptance", async
             }),
           ],
         });
-        const member = yield* host.acceptInvitation(workspace.id, bob.id, invitation.details.id);
-        yield* host.getMember(workspace.id, bob, workspace.ownerMemberId);
-        expect(yield* Effect.flip(host.getMember(workspace.id, bob, member.id))).toMatchObject({
+        const member = yield* Operations.acceptInvitation(
+          workspace.id,
+          bob.id,
+          invitation.details.id,
+        );
+        yield* Operations.getMember(workspace.id, bob, workspace.ownerMemberId);
+        expect(
+          yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
+        ).toMatchObject({
           _tag: "Authorization.Denied",
         });
       }),
@@ -681,18 +716,25 @@ test("invitation replay restores pending, accepted, and revoked records without 
     await runHost(
       filename,
       Effect.gen(function* () {
-        const host = yield* LocalHost.Service;
-        const workspace = yield* host.createWorkspace(alice.id);
+        const workspace = yield* Operations.createWorkspace(alice.id);
         const expiresAt = yield* future;
-        const accepted = yield* host.invite(workspace.id, alice, request(workspace.id, expiresAt));
-        const member = yield* host.acceptInvitation(workspace.id, bob.id, accepted.details.id);
-        const revoked = yield* host.invite(
+        const accepted = yield* Operations.invite(
+          workspace.id,
+          alice,
+          request(workspace.id, expiresAt),
+        );
+        const member = yield* Operations.acceptInvitation(
+          workspace.id,
+          bob.id,
+          accepted.details.id,
+        );
+        const revoked = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, expiresAt, charlie.id),
         );
-        yield* host.revokeInvitation(workspace.id, alice, revoked.details.id);
-        const pending = yield* host.invite(
+        yield* Operations.revokeInvitation(workspace.id, alice, revoked.details.id);
+        const pending = yield* Operations.invite(
           workspace.id,
           alice,
           request(workspace.id, expiresAt, Identity.HumanId.make("pending")),
@@ -736,70 +778,82 @@ test("invitation replay restores pending, accepted, and revoked records without 
         expect(
           yield* at(
             DateTime.add(expiresAt, { days: 1 }),
-            host.acceptInvitation(workspace.id, bob.id, accepted.details.id),
+            Operations.acceptInvitation(workspace.id, bob.id, accepted.details.id),
           ),
         ).toEqual(member);
       }),
     );
   }));
 
-test("CLI invitation, acceptance, revocation, and removal survive separate process invocations", async () =>
+test("invitation, acceptance, revocation, and removal survive separate server processes", async () =>
   temporary(async (filename) => {
-    const invoke = async (...args: string[]) => {
-      const child = Bun.spawn([process.execPath, "hosts/local/src/index.ts", ...args], {
-        cwd: join(import.meta.dir, "../../.."),
-        env: { ...process.env, AMENDS_DATABASE: filename },
-        stdout: "pipe",
-        stderr: "pipe",
+    const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
+    const first = await withServer(filename, async (call) => {
+      const created = await call(alice.id, "POST", "/workspaces");
+      expect(created.status).toBe(201);
+      const workspace = Schema.decodeUnknownSync(Workspace.Record)(created.body);
+      const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
+        recipientId: bob.id,
+        expiresAt,
+        grants: [
+          { permission: "member.read", scope: { _tag: "Workspace", workspaceId: workspace.id } },
+        ],
       });
-      const [exit, output, error] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-      ]);
-      return { exit, output, error };
-    };
-    const created = await invoke("create", alice.id);
-    expect(created.exit).toBe(0);
-    const workspace = Schema.decodeSync(Schema.fromJsonString(Workspace.Record))(
-      created.output.trim(),
-    );
-    const expiry = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
-    const issued = await invoke("invite", workspace.id, alice.id, bob.id, expiry);
-    expect(issued.exit).toBe(0);
-    const invitation = Schema.decodeSync(Schema.fromJsonString(Invitation.Record))(
-      issued.output.trim(),
-    );
-    expect((await invoke("accept", workspace.id, charlie.id, invitation.details.id)).exit).toBe(1);
-    const accepted = await invoke("accept", workspace.id, bob.id, invitation.details.id);
-    expect(accepted.exit).toBe(0);
-    const member = Schema.decodeSync(Schema.fromJsonString(Member.Record))(accepted.output.trim());
-    expect((await invoke("get", workspace.id, bob.id, workspace.ownerMemberId)).exit).toBe(0);
-    expect((await invoke("accept", workspace.id, bob.id, invitation.details.id)).output).toBe(
-      accepted.output,
-    );
-    const issuedAgain = await invoke("invite", workspace.id, alice.id, charlie.id, expiry, "-");
-    expect(issuedAgain.exit).toBe(0);
-    const second = Schema.decodeSync(Schema.fromJsonString(Invitation.Record))(
-      issuedAgain.output.trim(),
-    );
-    expect((await invoke("revoke", workspace.id, alice.id, second.details.id)).exit).toBe(0);
-    expect((await invoke("accept", workspace.id, charlie.id, second.details.id)).exit).toBe(1);
-    expect(member.identity).toEqual(bob);
-    expect((await invoke("remove", workspace.id, bob.id, workspace.ownerMemberId)).exit).toBe(1);
-    expect((await invoke("remove", workspace.id, alice.id, workspace.ownerMemberId)).exit).toBe(1);
-    const removed = await invoke("remove", workspace.id, alice.id, member.id);
-    expect(removed.exit).toBe(0);
-    expect(
-      Schema.decodeSync(Schema.fromJsonString(Member.Record))(removed.output.trim()),
-    ).toMatchObject({
-      id: member.id,
-      status: "removed",
+      expect(issued.status).toBe(201);
+      const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
+      const accept = `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`;
+      expect((await call(charlie.id, "POST", accept)).status).toBe(403);
+      const accepted = await call(bob.id, "POST", accept);
+      expect(accepted.status).toBe(200);
+      return {
+        workspace,
+        invitation,
+        member: Schema.decodeUnknownSync(Member.Record)(accepted.body),
+      };
     });
-    expect((await invoke("get", workspace.id, bob.id, workspace.ownerMemberId)).exit).toBe(1);
-    expect((await invoke("get", workspace.id, alice.id, member.id)).output).toBe(removed.output);
-    expect((await invoke("accept", workspace.id, bob.id, invitation.details.id)).output).toBe(
-      removed.output,
-    );
-    expect((await invoke("remove", workspace.id, alice.id, member.id)).exit).toBe(1);
+    const { workspace, invitation, member } = first;
+    expect(member.identity).toEqual(bob);
+    await withServer(filename, async (call) => {
+      const owner = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
+      const accept = `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`;
+      expect((await call(bob.id, "GET", owner)).status).toBe(200);
+      // Repeating acceptance returns the recorded membership.
+      expect((await call(bob.id, "POST", accept)).body).toEqual(first.member);
+      const issuedAgain = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
+        recipientId: charlie.id,
+        expiresAt,
+        grants: [],
+      });
+      expect(issuedAgain.status).toBe(201);
+      const second = Schema.decodeUnknownSync(Invitation.Record)(issuedAgain.body);
+      const revoke = `/workspaces/${workspace.id}/invitations/${second.details.id}/revoke`;
+      expect((await call(alice.id, "POST", revoke)).status).toBe(200);
+      const revoked = await call(
+        charlie.id,
+        "POST",
+        `/workspaces/${workspace.id}/invitations/${second.details.id}/accept`,
+      );
+      expect(revoked.status).toBe(410);
+      expect(revoked.body).toMatchObject({
+        _tag: "InvitationApplication.Unavailable",
+        reason: "revoked",
+      });
+      expect((await call(bob.id, "DELETE", owner)).status).toBe(403);
+      expect((await call(alice.id, "DELETE", owner)).status).toBe(409);
+      const removed = await call(
+        alice.id,
+        "DELETE",
+        `/workspaces/${workspace.id}/members/${member.id}`,
+      );
+      expect(removed.status).toBe(200);
+      expect(removed.body).toMatchObject({ id: member.id, status: "removed" });
+      expect((await call(bob.id, "GET", owner)).status).toBe(403);
+      expect(
+        (await call(alice.id, "GET", `/workspaces/${workspace.id}/members/${member.id}`)).body,
+      ).toEqual(removed.body);
+      expect((await call(bob.id, "POST", accept)).body).toEqual(removed.body);
+      expect(
+        (await call(alice.id, "DELETE", `/workspaces/${workspace.id}/members/${member.id}`)).status,
+      ).toBe(409);
+    });
   }));

@@ -1,4 +1,5 @@
-import { Checkpoint, Commit, Entry, Store, Workspace } from "@amends/core";
+import { Checkpoint, Commit, Entry, Store } from "@amends/core/journal";
+import { Workspace } from "@amends/core/workspace";
 import { Array, Cause, Context, DateTime, Effect, Exit, Option, Schema, Schedule } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
 

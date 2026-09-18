@@ -17,6 +17,19 @@ Use `effect: "catalog:"` to share the root Effect version. Export source through
 `package.json` and import other packages by their declared workspace names;
 do not use relative paths across workspace boundaries.
 
-`@amends/core` exports the journal, identity, authorization, and workspace contracts
-and services. `WorkspaceCore.layer` composes the current domain projections and
-permission definitions from host-provided workspace storage views.
+`@amends/core` composes one workspace's core. Its root export holds the
+composition: `layer` builds the application operations over the journal,
+authorization, and permission catalog; `HostServices` is the storage and
+cryptography a host must supply, derived from that layer; and `Operations` is
+the set of application services a gateway may run. Domains are subpath exports:
+`@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
+and `@amends/core/workspace`, each with its records, facts, stores, projections,
+and operations. Member and invitation operations include listing: members you
+may read, and every invitation for holders of `invitation.manage`.
+
+`@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one
+workspace's storage, resolves an authenticated identity into the actor, and runs
+core's application services with only public outcomes. `@amends/api-http` declares the HTTP contract
+shared by servers and browser clients, and `@amends/server-http` implements it
+over the gateway. Additional protocols add their own contract and handler
+packages over the same gateway.

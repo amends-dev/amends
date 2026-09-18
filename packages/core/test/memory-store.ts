@@ -352,6 +352,11 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
           cloneMember,
         );
       }),
+      list: Effect.gen(function* () {
+        return [...(yield* view).members.values()]
+          .filter((member) => member.workspaceId === workspaceId)
+          .map(cloneMember);
+      }),
       insert: Effect.fn("JournalTest.members.insert")(function* (record) {
         const target = yield* memberState("insert");
         if (record.workspaceId !== workspaceId || record.status !== "active") {

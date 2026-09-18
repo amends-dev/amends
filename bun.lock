@@ -47,6 +47,9 @@
       "name": "@amends/web",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/api-http": "workspace:*",
+        "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
         "@amends/ui": "workspace:*",
         "@effect/atom-solid": "catalog:",
         "@solid-primitives/keyed": "catalog:",
@@ -70,9 +73,21 @@
       "name": "@amends/host-local",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/api-http": "workspace:*",
         "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "@amends/server-http": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/sql-sqlite-bun": "catalog:",
+        "effect": "catalog:",
+      },
+    },
+    "packages/api-http": {
+      "name": "@amends/api-http",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -80,6 +95,24 @@
       "name": "@amends/core",
       "version": "0.0.0",
       "dependencies": {
+        "effect": "catalog:",
+      },
+    },
+    "packages/gateway": {
+      "name": "@amends/gateway",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/core": "workspace:*",
+        "effect": "catalog:",
+      },
+    },
+    "packages/server-http": {
+      "name": "@amends/server-http",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/api-http": "workspace:*",
+        "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -98,9 +131,15 @@
     "effect": "4.0.0-rc.115",
   },
   "packages": {
+    "@amends/api-http": ["@amends/api-http@workspace:packages/api-http"],
+
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
+    "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
+
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
+
+    "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
 
     "@amends/ui": ["@amends/ui@workspace:apps/ui"],
 

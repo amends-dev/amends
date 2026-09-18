@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/core.ts",
+    "./authorization": "./src/authorization/index.ts",
+    "./identity": "./src/identity/index.ts",
+    "./journal": "./src/journal/index.ts",
+    "./workspace": "./src/workspace/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

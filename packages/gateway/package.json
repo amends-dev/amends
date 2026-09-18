@@ -1,0 +1,19 @@
+{
+  "name": "@amends/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./directory": "./src/directory.ts",
+    "./errors": "./src/errors.ts",
+    "./sign-in": "./src/sign-in.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/core": "workspace:*",
+    "effect": "catalog:"
+  }
+}

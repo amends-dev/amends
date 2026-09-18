@@ -23,6 +23,8 @@ export interface Interface {
   readonly listPendingByRecipient: (
     recipientId: Identity.HumanId,
   ) => Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
+  /** Every invitation in this workspace in issue order, whatever its state. */
+  readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
   /** Insert a valid Pending invitation with a fresh ID in this workspace; never upsert. */
   readonly insert: (
     record: Invitation.Record,

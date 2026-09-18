@@ -26,7 +26,7 @@
     "start": "bun run --filter @amends/host-local start",
     "dev": "bun run --filter @amends/host-local dev",
     "typecheck": "tsc --noEmit && bun run --workspaces typecheck",
-    "test": "bun test packages/core/test hosts/local/test && bun run --filter @amends/ui test && bun run --filter @amends/web test",
+    "test": "bun test packages/core/test packages/server-http/test hosts/local/test && bun run --filter @amends/ui test && bun run --filter @amends/web test",
     "check:packages": "bun run scripts/check-packages.ts",
     "lint": "oxlint --disable-nested-config --deny-warnings .",
     "lint:fix": "oxlint --disable-nested-config --fix --deny-warnings .",

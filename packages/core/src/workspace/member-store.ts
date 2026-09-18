@@ -35,6 +35,9 @@ export interface Interface {
     identity: Identity.Reference,
   ) => Effect.Effect<Option.Option<Member.Record>, Failure>;
 
+  /** Every membership in this workspace, active and removed, in a stable order. */
+  readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
+
   /**
    * Insert an active record belonging to this workspace. Fail with Conflict for a
    * workspace mismatch, inactive record, reused member ID (including removed

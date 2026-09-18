@@ -1,14 +1,6 @@
-import {
-  Assignment,
-  AssignmentStore,
-  Member,
-  MemberStore,
-  Role,
-  RoleStore,
-  Store,
-  Workspace,
-  WorkspaceStore,
-} from "@amends/core";
+import { Assignment, AssignmentStore, Role, RoleStore } from "@amends/core/authorization";
+import { Store } from "@amends/core/journal";
+import { Member, MemberStore, Workspace, WorkspaceStore } from "@amends/core/workspace";
 import { Array, Effect, Schema } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
 import type { SqliteJournal } from "./journal-store.ts";
@@ -84,6 +76,10 @@ export const make = Effect.fn("SqliteDomains.make")(function* (
         Effect.mapError((cause) => new MemberStore.Failure({ operation: "findActive", cause })),
       );
     }),
+    list: records(
+      Member.Record,
+      guard(sql`SELECT record FROM members WHERE workspace_id = ${workspaceId} ORDER BY id`),
+    ).pipe(Effect.mapError((cause) => new MemberStore.Failure({ operation: "list", cause }))),
     insert: Effect.fn("SqliteMember.insert")(function* (record) {
       yield* Store.Transaction;
       if (record.workspaceId !== workspaceId || record.status !== "active")

@@ -1,14 +1,8 @@
-import {
-  AssignmentStore,
-  InvitationStore,
-  Checkpoint,
-  MemberStore,
-  RoleStore,
-  Store,
-  Workspace,
-  WorkspaceStore,
-} from "@amends/core";
-import { Context, Effect } from "effect";
+import { AssignmentStore, RoleStore } from "@amends/core/authorization";
+import { Checkpoint, Store } from "@amends/core/journal";
+import { InvitationStore, MemberStore, Workspace, WorkspaceStore } from "@amends/core/workspace";
+import { WorkspaceStorage } from "@amends/gateway";
+import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { SqliteJournal } from "./journal-store.ts";
 import { SqliteDomains } from "./domain-stores.ts";
@@ -37,5 +31,16 @@ export const make = Effect.fn("Storage.make")(function* () {
   );
   return { forWorkspace };
 });
+
+/** Expose the SQLite views to the gateway as its workspace storage contract. */
+export const layer = Layer.effect(
+  WorkspaceStorage.Service,
+  Effect.map(make(), (storage) =>
+    WorkspaceStorage.Service.of({
+      forWorkspace: (workspaceId) =>
+        Effect.map(storage.forWorkspace(workspaceId), (b) => b.context),
+    }),
+  ),
+);
 
 export * as Storage from "./storage.ts";

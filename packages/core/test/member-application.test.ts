@@ -102,6 +102,7 @@ const configured = (
   const invitations = Layer.succeed(InvitationStore.Service, {
     workspaceId,
     listPendingByRecipient: () => Effect.succeed([]),
+    list: Effect.succeed([]),
     get: () => Effect.die("Invitation lookup is not used in these member tests"),
     insert: () => Effect.die("Invitation insertion is not used in these member tests"),
     settle: () => Effect.die("These member tests have no pending invitations"),
@@ -541,4 +542,43 @@ test("removal joins an outer commit, sees staged permission, and rolls back with
   expect(
     [...snapshot.logs.values()].flatMap((batches) => batches.flatMap((batch) => batch.entries)),
   ).toHaveLength(2);
+});
+
+test("listing returns the memberships the actor may read, including removed ones, and nothing more", async () => {
+  const list = Effect.flatMap(MemberApplication.Service, (service) => service.list);
+  const fixture = await Effect.runPromise(make());
+  await seed(fixture, [assignment("read-bob")]);
+  // An exact grant sees that member only; the actor's own record needs its own grant.
+  expect((await run(fixture, list)).map((member) => member.id)).toEqual([bob.id]);
+  // Without any read grant the listing is empty rather than denied.
+  expect(await run(fixture, list, agent)).toEqual([]);
+  // A workspace-scoped grant sees everyone, and removal keeps the record listed.
+  await Effect.runPromise(
+    fixture.store.transaction(
+      Effect.gen(function* () {
+        yield* fixture
+          .assignments(workspaceId)
+          .insert(assignment("read-all", Scope.Value.cases.Workspace.make({ workspaceId })));
+        yield* fixture.members(workspaceId).markRemoved(bob.id);
+      }),
+    ),
+  );
+  const statuses = new Map(
+    (await run(fixture, list)).map((member) => [member.id, member.status] as const),
+  );
+  expect(statuses).toEqual(
+    new Map([
+      [alice.memberId, "active"],
+      [agent.memberId, "active"],
+      [bob.id, "removed"],
+    ]),
+  );
+  // A removed actor cannot list at all.
+  await Effect.runPromise(
+    fixture.store.transaction(fixture.members(workspaceId).markRemoved(alice.memberId)),
+  );
+  expect(await run(fixture, Effect.flip(list))).toMatchObject({
+    _tag: "Authorization.InvalidActor",
+    reason: "membership-removed",
+  });
 });
