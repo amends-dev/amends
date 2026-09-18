@@ -42,9 +42,11 @@ export interface Options<Requirements extends ReadonlyArray<unknown> = readonly 
 }
 
 /**
- * Bind a domain journal to a log and its projections. Definitions sharing a fact
+ * Construct a domain journal from a log and its projections. Definitions sharing a fact
  * name and version must share its payload schema. Projection dependencies are
  * supplied here; the resulting service interface is independent of registration.
+ *
+ * @category constructors
  */
 export const make = Effect.fn("Journal.make")(function* <
   const Requirements extends ReadonlyArray<unknown>,
@@ -77,7 +79,7 @@ export const make = Effect.fn("Journal.make")(function* <
     const versions = keys.get(definition.name) ?? new Set<number>();
     versions.add(definition.version);
     keys.set(definition.name, versions);
-    runners.push(yield* Projection.bind<unknown, Requirements[number]>({ definition, log }));
+    runners.push(yield* Projection.makeRunner<unknown, Requirements[number]>({ definition, log }));
   }
 
   const publish = Effect.fn("Journal.publish")(function* <F extends Fact.Definition>(
@@ -116,7 +118,11 @@ export const make = Effect.fn("Journal.make")(function* <
   return Service.of({ log: reader, commit: transaction.run, replay, publish });
 });
 
-/** Build the configured service from host storage and projection dependencies. */
+/**
+ * Provide the configured journal over the caller's log, transaction, and projection dependencies.
+ *
+ * @category layers
+ */
 export const layer = <const Requirements extends ReadonlyArray<unknown>>(
   options: Options<Requirements>,
 ) => Layer.effect(Service, make(options));

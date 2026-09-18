@@ -83,7 +83,7 @@ test("both assignment sources reject foreign workspace and exact-target scopes, 
 test("assignment creation facts preserve workspace checks through the journal codec", async () => {
   const codec = Codec.make(AssignmentFacts.Created);
   // Encode invalid stored data without the cross-field check to exercise replay decoding.
-  const unchecked = Codec.forSchema(Schema.Struct(AssignmentFacts.Created.payload.fields));
+  const unchecked = Codec.makeForSchema(Schema.Struct(AssignmentFacts.Created.payload.fields));
   const identifiers = {
     assignmentId: Assignment.Id.make("assignment-1"),
     workspaceId,

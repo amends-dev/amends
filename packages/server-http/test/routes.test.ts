@@ -148,7 +148,7 @@ const directory = Layer.succeed(
   }),
 );
 const services = Layer.mergeAll(
-  Routes.handlers.pipe(Layer.provide(Layer.mergeAll(gateway, signIn, credentials, directory))),
+  Routes.layerHandlers.pipe(Layer.provide(Layer.mergeAll(gateway, signIn, credentials, directory))),
   HttpServer.layerServices,
 );
 const run = <A, E>(

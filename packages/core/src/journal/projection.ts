@@ -37,7 +37,7 @@ export interface Definition<
   ) => Definition<Name, Version, E | E2, R | R2 | F["payload"]["DecodingServices"]>;
 }
 
-const build = <Name extends string, Version extends number, E, R>(
+const makeDefinition = <Name extends string, Version extends number, E, R>(
   name: Name,
   version: Version,
   subscriptions: ReadonlyArray<Subscription<E, R>>,
@@ -50,7 +50,7 @@ const build = <Name extends string, Version extends number, E, R>(
     handle: (event: Input<NoInfer<F>>) => Effect.Effect<void, E2, R2>,
   ) {
     const validate = Schema.decodeUnknownEffect(
-      Schema.toType(Event.schema<F["name"], F["version"], F["payload"]>(fact)),
+      Schema.toType(Event.makeSchema<F["name"], F["version"], F["payload"]>(fact)),
     );
     const apply = Effect.fn(`${name}.project.${fact.name}`)(function* (event: unknown) {
       yield* Store.Transaction;
@@ -70,10 +70,11 @@ const build = <Name extends string, Version extends number, E, R>(
       );
     });
 
-    return build<Name, Version, E | E2, R | R2 | F["payload"]["DecodingServices"]>(name, version, [
-      ...subscriptions,
-      { fact, apply, decode },
-    ]);
+    return makeDefinition<Name, Version, E | E2, R | R2 | F["payload"]["DecodingServices"]>(
+      name,
+      version,
+      [...subscriptions, { fact, apply, decode }],
+    );
   },
 });
 
@@ -81,11 +82,14 @@ const build = <Name extends string, Version extends number, E, R>(
  * Starts a projection definition. Each on call returns a new definition.
  * Handlers update transaction-participating domain stores using event data;
  * they must remain safe to replay without external actions or new publications.
+ *
+ * @category constructors
  */
 export const make = <const Name extends string, const Version extends number>(
   name: Name,
   options: { readonly version: Version },
-): Definition<Name, Version> => build<Name, Version, never, never>(name, options.version, []);
+): Definition<Name, Version> =>
+  makeDefinition<Name, Version, never, never>(name, options.version, []);
 
 export class Behind extends Schema.TaggedError<Behind>()("Projection.Behind", {
   key: Checkpoint.Key,
@@ -143,11 +147,13 @@ const cursorOf = (entry: Log.Value<Event.Payload>): Checkpoint.Cursor => ({
 });
 
 /**
- * Bind a definition, its dependencies, and its host-owned checkpoint store.
+ * Construct a runner from a definition, its dependencies, and its host-owned checkpoint store.
  * Invocation context takes precedence, preserving the current transaction and
  * scope. A new version needs a fresh target or a domain-managed migration.
+ *
+ * @category constructors
  */
-export const bind = Effect.fn("Projection.bind")(function* <E, R>(options: {
+export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(options: {
   readonly definition: Definition<string, number, E, R>;
   readonly log: Log.Reader<typeof Event.Payload>;
 }) {

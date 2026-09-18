@@ -5,6 +5,19 @@ no handlers, so servers and browser clients share it without leaking server code
 Every response and error is a core or gateway schema; this package only adds
 HTTP status annotations, paths, and the authentication declaration.
 
+## Construction
+
+`Api` and the group classes are reusable contract declarations constructed with
+Effect's `HttpApi.make` and `HttpApiGroup.make`. Schema declarations and their
+schema-owned constructors also retain Effect's naming. These declarations need
+no additional module-level `make` functions or service layers.
+
+`Authentication` declares the middleware contract, and `Principal` identifies
+the identity supplied per request. The server implementation lives in
+`@amends/server-http`; client credential attachment uses
+`HttpApiMiddleware.layerClient`. Keep those implementations out of this package
+so a client can import the complete contract without loading server code.
+
 ## Groups
 
 - `session`: `POST /session/email` requests a one-time code for an address and

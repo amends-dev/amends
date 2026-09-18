@@ -101,7 +101,11 @@ const requireWorkspace = Effect.fnUntraced(function* (
   }
 });
 
-/** Bind workspace services; the host supplies Actor.Service separately for each call. */
+/**
+ * Construct member operations from workspace services; the caller supplies Actor.Service per call.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
@@ -217,6 +221,11 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   return Service.of({ workspaceId, get, list, remove });
 });
 
+/**
+ * Provide member operations over the caller's workspace services.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Service, make());
 
 export * as MemberApplication from "./member-application.ts";

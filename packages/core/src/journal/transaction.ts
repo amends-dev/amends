@@ -65,90 +65,102 @@ const observe = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =>
     ),
   );
 
-export const layer = Layer.effect(
-  Service,
-  Effect.gen(function* () {
-    const store = yield* Store.Service;
-    const owner = Symbol("transaction coordinator");
+/**
+ * Construct a transaction coordinator over host storage. Each acquisition owns its commits.
+ *
+ * @category constructors
+ */
+export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return<
+  Interface,
+  never,
+  Store.Service
+> {
+  const store = yield* Store.Service;
+  const owner = Symbol("transaction coordinator");
 
-    const run = Effect.fn("Commit.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-      const current = yield* Effect.serviceOption(Current);
-      if (Option.isSome(current)) {
-        const state = current.value;
-        if (!state.active) return yield* new Closed({});
-        if (state.owner !== owner) return yield* observe(Effect.fail(new Foreign({})), state);
-        return yield* observe(
-          program.pipe(Effect.scoped, Effect.provideService(Store.Transaction, state.native)),
-          state,
-        );
-      }
-      // A raw host transaction cannot safely acquire a second core commit context.
-      if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-        return yield* new Foreign({});
+  const run = Effect.fn("Commit.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+    const current = yield* Effect.serviceOption(Current);
+    if (Option.isSome(current)) {
+      const state = current.value;
+      if (!state.active) return yield* new Closed({});
+      if (state.owner !== owner) return yield* observe(Effect.fail(new Foreign({})), state);
+      return yield* observe(
+        program.pipe(Effect.scoped, Effect.provideService(Store.Transaction, state.native)),
+        state,
+      );
+    }
+    // A raw host transaction cannot safely acquire a second core commit context.
+    if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+      return yield* new Foreign({});
 
-      return yield* store.transaction(
-        Effect.uninterruptibleMask((restore) =>
-          Effect.gen(function* () {
-            const native = yield* Store.Transaction;
-            const gate = yield* Semaphore.make(1);
-            const state: State = { owner, native, gate, active: true, failure: Option.none() };
-            const exit = yield* Effect.exit(
-              restore(
-                program.pipe(
-                  Effect.updateContext((context: Context.Context<R>) =>
-                    Context.add(context, Current, state),
-                  ),
-                  Effect.scoped,
+    return yield* store.transaction(
+      Effect.uninterruptibleMask((restore) =>
+        Effect.gen(function* () {
+          const native = yield* Store.Transaction;
+          const gate = yield* Semaphore.make(1);
+          const state: State = { owner, native, gate, active: true, failure: Option.none() };
+          const exit = yield* Effect.exit(
+            restore(
+              program.pipe(
+                Effect.updateContext((context: Context.Context<R>) =>
+                  Context.add(context, Current, state),
                 ),
+                Effect.scoped,
               ),
-            );
-            // Drain accepted writes and fence any late use of the inherited context.
-            yield* gate.withPermits(1)(
-              Effect.sync(() => {
-                state.active = false;
-              }),
-            );
-            if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
+            ),
+          );
+          // Drain accepted writes and fence any late use of the inherited context.
+          yield* gate.withPermits(1)(
+            Effect.sync(() => {
+              state.active = false;
+            }),
+          );
+          if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
+          if (Option.isSome(state.failure))
+            return yield* new Aborted({ cause: state.failure.value });
+          return exit.value;
+        }),
+      ),
+    );
+  });
+
+  const operation = Effect.fn("Commit.operation")(function* <A, E, R>(
+    program: Effect.Effect<A, E, R>,
+  ) {
+    return yield* run(
+      Effect.gen(function* () {
+        const current = yield* Effect.serviceOption(Current);
+        if (Option.isNone(current)) return yield* new Foreign({});
+        const state = current.value;
+        const forbidden = yield* Effect.serviceOption(Forbidden);
+        if (Option.isSome(forbidden)) return yield* new WriteForbidden({ reason: forbidden.value });
+        const fiberId = yield* Effect.fiberId;
+        const parent = yield* Effect.serviceOption(OperationOwner);
+        const execute = observe(
+          Effect.gen(function* () {
+            if (!state.active) return yield* new Closed({});
             if (Option.isSome(state.failure))
               return yield* new Aborted({ cause: state.failure.value });
-            return exit.value;
+            return yield* program;
           }),
-        ),
-      );
-    });
+          state,
+        );
+        if (Option.isSome(parent) && parent.value === fiberId) return yield* execute;
+        return yield* state.gate.withPermits(1)(
+          Effect.provideService(execute, OperationOwner, fiberId),
+        );
+      }),
+    );
+  });
 
-    const operation = Effect.fn("Commit.operation")(function* <A, E, R>(
-      program: Effect.Effect<A, E, R>,
-    ) {
-      return yield* run(
-        Effect.gen(function* () {
-          const current = yield* Effect.serviceOption(Current);
-          if (Option.isNone(current)) return yield* new Foreign({});
-          const state = current.value;
-          const forbidden = yield* Effect.serviceOption(Forbidden);
-          if (Option.isSome(forbidden))
-            return yield* new WriteForbidden({ reason: forbidden.value });
-          const fiberId = yield* Effect.fiberId;
-          const parent = yield* Effect.serviceOption(OperationOwner);
-          const execute = observe(
-            Effect.gen(function* () {
-              if (!state.active) return yield* new Closed({});
-              if (Option.isSome(state.failure))
-                return yield* new Aborted({ cause: state.failure.value });
-              return yield* program;
-            }),
-            state,
-          );
-          if (Option.isSome(parent) && parent.value === fiberId) return yield* execute;
-          return yield* state.gate.withPermits(1)(
-            Effect.provideService(execute, OperationOwner, fiberId),
-          );
-        }),
-      );
-    });
+  return Service.of({ run, operation });
+});
 
-    return Service.of({ run, operation });
-  }),
-);
+/**
+ * Provide one transaction coordinator over host storage.
+ *
+ * @category layers
+ */
+export const layer = Layer.effect(Service, make());
 
 export * as Transaction from "./transaction.ts";

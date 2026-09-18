@@ -62,7 +62,11 @@ const requireWorkspace = Effect.fnUntraced(function* (
 const decodeAssignments = Schema.decodeEffect(Schema.Array(Assignment.Record));
 const decodeRole = Schema.decodeEffect(Role.Record);
 
-/** Bind workspace stores and code metadata; read assignments and roles afresh on each call. */
+/**
+ * Construct a resolver from workspace stores and metadata; read assignments and roles per call.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
@@ -76,7 +80,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
 
   const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
     const permission = yield* catalog.get(name);
-    return yield* Schema.decodeEffect(Grant.schema(permission))({ permission: name, scope });
+    return yield* Schema.decodeEffect(Grant.makeSchema(permission))({ permission: name, scope });
   });
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
@@ -122,6 +126,11 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   return Service.of({ workspaceId, resolve });
 });
 
+/**
+ * Provide grant resolution over the caller's workspace stores and permission catalog.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Service, make());
 
 export * as GrantResolver from "./grant-resolver.ts";

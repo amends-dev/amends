@@ -30,11 +30,15 @@ export const Metadata = Entry.Metadata;
 export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}
 
 export type Type<F extends Fact.Definition> = ReturnType<
-  typeof schema<F["name"], F["version"], F["payload"]>
+  typeof makeSchema<F["name"], F["version"], F["payload"]>
 >["Type"];
 
-/** Builds the event schema for one fact's name, version, and payload contract. */
-export const schema = <
+/**
+ * Construct the event schema for one fact's name, version, and payload contract.
+ *
+ * @category constructors
+ */
+export const makeSchema = <
   const Name extends string,
   const Version extends number,
   PayloadSchema extends Schema.Constraint,
@@ -58,7 +62,7 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
   }
   const payload = yield* Codec.make(fact).decode(entry.payload.payload);
   return yield* Schema.decodeUnknownEffect(
-    Schema.toType(schema<F["name"], F["version"], F["payload"]>(fact)),
+    Schema.toType(makeSchema<F["name"], F["version"], F["payload"]>(fact)),
   )({ ...entry, name: fact.name, version: fact.version, payload });
 });
 

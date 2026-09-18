@@ -70,7 +70,7 @@ const readBob = Requirement.make(MemberPermissions.Read, bobTarget);
 const removeBob = Requirement.make(MemberPermissions.Remove, bobTarget);
 const readCharlie = Requirement.make(MemberPermissions.Read, charlieTarget);
 const removeCharlie = Requirement.make(MemberPermissions.Remove, charlieTarget);
-const Create = Permission.group("test.member", { targetKind: "Member" }).make("create", {
+const Create = Permission.makeGroup("test.member", { targetKind: "Member" }).make("create", {
   targetKind: "Workspace",
 });
 const workspaceTarget = Target.Reference.cases.Workspace.make({ workspaceId });

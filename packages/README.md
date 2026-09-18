@@ -17,6 +17,38 @@ Use `effect: "catalog:"` to share the root Effect version. Export source through
 `package.json` and import other packages by their declared workspace names;
 do not use relative paths across workspace boundaries.
 
+## Constructors and layers
+
+Use Effect's public library pattern across shared packages:
+
+- `make(...)` constructs a module's primary value or service implementation.
+  Named secondary constructors use `makeRunner`, `makeSchema`, or another
+  specific `make...` name. Pure construction returns a value; effectful
+  construction returns a lazy Effect with explicit errors and dependencies.
+- Service implementations expose a public `make` and a `layer` that delegates
+  to it. Keep initialization and validation in the constructor. `Service.of`
+  type-checks the implementation; it does not initialize or provide it.
+- Use `layer` for the main layer and `layer...` for named variants or
+  compositions. Use `Layer.provide` for internal dependencies and
+  `Layer.provideMerge` when consumers also need those services.
+- Acquire stable dependencies during construction. Resolve request identity,
+  the active transaction, and other invocation context during operations.
+  Scoped resources must remain within their acquisition scope.
+- Keep operation names such as `createWorkspace`, `resolve`, and `decode`.
+  Constructing an Effect that performs an operation does not make that
+  operation a constructor.
+- Contracts and composition-only modules do not need artificial constructors.
+  Host-owned service tags have no default implementation here. HTTP declarations
+  use Effect's `HttpApi.make` and `HttpApiGroup.make`; HTTP registration uses
+  `HttpApiBuilder.group` and layer composition directly.
+
+Mark public constructor documentation with `@category constructors` and layer
+exports with `@category layers`. Add configuration and acquisition variants only
+when they have a real use case. [Core's README](./core/README.md) provides the
+service inventory and examples; each protocol package documents its own surface.
+
+## Package boundaries
+
 `@amends/core` composes one workspace's core. Its root export holds the
 composition: `layer` builds the application operations over the journal,
 authorization, and permission catalog; `HostServices` is the storage and

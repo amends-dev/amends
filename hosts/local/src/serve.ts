@@ -6,7 +6,7 @@ import type { LocalHost } from "./host.ts";
 import { LocalSignIn } from "./sign-in.ts";
 
 /** The HTTP API, its OpenAPI document, and docs over the local gateway. */
-export const routes = Layer.mergeAll(Routes.api, Routes.docs);
+export const routes = Layer.mergeAll(Routes.layer, Routes.layerDocs);
 
 /** Serve the routes over a host on the loopback interface; the web development proxy targets this. */
 export const layer = (host: LocalHost.Host, port: number) =>

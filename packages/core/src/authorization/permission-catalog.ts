@@ -21,7 +21,11 @@ export class Service extends Context.Service<Service, Interface>()(
 
 const decodeDefinition = Schema.decodeEffect(Permission.Definition);
 
-/** Snapshot domain definitions at construction, rejecting every duplicate name. */
+/**
+ * Construct an immutable catalog from domain definitions, rejecting every duplicate name.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("PermissionCatalog.make")(function* (
   definitions: ReadonlyArray<Permission.Definition>,
 ): Effect.fn.Return<Interface, Duplicate | Schema.SchemaError> {
@@ -47,7 +51,11 @@ export const make = Effect.fn("PermissionCatalog.make")(function* (
   return Object.freeze(Service.of({ get }));
 });
 
-/** Build the required service from domain declarations during core composition. */
+/**
+ * Provide the permission catalog constructed from domain declarations.
+ *
+ * @category layers
+ */
 export const layer = (definitions: ReadonlyArray<Permission.Definition>) =>
   Layer.effect(Service, make(definitions));
 

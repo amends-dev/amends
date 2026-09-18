@@ -14,7 +14,11 @@ export interface Definition<
 /** The payload accepted when publishing this fact. */
 export type Payload<F extends Definition> = F["payload"]["Type"];
 
-/** Defines a fact while preserving its name, version, and full payload schema. */
+/**
+ * Construct a fact definition while preserving its name, version, and full payload schema.
+ *
+ * @category constructors
+ */
 export const make = <
   const Name extends string,
   const Version extends number,

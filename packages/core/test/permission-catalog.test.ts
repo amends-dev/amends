@@ -5,7 +5,7 @@ import { Permission } from "../src/authorization/permission.ts";
 import { MemberPermissions } from "../src/workspace/member-permissions.ts";
 
 test("the catalog layer resolves domain declarations and overrides through a stable service", async () => {
-  const group = Permission.group("test.member", { targetKind: "Member" });
+  const group = Permission.makeGroup("test.member", { targetKind: "Member" });
   const Create = group.make("create", { targetKind: "Workspace" });
   const configured = PermissionCatalog.layer([
     MemberPermissions.Read,

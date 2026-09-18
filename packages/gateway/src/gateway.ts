@@ -49,6 +49,9 @@ export interface Interface {
   >;
 }
 
+/** Workspace bootstrap and entry; core's application services are the operations. */
+export class Service extends Context.Service<Service, Interface>()("@amends/gateway/Service") {}
+
 const isPublic = Schema.is(Public);
 const isConflict = Schema.is(Store.Conflict);
 const isUncertain = Schema.is(Store.CommitUncertain);
@@ -86,10 +89,16 @@ const expose = <A, E, R>(
 type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
 
 /**
- * Bind workspace storage and cryptography. Identities come from a trusted
- * ingress; the gateway never accepts client-asserted actors or member IDs.
+ * Construct the gateway from workspace storage and cryptography. Identities come
+ * from a trusted ingress; the gateway never accepts client-asserted actors or member IDs.
+ *
+ * @category constructors
  */
-export const make = Effect.fn("Gateway.make")(function* () {
+export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
+  Interface,
+  never,
+  WorkspaceStorage.Service | Crypto.Crypto
+> {
   const storage = yield* WorkspaceStorage.Service;
   const cryptography = yield* Crypto.Crypto;
 
@@ -160,9 +169,11 @@ export const make = Effect.fn("Gateway.make")(function* () {
   return Service.of({ createWorkspace, inWorkspace, asMember, enableInvitations });
 });
 
-/** Workspace bootstrap and entry; core's application services are the operations. */
-export class Service extends Context.Service<Service, Interface>()("@amends/gateway/Service") {}
-
+/**
+ * Provide the gateway over the caller's workspace storage and cryptography.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Service, make());
 
 export * as Gateway from "./gateway.ts";

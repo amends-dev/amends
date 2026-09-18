@@ -13,7 +13,11 @@ export interface Definition<K extends Target.Kind = Target.Kind> extends Schema.
   readonly targetKind: K;
 }
 
-/** Declare a permission in domain code. Declaring it does not grant or enforce access. */
+/**
+ * Construct a permission definition in domain code; this does not grant or enforce access.
+ *
+ * @category constructors
+ */
 export const make = <const K extends Target.Kind>(
   name: string,
   options: { readonly targetKind: K },
@@ -35,10 +39,13 @@ export interface Group<K extends Target.Kind = Target.Kind> {
 }
 
 /**
- * Prefix action names and supply a default target kind. Actions such as creation
- * can override the default to target their destination workspace or container.
+ * Construct a group that prefixes action names and supplies a default target kind.
+ * Actions such as creation can override the default to target their destination
+ * workspace or container.
+ *
+ * @category constructors
  */
-export const group = <const K extends Target.Kind>(
+export const makeGroup = <const K extends Target.Kind>(
   prefix: string,
   options: { readonly targetKind: K },
 ): Group<K> => {

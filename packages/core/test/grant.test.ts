@@ -50,7 +50,7 @@ test("definition-aware schemas validate stored names and scopes when decoding or
     [MemberPermissions.Remove, exactMember, exactWorkspace],
     [ManageWorkspace, exactWorkspace, exactMember],
   ] as const) {
-    const schema = Grant.schema(permission);
+    const schema = Grant.makeSchema(permission);
     const decode = Schema.decodeUnknownEffect(schema);
     for (const scope of [workspaceScope, compatible]) {
       const stored = { permission: permission.name, scope };

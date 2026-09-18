@@ -8,8 +8,12 @@ import { MembersHandlers } from "./members.ts";
 import { SessionHandlers } from "./session.ts";
 import { WorkspacesHandlers } from "./workspaces.ts";
 
-/** Every group's handlers and the API's authentication, without the host services they require. */
-export const handlers = Layer.mergeAll(
+/**
+ * Provide every group's handlers and authentication over the required host services.
+ *
+ * @category layers
+ */
+export const layerHandlers = Layer.mergeAll(
   SessionHandlers.layer,
   MeHandlers.layer,
   WorkspacesHandlers.layer,
@@ -22,12 +26,18 @@ export const handlers = Layer.mergeAll(
  * SignIn.Service, Credentials.Service, WorkspaceDirectory.Service, and their
  * platform's HTTP services, then serve this through HttpRouter.serve or
  * HttpRouter.toWebHandler.
+ *
+ * @category layers
  */
-export const api = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
-  Layer.provide(handlers),
+export const layer = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
+  Layer.provide(layerHandlers),
 );
 
-/** Interactive documentation for local development. */
-export const docs = HttpApiScalar.layer(Api, { path: "/docs" });
+/**
+ * Register interactive documentation for local development.
+ *
+ * @category layers
+ */
+export const layerDocs = HttpApiScalar.layer(Api, { path: "/docs" });
 
 export * as Routes from "./routes.ts";

@@ -86,6 +86,11 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/workspace/invitation-application/Service",
 ) {}
 
+/**
+ * Construct invitation operations from workspace services; read the actor during protected calls.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("InvitationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   InvalidResponse,
@@ -133,7 +138,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     const result: Array<Grant.Value> = [];
     for (const grant of grants) {
       const definition = yield* catalog.get(grant.permission);
-      const checked = yield* Schema.decodeEffect(Grant.schema(definition))(grant);
+      const checked = yield* Schema.decodeEffect(Grant.makeSchema(definition))(grant);
       const targetWorkspace =
         checked.scope._tag === "Workspace"
           ? checked.scope.workspaceId
@@ -291,5 +296,11 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   return Service.of({ issue, accept, revoke, list });
 });
 
+/**
+ * Provide invitation operations over the caller's workspace services and cryptography.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Service, make());
+
 export * as InvitationApplication from "./invitation-application.ts";

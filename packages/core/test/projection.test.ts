@@ -24,7 +24,7 @@ const definition = Projection.make("counter", { version: 1 }).on(Changed, add);
 const source = Journal.make({ logId, projections: [] });
 const runner = Effect.gen(function* () {
   const journal = yield* source;
-  return yield* Projection.bind({ definition, log: journal.log });
+  return yield* Projection.makeRunner({ definition, log: journal.log });
 });
 
 const run = <A, E>(
@@ -91,7 +91,7 @@ test("a failed batch rolls back every handler and preserves previously committed
       const rejecting = definition.on(Changed, (event) =>
         event.payload.amount === 3 ? Effect.fail("rejected") : Effect.void,
       );
-      const failed = yield* Projection.bind({ definition: rejecting, log: journal.log });
+      const failed = yield* Projection.makeRunner({ definition: rejecting, log: journal.log });
       expect(yield* Effect.flip(failed.replay)).toMatchObject({
         _tag: "Projection.Failure",
         phase: "apply",
@@ -220,7 +220,7 @@ test("unrelated facts advance progress but unsupported versions fail without ski
       expect(yield* (yield* Counter).get).toBe(0);
       const checkpoint = yield* original.checkpoint;
       expect(Option.isSome(checkpoint) && checkpoint.value.position).toBe(Log.Position.make(0));
-      const compatible = yield* Projection.bind({
+      const compatible = yield* Projection.makeRunner({
         definition: definition.on(ChangedV2, (event) =>
           Effect.flatMap(Counter, (counter) => counter.add(event.payload.amount)),
         ),
@@ -274,7 +274,7 @@ test("interruption during replay rolls back projection changes and progress toge
       const blocking = definition.on(Changed, () =>
         Deferred.succeed(ready, undefined).pipe(Effect.andThen(Effect.never)),
       );
-      const bound = yield* Projection.bind({ definition: blocking, log: journal.log });
+      const bound = yield* Projection.makeRunner({ definition: blocking, log: journal.log });
       const fiber = yield* bound.step.pipe(Effect.forkChild);
       yield* Deferred.await(ready);
       yield* Fiber.interrupt(fiber);
@@ -321,7 +321,7 @@ test("replay handlers cannot append and a caught failure poisons the outer commi
         schema: Schema.String,
       });
       const recursive = definition.on(Changed, () => turn.append("forbidden").pipe(Effect.asVoid));
-      const bound = yield* Projection.bind({ definition: recursive, log: journal.log });
+      const bound = yield* Projection.makeRunner({ definition: recursive, log: journal.log });
       expect(yield* Effect.flip(bound.step)).toMatchObject({
         _tag: "Projection.Failure",
         phase: "apply",
@@ -353,7 +353,7 @@ test("checkpoint keys isolate log, projection name, and version; duplicate regis
         [journal.log, "a", 2],
         [other.log, "a", 1],
       ] as const) {
-        const bound = yield* Projection.bind({
+        const bound = yield* Projection.makeRunner({
           definition: Projection.make(name, { version }),
           log,
         });
@@ -411,7 +411,7 @@ test("historical decoding resolves services, runs once per event, and cannot app
         id: Log.Id.make("decoder-log"),
         schema: Schema.String,
       });
-      const fresh = yield* Projection.bind({
+      const fresh = yield* Projection.makeRunner({
         definition: Projection.make("fresh", { version: 1 }).on(Decoded, (event) =>
           Effect.flatMap(Counter, (counter) => counter.add(event.payload)),
         ),

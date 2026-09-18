@@ -179,7 +179,7 @@ const initialize = Effect.gen(function* () {
 }).pipe(Effect.provide(JournalLive));
 ```
 
-For individual control, `Projection.bind({ definition, log: journal.log })` acquires
+For individual control, `Projection.makeRunner({ definition, log: journal.log })` acquires
 the definition's dependencies and returns a runner with `step`, `replay`, and
 `checkpoint` effects. These effects have no remaining service requirements.
 `step` applies the next

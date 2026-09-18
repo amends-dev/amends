@@ -24,76 +24,119 @@ class Audit extends Context.Service<Audit, { readonly check: Effect.Effect<void,
   "ServiceTest/Audit",
 ) {}
 
-test("the journal layer binds heterogeneous projections behind one stable service", async () => {
-  const fixture = await Effect.runPromise(make());
-  const reject = await Effect.runPromise(Ref.make(false));
-  const finalized = await Effect.runPromise(Ref.make(0));
-  const rejection = new Rejected({ reason: "test rejection" });
-  const audit = Projection.make("audit", { version: 1 }).on(
-    Changed,
-    Effect.fn("ServiceTest.audit")(function* (event) {
-      yield* (yield* Audit).check;
-      const native = yield* Store.Transaction;
-      expect(native.id).toBe(event.commitId);
-      yield* Effect.addFinalizer(() => Ref.update(finalized, (count) => count + 1));
-    }),
-  );
-  const configured = Journal.layer({ logId: Log.Id.make("domain"), projections: [counter, audit] });
-  const registrations = [counter, audit];
-  const fromArray = Journal.layer({ logId: Log.Id.make("domain"), projections: registrations });
-  expectTypeOf<Layer.Services<typeof fromArray>>().toEqualTypeOf<
-    Layer.Services<typeof configured>
-  >();
-  expectTypeOf<Layer.Success<typeof configured>>().toEqualTypeOf<Journal.Service>();
-  expectTypeOf<Layer.Services<typeof configured>>().toEqualTypeOf<
-    Log.Service | Transaction.Service | Checkpoint.Service | Counter | Audit
-  >();
-  expectTypeOf<
-    Effect.Success<ReturnType<typeof Journal.make>>
-  >().toEqualTypeOf<Journal.Interface>();
-  const host = Layer.mergeAll(
-    Layer.succeed(Store.Service, fixture.store),
-    Layer.succeed(Checkpoint.Service, fixture.checkpoints),
-    Layer.succeed(Counter, fixture.counter),
-    Layer.succeed(Audit, {
-      check: Ref.get(reject).pipe(
-        Effect.flatMap((value) => (value ? Effect.fail(rejection) : Effect.void)),
-      ),
-    }),
-  );
-  const live = configured.pipe(Layer.provide(Log.layer), Layer.provide(host));
-  expectTypeOf<Layer.Services<typeof live>>().toEqualTypeOf<never>();
+test.each(["make", "layer"] as const)(
+  "journal %s binds heterogeneous projections behind one stable service",
+  async (construction) => {
+    const fixture = await Effect.runPromise(make());
+    const reject = await Effect.runPromise(Ref.make(false));
+    const finalized = await Effect.runPromise(Ref.make(0));
+    const rejection = new Rejected({ reason: "test rejection" });
+    const audit = Projection.make("audit", { version: 1 }).on(
+      Changed,
+      Effect.fn("ServiceTest.audit")(function* (event) {
+        yield* (yield* Audit).check;
+        const native = yield* Store.Transaction;
+        expect(native.id).toBe(event.commitId);
+        yield* Effect.addFinalizer(() => Ref.update(finalized, (count) => count + 1));
+      }),
+    );
+    const configured = Journal.layer({
+      logId: Log.Id.make("domain"),
+      projections: [counter, audit],
+    });
+    const registrations = [counter, audit];
+    const fromArray = Journal.layer({ logId: Log.Id.make("domain"), projections: registrations });
+    expectTypeOf<Layer.Services<typeof fromArray>>().toEqualTypeOf<
+      Layer.Services<typeof configured>
+    >();
+    expectTypeOf<Layer.Success<typeof configured>>().toEqualTypeOf<Journal.Service>();
+    expectTypeOf<Layer.Services<typeof configured>>().toEqualTypeOf<
+      Log.Service | Transaction.Service | Checkpoint.Service | Counter | Audit
+    >();
+    expectTypeOf<
+      Effect.Success<ReturnType<typeof Journal.make>>
+    >().toEqualTypeOf<Journal.Interface>();
+    const host = Layer.mergeAll(
+      Layer.succeed(Store.Service, fixture.store),
+      Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+      Layer.succeed(Counter, fixture.counter),
+      Layer.succeed(Audit, {
+        check: Ref.get(reject).pipe(
+          Effect.flatMap((value) => (value ? Effect.fail(rejection) : Effect.void)),
+        ),
+      }),
+    );
+    const live = configured.pipe(Layer.provide(Log.layer), Layer.provide(host));
+    expectTypeOf<Layer.Services<typeof live>>().toEqualTypeOf<never>();
 
-  const consume = Effect.gen(function* () {
-    const journal = yield* Journal.Service;
-    expect(Option.isNone(yield* Effect.serviceOption(Counter))).toBe(true);
-    expect(Option.isNone(yield* Effect.serviceOption(Audit))).toBe(true);
-    yield* journal.commit(
-      Effect.gen(function* () {
-        yield* journal.publish(Changed, 2);
-        yield* journal.commit(journal.publish(Changed, 3));
-      }),
+    const consume = Effect.gen(function* () {
+      const journal = yield* Journal.Service;
+      expect(Option.isNone(yield* Effect.serviceOption(Counter))).toBe(true);
+      expect(Option.isNone(yield* Effect.serviceOption(Audit))).toBe(true);
+      yield* journal.commit(
+        Effect.gen(function* () {
+          yield* journal.publish(Changed, 2);
+          yield* journal.commit(journal.publish(Changed, 3));
+        }),
+      );
+      expect(yield* fixture.counter.get).toBe(5);
+      expect(yield* Ref.get(finalized)).toBe(2);
+      yield* journal.replay;
+      yield* Ref.set(reject, true);
+      const error = yield* journal.publish(Changed, 7).pipe(
+        Effect.match({
+          onFailure: (failure) => failure,
+          onSuccess: () => undefined,
+        }),
+      );
+      if (error?._tag !== "Projection.Failure") throw new Error("Expected projection failure");
+      expect(error.cause).toBe(rejection);
+      expect(error.key.name).toBe("audit");
+      expect(error.phase).toBe("apply");
+      expect(yield* fixture.counter.get).toBe(5);
+      expect((yield* fixture.snapshot).logs.get(journal.log.id)).toHaveLength(1);
+    });
+    expectTypeOf<Effect.Services<typeof consume>>().toEqualTypeOf<Journal.Service>();
+    expectTypeOf<Effect.Error<typeof consume>>().toEqualTypeOf<Projection.Error | Log.WriteError>();
+    const acquire = Effect.gen(function* () {
+      const transaction = yield* Transaction.make();
+      const logs = yield* Log.make().pipe(Effect.provideService(Transaction.Service, transaction));
+      return yield* Journal.make({
+        logId: Log.Id.make("domain"),
+        projections: [counter, audit],
+      }).pipe(
+        Effect.provideService(Log.Service, logs),
+        Effect.provideService(Transaction.Service, transaction),
+      );
+    }).pipe(Effect.provide(host));
+    const direct = Effect.flatMap(acquire, (journal) =>
+      consume.pipe(Effect.provideService(Journal.Service, journal)),
     );
-    expect(yield* fixture.counter.get).toBe(5);
-    expect(yield* Ref.get(finalized)).toBe(2);
-    yield* journal.replay;
-    yield* Ref.set(reject, true);
-    const error = yield* journal.publish(Changed, 7).pipe(
-      Effect.match({
-        onFailure: (failure) => failure,
-        onSuccess: () => undefined,
-      }),
-    );
-    if (error?._tag !== "Projection.Failure") throw new Error("Expected projection failure");
-    expect(error.cause).toBe(rejection);
-    expect(error.key.name).toBe("audit");
-    expect(error.phase).toBe("apply");
-    expect(yield* fixture.counter.get).toBe(5);
-    expect((yield* fixture.snapshot).logs.get(journal.log.id)).toHaveLength(1);
-  });
-  expectTypeOf<Effect.Services<typeof consume>>().toEqualTypeOf<Journal.Service>();
-  expectTypeOf<Effect.Error<typeof consume>>().toEqualTypeOf<Projection.Error | Log.WriteError>();
-  await Effect.runPromise(consume.pipe(Effect.provide(live)));
+    expectTypeOf<Effect.Services<typeof direct>>().toEqualTypeOf<never>();
+    await Effect.runPromise(construction === "make" ? direct : consume.pipe(Effect.provide(live)));
+  },
+);
+
+test("each evaluation of the transaction constructor owns a separate coordinator", async () => {
+  const fixture = await Effect.runPromise(make());
+  const acquire = Transaction.make();
+  expectTypeOf<Effect.Success<typeof acquire>>().toEqualTypeOf<Transaction.Interface>();
+  expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<Store.Service>();
+  expectTypeOf<Effect.Success<ReturnType<typeof Log.make>>>().toEqualTypeOf<Log.Interface>();
+  expectTypeOf<Effect.Services<ReturnType<typeof Log.make>>>().toEqualTypeOf<
+    Store.Service | Transaction.Service
+  >();
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const first = yield* acquire;
+      const second = yield* acquire;
+      const failure = yield* Effect.flip(first.run(second.run(Effect.void)));
+      expect(failure._tag).toBe("Commit.Foreign");
+      expect(yield* fixture.attempts).toBe(1);
+      yield* second.run(second.run(Effect.void));
+      expect(yield* fixture.attempts).toBe(2);
+    }).pipe(Effect.provideService(Store.Service, fixture.store)),
+  );
 });
 
 test("binding inside an earlier commit never reuses its transaction or scope", async () => {
@@ -132,7 +175,7 @@ test("binding inside an earlier commit never reuses its transaction or scope", a
       const bound = yield* logs.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
-          return yield* Projection.bind({ definition: scoped, log: source.log });
+          return yield* Projection.makeRunner({ definition: scoped, log: source.log });
         }),
       );
       expectTypeOf<Effect.Services<typeof bound.replay>>().toEqualTypeOf<never>();

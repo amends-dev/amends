@@ -4,6 +4,11 @@ import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
+/**
+ * Register member handlers, capturing the gateway and reading the principal per request.
+ *
+ * @category layers
+ */
 export const layer = HttpApiBuilder.group(
   Api,
   "members",

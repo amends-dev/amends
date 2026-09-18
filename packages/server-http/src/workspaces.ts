@@ -3,6 +3,11 @@ import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
+/**
+ * Register workspace creation over the gateway, requiring a human principal per request.
+ *
+ * @category layers
+ */
 export const layer = HttpApiBuilder.group(
   Api,
   "workspaces",

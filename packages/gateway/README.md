@@ -7,6 +7,18 @@ and bind a workspace's storage and resolve an authenticated identity into the
 actor so those services can run. HTTP, RPC, and MCP all enter the same way and then
 call core directly, so nothing is declared twice.
 
+## Construction
+
+`Gateway.make()` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`
+and `Crypto.Crypto`. It captures those stable dependencies without opening a
+workspace or resolving an actor. `Gateway.layer` delegates to that constructor
+and provides `Gateway.Service`, with the same dependencies left to the caller.
+
+`WorkspaceStorage`, `Credentials`, `SignIn`, and `WorkspaceDirectory` declare
+host-owned contracts. Their implementations and construction APIs belong to
+adapters or hosts; they have no default `make` or `layer` here. `Service.of(...)`
+is sufficient to type-check a supplied implementation.
+
 ## Surface
 
 - `createWorkspace` allocates a workspace ID and runs core initialization for

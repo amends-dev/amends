@@ -4,7 +4,7 @@ import { Scope } from "./scope.ts";
 
 /**
  * A scoped allowance, with its recipient assigned separately. This schema checks
- * the stored shape; use schema(permission) to validate it against a domain definition.
+ * the stored shape; use makeSchema(permission) to validate it against a domain definition.
  */
 export const Value = Schema.Struct({
   permission: Permission.Name,
@@ -12,8 +12,12 @@ export const Value = Schema.Struct({
 });
 export interface Value extends Schema.Schema.Type<typeof Value> {}
 
-/** Validate the permission name and scope using its trusted domain definition. */
-export const schema = (permission: Permission.Definition) => {
+/**
+ * Construct a schema that validates permission names and scopes against a trusted domain definition.
+ *
+ * @category constructors
+ */
+export const makeSchema = (permission: Permission.Definition) => {
   const definition = Permission.Definition.make(permission);
   return Value.check(
     Schema.makeFilter(({ permission: name, scope }) => {
@@ -31,8 +35,12 @@ export const schema = (permission: Permission.Definition) => {
   );
 };
 
-/** Construct a scoped allowance; assigning it and authorizing the grantor are separate operations. */
+/**
+ * Construct a scoped allowance; assigning it and authorizing the grantor are separate operations.
+ *
+ * @category constructors
+ */
 export const make = (permission: Permission.Definition, scope: Scope.Value): Value =>
-  schema(permission).make({ permission: permission.name, scope });
+  makeSchema(permission).make({ permission: permission.name, scope });
 
 export * as Grant from "./grant.ts";

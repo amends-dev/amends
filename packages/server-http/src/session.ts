@@ -3,6 +3,11 @@ import { SignIn } from "@amends/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
+/**
+ * Register session handlers over the host's sign-in service.
+ *
+ * @category layers
+ */
 export const layer = HttpApiBuilder.group(
   Api,
   "session",

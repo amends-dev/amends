@@ -18,7 +18,12 @@ export interface Interface<F extends Fact.Definition> extends Value<F["payload"]
   readonly fact: F;
 }
 
-export const forSchema = <S extends Schema.Constraint>(payload: S): Value<S> => {
+/**
+ * Construct a binary codec from a payload schema, preserving its encoding and decoding requirements.
+ *
+ * @category constructors
+ */
+export const makeForSchema = <S extends Schema.Constraint>(payload: S): Value<S> => {
   const schema = SchemaBinary.toCodec(payload);
   const encode = Schema.encodeEffect(schema);
   const decode = Schema.decodeUnknownEffect(schema);
@@ -35,9 +40,14 @@ export const forSchema = <S extends Schema.Constraint>(payload: S): Value<S> => 
   };
 };
 
+/**
+ * Construct a fact codec using the same binary format as other log payloads.
+ *
+ * @category constructors
+ */
 export const make = <F extends Fact.Definition>(fact: F): Interface<F> => ({
   fact,
-  ...forSchema<F["payload"]>(fact.payload),
+  ...makeForSchema<F["payload"]>(fact.payload),
 });
 
 export * as Codec from "./codec.ts";

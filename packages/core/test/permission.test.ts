@@ -18,7 +18,7 @@ test("permission groups preserve existing member definitions and their specific 
 });
 
 test("an action can target its workspace while other actions in the group keep their default", () => {
-  const member = Permission.group("test.member", { targetKind: "Member" });
+  const member = Permission.makeGroup("test.member", { targetKind: "Member" });
   const created = member.make("create", { targetKind: "Workspace" });
   const read = member.make("read");
   expectTypeOf(created.targetKind).toEqualTypeOf<"Workspace">();
@@ -49,12 +49,14 @@ test("an action can target its workspace while other actions in the group keep t
 });
 
 test("groups validate name components and both default and overridden target kinds", () => {
-  expect(() => Permission.group("", { targetKind: "Member" })).toThrow("Schema validation failed");
+  expect(() => Permission.makeGroup("", { targetKind: "Member" })).toThrow(
+    "Schema validation failed",
+  );
   expect(() => {
     // @ts-expect-error Unsupported target kinds are rejected when declaring the group.
-    Permission.group("test.member", { targetKind: "Unknown" });
+    Permission.makeGroup("test.member", { targetKind: "Unknown" });
   }).toThrow("Schema validation failed");
-  const member = Permission.group("test.member", { targetKind: "Member" });
+  const member = Permission.makeGroup("test.member", { targetKind: "Member" });
   expect(() => member.make("")).toThrow("Schema validation failed");
   expect(() => {
     // @ts-expect-error Unsupported target kinds are rejected for action overrides too.
@@ -68,7 +70,7 @@ test("groups validate name components and both default and overridden target kin
 
 test("group defaults are captured independently of the options object", () => {
   const options: { targetKind: Target.Kind } = { targetKind: "Member" };
-  const member = Permission.group("test.member", options);
+  const member = Permission.makeGroup("test.member", options);
   options.targetKind = "Workspace";
   expect(member.make("read").targetKind).toBe("Member");
 });

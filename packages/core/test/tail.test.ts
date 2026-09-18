@@ -64,7 +64,7 @@ test("a tail resumes after its cursor, drains history, and waits for a future co
 
 test("a commit between the empty read and wait registration is not lost", async () => {
   const fixture = await Effect.runPromise(make());
-  const payload = await Effect.runPromise(Codec.forSchema(Schema.String).encode("raced"));
+  const payload = await Effect.runPromise(Codec.makeForSchema(Schema.String).encode("raced"));
   let inject = true;
   let waits = 0;
   const raced: Fixture = {

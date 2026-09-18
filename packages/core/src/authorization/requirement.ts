@@ -22,7 +22,11 @@ export const Value = Schema.Struct({
 );
 export interface Value extends Schema.Schema.Type<typeof Value> {}
 
-/** Construct a requirement for a target of the permission's declared kind. */
+/**
+ * Construct a requirement for a target of the permission's declared kind.
+ *
+ * @category constructors
+ */
 export const make = <K extends Target.Kind>(
   permission: Permission.Definition<K>,
   target: Target.Of<NoInfer<K>>,

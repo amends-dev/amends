@@ -69,7 +69,11 @@ const requireWorkspace = Effect.fnUntraced(function* (
   }
 });
 
-/** Bind workspace dependencies while leaving actor and transaction context to each call. */
+/**
+ * Construct authorization from workspace dependencies; read actor and transaction context per call.
+ *
+ * @category constructors
+ */
 export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
@@ -133,6 +137,11 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   return Service.of({ workspaceId, require: requirePermissions });
 });
 
+/**
+ * Provide authorization over the caller's workspace services.
+ *
+ * @category layers
+ */
 export const layer = Layer.effect(Service, make());
 
 export * as Authorization from "./authorization.ts";

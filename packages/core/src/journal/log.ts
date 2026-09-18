@@ -117,180 +117,193 @@ const validateRead = Schema.decodeEffect(Store.ReadOptions);
 const validateAppend = Schema.decodeEffect(Store.AppendOptions);
 const validateCommitId = Schema.decodeEffect(Commit.Id);
 
-export const layer = Layer.effect(
-  Service,
-  Effect.gen(function* () {
-    const store = yield* Store.Service;
-    const transaction = yield* Transaction.Service;
+/**
+ * Construct typed logs over host storage and the supplied transaction coordinator.
+ *
+ * @category constructors
+ */
+export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
+  Interface,
+  never,
+  Store.Service | Transaction.Service
+> {
+  const store = yield* Store.Service;
+  const transaction = yield* Transaction.Service;
 
-    const open = <S extends Schema.Constraint>({
-      id,
-      schema,
-    }: {
-      readonly id: Id;
-      readonly schema: S;
-    }): Handle<S> => {
-      const codec = Codec.forSchema(schema);
-      const ownedBatch = batchSchema.check(
-        Schema.makeFilter((batch) =>
-          batch.logId === id ? undefined : "Batch belongs to a different log",
+  const open = <S extends Schema.Constraint>({
+    id,
+    schema,
+  }: {
+    readonly id: Id;
+    readonly schema: S;
+  }): Handle<S> => {
+    const codec = Codec.makeForSchema(schema);
+    const ownedBatch = batchSchema.check(
+      Schema.makeFilter((batch) =>
+        batch.logId === id ? undefined : "Batch belongs to a different log",
+      ),
+    );
+    const decodeEntry = Effect.fnUntraced(function* (entry: Entry.Record) {
+      return {
+        id: entry.id,
+        logId: entry.logId,
+        position: entry.position,
+        commitId: entry.commitId,
+        index: entry.index,
+        recordedAt: entry.recordedAt,
+        payload: yield* codec.decode(entry.payload),
+      };
+    });
+    const decodeBatch = Effect.fnUntraced(function* (batch: Store.Batch) {
+      return {
+        logId: batch.logId,
+        position: batch.position,
+        commit: batch.commit,
+        entries: yield* Effect.forEach(batch.entries, decodeEntry),
+      };
+    });
+
+    const appendAll = Effect.fn("Log.appendAll")(function* (
+      values: ReadonlyArray<S["Type"]>,
+      options: Store.AppendOptions = {},
+    ) {
+      return yield* transaction.operation(
+        Effect.gen(function* () {
+          const request = yield* validateAppend(options);
+          const native = yield* Store.Transaction;
+          const payloads = yield* Effect.forEach(values, codec.encode);
+          const responseSchema = Schema.Array(Schema.toType(Entry.Record)).check(
+            Schema.makeFilter((entries) => {
+              if (entries.length !== payloads.length)
+                return "Append response count does not match the request";
+              const ids = new Set<string>();
+              let previous: Entry.Record | undefined;
+              for (const [index, entry] of entries.entries()) {
+                const payload = payloads[index];
+                if (entry.logId !== id || entry.commitId !== native.id)
+                  return "Append returned a different log or commit";
+                if (ids.has(entry.id)) return "Append returned duplicate entry ids";
+                if (
+                  previous !== undefined &&
+                  (entry.position !== previous.position || entry.index !== previous.index + 1)
+                ) {
+                  return "Append entries must be consecutive in one log batch";
+                }
+                if (
+                  payload === undefined ||
+                  payload.length !== entry.payload.length ||
+                  !payload.every((byte, offset) => byte === entry.payload[offset])
+                )
+                  return "Append changed the payload bytes";
+                ids.add(entry.id);
+                previous = entry;
+              }
+              return undefined;
+            }),
+          );
+          const entries = yield* Schema.decodeEffect(responseSchema)(
+            yield* native.append({ logId: id, payloads, ...request }),
+          );
+          return yield* Effect.forEach(entries, decodeEntry);
+        }),
+      );
+    });
+
+    const append = Effect.fn("Log.append")(function* (
+      value: S["Type"],
+      options?: Store.AppendOptions,
+    ) {
+      const entries = yield* appendAll([value], options);
+      if (Array.isReadonlyArrayNonEmpty(entries)) return Array.headNonEmpty(entries);
+      return yield* new InvalidResponse({ message: "Append returned no entry" });
+    });
+
+    const get = Effect.fn("Log.get")(function* (commitId: Commit.Id) {
+      const requestedId = yield* validateCommitId(commitId);
+      const resultSchema = Schema.Option(
+        ownedBatch.check(
+          Schema.makeFilter((batch) =>
+            batch.commit.id === requestedId ? undefined : "Commit id does not match the request",
+          ),
         ),
       );
-      const decodeEntry = Effect.fnUntraced(function* (entry: Entry.Record) {
-        return {
-          id: entry.id,
-          logId: entry.logId,
-          position: entry.position,
-          commitId: entry.commitId,
-          index: entry.index,
-          recordedAt: entry.recordedAt,
-          payload: yield* codec.decode(entry.payload),
-        };
-      });
-      const decodeBatch = Effect.fnUntraced(function* (batch: Store.Batch) {
-        return {
-          logId: batch.logId,
-          position: batch.position,
-          commit: batch.commit,
-          entries: yield* Effect.forEach(batch.entries, decodeEntry),
-        };
-      });
+      const result = yield* Schema.decodeEffect(resultSchema)(yield* store.get(id, requestedId));
+      if (Option.isNone(result)) return Option.none<Batch<S["Type"]>>();
+      return Option.some(yield* decodeBatch(result.value));
+    });
 
-      const appendAll = Effect.fn("Log.appendAll")(function* (
-        values: ReadonlyArray<S["Type"]>,
-        options: Store.AppendOptions = {},
-      ) {
-        return yield* transaction.operation(
-          Effect.gen(function* () {
-            const request = yield* validateAppend(options);
-            const native = yield* Store.Transaction;
-            const payloads = yield* Effect.forEach(values, codec.encode);
-            const responseSchema = Schema.Array(Schema.toType(Entry.Record)).check(
-              Schema.makeFilter((entries) => {
-                if (entries.length !== payloads.length)
-                  return "Append response count does not match the request";
-                const ids = new Set<string>();
-                let previous: Entry.Record | undefined;
-                for (const [index, entry] of entries.entries()) {
-                  const payload = payloads[index];
-                  if (entry.logId !== id || entry.commitId !== native.id)
-                    return "Append returned a different log or commit";
-                  if (ids.has(entry.id)) return "Append returned duplicate entry ids";
-                  if (
-                    previous !== undefined &&
-                    (entry.position !== previous.position || entry.index !== previous.index + 1)
-                  ) {
-                    return "Append entries must be consecutive in one log batch";
-                  }
-                  if (
-                    payload === undefined ||
-                    payload.length !== entry.payload.length ||
-                    !payload.every((byte, offset) => byte === entry.payload[offset])
-                  )
-                    return "Append changed the payload bytes";
-                  ids.add(entry.id);
-                  previous = entry;
-                }
-                return undefined;
-              }),
-            );
-            const entries = yield* Schema.decodeEffect(responseSchema)(
-              yield* native.append({ logId: id, payloads, ...request }),
-            );
-            return yield* Effect.forEach(entries, decodeEntry);
-          }),
-        );
-      });
-
-      const append = Effect.fn("Log.append")(function* (
-        value: S["Type"],
-        options?: Store.AppendOptions,
-      ) {
-        const entries = yield* appendAll([value], options);
-        if (Array.isReadonlyArrayNonEmpty(entries)) return Array.headNonEmpty(entries);
-        return yield* new InvalidResponse({ message: "Append returned no entry" });
-      });
-
-      const get = Effect.fn("Log.get")(function* (commitId: Commit.Id) {
-        const requestedId = yield* validateCommitId(commitId);
-        const resultSchema = Schema.Option(
-          ownedBatch.check(
-            Schema.makeFilter((batch) =>
-              batch.commit.id === requestedId ? undefined : "Commit id does not match the request",
-            ),
-          ),
-        );
-        const result = yield* Schema.decodeEffect(resultSchema)(yield* store.get(id, requestedId));
-        if (Option.isNone(result)) return Option.none<Batch<S["Type"]>>();
-        return Option.some(yield* decodeBatch(result.value));
-      });
-
-      const read = Effect.fn("Log.read")(function* (options: Store.ReadOptions) {
-        const request = yield* validateRead(options);
-        const resultSchema = Schema.Array(ownedBatch).check(
-          Schema.makeFilter((batches) => {
-            if (batches.length > request.limit) return "Page exceeds the requested limit";
-            let previous = request.after;
-            const commits = new Set<string>();
-            const entries = new Set<string>();
-            for (const batch of batches) {
-              if (previous !== undefined && batch.position <= previous)
-                return "Log positions must advance beyond the cursor";
-              if (commits.has(batch.commit.id)) return "Duplicate commit in log page";
-              previous = batch.position;
-              commits.add(batch.commit.id);
-              for (const entry of batch.entries) {
-                if (entries.has(entry.id)) return "Duplicate entry in log page";
-                entries.add(entry.id);
-              }
+    const read = Effect.fn("Log.read")(function* (options: Store.ReadOptions) {
+      const request = yield* validateRead(options);
+      const resultSchema = Schema.Array(ownedBatch).check(
+        Schema.makeFilter((batches) => {
+          if (batches.length > request.limit) return "Page exceeds the requested limit";
+          let previous = request.after;
+          const commits = new Set<string>();
+          const entries = new Set<string>();
+          for (const batch of batches) {
+            if (previous !== undefined && batch.position <= previous)
+              return "Log positions must advance beyond the cursor";
+            if (commits.has(batch.commit.id)) return "Duplicate commit in log page";
+            previous = batch.position;
+            commits.add(batch.commit.id);
+            for (const entry of batch.entries) {
+              if (entries.has(entry.id)) return "Duplicate entry in log page";
+              entries.add(entry.id);
             }
-            return undefined;
-          }),
-        );
-        const batches = yield* Schema.decodeEffect(resultSchema)(yield* store.read(id, request));
-        return yield* Effect.forEach(batches, decodeBatch);
-      });
+          }
+          return undefined;
+        }),
+      );
+      const batches = yield* Schema.decodeEffect(resultSchema)(yield* store.read(id, request));
+      return yield* Effect.forEach(batches, decodeBatch);
+    });
 
-      const stream = (options: Store.ReadOptions) =>
-        Stream.paginate(
-          options,
-          Effect.fnUntraced(function* (cursor) {
+    const stream = (options: Store.ReadOptions) =>
+      Stream.paginate(
+        options,
+        Effect.fnUntraced(function* (cursor) {
+          const batches = yield* read(cursor);
+          return [
+            batches,
+            Option.map(Array.last(batches), (batch) => ({
+              after: batch.position,
+              limit: cursor.limit,
+            })),
+          ] as const;
+        }),
+      ).pipe(Stream.withSpan("Log.stream"));
+
+    const tail = (options: Store.ReadOptions) =>
+      Stream.paginate(
+        options,
+        Effect.fnUntraced(function* (cursor) {
+          if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+            return yield* new TailInTransaction({});
+          while (true) {
             const batches = yield* read(cursor);
-            return [
-              batches,
-              Option.map(Array.last(batches), (batch) => ({
-                after: batch.position,
-                limit: cursor.limit,
-              })),
-            ] as const;
-          }),
-        ).pipe(Stream.withSpan("Log.stream"));
-
-      const tail = (options: Store.ReadOptions) =>
-        Stream.paginate(
-          options,
-          Effect.fnUntraced(function* (cursor) {
-            if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-              return yield* new TailInTransaction({});
-            while (true) {
-              const batches = yield* read(cursor);
-              const last = Array.last(batches);
-              if (Option.isSome(last)) {
-                return [
-                  batches,
-                  Option.some({ after: last.value.position, limit: cursor.limit }),
-                ] as const;
-              }
-              yield* store.waitForAppend(id, Option.fromUndefinedOr(cursor.after));
+            const last = Array.last(batches);
+            if (Option.isSome(last)) {
+              return [
+                batches,
+                Option.some({ after: last.value.position, limit: cursor.limit }),
+              ] as const;
             }
-          }),
-        ).pipe(Stream.withSpan("Log.tail"));
+            yield* store.waitForAppend(id, Option.fromUndefinedOr(cursor.after));
+          }
+        }),
+      ).pipe(Stream.withSpan("Log.tail"));
 
-      return { id, schema, append, appendAll, get, read, stream, tail };
-    };
+    return { id, schema, append, appendAll, get, read, stream, tail };
+  };
 
-    return Service.of({ open, commit: transaction.run });
-  }),
-).pipe(Layer.provideMerge(Transaction.layer));
+  return Service.of({ open, commit: transaction.run });
+});
+
+/**
+ * Provide typed logs and their shared transaction coordinator over host storage.
+ *
+ * @category layers
+ */
+export const layer = Layer.effect(Service, make()).pipe(Layer.provideMerge(Transaction.layer));
 
 export * as Log from "./log.ts";
