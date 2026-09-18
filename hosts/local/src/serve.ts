@@ -2,7 +2,6 @@ import { Routes } from "@amends/server-http";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Layer } from "effect";
 import { HttpRouter } from "effect/unstable/http";
-import { LocalAuthentication } from "./authentication.ts";
 import { LocalHost } from "./host.ts";
 import { LocalSignIn } from "./sign-in.ts";
 
@@ -15,7 +14,6 @@ export const layer = (filename: string, port: number) =>
     Layer.provide(
       Layer.mergeAll(
         LocalHost.layer(filename),
-        LocalAuthentication.layer,
         LocalSignIn.layer().pipe(Layer.provide(BunCrypto.layer)),
       ),
     ),

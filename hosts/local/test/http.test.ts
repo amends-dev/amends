@@ -9,7 +9,6 @@ import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { LocalAuthentication } from "../src/authentication.ts";
 import { LocalHost } from "../src/host.ts";
 import { LocalServer } from "../src/serve.ts";
 import { LocalSignIn } from "../src/sign-in.ts";
@@ -27,7 +26,6 @@ const server = (filename: string) =>
     Layer.provide(
       Layer.mergeAll(
         LocalHost.layer(filename),
-        LocalAuthentication.layer,
         LocalSignIn.layer((email, code) => Effect.sync(() => delivered.set(email, code))).pipe(
           Layer.provide(BunCrypto.layer),
         ),

@@ -28,13 +28,16 @@ currently run through TypeScript. Check compatibility before changing this setup
   `core` operates within one workspace with a trusted actor; its application
   services are the operations. `gateway` is how a host enters core: it bootstraps
   a workspace and resolves an authenticated identity into the actor, and it holds
-  the host contracts for storage, sign-in, and the workspace directory. `api-http`
-  is the HTTP contract shared by servers and clients, and `server-http` implements
-  it over the gateway. Another protocol adds its own contract and handler packages
+  the host contracts for storage, sign-in, credential resolution, and the workspace
+  directory. `api-http` is the HTTP contract shared by servers and clients, and
+  `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
   over the same gateway rather than new gateway methods.
 - `hosts/*`: runtime composition and adapters, such as the Bun host in `hosts/local`,
-  which serves the HTTP API over SQLite with development sign-in and authentication.
-  Hosts may install their runtime's dependencies and consume shared packages.
+  which serves the HTTP API over SQLite with development sign-in and credentials.
+  Hosts may install their runtime's dependencies and consume shared packages. A host
+  implements gateway contracts and serves protocol handler packages; it does not
+  depend on a protocol's contract package, which is for clients. A host's tests may
+  take a contract as a development dependency to act as a client.
 - `apps/*`: user-facing clients. `ui` holds the design system's components, tokens,
   and styles; `web` is the Solid application, which talks to a host only through
   the HTTP contract. Apps may install UI dependencies and consume shared packages.

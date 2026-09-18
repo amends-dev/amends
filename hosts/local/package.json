@@ -9,12 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/api-http": "workspace:*",
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/server-http": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@amends/api-http": "workspace:*"
   }
 }

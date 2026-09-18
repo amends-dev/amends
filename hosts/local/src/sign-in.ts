@@ -1,6 +1,6 @@
 import { Identity } from "@amends/core/identity";
-import { SignIn } from "@amends/gateway";
-import { Crypto, DateTime, Duration, Effect, Layer, Schema } from "effect";
+import { Credentials, SignIn } from "@amends/gateway";
+import { Crypto, DateTime, Duration, Effect, Layer, Redacted, Schema } from "effect";
 
 interface Pending {
   readonly code: SignIn.Code;
@@ -15,8 +15,9 @@ export const logDelivery: Deliver = (email, code) =>
 
 /**
  * Development sign-in. Codes live in memory and expire after ten minutes; the
- * session token is the address itself, which LocalAuthentication trusts as the
- * human ID. Nothing here verifies that the person controls the address.
+ * session token is the address itself, which credential resolution below
+ * trusts as the human ID. Nothing here verifies that the person controls the
+ * address.
  */
 export const make = Effect.fn("LocalSignIn.make")(function* (deliver: Deliver) {
   const cryptography = yield* Crypto.Crypto;
@@ -46,8 +47,24 @@ export const make = Effect.fn("LocalSignIn.make")(function* (deliver: Deliver) {
   return SignIn.Service.of({ start, complete });
 });
 
+/**
+ * Development credentials: the token is the human ID it asserts, mirroring the
+ * CLI's trusted local operator assertions. A network host must verify tokens.
+ */
+export const credentials = Layer.succeed(
+  Credentials.Service,
+  Credentials.Service.of({
+    resolve: (token) =>
+      Schema.decodeEffect(Identity.HumanId)(Redacted.value(token)).pipe(
+        Effect.mapError(() => new Credentials.Rejected({ reason: "malformed" })),
+        Effect.map((id) => Identity.Reference.cases.Human.make({ id })),
+      ),
+  }),
+);
+
+/** Both halves of the session: issuing tokens and resolving them. */
 export const layer = (deliver: Deliver = logDelivery) =>
-  Layer.effect(SignIn.Service, make(deliver));
+  Layer.merge(Layer.effect(SignIn.Service, make(deliver)), credentials);
 
 /** Codes expire ten minutes after delivery. */
 export const lifetime = Duration.minutes(10);

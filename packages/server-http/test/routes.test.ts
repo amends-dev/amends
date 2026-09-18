@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Api, Authentication, Principal, Unauthorized } from "@amends/api-http";
+import { Api, Authentication } from "@amends/api-http";
 import type * as Core from "@amends/core";
 import { Authorization, Requirement, Target } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
@@ -11,7 +11,7 @@ import {
   MemberPermissions,
   Workspace,
 } from "@amends/core/workspace";
-import { Gateway, SignIn, WorkspaceDirectory } from "@amends/gateway";
+import { Credentials, Gateway, SignIn, WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/unstable/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
@@ -105,23 +105,19 @@ const gateway = Layer.succeed(
   }),
 );
 
-/** Trusts the bearer token as a human ID, like the local host's development server. */
-const authentication = Layer.succeed(
-  Authentication,
-  Authentication.of({
-    bearer: (httpEffect, { credential }) => {
+/** Trusts the token as a human ID, like the local host's development credentials. */
+const credentials = Layer.succeed(
+  Credentials.Service,
+  Credentials.Service.of({
+    resolve: (credential) => {
       const token = Redacted.value(credential);
       if (token === "agent")
-        return Effect.provideService(
-          httpEffect,
-          Principal,
+        return Effect.succeed(
           Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make(token) }),
         );
       if (token.length === 0 || token === "invalid")
-        return Effect.fail(new Unauthorized({ message: "Unknown bearer token" }));
-      return Effect.provideService(
-        httpEffect,
-        Principal,
+        return Effect.fail(new Credentials.Rejected({ reason: "unknown" }));
+      return Effect.succeed(
         Identity.Reference.cases.Human.make({ id: Identity.HumanId.make(token) }),
       );
     },
@@ -152,10 +148,7 @@ const directory = Layer.succeed(
   }),
 );
 const services = Layer.mergeAll(
-  Routes.handlers.pipe(
-    Layer.provide(Layer.mergeAll(gateway, signIn, directory)),
-    Layer.provideMerge(authentication),
-  ),
+  Routes.handlers.pipe(Layer.provide(Layer.mergeAll(gateway, signIn, credentials, directory))),
   HttpServer.layerServices,
 );
 const run = <A, E>(

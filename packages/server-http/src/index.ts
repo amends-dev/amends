@@ -1,3 +1,4 @@
+export { BearerAuthentication } from "./authentication.ts";
 export { InvitationsHandlers } from "./invitations.ts";
 export { MeHandlers } from "./me.ts";
 export { MembersHandlers } from "./members.ts";
