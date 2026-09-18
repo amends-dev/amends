@@ -23,7 +23,7 @@ bun run start
 This listens on `http://127.0.0.1:8787` with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `AMENDS_DATABASE` selects the SQLite file, by
-default `amends.sqlite` in the host directory; use an absolute path when
+default `./data/amends.sqlite` in the host directory; use an absolute path when
 running from elsewhere. `AMENDS_PORT` changes the port, and `0` picks a free one.
 `bun run dev` restarts the server when its source changes.
 

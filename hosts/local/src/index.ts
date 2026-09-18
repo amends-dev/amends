@@ -10,7 +10,7 @@ import { LocalServer } from "./serve.ts";
 const program = Effect.gen(function* () {
   const url = yield* Config.option(Config.Redacted("AMENDS_DATABASE_URL"));
   const filename = yield* Config.String("AMENDS_DATABASE").pipe(
-    Config.withDefault("amends.sqlite"),
+    Config.withDefault("./data/amends.sqlite"),
   );
   const port = yield* Config.Int("AMENDS_PORT").pipe(Config.withDefault(8787));
   const host = Option.match(url, {
