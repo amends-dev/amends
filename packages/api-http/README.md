@@ -2,8 +2,25 @@
 
 `@amends/api-http` declares the public HTTP API with Effect `HttpApi`. It contains
 no handlers, so servers and browser clients share it without leaking server code.
-Every response and error is a core or gateway schema; this package only adds
-HTTP status annotations, paths, and the authentication declaration.
+Responses and domain errors reuse core and gateway schemas. This package owns
+HTTP paths, request envelopes, status annotations, and the authentication
+declaration, including the protocol errors `Unauthorized` and `HumanRequired`.
+
+## Organization and names
+
+Each HTTP group has one focused module, matched by its handler module in
+`@amends/server-http`. Keep `Api` as the aggregate contract, group classes such
+as `MembersGroup` as declarations, and `ApiErrors` as the canonical error
+namespace. Resource-specific names such as `InvitationNotOwner`,
+`InvitationUnavailable`, and `InvitationInvalidExpiry` identify the source of
+an outcome within that shared namespace. Their serialized error tags stay the
+tags declared by core or gateway.
+
+Public response schemas use stable identifiers in OpenAPI. Status-specific
+variants are named here, such as `CreatedWorkspace` and
+`IssuedWorkspaceInvitation`. Gateway codecs preserve the JSON keys `identity`
+and `people` while clients and handlers use `humanId` and `activeMemberCount`.
+The directory count is a nonnegative integer.
 
 ## Construction
 
@@ -26,10 +43,12 @@ so a client can import the complete contract without loading server code.
   invitations.
 - `workspaces`: `POST /workspaces` creates a workspace owned by the authenticated
   human.
-- `members`: `GET` and `DELETE /workspaces/:workspaceId/members/:memberId`.
-- `invitations`: `POST /workspaces/:workspaceId/invitations` issues, `POST
-…/:invitationId/accept` and `…/revoke` change state, and `POST …/enable`
-  upgrades workspaces created before invitations existed.
+- `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
+  `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
+- `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;
+  `POST` to the same path issues one. `POST …/:invitationId/accept` and
+  `POST …/:invitationId/revoke` change state; `POST …/enable` upgrades workspaces
+  created before invitations existed.
 
 Workspace IDs travel in the path so a host can route a request to the right
 workspace before reading its body. Status codes follow `ApiErrors`: not a member,

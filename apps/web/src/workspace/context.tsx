@@ -7,7 +7,7 @@ export interface OpenedWorkspace {
   readonly id: Workspace.Id;
   readonly record: Workspace.Record;
   readonly me: Member.Record;
-  readonly people: number;
+  readonly activeMemberCount: number;
   readonly owner: boolean;
 }
 
@@ -15,7 +15,7 @@ export const fromMembership = (membership: WorkspaceDirectory.Membership): Opene
   id: membership.workspace.id,
   record: membership.workspace,
   me: membership.member,
-  people: membership.people,
+  activeMemberCount: membership.activeMemberCount,
   owner: membership.workspace.ownerMemberId === membership.member.id,
 });
 

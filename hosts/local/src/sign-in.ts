@@ -48,7 +48,7 @@ export const make = Effect.fn("LocalSignIn.make")(function* (
       }
       if (found.code !== code) return yield* new SignIn.Rejected({ reason: "mismatch" });
       pending.delete(email);
-      return { token: email, identity: Identity.HumanId.make(email) };
+      return { token: email, humanId: Identity.HumanId.make(email) };
     },
   );
   return SignIn.Service.of({ start, complete });

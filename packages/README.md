@@ -17,6 +17,36 @@ Use `effect: "catalog:"` to share the root Effect version. Export source through
 `package.json` and import other packages by their declared workspace names;
 do not use relative paths across workspace boundaries.
 
+## Features and module names
+
+A feature owns a coherent concept, its rules, and its lifecycle. It can begin as
+one focused module. Introduce a feature directory when its related models,
+operations, facts, projections, or contracts need separate modules. Keep those
+modules together and add only the responsibilities the feature has.
+
+Core has multi-module features. Gateway's host contracts and the HTTP packages'
+individual groups fit in focused files today. Keep HTTP contract and handler
+filenames aligned so `api-http/src/invitations.ts` is easy to trace to
+`server-http/src/invitations.ts`.
+
+Each namespace-style leaf establishes one canonical name, such as `GatewayErrors`
+or `MemberStore`. Public barrels relay that name; internal imports target the
+owning leaf. Framework declarations such as `Api`, `MembersGroup`, and
+`Authentication` retain their named class exports. Error schemas belong to the
+errors module rather than also appearing on an operations namespace.
+
+Use [core's schema vocabulary](./core/README.md#schema-and-type-names) throughout
+shared packages. Qualify names that would be ambiguous in a shared namespace:
+`ApiErrors.InvitationNotOwner` identifies the relevant resource. Keep field
+names precise: `humanId` is a human ID, and `activeMemberCount` counts active
+human and agent memberships.
+
+Decoded TypeScript names and encoded field names are separate contracts. When
+renaming an existing field, preserve its encoded name with a schema codec or
+plan an explicit migration. Test both encoding and decoding. Public models used
+by HTTP carry stable schema identifiers for generated documentation. Keep
+transport status annotations in the HTTP contract package.
+
 ## Constructors and layers
 
 Use Effect's public library pattern across shared packages:

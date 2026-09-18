@@ -126,7 +126,7 @@ function Choices(props: {
                           title={membership.workspace.id}
                           titleKind="code"
                           leadingIcon={<WorkspaceMark name={membership.workspace.id} />}
-                          supportingText={`${membership.people === 1 ? "just you" : count(membership.people, "person", "people")} · ${owner() ? "owner" : "member"}`}
+                          supportingText={`${membership.activeMemberCount === 1 ? "just you" : count(membership.activeMemberCount, "person", "people")} · ${owner() ? "owner" : "member"}`}
                           onOpen={() => props.onOpen(membership.workspace.id)}
                         />
                       );

@@ -171,7 +171,7 @@ test("email sign-in issues a session the server accepts, and the directory lists
         const invitation = yield* inviter.invitations.issue({
           params: { workspaceId: other.id },
           payload: {
-            recipientId: session.identity,
+            recipientId: session.humanId,
             expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
             grants: [],
           },
@@ -185,18 +185,24 @@ test("email sign-in issues a session the server accepts, and the directory lists
       }).pipe(Effect.scoped, Effect.provide(server(filename))),
     );
     expect(outcome.wrong).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
-    expect(outcome.session.identity).toBe(Identity.HumanId.make("jo@mercier.co"));
+    expect(outcome.session.humanId).toBe(Identity.HumanId.make("jo@mercier.co"));
     expect(outcome.reused).toMatchObject({ _tag: "SignIn.Rejected", reason: "unknown" });
     expect(outcome.before).toEqual({ memberships: [], invitations: [] });
     expect(outcome.after.memberships).toMatchObject([
-      { workspace: { id: outcome.workspace.id }, member: { status: "active" }, people: 1 },
+      {
+        workspace: { id: outcome.workspace.id },
+        member: { status: "active" },
+        activeMemberCount: 1,
+      },
     ]);
     expect(outcome.after.invitations).toMatchObject([
       { details: { workspaceId: outcome.other.id }, state: { _tag: "Pending" } },
     ]);
     expect(outcome.joined.invitations).toEqual([]);
-    const people = new Map(outcome.joined.memberships.map((m) => [m.workspace.id, m.people]));
-    expect(people).toEqual(
+    const activeMemberCounts = new Map(
+      outcome.joined.memberships.map((m) => [m.workspace.id, m.activeMemberCount]),
+    );
+    expect(activeMemberCounts).toEqual(
       new Map([
         [outcome.workspace.id, 1],
         [outcome.other.id, 2],

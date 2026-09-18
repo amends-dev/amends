@@ -3,6 +3,11 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["scripts/**/*.ts", "packages/core/test/**/*.ts", "packages/server-http/test/**/*.ts"],
+  "include": [
+    "scripts/**/*.ts",
+    "packages/core/test/**/*.ts",
+    "packages/gateway/test/**/*.ts",
+    "packages/server-http/test/**/*.ts"
+  ],
   "exclude": ["node_modules", "repos", "dist", "out", "coverage"]
 }

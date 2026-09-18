@@ -10,8 +10,10 @@ export type Email = typeof Email.Type;
 export const Code = Schema.String.check(Schema.isPattern(/^\d{6}$/, { title: "six-digit code" }));
 export type Code = typeof Code.Type;
 
-/** A credential the host's Authentication accepts, and the human it identifies. */
-export const Session = Schema.Struct({ token: Schema.NonEmptyString, identity: Identity.HumanId });
+/** A credential the host accepts and its human ID; JSON retains the existing identity field. */
+export const Session = Schema.Struct({ token: Schema.NonEmptyString, humanId: Identity.HumanId })
+  .pipe(Schema.encodeKeys({ humanId: "identity" }))
+  .annotate({ identifier: "SignInSession" });
 export interface Session extends Schema.Schema.Type<typeof Session> {}
 
 export class Rejected extends Schema.TaggedError<Rejected>()("SignIn.Rejected", {

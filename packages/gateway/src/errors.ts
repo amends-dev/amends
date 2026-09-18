@@ -35,7 +35,7 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.In
  * consistency failures reveal nothing actionable and become defects that keep
  * their original cause for host logging.
  */
-export const Public = Schema.Union([
+export const PublicError = Schema.Union([
   NotMember,
   Conflict,
   Uncertain,
@@ -54,7 +54,9 @@ export const Public = Schema.Union([
   InvitationApplication.InvalidExpiry,
   WorkspaceInitialization.NotOwner,
 ]);
-export type Public = typeof Public.Type;
+export type PublicError = typeof PublicError.Type;
 
 /** The public outcomes of a core program whose error type is E. */
-export type Exposed<E> = Extract<E, Public> | Conflict | Uncertain | InvalidInput;
+export type ExposedError<E> = Extract<E, PublicError> | Conflict | Uncertain | InvalidInput;
+
+export * as GatewayErrors from "./errors.ts";

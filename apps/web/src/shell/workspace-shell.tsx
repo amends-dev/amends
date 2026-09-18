@@ -93,8 +93,10 @@ function Frame(props: ParentProps<{ opened: OpenedWorkspace }>) {
               title="Home"
               summary={
                 <A href={href.picker({ choose: true })}>
-                  {opened().people === 1 ? "just you" : `${opened().people} people`} · switch
-                  workspace
+                  {opened().activeMemberCount === 1
+                    ? "just you"
+                    : `${opened().activeMemberCount} people`}{" "}
+                  · switch workspace
                 </A>
               }
               {...header()?.()}

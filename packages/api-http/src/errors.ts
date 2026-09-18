@@ -4,7 +4,7 @@ import {
   MemberApplication,
   WorkspaceInitialization,
 } from "@amends/core/workspace";
-import * as GatewayErrors from "@amends/gateway/errors";
+import { GatewayErrors } from "@amends/gateway/errors";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
 
@@ -31,10 +31,14 @@ export const OwnerProtected = MemberApplication.OwnerProtected.pipe(HttpApiSchem
 export const AlreadyRemoved = MemberApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409));
 export const InvitationNotFound = InvitationApplication.NotFound.pipe(HttpApiSchema.status(404));
 export const NotRecipient = InvitationApplication.NotRecipient.pipe(HttpApiSchema.status(403));
-export const NotOwner = InvitationApplication.NotOwner.pipe(HttpApiSchema.status(403));
+export const InvitationNotOwner = InvitationApplication.NotOwner.pipe(HttpApiSchema.status(403));
 export const AlreadyMember = InvitationApplication.AlreadyMember.pipe(HttpApiSchema.status(409));
-export const Unavailable = InvitationApplication.Unavailable.pipe(HttpApiSchema.status(410));
-export const InvalidExpiry = InvitationApplication.InvalidExpiry.pipe(HttpApiSchema.status(400));
+export const InvitationUnavailable = InvitationApplication.Unavailable.pipe(
+  HttpApiSchema.status(410),
+);
+export const InvitationInvalidExpiry = InvitationApplication.InvalidExpiry.pipe(
+  HttpApiSchema.status(400),
+);
 export const NotWorkspaceOwner = WorkspaceInitialization.NotOwner.pipe(HttpApiSchema.status(403));
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
@@ -49,3 +53,5 @@ export const workspace = [
 
 /** Outcomes every member operation shares: the workspace set plus membership. */
 export const member = [NotMember, ...workspace] as const;
+
+export * as ApiErrors from "./errors.ts";

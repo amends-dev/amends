@@ -10,7 +10,7 @@ const Memberships = Schema.Array(
   Schema.Struct({
     workspace: Schema.fromJsonString(Workspace.Record),
     member: Schema.fromJsonString(Member.Record),
-    people: Schema.Int,
+    activeMemberCount: Schema.Natural,
   }),
 );
 const invitationRecords = makeRecordDecoder(Invitations.codec);
@@ -28,7 +28,7 @@ export const make = Effect.fn("SqliteDirectory.make")(function* () {
     identity: Identity.Reference,
   ) {
     const memberships =
-      yield* sql`SELECT w.record AS workspace, m.record AS member, (SELECT COUNT(*) FROM members p WHERE p.workspace_id = m.workspace_id AND json_extract(p.record, '$.status') = 'active') AS people FROM members m JOIN workspaces w ON w.workspace_id = m.workspace_id WHERE json_extract(m.record, '$.identity._tag') = ${identity._tag} AND json_extract(m.record, '$.identity.id') = ${identity.id} ORDER BY w.workspace_id, m.id`.pipe(
+      yield* sql`SELECT w.record AS workspace, m.record AS member, (SELECT COUNT(*) FROM members p WHERE p.workspace_id = m.workspace_id AND json_extract(p.record, '$.status') = 'active') AS activeMemberCount FROM members m JOIN workspaces w ON w.workspace_id = m.workspace_id WHERE json_extract(m.record, '$.identity._tag') = ${identity._tag} AND json_extract(m.record, '$.identity.id') = ${identity.id} ORDER BY w.workspace_id, m.id`.pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(Memberships)),
         Effect.orDie,
       );

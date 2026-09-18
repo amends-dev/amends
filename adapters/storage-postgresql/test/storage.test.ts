@@ -197,8 +197,10 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
     expect(outcome.listing.invitations).toEqual([outcome.invitation]);
     expect(outcome.joined).toMatchObject({ identity: bob, status: "active" });
     expect(outcome.afterJoin.invitations).toEqual([]);
-    const people = new Map(outcome.afterJoin.memberships.map((m) => [m.workspace.id, m.people]));
-    expect(people).toEqual(
+    const activeMemberCounts = new Map(
+      outcome.afterJoin.memberships.map((m) => [m.workspace.id, m.activeMemberCount]),
+    );
+    expect(activeMemberCounts).toEqual(
       new Map([
         [outcome.a.id, 2],
         [outcome.b.id, 1],

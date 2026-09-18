@@ -36,9 +36,9 @@ test.each(["make", "layer"] as const)(
 
       yield* TestClock.adjust("599999 millis");
       const session = yield* signIn.complete(alice, aliceCode);
-      expect(session).toEqual({ token: alice, identity: Identity.HumanId.make(alice) });
+      expect(session).toEqual({ token: alice, humanId: Identity.HumanId.make(alice) });
       expect(yield* credentials.resolve(Redacted.make(session.token))).toEqual(
-        Identity.Reference.cases.Human.make({ id: session.identity }),
+        Identity.Reference.cases.Human.make({ id: session.humanId }),
       );
       expect(yield* Effect.flip(signIn.complete(alice, aliceCode))).toMatchObject({
         _tag: "SignIn.Rejected",
@@ -95,7 +95,7 @@ test("each evaluation of the sign-in constructor owns its pending codes", async 
       });
       expect(yield* first.complete(email, code)).toEqual({
         token: email,
-        identity: Identity.HumanId.make(email),
+        humanId: Identity.HumanId.make(email),
       });
     }).pipe(Effect.provide(BunCrypto.layer)),
   );

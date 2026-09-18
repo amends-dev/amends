@@ -16,7 +16,7 @@ export function Entry(props: Omit<EntryShellProps, "home" | "account" | "links">
         session() === undefined
           ? undefined
           : {
-              name: session()!.identity,
+              name: session()!.humanId,
               onSignOut: () => {
                 setSession(undefined);
                 navigate(href.signIn(), { replace: true });

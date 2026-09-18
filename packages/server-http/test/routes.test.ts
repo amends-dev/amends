@@ -11,7 +11,7 @@ import {
   MemberPermissions,
   Workspace,
 } from "@amends/core/workspace";
-import { Credentials, Gateway, SignIn, WorkspaceDirectory } from "@amends/gateway";
+import { Credentials, Gateway, GatewayErrors, SignIn, WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/unstable/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
@@ -87,7 +87,7 @@ const gateway = Layer.succeed(
     createWorkspace: record("createWorkspace", () => Effect.succeed(workspace)),
     inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, Core.Operations>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] });
-      return Effect.provide(program, operations) as Effect.Effect<A, Gateway.Exposed<E>>;
+      return Effect.provide(program, operations) as Effect.Effect<A, GatewayErrors.ExposedError<E>>;
     },
     asMember: <A, E>(
       id: Workspace.Id,
@@ -95,11 +95,12 @@ const gateway = Layer.succeed(
       program: Effect.Effect<A, E, Core.Operations | Actor.Service>,
     ) => {
       calls.push({ operation: "asMember", arguments: [id, identity] });
-      if (identity.id !== alice.id) return Effect.fail(new Gateway.NotMember({ workspaceId: id }));
+      if (identity.id !== alice.id)
+        return Effect.fail(new GatewayErrors.NotMember({ workspaceId: id }));
       return Effect.provide(
         Effect.provideService(program, Actor.Service, actor),
         operations,
-      ) as Effect.Effect<A, Gateway.Exposed<E> | Gateway.NotMember>;
+      ) as Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
     },
     enableInvitations: record("enableInvitations", () => Effect.void),
   }),
@@ -134,7 +135,7 @@ const signIn = Layer.succeed(
     start: record("start", () => Effect.void),
     complete: record("complete", (email, code) =>
       code === "419270"
-        ? Effect.succeed({ token: email, identity: Identity.HumanId.make(email) })
+        ? Effect.succeed({ token: email, humanId: Identity.HumanId.make(email) })
         : Effect.fail(new SignIn.Rejected({ reason: "mismatch" })),
     ),
   }),
@@ -143,7 +144,10 @@ const directory = Layer.succeed(
   WorkspaceDirectory.Service,
   WorkspaceDirectory.Service.of({
     list: record("list", () =>
-      Effect.succeed({ memberships: [{ workspace, member, people: 1 }], invitations: [] }),
+      Effect.succeed({
+        memberships: [{ workspace, member, activeMemberCount: 1 }],
+        invitations: [],
+      }),
     ),
   }),
 );
@@ -290,7 +294,7 @@ test("sign-in needs no credential, and the directory answers for the principal",
     }),
   );
   expect(outcome.rejected).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
-  expect(outcome.session).toEqual({ token: email, identity: Identity.HumanId.make(email) });
+  expect(outcome.session).toEqual({ token: email, humanId: Identity.HumanId.make(email) });
   // The client rejects a malformed address before any request is sent.
   expect(outcome.malformed._tag).toBe("SchemaError");
   expect(calls.map((call) => call.operation)).toEqual(["start", "complete", "complete"]);
@@ -298,4 +302,22 @@ test("sign-in needs no credential, and the directory answers for the principal",
   const listing = await run("alice", (client) => client.me.workspaces());
   expect(listing.memberships).toHaveLength(1);
   expect(calls).toEqual([{ operation: "list", arguments: [alice] }]);
+});
+
+test("session and directory responses retain their existing JSON field names", async () => {
+  const session = await run("", (client) =>
+    client.session
+      .complete({
+        payload: { email: "jo@mercier.co", code: "419270" },
+        responseMode: "response-only",
+      })
+      .pipe(Effect.flatMap((response) => response.json)),
+  );
+  expect(session).toEqual({ token: "jo@mercier.co", identity: "jo@mercier.co" });
+  const directory = await run("alice", (client) =>
+    client.me
+      .workspaces({ responseMode: "response-only" })
+      .pipe(Effect.flatMap((response) => response.json)),
+  );
+  expect(directory).toEqual({ memberships: [{ workspace, member, people: 1 }], invitations: [] });
 });

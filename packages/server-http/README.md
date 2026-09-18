@@ -5,8 +5,23 @@
 `Principal` the authentication middleware provided, enters the workspace through
 `Gateway.asMember` or `Gateway.inWorkspace`, and calls one core application
 service. The session and directory handlers call the host's `SignIn` and
-`WorkspaceDirectory` services directly. Encoding, status codes, and error decoding come from the contract, so
-the handlers contain no domain logic and no identity handling.
+`WorkspaceDirectory` services directly. Encoding, status codes, and error decoding
+come from the contract. Handlers read principals and enforce human-only entry
+points; credential verification belongs to the authentication middleware, and
+domain rules belong to core.
+
+## Organization
+
+Keep one focused handler module per HTTP group, with filenames matching
+`@amends/api-http`. Names such as `MembersHandlers` and `InvitationsHandlers`
+describe endpoint collections; `Routes` composes them. `BearerAuthentication`
+implements the middleware contract. `Principal` is the authenticated human or
+agent identity; core's `Actor.Service` is the workspace member resolved by the
+gateway for an operation.
+
+Handlers and host stubs use the decoded gateway models: `humanId` on a sign-in
+session and `activeMemberCount` on a directory membership. The contract codecs
+preserve the existing `identity` and `people` JSON keys.
 
 ## Construction and registration
 
@@ -35,5 +50,5 @@ Tests run the handlers through `HttpApiTest` against a gateway stub that
 records entry and runs programs over stubbed core services, covering principal
 and parameter passing, tag and status preservation, unauthorized rejection
 before any gateway call, human-only endpoints, and JSON round-tripping of dates
-and grants. The local host's tests cover the same routes
+and grants, and compatibility of session and directory JSON fields. The local host's tests cover the same routes
 over real SQLite storage, including through its spawned server entry point.

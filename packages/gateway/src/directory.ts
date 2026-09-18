@@ -7,15 +7,18 @@ import type { Effect } from "effect";
 export const Membership = Schema.Struct({
   workspace: Workspace.Record,
   member: Member.Record,
-  people: Schema.Int,
-});
+  /** Active human and agent memberships; JSON retains the existing people field. */
+  activeMemberCount: Schema.Natural,
+})
+  .pipe(Schema.encodeKeys({ activeMemberCount: "people" }))
+  .annotate({ identifier: "WorkspaceDirectoryMembership" });
 export interface Membership extends Schema.Schema.Type<typeof Membership> {}
 
 /** Everything an identity can reach: active and removed memberships, and pending invitations. */
 export const Listing = Schema.Struct({
   memberships: Schema.Array(Membership),
   invitations: Schema.Array(Invitation.Record),
-});
+}).annotate({ identifier: "WorkspaceDirectoryListing" });
 export interface Listing extends Schema.Schema.Type<typeof Listing> {}
 
 export interface Interface {

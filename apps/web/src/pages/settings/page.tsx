@@ -518,7 +518,7 @@ function WorkspaceSettings() {
             { label: "id", value: opened().id },
             { label: "owner", value: opened().record.ownerMemberId },
             { label: "created by", value: opened().record.createdBy },
-            { label: "people", value: String(opened().people) },
+            { label: "people", value: String(opened().activeMemberCount) },
           ]}
         />
         <Text variant="caption">

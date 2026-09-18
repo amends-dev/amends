@@ -10,7 +10,7 @@ import { invitations, members, workspaces } from "./schema.ts";
 const Membership = Schema.Struct({
   workspace: Workspace.Record,
   member: Member.Record,
-  people: Schema.Int,
+  activeMemberCount: Schema.Natural,
 });
 
 /**
@@ -26,7 +26,10 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
     identity: Identity.Reference,
   ) {
     const active = db
-      .select({ workspaceId: members.workspaceId, people: count().as("people") })
+      .select({
+        workspaceId: members.workspaceId,
+        activeMemberCount: count().as("activeMemberCount"),
+      })
       .from(members)
       .where(eq(members.status, "active"))
       .groupBy(members.workspaceId)
@@ -40,7 +43,7 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
         },
         // Selections nest one level, so the identity union is nested below.
         member: members,
-        people: active.people,
+        activeMemberCount: active.activeMemberCount,
       })
       .from(members)
       .innerJoin(workspaces, eq(workspaces.workspaceId, members.workspaceId))
@@ -50,7 +53,7 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
       .pipe(
         Effect.flatMap((rows) =>
           Schema.decodeEffect(Schema.Array(Membership))(
-            rows.map(({ workspace, member, people }) => ({
+            rows.map(({ workspace, member, activeMemberCount }) => ({
               workspace,
               member: {
                 id: member.id,
@@ -58,7 +61,7 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
                 identity: { _tag: member.identityKind, id: member.identityId },
                 status: member.status,
               },
-              people,
+              activeMemberCount,
             })),
           ),
         ),

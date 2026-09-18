@@ -4,10 +4,8 @@ import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Store } from "@amends/core/journal";
 import { MemberStore, Workspace, WorkspaceInitialization } from "@amends/core/workspace";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import { Conflict, type Exposed, InvalidInput, NotMember, Public, Uncertain } from "./errors.ts";
+import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
-
-export { NotMember, Conflict, Uncertain, InvalidInput, Public, type Exposed } from "./errors.ts";
 
 export interface Interface {
   /**
@@ -16,7 +14,10 @@ export interface Interface {
    */
   readonly createWorkspace: (
     creator: Identity.HumanId,
-  ) => Effect.Effect<Workspace.Record, Conflict | Uncertain | InvalidInput>;
+  ) => Effect.Effect<
+    Workspace.Record,
+    GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
+  >;
   /**
    * Run core operations in a workspace without an actor: invitation acceptance,
    * where the recipient is not yet a member. Programs may require only core's
@@ -25,7 +26,7 @@ export interface Interface {
   readonly inWorkspace: <A, E, R extends Core.Operations>(
     workspaceId: Workspace.Id,
     program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, Exposed<E>>;
+  ) => Effect.Effect<A, GatewayErrors.ExposedError<E>>;
   /**
    * Run core operations as the identity's active membership. Core rechecks
    * membership and permissions inside each operation's transaction.
@@ -34,7 +35,7 @@ export interface Interface {
     workspaceId: Workspace.Id,
     identity: Identity.Reference,
     program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, Exposed<E> | NotMember>;
+  ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
   /**
    * Grant invitation management to the current owner of a workspace created
    * before that permission existed. Initialization owns this upgrade, so it is
@@ -45,14 +46,17 @@ export interface Interface {
     identity: Identity.Reference,
   ) => Effect.Effect<
     void,
-    Exposed<Effect.Error<ReturnType<typeof WorkspaceInitialization.enableInvitations>>> | NotMember
+    | GatewayErrors.ExposedError<
+        Effect.Error<ReturnType<typeof WorkspaceInitialization.enableInvitations>>
+      >
+    | GatewayErrors.NotMember
   >;
 }
 
 /** Workspace bootstrap and entry; core's application services are the operations. */
 export class Service extends Context.Service<Service, Interface>()("@amends/gateway/Service") {}
 
-const isPublic = Schema.is(Public);
+const isPublic = Schema.is(GatewayErrors.PublicError);
 const isConflict = Schema.is(Store.Conflict);
 const isUncertain = Schema.is(Store.CommitUncertain);
 const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
@@ -65,23 +69,27 @@ const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
 const expose = <A, E, R>(
   workspaceId: Workspace.Id,
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, Exposed<E>, R> =>
-  Effect.catch(effect, (error): Effect.Effect<never, Exposed<E>> => {
+): Effect.Effect<A, GatewayErrors.ExposedError<E>, R> =>
+  Effect.catch(effect, (error): Effect.Effect<never, GatewayErrors.ExposedError<E>> => {
     if (isConflict(error))
       return Effect.fail(
-        new Conflict({ workspaceId, operation: error.operation, message: error.message }),
+        new GatewayErrors.Conflict({
+          workspaceId,
+          operation: error.operation,
+          message: error.message,
+        }),
       );
     if (isUncertain(error))
-      return Effect.fail(new Uncertain({ workspaceId, commitId: error.commitId }));
+      return Effect.fail(new GatewayErrors.Uncertain({ workspaceId, commitId: error.commitId }));
     if (Schema.isSchemaError(error))
-      return Effect.fail(new InvalidInput({ message: error.message }));
+      return Effect.fail(new GatewayErrors.InvalidInput({ message: error.message }));
     if (isMismatch(error))
       return Effect.fail(
-        new InvalidInput({
+        new GatewayErrors.InvalidInput({
           message: `Values must belong to workspace ${error.expectedWorkspaceId}`,
         }),
       );
-    if (isPublic(error)) return Effect.fail(error as Extract<E, Public>);
+    if (isPublic(error)) return Effect.fail(error as Extract<E, GatewayErrors.PublicError>);
     return Effect.die(error);
   });
 
@@ -127,7 +135,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
     program: Effect.Effect<A, E, R>,
   ) {
     const membership = yield* Effect.orDie((yield* MemberStore.Service).findActive(identity));
-    if (Option.isNone(membership)) return yield* new NotMember({ workspaceId });
+    if (Option.isNone(membership)) return yield* new GatewayErrors.NotMember({ workspaceId });
     const actor = Actor.Value.make({ workspaceId, memberId: membership.value.id, identity });
     return yield* expose(workspaceId, Effect.provideService(program, Actor.Service, actor));
   });
