@@ -21,6 +21,8 @@ import { MemberApplication } from "./workspace/member/application.ts";
 import { MemberPermissions } from "./workspace/member/permissions.ts";
 import { MemberProjection } from "./workspace/member/projection.ts";
 import { WorkspaceProjection } from "./workspace/projection.ts";
+import { OwnershipApplication } from "./workspace/ownership/application.ts";
+import { OwnershipPermissions } from "./workspace/ownership/permissions.ts";
 
 /** Projections registered for journal publication, applied in this order. */
 const projections = [
@@ -38,6 +40,7 @@ const permissions = [
   InvitationPermissions.Manage,
   AssignmentPermissions.Read,
   AssignmentPermissions.Manage,
+  OwnershipPermissions.Transfer,
 ];
 
 /** The domain journal and its log, over host storage. */
@@ -56,6 +59,7 @@ const operations = Layer.mergeAll(
   MemberApplication.layer,
   InvitationApplication.layer,
   AssignmentApplication.layer,
+  OwnershipApplication.layer,
 ).pipe(Layer.provide(Delegation.layer));
 
 /**

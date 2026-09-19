@@ -1,4 +1,8 @@
-import { InvitationPermissions, MemberPermissions } from "@amends/core/workspace";
+import {
+  InvitationPermissions,
+  MemberPermissions,
+  OwnershipPermissions,
+} from "@amends/core/workspace";
 import { AssignmentPermissions, type Permission } from "@amends/core/authorization";
 import { DescriptionList, Section, Text } from "@amends/ui/components";
 export const permissions: ReadonlyArray<{
@@ -18,6 +22,10 @@ export const permissions: ReadonlyArray<{
   {
     definition: AssignmentPermissions.Manage,
     description: "Assign, revoke, or change roles within your delegation authority.",
+  },
+  {
+    definition: OwnershipPermissions.Transfer,
+    description: "Transfer ownership to another active person, as the current owner.",
   },
 ];
 

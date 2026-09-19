@@ -1,5 +1,5 @@
 import { Store } from "@amends/core/journal";
-import { Workspace, WorkspaceStore } from "@amends/core/workspace";
+import { Ownership, Workspace, WorkspaceStore } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -12,7 +12,7 @@ const decode = makeRecordDecoder(codec);
 const encode = Schema.encodeEffect(codec);
 
 /**
- * The workspace's own record, inserted once by initialization.
+ * Workspace metadata, with ownership changes guarded by the previous owner.
  *
  * @category constructors
  */
@@ -42,6 +42,26 @@ export const make = Effect.fn("Workspaces.make")(function* () {
       yield* guard(sql`INSERT INTO workspaces VALUES (${workspaceId}, ${data})`, true).pipe(
         Effect.mapError(storeError(WorkspaceStore, "insert")),
       );
+    }),
+    transferOwnership: Effect.fn("Workspaces.transferOwnership")(function* (input) {
+      yield* Store.Transaction;
+      const change = yield* Schema.decodeEffect(Ownership.Change)(input).pipe(
+        Effect.mapError(storeConflict(WorkspaceStore, "transferOwnership")),
+      );
+      if (change.workspaceId !== workspaceId)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "transferOwnership",
+          message: "Change belongs to another workspace",
+        });
+      const rows = yield* guard(
+        sql`UPDATE workspaces SET record = json_set(record, '$.ownerMemberId', ${change.ownerMemberId}) WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.ownerMemberId') = ${change.previousOwnerMemberId} RETURNING workspace_id`,
+        true,
+      ).pipe(Effect.mapError(storeError(WorkspaceStore, "transferOwnership")));
+      if (rows.length === 0)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "transferOwnership",
+          message: "Workspace is missing or ownership has changed",
+        });
     }),
   });
 });

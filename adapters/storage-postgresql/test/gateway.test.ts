@@ -4,6 +4,7 @@ import { Identity } from "@amends/core/identity";
 import {
   InvitationApplication,
   InvitationPermissions,
+  OwnershipPermissions,
   MemberApplication,
   MemberPermissions,
   Workspace,
@@ -130,6 +131,7 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
                   InvitationPermissions.Manage.name,
                   AssignmentPermissions.Read.name,
                   AssignmentPermissions.Manage.name,
+                  ...(id === BuiltinRoles.OwnerId ? [OwnershipPermissions.Transfer.name] : []),
                 ],
               }),
             );

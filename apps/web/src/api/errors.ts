@@ -24,6 +24,8 @@ export const mayRetainData = (cause: Cause.Cause<unknown>) =>
     "Delegation.Denied",
     "AssignmentApplication.MemberNotFound",
     "AssignmentApplication.NotFound",
+    "OwnershipApplication.NotOwner",
+    "OwnershipApplication.MemberNotFound",
     "MemberApplication.NotFound",
     "InvitationApplication.NotFound",
   ].includes(errorOf(cause)?._tag ?? "");
@@ -68,6 +70,14 @@ export const explain = (cause: Cause.Cause<unknown>): string => {
     case "AssignmentApplication.MemberNotFound":
     case "AssignmentApplication.NotFound":
       return "This member or assignment is no longer available.";
+    case "OwnershipApplication.NotOwner":
+      return "Only the current owner can transfer ownership. Refresh ownership to see its current state.";
+    case "OwnershipApplication.Changed":
+      return "Ownership changed after you opened this form. Cancel and refresh ownership before trying again.";
+    case "OwnershipApplication.MemberNotFound":
+      return "The selected member is no longer available. Refresh ownership and select another person.";
+    case "OwnershipApplication.InvalidRecipient":
+      return "Choose another active human member as the new owner.";
     case "InvitationApplication.NotRecipient":
       return "This invitation belongs to a different signed-in address.";
     case "InvitationApplication.AlreadyMember":

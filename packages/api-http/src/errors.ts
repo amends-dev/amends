@@ -4,7 +4,11 @@ import {
   Delegation,
   PermissionCatalog,
 } from "@amends/core/authorization";
-import { InvitationApplication, MemberApplication } from "@amends/core/workspace";
+import {
+  InvitationApplication,
+  MemberApplication,
+  OwnershipApplication,
+} from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
@@ -51,6 +55,13 @@ export const assignment = [
   AssignmentApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
   AssignmentApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
   AssignmentApplication.Changed.pipe(HttpApiSchema.status(409)),
+] as const;
+
+export const ownership = [
+  OwnershipApplication.NotOwner.pipe(HttpApiSchema.status(403)),
+  OwnershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  OwnershipApplication.InvalidRecipient.pipe(HttpApiSchema.status(409)),
+  OwnershipApplication.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */

@@ -41,8 +41,8 @@ follow the same rules. An authorized non-owner may remove their own membership.
 Administrators can remove ordinary Viewer-only or unassigned members, but only the
 owner can remove another administrator or a member with additional access. An authorized
 non-owner can still leave. Ownership alone does not authorize removal, and the current owner cannot be
-removed even by an otherwise authorized member. Ownership transfer is a
-separate, unimplemented workflow.
+removed even by an otherwise authorized member. Use the ownership transfer
+workflow before removing the former owner.
 
 Removal also revokes every pending invitation for that human in this workspace,
 including expired invitations still recorded as pending. This is part of removal
@@ -125,11 +125,44 @@ The owner can manage Viewer and Administrator access. Other holders of managemen
 permission can manage only Viewer-only or unassigned recipients. Direct grants and
 unfamiliar roles require the owner. The Owner assignment and owner membership are
 protected from these mutations, including attempts by the owner. Ownership transfer
-and custom-role management remain separate, unimplemented workflows.
+has its own operation. Custom-role management remains unimplemented.
 
 The web member details show actual assignments with revoke and change-role controls
 when permitted. Refresh access after a stale-change error before submitting again.
 Invitation forms offer role choices from the same backend policy.
+
+## Ownership transfer
+
+`GET /workspaces/:workspaceId/ownership` requires active membership and returns
+the workspace, current owner membership, current Owner assignment ID, `canTransfer`,
+and eligible candidates. Only the current owner holding `workspace.transfer-ownership`
+receives candidates: other active human members in that workspace. Agents and
+removed members cannot become owners.
+
+`POST …/ownership` accepts `{ memberId, expectedOwnerAssignmentId }`. The latter
+must match the Owner assignment returned by the ownership read. If ownership moves
+away and later returns to the same person, a new assignment ID still invalidates
+their old form. Stale authority returns HTTP 409; a caller who has lost permission
+or current ownership receives HTTP 403. Missing recipients return 404; the current
+owner, removed members, and agents are rejected as recipients with 409.
+
+The operation checks both current ownership and the transfer permission. In one
+journal commit it revokes both members' built-in workspace roles, assigns
+Administrator to the previous owner and Owner to the recipient, and updates
+`ownerMemberId`. Direct grants and assignments scoped to specific resources remain
+unchanged. The workspace's name and `createdBy` remain unchanged. Core requires one
+matching active human Owner assignment before and after the change. Failures roll
+back metadata, assignments, facts, and checkpoints together.
+
+Workspace settings provide candidate selection and a review dialog naming the new
+owner and explaining the previous owner's Administrator access. Success refreshes
+ownership, the workspace directory, and role choices. After a stale-form error,
+cancel the dialog and refresh ownership before reviewing another transfer.
+
+The ownership fact and metadata projection remain at version 1. Storage updates
+the existing owner field, so this workflow needs no database schema migration.
+Existing role bundles are not regenerated; use a fresh development workspace to
+receive the new owner-tier permission, or apply a deliberate recorded role update.
 
 ## Initialization
 
@@ -147,15 +180,14 @@ Each registered permission declares a required `builtinTier`. Viewer includes
 `viewer` permissions, Administrator also includes `administrator` permissions,
 and Owner includes all three tiers, including `owner`. The current bundles are:
 
-| Role          | Stored permissions                                                                          |
-| ------------- | ------------------------------------------------------------------------------------------- |
-| Viewer        | `member.read`, `assignment.read`                                                            |
-| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage` |
-| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage` |
+| Role          | Stored permissions                                                                                                          |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Viewer        | `member.read`, `assignment.read`                                                                                            |
+| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`                                 |
+| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership` |
 
-Administrator and Owner currently contain the same permission names because no
-owner-tier actions have been implemented. Delegation separately reserves administrator
-management for the current owner. Ownership transfer remains future work.
+Ownership transfer is the first owner-tier permission. Delegation separately reserves
+administrator management for the current owner.
 
 Role IDs are stable within each workspace: `builtin:viewer`, `builtin:administrator`,
 and `builtin:owner`. These identities are reserved for built-in definitions. Tiers

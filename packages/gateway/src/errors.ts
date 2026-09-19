@@ -5,7 +5,12 @@ import {
   PermissionCatalog,
 } from "@amends/core/authorization";
 import { Commit } from "@amends/core/journal";
-import { InvitationApplication, MemberApplication, Workspace } from "@amends/core/workspace";
+import {
+  InvitationApplication,
+  MemberApplication,
+  OwnershipApplication,
+  Workspace,
+} from "@amends/core/workspace";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -51,6 +56,10 @@ export const PublicError = Schema.Union([
   AssignmentApplication.MemberNotFound,
   AssignmentApplication.InactiveMember,
   AssignmentApplication.Changed,
+  OwnershipApplication.NotOwner,
+  OwnershipApplication.MemberNotFound,
+  OwnershipApplication.InvalidRecipient,
+  OwnershipApplication.Changed,
   MemberApplication.NotFound,
   MemberApplication.OwnerProtected,
   MemberApplication.AlreadyRemoved,

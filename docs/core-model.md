@@ -494,8 +494,23 @@ Creation attribution and current ownership are separate. Ownership does not
 implicitly bypass permission checks; the initial owner receives permissions through its role assignment.
 The initial permission set and subsequent changes to it must be deliberate.
 Ordinary operations receive an actor specific to that operation and check current
-membership and permissions. Ownership transfer still requires its application contract;
-the first removal workflow is defined below.
+membership and permissions. Ownership transfer and removal follow the workflows below.
+
+### Ownership transfers as one atomic change
+
+The current owner must hold `workspace.transfer-ownership` and select another active
+human member of the same workspace. The request identifies the Owner assignment the
+caller reviewed. Each transfer creates a fresh Owner assignment, so an old request
+cannot become valid again merely because ownership returns to its original holder.
+
+Transfer replaces both people's built-in workspace roles: the recipient becomes
+Owner and the previous owner becomes Administrator. It updates current ownership
+without changing creation attribution, direct grants, or access scoped to individual
+resources. The metadata change and assignment facts share one commit. Competing
+transfers cannot create multiple owners, and failures cannot leave partial changes.
+Only initialization and this workflow establish Owner access; ordinary role operations
+continue to protect it. Replay applies recorded outcomes without reauthorizing the
+previous owner.
 
 ### Humans and agents share membership
 
@@ -539,7 +554,7 @@ An invitation identifies a human, its issuing member, a required built-in role,
 and an expiry time. Issuance and revocation require invitation management and
 assignment management permissions. Shared delegation policy allows the current owner
 to delegate Viewer or Administrator, while other administrators can delegate Viewer.
-Owner is reserved for initialization and a future ownership-transfer workflow.
+Owner is reserved for initialization and the ownership-transfer workflow.
 
 Acceptance receives a trusted authenticated human identity, checks recipient and
 expiry, and rechecks the inviter's current membership, permissions, and delegation

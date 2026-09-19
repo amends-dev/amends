@@ -50,7 +50,12 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     ),
     Context.add(
       WorkspaceStore.Service,
-      WorkspaceStore.Service.of({ workspaceId, get: unexpected(), insert: unexpected }),
+      WorkspaceStore.Service.of({
+        workspaceId,
+        get: unexpected(),
+        insert: unexpected,
+        transferOwnership: unexpected,
+      }),
     ),
     Context.add(
       MemberStore.Service,

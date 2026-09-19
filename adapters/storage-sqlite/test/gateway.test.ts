@@ -1,7 +1,11 @@
 import { expect, expectTypeOf, test } from "bun:test";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { Log } from "@amends/core/journal";
-import { InvitationPermissions, MemberPermissions } from "@amends/core/workspace";
+import {
+  InvitationPermissions,
+  MemberPermissions,
+  OwnershipPermissions,
+} from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Option } from "effect";
 import { Operations } from "./operations.ts";
@@ -85,6 +89,7 @@ test("one host creates two isolated workspaces and uses each operation's authent
                   InvitationPermissions.Manage.name,
                   AssignmentPermissions.Read.name,
                   AssignmentPermissions.Manage.name,
+                  ...(id === BuiltinRoles.OwnerId ? [OwnershipPermissions.Transfer.name] : []),
                 ],
               }),
             );

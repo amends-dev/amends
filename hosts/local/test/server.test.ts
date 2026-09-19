@@ -1,7 +1,7 @@
 import { Assignment, BuiltinRoles } from "@amends/core/authorization";
 import { expect, test } from "bun:test";
 import { Identity } from "@amends/core/identity";
-import { Invitation, Member, Workspace } from "@amends/core/workspace";
+import { Invitation, Member, Ownership, Workspace } from "@amends/core/workspace";
 import { DateTime, Schema } from "effect";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,6 +19,75 @@ const temporary = async (run: (filename: string) => Promise<void>) => {
     await rm(directory, { recursive: true, force: true });
   }
 };
+
+test("ownership endpoints transfer to an active human, update directory state, and reject the previous owner's authority", async () =>
+  temporary(async (filename) =>
+    withServer(filename, async (call) => {
+      const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+        (await call(alice.id, "POST", "/workspaces", { name: "Ownership" })).body,
+      );
+      const base = `/workspaces/${workspace.id}`;
+      const initial = Schema.decodeUnknownSync(Ownership.View)(
+        (await call(alice.id, "GET", `${base}/ownership`)).body,
+      );
+      expect(initial.canTransfer).toBe(true);
+      expect(initial.candidates).toEqual([]);
+      const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
+      const invitation = Schema.decodeUnknownSync(Invitation.Record)(
+        (
+          await call(alice.id, "POST", `${base}/invitations`, {
+            recipientId: bob.id,
+            expiresAt,
+            roleId: BuiltinRoles.ViewerId,
+          })
+        ).body,
+      );
+      const member = Schema.decodeUnknownSync(Member.Record)(
+        (await call(bob.id, "POST", `${base}/invitations/${invitation.details.id}/accept`)).body,
+      );
+      const payload = { memberId: member.id, expectedOwnerAssignmentId: initial.ownerAssignmentId };
+      expect((await call(charlie.id, "GET", `${base}/ownership`)).status).toBe(403);
+      expect((await call(bob.id, "POST", `${base}/ownership`, payload)).status).toBe(403);
+      expect(
+        (await call(alice.id, "POST", `${base}/ownership`, { memberId: member.id })).status,
+      ).toBe(400);
+      expect(
+        (
+          await call(alice.id, "POST", `${base}/ownership`, {
+            ...payload,
+            memberId: workspace.ownerMemberId,
+          })
+        ).status,
+      ).toBe(409);
+      const transferred = await call(alice.id, "POST", `${base}/ownership`, payload);
+      expect(transferred.status).toBe(200);
+      expect(transferred.body).toEqual({
+        id: workspace.id,
+        name: workspace.name,
+        createdBy: alice.id,
+        ownerMemberId: member.id,
+      });
+      expect((await call(alice.id, "POST", `${base}/ownership`, payload)).status).toBe(403);
+      expect((await call(alice.id, "DELETE", `${base}/members/${member.id}`)).status).toBe(409);
+      const current = Schema.decodeUnknownSync(Ownership.View)(
+        (await call(bob.id, "GET", `${base}/ownership`)).body,
+      );
+      expect(current.owner.id).toBe(member.id);
+      expect(current.canTransfer).toBe(true);
+      expect(current.ownerAssignmentId).not.toBe(initial.ownerAssignmentId);
+      expect((await call(alice.id, "GET", "/me/workspaces")).body).toMatchObject({
+        memberships: [{ workspace: { ownerMemberId: member.id, createdBy: alice.id } }],
+      });
+      expect(
+        (
+          await call(bob.id, "POST", `${base}/ownership`, {
+            memberId: workspace.ownerMemberId,
+            expectedOwnerAssignmentId: initial.ownerAssignmentId,
+          })
+        ).status,
+      ).toBe(409);
+    }),
+  ));
 
 test("role invitations and assignment endpoints enforce required roles, delegation, and stale changes", async () =>
   temporary(async (filename) =>

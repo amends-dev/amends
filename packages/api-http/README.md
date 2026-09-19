@@ -44,6 +44,11 @@ so a client can import the complete contract without loading server code.
 - `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput` (`{ "name": "Design studio" }`)
   and creates a workspace owned by the authenticated human. The name is required,
   non-empty, and trimmed; the returned `Workspace.Record` includes it.
+  `GET /workspaces/:workspaceId/ownership` returns current ownership and eligible
+  candidates. `POST` to that path accepts `{ memberId, expectedOwnerAssignmentId }`
+  and transfers ownership atomically, returning the updated workspace. The caller
+  must be the current human owner with transfer permission. Stale authority or an
+  ineligible recipient returns 409; missing recipients return 404.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
 - `assignments`: `GET …/roles` lists built-in role choices;

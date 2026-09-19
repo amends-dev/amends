@@ -5,6 +5,8 @@ import {
   InvitationApplication,
   Member,
   MemberApplication,
+  Ownership,
+  OwnershipApplication,
   Workspace,
 } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
@@ -89,6 +91,27 @@ export const revokeInvitation = (
   );
 
 export * as Operations from "./operations.ts";
+
+export const ownership = (workspaceId: Workspace.Id, identity: Identity.Reference) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(OwnershipApplication.Service, (service) => service.get),
+    ),
+  );
+export const transferOwnership = (
+  workspaceId: Workspace.Id,
+  identity: Identity.Reference,
+  input: Ownership.TransferInput,
+) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(OwnershipApplication.Service, (service) => service.transfer(input)),
+    ),
+  );
 
 export const access = (
   workspaceId: Workspace.Id,

@@ -14,7 +14,7 @@ export const CreateInput = Schema.Struct({ name: Name }).annotate({
 });
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
 
-/** Creation attribution stays fixed when ownership is transferred in a later workflow. */
+/** Creation attribution stays fixed when ownership is transferred. */
 export const Record = Schema.Struct({
   id: Id,
   name: Name,

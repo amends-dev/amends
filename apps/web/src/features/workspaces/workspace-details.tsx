@@ -1,5 +1,6 @@
 import { DescriptionList, FormColumns, Section, Text } from "@amends/ui/components";
 import { useWorkspace } from "../../workspace/context.tsx";
+import { TransferOwnership } from "./transfer-ownership.tsx";
 export function WorkspaceDetails() {
   const opened = useWorkspace();
   return (
@@ -15,9 +16,10 @@ export function WorkspaceDetails() {
           ]}
         />
         <Text variant="caption">
-          Creation attribution is recorded once; ownership transfer is a separate workflow.
+          Creation attribution is recorded once and stays unchanged when ownership transfers.
         </Text>
       </Section>
+      <TransferOwnership />
     </FormColumns>
   );
 }

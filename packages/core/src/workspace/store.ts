@@ -2,6 +2,7 @@ import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { Workspace } from "./workspace.ts";
+import type { Ownership } from "./ownership/ownership.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("WorkspaceStore.Failure", {
   operation: Schema.String,
@@ -20,6 +21,14 @@ export interface Interface {
   /** Insert once; invalid records, duplicate creation, and a different workspace conflict. Never overwrite ownership. */
   readonly insert: (
     record: Workspace.Record,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * Change only ownerMemberId when the current owner matches previousOwnerMemberId.
+   * Reject invalid changes, foreign workspaces, absent records, and stale owners as
+   * conflicts before changing state. The application validates memberships and roles.
+   */
+  readonly transferOwnership: (
+    change: Ownership.Change,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 

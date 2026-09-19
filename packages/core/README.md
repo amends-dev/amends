@@ -13,12 +13,12 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                           |
-| --------------- | ----------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/` and `invitation/` features.   |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features. |
-| `identity`      | Stable human and agent references and the actor resolved for an operation.          |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                     |
+| Domain          | Ownership                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features. |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
+| `identity`      | Stable human and agent references and the actor resolved for an operation.                       |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -94,6 +94,14 @@ revocation, and atomic workspace-role replacement. `Delegation` supplies the sha
 rules used by assignments, invitations, and member removal. Role definition editing
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization)
 for the implemented bundles and current invitation restrictions.
+
+`OwnershipApplication` coordinates ownership and assignments in one commit. It
+requires the current owner and `OwnershipPermissions.Transfer`, validates another
+active human recipient, and uses the current Owner assignment ID as the expected
+authority for a transfer. The former owner becomes an Administrator. `WorkspaceStore`
+applies the recorded change only if the previous owner matches, preserving all other
+metadata. The ownership fact is projected alongside the recorded assignment changes;
+replay does not reauthorize the former owner.
 
 ## Module dependencies and exports
 

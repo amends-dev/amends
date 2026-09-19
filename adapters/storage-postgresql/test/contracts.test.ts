@@ -293,3 +293,65 @@ it("workspace names are required at the store boundary without partial writes", 
       }),
     ),
   ));
+
+it("ownership storage validates transitions and changes only the owner when the previous owner matches", async () =>
+  withDatabase(async (location) =>
+    inDatabase(
+      location,
+      Effect.gen(function* () {
+        const bound = yield* boundTo(workspaceId);
+        const workspace = yield* initialized(bound);
+        const next = Member.Id.make("next-owner");
+        const change = {
+          workspaceId,
+          previousOwnerMemberId: workspace.ownerMemberId,
+          ownerMemberId: next,
+        };
+        yield* bound.store.transaction(
+          Effect.gen(function* () {
+            for (const input of [
+              { ...change, workspaceId: otherWorkspaceId },
+              { ...change, previousOwnerMemberId: next },
+              { ...change, ownerMemberId: workspace.ownerMemberId },
+            ]) {
+              expect(yield* Effect.flip(bound.workspace.transferOwnership(input))).toMatchObject({
+                _tag: "WorkspaceStore.Conflict",
+              });
+              expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
+            }
+            const invalid = { ...change };
+            Reflect.set(invalid, "ownerMemberId", "");
+            expect(yield* Effect.flip(bound.workspace.transferOwnership(invalid))).toMatchObject({
+              _tag: "WorkspaceStore.Conflict",
+            });
+            yield* bound.workspace.transferOwnership(change);
+            expect(yield* Effect.flip(bound.workspace.transferOwnership(change))).toMatchObject({
+              _tag: "WorkspaceStore.Conflict",
+            });
+          }),
+        );
+        expect(yield* bound.workspace.get).toEqual(
+          Option.some({
+            id: workspace.id,
+            name: workspace.name,
+            createdBy: workspace.createdBy,
+            ownerMemberId: next,
+          }),
+        );
+        const missing = yield* boundTo(otherWorkspaceId);
+        expect(
+          yield* Effect.flip(
+            missing.store.transaction(
+              missing.workspace.transferOwnership({ ...change, workspaceId: otherWorkspaceId }),
+            ),
+          ),
+        ).toMatchObject({ _tag: "WorkspaceStore.Conflict" });
+        const expired = yield* bound.store.transaction(Effect.context<Store.Transaction>());
+        expect(
+          yield* Effect.flip(
+            bound.workspace.transferOwnership(change).pipe(Effect.provide(expired)),
+          ),
+        ).toMatchObject({ _tag: "WorkspaceStore.Failure" });
+      }),
+    ),
+  ));

@@ -1,6 +1,6 @@
 import { Store } from "@amends/core/journal";
-import { Workspace, WorkspaceStore } from "@amends/core/workspace";
-import { eq } from "drizzle-orm";
+import { Ownership, Workspace, WorkspaceStore } from "@amends/core/workspace";
+import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -18,7 +18,7 @@ const recordColumns = {
 const decode = Schema.decodeUnknownEffect(Schema.Array(Workspace.Record));
 
 /**
- * The workspace's own record, inserted once by initialization.
+ * Workspace metadata, with ownership changes guarded by the previous owner.
  *
  * @category constructors
  */
@@ -52,6 +52,30 @@ export const make = Effect.fn("Workspaces.make")(function* () {
         }),
         true,
       ).pipe(Effect.mapError(storeError(WorkspaceStore, "insert")));
+    }),
+    transferOwnership: Effect.fn("Workspaces.transferOwnership")(function* (input) {
+      yield* Store.Transaction;
+      const change = yield* Schema.decodeEffect(Ownership.Change)(input).pipe(
+        Effect.mapError(storeConflict(WorkspaceStore, "transferOwnership")),
+      );
+      if (change.workspaceId !== workspaceId)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "transferOwnership",
+          message: "Change belongs to another workspace",
+        });
+      const rows = yield* guard(
+        db
+          .update(workspaces)
+          .set({ ownerMemberId: change.ownerMemberId })
+          .where(and(own, eq(workspaces.ownerMemberId, change.previousOwnerMemberId)))
+          .returning({ id: workspaces.workspaceId }),
+        true,
+      ).pipe(Effect.mapError(storeError(WorkspaceStore, "transferOwnership")));
+      if (rows.length === 0)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "transferOwnership",
+          message: "Workspace is missing or ownership has changed",
+        });
     }),
   });
 });

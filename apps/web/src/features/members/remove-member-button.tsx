@@ -37,7 +37,7 @@ function RemoveMemberAction(props: Props) {
       <ActionGroup
         description={
           owner()
-            ? "The current owner cannot be removed. Ownership transfer is a separate workflow."
+            ? "The current owner cannot be removed. Transfer ownership in workspace settings first."
             : me()
               ? "You lose access immediately. Your history stays on the workspace's record."
               : "They lose access immediately, and their pending invitations are revoked. Their history stays readable."

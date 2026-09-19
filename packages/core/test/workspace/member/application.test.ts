@@ -98,6 +98,7 @@ const configured = (
       ownerMemberId: alice.memberId,
     }),
     insert: () => Effect.die("Workspace insertion is not used by membership operations"),
+    transferOwnership: () => Effect.die("Ownership transfer is not used by membership operations"),
     ...workspaceOverrides,
   });
   const invitations = Layer.succeed(InvitationStore.Service, {
@@ -494,6 +495,7 @@ test("removal fails closed when ownership cannot be read reliably", async () => 
             workspaceId: foreignWorkspaceId,
             get: Effect.succeedNone,
             insert: () => Effect.die("Unexpected workspace insertion"),
+            transferOwnership: () => Effect.die("Unexpected ownership transfer"),
           }),
         ),
       ),
