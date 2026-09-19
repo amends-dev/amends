@@ -67,7 +67,8 @@ the address itself. Development credentials trust any nonempty bearer token as
 the human ID it asserts:
 
 ```bash
-curl -X POST -H 'Authorization: Bearer alice' http://127.0.0.1:8787/workspaces
+curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
+  -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
 ```
 
 Nothing verifies control of the address. Replace both development implementations

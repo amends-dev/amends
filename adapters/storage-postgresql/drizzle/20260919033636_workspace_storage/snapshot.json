@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "9a8f55ed-eae9-43b9-a327-05fe42f9ab57",
+  "id": "ac67a524-73c7-48b6-a0c8-de5c9c326f32",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -858,6 +858,19 @@
       "entityType": "columns",
       "schema": "public",
       "table": "roles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "workspaces"
     },
     {
       "type": "text",

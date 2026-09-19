@@ -19,10 +19,33 @@ const temporary = async (run: (filename: string) => Promise<void>) => {
   }
 };
 
+test("workspace creation requires a name and preserves it across server restarts", async () =>
+  temporary(async (filename) => {
+    const workspace = await withServer(filename, async (call) => {
+      for (const payload of [undefined, {}, { name: "" }, { name: " \t\n" }, { name: 42 }]) {
+        expect((await call(alice.id, "POST", "/workspaces", payload)).status).toBe(400);
+      }
+      expect((await call(alice.id, "GET", "/me/workspaces")).body).toEqual({
+        memberships: [],
+        invitations: [],
+      });
+      const created = await call(alice.id, "POST", "/workspaces", { name: "Design & Engineering" });
+      expect(created.status).toBe(201);
+      const record = Schema.decodeUnknownSync(Workspace.Record)(created.body);
+      expect(record.name).toBe("Design & Engineering");
+      return record;
+    });
+    await withServer(filename, async (call) => {
+      expect((await call(alice.id, "GET", "/me/workspaces")).body).toMatchObject({
+        memberships: [{ workspace }],
+      });
+    });
+  }));
+
 test("the server entry point serves persisted memberships to another process, and denies another identity", async () =>
   temporary(async (filename) => {
     const workspace = await withServer(filename, async (call) => {
-      const created = await call(alice.id, "POST", "/workspaces");
+      const created = await call(alice.id, "POST", "/workspaces", { name: "Test workspace" });
       expect(created.status).toBe(201);
       return Schema.decodeUnknownSync(Workspace.Record)(created.body);
     });
@@ -42,7 +65,7 @@ test("invitation, acceptance, revocation, and removal survive separate server pr
   temporary(async (filename) => {
     const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
     const first = await withServer(filename, async (call) => {
-      const created = await call(alice.id, "POST", "/workspaces");
+      const created = await call(alice.id, "POST", "/workspaces", { name: "Test workspace" });
       expect(created.status).toBe(201);
       const workspace = Schema.decodeUnknownSync(Workspace.Record)(created.body);
       const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {

@@ -38,7 +38,12 @@ const member = (
     status,
   });
 const membership: WorkspaceDirectory.Membership = {
-  workspace: { id: workspaceId, createdBy: humanId, ownerMemberId: Member.Id.make("owner") },
+  workspace: {
+    id: workspaceId,
+    createdBy: humanId,
+    name: "Test workspace",
+    ownerMemberId: Member.Id.make("owner"),
+  },
   member: member("reader"),
   activeMemberCount: 3,
 };

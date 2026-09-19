@@ -93,6 +93,7 @@ const configured = (
     get: Effect.succeedSome({
       id: workspaceId,
       createdBy: Identity.HumanId.make("alice"),
+      name: "Test workspace",
       ownerMemberId: alice.memberId,
     }),
     insert: () => Effect.die("Workspace insertion is not used by membership operations"),
@@ -461,6 +462,7 @@ test("removal fails closed when ownership cannot be read reliably", async () => 
       get: Effect.succeedSome({
         id: foreignWorkspaceId,
         createdBy: Identity.HumanId.make("alice"),
+        name: "Test workspace",
         ownerMemberId: alice.memberId,
       }),
       tag: "MemberApplication.WorkspaceMismatch",

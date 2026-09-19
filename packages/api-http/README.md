@@ -41,8 +41,9 @@ so a client can import the complete contract without loading server code.
   `POST /session/code` exchanges it for a session. Neither needs a credential.
 - `me`: `GET /me/workspaces` lists the principal's memberships and pending
   invitations.
-- `workspaces`: `POST /workspaces` creates a workspace owned by the authenticated
-  human.
+- `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput` (`{ "name": "Design studio" }`)
+  and creates a workspace owned by the authenticated human. The name is required,
+  non-empty, and trimmed; the returned `Workspace.Record` includes it.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;

@@ -18,7 +18,12 @@ test.each([0, 2])("directory JSON retains people for an active member count of %
   const wire = {
     memberships: [
       {
-        workspace: { id: "workspace", createdBy: "human", ownerMemberId: "owner" },
+        workspace: {
+          id: "workspace",
+          createdBy: "human",
+          name: "Test workspace",
+          ownerMemberId: "owner",
+        },
         member: {
           id: "agent-member",
           workspaceId: "workspace",

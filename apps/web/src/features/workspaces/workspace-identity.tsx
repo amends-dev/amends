@@ -14,11 +14,11 @@ export function WorkspaceIdentity() {
       aria-label="Switch workspace"
       onClick={sidebar.close}
     >
-      <WorkspaceMark name={membership().workspace.id} />
+      <WorkspaceMark name={membership().workspace.name} />
       <Show when={!sidebar.compact()}>
         <span class={s.identityText}>
           <Text as="strong" variant="bodySmall" class={s.identityLine}>
-            {membership().workspace.id}
+            {membership().workspace.name}
           </Text>
           <Text as="span" variant="caption" class={s.identityLine}>
             {membership().workspace.ownerMemberId === membership().member.id ? "owner" : "member"} ·{" "}

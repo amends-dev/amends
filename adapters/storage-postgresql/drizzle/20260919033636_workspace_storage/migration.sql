@@ -100,6 +100,7 @@ CREATE TABLE "roles" (
 );
 --> statement-breakpoint
 CREATE TABLE "workspaces" (
+	"name" text NOT NULL,
 	"workspace_id" text PRIMARY KEY,
 	"created_by" text NOT NULL,
 	"owner_member_id" text NOT NULL

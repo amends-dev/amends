@@ -56,7 +56,7 @@ test("the HTTP server carries the membership workflow over SQLite with bearer id
           HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
         const asAlice = yield* client(alice);
         const asBob = yield* client(bob);
-        const workspace = yield* asAlice.workspaces.create();
+        const workspace = yield* asAlice.workspaces.create({ payload: { name: "Test workspace" } });
         const params = { workspaceId: workspace.id, memberId: workspace.ownerMemberId };
         const owner = yield* asAlice.members.get({ params });
         const outsider = yield* Effect.flip(asBob.members.get({ params }));
@@ -172,9 +172,9 @@ test("email sign-in issues a session the server accepts, and the directory lists
         const reused = yield* Effect.flip(anonymous.session.complete({ payload: { email, code } }));
         const client = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(session.token)));
         const before = yield* client.me.workspaces();
-        const workspace = yield* client.workspaces.create();
+        const workspace = yield* client.workspaces.create({ payload: { name: "Test workspace" } });
         const inviter = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(alice)));
-        const other = yield* inviter.workspaces.create();
+        const other = yield* inviter.workspaces.create({ payload: { name: "Test workspace" } });
         const invitation = yield* inviter.invitations.issue({
           params: { workspaceId: other.id },
           payload: {

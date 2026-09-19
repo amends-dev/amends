@@ -50,7 +50,7 @@ export function WorkspaceAccessPage(props: {
               <Match when={true}>
                 <Notice tone="danger">
                   {props.membership
-                    ? `Your membership of ${props.membership.workspace.id} has ended. The work you did stays on that workspace's record.`
+                    ? `Your membership of ${props.membership.workspace.name} has ended. The work you did stays on that workspace's record.`
                     : "You are not a member of this workspace. If someone shared a link with you, ask them for an invitation."}
                 </Notice>
                 <Text>Rejoining needs a fresh invitation. An old link will not work.</Text>

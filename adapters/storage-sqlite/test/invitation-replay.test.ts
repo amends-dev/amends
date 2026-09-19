@@ -260,6 +260,7 @@ test("old workspaces explicitly enable invitations once and catch up the new pro
               yield* journal.publish(WorkspaceFacts.Initialized, {
                 id: workspaceId,
                 createdBy: alice.id,
+                name: "Test workspace",
                 ownerMemberId: memberId,
               });
               yield* journal.publish(MemberFacts.Added, { workspaceId, memberId, identity: alice });

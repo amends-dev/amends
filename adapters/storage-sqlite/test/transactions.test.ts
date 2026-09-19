@@ -86,7 +86,7 @@ test("interruption rolls back initialization and leaves the connection usable", 
           const journal = yield* Journal.Service;
           return yield* journal.commit(
             Effect.gen(function* () {
-              yield* WorkspaceInitialization.initialize(alice.id);
+              yield* WorkspaceInitialization.initialize(alice.id, { name: "Test workspace" });
               yield* Deferred.succeed(ready, undefined);
               return yield* Effect.never;
             }),
@@ -152,7 +152,9 @@ test("independent hosts report a busy transaction without retrying and preserve 
             const journal = yield* Journal.Service;
             return yield* journal.commit(
               Effect.gen(function* () {
-                const record = yield* WorkspaceInitialization.initialize(alice.id);
+                const record = yield* WorkspaceInitialization.initialize(alice.id, {
+                  name: "Test workspace",
+                });
                 yield* Deferred.succeed(ready, undefined);
                 yield* Deferred.await(release);
                 return record;

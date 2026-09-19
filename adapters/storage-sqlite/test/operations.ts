@@ -15,7 +15,9 @@ import { Effect } from "effect";
  * handler does, without going through HTTP.
  */
 export const createWorkspace = (creator: Identity.HumanId) =>
-  Effect.flatMap(Gateway.Service, (gateway) => gateway.createWorkspace(creator));
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.createWorkspace(creator, { name: "Test workspace" }),
+  );
 
 export const getMember = (
   workspaceId: Workspace.Id,

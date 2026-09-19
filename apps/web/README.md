@@ -160,7 +160,9 @@ renders its header and main content directly. `DocumentTitle` owns browser metad
 There is no page-header registration or separate shell for sign-in and workspace selection.
 
 - `/sign-in`: request and complete a one-time email code exchange.
-- `/`: list reachable workspaces, accept invitations, and create a workspace. The remembered
+- `/`: list reachable workspaces by name, accept invitations, and create a workspace
+  through `CreateWorkspaceButton` and its name dialog. Names are required and trimmed
+  before submission; `Workspaces.makeCreate()` accepts `Workspace.CreateInput`. The remembered
   active workspace opens by default; `/?choose` always shows the picker.
 - `/workspaces/:workspaceId`: validate the ID and resolve membership before mounting protected
   content. Lookup failure, rejected credentials, and ended membership are distinct states.

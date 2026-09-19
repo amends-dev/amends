@@ -38,6 +38,7 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
       .select({
         workspace: {
           id: workspaces.workspaceId,
+          name: workspaces.name,
           createdBy: workspaces.createdBy,
           ownerMemberId: workspaces.ownerMemberId,
         },

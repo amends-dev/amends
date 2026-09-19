@@ -14,11 +14,11 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     return handlers.handleAll({
-      create: () =>
+      create: ({ payload }) =>
         Effect.gen(function* () {
           const principal = yield* Principal;
           if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
-          return yield* gateway.createWorkspace(principal.id);
+          return yield* gateway.createWorkspace(principal.id, payload);
         }),
     });
   }),

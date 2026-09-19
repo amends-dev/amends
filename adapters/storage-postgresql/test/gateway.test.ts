@@ -17,8 +17,8 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
     const outcome = await Effect.runPromise(
       Effect.gen(function* () {
         const entry = yield* Gateway.Service;
-        const a = yield* entry.createWorkspace(alice.id);
-        const b = yield* entry.createWorkspace(bob.id);
+        const a = yield* entry.createWorkspace(alice.id, { name: "Alice workspace" });
+        const b = yield* entry.createWorkspace(bob.id, { name: "Bob workspace" });
         const getMember = (workspace: Workspace.Record, identity: Identity.Reference) =>
           entry.asMember(
             workspace.id,
@@ -145,3 +145,25 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
       }),
     );
   }));
+
+it("workspace creation rejects blank names before persisting a workspace", async () =>
+  withDatabase(async (location) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const gateway = yield* Gateway.Service;
+        for (const name of ["", " \t\n"]) {
+          expect(yield* Effect.flip(gateway.createWorkspace(alice.id, { name }))).toMatchObject({
+            _tag: "Gateway.InvalidInput",
+          });
+        }
+        expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
+          memberships: [],
+          invitations: [],
+        });
+        const workspace = yield* gateway.createWorkspace(alice.id, { name: "Studio" });
+        expect(workspace.name).toBe("Studio");
+        const listing = yield* (yield* WorkspaceDirectory.Service).list(alice);
+        expect(listing.memberships.map((membership) => membership.workspace)).toEqual([workspace]);
+      }).pipe(Effect.provide(host(location))),
+    ),
+  ));

@@ -24,6 +24,7 @@ const member: Member.Record = { id: memberId, workspaceId, identity: alice, stat
 const workspace: Workspace.Record = {
   id: workspaceId,
   createdBy: alice.id,
+  name: "Test workspace",
   ownerMemberId: memberId,
 };
 
@@ -212,7 +213,10 @@ test("domain outcomes keep their tags and statuses", async () => {
         responseMode: "response-only",
       }),
       client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
-      client.workspaces.create({ responseMode: "response-only" }),
+      client.workspaces.create({
+        payload: { name: "Test workspace" },
+        responseMode: "response-only",
+      }),
     ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
   );
   expect(statuses).toEqual([200, 404, 403, 201]);
@@ -229,9 +233,13 @@ test("missing or rejected credentials are unauthorized before any gateway call",
 
 test("workspace creation and acceptance require a human principal", async () => {
   calls.length = 0;
-  const created = await run("alice", (client) => client.workspaces.create());
+  const created = await run("alice", (client) =>
+    client.workspaces.create({ payload: { name: "Test workspace" } }),
+  );
   expect(created).toEqual(workspace);
-  const refused = await run("agent", (client) => client.workspaces.create().pipe(Effect.flip));
+  const refused = await run("agent", (client) =>
+    client.workspaces.create({ payload: { name: "Test workspace" } }).pipe(Effect.flip),
+  );
   expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
   const accepted = await run("alice", (client) =>
     client.invitations.accept({
@@ -240,7 +248,7 @@ test("workspace creation and acceptance require a human principal", async () => 
   );
   expect(accepted).toEqual(member);
   expect(calls).toEqual([
-    { operation: "createWorkspace", arguments: [alice.id] },
+    { operation: "createWorkspace", arguments: [alice.id, { name: "Test workspace" }] },
     { operation: "inWorkspace", arguments: [workspaceId] },
     { operation: "accept", arguments: ["invitation-one", alice.id] },
   ]);

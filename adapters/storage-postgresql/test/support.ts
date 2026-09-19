@@ -62,7 +62,9 @@ export const inDatabase = <A, E>(
   program: Effect.Effect<A, E, PostgresDatabase.Service | SqlClient.SqlClient>,
 ) => Effect.runPromise(program.pipe(Effect.provide(database(url))));
 export const initialized = (bound: Bound, creator = alice.id) =>
-  WorkspaceInitialization.initialize(creator).pipe(Effect.provide(core(bound)));
+  WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
+    Effect.provide(core(bound)),
+  );
 export const host = (url: string, options: PostgresStorage.Options = {}) =>
   Gateway.layer.pipe(
     Layer.provideMerge(layer(options)),

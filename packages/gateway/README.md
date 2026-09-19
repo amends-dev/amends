@@ -40,8 +40,10 @@ is sufficient to type-check a supplied implementation.
 
 ## Surface
 
-- `createWorkspace` allocates a workspace ID and runs core initialization for
-  the creator. The caller has authenticated the creator and checked entitlement.
+- `createWorkspace(creator, input)` accepts `Workspace.CreateInput` with a required
+  name, allocates a workspace ID, and runs core initialization for the creator.
+  Core rejects blank or untrimmed names before committing any facts. The caller
+  has authenticated the creator and checked entitlement.
 - `asMember(workspaceId, identity, program)` binds the workspace, resolves the
   identity's active membership into `Actor.Service`, and runs the program.
   Programs may require only core's `Operations` and the actor. Stores,

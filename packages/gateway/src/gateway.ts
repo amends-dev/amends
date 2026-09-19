@@ -14,6 +14,7 @@ export interface Interface {
    */
   readonly createWorkspace: (
     creator: Identity.HumanId,
+    input: Workspace.CreateInput,
   ) => Effect.Effect<
     Workspace.Record,
     GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
@@ -141,9 +142,9 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
   });
 
   const createWorkspace: Interface["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(
-    function* (creator: Identity.HumanId) {
+    function* (creator: Identity.HumanId, input: Workspace.CreateInput) {
       const id = Workspace.Id.make(yield* Effect.orDie(cryptography.randomUUIDv4));
-      return yield* bind(id, expose(id, WorkspaceInitialization.initialize(creator)));
+      return yield* bind(id, expose(id, WorkspaceInitialization.initialize(creator, input)));
     },
   );
 

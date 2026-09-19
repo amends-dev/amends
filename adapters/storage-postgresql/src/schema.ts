@@ -47,6 +47,7 @@ const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, An
   );
 
 export const workspaces = pgTable("workspaces", {
+  name: text("name").notNull(),
   workspaceId: text("workspace_id").primaryKey(),
   createdBy: text("created_by").notNull(),
   // Not a foreign key: the workspace record is projected before its owner's membership.

@@ -51,7 +51,9 @@ export const host = (filename: string) =>
     Layer.provideMerge(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
   );
 export const initialized = (bound: Bound, creator = alice.id) =>
-  WorkspaceInitialization.initialize(creator).pipe(Effect.provide(core(bound)));
+  WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
+    Effect.provide(core(bound)),
+  );
 export const temporary = async (run: (filename: string) => Promise<void>) => {
   const directory = await mkdtemp(join(tmpdir(), "amends-sqlite-"));
   try {

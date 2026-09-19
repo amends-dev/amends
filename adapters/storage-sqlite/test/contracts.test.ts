@@ -263,3 +263,41 @@ it("checkpoint validation rejects invalid progress without leaving a partial che
       }),
     ),
   ));
+
+it("workspace names are required at the store boundary without partial writes", async () =>
+  withDatabase(async (location) =>
+    inDatabase(
+      location,
+      Effect.gen(function* () {
+        const bound = yield* boundTo(workspaceId);
+        const record: Workspace.Record = {
+          id: workspaceId,
+          name: "Design & Engineering",
+          createdBy: Identity.HumanId.make("owner"),
+          ownerMemberId: Member.Id.make("owner-member"),
+        };
+        yield* bound.store.transaction(
+          Effect.gen(function* () {
+            for (const name of ["", " \t\n", " padded "]) {
+              expect(
+                yield* Effect.flip(
+                  bound.workspace.insert({
+                    id: record.id,
+                    name,
+                    createdBy: record.createdBy,
+                    ownerMemberId: record.ownerMemberId,
+                  }),
+                ),
+              ).toMatchObject({
+                _tag: "WorkspaceStore.Conflict",
+                operation: "insert",
+              });
+              expect(yield* bound.workspace.get).toEqual(Option.none());
+            }
+            yield* bound.workspace.insert(record);
+          }),
+        );
+        expect(yield* bound.workspace.get).toEqual(Option.some(record));
+      }),
+    ),
+  ));

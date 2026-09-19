@@ -40,8 +40,10 @@ export const invitationAssignmentId = (memberId: Member.Id) =>
  */
 export const initialize = Effect.fn("WorkspaceInitialization.initialize")(function* (
   creator: Identity.HumanId,
+  input: Workspace.CreateInput,
 ) {
   const createdBy = yield* Schema.decodeEffect(Identity.HumanId)(creator);
+  const { name } = yield* Schema.decodeEffect(Workspace.CreateInput)(input);
   const workspace = yield* WorkspaceStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -50,7 +52,12 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
       if (Option.isSome(yield* workspace.get))
         return yield* new AlreadyInitialized({ workspaceId: workspace.workspaceId });
       const ownerMemberId = Member.Id.make(yield* crypto.randomUUIDv4);
-      const record = Workspace.Record.make({ id: workspace.workspaceId, createdBy, ownerMemberId });
+      const record = Workspace.Record.make({
+        id: workspace.workspaceId,
+        name,
+        createdBy,
+        ownerMemberId,
+      });
       yield* journal.publish(WorkspaceFacts.Initialized, record);
       yield* journal.publish(MemberFacts.Added, {
         workspaceId: record.id,

@@ -21,7 +21,9 @@ test("the subprocess fixture ignores inherited database selection and uses its t
     await withServer(
       filename,
       async (call) => {
-        expect((await call("fixture-owner", "POST", "/workspaces")).status).toBe(201);
+        expect(
+          (await call("fixture-owner", "POST", "/workspaces", { name: "Test workspace" })).status,
+        ).toBe(201);
       },
       {
         env: {

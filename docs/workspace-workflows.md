@@ -11,8 +11,21 @@ development bearer identities.
 
 ## Workspaces and members
 
-`POST /workspaces` creates a workspace owned by the caller and returns its `id`,
-`createdBy`, and `ownerMemberId`. `GET /me/workspaces` lists the caller's
+`POST /workspaces` requires a JSON body with a non-empty, trimmed `name`. It creates
+a workspace owned by the caller and returns `id`, `name`, `createdBy`, and
+`ownerMemberId`. Missing, blank, or untrimmed names return HTTP 400 without creating
+a workspace. Names are display labels; IDs remain the stable routing identity.
+
+```bash
+curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
+  -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
+```
+
+The web picker opens a name form when you click **New workspace**. Submitting
+**Create workspace** trims the name and opens the new workspace after creation.
+Cancelling creates nothing. The name appears in the picker, sidebar, and settings.
+
+`GET /me/workspaces` lists the caller's
 memberships, including ended ones, with each workspace's active member count,
 and the caller's pending invitations. It reads the host's projection tables
 across every workspace; this is host routing, not a core operation.

@@ -11,6 +11,7 @@ const validateRecord = Schema.decodeEffect(Schema.toType(Workspace.Record));
 /** Selected in the record's shape; decoding checks the brands. */
 const recordColumns = {
   id: workspaces.workspaceId,
+  name: workspaces.name,
   createdBy: workspaces.createdBy,
   ownerMemberId: workspaces.ownerMemberId,
 };
@@ -45,6 +46,7 @@ export const make = Effect.fn("Workspaces.make")(function* () {
       yield* guard(
         db.insert(workspaces).values({
           workspaceId,
+          name: record.name,
           createdBy: record.createdBy,
           ownerMemberId: record.ownerMemberId,
         }),

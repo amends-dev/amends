@@ -1,6 +1,6 @@
 import { expect, expectTypeOf, test } from "bun:test";
 import { Log } from "@amends/core/journal";
-import { Gateway } from "@amends/gateway";
+import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Option } from "effect";
 import { Operations } from "./operations.ts";
 
@@ -80,3 +80,25 @@ test("one host creates two isolated workspaces and uses each operation's authent
       }),
     );
   }));
+
+test("workspace creation rejects blank names before persisting a workspace", async () =>
+  temporary(async (location) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const gateway = yield* Gateway.Service;
+        for (const name of ["", " \t\n"]) {
+          expect(yield* Effect.flip(gateway.createWorkspace(alice.id, { name }))).toMatchObject({
+            _tag: "Gateway.InvalidInput",
+          });
+        }
+        expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
+          memberships: [],
+          invitations: [],
+        });
+        const workspace = yield* gateway.createWorkspace(alice.id, { name: "Studio" });
+        expect(workspace.name).toBe("Studio");
+        const listing = yield* (yield* WorkspaceDirectory.Service).list(alice);
+        expect(listing.memberships.map((membership) => membership.workspace)).toEqual([workspace]);
+      }).pipe(Effect.provide(host(location))),
+    ),
+  ));

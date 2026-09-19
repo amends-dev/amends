@@ -42,9 +42,8 @@ export function WorkspacePicker(props: { onSelect: (workspaceId: Workspace.Id) =
                   >
                     {(membership) => (
                       <WorkItemRow
-                        title={membership.workspace.id}
-                        titleKind="code"
-                        leadingIcon={<WorkspaceMark name={membership.workspace.id} />}
+                        title={membership.workspace.name}
+                        leadingIcon={<WorkspaceMark name={membership.workspace.name} />}
                         supportingText={`${membership.activeMemberCount === 1 ? "just you" : `${membership.activeMemberCount} people`} · ${membership.workspace.ownerMemberId === membership.member.id ? "owner" : "member"}`}
                         onOpen={() => props.onSelect(membership.workspace.id)}
                       />
