@@ -139,7 +139,7 @@ it("keeps the log reading position during updates and resumes following at the b
   const resize = resizeObserver();
   const [count, setCount] = createSignal(1);
   render(() => <FollowLatest count={count()}>Log entries</FollowLatest>);
-  const viewport = screen.getByLabelText("Scrollable session log");
+  const viewport = screen.getByLabelText("Scrollable turn log");
   Object.defineProperties(viewport, {
     clientHeight: { configurable: true, value: 200 },
     scrollHeight: { configurable: true, value: 1000 },

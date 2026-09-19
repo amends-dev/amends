@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, Show, type JSX } from "solid-js";
+import { createSignal, onMount, onCleanup, children, Show, type JSX } from "solid-js";
 import { layout } from "../tokens/index.ts";
 import { Tabs } from "./tabs.tsx";
 import * as s from "./detail-layout.css.ts";
@@ -11,6 +11,7 @@ export function DetailLayout(props: {
   primaryLabel?: string;
   detailLabel?: string;
 }) {
+  const headerSlot = children(() => props.header);
   const [panel, setPanel] = createSignal("primary");
   const [split, setSplit] = createSignal(false);
   let root!: HTMLDivElement;
@@ -28,8 +29,8 @@ export function DetailLayout(props: {
       }}
       class={s.root}
     >
-      <Show when={props.header}>
-        <div class={s.header}>{props.header}</div>
+      <Show when={headerSlot()}>
+        <div class={s.header}>{headerSlot()}</div>
       </Show>
       <div class={s.body}>
         <Tabs

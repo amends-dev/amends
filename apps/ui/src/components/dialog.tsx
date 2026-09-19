@@ -1,5 +1,13 @@
 import { Text } from "./text.tsx";
-import { createEffect, createUniqueId, onCleanup, Show, untrack, type JSX } from "solid-js";
+import {
+  createEffect,
+  createUniqueId,
+  onCleanup,
+  children,
+  Show,
+  untrack,
+  type JSX,
+} from "solid-js";
 import { Button, IconButton } from "./button.tsx";
 import * as s from "./dialog.css.ts";
 
@@ -27,6 +35,7 @@ export interface DialogProps {
 }
 /** Controlled native modal. Keep it in its theme scope; the browser promotes it to the top layer. */
 export function Dialog(props: DialogProps) {
+  const actionsSlot = children(() => props.actions);
   const id = createUniqueId();
   let element!: HTMLDialogElement;
   let heading!: HTMLHeadingElement;
@@ -146,8 +155,8 @@ export function Dialog(props: DialogProps) {
           </header>
         </Show>
         {props.children}
-        <Show when={props.actions}>
-          <footer class={s.actions}>{props.actions}</footer>
+        <Show when={actionsSlot()}>
+          <footer class={s.actions}>{actionsSlot()}</footer>
         </Show>
       </div>
     </dialog>

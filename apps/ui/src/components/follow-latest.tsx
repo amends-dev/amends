@@ -29,7 +29,7 @@ export function FollowLatest(props: { count: number; children: JSX.Element }) {
         }}
         class={s.viewport}
         tabIndex={0}
-        aria-label="Scrollable session log"
+        aria-label="Scrollable turn log"
         onScroll={() => {
           if (viewport.clientHeight > 0) {
             following = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 24;

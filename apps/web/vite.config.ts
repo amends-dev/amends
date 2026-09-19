@@ -4,11 +4,13 @@ import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 
 export default defineConfig({
   plugins: [solid(), vanillaExtractPlugin()],
+  // Shared source packages and primitives must use the same reactive owner tree.
+  resolve: { dedupe: ["solid-js"] },
   server: {
     host: "127.0.0.1",
     port: 4321,
     strictPort: true,
-    // Reserved for an HTTP host on port 8787; the local CLI host does not serve this API.
+    // The local Bun host serves the shared HTTP contract on port 8787.
     proxy: {
       "/api": {
         target: "http://localhost:8787",

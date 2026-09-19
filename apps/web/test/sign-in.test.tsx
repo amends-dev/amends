@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
-import { RegistryProvider } from "@effect/atom-solid";
+import { SessionBoundary } from "../src/session/boundary.tsx";
 import { MemoryRouter, Route, createMemoryHistory } from "@solidjs/router";
-import { SignInPage } from "../src/pages/entry/sign-in.tsx";
+import { SignInPage } from "../src/pages/session/sign-in.tsx";
 
 /** The local host's contract, answered in memory: one delivered code per address. */
 const codes = new Map<string, string>();
@@ -49,12 +49,12 @@ const mount = () => {
   history.set({ value: "/sign-in" });
   // A registry per test keeps the session atom from leaking between tests.
   render(() => (
-    <RegistryProvider>
+    <SessionBoundary>
       <MemoryRouter history={history}>
         <Route path="/sign-in" component={SignInPage} />
         <Route path="/" component={() => <p>picker</p>} />
       </MemoryRouter>
-    </RegistryProvider>
+    </SessionBoundary>
   ));
   return history;
 };

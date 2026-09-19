@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { createSignal } from "solid-js";
-import { Breadcrumbs, PageHeader } from "../src/components/index.ts";
+import { Breadcrumbs, Button, PageHeader } from "../src/components/index.ts";
 
 afterEach(() => {
   cleanup();
@@ -17,11 +17,11 @@ it("keeps navigation beside ancestry, above title/actions and metadata", () => {
         <Breadcrumbs items={[{ label: "Configure", href: "/configure" }, { label: "Agents" }]} />
       }
       navigation={<button>Open navigation</button>}
-      actions={[{ label: "Add agent", icon: "+", onClick: () => {} }]}
+      actions={<Button compactIcon="+">Add agent</Button>}
       summary="3 active"
     />
   ));
-  const header = container.querySelector("header")!;
+  const header = container.firstElementChild!;
   expect(
     header.children[0]?.contains(screen.getByRole("navigation", { name: "Breadcrumbs" })),
   ).toBe(true);
@@ -44,16 +44,19 @@ it("retains the focused action while its label and selection state change", asyn
   render(() => (
     <PageHeader
       title="Tasks"
-      actions={[
-        {
-          label: selecting() ? "Done" : "Select tasks",
-          icon: "☑",
-          pressed: selecting(),
-          variant: "secondary",
-          onClick: () => setSelecting(!selecting()),
-        },
-        { label: "New task", icon: "+", onClick: () => {} },
-      ]}
+      actions={
+        <>
+          <Button
+            compactIcon="☑"
+            aria-pressed={selecting()}
+            variant="secondary"
+            onClick={() => setSelecting(!selecting())}
+          >
+            {selecting() ? "Done" : "Select tasks"}
+          </Button>
+          <Button compactIcon="+">New task</Button>
+        </>
+      }
     />
   ));
   const action = screen.getByRole("button", { name: "Select tasks" });

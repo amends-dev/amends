@@ -83,16 +83,63 @@ consistent. The consuming application supplies the mobile navigation button to `
 | `FormColumns`     | Related fields or static sections. Columns stack when their container is 560px or narrower; fields do not become tabs.                                                                 |
 | `InspectorLayout` | Contextual content opened from the page. Dock a 400px inspector when at least 560px remains for the main content; otherwise use a modal drawer from the right, full width below 768px. |
 
-`EntryShell` frames the screens before a workspace exists: sign-in, the picker,
-and membership explanations. It shows the mark as a home link, the signed-in
-address with sign-out when an account is supplied, a title and blurb, a reading
-column of 420px or 560px, and a footer note. It has no rail. `CodeField` is a
-one-time numeric code: one real input carries focus, keyboard entry, paste, and
-autofill, while the boxes are presentation. The caller keeps the digits and
-decides when the code is complete.
+### Shell composition
+
+There is one shell implementation: `Shell.Root`, `Shell.Sidebar`, `Shell.Body`,
+`Shell.Header`, `Shell.Main`, and `Shell.Footer`. The application includes the
+parts it needs. Sign-in and workspace selection omit the sidebar. The shell knows
+nothing about accounts, workspace records, branding destinations, or policy copy.
+
+`Shell.Sidebar` owns the responsive sidebar/rail/drawer presentation and moves one
+mounted child tree between them. Compose its regions with `Shell.SidebarHeader`,
+`Shell.SidebarContent`, and `Shell.SidebarActions`. Expanded actions sit beside the
+identity; rail actions stay at the bottom while the navigation content scrolls.
+Place `Shell.NavigationToggle placement="sidebar"` after the header for the tablet
+rail. The default toggle belongs in the page header and appears on mobile.
+`Shell.useSidebar()` supplies compact mode and navigation dismissal to children.
+Escape and selection restore trigger focus; opening the desktop sidebar closes the
+drawer and moves focus to main content. When children move into the drawer, the shell
+updates their overlay host so menus and tooltips stay inside the native modal.
+
+`Shell.Body` arranges the header, main, footer, and inspector docking host. It measures
+space after navigation but before the inspector consumes its column. `Shell.Main`
+provides the sole main landmark and skip-link focus target. Its default
+`scroll="page"` owns scrolling; `scroll="panels"` fills the available height and lets
+companion/collection content own its scroll containers.
+
+`Shell.Header` provides the header landmark and padding. `PageHeader` supplies its
+internal breadcrumbs, title, actions, and summary without another header landmark.
+Its `actions` prop accepts JSX, including a domain action component. Compose buttons
+with `compactIcon` and accessible labels to retain the mobile action presentation.
+`ContentColumn` provides reading width (420px or 560px) and start/center placement
+inside main content; centered content remains reachable when the viewport is short.
+`PageHeading` supplies a title and optional description without a frame.
+
+```tsx
+<Shell.Root>
+  <Shell.Body>
+    <Shell.Header>{brandLink}</Shell.Header>
+    <Shell.Main>
+      <ContentColumn width="narrow" align="center">
+        <PageHeading title="Sign in" />
+        {form}
+      </ContentColumn>
+    </Shell.Main>
+    <Shell.Footer>{policyLinks}</Shell.Footer>
+  </Shell.Body>
+</Shell.Root>
+```
+
+Keep supplied content owners stable. Resolve JSX slots that are read more than once
+with Solid's `children` helper, and memoize collections of panel descriptions before
+using them for both navigation and content. A component passed as an action or tab
+panel must be instantiated once, even when its state changes.
+
+`CodeField` uses one real input for focus, keyboard entry, paste, and autofill; its
+boxes are presentation. The caller keeps the digits and decides when the code is complete.
 
 Header actions start a flow or operate on the current resource: New task, Select tasks,
-Edit, and Stop session. Submission actions belong to `FormActions`, including Publish
+Edit, and Stop turn. Submission actions belong to `FormActions`, including Publish
 version. Use breadcrumbs for ancestry instead of adding a duplicate back button in
 the header. Each header action requires an icon and label; below 768px it becomes a
 44px circular button while keeping its accessible name. Status text stays visible.
@@ -101,7 +148,7 @@ On the task list, Select tasks is the secondary header action beside New task. I
 becomes Done in the same position while checkboxes are visible. The selection count
 and bulk actions belong in the collection footer.
 
-Use separate pills for collection filters. Session event categories use a segmented
+Use separate pills for collection filters. Turn event categories use a segmented
 switch in the full-width `DetailLayout` header, aligned right. A segmented control
 used as a form field, such as priority or authority, stays with its field label; the
 toolbar alignment rule applies to controls that switch displayed content.
@@ -113,7 +160,7 @@ the history on wide screens and below it at narrow widths, with one create actio
 Responsive layouts use the space available after navigation and inspectors. Keep
 drafts, selected panels, and reading position when changing presentation. Companion
 tabs transfer keyboard focus to the selected panel when both panels become visible;
-collapsing preserves the panel containing focus. Session logs follow new entries only
+collapsing preserves the panel containing focus. Turn logs follow new entries only
 while the reader is at the bottom.
 
 Inspectors keep one body mounted while moving between docked and modal presentation.
@@ -132,7 +179,7 @@ Use `Message` for every author: user, agent, contact, or system. Its `kind` sele
 identity treatment; the body stays visible with the same typography and spacing. Channel direction,
 delivery information, and workflow notes belong in its metadata and footer.
 
-Messages, turn entries, and session log events use spacing instead of bottom divider lines.
+Messages, turn entries, and turn log events use spacing instead of bottom divider lines.
 
 Use `Composer` for every writable conversation. It has one outlined editor, a visible label,
 a send action at the lower right, and context and errors underneath. The send action becomes a
@@ -148,19 +195,20 @@ the same draft. Answering has an explicit "answer and continue work" action. Thr
 such as tracking or viewing a task, belong above the conversation, outside the composer.
 Channel traces are read-only and do not show a composer.
 
-For agent, channel, and task threads, the consuming application should combine
-messages, thread membership and task workflow events, task creation cards, and turns in chronological
-order, using journal sequence to break ties. A task card sits at creation and reflects the task's
-current title, status, and owner. A turn entry represents its start; it is not repeated as a plain
-start event. Channel delivery stays with its message. Events are separate timeline entries rather
-than message footnotes or a separate related-tasks section.
+For agent, channel, and task threads, consume the server's ordered thread activity.
+Thread sequence determines order; timestamps are display information. The web must not
+reconstruct a timeline by sorting unrelated messages, tasks, and turn records. Activity
+references its domain subject and preserves the historical change it reports. Detailed
+harness/tool output belongs in the turn log; it is not automatically a thread message.
+The backend thread/turn contracts are still planned, so the current UI components accept
+presentation data without inventing that protocol.
 
 Use `TurnSummary` for execution details, independently of the closing message. Number turns
 chronologically within the thread, position them at their start time, and include working,
-failed, cancelled, and silent turns. Its child factory mounts the session preview only while
+failed, cancelled, and silent turns. Its child factory mounts the turn preview only while
 expanded. Questions and answers remain messages; task actions stay with the task workflow.
 
-Use `TaskReference` for a task linked from a conversation, a parent task, or a session origin.
+Use `TaskReference` for a task linked from a conversation, a parent task, or a turn origin.
 It includes the title, status, and optional owner. Task lists with selection and row actions
 continue to use their list presentation.
 

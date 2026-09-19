@@ -1,39 +1,46 @@
+import { ConnectionsPage } from "./pages/connections/list.tsx";
+import { EnvironmentsPage } from "./pages/environments/list.tsx";
+import { ChannelsPage } from "./pages/channels/list.tsx";
+import { AgentsPage } from "./pages/agents/list.tsx";
+import { TasksPage } from "./pages/tasks/list.tsx";
+import { TriagePage } from "./pages/triage/list.tsx";
+import { HomePage } from "./pages/workspaces/home.tsx";
 import { lazy } from "solid-js";
-import { PickerPage } from "./pages/entry/picker.tsx";
-import { SignInPage } from "./pages/entry/sign-in.tsx";
-import { placeholder } from "./pages/placeholder.tsx";
-import { SettingsPage } from "./pages/settings/page.tsx";
+import { PickerPage } from "./pages/workspaces/picker.tsx";
+import { SignInPage } from "./pages/session/sign-in.tsx";
+import { NotFound } from "./pages/not-found.tsx";
+const SettingsPage = lazy(() =>
+  import("./pages/workspaces/settings.tsx").then((module) => ({ default: module.SettingsPage })),
+);
 
-/** Screens before a workspace exists. */
-export const entry = {
+/** Routes that do not require an opened workspace. */
+export const standalone = {
   signIn: { path: "/sign-in", title: "Sign in", component: SignInPage },
   picker: { path: "/", title: "Where are you working?", component: PickerPage },
 } as const;
 
 /** Route paths, page components, and titles inside one workspace have one owner. */
 export const workspace = {
-  home: { path: "/", title: "Home", component: placeholder("Home") },
-  triage: { path: "/triage", title: "Triage", component: placeholder("Triage") },
-  tasks: { path: "/tasks", title: "Tasks", component: placeholder("Tasks") },
-  agents: { path: "/agents", title: "Agents", component: placeholder("Agents") },
-  channels: { path: "/channels", title: "Channels", component: placeholder("Channels") },
+  home: { path: "/", title: "Home", component: HomePage },
+  triage: { path: "/triage", title: "Triage", component: TriagePage },
+  tasks: { path: "/tasks", title: "Tasks", component: TasksPage },
+  agents: { path: "/agents", title: "Agents", component: AgentsPage },
+  channels: { path: "/channels", title: "Channels", component: ChannelsPage },
   environments: {
     path: "/environments",
     title: "Environments",
-    component: placeholder("Environments"),
+    component: EnvironmentsPage,
   },
   connections: {
     path: "/connections",
     title: "Connections",
-    component: placeholder("Connections"),
+    component: ConnectionsPage,
   },
   settings: { path: "/settings", title: "Settings", component: SettingsPage },
   notFound: {
     path: "*unmatched",
     title: "Page not found",
-    component: lazy(() =>
-      import("./pages/not-found.tsx").then((module) => ({ default: module.NotFound })),
-    ),
+    component: NotFound,
   },
 } as const;
 
@@ -45,9 +52,9 @@ const inWorkspace = (workspaceId: string, path: string) =>
 
 /** Build links from the same paths used by the router. */
 export const href = {
-  signIn: () => entry.signIn.path,
+  signIn: () => standalone.signIn.path,
   picker: (options?: { choose: boolean }) =>
-    options?.choose ? `${entry.picker.path}?choose` : entry.picker.path,
+    options?.choose ? `${standalone.picker.path}?choose` : standalone.picker.path,
   home: (workspaceId: string) => inWorkspace(workspaceId, workspace.home.path),
   triage: (workspaceId: string) => inWorkspace(workspaceId, workspace.triage.path),
   tasks: (workspaceId: string) => inWorkspace(workspaceId, workspace.tasks.path),

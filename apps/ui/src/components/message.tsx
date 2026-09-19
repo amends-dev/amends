@@ -1,6 +1,6 @@
 import { Text } from "./text.tsx";
 import { Identity, type IdentityData } from "./identity.tsx";
-import { Show } from "solid-js";
+import { children, Show } from "solid-js";
 import type { JSX } from "solid-js";
 import * as s from "./message.css.ts";
 export function Message(props: {
@@ -16,6 +16,7 @@ export function Message(props: {
   footer?: JSX.Element;
   delivery?: JSX.Element;
 }) {
+  const footerSlot = children(() => props.footer);
   return (
     <article
       class={s.root}
@@ -48,8 +49,8 @@ export function Message(props: {
         <Text as="div" variant="body" class={s.body}>
           {props.children}
         </Text>
-        <Show when={props.footer}>
-          <div class={s.footer}>{props.footer}</div>
+        <Show when={footerSlot()}>
+          <div class={s.footer}>{footerSlot()}</div>
         </Show>
       </div>
     </article>

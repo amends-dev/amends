@@ -1,5 +1,5 @@
 import { Text } from "./text.tsx";
-import { Show, type JSX } from "solid-js";
+import { children, Show, type JSX } from "solid-js";
 import * as s from "./action-card.css.ts";
 export interface ActionCardProps {
   label: string;
@@ -11,6 +11,7 @@ export interface ActionCardProps {
   actions: JSX.Element;
 }
 export function ActionCard(props: ActionCardProps) {
+  const childrenSlot = children(() => props.children);
   return (
     <article class={s.root} aria-label={props.label}>
       <div class={s.header}>
@@ -29,9 +30,9 @@ export function ActionCard(props: ActionCardProps) {
           {props.quote}
         </Text>
       </Show>
-      <Show when={props.children}>
+      <Show when={childrenSlot()}>
         <Text as="div" variant="bodySmall" tone="secondary">
-          {props.children}
+          {childrenSlot()}
         </Text>
       </Show>
       <div class={s.actions}>{props.actions}</div>

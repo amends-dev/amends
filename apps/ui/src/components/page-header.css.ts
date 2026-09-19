@@ -1,17 +1,11 @@
 import { style } from "@vanilla-extract/css";
 import { vars } from "../styles/contract.css.ts";
-import { breakpoint } from "../tokens/index.ts";
 
 export const header = style({
   display: "grid",
   gap: vars.space[3],
   minWidth: 0,
-  padding: "24px 30px 14px",
-  "@media": {
-    [`(max-width: ${breakpoint.navigation - 1}px)`]: {
-      padding: "max(16px, env(safe-area-inset-top)) 18px 12px",
-    },
-  },
+  width: "100%",
 });
 export const row = style({
   display: "flex",
@@ -22,7 +16,6 @@ export const row = style({
 export const navigation = style({
   display: "flex",
   flexShrink: 0,
-  "@media": { [`(min-width: ${breakpoint.navigation}px)`]: { display: "none" } },
 });
 export const ancestry = style([row]);
 export const breadcrumbs = style({ flex: "1 1 0", minWidth: 0 });
@@ -55,3 +48,5 @@ export const summary = style({
   overflowWrap: "anywhere",
   minWidth: 0,
 });
+
+export const heading = style({ display: "grid", gap: vars.space[2] });

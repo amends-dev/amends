@@ -1,5 +1,5 @@
 import { Text } from "./text.tsx";
-import { Show, type JSX } from "solid-js";
+import { children, Show, type JSX } from "solid-js";
 import * as s from "./form-actions.css.ts";
 
 export interface FormActionsProps {
@@ -10,11 +10,12 @@ export interface FormActionsProps {
 
 /** One commit point after the editable content, with the secondary action before the primary. */
 export function FormActions(props: FormActionsProps) {
+  const descriptionSlot = children(() => props.description);
   return (
     <div class={s.root}>
-      <Show when={props.description}>
+      <Show when={descriptionSlot()}>
         <Text as="p" variant="bodySmall" class={s.description}>
-          {props.description}
+          {descriptionSlot()}
         </Text>
       </Show>
       <div class={s.actions}>

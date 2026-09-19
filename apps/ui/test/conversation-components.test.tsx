@@ -39,7 +39,7 @@ it("shows messages from every author with the same readable body, preserving cha
 
 it("mounts execution details on keyboard expansion and keeps them open as a turn finishes", async () => {
   const [status, setStatus] = createSignal("working");
-  const details = vi.fn(() => <a href="/session">Open session log</a>);
+  const details = vi.fn(() => <a href="/turns/example">Open turn log</a>);
   render(() => (
     <TurnSummary
       label="turn 1"

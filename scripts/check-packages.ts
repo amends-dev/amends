@@ -1,3 +1,5 @@
+import { dirname, resolve } from "node:path";
+
 interface PackageManifest {
   name: string;
   dependencies?: Record<string, string>;
@@ -41,9 +43,47 @@ for (const { path, manifest } of packages) {
   }
 }
 
+// Keep endpoint construction in web/api and presentation independent of application contracts.
+for await (const path of new Bun.Glob("apps/{ui,web}/src/**/*.{ts,tsx}").scan({ cwd: root })) {
+  const source = await Bun.file(`${root}/${path}`).text();
+  const imports = new Bun.Transpiler({ loader: path.endsWith(".tsx") ? "tsx" : "ts" }).scanImports(
+    source,
+  );
+  // Bun's runtime scanner omits type-only imports/re-exports. They obey the same boundary.
+  const declarations = source.matchAll(
+    /\b(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?(?:\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s+from\s*["']([^"']+)["']/g,
+  );
+  const dependencies = new Set(imports.map((dependency) => dependency.path));
+  for (const declaration of declarations) {
+    if (declaration[1]) dependencies.add(declaration[1]);
+  }
+  for (const dependency of dependencies) {
+    const target = dependency.startsWith(".")
+      ? resolve(root, dirname(path), dependency)
+      : dependency;
+    if (
+      path.startsWith("apps/ui/") &&
+      (dependency.startsWith("@amends/") ||
+        target.startsWith(resolve(root, "apps/web") + "/") ||
+        target.startsWith(resolve(root, "packages") + "/") ||
+        target.startsWith(resolve(root, "adapters") + "/") ||
+        target.startsWith(resolve(root, "hosts") + "/"))
+    )
+      errors.push(`${path}: UI must not import application code or contracts (${dependency}).`);
+    if (
+      path.startsWith("apps/web/") &&
+      !path.startsWith("apps/web/src/api/") &&
+      (target === resolve(root, "apps/web/src/api/client.ts") ||
+        dependency === "@amends/api-http" ||
+        dependency.startsWith("@amends/api-http/"))
+    )
+      errors.push(`${path}: use a named web API module instead of ${dependency}.`);
+  }
+}
+
 if (errors.length > 0) {
   console.error(errors.join("\n"));
   process.exitCode = 1;
 } else {
-  console.log(`Checked dependency boundaries for ${packages.length} shared package(s).`);
+  console.log(`Checked ${packages.length} shared packages and web/UI import boundaries.`);
 }

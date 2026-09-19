@@ -1,5 +1,5 @@
 import { Text } from "./text.tsx";
-import { Match, Switch, Show, type JSX } from "solid-js";
+import { children, Match, Switch, Show, type JSX } from "solid-js";
 import { vars } from "../styles/contract.css.ts";
 import * as s from "./empty-state.css.ts";
 export interface EmptyStateProps {
@@ -11,6 +11,8 @@ export interface EmptyStateProps {
   action?: JSX.Element;
 }
 export function EmptyState(props: EmptyStateProps) {
+  const actionSlot = children(() => props.action);
+  const detailSlot = children(() => props.detail);
   return (
     <div class={s.root} data-layout={props.layout ?? "centered"}>
       {props.illustration}
@@ -21,13 +23,13 @@ export function EmptyState(props: EmptyStateProps) {
         <Text as="div" variant={props.layout === "inline" ? "bodySmall" : "body"} tone="secondary">
           {props.description}
         </Text>
-        <Show when={props.detail}>
+        <Show when={detailSlot()}>
           <Text as="div" variant="caption" tone="muted">
-            {props.detail}
+            {detailSlot()}
           </Text>
         </Show>
       </div>
-      <Show when={props.action}>{props.action}</Show>
+      <Show when={actionSlot()}>{actionSlot()}</Show>
     </div>
   );
 }

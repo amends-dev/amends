@@ -1,5 +1,5 @@
 import * as K from "@kobalte/core/tabs";
-import { createRenderEffect, For, on, type JSX } from "solid-js";
+import { createMemo, createRenderEffect, For, on, type JSX } from "solid-js";
 import * as s from "./tabs.css.ts";
 export interface TabsProps {
   label: string;
@@ -10,6 +10,7 @@ export interface TabsProps {
   split?: boolean;
 }
 export function Tabs(props: TabsProps) {
+  const items = createMemo(() => props.items);
   let list: HTMLDivElement | undefined;
   const panels = new Map<string, HTMLDivElement>();
   createRenderEffect(
@@ -36,7 +37,7 @@ export function Tabs(props: TabsProps) {
         class={s.list}
         aria-label={props.label}
       >
-        <For each={props.items}>
+        <For each={items()}>
           {(item) => (
             <K.Trigger class={s.trigger} value={item.value}>
               {item.label}
@@ -44,7 +45,7 @@ export function Tabs(props: TabsProps) {
           )}
         </For>
       </K.List>
-      <For each={props.items}>
+      <For each={items()}>
         {(item) => (
           <K.Content
             ref={(panel) => panels.set(item.value, panel)}

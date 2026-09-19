@@ -1,5 +1,5 @@
 import { Text } from "./text.tsx";
-import { Show, type JSX } from "solid-js";
+import { children, Show, type JSX } from "solid-js";
 import * as s from "./work-item-row.css.ts";
 import { Identity, type IdentityData } from "./identity.tsx";
 export type WorkItemRowProps = {
@@ -29,6 +29,11 @@ export type WorkItemRowProps = {
 );
 /** Selection and actions are siblings of the primary link/button, so they never activate the row. */
 export function WorkItemRow(props: WorkItemRowProps) {
+  const leadingIconSlot = children(() => props.leadingIcon);
+  const metadataSlot = children(() => props.metadata);
+  const progressSlot = children(() => props.progress);
+  const actionsSlot = children(() => props.actions);
+  const noticeSlot = children(() => props.notice);
   const content = () => (
     <>
       <Text as="span" variant="inherit" class={s.titleLine}>
@@ -61,7 +66,7 @@ export function WorkItemRow(props: WorkItemRowProps) {
       data-metadata={props.metadataPlacement}
       data-interactive={!!(props.href || props.onOpen)}
       data-active={props.active || undefined}
-      data-icon={!!props.leadingIcon}
+      data-icon={!!leadingIconSlot()}
       data-identity={!!props.identityKind}
       data-timestamp={!!props.timestamp}
       data-selectable={!!props.selection}
@@ -82,7 +87,7 @@ export function WorkItemRow(props: WorkItemRowProps) {
         )}
       </Show>
       <Text as="span" variant="inherit" class={s.indicator}>
-        {props.leadingIcon ?? props.indicator}
+        {leadingIconSlot() ?? props.indicator}
       </Text>
       <Show when={props.timestamp}>
         {(time) => (
@@ -125,7 +130,7 @@ export function WorkItemRow(props: WorkItemRowProps) {
           </a>
         )}
       </Show>
-      <Show when={props.metadata || props.timestamp || props.progress}>
+      <Show when={metadataSlot() || props.timestamp || progressSlot()}>
         <Text as="div" variant="caption" class={s.metadata}>
           <Show when={props.timestamp}>
             {(time) => (
@@ -139,19 +144,19 @@ export function WorkItemRow(props: WorkItemRowProps) {
               </Text>
             )}
           </Show>
-          <Show when={props.progress}>
+          <Show when={progressSlot()}>
             <Text as="span" variant="inherit" class={s.progress}>
-              {props.progress}
+              {progressSlot()}
             </Text>
           </Show>
-          {props.metadata}
+          {metadataSlot()}
         </Text>
       </Show>
-      <Show when={props.actions}>
-        <div class={s.actions}>{props.actions}</div>
+      <Show when={actionsSlot()}>
+        <div class={s.actions}>{actionsSlot()}</div>
       </Show>
-      <Show when={props.notice}>
-        <div class={s.notice}>{props.notice}</div>
+      <Show when={noticeSlot()}>
+        <div class={s.notice}>{noticeSlot()}</div>
       </Show>
     </div>
   );

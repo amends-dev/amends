@@ -23,19 +23,18 @@ const write = (key: string, value: string | undefined) => {
   }
 };
 
-/** The signed-in session, kept across reloads. Clearing it signs out. */
-export const sessionAtom = Atom.writable<SignIn.Session | undefined, SignIn.Session | undefined>(
-  () => {
-    const stored = read(sessionKey);
-    return stored === undefined
-      ? undefined
-      : decodeSession(stored).pipe((o) => (o._tag === "Some" ? o.value : undefined));
-  },
-  (context, value) => {
-    write(sessionKey, value === undefined ? undefined : encodeSession(value));
-    context.setSelf(value);
-  },
-).pipe(Atom.keepAlive);
+export const readSession = (): SignIn.Session | undefined => {
+  const stored = read(sessionKey);
+  return stored === undefined
+    ? undefined
+    : decodeSession(stored).pipe((o) => (o._tag === "Some" ? o.value : undefined));
+};
+
+export const saveSession = (value: SignIn.Session | undefined) =>
+  write(sessionKey, value === undefined ? undefined : encodeSession(value));
+
+/** Seeded once by SessionBoundary in each credential session's registry. */
+export const sessionAtom = Atom.make<SignIn.Session | undefined>(undefined).pipe(Atom.keepAlive);
 
 /** The workspace opened most recently; the picker opens it by default next time. */
 export const lastWorkspaceAtom = Atom.writable<string | undefined, string | undefined>(

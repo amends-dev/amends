@@ -1,4 +1,4 @@
-import { Show, type JSX } from "solid-js";
+import { children, Show, type JSX } from "solid-js";
 import * as s from "./ordered-list.css.ts";
 export function OrderedList(props: { label: string; children: JSX.Element }) {
   return (
@@ -17,6 +17,8 @@ export function OrderedListItem(props: {
   contentId?: string;
   children?: JSX.Element;
 }) {
+  const descriptionSlot = children(() => props.description);
+  const actionsSlot = children(() => props.actions);
   return (
     <li class={s.item} data-expanded={props.expanded}>
       <div class={s.row}>
@@ -25,12 +27,12 @@ export function OrderedListItem(props: {
         </span>
         <div>
           <div class={s.title}>{props.title}</div>
-          <Show when={props.description}>
-            <div class={s.description}>{props.description}</div>
+          <Show when={descriptionSlot()}>
+            <div class={s.description}>{descriptionSlot()}</div>
           </Show>
         </div>
-        <Show when={props.actions}>
-          <div class={s.actions}>{props.actions}</div>
+        <Show when={actionsSlot()}>
+          <div class={s.actions}>{actionsSlot()}</div>
         </Show>
       </div>
       <fieldset

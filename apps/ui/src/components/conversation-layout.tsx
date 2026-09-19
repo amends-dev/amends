@@ -1,4 +1,4 @@
-import { createEffect, on, Show, type JSX } from "solid-js";
+import { createEffect, on, children, Show, type JSX } from "solid-js";
 import * as s from "./conversation-layout.css.ts";
 
 export function ConversationLayout(props: {
@@ -9,6 +9,7 @@ export function ConversationLayout(props: {
   header?: JSX.Element;
   revision?: number;
 }) {
+  const headerSlot = children(() => props.header);
   let body!: HTMLDivElement;
   createEffect(
     on(
@@ -21,8 +22,8 @@ export function ConversationLayout(props: {
   );
   return (
     <section class={s.root} aria-label={props.label}>
-      <Show when={props.header}>
-        <div class={s.header}>{props.header}</div>
+      <Show when={headerSlot()}>
+        <div class={s.header}>{headerSlot()}</div>
       </Show>
       <div
         ref={(node) => {

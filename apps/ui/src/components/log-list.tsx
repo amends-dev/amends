@@ -1,8 +1,8 @@
-import { createSignal, createUniqueId, Show, type JSX } from "solid-js";
+import { createSignal, createUniqueId, children, Show, type JSX } from "solid-js";
 import * as s from "./log-list.css.ts";
 export function LogList(props: { children: JSX.Element; label?: string }) {
   return (
-    <ol class={s.list} aria-label={props.label ?? "Session log"}>
+    <ol class={s.list} aria-label={props.label ?? "Turn log"}>
       {props.children}
     </ol>
   );
@@ -14,6 +14,7 @@ export function LogRow(props: {
   detail?: JSX.Element;
   narration?: boolean;
 }) {
+  const detailSlot = children(() => props.detail);
   return (
     <li class={s.row}>
       <span class={s.time}>{props.time}</span>
@@ -21,8 +22,8 @@ export function LogRow(props: {
         {props.indicator}
         <div>
           {props.children}
-          <Show when={props.detail}>
-            <div class={s.detail}>{props.detail}</div>
+          <Show when={detailSlot()}>
+            <div class={s.detail}>{detailSlot()}</div>
           </Show>
         </div>
       </div>

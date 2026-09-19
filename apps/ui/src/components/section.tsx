@@ -1,5 +1,5 @@
 import { Text } from "./text.tsx";
-import { createUniqueId, Show, type JSX } from "solid-js";
+import { children, createUniqueId, Show, type JSX } from "solid-js";
 import * as s from "./section.css.ts";
 export interface SectionProps {
   title: string;
@@ -8,6 +8,8 @@ export interface SectionProps {
   children: JSX.Element;
 }
 export function Section(props: SectionProps) {
+  const countSlot = children(() => props.count);
+  const noteSlot = children(() => props.note);
   const id = createUniqueId();
   return (
     <section class={s.root} aria-labelledby={id}>
@@ -15,15 +17,15 @@ export function Section(props: SectionProps) {
         <Text as="h2" variant="label" id={id} class={s.title}>
           {props.title}
         </Text>
-        <Show when={props.count !== undefined}>
+        <Show when={countSlot() !== undefined}>
           <Text as="span" variant="caption">
-            {props.count}
+            {countSlot()}
           </Text>
         </Show>
         <span class={s.seam} aria-hidden="true" />
-        <Show when={props.note}>
+        <Show when={noteSlot()}>
           <Text as="span" variant="caption" class={s.note}>
-            {props.note}
+            {noteSlot()}
           </Text>
         </Show>
       </div>

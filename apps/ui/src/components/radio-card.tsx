@@ -10,6 +10,7 @@ export interface RadioCardOption {
 }
 export interface RadioCardGroupProps {
   label: string;
+  disabled?: boolean;
   compact?: boolean;
   stacked?: boolean;
   name?: string;
@@ -21,7 +22,7 @@ export interface RadioCardGroupProps {
 export function RadioCardGroup(props: RadioCardGroupProps) {
   const id = createUniqueId();
   return (
-    <fieldset class={s.group}>
+    <fieldset class={s.group} disabled={props.disabled}>
       <legend class={s.legend}>{props.label}</legend>
       <div class={s.options} data-stacked={props.stacked}>
         <For each={props.options}>

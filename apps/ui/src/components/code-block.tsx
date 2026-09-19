@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type JSX } from "solid-js";
+import { children, createSignal, For, Show, type JSX } from "solid-js";
 import { Button } from "./button.tsx";
 import * as s from "./code-block.css.ts";
 export function CodeBlock(props: {
@@ -12,6 +12,7 @@ export function CodeBlock(props: {
   /** Wrap long lines instead of scrolling sideways: prose reads that way, code and data do not. */
   wrap?: boolean;
 }) {
+  const footer = children(() => props.footer);
   const [feedback, setFeedback] = createSignal("");
   const copy = async () => {
     try {
@@ -53,11 +54,11 @@ export function CodeBlock(props: {
     <Show
       when={props.copyable}
       fallback={
-        <Show when={props.viewer || props.footer} fallback={code()}>
+        <Show when={props.viewer || footer()} fallback={code()}>
           <div class={props.viewer ? s.viewer : undefined}>
             {code()}
-            <Show when={props.footer}>
-              <div class={s.footer}>{props.footer}</div>
+            <Show when={footer()}>
+              <div class={s.footer}>{footer()}</div>
             </Show>
           </div>
         </Show>
@@ -65,8 +66,8 @@ export function CodeBlock(props: {
     >
       <div class={s.copyable} data-appearance={props.appearance}>
         {code()}
-        <Show when={props.footer}>
-          <div class={s.footer}>{props.footer}</div>
+        <Show when={footer()}>
+          <div class={s.footer}>{footer()}</div>
         </Show>
         <div class={s.actions}>
           <Button

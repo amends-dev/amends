@@ -1,7 +1,8 @@
 import { IconButton } from "./button.tsx";
+import type { JSX } from "solid-js";
 import * as s from "./navigation-toggle.css.ts";
 export interface NavigationToggleProps {
-  onClick: () => void;
+  onClick: JSX.EventHandler<HTMLButtonElement, MouseEvent>;
   expanded: boolean;
   variant?: "ghost" | "secondary";
 }

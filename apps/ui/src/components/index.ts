@@ -19,8 +19,9 @@ export { Tooltip, type TooltipProps } from "./tooltip.tsx";
 export { Popover, type PopoverProps } from "./popover.tsx";
 export { Identity, type IdentityProps, type IdentityData } from "./identity.tsx";
 export { RadioCardGroup, type RadioCardGroupProps, type RadioCardOption } from "./radio-card.tsx";
-export { AppShell, type AppShellProps } from "./app-shell.tsx";
-export { EntryShell, type EntryShellProps, type EntryLinkProps } from "./entry-shell.tsx";
+export { Shell } from "./shell.tsx";
+export { ContentColumn } from "./content-column.tsx";
+export { PageHeading } from "./page-heading.tsx";
 export { CodeField, type CodeFieldProps } from "./code-field.tsx";
 export {
   NavigationItem,
@@ -28,7 +29,7 @@ export {
   type NavigationLinkProps,
 } from "./navigation-item.tsx";
 export { AccountPopover, type AccountPopoverProps } from "./account-popover.tsx";
-export { PageHeader, type PageHeaderProps, type PageHeaderAction } from "./page-header.tsx";
+export { PageHeader, type PageHeaderProps } from "./page-header.tsx";
 export { ContentToolbar, type ContentToolbarProps } from "./content-toolbar.tsx";
 export { FormActions, type FormActionsProps } from "./form-actions.tsx";
 export {
