@@ -11,6 +11,8 @@ export class Unknown extends Schema.TaggedError<Unknown>()("PermissionCatalog.Un
 
 /** Immutable code-defined permissions, shared independently of workspace assignments. */
 export interface Interface {
+  /** Validated, immutable declarations in registration order, also used to construct built-in roles. */
+  readonly definitions: ReadonlyArray<Permission.Definition>;
   /** Resolve an explicitly registered name to its validated definition. */
   readonly get: (name: Permission.Name) => Effect.Effect<Permission.Definition, Unknown>;
 }
@@ -38,6 +40,7 @@ export const make = Effect.fn("PermissionCatalog.make")(function* (
       Object.freeze({
         name: definition.name,
         targetKind: definition.targetKind,
+        builtinTier: definition.builtinTier,
       }),
     );
   }
@@ -48,7 +51,7 @@ export const make = Effect.fn("PermissionCatalog.make")(function* (
     return definition;
   });
 
-  return Object.freeze(Service.of({ get }));
+  return Object.freeze(Service.of({ definitions: Object.freeze([...byName.values()]), get }));
 });
 
 /**

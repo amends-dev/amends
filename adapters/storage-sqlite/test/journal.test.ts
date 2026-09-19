@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
+import { BuiltinRoles, RoleFacts } from "@amends/core/authorization";
 import { Journal, Log, Store } from "@amends/core/journal";
+import { MemberPermissions } from "@amends/core/workspace";
 import { SqliteDatabase } from "../src/index.ts";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -75,13 +77,24 @@ test("separate connections observe live appends; identical log IDs stay isolated
     );
   }));
 
-test("replay rebuilds ownership, membership, and initial grants from persisted facts", async () =>
+test("replay restores ownership, membership, and recorded roles without regenerating permission bundles", async () =>
   temporary(async (filename) => {
     await inDatabase(
       filename,
       Effect.gen(function* () {
         const bound = yield* (yield* views).forWorkspace(workspaceId);
         const workspace = yield* initialized(bound);
+        // A recorded policy change must survive replay even when the current template differs.
+        yield* Effect.flatMap(Journal.Service, (journal) =>
+          journal.publish(RoleFacts.PermissionsChanged, {
+            workspaceId,
+            roleId: BuiltinRoles.OwnerId,
+            permissions: [MemberPermissions.Read.name],
+          }),
+        ).pipe(Effect.provide(core(bound)));
+        const roleIds = [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
+        const roles = yield* Effect.forEach(roleIds, (id) => bound.roles.get(id));
+        const assignments = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
         const sql = yield* SqlClient.SqlClient;
         // Clear only this temporary test database's read models to exercise recovery.
         yield* sql.withTransaction(
@@ -89,6 +102,7 @@ test("replay rebuilds ownership, membership, and initial grants from persisted f
             yield* sql`DELETE FROM workspaces`;
             yield* sql`DELETE FROM members`;
             yield* sql`DELETE FROM assignments`;
+            yield* sql`DELETE FROM roles`;
             yield* sql`DELETE FROM checkpoints`;
           }),
         );
@@ -101,10 +115,12 @@ test("replay rebuilds ownership, membership, and initial grants from persisted f
           _tag: "Some",
           value: { identity: alice, status: "active" },
         });
-        expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toHaveLength(
-          3,
+        expect(yield* Effect.forEach(roleIds, (id) => bound.roles.get(id))).toEqual(roles);
+        expect(assignments).toHaveLength(1);
+        expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
+          assignments,
         );
-        expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toHaveLength(1);
+        expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toHaveLength(2);
       }),
     );
   }));

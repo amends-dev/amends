@@ -1,5 +1,7 @@
 import { expect } from "bun:test";
+import { BuiltinRoles, RoleFacts } from "@amends/core/authorization";
 import { Journal, Log, Store } from "@amends/core/journal";
+import { MemberPermissions } from "@amends/core/workspace";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 
@@ -77,15 +79,26 @@ it("separate pools observe live appends; identical log IDs stay isolated by work
     );
   }));
 
-it("replay rebuilds ownership, membership, and initial grants from persisted facts", async () =>
+it("replay restores ownership, membership, and recorded roles without regenerating permission bundles", async () =>
   withDatabase(async (url) => {
     await inDatabase(
       url,
       Effect.gen(function* () {
         const bound = yield* (yield* views()).forWorkspace(workspaceId);
         const workspace = yield* initialized(bound);
+        // A recorded policy change must survive replay even when the current template differs.
+        yield* Effect.flatMap(Journal.Service, (journal) =>
+          journal.publish(RoleFacts.PermissionsChanged, {
+            workspaceId,
+            roleId: BuiltinRoles.OwnerId,
+            permissions: [MemberPermissions.Read.name],
+          }),
+        ).pipe(Effect.provide(core(bound)));
+        const roleIds = [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
+        const roles = yield* Effect.forEach(roleIds, (id) => bound.roles.get(id));
+        const assignments = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
         const sql = yield* SqlClient.SqlClient;
-        // Clear the read models; the workspace row cascades to its memberships and grants.
+        // Clear the read models; the workspace row cascades to memberships, roles, and assignments.
         yield* sql.withTransaction(
           Effect.gen(function* () {
             yield* sql`DELETE FROM workspaces`;
@@ -102,10 +115,12 @@ it("replay rebuilds ownership, membership, and initial grants from persisted fac
           _tag: "Some",
           value: { identity: alice, status: "active" },
         });
-        expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toHaveLength(
-          3,
+        expect(yield* Effect.forEach(roleIds, (id) => bound.roles.get(id))).toEqual(roles);
+        expect(assignments).toHaveLength(1);
+        expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
+          assignments,
         );
-        expect(yield* bound.store.read(journalLog, { limit: 10 })).toHaveLength(1);
+        expect(yield* bound.store.read(journalLog, { limit: 10 })).toHaveLength(2);
       }),
     );
   }));

@@ -16,7 +16,10 @@ const exactWorkspace = Scope.Value.cases.Target.make({
 const exactMember = Scope.Value.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("member-1") }),
 });
-const ManageWorkspace = Permission.make("test.workspace.manage", { targetKind: "Workspace" });
+const ManageWorkspace = Permission.make("test.workspace.manage", {
+  targetKind: "Workspace",
+  builtinTier: "administrator",
+});
 
 test("workspace grants store permission names and scopes for either target kind", () => {
   for (const permission of [MemberPermissions.Read, MemberPermissions.Remove, ManageWorkspace]) {

@@ -1,10 +1,9 @@
 import { expect, test } from "bun:test";
-import { AssignmentFacts } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Journal, Log, Store } from "@amends/core/journal";
 import {
   InvitationApplication,
-  InvitationPermissions,
   InvitationProjection,
   MemberApplication,
   MemberProjection,
@@ -65,7 +64,7 @@ test("failed acceptance checkpoint rolls back membership, assignments, consumpti
         const sql = yield* SqlClient.SqlClient;
         expect(
           yield* sql`SELECT COUNT(*) AS count FROM assignments WHERE workspace_id = ${workspace.id}`,
-        ).toEqual([{ count: 3 }]);
+        ).toEqual([{ count: 1 }]);
         yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
       }),
     );
@@ -257,12 +256,8 @@ test("invitation replay restores pending, accepted, and revoked records without 
         );
         const assignment = (yield* bound.assignments.listActiveByMember(
           workspace.ownerMemberId,
-        )).find(
-          ({ source }) =>
-            source._tag === "Direct" &&
-            source.grant.permission === InvitationPermissions.Manage.name,
-        );
-        if (assignment === undefined) throw new Error("Missing invitation assignment");
+        )).find(({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId);
+        if (assignment === undefined) throw new Error("Missing Owner assignment");
         yield* Effect.flatMap(Journal.Service, (journal) =>
           journal.publish(AssignmentFacts.Revoked, {
             workspaceId: workspace.id,

@@ -34,7 +34,10 @@ const memberScope = Scope.Value.cases.Target.make({
 const workspaceTargetScope = Scope.Value.cases.Target.make({
   target: Target.Reference.cases.Workspace.make({ workspaceId }),
 });
-const ManageWorkspace = Permission.make("test.workspace.manage", { targetKind: "Workspace" });
+const ManageWorkspace = Permission.make("test.workspace.manage", {
+  targetKind: "Workspace",
+  builtinTier: "administrator",
+});
 const role = {
   id: roleId,
   workspaceId,

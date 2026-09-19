@@ -7,6 +7,7 @@ export { AssignmentFacts } from "./assignment/facts.ts";
 export { AssignmentProjection } from "./assignment/projection.ts";
 export { AssignmentStore } from "./assignment/store.ts";
 export { Authorization } from "./authorization.ts";
+export { BuiltinRoles } from "./role/builtin.ts";
 export { Grant } from "./grant.ts";
 export { GrantResolver } from "./grant-resolver.ts";
 export { Permission } from "./permission.ts";

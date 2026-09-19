@@ -8,7 +8,7 @@ import { Target } from "./target.ts";
  * Construction validates the pairing, not resource existence or authorization.
  */
 export const Value = Schema.Struct({
-  permission: Permission.Definition,
+  permission: Permission.Reference,
   target: Target.Reference,
 }).check(
   Schema.makeFilter(({ permission, target }) =>
@@ -30,6 +30,10 @@ export interface Value extends Schema.Schema.Type<typeof Value> {}
 export const make = <K extends Target.Kind>(
   permission: Permission.Definition<K>,
   target: Target.Of<NoInfer<K>>,
-): Value => Value.make({ permission, target });
+): Value =>
+  Value.make({
+    permission: { name: permission.name, targetKind: permission.targetKind },
+    target,
+  });
 
 export * as Requirement from "./requirement.ts";

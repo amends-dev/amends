@@ -11,7 +11,10 @@ const workspaceId = Workspace.Id.make("workspace-1");
 const memberId = Member.Id.make("member-1");
 const workspace = Target.Reference.cases.Workspace.make({ workspaceId });
 const member = Target.Reference.cases.Member.make({ workspaceId, memberId });
-const ManageWorkspace = Permission.make("test.workspace.manage", { targetKind: "Workspace" });
+const ManageWorkspace = Permission.make("test.workspace.manage", {
+  targetKind: "Workspace",
+  builtinTier: "administrator",
+});
 
 test("requirements pair declared permissions with concrete targets", () => {
   expectTypeOf(MemberPermissions.Read.targetKind).toEqualTypeOf<"Member">();
@@ -20,17 +23,31 @@ test("requirements pair declared permissions with concrete targets", () => {
   expectTypeOf<Target.Kind>().toEqualTypeOf<Target.Reference["_tag"]>();
 
   expect(Requirement.make(MemberPermissions.Read, member)).toEqual({
-    permission: MemberPermissions.Read,
+    permission: { name: MemberPermissions.Read.name, targetKind: "Member" },
     target: member,
   });
   expect(Requirement.make(MemberPermissions.Remove, member)).toEqual({
-    permission: MemberPermissions.Remove,
+    permission: { name: MemberPermissions.Remove.name, targetKind: "Member" },
     target: member,
   });
   expect(Requirement.make(ManageWorkspace, workspace)).toEqual({
-    permission: ManageWorkspace,
+    permission: { name: ManageWorkspace.name, targetKind: "Workspace" },
     target: workspace,
   });
+});
+
+test("requirements retain their encoded contract without tier metadata", async () => {
+  const encoded = {
+    permission: { name: "member.read", targetKind: "Member" },
+    target: { _tag: "Member", workspaceId, memberId },
+  } as const;
+  const requirement = Requirement.make(MemberPermissions.Read, member);
+  expect(await Effect.runPromise(Schema.encodeEffect(Requirement.Value)(requirement))).toEqual(
+    encoded,
+  );
+  expect(await Effect.runPromise(Schema.decodeEffect(Requirement.Value)(encoded))).toEqual(
+    requirement,
+  );
 });
 
 test("requirement construction rejects the wrong target kind in types and at runtime", () => {

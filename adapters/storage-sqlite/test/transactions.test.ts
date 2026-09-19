@@ -42,7 +42,7 @@ test("initialization commits once under competing requests and never replaces ow
     );
   }));
 
-test("a failed final checkpoint rolls back workspace, membership, grants, log, and all checkpoints", async () =>
+test("a failed final checkpoint rolls back workspace, membership, roles, assignments, log, and all checkpoints", async () =>
   temporary(async (filename) => {
     await inDatabase(
       filename,
@@ -58,7 +58,7 @@ test("a failed final checkpoint rolls back workspace, membership, grants, log, a
           context: Context.add(bound.context, Checkpoint.Service, {
             ...bound.checkpoints,
             set: (key, cursor) =>
-              cursor.index === 4 ? Effect.fail(failure) : bound.checkpoints.set(key, cursor),
+              cursor.index === 5 ? Effect.fail(failure) : bound.checkpoints.set(key, cursor),
           }),
         };
         expect(yield* Effect.flip(initialized(broken))).toBe(failure);
@@ -67,6 +67,7 @@ test("a failed final checkpoint rolls back workspace, membership, grants, log, a
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 10 })).toEqual([]);
         const sql = yield* SqlClient.SqlClient;
         expect(yield* sql`SELECT COUNT(*) AS count FROM assignments`).toEqual([{ count: 0 }]);
+        expect(yield* sql`SELECT COUNT(*) AS count FROM roles`).toEqual([{ count: 0 }]);
         expect(yield* sql`SELECT COUNT(*) AS count FROM checkpoints`).toEqual([{ count: 0 }]);
         expect(yield* sql`SELECT COUNT(*) AS count FROM commits`).toEqual([{ count: 0 }]);
         const workspace = yield* initialized(bound);

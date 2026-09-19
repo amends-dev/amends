@@ -1,5 +1,7 @@
 import { expect, expectTypeOf, test } from "bun:test";
+import { BuiltinRoles } from "@amends/core/authorization";
 import { Log } from "@amends/core/journal";
+import { InvitationPermissions, MemberPermissions } from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Option } from "effect";
 import { Operations } from "./operations.ts";
@@ -53,29 +55,42 @@ test("one host creates two isolated workspaces and uses each operation's authent
           const bound = yield* storage.forWorkspace(workspace.id);
           expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
           const assignments = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
-          expect(assignments.map((assignment) => assignment.source)).toEqual(
-            expect.arrayContaining([
-              {
-                _tag: "Direct",
-                grant: {
-                  permission: "member.read",
-                  scope: { _tag: "Workspace", workspaceId: workspace.id },
-                },
-              },
-              {
-                _tag: "Direct",
-                grant: {
-                  permission: "member.remove",
-                  scope: { _tag: "Workspace", workspaceId: workspace.id },
-                },
-              },
-            ]),
+          expect(assignments.map((assignment) => assignment.source)).toEqual([
+            {
+              _tag: "Role",
+              roleId: BuiltinRoles.OwnerId,
+              scope: { _tag: "Workspace", workspaceId: workspace.id },
+            },
+          ]);
+          expect(yield* bound.roles.get(BuiltinRoles.ViewerId)).toEqual(
+            Option.some({
+              id: BuiltinRoles.ViewerId,
+              workspaceId: workspace.id,
+              name: "Viewer",
+              permissions: [MemberPermissions.Read.name],
+            }),
           );
-          expect(assignments).toHaveLength(3);
+          for (const [id, name] of [
+            [BuiltinRoles.AdministratorId, "Administrator"],
+            [BuiltinRoles.OwnerId, "Owner"],
+          ] as const) {
+            expect(yield* bound.roles.get(id)).toEqual(
+              Option.some({
+                id,
+                workspaceId: workspace.id,
+                name,
+                permissions: [
+                  MemberPermissions.Read.name,
+                  MemberPermissions.Remove.name,
+                  InvitationPermissions.Manage.name,
+                ],
+              }),
+            );
+          }
           const batches = yield* bound.store.read(Log.Id.make("journal"), { limit: 10 });
           expect(batches).toHaveLength(1);
-          expect(batches[0]?.entries).toHaveLength(5);
-          expect(batches[0]?.commit.entryCount).toBe(5);
+          expect(batches[0]?.entries).toHaveLength(6);
+          expect(batches[0]?.commit.entryCount).toBe(6);
         }
       }),
     );

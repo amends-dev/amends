@@ -6,7 +6,7 @@ import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
 
 test("the catalog layer resolves domain declarations and overrides through a stable service", async () => {
   const group = Permission.makeGroup("test.member", { targetKind: "Member" });
-  const Create = group.make("create", { targetKind: "Workspace" });
+  const Create = group.make("create", { targetKind: "Workspace", builtinTier: "administrator" });
   const configured = PermissionCatalog.layer([
     MemberPermissions.Read,
     MemberPermissions.Remove,
@@ -26,6 +26,7 @@ test("the catalog layer resolves domain declarations and overrides through a sta
     expect(yield* catalog.get(MemberPermissions.Read.name)).toEqual(MemberPermissions.Read);
     expect(yield* catalog.get(MemberPermissions.Remove.name)).toEqual(MemberPermissions.Remove);
     expect(yield* catalog.get(Create.name)).toEqual(Create);
+    expect(catalog.definitions).toEqual([MemberPermissions.Read, MemberPermissions.Remove, Create]);
   });
   expectTypeOf<Effect.Services<typeof consume>>().toEqualTypeOf<PermissionCatalog.Service>();
   expectTypeOf<Effect.Error<typeof consume>>().toEqualTypeOf<PermissionCatalog.Unknown>();
@@ -35,8 +36,12 @@ test("the catalog layer resolves domain declarations and overrides through a sta
 test("duplicate names reject construction even when their definitions agree", async () => {
   for (const duplicate of [
     MemberPermissions.Read,
-    Permission.make(MemberPermissions.Read.name, { targetKind: "Member" }),
-    Permission.make(MemberPermissions.Read.name, { targetKind: "Workspace" }),
+    Permission.make(MemberPermissions.Read.name, { targetKind: "Member", builtinTier: "viewer" }),
+    Permission.make(MemberPermissions.Read.name, {
+      targetKind: "Workspace",
+      builtinTier: "viewer",
+    }),
+    Permission.make(MemberPermissions.Read.name, { targetKind: "Member", builtinTier: "owner" }),
   ]) {
     const error = await Effect.runPromise(
       PermissionCatalog.make([MemberPermissions.Read, duplicate]).pipe(Effect.flip),
@@ -80,21 +85,29 @@ test("unknown permissions fail explicitly, including in an empty catalog", async
 test("catalog definitions are isolated from changes to declarations, input lists, and lookup results", async () => {
   await Effect.runPromise(
     Effect.gen(function* () {
-      const declaration = Permission.make("test.read", { targetKind: "Member" });
+      const declaration = Permission.make("test.read", {
+        targetKind: "Member",
+        builtinTier: "viewer",
+      });
       const originalName = declaration.name;
       const definitions = [declaration];
       const catalog = yield* PermissionCatalog.make(definitions);
       Reflect.set(declaration, "name", MemberPermissions.Remove.name);
       Reflect.set(declaration, "targetKind", "Workspace");
+      Reflect.set(declaration, "builtinTier", "owner");
       definitions.push(MemberPermissions.Remove);
 
       const resolved = yield* catalog.get(originalName);
-      expect(resolved).toEqual({ name: originalName, targetKind: "Member" });
+      expect(resolved).toEqual({ name: originalName, targetKind: "Member", builtinTier: "viewer" });
       expect(Reflect.set(resolved, "name", MemberPermissions.Remove.name)).toBe(false);
       expect(Reflect.set(resolved, "targetKind", "Workspace")).toBe(false);
+      expect(Reflect.set(resolved, "builtinTier", "owner")).toBe(false);
+      expect(Reflect.set(catalog.definitions, "0", MemberPermissions.Remove)).toBe(false);
+      expect(catalog.definitions).toEqual([resolved]);
       expect(yield* catalog.get(originalName)).toEqual({
         name: originalName,
         targetKind: "Member",
+        builtinTier: "viewer",
       });
       expect(yield* Effect.flip(catalog.get(MemberPermissions.Remove.name))).toMatchObject({
         _tag: "PermissionCatalog.Unknown",
@@ -108,8 +121,13 @@ test("invalid declarations fail construction through the schema error channel", 
   for (const [field, value] of [
     ["name", ""],
     ["targetKind", "Unknown"],
+    ["builtinTier", "unknown"],
+    ["builtinTier", undefined],
   ] as const) {
-    const declaration = Permission.make("test.invalid", { targetKind: "Member" });
+    const declaration = Permission.make("test.invalid", {
+      targetKind: "Member",
+      builtinTier: "viewer",
+    });
     Reflect.set(declaration, field, value);
     const error = await Effect.runPromise(PermissionCatalog.make([declaration]).pipe(Effect.flip));
     expect(error._tag).toBe("SchemaError");

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { AssignmentFacts, Grant, Permission } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles, Grant, Permission } from "@amends/core/authorization";
 import { Journal, Log } from "@amends/core/journal";
 import {
   InvitationPermissions,
@@ -124,11 +124,9 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
             const assignment = (yield* bound.assignments.listActiveByMember(
               workspace.ownerMemberId,
             )).find(
-              ({ source }) =>
-                source._tag === "Direct" &&
-                source.grant.permission === InvitationPermissions.Manage.name,
+              ({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId,
             );
-            if (assignment === undefined) throw new Error("Missing invitation assignment");
+            if (assignment === undefined) throw new Error("Missing Owner assignment");
             yield* Effect.flatMap(Journal.Service, (journal) =>
               journal.publish(AssignmentFacts.Revoked, {
                 workspaceId: workspace.id,

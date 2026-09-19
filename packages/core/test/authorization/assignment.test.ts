@@ -16,7 +16,10 @@ const workspaceId = Workspace.Id.make("workspace-1");
 const recipientId = Member.Id.make("recipient");
 const targetMemberId = Member.Id.make("target-member");
 const roleId = Role.Id.make("role-1");
-const ManageWorkspace = Permission.make("test.workspace.manage", { targetKind: "Workspace" });
+const ManageWorkspace = Permission.make("test.workspace.manage", {
+  targetKind: "Workspace",
+  builtinTier: "administrator",
+});
 
 const sourcesIn = (workspaceId: Workspace.Id): ReadonlyArray<Assignment.Source> => {
   const scopedPermissions = [

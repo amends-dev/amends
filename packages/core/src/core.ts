@@ -57,7 +57,7 @@ const operations = Layer.mergeAll(MemberApplication.layer, InvitationApplication
  */
 export const layer = operations.pipe(
   Layer.provideMerge(Layer.mergeAll(journal, authorization)),
-  Layer.provide(PermissionCatalog.layer(permissions)),
+  Layer.provideMerge(PermissionCatalog.layer(permissions)),
 );
 
 /**

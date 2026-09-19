@@ -485,13 +485,13 @@ running process per workspace.
 
 The host authenticates identities, checks workspace-creation entitlement, allocates
 workspace IDs, and binds storage. Core initialization atomically establishes the
-workspace record, the creator's human membership, initial ownership, and explicit
-initial permission assignments. Initialization receives trusted human identity
+workspace record, the creator's human membership, initial ownership, built-in roles,
+and a workspace-scoped Owner assignment. Initialization receives trusted human identity
 before an ordinary member actor exists. Repeated initialization cannot replace
 ownership or grant additional access.
 
 Creation attribution and current ownership are separate. Ownership does not
-implicitly bypass permission checks; the initial owner receives explicit grants.
+implicitly bypass permission checks; the initial owner receives permissions through its role assignment.
 The initial permission set and subsequent changes to it must be deliberate.
 Ordinary operations receive an actor specific to that operation and check current
 membership and permissions. Ownership transfer still requires its application contract;
@@ -601,12 +601,31 @@ Role: Task contributor
 
 Permission checks concern the actual action and target, not only a tool name or a workspace
 role label. Reading one channel need not grant access to all channels. Using a connection
-and managing its configuration are also different actions. The exact scope rules, role
-catalog, and grant representation remain open.
+and managing its configuration are also different actions. Scope rules for future
+resource types remain open.
 
 Having permission to perform an action and having permission to grant that ability to
 another member are separate. The system checks the grantor's authority when permissions
 are assigned or changed; it does not infer unlimited grant authority from agent creation.
+
+### Built-in roles are constructed from explicit permission tiers
+
+Each permission declares its minimum built-in role through `builtinTier`: `viewer`,
+`administrator`, or `owner`. Viewer includes viewer-tier permissions, Administrator
+also includes administrator-tier permissions, and Owner includes all three tiers.
+Classification is required for each action, including actions declared through a
+permission group. It is never inferred from the action's name.
+
+The tier orders bundle construction only. Operations still check individual
+permissions at the requested scope; having a higher-tier permission does not grant
+lower-tier permissions. Ownership protections and delegation rules are separate.
+Custom roles will use explicit permission sets without needing a place in this hierarchy.
+
+Workspace initialization records the generated role definitions and assigns Owner
+to the creator. These are ordinary stored permission bundles with stable reserved
+identities. Authorization and replay use the recorded permissions, so changing tier
+declarations never silently changes existing workspace access. Existing bundles
+require a deliberate recorded policy update.
 
 ### Creating, configuring, using, and authorizing an agent are distinct actions
 

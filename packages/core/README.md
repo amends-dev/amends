@@ -61,6 +61,38 @@ Core tests follow the domain and feature directories under `test/`. Tests that
 cover several authorization features live at `test/authorization/`; shared
 in-memory storage support remains in `test/memory-store.ts`.
 
+## Permission declarations and built-in roles
+
+Declare a permission beside its owning feature and register it in `core.ts`.
+Every declaration must explicitly choose `builtinTier`: `viewer`, `administrator`,
+or `owner`. Permission groups supply a name prefix and default target kind, but
+never a default tier:
+
+```ts
+import { Permission } from "@amends/core/authorization";
+
+const member = Permission.makeGroup("member", { targetKind: "Member" });
+const Read = member.make("read", { builtinTier: "viewer" });
+const Remove = member.make("remove", { builtinTier: "administrator" });
+```
+
+`PermissionCatalog` validates and freezes the registered definitions. Its
+`definitions` array supplies `BuiltinRoles.make`, which constructs cumulative
+Viewer, Administrator, and Owner records for one workspace. Workspace initialization
+records all three roles and one workspace-scoped Owner assignment for its creator.
+The reserved role IDs are stable within each workspace; display names are labels.
+
+Tiers only construct these default bundles. Authorization checks stored permission
+names and scopes, and application services enforce ownership and delegation rules.
+`Permission.Reference` retains only the name and target kind used by requirements,
+preserving the HTTP error contract without exposing bundle-construction metadata.
+
+Changing a declaration changes the desired bundles for new workspaces. Updating
+an existing workspace requires an explicit role fact; neither authorization nor
+replay regenerates its roles. Role management APIs and custom roles are separate
+work. See [workspace workflows](../../docs/workspace-workflows.md#initialization)
+for the implemented bundles and current invitation restrictions.
+
 ## Module dependencies and exports
 
 Models and ID modules are independent of application services, projections, and

@@ -5,6 +5,7 @@ import { AssignmentProjection } from "../../src/authorization/assignment/project
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
 import { Assignment } from "../../src/authorization/assignment/assignment.ts";
 import { Authorization } from "../../src/authorization/authorization.ts";
+import { BuiltinRoles } from "../../src/authorization/role/builtin.ts";
 import { GrantResolver } from "../../src/authorization/grant-resolver.ts";
 import { Grant } from "../../src/authorization/grant.ts";
 import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts";
@@ -72,6 +73,7 @@ const readCharlie = Requirement.make(MemberPermissions.Read, charlieTarget);
 const removeCharlie = Requirement.make(MemberPermissions.Remove, charlieTarget);
 const Create = Permission.makeGroup("test.member", { targetKind: "Member" }).make("create", {
   targetKind: "Workspace",
+  builtinTier: "administrator",
 });
 const workspaceTarget = Target.Reference.cases.Workspace.make({ workspaceId });
 const createInWorkspace = Requirement.make(Create, workspaceTarget);
@@ -274,6 +276,44 @@ test("every requirement must be satisfied across role and direct assignments", a
   );
 });
 
+test("a built-in role's identity and permission tiers never bypass its stored permissions or scope", async () => {
+  const fixture = await Effect.runPromise(make());
+  await seed(
+    fixture,
+    [alice],
+    [
+      {
+        id: Assignment.Id.make("owner"),
+        workspaceId,
+        memberId: alice.memberId,
+        status: "active",
+        source: Assignment.Source.cases.Role.make({
+          roleId: BuiltinRoles.OwnerId,
+          scope: bobScope,
+        }),
+      },
+    ],
+    [
+      {
+        id: BuiltinRoles.OwnerId,
+        workspaceId,
+        name: "Owner",
+        permissions: [MemberPermissions.Remove.name],
+      },
+    ],
+  );
+  await run(fixture, check([removeBob]));
+  // Possessing an administrator-tier permission does not imply viewer-tier access.
+  expect(await run(fixture, Effect.flip(check([readBob])))).toMatchObject({
+    _tag: "Authorization.Denied",
+    requirement: readBob,
+  });
+  expect(await run(fixture, Effect.flip(check([removeCharlie])))).toMatchObject({
+    _tag: "Authorization.Denied",
+    requirement: removeCharlie,
+  });
+});
+
 test("missing or removed acting memberships fail even when assignments still grant access", async () => {
   const fixture = await Effect.runPromise(make());
   await seed(fixture, [], [direct("remove", alice.memberId, MemberPermissions.Remove)]);
@@ -358,12 +398,16 @@ test("workspace guards reject mismatched composition, actors, membership records
 test("requirements are validated against canonical permission definitions", async () => {
   const fixture = await Effect.runPromise(make());
   await seed(fixture, [alice], [direct("remove", alice.memberId, MemberPermissions.Remove)]);
-  const unregistered = Permission.make("member.unregistered", { targetKind: "Member" });
+  const unregistered = Permission.make("member.unregistered", {
+    targetKind: "Member",
+    builtinTier: "viewer",
+  });
   expect(
     await run(fixture, Effect.flip(check([Requirement.make(unregistered, bobTarget)]))),
   ).toMatchObject({ _tag: "PermissionCatalog.Unknown", name: unregistered.name });
   const wrongDefinition = Permission.make(MemberPermissions.Remove.name, {
     targetKind: "Workspace",
+    builtinTier: "administrator",
   });
   const wrongKind = Requirement.make(wrongDefinition, workspaceTarget);
   expect(await run(fixture, Effect.flip(check([wrongKind])))).toMatchObject({

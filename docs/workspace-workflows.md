@@ -107,15 +107,37 @@ background task is required to change expired rows.
 ## Initialization
 
 The host allocates the workspace ID and binds its storage views. Core initialization
-then publishes five facts in one journal commit: workspace initialization, creator
-membership, and three direct permission assignments. Projections persist the records
-and their checkpoints in that same transaction.
+then publishes six facts in one journal commit: workspace initialization, creator
+membership, three built-in roles, and one Owner role assignment. Projections persist
+the records and their checkpoints in that same transaction.
 
 The creator is a human and is recorded as the initial owner. Creation attribution
-is retained separately from current ownership. The initial explicit permissions
-are `member.read`, `member.remove`, and `invitation.manage` with workspace scope.
-Ownership supplies no implicit permission bypass;
-adding future permissions requires a deliberate bootstrap-policy update.
+is retained separately from current ownership. The creator receives Owner at workspace
+scope. Authorization resolves that assignment's stored role permissions; ownership
+supplies no implicit permission bypass.
+
+Each registered permission declares a required `builtinTier`. Viewer includes
+`viewer` permissions, Administrator also includes `administrator` permissions,
+and Owner includes all three tiers, including `owner`. The current bundles are:
+
+| Role          | Stored permissions                                  |
+| ------------- | --------------------------------------------------- |
+| Viewer        | `member.read`                                       |
+| Administrator | `member.read`, `member.remove`, `invitation.manage` |
+| Owner         | `member.read`, `member.remove`, `invitation.manage` |
+
+Administrator and Owner currently contain the same permission names because no
+owner-tier actions have been implemented. Invitation issuance and revocation still
+require current ownership in addition to `invitation.manage`. Role assignment APIs,
+role-based invitations, delegated administration, and ownership transfer remain future work.
+
+Role IDs are stable within each workspace: `builtin:viewer`, `builtin:administrator`,
+and `builtin:owner`. These identities are reserved for built-in definitions. Tiers
+construct permission bundles; they do not authorize requests or confer delegation
+authority. The bundles are saved through role facts, so changing declarations affects
+new workspaces only. Existing workspaces retain their recorded roles or direct grants;
+updating them requires an explicit recorded policy change. Replay never regenerates
+roles from current declarations.
 
 Initialization requires an absent workspace record. A repeated call returns
 `WorkspaceInitialization.AlreadyInitialized` without replacing ownership or
