@@ -5,6 +5,7 @@ import {
   PermissionCatalog,
 } from "@amends/core/authorization";
 import { Commit } from "@amends/core/journal";
+import { NotificationApplication } from "@amends/core/notification";
 import {
   InvitationApplication,
   MemberApplication,
@@ -63,6 +64,7 @@ export const PublicError = Schema.Union([
   MemberApplication.NotFound,
   MemberApplication.OwnerProtected,
   MemberApplication.AlreadyRemoved,
+  NotificationApplication.NotFound,
   InvitationApplication.NotFound,
   InvitationApplication.NotRecipient,
   InvitationApplication.AlreadyMember,

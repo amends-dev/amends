@@ -3,6 +3,11 @@ import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authoriz
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Commit, Store } from "@amends/core/journal";
 import {
+  Notification,
+  NotificationApplication,
+  NotificationStore,
+} from "@amends/core/notification";
+import {
   InvitationStore,
   Member,
   MemberApplication,
@@ -80,6 +85,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listPendingByRecipient: unexpected,
         insert: unexpected,
         settle: unexpected,
+      }),
+    ),
+    Context.add(
+      NotificationStore.Service,
+      NotificationStore.Service.of({
+        workspaceId,
+        get: unexpected,
+        listByRecipient: unexpected,
+        listPendingByRecipient: unexpected,
+        insert: unexpected,
       }),
     ),
     Context.add(
@@ -193,6 +208,13 @@ test.each(["inWorkspace", "asMember"] as const)(
 
         const missing = new MemberApplication.NotFound({ workspaceId, memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);
+        const missingNotification = new NotificationApplication.NotFound({
+          workspaceId,
+          notificationId: Notification.Id.make("missing"),
+        });
+        expect(yield* Effect.flip(enter(Effect.fail(missingNotification)))).toBe(
+          missingNotification,
+        );
       }),
     );
   },
@@ -208,6 +230,14 @@ test("unexpected failures and malformed public errors stay defects; interruption
       expect(
         defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
       ).toBe(failure);
+      const invalidNotification = new NotificationApplication.InvalidResponse({
+        message: "Invalid stored notification",
+      });
+      expect(
+        defect(
+          yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(invalidNotification))),
+        ),
+      ).toBe(invalidNotification);
       const malformed = { _tag: "MemberApplication.NotFound", workspaceId, memberId: 42 };
       expect(
         defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),

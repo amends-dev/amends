@@ -85,8 +85,11 @@ authorization, and permission catalog; `HostServices` is the storage and
 cryptography a host must supply, derived from that layer; and `Operations` is
 the set of application services a gateway may run. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
-and `@amends/core/workspace`, each with its records, facts, stores, projections,
-and operations. Member and invitation operations include listing: members you
+`@amends/core/notification`, and `@amends/core/workspace`, each exposing the
+records, facts, stores, projections, and operations it implements. The notification
+surface includes its record, store contract, authorized inbox reads, and empty
+projection. Notification reads derive the recipient from the current actor and
+require active membership. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 
 `@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one

@@ -33,6 +33,7 @@ export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
 export const targetKinds = ["Workspace", "Member"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
+export const notificationStates = ["Pending"] as const;
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -169,6 +170,54 @@ export const invitations = pgTable(
     index("pending_invitations_by_recipient")
       .on(table.recipientId)
       .where(sql`${table.state} = 'Pending'`),
+  ],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    sourceLogId: text("source_log_id").notNull(),
+    sourceEntryId: text("source_entry_id").notNull(),
+    recipientKind: text("recipient_kind", { enum: identityKinds }).notNull(),
+    recipientId: text("recipient_id").notNull(),
+    recordedAt: instant("recorded_at").notNull(),
+    state: text("state", { enum: notificationStates }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    foreignKey({
+      columns: [table.workspaceId],
+      foreignColumns: [workspaces.workspaceId],
+      name: "notifications_workspace",
+    }).onDelete("cascade"),
+    // Source existence and recipient selection belong to notification generation.
+    uniqueIndex("notifications_by_source_recipient").on(
+      table.workspaceId,
+      table.sourceLogId,
+      table.sourceEntryId,
+      table.recipientKind,
+      table.recipientId,
+    ),
+    index("notifications_by_recipient").on(
+      table.workspaceId,
+      table.recipientKind,
+      table.recipientId,
+      table.recordedAt,
+      sql`${table.id} COLLATE "C"`,
+    ),
+    index("pending_notifications_by_recipient")
+      .on(
+        table.workspaceId,
+        table.recipientKind,
+        table.recipientId,
+        table.recordedAt,
+        sql`${table.id} COLLATE "C"`,
+      )
+      .where(sql`${table.state} = 'Pending'`),
+    check("notifications_recipient_kind", sql`${table.recipientKind} IN ('Human', 'Agent')`),
+    check("notifications_state", sql`${table.state} = 'Pending'`),
   ],
 );
 

@@ -58,6 +58,20 @@ so a client can import the complete contract without loading server code.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;
   `POST` to the same path issues one with required `recipientId`, `roleId`, and `expiresAt`. `POST …/:invitationId/accept` and
   `POST …/:invitationId/revoke` change state.
+- `notifications`: `GET /workspaces/:workspaceId/notifications` lists the authenticated
+  human or agent's inbox. `GET …/:notificationId` reads one notification. Active
+  membership is required, and a missing record or another recipient's notification
+  returns the same 404. The caller cannot select a different recipient.
+
+Notification lists require an integer `limit` from 1 to 100. The optional
+`pendingOnly=true` filter selects pending records; omission or `false` lists all
+states. Results are arrays ordered by `recordedAt` ascending, then ID in binary
+lexical order. To continue, pass the last record's `{ recordedAt, id }` as `after`.
+The generated client accepts the decoded cursor, including an Effect UTC date;
+on the wire, `after` is URL-encoded JSON with an ISO timestamp. The boundary is
+exclusive, and an empty page ends the traversal. Pages do not form a fixed snapshot.
+These reads neither acknowledge notifications nor grant access to their sources.
+Generation is not implemented yet, so normal workspaces have empty inboxes.
 
 Workspace IDs travel in the path so a host can route a request to the right
 workspace before reading its body. Status codes follow `ApiErrors`: not a member,

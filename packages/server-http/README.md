@@ -10,6 +10,12 @@ come from the contract. Handlers read principals and enforce human-only entry
 points; credential verification belongs to the authentication middleware, and
 domain rules belong to core.
 
+Notification handlers enter through `Gateway.asMember` and call
+`NotificationApplication.get`, `list`, or `listPending`. The contract decodes the
+page size, cursor, and optional pending-only filter; core derives the recipient
+from the actor and checks active membership and recipient ownership in the read
+transaction. The HTTP layer adds no notification generation or delivery.
+
 ## Organization
 
 Keep one focused handler module per HTTP group, with filenames matching
@@ -52,3 +58,7 @@ and parameter passing, tag and status preservation, unauthorized rejection
 before any gateway call, human-only endpoints, and JSON round-tripping of dates
 and grants, and compatibility of session and directory JSON fields. The local host's tests cover the same routes
 over real SQLite storage, including through its spawned server entry point.
+Notification tests cover cursor and date round-trips, filter selection, malformed
+queries, human and agent inbox isolation, workspace boundaries, and loss of access
+after membership removal. Host fixtures seed notification records because their
+generation projection is still empty.

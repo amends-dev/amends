@@ -14,6 +14,8 @@ import { PermissionCatalog } from "./authorization/permission-catalog.ts";
 import { RoleProjection } from "./authorization/role/projection.ts";
 import { Journal } from "./journal/journal.ts";
 import { Log } from "./journal/log.ts";
+import { NotificationApplication } from "./notification/application.ts";
+import { NotificationProjection } from "./notification/projection.ts";
 import { InvitationApplication } from "./workspace/invitation/application.ts";
 import { InvitationPermissions } from "./workspace/invitation/permissions.ts";
 import { InvitationProjection } from "./workspace/invitation/projection.ts";
@@ -31,6 +33,7 @@ const projections = [
   RoleProjection.definition,
   AssignmentProjection.definition,
   InvitationProjection.definition,
+  NotificationProjection.definition,
 ] as const;
 
 /** Permissions the domains declare; requirements and grants must name one of these. */
@@ -60,6 +63,7 @@ const operations = Layer.mergeAll(
   InvitationApplication.layer,
   AssignmentApplication.layer,
   OwnershipApplication.layer,
+  NotificationApplication.layer,
 ).pipe(Layer.provide(Delegation.layer));
 
 /**

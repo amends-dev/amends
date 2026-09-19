@@ -18,6 +18,13 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE TABLE checkpoints (workspace_id TEXT NOT NULL, log_id TEXT NOT NULL, name TEXT NOT NULL, version REAL NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, log_id, name, version))`;
     yield* sql`CREATE TABLE invitations (workspace_id TEXT NOT NULL, id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
   }),
+  "0002_notifications": Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE notifications (workspace_id TEXT NOT NULL, id TEXT NOT NULL, recorded_at INTEGER NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
+    yield* sql`CREATE UNIQUE INDEX notifications_by_source_recipient ON notifications(workspace_id, json_extract(record, '$.source.logId'), json_extract(record, '$.source.entryId'), json_extract(record, '$.recipient._tag'), json_extract(record, '$.recipient.id'))`;
+    yield* sql`CREATE INDEX notifications_by_recipient ON notifications(workspace_id, json_extract(record, '$.recipient._tag'), json_extract(record, '$.recipient.id'), recorded_at, id COLLATE BINARY)`;
+    yield* sql`CREATE INDEX pending_notifications_by_recipient ON notifications(workspace_id, json_extract(record, '$.recipient._tag'), json_extract(record, '$.recipient.id'), recorded_at, id COLLATE BINARY) WHERE json_extract(record, '$.state._tag') = 'Pending'`;
+  }),
 });
 
 export * as Migrations from "./migrations.ts";

@@ -8,6 +8,7 @@ import { PostgresDatabase } from "./database.ts";
 import { Invitations } from "./invitations.ts";
 import { Journal } from "./journal.ts";
 import { Members } from "./members.ts";
+import { Notifications } from "./notifications.ts";
 import { Roles } from "./roles.ts";
 import { Workspaces } from "./workspaces.ts";
 
@@ -27,6 +28,7 @@ const layerStores = Layer.mergeAll(
   Roles.layer,
   Assignments.layer,
   Invitations.layer,
+  Notifications.layer,
 );
 
 /**

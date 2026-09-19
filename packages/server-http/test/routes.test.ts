@@ -4,6 +4,8 @@ import { Api, Authentication } from "@amends/api-http";
 import type * as Core from "@amends/core";
 import { Authorization, Requirement, Target } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
+import { Entry } from "@amends/core/journal";
+import { Notification, NotificationApplication } from "@amends/core/notification";
 import {
   Invitation,
   InvitationApplication,
@@ -45,7 +47,28 @@ const denied = new Authorization.Denied({
   ),
 });
 const actor = Actor.Value.make({ workspaceId, memberId, identity: alice });
+const notification: Notification.Record = {
+  id: Notification.Id.make("pending"),
+  workspaceId,
+  source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("entry-one") },
+  recipient: alice,
+  recordedAt: DateTime.makeUnsafe("2026-01-01T00:00:00.123Z"),
+  state: { _tag: "Pending" },
+};
 const operations = Layer.mergeAll(
+  Layer.succeed(
+    NotificationApplication.Service,
+    NotificationApplication.Service.of({
+      workspaceId,
+      get: record("notification.get", (notificationId) =>
+        notificationId === notification.id
+          ? Effect.succeed(notification)
+          : Effect.fail(new NotificationApplication.NotFound({ workspaceId, notificationId })),
+      ),
+      list: record("notification.list", () => Effect.succeed([notification])),
+      listPending: record("notification.listPending", () => Effect.succeed([notification])),
+    }),
+  ),
   Layer.succeed(
     MemberApplication.Service,
     MemberApplication.Service.of({
@@ -171,7 +194,60 @@ const makeClient = HttpApiTest.groups(Api, [
   "workspaces",
   "members",
   "invitations",
+  "notifications",
 ]);
+
+test("notification queries decode cursors and select the requested application read", async () => {
+  calls.length = 0;
+  const after = { recordedAt: notification.recordedAt, id: Notification.Id.make("a + & é") };
+  const pages = await run("alice", (client) =>
+    Effect.gen(function* () {
+      const first = yield* client.notifications.list({
+        params: { workspaceId },
+        query: { limit: 1 },
+      });
+      const next = yield* client.notifications.list({
+        params: { workspaceId },
+        query: { limit: 2, after, pendingOnly: true },
+      });
+      yield* client.notifications.list({
+        params: { workspaceId },
+        query: { limit: 3, pendingOnly: false },
+      });
+      return [first, next];
+    }),
+  );
+  expect(pages).toEqual([[notification], [notification]]);
+  expect(calls).toEqual([
+    { operation: "asMember", arguments: [workspaceId, alice] },
+    { operation: "notification.list", arguments: [{ limit: 1 }] },
+    { operation: "asMember", arguments: [workspaceId, alice] },
+    { operation: "notification.listPending", arguments: [{ limit: 2, after }] },
+    { operation: "asMember", arguments: [workspaceId, alice] },
+    { operation: "notification.list", arguments: [{ limit: 3 }] },
+  ]);
+});
+
+test("individual notification reads encode records and expose a typed 404", async () => {
+  const found = await run("alice", (client) =>
+    client.notifications.get({
+      params: { workspaceId, notificationId: notification.id },
+    }),
+  );
+  expect(found).toEqual(notification);
+  const missing = await run("alice", (client) =>
+    client.notifications
+      .get({
+        params: { workspaceId, notificationId: Notification.Id.make("missing") },
+      })
+      .pipe(Effect.flip),
+  );
+  expect(missing).toMatchObject({
+    _tag: "NotificationApplication.NotFound",
+    workspaceId,
+    notificationId: "missing",
+  });
+});
 
 test("member reads pass the bearer principal and path parameters to the gateway", async () => {
   calls.length = 0;

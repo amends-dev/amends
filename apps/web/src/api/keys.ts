@@ -1,4 +1,5 @@
 import type { Member, Workspace } from "@amends/core/workspace";
+import type { Notification } from "@amends/core/notification";
 
 /** Every entry is one invalidation key, scoped to the complete resource identity. */
 export const keys = {
@@ -12,5 +13,11 @@ export const keys = {
   },
   invitations: {
     list: (workspaceId: Workspace.Id) => JSON.stringify(["invitations", "list", workspaceId]),
+  },
+  notifications: {
+    all: (workspaceId: Workspace.Id) => JSON.stringify(["notifications", workspaceId]),
+    list: (workspaceId: Workspace.Id) => JSON.stringify(["notifications", "list", workspaceId]),
+    get: (workspaceId: Workspace.Id, notificationId: Notification.Id) =>
+      JSON.stringify(["notifications", "get", workspaceId, notificationId]),
   },
 };

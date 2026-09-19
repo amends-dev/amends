@@ -7,7 +7,9 @@ Workspace storage and the workspace directory over one SQLite file, through
 
 Each record is stored as the JSON of its schema's encoded form in a `record`
 column, keyed by workspace and ID, with indexes over the JSON fields the stores
-filter on. Journal tables hold their fields as columns. Migrations live in
+filter on. Notifications also store an indexed epoch-millisecond timestamp so
+pagination orders instants correctly, independent of their string representation.
+Journal tables hold their fields as columns. Migrations live in
 `src/migrations.ts` and apply in `SqliteDatabase.make()`, before it returns the
 database service. `SqliteDatabase.layer(filename)` uses the same constructor.
 
@@ -15,7 +17,7 @@ database service. `SqliteDatabase.layer(filename)` uses the same constructor.
 
 One module per store, each exporting `make` and a `layer` for the core service
 it implements: `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`,
-`roles.ts`, `assignments.ts`, and `invitations.ts`. They share `binding.ts`,
+`roles.ts`, `assignments.ts`, `invitations.ts`, and `notifications.ts`. They share `binding.ts`,
 which is one workspace's view of the database: its identity, the transaction
 boundary, and the guard each statement runs under. `storage.ts` exports
 `layerWorkspace(workspaceId)` to compose the store layers over a binding for the
@@ -27,6 +29,12 @@ Follow the [adapter naming and validation conventions](../README.md). Records
 are validated before JSON encoding, edited fields use their core schemas, and
 invalid writes return the corresponding store's `Conflict`. Reads decode stored
 JSON back into validated domain records; corrupt data remains a `Failure`.
+
+Notification reads match both recipient kind and ID, with bounded pages ordered
+by recorded time and binary ID order. Notification IDs and source/recipient
+associations are unique within the workspace. Inserts join the journal transaction;
+source existence and recipient selection remain generation responsibilities.
+The notification projection currently has no generation handlers.
 
 ## Transactions
 

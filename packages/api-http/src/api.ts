@@ -3,6 +3,7 @@ import { InvitationsGroup } from "./invitations.ts";
 import { AssignmentsGroup } from "./assignments.ts";
 import { MeGroup } from "./me.ts";
 import { MembersGroup } from "./members.ts";
+import { NotificationsGroup } from "./notifications.ts";
 import { SessionGroup } from "./session.ts";
 import { WorkspacesGroup } from "./workspaces.ts";
 
@@ -14,4 +15,5 @@ export class Api extends HttpApi.make("amends")
   .add(MembersGroup)
   .add(InvitationsGroup)
   .add(AssignmentsGroup)
+  .add(NotificationsGroup)
   .annotateMerge(OpenApi.annotations({ title: "Amends API" })) {}

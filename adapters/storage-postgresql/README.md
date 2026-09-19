@@ -22,7 +22,7 @@ returns the database service. `PostgresDatabase.layer(config)` uses that constru
 
 One module per store, each exporting `make` and a `layer` for the core service
 it implements: `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`,
-`roles.ts`, `assignments.ts`, and `invitations.ts`. They share `binding.ts`,
+`roles.ts`, `assignments.ts`, `invitations.ts`, and `notifications.ts`. They share `binding.ts`,
 which is one workspace's view of the database: its identity, the transaction
 boundary, and the guard each statement runs under. `storage.ts` exports
 `layerWorkspace(workspaceId, options)` to compose the store layers over a binding
@@ -38,6 +38,13 @@ consistency and invitation expiry. Edited fields use their core schemas.
 Invalid write values return the corresponding store's `Conflict` before any
 statement changes data. Query results are assembled as encoded records and then
 decoded with core schemas; corrupt rows remain `Failure` outcomes.
+
+Notification reads match both recipient kind and ID, with bounded pages ordered
+by recorded time and ID using `COLLATE "C"` to match SQLite's binary ordering.
+Notification IDs and source/recipient associations are unique within the workspace.
+Inserts join the journal transaction; source existence and recipient selection
+remain generation responsibilities. The notification projection currently has no
+generation handlers.
 
 ## Transactions
 

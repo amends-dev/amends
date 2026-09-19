@@ -2,6 +2,7 @@ import * as Core from "@amends/core";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
 import { Checkpoint, Store } from "@amends/core/journal";
+import { NotificationStore } from "@amends/core/notification";
 import {
   InvitationStore,
   MemberStore,
@@ -32,6 +33,7 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
   roles: Context.get(context, RoleStore.Service),
   assignments: Context.get(context, AssignmentStore.Service),
   invitations: Context.get(context, InvitationStore.Service),
+  notifications: Context.get(context, NotificationStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 export const views = Effect.map(SqliteStorage.make(), (service) => ({

@@ -28,6 +28,7 @@ export const mayRetainData = (cause: Cause.Cause<unknown>) =>
     "OwnershipApplication.MemberNotFound",
     "MemberApplication.NotFound",
     "InvitationApplication.NotFound",
+    "NotificationApplication.NotFound",
   ].includes(errorOf(cause)?._tag ?? "");
 export const failureOf = <A, E>(result: AsyncResult.AsyncResult<A, E>) =>
   AsyncResult.isFailure(result) ? result : undefined;
@@ -51,6 +52,8 @@ export const explain = (cause: Cause.Cause<unknown>): string => {
       return "You do not hold the permission this needs.";
     case "MemberApplication.NotFound":
       return "This member is no longer available.";
+    case "NotificationApplication.NotFound":
+      return "This notification is no longer available.";
     case "MemberApplication.OwnerProtected":
       return "The current owner cannot be removed. Transfer ownership first.";
     case "MemberApplication.AlreadyRemoved":

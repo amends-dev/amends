@@ -1,10 +1,46 @@
 import { expect, test } from "bun:test";
 import { SqliteDatabase } from "../src/index.ts";
-import { SqliteClient } from "@effect/sql-sqlite-bun";
+import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-bun";
 import { Cause, Effect, Exit, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
+import { Migrations } from "../src/migrations.ts";
 
 import { workspaceId, views, inDatabase, initialized, temporary } from "./support.ts";
+
+test("the notification migration upgrades existing storage without changing workspace data", async () =>
+  temporary(async (filename) => {
+    const record = JSON.stringify({
+      id: workspaceId,
+      name: "Before notifications",
+      createdBy: "existing-human",
+      ownerMemberId: "existing-owner",
+    });
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* SqliteMigrator.run({
+          loader: Migrations.loader.pipe(
+            Effect.map((migrations) => migrations.filter(([id]) => id === 1)),
+          ),
+        });
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`INSERT INTO workspaces (workspace_id, record) VALUES (${workspaceId}, ${record})`;
+      }).pipe(Effect.provide(SqliteClient.layer({ filename, busyTimeout: 0 }))),
+    );
+    await inDatabase(
+      filename,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        expect(
+          yield* sql`SELECT record FROM workspaces WHERE workspace_id = ${workspaceId}`,
+        ).toEqual([{ record }]);
+        expect(yield* sql`SELECT COUNT(*) AS count FROM notifications`).toEqual([{ count: 0 }]);
+        expect(
+          yield* sql`SELECT migration_id FROM effect_sql_migrations ORDER BY migration_id`,
+        ).toEqual([{ migration_id: 1 }, { migration_id: 2 }]);
+      }),
+    );
+  }));
+
 test.each(["make", "layer"] as const)(
   "database %s initializes every store and preserves data when reopened",
   async (construction) =>

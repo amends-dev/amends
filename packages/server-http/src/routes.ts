@@ -6,6 +6,7 @@ import { InvitationsHandlers } from "./invitations.ts";
 import { AssignmentsHandlers } from "./assignments.ts";
 import { MeHandlers } from "./me.ts";
 import { MembersHandlers } from "./members.ts";
+import { NotificationsHandlers } from "./notifications.ts";
 import { SessionHandlers } from "./session.ts";
 import { WorkspacesHandlers } from "./workspaces.ts";
 
@@ -21,6 +22,7 @@ export const layerHandlers = Layer.mergeAll(
   MembersHandlers.layer,
   InvitationsHandlers.layer,
   AssignmentsHandlers.layer,
+  NotificationsHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 
 /**

@@ -19,11 +19,27 @@ The current domains contain these features:
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
 | `identity`      | Stable human and agent references and the actor resolved for an operation.                       |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
+| `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
 domains; workspace scoping alone does not make a feature part of workspace
 management.
+
+The notification foundation is exported as `@amends/core/notification`. A record
+references a source log entry and a human or agent recipient and currently supports
+only `Pending` state. Both storage adapters implement its bounded recipient reads
+and transactional insert. `NotificationApplication.get`, `list`, and `listPending`
+require current active membership and derive the recipient from the acting identity.
+They expose only that recipient's inbox; missing and other recipients' IDs both
+return `NotificationApplication.NotFound`. Authorization and reads share a journal
+transaction, joining an outer commit when present. Reading never acknowledges a
+notification or grants access to its source. Core now requires `NotificationStore`.
+
+The HTTP API exposes these reads, and the web client provides session-scoped query
+atoms. Generation, acknowledgment, and delivery remain deferred. The empty projection
+still advances its checkpoint; introducing historical generation requires fresh
+development data or explicit projection preparation.
 
 Membership demonstrates the feature layout:
 
@@ -252,6 +268,7 @@ meaning rather than using it as a synonym for a constructor.
 | Grant resolver        | `GrantResolver.make()`                | `GrantResolver.Service`                 |
 | Authorization         | `Authorization.make()`                | `Authorization.Service`                 |
 | Member operations     | `MemberApplication.make()`            | `MemberApplication.Service`             |
+| Notification reads    | `NotificationApplication.make()`      | `NotificationApplication.Service`       |
 | Assignment operations | `AssignmentApplication.make()`        | `AssignmentApplication.Service`         |
 | Delegation policy     | `Delegation.make()`                   | `Delegation.Service`                    |
 | Invitation operations | `InvitationApplication.make()`        | `InvitationApplication.Service`         |

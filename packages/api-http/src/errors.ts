@@ -10,6 +10,7 @@ import {
   OwnershipApplication,
 } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
+import { NotificationApplication } from "@amends/core/notification";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
 
@@ -32,6 +33,9 @@ export const Denied = Authorization.Denied.pipe(HttpApiSchema.status(403));
 export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status(403));
 export const UnknownPermission = PermissionCatalog.Unknown.pipe(HttpApiSchema.status(400));
 export const MemberNotFound = MemberApplication.NotFound.pipe(HttpApiSchema.status(404));
+export const NotificationNotFound = NotificationApplication.NotFound.pipe(
+  HttpApiSchema.status(404),
+);
 export const OwnerProtected = MemberApplication.OwnerProtected.pipe(HttpApiSchema.status(409));
 export const AlreadyRemoved = MemberApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409));
 export const InvitationNotFound = InvitationApplication.NotFound.pipe(HttpApiSchema.status(404));

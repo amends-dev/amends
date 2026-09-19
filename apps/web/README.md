@@ -140,6 +140,31 @@ Queries currently have no idle retention or automatic polling. They remain activ
 mounted. Add retention explicitly when needed; Effect's `timeToLive` retains idle atoms,
 not freshness or a polling interval.
 
+### Notification reads
+
+`Notifications.list(workspaceId, { limit, after?, pendingOnly? })` reads one inbox page;
+`Notifications.get(workspaceId, notificationId)` reads one record. List options come
+from the generated HTTP client: `limit` is required (1–100), and `after` contains the
+last record's UTC `recordedAt` and `id`. The client encodes that cursor for the URL.
+Each page is independent; an empty page ends traversal. Pages are not a fixed snapshot.
+
+Use these queries through `useQuery` inside `SessionBoundary`, as with member reads.
+The credential session owns the registry; within it, workspace, cursor, pending-only
+filter, and page size determine the list atom. Omitting `pendingOnly` is equivalent to
+`false`. Replacing credentials discards the registry and its notification data and requests.
+The server derives the recipient from the authenticated identity; callers supply no recipient.
+
+Notification queries register these session-local invalidation keys:
+
+- `keys.notifications.list(workspaceId)` refreshes every mounted page and filter.
+- `keys.notifications.get(workspaceId, notificationId)` refreshes that detail query.
+- `keys.notifications.all(workspaceId)` refreshes both lists and details in the workspace.
+
+A future browser stream can pass those keys to `Reactivity.invalidate` in the API runtime
+owned by the current session. No polling or stream subscription is installed here.
+Notification 404s suppress previously cached data through the shared result policy.
+Notification generation and inbox presentation remain separate steps.
+
 ## Session lifetime
 
 `SessionBoundary` owns the persisted session outside the replaceable atom registry.
