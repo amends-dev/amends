@@ -2,7 +2,7 @@ import type { Scope } from "@amends/core/authorization";
 import type { Workspace } from "@amends/core/workspace";
 import type { scopeKinds, targetKinds } from "./schema.ts";
 
-/** The three scope columns shared by assignments and invitation grants. */
+/** The three columns encoding an assignment's scope. */
 export interface Columns {
   readonly scopeKind: (typeof scopeKinds)[number];
   readonly targetKind: (typeof targetKinds)[number] | null;

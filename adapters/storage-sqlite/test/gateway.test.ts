@@ -1,5 +1,5 @@
 import { expect, expectTypeOf, test } from "bun:test";
-import { BuiltinRoles } from "@amends/core/authorization";
+import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { Log } from "@amends/core/journal";
 import { InvitationPermissions, MemberPermissions } from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
@@ -67,7 +67,7 @@ test("one host creates two isolated workspaces and uses each operation's authent
               id: BuiltinRoles.ViewerId,
               workspaceId: workspace.id,
               name: "Viewer",
-              permissions: [MemberPermissions.Read.name],
+              permissions: [MemberPermissions.Read.name, AssignmentPermissions.Read.name],
             }),
           );
           for (const [id, name] of [
@@ -83,6 +83,8 @@ test("one host creates two isolated workspaces and uses each operation's authent
                   MemberPermissions.Read.name,
                   MemberPermissions.Remove.name,
                   InvitationPermissions.Manage.name,
+                  AssignmentPermissions.Read.name,
+                  AssignmentPermissions.Manage.name,
                 ],
               }),
             );

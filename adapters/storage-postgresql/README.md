@@ -11,8 +11,7 @@ connection and every Drizzle statement inside it lands on that connection.
 primary key with `workspace_id`, and each reference between tables carries the
 workspace as part of a composite foreign key, so a join that starts scoped stays
 scoped. Tagged unions become a discriminator column plus the columns each case
-needs, with a check constraint that they agree. Invitation grants are a child
-table in requested order; role permissions are a text array.
+needs, with a check constraint that they agree. Invitations store a required role ID; role permissions are a text array.
 
 Migrations live in `drizzle/`, generated from the schema. After changing the
 schema, run `bun run --filter @amends/storage-postgresql generate` and commit the
@@ -82,6 +81,6 @@ The suites separate database construction, transactions, journal behavior,
 authorization, gateway workflows, and invitations. Each file creates its fixture
 through `support.ts` and owns its test-cluster cleanup. `contracts.test.ts` runs
 the same direct-store rejection and round-trip scenarios as SQLite, including
-role validation, every foreign scope shape, invalid invitation expiry, checkpoint
+role validation, every foreign scope shape, missing or blank invitation roles, invalid invitation expiry, checkpoint
 validation, and rollback. Engine-specific locking and aborted-transaction tests
 remain separate from these shared contract expectations.

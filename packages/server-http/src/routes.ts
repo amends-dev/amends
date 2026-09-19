@@ -3,6 +3,7 @@ import { Layer } from "effect";
 import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
 import { BearerAuthentication } from "./authentication.ts";
 import { InvitationsHandlers } from "./invitations.ts";
+import { AssignmentsHandlers } from "./assignments.ts";
 import { MeHandlers } from "./me.ts";
 import { MembersHandlers } from "./members.ts";
 import { SessionHandlers } from "./session.ts";
@@ -19,6 +20,7 @@ export const layerHandlers = Layer.mergeAll(
   WorkspacesHandlers.layer,
   MembersHandlers.layer,
   InvitationsHandlers.layer,
+  AssignmentsHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 
 /**

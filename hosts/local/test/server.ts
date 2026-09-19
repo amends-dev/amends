@@ -90,7 +90,7 @@ export const withServer = async <A>(
 
 export type Call = (
   token: string,
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
 ) => Promise<{ status: number; body: unknown }>;

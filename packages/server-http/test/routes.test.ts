@@ -1,3 +1,4 @@
+import { BuiltinRoles } from "@amends/core/authorization";
 import { expect, test } from "bun:test";
 import { Api, Authentication } from "@amends/api-http";
 import type * as Core from "@amends/core";
@@ -65,7 +66,7 @@ const operations = Layer.mergeAll(
         Effect.succeed({
           details: {
             recipientId: request.recipientId,
-            grants: request.grants,
+            roleId: request.roleId,
             expiresAt: request.expiresAt,
             id: Invitation.Id.make("invitation-one"),
             workspaceId,
@@ -253,7 +254,7 @@ test("workspace creation and acceptance require a human principal", async () => 
   ]);
 });
 
-test("invitation payloads round-trip dates and grants through JSON", async () => {
+test("invitation payloads round-trip dates and roles through JSON", async () => {
   calls.length = 0;
   const expiresAt = DateTime.makeUnsafe("2026-02-01T00:00:00Z");
   const issued = await run("alice", (client) =>
@@ -262,9 +263,7 @@ test("invitation payloads round-trip dates and grants through JSON", async () =>
       payload: {
         recipientId: Identity.HumanId.make("bob"),
         expiresAt,
-        grants: [
-          { permission: MemberPermissions.Read.name, scope: { _tag: "Workspace", workspaceId } },
-        ],
+        roleId: BuiltinRoles.ViewerId,
       },
     }),
   );
@@ -276,7 +275,7 @@ test("invitation payloads round-trip dates and grants through JSON", async () =>
     arguments: [
       {
         recipientId: "bob",
-        grants: [{ permission: "member.read", scope: { _tag: "Workspace", workspaceId } }],
+        roleId: BuiltinRoles.ViewerId,
       },
     ],
   });

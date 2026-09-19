@@ -3,8 +3,7 @@ import type { PlatformError } from "effect";
 import { Assignment } from "../../authorization/assignment/assignment.ts";
 import { AssignmentFacts } from "../../authorization/assignment/facts.ts";
 import { Authorization } from "../../authorization/authorization.ts";
-import { Grant } from "../../authorization/grant.ts";
-import { PermissionCatalog } from "../../authorization/permission-catalog.ts";
+import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
@@ -19,8 +18,6 @@ import { InvitationStore } from "./store.ts";
 import { Member } from "../member/member.ts";
 import { MemberFacts } from "../member/facts.ts";
 import { MemberStore } from "../member/store.ts";
-import { Workspace } from "../workspace.ts";
-import { WorkspaceStore } from "../store.ts";
 
 export class NotFound extends Schema.TaggedError<NotFound>()("InvitationApplication.NotFound", {
   invitationId: Invitation.Id,
@@ -29,9 +26,6 @@ export class NotRecipient extends Schema.TaggedError<NotRecipient>()(
   "InvitationApplication.NotRecipient",
   { invitationId: Invitation.Id },
 ) {}
-export class NotOwner extends Schema.TaggedError<NotOwner>()("InvitationApplication.NotOwner", {
-  workspaceId: Workspace.Id,
-}) {}
 export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
   "InvitationApplication.AlreadyMember",
   { recipientId: Identity.HumanId },
@@ -54,16 +48,14 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 
 export type Error =
   | Authorization.Error
+  | Delegation.Error
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
   | InvitationStore.Failure
   | MemberStore.Failure
-  | WorkspaceStore.Failure
-  | PermissionCatalog.Unknown
   | NotFound
   | NotRecipient
-  | NotOwner
   | AlreadyMember
   | Unavailable
   | InvalidExpiry
@@ -96,24 +88,25 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   InvalidResponse,
   | InvitationStore.Service
   | MemberStore.Service
-  | WorkspaceStore.Service
   | Authorization.Service
-  | PermissionCatalog.Service
+  | Delegation.Service
   | Journal.Service
   | Crypto.Crypto
 > {
   const invitations = yield* InvitationStore.Service;
   const members = yield* MemberStore.Service;
-  const workspace = yield* WorkspaceStore.Service;
   const authorization = yield* Authorization.Service;
-  const catalog = yield* PermissionCatalog.Service;
+  const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = workspace.workspaceId;
+  const workspaceId = invitations.workspaceId;
   if (
-    [invitations.workspaceId, members.workspaceId, authorization.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
+    [
+      invitations.workspaceId,
+      members.workspaceId,
+      authorization.workspaceId,
+      delegation.workspaceId,
+    ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
       message: "Invitation services belong to different workspaces",
@@ -123,34 +116,12 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
-  // This is the first invitation grant policy: current ownership confers delegation
-  // authority. Possessing a permission alone never confers the right to grant it.
-  const authorizeOwner = Effect.fnUntraced(function* () {
+  const authorizeAccess = Effect.fn("InvitationApplication.authorizeAccess")(function* (
+    input: Invitation.IssueInput,
+  ) {
     yield* authorization.require([manage]);
-    const actor = yield* Actor.Service;
-    const found = yield* workspace.get;
-    if (Option.isNone(found) || found.value.id !== workspaceId)
-      return yield* new InvalidResponse({ message: "Workspace metadata is missing or mismatched" });
-    if (found.value.ownerMemberId !== actor.memberId) return yield* new NotOwner({ workspaceId });
-    return actor;
-  });
-  const validateGrants = Effect.fnUntraced(function* (grants: ReadonlyArray<Grant.Value>) {
-    const result: Array<Grant.Value> = [];
-    for (const grant of grants) {
-      const definition = yield* catalog.get(grant.permission);
-      const checked = yield* Schema.decodeEffect(Grant.makeSchema(definition))(grant);
-      const targetWorkspace =
-        checked.scope._tag === "Workspace"
-          ? checked.scope.workspaceId
-          : checked.scope.target.workspaceId;
-      if (targetWorkspace !== workspaceId)
-        return yield* new Authorization.WorkspaceMismatch({
-          expectedWorkspaceId: workspaceId,
-          actualWorkspaceId: targetWorkspace,
-        });
-      result.push(checked);
-    }
-    return result;
+    yield* delegation.requireGrant(input.roleId);
+    return yield* Actor.Service;
   });
   const load = Effect.fnUntraced(function* (id: Invitation.Id) {
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
@@ -173,12 +144,12 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   });
 
   const issue = Effect.fn("InvitationApplication.issue")(function* (input: Invitation.IssueInput) {
-    const actor = yield* authorizeOwner();
+    yield* authorization.require([manage]);
     const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input);
+    const actor = yield* authorizeAccess(request);
     const issuedAt = yield* DateTime.now;
     if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
     yield* requireUnjoined(request.recipientId);
-    const grants = yield* validateGrants(request.grants);
     const details: Invitation.Issuance = {
       id: Invitation.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
@@ -186,7 +157,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       issuedAt,
       expiresAt: request.expiresAt,
       recipientId: request.recipientId,
-      grants,
+      roleId: request.roleId,
     };
     yield* journal.publish(InvitationFacts.Issued, details);
     return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
@@ -229,14 +200,13 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
         reason: "membership-missing",
       });
     // Only this authority check uses the recorded inviter, never recipient input.
-    yield* authorizeOwner().pipe(
+    yield* authorizeAccess(details).pipe(
       Effect.provideService(Actor.Service, {
         workspaceId,
         memberId: details.inviterMemberId,
         identity: inviter.value.identity,
       }),
     );
-    const grants = yield* validateGrants(details.grants);
     const member: Member.Record = {
       id: Member.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
@@ -248,13 +218,15 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       workspaceId,
       identity: member.identity,
     });
-    for (const grant of grants)
-      yield* journal.publish(AssignmentFacts.Created, {
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        memberId: member.id,
-        source: Assignment.Source.cases.Direct.make({ grant }),
-      });
+    yield* journal.publish(AssignmentFacts.Created, {
+      assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+      workspaceId,
+      memberId: member.id,
+      source: Assignment.Source.cases.Role.make({
+        roleId: details.roleId,
+        scope: { _tag: "Workspace", workspaceId },
+      }),
+    });
     yield* journal.publish(InvitationFacts.Accepted, {
       _tag: "Accepted",
       workspaceId,
@@ -266,8 +238,9 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   }, journal.commit);
 
   const revoke = Effect.fn("InvitationApplication.revoke")(function* (id: Invitation.Id) {
-    const actor = yield* authorizeOwner();
+    yield* authorization.require([manage]);
     const invitation = yield* load(id);
+    const actor = yield* authorizeAccess(invitation.details);
     if (invitation.state._tag === "Revoked") return invitation;
     if (invitation.state._tag === "Accepted")
       return yield* new Unavailable({ invitationId: id, reason: "accepted" });

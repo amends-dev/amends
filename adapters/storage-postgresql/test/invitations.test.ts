@@ -1,11 +1,11 @@
 import { expect } from "bun:test";
-import { Grant, Scope, Target } from "@amends/core/authorization";
-import { Invitation, Member, MemberPermissions } from "@amends/core/workspace";
+import { BuiltinRoles } from "@amends/core/authorization";
+import { Invitation, Member } from "@amends/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 
 import { bob, workspaceId, views, inDatabase, initialized, setup } from "./support.ts";
 const { it, withDatabase } = await setup();
-it("invitations keep their grants, instants, and terminal states across settlement", async () =>
+it("invitations keep their roles, instants, and terminal states across settlement", async () =>
   withDatabase(async (url) => {
     await inDatabase(
       url,
@@ -13,37 +13,25 @@ it("invitations keep their grants, instants, and terminal states across settleme
         const bound = yield* (yield* views()).forWorkspace(workspaceId);
         const workspace = yield* initialized(bound);
         const issuedAt = yield* DateTime.now;
-        const grants = [
-          Grant.make(MemberPermissions.Read, Scope.Value.cases.Workspace.make({ workspaceId })),
-          Grant.make(
-            MemberPermissions.Remove,
-            Scope.Value.cases.Target.make({
-              target: Target.Reference.cases.Member.make({
-                workspaceId,
-                memberId: workspace.ownerMemberId,
-              }),
-            }),
-          ),
-        ];
-        const details = (id: string, granted = grants): Invitation.Issuance => ({
+        const details = (id: string, roleId = BuiltinRoles.ViewerId): Invitation.Issuance => ({
           id: Invitation.Id.make(id),
           workspaceId,
           recipientId: bob.id,
           inviterMemberId: workspace.ownerMemberId,
           issuedAt,
           expiresAt: DateTime.add(issuedAt, { hours: 1 }),
-          grants: granted,
+          roleId,
         });
         const memberId = Member.Id.make("joined");
         const settledAt = DateTime.add(issuedAt, { minutes: 5 });
-        const pending = (id: string, granted = grants): Invitation.Record => ({
-          details: details(id, granted),
+        const pending = (id: string, roleId = BuiltinRoles.ViewerId): Invitation.Record => ({
+          details: details(id, roleId),
           state: { _tag: "Pending" },
         });
         yield* bound.store.transaction(
           Effect.gen(function* () {
             yield* bound.invitations.insert(pending("first"));
-            yield* bound.invitations.insert(pending("second", []));
+            yield* bound.invitations.insert(pending("second", BuiltinRoles.AdministratorId));
             yield* bound.invitations.settle(Invitation.Id.make("first"), {
               _tag: "Accepted",
               memberId,

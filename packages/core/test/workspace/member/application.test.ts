@@ -4,6 +4,7 @@ import { AssignmentFacts } from "../../../src/authorization/assignment/facts.ts"
 import { AssignmentProjection } from "../../../src/authorization/assignment/projection.ts";
 import { AssignmentStore } from "../../../src/authorization/assignment/store.ts";
 import { Assignment } from "../../../src/authorization/assignment/assignment.ts";
+import { Delegation } from "../../../src/authorization/delegation.ts";
 import { Authorization } from "../../../src/authorization/authorization.ts";
 import { GrantResolver } from "../../../src/authorization/grant-resolver.ts";
 import { Grant } from "../../../src/authorization/grant.ts";
@@ -107,9 +108,12 @@ const configured = (
     insert: () => Effect.die("Invitation insertion is not used in these member tests"),
     settle: () => Effect.die("These member tests have no pending invitations"),
   });
+  const delegation = Delegation.layer.pipe(
+    Layer.provide(Layer.mergeAll(services, workspace, host)),
+  );
   // Keep the journal available to exercise reads inside an outer application commit.
   return MemberApplication.layer.pipe(
-    Layer.provideMerge(Layer.mergeAll(services, workspace, invitations)),
+    Layer.provideMerge(Layer.mergeAll(services, workspace, invitations, delegation)),
     Layer.provide(members),
   );
 };
@@ -127,6 +131,7 @@ const run = <A, E>(
     | MemberApplication.Service
     | Journal.Service
     | Authorization.Service
+    | Delegation.Service
     | WorkspaceStore.Service
     | InvitationStore.Service
     | Actor.Service
@@ -166,6 +171,7 @@ test("member reads require only the current actor and leave the journal unchange
     | WorkspaceStore.Service
     | InvitationStore.Service
     | Authorization.Service
+    | Delegation.Service
     | Journal.Service
   >();
   expectTypeOf<

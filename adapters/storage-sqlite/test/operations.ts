@@ -1,4 +1,5 @@
 import { Identity } from "@amends/core/identity";
+import { Assignment, AssignmentApplication } from "@amends/core/authorization";
 import {
   Invitation,
   InvitationApplication,
@@ -88,3 +89,55 @@ export const revokeInvitation = (
   );
 
 export * as Operations from "./operations.ts";
+
+export const access = (
+  workspaceId: Workspace.Id,
+  identity: Identity.Reference,
+  memberId: Member.Id,
+) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(AssignmentApplication.Service, (service) => service.list(memberId)),
+    ),
+  );
+export const assign = (
+  workspaceId: Workspace.Id,
+  identity: Identity.Reference,
+  input: Assignment.AssignInput,
+) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(AssignmentApplication.Service, (service) => service.assign(input)),
+    ),
+  );
+export const change = (
+  workspaceId: Workspace.Id,
+  identity: Identity.Reference,
+  input: Assignment.ChangeInput,
+) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(AssignmentApplication.Service, (service) => service.change(input)),
+    ),
+  );
+export const revokeAssignment = (
+  workspaceId: Workspace.Id,
+  identity: Identity.Reference,
+  memberId: Member.Id,
+  assignmentId: Assignment.Id,
+) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(AssignmentApplication.Service, (service) =>
+        service.revoke(memberId, assignmentId),
+      ),
+    ),
+  );

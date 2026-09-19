@@ -27,6 +27,7 @@ export class MembersGroup extends HttpApiGroup.make("members")
         ApiErrors.MemberNotFound,
         ApiErrors.OwnerProtected,
         ApiErrors.AlreadyRemoved,
+        ...ApiErrors.delegation,
       ],
     }),
   )

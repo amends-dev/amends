@@ -1,3 +1,4 @@
+import { BuiltinRoles } from "@amends/core/authorization";
 import { Key } from "@solid-primitives/keyed";
 import type { Invitation } from "@amends/core/workspace";
 import {
@@ -72,13 +73,7 @@ export function InvitationList() {
                         />
                       }
                       supportingText={describe(invitation())}
-                      metadata={
-                        invitation().details.grants.length === 0
-                          ? "no permissions"
-                          : `grants ${invitation()
-                              .details.grants.map((grant) => grant.permission)
-                              .join(", ")}`
-                      }
+                      metadata={BuiltinRoles.nameOf(invitation().details.roleId)}
                       actions={
                         <Show when={stateOf(invitation(), now()) === "pending"}>
                           <RevokeInvitationButton invitationId={invitation().details.id} />

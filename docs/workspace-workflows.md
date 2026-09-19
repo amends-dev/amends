@@ -38,7 +38,9 @@ exact grant sees that member. `GET …/members/:memberId` reads one.
 status `removed`. Core requires `member.remove` on that member; `member.read`
 is not required. Both workspace and exact-member grants work. Humans and agents
 follow the same rules. An authorized non-owner may remove their own membership.
-Ownership alone does not authorize removal, and the current owner cannot be
+Administrators can remove ordinary Viewer-only or unassigned members, but only the
+owner can remove another administrator or a member with additional access. An authorized
+non-owner can still leave. Ownership alone does not authorize removal, and the current owner cannot be
 removed even by an otherwise authorized member. Ownership transfer is a
 separate, unimplemented workflow.
 
@@ -57,40 +59,36 @@ The membership and its assignments remain historical records. Active-membership
 checks deny subsequent operations, including calls with an actor resolved before
 removal. Authorized readers can still inspect the removed record. Other workspace
 memberships are unaffected. An old accepted invitation cannot restore access;
-rejoining creates a fresh member ID with only the new invitation's grants.
+rejoining creates a fresh member ID with the new invitation's role.
 
 ## Invitations
 
 `POST /workspaces/:id/invitations` issues an invitation to an address with an
-ISO expiry in the future and a list of grants with workspace scope:
+ISO expiry in the future and a required built-in role:
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","grants":[{"permission":"member.read","scope":{"_tag":"Workspace","workspaceId":"<workspace-id>"}}]}' \
+  -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","roleId":"builtin:viewer"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations
 curl -X POST -H 'Authorization: Bearer bob' http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
 ```
 
-The response carries the invitation ID under `details.id`. The core API also
-accepts exact-target scopes. Only registered permissions with compatible scopes
-in this workspace are accepted; anything else is `Gateway.InvalidInput`. Expiry
-is required and must follow issuance; acceptance at the exact deadline fails.
-`GET …/invitations` lists every invitation in the workspace for holders of
-`invitation.manage`.
+The response carries the invitation ID under `details.id` and the selected role
+under `details.roleId`. Expiry must follow issuance; acceptance at the exact
+deadline fails. Invitations require a role and always assign it at workspace scope.
+There is no direct-grant or optional-role invitation path.
 
-The current active owner must hold `invitation.manage` on the workspace to issue
-or revoke invitations. Ownership separately authorizes selecting initial grants;
-holding `invitation.manage` alone does not let another member grant access. This
-first policy lets the owner select valid direct grants independently of which
-permissions they personally hold. Role assignments through invitations remain
-later work.
+Issuance and revocation require `invitation.manage` and `assignment.manage` on the
+workspace. The shared delegation policy allows the owner to select Viewer or
+Administrator, and other authorized administrators to select Viewer. Owner cannot
+be granted through an invitation. `GET …/invitations` requires `invitation.manage`.
 
-Only the named authenticated human can accept. Acceptance rechecks that the
-original inviter is still the active owner and still has invitation permission,
-then creates the membership and exact stored grants and consumes the invitation
-in one commit. The recipient does not need an existing workspace actor.
-Invitations use stable human IDs; email delivery and inviting an unregistered
-email address are outside this local workflow.
+Only the named authenticated human can accept. Acceptance rechecks the original
+inviter's active membership, permissions, and current authority to delegate the
+referenced role. It commits membership, a role assignment, and acceptance together.
+The role's current stored permissions apply; they are not copied into direct grants.
+Invitations use stable human IDs; email delivery and unregistered email addresses
+remain outside this local workflow.
 
 Already-active members cannot be invited or accept a second invitation. Multiple
 pending invitations may exist, but only one can establish an active membership.
@@ -103,6 +101,35 @@ reactivates it. Rejoining requires a fresh invitation and membership.
 Repeating revocation is harmless. Revocation cannot undo an accepted membership;
 use member removal for that. Expiry is checked against the clock, so no
 background task is required to change expired rows.
+
+## Assignments and delegation
+
+`GET /workspaces/:workspaceId/roles` lists the stored built-in roles with an
+`assignable` flag for the current actor. It requires active membership.
+`GET …/members/:memberId/assignments` requires `assignment.read` on that member
+and returns active assignments, role choices, and `canManage`. Removed memberships
+remain readable but cannot receive or change assignments.
+
+All assignment mutations require `assignment.manage` on the workspace:
+
+- `POST …/assignments` accepts `{ memberId, roleId }` and adds a workspace role.
+  Repeating the same active assignment returns it without another journal fact.
+- `DELETE …/members/:memberId/assignments/:assignmentId` revokes one assignment.
+  Repeating revocation is harmless after current authorization and recipient checks.
+- `PUT …/assignments` accepts `{ memberId, roleId, expectedAssignmentIds }`. The IDs
+  must match all current workspace-scoped role assignments. A stale form receives
+  HTTP 409. Revoking previous roles and assigning the replacement share one commit.
+  Direct grants and exact-target assignments are preserved and displayed separately.
+
+The owner can manage Viewer and Administrator access. Other holders of management
+permission can manage only Viewer-only or unassigned recipients. Direct grants and
+unfamiliar roles require the owner. The Owner assignment and owner membership are
+protected from these mutations, including attempts by the owner. Ownership transfer
+and custom-role management remain separate, unimplemented workflows.
+
+The web member details show actual assignments with revoke and change-role controls
+when permitted. Refresh access after a stale-change error before submitting again.
+Invitation forms offer role choices from the same backend policy.
 
 ## Initialization
 
@@ -120,16 +147,15 @@ Each registered permission declares a required `builtinTier`. Viewer includes
 `viewer` permissions, Administrator also includes `administrator` permissions,
 and Owner includes all three tiers, including `owner`. The current bundles are:
 
-| Role          | Stored permissions                                  |
-| ------------- | --------------------------------------------------- |
-| Viewer        | `member.read`                                       |
-| Administrator | `member.read`, `member.remove`, `invitation.manage` |
-| Owner         | `member.read`, `member.remove`, `invitation.manage` |
+| Role          | Stored permissions                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| Viewer        | `member.read`, `assignment.read`                                                            |
+| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage` |
+| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage` |
 
 Administrator and Owner currently contain the same permission names because no
-owner-tier actions have been implemented. Invitation issuance and revocation still
-require current ownership in addition to `invitation.manage`. Role assignment APIs,
-role-based invitations, delegated administration, and ownership transfer remain future work.
+owner-tier actions have been implemented. Delegation separately reserves administrator
+management for the current owner. Ownership transfer remains future work.
 
 Role IDs are stable within each workspace: `builtin:viewer`, `builtin:administrator`,
 and `builtin:owner`. These identities are reserved for built-in definitions. Tiers
@@ -143,3 +169,11 @@ Initialization requires an absent workspace record. A repeated call returns
 `WorkspaceInitialization.AlreadyInitialized` without replacing ownership or
 granting more access. A failed projection or checkpoint rolls back the entire
 initialization. Concurrent initializers serialize or receive a storage conflict.
+
+## Development data
+
+The required-role invitation schema replaces the earlier direct-grant model. This
+development change requires fresh SQLite and PostgreSQL development data. It does
+not translate old invitation grants into roles or reset databases on startup.
+Fact and projection versions remain at 1 during development; versioned compatibility
+will be introduced when production data needs to be preserved.

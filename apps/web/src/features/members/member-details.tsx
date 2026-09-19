@@ -6,6 +6,7 @@ import { useQuery } from "../../api/hooks.ts";
 import { QueryView } from "../../components/query-view.tsx";
 import { useWorkspace } from "../../workspace/context.tsx";
 import { RemoveMemberButton } from "./remove-member-button.tsx";
+import { MemberAccess } from "./member-access.tsx";
 type Props = { memberId: Member.Id; onRemoved?: ((memberId: Member.Id) => void) | undefined };
 export function MemberDetails(props: Props) {
   const membership = useWorkspace();
@@ -36,13 +37,10 @@ function Details(props: Props) {
                 { label: "membership", value: member().id },
                 { label: "identity", value: `${member().identity._tag} ${member().identity.id}` },
                 { label: "status", value: member().status },
-                {
-                  label: "role",
-                  value: member().id === membership().workspace.ownerMemberId ? "owner" : "member",
-                },
               ]}
             />
           </Section>
+          <MemberAccess memberId={member().id} />
           <Show when={member().status === "active"}>
             <RemoveMemberButton memberId={member().id} onRemoved={props.onRemoved} />
           </Show>

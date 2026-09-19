@@ -1,3 +1,4 @@
+import { Assignment, BuiltinRoles } from "@amends/core/authorization";
 import { expect, test } from "bun:test";
 import { Identity } from "@amends/core/identity";
 import { Invitation, Member, Workspace } from "@amends/core/workspace";
@@ -18,6 +19,105 @@ const temporary = async (run: (filename: string) => Promise<void>) => {
     await rm(directory, { recursive: true, force: true });
   }
 };
+
+test("role invitations and assignment endpoints enforce required roles, delegation, and stale changes", async () =>
+  temporary(async (filename) =>
+    withServer(filename, async (call) => {
+      const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+        (await call(alice.id, "POST", "/workspaces", { name: "Roles" })).body,
+      );
+      const base = `/workspaces/${workspace.id}`;
+      const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
+      expect(
+        (await call(alice.id, "POST", `${base}/invitations`, { recipientId: bob.id, expiresAt }))
+          .status,
+      ).toBe(400);
+      expect(
+        (
+          await call(alice.id, "POST", `${base}/invitations`, {
+            recipientId: bob.id,
+            expiresAt,
+            roleId: BuiltinRoles.OwnerId,
+          })
+        ).status,
+      ).toBe(409);
+      const issued = await call(alice.id, "POST", `${base}/invitations`, {
+        recipientId: bob.id,
+        expiresAt,
+        roleId: BuiltinRoles.ViewerId,
+      });
+      const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
+      const joined = Schema.decodeUnknownSync(Member.Record)(
+        (await call(bob.id, "POST", `${base}/invitations/${invitation.details.id}/accept`)).body,
+      );
+      const listing = Schema.decodeUnknownSync(Assignment.Access)(
+        (await call(alice.id, "GET", `${base}/members/${joined.id}/assignments`)).body,
+      );
+      expect(listing.canManage).toBe(true);
+      const input = {
+        memberId: joined.id,
+        roleId: BuiltinRoles.AdministratorId,
+        expectedAssignmentIds: listing.assignments.map(({ id }) => id),
+      };
+      const changed = await call(alice.id, "PUT", `${base}/assignments`, input);
+      expect(changed.status).toBe(200);
+      const assignment = Schema.decodeUnknownSync(Assignment.Record)(changed.body);
+      expect((await call(alice.id, "PUT", `${base}/assignments`, input)).status).toBe(409);
+      const choices = Schema.decodeUnknownSync(Schema.Array(Assignment.RoleChoice))(
+        (await call(bob.id, "GET", `${base}/roles`)).body,
+      );
+      expect(choices.filter(({ assignable }) => assignable).map(({ role }) => role.id)).toEqual([
+        BuiltinRoles.ViewerId,
+      ]);
+      expect(
+        (
+          await call(bob.id, "POST", `${base}/invitations`, {
+            recipientId: charlie.id,
+            expiresAt,
+            roleId: BuiltinRoles.AdministratorId,
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await call(bob.id, "POST", `${base}/invitations`, {
+            recipientId: charlie.id,
+            expiresAt,
+            roleId: BuiltinRoles.ViewerId,
+          })
+        ).status,
+      ).toBe(201);
+      expect(
+        (
+          await call(alice.id, "POST", `${base}/assignments`, {
+            memberId: joined.id,
+            roleId: BuiltinRoles.AdministratorId,
+          })
+        ).body,
+      ).toEqual(changed.body);
+      expect(
+        (
+          await call(
+            alice.id,
+            "DELETE",
+            `${base}/members/${joined.id}/assignments/${assignment.id}`,
+          )
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await call(
+            alice.id,
+            "DELETE",
+            `${base}/members/${joined.id}/assignments/${assignment.id}`,
+          )
+        ).status,
+      ).toBe(200);
+      expect((await call(bob.id, "GET", `${base}/members/${joined.id}/assignments`)).status).toBe(
+        403,
+      );
+    }),
+  ));
 
 test("workspace creation requires a name and preserves it across server restarts", async () =>
   temporary(async (filename) => {
@@ -71,9 +171,7 @@ test("invitation, acceptance, revocation, and removal survive separate server pr
       const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
         recipientId: bob.id,
         expiresAt,
-        grants: [
-          { permission: "member.read", scope: { _tag: "Workspace", workspaceId: workspace.id } },
-        ],
+        roleId: BuiltinRoles.ViewerId,
       });
       expect(issued.status).toBe(201);
       const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
@@ -98,7 +196,7 @@ test("invitation, acceptance, revocation, and removal survive separate server pr
       const issuedAgain = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
         recipientId: charlie.id,
         expiresAt,
-        grants: [],
+        roleId: BuiltinRoles.ViewerId,
       });
       expect(issuedAgain.status).toBe(201);
       const second = Schema.decodeUnknownSync(Invitation.Record)(issuedAgain.body);

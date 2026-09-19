@@ -50,4 +50,21 @@ export const Record = Schema.Struct({
 }).check(SourceInWorkspace);
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
+/** Built-in role assignments created by application operations always cover the workspace. */
+export const AssignInput = Schema.Struct({ memberId: Member.Id, roleId: Role.Id });
+export interface AssignInput extends Schema.Schema.Type<typeof AssignInput> {}
+export const ChangeInput = Schema.Struct({
+  ...AssignInput.fields,
+  expectedAssignmentIds: Schema.UniqueArray(Id),
+});
+export interface ChangeInput extends Schema.Schema.Type<typeof ChangeInput> {}
+export const RoleChoice = Schema.Struct({ role: Role.Record, assignable: Schema.Boolean });
+export interface RoleChoice extends Schema.Schema.Type<typeof RoleChoice> {}
+export const Access = Schema.Struct({
+  assignments: Schema.Array(Record),
+  roles: Schema.Array(RoleChoice),
+  canManage: Schema.Boolean,
+});
+export interface Access extends Schema.Schema.Type<typeof Access> {}
+
 export * as Assignment from "./assignment.ts";

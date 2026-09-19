@@ -1,6 +1,6 @@
-import { Grant, Scope } from "@amends/core/authorization";
+import { BuiltinRoles, Scope, type Role } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
-import { Invitation, MemberPermissions, Workspace } from "@amends/core/workspace";
+import { Invitation, Workspace } from "@amends/core/workspace";
 import type { Gateway } from "@amends/gateway";
 import { Clock, DateTime, Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql";
@@ -18,13 +18,14 @@ export const runHost = <A, E>(
 export const scope = (workspaceId: Workspace.Id) =>
   Scope.Value.cases.Workspace.make({ workspaceId });
 export const request = (
-  workspaceId: Workspace.Id,
+  _workspaceId: Workspace.Id,
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
+  roleId: Role.Id = BuiltinRoles.ViewerId,
 ): Invitation.IssueInput => ({
   recipientId,
   expiresAt,
-  grants: [Grant.make(MemberPermissions.Read, scope(workspaceId))],
+  roleId,
 });
 export const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
 export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>) =>

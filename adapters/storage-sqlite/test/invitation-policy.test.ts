@@ -1,12 +1,7 @@
 import { expect, test } from "bun:test";
-import { AssignmentFacts, BuiltinRoles, Grant, Permission } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles, Role } from "@amends/core/authorization";
 import { Journal, Log } from "@amends/core/journal";
-import {
-  InvitationPermissions,
-  MemberFacts,
-  MemberPermissions,
-  Workspace,
-} from "@amends/core/workspace";
+import { MemberFacts } from "@amends/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { Operations } from "./operations.ts";
@@ -18,7 +13,6 @@ import {
   core,
   runHost,
   temporary,
-  scope,
   request,
   future,
   boundTo,
@@ -86,7 +80,7 @@ test("expiry is checked against the operation clock, including the exact deadlin
     );
   }));
 
-test("holding invitation permission does not confer ownership-based grant authority", async () =>
+test("administrators can invite viewers but cannot invite administrators or owners", async () =>
   temporary(async (filename) => {
     await runHost(
       filename,
@@ -95,14 +89,32 @@ test("holding invitation permission does not confer ownership-based grant author
         const invitation = yield* Operations.invite(workspace.id, alice, {
           recipientId: bob.id,
           expiresAt: yield* future,
-          grants: [Grant.make(InvitationPermissions.Manage, scope(workspace.id))],
+          roleId: BuiltinRoles.AdministratorId,
         });
         yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
         expect(
           yield* Effect.flip(
-            Operations.invite(workspace.id, bob, request(workspace.id, yield* future, charlie.id)),
+            Operations.invite(
+              workspace.id,
+              bob,
+              request(workspace.id, yield* future, charlie.id, BuiltinRoles.AdministratorId),
+            ),
           ),
-        ).toMatchObject({ _tag: "InvitationApplication.NotOwner" });
+        ).toMatchObject({ _tag: "Delegation.Denied" });
+        yield* Operations.invite(
+          workspace.id,
+          bob,
+          request(workspace.id, yield* future, charlie.id),
+        );
+        expect(
+          yield* Effect.flip(
+            Operations.invite(
+              workspace.id,
+              bob,
+              request(workspace.id, yield* future, charlie.id, BuiltinRoles.OwnerId),
+            ),
+          ),
+        ).toMatchObject({ _tag: "Delegation.OwnerProtected" });
       }),
     );
   }));
@@ -117,7 +129,7 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
           const invitation = yield* Operations.invite(
             workspace.id,
             alice,
-            request(workspace.id, yield* future),
+            request(workspace.id, yield* future, bob.id, BuiltinRoles.AdministratorId),
           );
           const bound = yield* boundTo(workspace.id);
           if (change === "permission") {
@@ -152,7 +164,7 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
               ? "Authorization.Denied"
               : change === "membership"
                 ? "Authorization.InvalidActor"
-                : "InvitationApplication.NotOwner",
+                : "Delegation.Denied",
           );
           expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
           expect(yield* bound.invitations.get(invitation.details.id)).toMatchObject({
@@ -164,29 +176,21 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
     );
   }));
 
-test("invalid grant names, target kinds, and foreign scopes never publish an invitation", async () =>
-  temporary(async (filename) => {
-    await runHost(
+test("unsupported and Owner roles never publish an invitation", async () =>
+  temporary(async (filename) =>
+    runHost(
       filename,
       Effect.gen(function* () {
         const workspace = yield* Operations.createWorkspace(alice.id);
         const bound = yield* boundTo(workspace.id);
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
-        const invalid: ReadonlyArray<Grant.Value> = [
-          { permission: Permission.Name.make("unknown.permission"), scope: scope(workspace.id) },
-          { permission: MemberPermissions.Read.name, scope: scope(Workspace.Id.make("foreign")) },
-          {
-            permission: MemberPermissions.Read.name,
-            scope: { _tag: "Target", target: { _tag: "Workspace", workspaceId: workspace.id } },
-          },
-        ];
-        for (const grant of invalid) {
+        for (const roleId of [Role.Id.make("unknown"), BuiltinRoles.OwnerId]) {
           yield* Effect.flip(
-            Operations.invite(workspace.id, alice, {
-              recipientId: bob.id,
-              grants: [grant],
-              expiresAt: yield* future,
-            }),
+            Operations.invite(
+              workspace.id,
+              alice,
+              request(workspace.id, yield* future, bob.id, roleId),
+            ),
           );
           expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
         }
@@ -196,40 +200,5 @@ test("invalid grant names, target kinds, and foreign scopes never publish an inv
           ),
         ).toMatchObject({ _tag: "InvitationApplication.AlreadyMember" });
       }),
-    );
-  }));
-
-test("exact-target grants remain limited to that member after acceptance", async () =>
-  temporary(async (filename) => {
-    await runHost(
-      filename,
-      Effect.gen(function* () {
-        const workspace = yield* Operations.createWorkspace(alice.id);
-        const invitation = yield* Operations.invite(workspace.id, alice, {
-          recipientId: bob.id,
-          expiresAt: yield* future,
-          grants: [
-            Grant.make(MemberPermissions.Read, {
-              _tag: "Target",
-              target: {
-                _tag: "Member",
-                workspaceId: workspace.id,
-                memberId: workspace.ownerMemberId,
-              },
-            }),
-          ],
-        });
-        const member = yield* Operations.acceptInvitation(
-          workspace.id,
-          bob.id,
-          invitation.details.id,
-        );
-        yield* Operations.getMember(workspace.id, bob, workspace.ownerMemberId);
-        expect(
-          yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
-        ).toMatchObject({
-          _tag: "Authorization.Denied",
-        });
-      }),
-    );
-  }));
+    ),
+  ));

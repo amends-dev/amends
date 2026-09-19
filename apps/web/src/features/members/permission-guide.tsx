@@ -1,15 +1,23 @@
 import { InvitationPermissions, MemberPermissions } from "@amends/core/workspace";
-import type { Permission } from "@amends/core/authorization";
+import { AssignmentPermissions, type Permission } from "@amends/core/authorization";
 import { DescriptionList, Section, Text } from "@amends/ui/components";
 export const permissions: ReadonlyArray<{
   definition: Permission.Definition;
   description: string;
 }> = [
   { definition: MemberPermissions.Read, description: "Read memberships in the workspace." },
-  { definition: MemberPermissions.Remove, description: "Remove members other than the owner." },
+  {
+    definition: MemberPermissions.Remove,
+    description: "Remove members within your delegation authority, or leave.",
+  },
   {
     definition: InvitationPermissions.Manage,
-    description: "Issue and revoke invitations, as the owner.",
+    description: "Issue and revoke invitations within your delegation authority.",
+  },
+  { definition: AssignmentPermissions.Read, description: "Read a member's access assignments." },
+  {
+    definition: AssignmentPermissions.Manage,
+    description: "Assign, revoke, or change roles within your delegation authority.",
   },
 ];
 
@@ -23,8 +31,8 @@ export function PermissionGuide() {
         }))}
       />
       <Text variant="caption">
-        Every operation names the permission it needs and the member it targets. The owner receives
-        these three at creation; invitations grant them explicitly.
+        Operations check permissions on their targets. The creator receives the Owner role;
+        invitations assign a role when accepted. Delegation rules protect owners and administrators.
       </Text>
     </Section>
   );

@@ -1,5 +1,6 @@
 import { HttpApi, OpenApi } from "effect/unstable/httpapi";
 import { InvitationsGroup } from "./invitations.ts";
+import { AssignmentsGroup } from "./assignments.ts";
 import { MeGroup } from "./me.ts";
 import { MembersGroup } from "./members.ts";
 import { SessionGroup } from "./session.ts";
@@ -12,4 +13,5 @@ export class Api extends HttpApi.make("amends")
   .add(WorkspacesGroup)
   .add(MembersGroup)
   .add(InvitationsGroup)
+  .add(AssignmentsGroup)
   .annotateMerge(OpenApi.annotations({ title: "Amends API" })) {}

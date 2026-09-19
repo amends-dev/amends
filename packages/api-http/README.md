@@ -46,14 +46,18 @@ so a client can import the complete contract without loading server code.
   non-empty, and trimmed; the returned `Workspace.Record` includes it.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
+- `assignments`: `GET …/roles` lists built-in role choices;
+  `GET …/members/:memberId/assignments` reads access; `POST …/assignments` adds a role;
+  `PUT …/assignments` atomically replaces workspace roles with an expected assignment-ID
+  set; `DELETE …/members/:memberId/assignments/:assignmentId` revokes access.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;
-  `POST` to the same path issues one. `POST …/:invitationId/accept` and
+  `POST` to the same path issues one with required `recipientId`, `roleId`, and `expiresAt`. `POST …/:invitationId/accept` and
   `POST …/:invitationId/revoke` change state.
 
 Workspace IDs travel in the path so a host can route a request to the right
 workspace before reading its body. Status codes follow `ApiErrors`: not a member,
-denied, not owner, and not recipient are 403; missing records are 404; ownership
-protection, repeated removal, existing membership, and storage conflicts are 409;
+denied delegation and wrong recipients are 403; missing records are 404; ownership
+protection, stale assignment changes, inactive recipients, repeated removal, existing membership, and storage conflicts are 409;
 consumed or expired invitations are 410; rejected input, expiry, or permission
 names are 400; and an uncertain commit is 500 with its commit ID.
 

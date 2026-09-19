@@ -1,9 +1,8 @@
-import { Invitation, MemberPermissions } from "@amends/core/workspace";
-import type { Permission } from "@amends/core/authorization";
+import { Invitation } from "@amends/core/workspace";
+import { BuiltinRoles, Role } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
 import {
   Button,
-  Checkbox,
   Field,
   FormActions,
   FormLayout,
@@ -13,12 +12,12 @@ import {
   TextField,
 } from "@amends/ui/components";
 import { DateTime, Exit, Schema } from "effect";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { Invitations } from "../../api/invitations.ts";
-import { useCommand } from "../../api/hooks.ts";
-import { CommandError } from "../../components/query-view.tsx";
+import { useCommand, useQuery } from "../../api/hooks.ts";
+import { CommandError, QueryView } from "../../components/query-view.tsx";
 import { useWorkspace } from "../../workspace/context.tsx";
-import { permissions } from "../members/permission-guide.tsx";
+import { Assignments } from "../../api/assignments.ts";
 const day = (value: DateTime.Utc) => DateTime.formatIsoDate(value);
 export function IssueInvitationForm() {
   const membership = useWorkspace();
@@ -35,15 +34,10 @@ function IssueForm() {
   const opened = useWorkspace();
   const [recipient, setRecipient] = createSignal("");
   const [days, setDays] = createSignal("7");
-  const [granted, setGranted] = createSignal<ReadonlyArray<Permission.Name>>([
-    MemberPermissions.Read.name,
-  ]);
+  const [roleId, setRoleId] = createSignal(BuiltinRoles.ViewerId);
+  const roles = useQuery(() => Assignments.roles(opened().workspace.id));
   const issuance = useCommand(Invitations.makeIssue());
   const [issued, setIssued] = createSignal<Invitation.Record>();
-  const toggle = (name: Permission.Name, on: boolean) =>
-    setGranted((current) =>
-      on ? [...current.filter((n) => n !== name), name] : current.filter((n) => n !== name),
-    );
   const submit = async (event: SubmitEvent) => {
     event.preventDefault();
     if (issuance.pending()) return;
@@ -55,10 +49,7 @@ function IssueForm() {
       payload: {
         recipientId: address,
         expiresAt: DateTime.add(DateTime.nowUnsafe(), { days: Number(days()) }),
-        grants: granted().map((permission) => ({
-          permission,
-          scope: { _tag: "Workspace" as const, workspaceId: opened().workspace.id },
-        })),
+        roleId: roleId(),
       },
     });
     if (exit && Exit.isSuccess(exit)) {
@@ -68,55 +59,62 @@ function IssueForm() {
   };
   return (
     <Section title="New invitation">
-      <FormLayout onSubmit={(event) => void submit(event)}>
-        <Field
-          label="Address"
-          description="The email they sign in with. One address is one identity."
-          required
-        >
-          <TextField
-            type="email"
-            autocomplete="off"
-            value={recipient()}
-            readOnly={issuance.pending()}
-            onInput={(event) => setRecipient(event.currentTarget.value)}
-          />
-        </Field>
-        <RadioCardGroup
-          label="Expires"
-          disabled={issuance.pending()}
-          value={days()}
-          onChange={setDays}
-          options={[
-            { value: "7", label: "7 days" },
-            { value: "30", label: "30 days" },
-          ]}
-        />
-        <Field label="Permissions" description="Granted with workspace scope when they accept.">
-          <div>
-            <For each={permissions}>
-              {(permission) => (
-                <Checkbox
-                  label={permission.definition.name}
-                  disabled={issuance.pending()}
-                  description={permission.description}
-                  checked={granted().includes(permission.definition.name)}
-                  onChange={(event) =>
-                    toggle(permission.definition.name, event.currentTarget.checked)
+      <QueryView result={roles.result()} retry={roles.refresh} loading="Loading roles…">
+        {(choices) => (
+          <FormLayout onSubmit={(event) => void submit(event)}>
+            <Field
+              label="Address"
+              description="The email they sign in with. One address is one identity."
+              required
+            >
+              <TextField
+                type="email"
+                autocomplete="off"
+                value={recipient()}
+                readOnly={issuance.pending()}
+                onInput={(event) => setRecipient(event.currentTarget.value)}
+              />
+            </Field>
+            <RadioCardGroup
+              label="Expires"
+              disabled={issuance.pending()}
+              value={days()}
+              onChange={setDays}
+              options={[
+                { value: "7", label: "7 days" },
+                { value: "30", label: "30 days" },
+              ]}
+            />
+            <RadioCardGroup
+              label="Role"
+              disabled={issuance.pending()}
+              value={roleId()}
+              onChange={(value) => setRoleId(Role.Id.make(value))}
+              options={choices()
+                .filter(({ role }) => role.id !== BuiltinRoles.OwnerId)
+                .map(({ role, assignable }) => ({
+                  value: role.id,
+                  label: role.name,
+                  disabled: !assignable,
+                }))}
+            />
+            <FormActions
+              primary={
+                <Button
+                  type="submit"
+                  pending={issuance.pending()}
+                  disabled={
+                    !recipient().trim() ||
+                    !choices().some((choice) => choice.role.id === roleId() && choice.assignable)
                   }
-                />
-              )}
-            </For>
-          </div>
-        </Field>
-        <FormActions
-          primary={
-            <Button type="submit" pending={issuance.pending()} disabled={!recipient().trim()}>
-              issue the invitation
-            </Button>
-          }
-        />
-      </FormLayout>
+                >
+                  issue the invitation
+                </Button>
+              }
+            />
+          </FormLayout>
+        )}
+      </QueryView>
       <Show when={issued()}>
         {(invitation) => (
           <Notice live="polite">

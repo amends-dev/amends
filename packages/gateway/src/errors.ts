@@ -1,4 +1,9 @@
-import { Authorization, PermissionCatalog } from "@amends/core/authorization";
+import {
+  AssignmentApplication,
+  Authorization,
+  Delegation,
+  PermissionCatalog,
+} from "@amends/core/authorization";
 import { Commit } from "@amends/core/journal";
 import { InvitationApplication, MemberApplication, Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
@@ -38,12 +43,19 @@ export const PublicError = Schema.Union([
   Authorization.Denied,
   Authorization.InvalidActor,
   PermissionCatalog.Unknown,
+  Delegation.Denied,
+  Delegation.OwnerProtected,
+  Delegation.UnsupportedRole,
+  Delegation.RoleNotFound,
+  AssignmentApplication.NotFound,
+  AssignmentApplication.MemberNotFound,
+  AssignmentApplication.InactiveMember,
+  AssignmentApplication.Changed,
   MemberApplication.NotFound,
   MemberApplication.OwnerProtected,
   MemberApplication.AlreadyRemoved,
   InvitationApplication.NotFound,
   InvitationApplication.NotRecipient,
-  InvitationApplication.NotOwner,
   InvitationApplication.AlreadyMember,
   InvitationApplication.Unavailable,
   InvitationApplication.InvalidExpiry,

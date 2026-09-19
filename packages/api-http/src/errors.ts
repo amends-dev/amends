@@ -1,4 +1,9 @@
-import { Authorization, PermissionCatalog } from "@amends/core/authorization";
+import {
+  AssignmentApplication,
+  Authorization,
+  Delegation,
+  PermissionCatalog,
+} from "@amends/core/authorization";
 import { InvitationApplication, MemberApplication } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
 import { Schema } from "effect";
@@ -27,7 +32,6 @@ export const OwnerProtected = MemberApplication.OwnerProtected.pipe(HttpApiSchem
 export const AlreadyRemoved = MemberApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409));
 export const InvitationNotFound = InvitationApplication.NotFound.pipe(HttpApiSchema.status(404));
 export const NotRecipient = InvitationApplication.NotRecipient.pipe(HttpApiSchema.status(403));
-export const InvitationNotOwner = InvitationApplication.NotOwner.pipe(HttpApiSchema.status(403));
 export const AlreadyMember = InvitationApplication.AlreadyMember.pipe(HttpApiSchema.status(409));
 export const InvitationUnavailable = InvitationApplication.Unavailable.pipe(
   HttpApiSchema.status(410),
@@ -35,6 +39,19 @@ export const InvitationUnavailable = InvitationApplication.Unavailable.pipe(
 export const InvitationInvalidExpiry = InvitationApplication.InvalidExpiry.pipe(
   HttpApiSchema.status(400),
 );
+export const delegation = [
+  Delegation.Denied.pipe(HttpApiSchema.status(403)),
+  Delegation.OwnerProtected.pipe(HttpApiSchema.status(409)),
+  Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
+  Delegation.RoleNotFound.pipe(HttpApiSchema.status(404)),
+] as const;
+export const assignment = [
+  ...delegation,
+  AssignmentApplication.NotFound.pipe(HttpApiSchema.status(404)),
+  AssignmentApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  AssignmentApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
+  AssignmentApplication.Changed.pipe(HttpApiSchema.status(409)),
+] as const;
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [

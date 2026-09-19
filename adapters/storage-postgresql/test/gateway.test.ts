@@ -1,5 +1,5 @@
 import { expect } from "bun:test";
-import { BuiltinRoles, Grant, Scope, Target } from "@amends/core/authorization";
+import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
 import {
   InvitationApplication,
@@ -35,27 +35,12 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
           { concurrency: "unbounded" },
         );
         const crossed = yield* Effect.flip(getMember(b, alice));
-        const grants = [
-          Grant.make(
-            MemberPermissions.Read,
-            Scope.Value.cases.Workspace.make({ workspaceId: a.id }),
-          ),
-          Grant.make(
-            MemberPermissions.Remove,
-            Scope.Value.cases.Target.make({
-              target: Target.Reference.cases.Member.make({
-                workspaceId: a.id,
-                memberId: a.ownerMemberId,
-              }),
-            }),
-          ),
-        ];
         const expiresAt = yield* future;
         const invitation = yield* entry.asMember(
           a.id,
           alice,
           Effect.flatMap(InvitationApplication.Service, (invitations) =>
-            invitations.issue({ recipientId: bob.id, expiresAt, grants }),
+            invitations.issue({ recipientId: bob.id, expiresAt, roleId: BuiltinRoles.ViewerId }),
           ),
         );
         const listing = yield* (yield* WorkspaceDirectory.Service).list(bob);
@@ -127,7 +112,7 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
               id: BuiltinRoles.ViewerId,
               workspaceId: workspace.id,
               name: "Viewer",
-              permissions: [MemberPermissions.Read.name],
+              permissions: [MemberPermissions.Read.name, AssignmentPermissions.Read.name],
             }),
           );
           for (const [id, name] of [
@@ -143,6 +128,8 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
                   MemberPermissions.Read.name,
                   MemberPermissions.Remove.name,
                   InvitationPermissions.Manage.name,
+                  AssignmentPermissions.Read.name,
+                  AssignmentPermissions.Manage.name,
                 ],
               }),
             );
@@ -158,11 +145,15 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
         );
         const accepted = yield* bound.assignments.listActiveByMember(outcome.joined.id);
         expect(accepted.map((assignment) => assignment.source)).toEqual(
-          expect.arrayContaining(
-            outcome.invitation.details.grants.map((grant) => ({ _tag: "Direct", grant })),
-          ),
+          expect.arrayContaining([
+            {
+              _tag: "Role",
+              roleId: BuiltinRoles.ViewerId,
+              scope: { _tag: "Workspace", workspaceId: outcome.a.id },
+            },
+          ]),
         );
-        expect(accepted).toHaveLength(2);
+        expect(accepted).toHaveLength(1);
       }),
     );
   }));

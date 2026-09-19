@@ -131,9 +131,9 @@ it.each([
     ),
 );
 
-it.each(["Workspace", "TargetWorkspace", "TargetMember"] as const)(
-  "invitations reject a foreign %s grant and invalid expiry without leaving partial rows",
-  async (scopeKind) =>
+it.each(["missing", "blank"] as const)(
+  "invitations reject a %s role and invalid expiry without leaving partial rows",
+  async (invalidRole) =>
     withDatabase(async (location) =>
       inDatabase(
         location,
@@ -149,12 +149,7 @@ it.each(["Workspace", "TargetWorkspace", "TargetMember"] as const)(
               inviterMemberId: workspace.ownerMemberId,
               issuedAt,
               expiresAt: DateTime.add(issuedAt, { hours: 1 }),
-              grants: [
-                Grant.Value.make({
-                  permission,
-                  scope: localScope(scopeKind, otherWorkspaceId, workspace.ownerMemberId),
-                }),
-              ],
+              roleId,
             },
             state: { _tag: "Pending" },
           };
@@ -162,14 +157,10 @@ it.each(["Workspace", "TargetWorkspace", "TargetMember"] as const)(
             state: record.state,
             details: {
               ...record.details,
-              grants: [
-                Grant.Value.make({
-                  permission,
-                  scope: localScope(scopeKind, workspaceId, workspace.ownerMemberId),
-                }),
-              ],
+              roleId,
             },
           };
+          Reflect.set(record.details, "roleId", invalidRole === "missing" ? undefined : "");
           yield* bound.store.transaction(
             Effect.gen(function* () {
               expect(yield* Effect.flip(bound.invitations.insert(record))).toMatchObject({

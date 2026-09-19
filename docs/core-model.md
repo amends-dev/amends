@@ -533,30 +533,30 @@ Its initial permissions must also be authorized. Permission to create agents doe
 include unrestricted authority to grant them access. Invitation delivery, expiry, revocation,
 and detailed membership lifecycle states are refined below for the first human admission flow.
 
-### First human invitations use named identities and direct initial grants
+### Human invitations use named identities and required roles
 
-An invitation identifies a human, its issuing member, explicit initial direct
-grants, and an expiry time. Issuance and revocation require `invitation.manage`
-on the workspace and an active current owner. Ownership is the first grant-authority
-policy: it permits selecting valid grants in that workspace. Possessing an action
-permission alone does not confer delegation authority.
+An invitation identifies a human, its issuing member, a required built-in role,
+and an expiry time. Issuance and revocation require invitation management and
+assignment management permissions. Shared delegation policy allows the current owner
+to delegate Viewer or Administrator, while other administrators can delegate Viewer.
+Owner is reserved for initialization and a future ownership-transfer workflow.
 
-Acceptance receives the recipient's trusted authenticated human identity from the
-host. The invitation must name that identity, remain pending, and not have reached
-its expiry. The original inviter must still be the active owner with invitation
-permission. Membership creation, the stored initial grants, and acceptance are
-committed together. Existing active members cannot use another invitation to add
-access. Competing invitations cannot create duplicate active memberships.
+Acceptance receives a trusted authenticated human identity, checks recipient and
+expiry, and rechecks the inviter's current membership, permissions, and delegation
+authority. Membership, a workspace-scoped role assignment, and acceptance commit
+together. An accepted invitation is a receipt: repeated acceptance never grants
+again or reactivates a removed member. Rejoining requires a fresh invitation and
+member ID. Role permissions remain live through the referenced role.
 
-Invitation outcomes are pending, accepted, or revoked. Expiry is evaluated against
-the clock. Repeated acceptance of the same accepted invitation returns the recorded
-membership without creating grants again or reactivating a removed membership.
-Rejoining requires a fresh invitation and member ID. Revocation prevents pending
-acceptance; it does not undo an accepted membership. Repeating revocation is harmless.
+### Assignment changes use the same delegation policy
 
-This first flow addresses known human identities. Delivery, unregistered email
-recipients, role-based initial access, and broader delegation policies remain
-subsequent work.
+Assignment and revocation require explicit management authority. Assigning roles is
+additive. Replacing a workspace role is a dedicated atomic operation that checks
+the previous assignment IDs to reject stale changes. The owner can manage
+administrators; other administrators can manage Viewer-only or unassigned members.
+Member removal enforces the same recipient restrictions. Authorized non-owners may
+still leave, and the current owner cannot be removed or have their access changed
+through ordinary assignment operations.
 
 ### Removal ends workspace access while preserving membership history
 

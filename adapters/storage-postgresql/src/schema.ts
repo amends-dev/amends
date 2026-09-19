@@ -140,6 +140,7 @@ export const invitations = pgTable(
     id: text("id").notNull(),
     recipientId: text("recipient_id").notNull(),
     inviterMemberId: text("inviter_member_id").notNull(),
+    roleId: text("role_id").notNull(),
     issuedAt: instant("issued_at").notNull(),
     expiresAt: instant("expires_at").notNull(),
     state: text("state", { enum: invitationStates }).notNull(),
@@ -168,27 +169,6 @@ export const invitations = pgTable(
     index("pending_invitations_by_recipient")
       .on(table.recipientId)
       .where(sql`${table.state} = 'Pending'`),
-  ],
-);
-
-/** An invitation's grants in their requested order; acceptance assigns exactly these. */
-export const invitationGrants = pgTable(
-  "invitation_grants",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    invitationId: text("invitation_id").notNull(),
-    position: integer("position").notNull(),
-    permission: text("permission").notNull(),
-    ...scopeColumns,
-  },
-  (table) => [
-    primaryKey({ columns: [table.workspaceId, table.invitationId, table.position] }),
-    foreignKey({
-      columns: [table.workspaceId, table.invitationId],
-      foreignColumns: [invitations.workspaceId, invitations.id],
-      name: "invitation_grants_invitation",
-    }).onDelete("cascade"),
-    scopeAgrees("invitation_grants_scope_agrees", table),
   ],
 );
 

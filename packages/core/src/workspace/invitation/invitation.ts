@@ -1,5 +1,5 @@
 import { DateTime, Schema } from "effect";
-import { Grant } from "../../authorization/grant.ts";
+import { Role } from "../../authorization/role/role.ts";
 import { Identity } from "../../identity/identity.ts";
 import { Member } from "../member/member.ts";
 import { Workspace } from "../workspace.ts";
@@ -9,12 +9,12 @@ export type Id = typeof Id.Type;
 
 export const IssueInput = Schema.Struct({
   recipientId: Identity.HumanId,
-  grants: Schema.Array(Grant.Value),
+  roleId: Role.Id,
   expiresAt: Schema.DateTimeUtcFromString,
 }).annotate({ identifier: "WorkspaceInvitationIssueInput" });
 export interface IssueInput extends Schema.Schema.Type<typeof IssueInput> {}
 
-/** Immutable issuance record; acceptance uses these exact grants. */
+/** Immutable issuance record; acceptance assigns the referenced role at workspace scope. */
 export const Issuance = Schema.Struct({
   ...IssueInput.fields,
   id: Id,
@@ -26,14 +26,6 @@ export const Issuance = Schema.Struct({
     Schema.makeFilter((value) => {
       if (!DateTime.isGreaterThan(value.expiresAt, value.issuedAt))
         return "Expiry must follow issuance";
-      for (const grant of value.grants) {
-        const workspaceId =
-          grant.scope._tag === "Workspace"
-            ? grant.scope.workspaceId
-            : grant.scope.target.workspaceId;
-        if (workspaceId !== value.workspaceId)
-          return "Invitation grants must belong to the invitation's workspace";
-      }
       return undefined;
     }),
   )

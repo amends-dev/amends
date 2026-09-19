@@ -1,7 +1,8 @@
+import { BuiltinRoles } from "@amends/core/authorization";
 import { expect, test } from "bun:test";
 import { Api, Authentication } from "@amends/api-http";
 import { Identity } from "@amends/core/identity";
-import { Member, MemberPermissions } from "@amends/core/workspace";
+import { Member } from "@amends/core/workspace";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer } from "effect";
 import { HttpClientRequest, HttpRouter } from "effect/unstable/http";
@@ -65,12 +66,7 @@ test("the HTTP server carries the membership workflow over SQLite with bearer id
           payload: {
             recipientId: bob,
             expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-            grants: [
-              {
-                permission: MemberPermissions.Read.name,
-                scope: { _tag: "Workspace", workspaceId: workspace.id },
-              },
-            ],
+            roleId: BuiltinRoles.ViewerId,
           },
         });
         const invitationParams = {
@@ -88,7 +84,7 @@ test("the HTTP server carries the membership workflow over SQLite with bearer id
             payload: {
               recipientId: Identity.HumanId.make("charlie"),
               expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-              grants: [],
+              roleId: BuiltinRoles.ViewerId,
             },
           }),
         );
@@ -180,7 +176,7 @@ test("email sign-in issues a session the server accepts, and the directory lists
           payload: {
             recipientId: session.humanId,
             expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-            grants: [],
+            roleId: BuiltinRoles.ViewerId,
           },
         });
         const after = yield* client.me.workspaces();

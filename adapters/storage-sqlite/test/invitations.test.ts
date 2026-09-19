@@ -1,3 +1,4 @@
+import { BuiltinRoles } from "@amends/core/authorization";
 import { expect, expectTypeOf, test } from "bun:test";
 import { Actor } from "@amends/core/identity";
 import { Log } from "@amends/core/journal";
@@ -66,7 +67,7 @@ test("owner invites a reader; concurrent repeat acceptance grants once and never
         const freshInvite = yield* Operations.invite(workspace.id, alice, {
           recipientId: bob.id,
           expiresAt: yield* future,
-          grants: [],
+          roleId: BuiltinRoles.ViewerId,
         });
         const rejoined = yield* Operations.acceptInvitation(
           workspace.id,
@@ -74,9 +75,9 @@ test("owner invites a reader; concurrent repeat acceptance grants once and never
           freshInvite.details.id,
         );
         expect(rejoined.id).not.toBe(first.id);
-        expect(yield* bound.assignments.listActiveByMember(rejoined.id)).toEqual([]);
+        expect(yield* bound.assignments.listActiveByMember(rejoined.id)).toHaveLength(1);
         expect(
-          yield* Effect.flip(Operations.getMember(workspace.id, bob, workspace.ownerMemberId)),
+          yield* Effect.flip(Operations.removeMember(workspace.id, bob, workspace.ownerMemberId)),
         ).toMatchObject({ _tag: "Authorization.Denied" });
       }),
     );

@@ -5,9 +5,9 @@ import { Authentication } from "./authentication.ts";
 import { ApiErrors } from "./errors.ts";
 
 const invitation = [
+  ...ApiErrors.delegation,
   ApiErrors.InvitationNotFound,
   ApiErrors.NotRecipient,
-  ApiErrors.InvitationNotOwner,
   ApiErrors.AlreadyMember,
   ApiErrors.InvitationUnavailable,
   ApiErrors.InvitationInvalidExpiry,

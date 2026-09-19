@@ -3,10 +3,13 @@
  * application operations run for the acting member.
  */
 export { Assignment } from "./assignment/assignment.ts";
+export { AssignmentApplication } from "./assignment/application.ts";
+export { AssignmentPermissions } from "./assignment/permissions.ts";
 export { AssignmentFacts } from "./assignment/facts.ts";
 export { AssignmentProjection } from "./assignment/projection.ts";
 export { AssignmentStore } from "./assignment/store.ts";
 export { Authorization } from "./authorization.ts";
+export { Delegation } from "./delegation.ts";
 export { BuiltinRoles } from "./role/builtin.ts";
 export { Grant } from "./grant.ts";
 export { GrantResolver } from "./grant-resolver.ts";

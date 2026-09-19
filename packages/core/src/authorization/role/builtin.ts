@@ -14,6 +14,10 @@ const roles = [
   { id: OwnerId, name: "Owner", tier: "owner" },
 ] as const;
 
+/** Display label for a built-in identity, including invitations before membership exists. */
+export const nameOf = (roleId: Role.Id): string =>
+  roles.find(({ id }) => id === roleId)?.name ?? roleId;
+
 // Ordering is local to bundle construction. Access checks use stored permissions and scopes.
 const order: Readonly<Record<Permission.BuiltinTier, number>> = {
   viewer: 0,

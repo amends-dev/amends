@@ -1,5 +1,6 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
+import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
@@ -53,6 +54,7 @@ export type Error =
 
 export type RemoveError =
   | Error
+  | Delegation.Error
   | WorkspaceStore.Failure
   | InvitationStore.Failure
   | Projection.Error
@@ -113,17 +115,20 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | WorkspaceStore.Service
   | InvitationStore.Service
   | Authorization.Service
+  | Delegation.Service
   | Journal.Service
 > {
   const members = yield* MemberStore.Service;
   const workspace = yield* WorkspaceStore.Service;
   const invitations = yield* InvitationStore.Service;
   const authorization = yield* Authorization.Service;
+  const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, members.workspaceId);
   yield* requireWorkspace(workspaceId, workspace.workspaceId);
   yield* requireWorkspace(workspaceId, invitations.workspaceId);
+  yield* requireWorkspace(workspaceId, delegation.workspaceId);
 
   const load = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* members.get(id);
@@ -187,6 +192,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       return yield* new OwnerProtected({ workspaceId, memberId: id });
     if (member.status === "removed")
       return yield* new AlreadyRemoved({ workspaceId, memberId: id });
+    yield* delegation.requireRemoval(id);
     yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
     if (member.identity._tag === "Human") {
       const actor = yield* Actor.Service;

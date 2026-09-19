@@ -21,7 +21,9 @@ export const mayRetainData = (cause: Cause.Cause<unknown>) =>
     "Gateway.NotMember",
     "Authorization.InvalidActor",
     "Authorization.Denied",
-    "InvitationApplication.NotOwner",
+    "Delegation.Denied",
+    "AssignmentApplication.MemberNotFound",
+    "AssignmentApplication.NotFound",
     "MemberApplication.NotFound",
     "InvitationApplication.NotFound",
   ].includes(errorOf(cause)?._tag ?? "");
@@ -51,8 +53,21 @@ export const explain = (cause: Cause.Cause<unknown>): string => {
       return "The current owner cannot be removed. Transfer ownership first.";
     case "MemberApplication.AlreadyRemoved":
       return "This membership has already ended.";
-    case "InvitationApplication.NotOwner":
-      return "Only the current owner can manage invitations.";
+    case "Delegation.Denied":
+      return "Only the workspace owner can manage administrators or members with additional access.";
+    case "Delegation.OwnerProtected":
+      return "Owner access can only change through ownership transfer.";
+    case "Delegation.UnsupportedRole":
+      return "Select an available built-in role.";
+    case "Delegation.RoleNotFound":
+      return "This role is unavailable in the workspace.";
+    case "AssignmentApplication.Changed":
+      return "Their roles changed since you loaded them. Refresh access before trying again.";
+    case "AssignmentApplication.InactiveMember":
+      return "Removed members cannot receive access. Invite them again to rejoin.";
+    case "AssignmentApplication.MemberNotFound":
+    case "AssignmentApplication.NotFound":
+      return "This member or assignment is no longer available.";
     case "InvitationApplication.NotRecipient":
       return "This invitation belongs to a different signed-in address.";
     case "InvitationApplication.AlreadyMember":

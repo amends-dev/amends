@@ -1,3 +1,4 @@
+import { BuiltinRoles } from "@amends/core/authorization";
 import { Key } from "@solid-primitives/keyed";
 import type { Workspace } from "@amends/core/workspace";
 import {
@@ -65,13 +66,7 @@ export function WorkspacePicker(props: { onSelect: (workspaceId: Workspace.Id) =
                         title={invitation().details.workspaceId}
                         titleKind="code"
                         leadingIcon={<WorkspaceMark name={invitation().details.workspaceId} />}
-                        supportingText={
-                          invitation().details.grants.length === 0
-                            ? "no permissions yet"
-                            : `grants ${invitation()
-                                .details.grants.map((grant) => grant.permission)
-                                .join(", ")}`
-                        }
+                        supportingText={BuiltinRoles.nameOf(invitation().details.roleId)}
                         actions={
                           <AcceptInvitationButton
                             workspaceId={invitation().details.workspaceId}

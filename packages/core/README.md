@@ -89,8 +89,10 @@ preserving the HTTP error contract without exposing bundle-construction metadata
 
 Changing a declaration changes the desired bundles for new workspaces. Updating
 an existing workspace requires an explicit role fact; neither authorization nor
-replay regenerates its roles. Role management APIs and custom roles are separate
-work. See [workspace workflows](../../docs/workspace-workflows.md#initialization)
+replay regenerates its roles. `AssignmentApplication` provides listing, assignment,
+revocation, and atomic workspace-role replacement. `Delegation` supplies the shared
+rules used by assignments, invitations, and member removal. Role definition editing
+and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization)
 for the implemented bundles and current invitation restrictions.
 
 ## Module dependencies and exports
@@ -174,7 +176,10 @@ versions, brands, error tags, service keys, projection keys, and encoded fields
 during organizational changes. In particular, `Invitation.Record.details` still
 holds `Invitation.Issuance`; changing its TypeScript name does not rename the
 persisted or HTTP field. Contract changes require an explicit compatibility or
-migration decision.
+migration decision. During the current development phase, change fact and projection
+schemas in place at version 1 rather than adding compatibility versions. Breaking
+development-data changes require a deliberate reset decision. Versioned evolution
+will begin when production data must be preserved.
 
 ## Constructors and layers
 
@@ -239,6 +244,8 @@ meaning rather than using it as a synonym for a constructor.
 | Grant resolver        | `GrantResolver.make()`                | `GrantResolver.Service`                 |
 | Authorization         | `Authorization.make()`                | `Authorization.Service`                 |
 | Member operations     | `MemberApplication.make()`            | `MemberApplication.Service`             |
+| Assignment operations | `AssignmentApplication.make()`        | `AssignmentApplication.Service`         |
+| Delegation policy     | `Delegation.make()`                   | `Delegation.Service`                    |
 | Invitation operations | `InvitationApplication.make()`        | `InvitationApplication.Service`         |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.

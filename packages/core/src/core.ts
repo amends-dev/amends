@@ -5,6 +5,9 @@
  */
 import { Layer } from "effect";
 import { AssignmentProjection } from "./authorization/assignment/projection.ts";
+import { AssignmentApplication } from "./authorization/assignment/application.ts";
+import { AssignmentPermissions } from "./authorization/assignment/permissions.ts";
+import { Delegation } from "./authorization/delegation.ts";
 import { Authorization } from "./authorization/authorization.ts";
 import { GrantResolver } from "./authorization/grant-resolver.ts";
 import { PermissionCatalog } from "./authorization/permission-catalog.ts";
@@ -33,6 +36,8 @@ const permissions = [
   MemberPermissions.Read,
   MemberPermissions.Remove,
   InvitationPermissions.Manage,
+  AssignmentPermissions.Read,
+  AssignmentPermissions.Manage,
 ];
 
 /** The domain journal and its log, over host storage. */
@@ -47,7 +52,11 @@ const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer
  * Application operations, sharing one journal and one authorization check. These
  * are what hosts and protocols call; stores and the journal stay internal.
  */
-const operations = Layer.mergeAll(MemberApplication.layer, InvitationApplication.layer);
+const operations = Layer.mergeAll(
+  MemberApplication.layer,
+  InvitationApplication.layer,
+  AssignmentApplication.layer,
+).pipe(Layer.provide(Delegation.layer));
 
 /**
  * Complete core for one workspace: application operations over the journal,
