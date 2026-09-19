@@ -1,23 +1,27 @@
 import { BunRuntime } from "@effect/platform-bun";
-import { Config, Effect, Layer, Option } from "effect";
+import { ConfigProvider, Effect, Layer } from "effect";
+import { LocalConfig } from "./config.ts";
 import { LocalHost } from "./host.ts";
-import { LocalServer } from "./serve.ts";
+import { LocalServer } from "./server.ts";
 
 /**
  * Serve the application on the loopback interface. AMENDS_DATABASE_URL selects
  * a PostgreSQL database; otherwise AMENDS_DATABASE names the SQLite file.
  */
 const program = Effect.gen(function* () {
-  const url = yield* Config.option(Config.Redacted("AMENDS_DATABASE_URL"));
-  const filename = yield* Config.String("AMENDS_DATABASE").pipe(
-    Config.withDefault("./data/amends.sqlite"),
-  );
-  const port = yield* Config.Int("AMENDS_PORT").pipe(Config.withDefault(8787));
-  const host = Option.match(url, {
-    onNone: () => LocalHost.layerSqlite(filename),
-    onSome: LocalHost.layerPostgres,
+  const { port, storage } = yield* LocalConfig.load();
+  const host = LocalConfig.Storage.$match(storage, {
+    Sqlite: ({ filename }) => LocalHost.layerSqlite(filename),
+    Postgres: ({ url }) => LocalHost.layerPostgres(url),
   });
   return yield* Layer.launch(LocalServer.layer(host, port));
 });
 
-BunRuntime.runMain(program);
+BunRuntime.runMain(
+  program.pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConfigProvider.fromEnv({ preserveEmptyStrings: true }),
+    ),
+  ),
+);

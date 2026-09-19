@@ -25,25 +25,46 @@ tests may take a contract package as a development dependency to act as a client
 Use the [shared construction conventions](../packages/README.md#constructors-and-layers).
 `make` constructs a host-owned implementation; `layer` provides it or composes
 existing layers. Named layer exports start with `layer`, such as `layerSqlite`,
-`layerPostgres`, and `layerRoutes`. Pure secondary constructors use descriptive
-names such as `makeCredentials` and return the gateway contract's `Service.of(...)`.
+`layerPostgres`, and `layerRoutes`. Each implementation owns its `make` constructor
+and returns the gateway contract's `Service.of(...)`.
 Use `Layer.sync` for lazy synchronous construction and `Layer.effect` for effectful
 construction. Constructors own defaults, state allocation, and initialization.
 
-The local host has two implementations in `LocalSignIn`: `make(deliver?)`
-constructs sign-in with fresh pending-code state, and `makeCredentials()`
-constructs the development credential resolver. `layerCredentials` provides the
-resolver; `layer(deliver?)` provides both services. Credential and code validation
-happen during operations. Constructing either implementation issues no token or code.
+Group related implementations in a capability directory when they need several
+modules. The local host's `authentication/` contains `DevelopmentSignIn`,
+`DevelopmentCredentials`, and their composition, `DevelopmentAuthentication`.
+The names describe the development trust model; another host can supply different
+implementations of the same gateway contracts.
+
+`DevelopmentSignIn.make(deliver?)` constructs sign-in with fresh pending-code
+state; `DevelopmentCredentials.make()` constructs the credential resolver.
+Their respective `layer` exports delegate to those constructors.
+`DevelopmentAuthentication.layer(deliver?)` composes both services. Credential
+and code validation happen during operations. Construction issues no token or code.
 
 `LocalHost` and `LocalServer` are composition modules, so they expose layers without
 additional `make` wrappers. `LocalHost.layerSqlite` and `layerPostgres` compose the
 gateway, directory, database adapter, and cryptography. `LocalServer.layerRoutes`
 registers the API and documentation; `LocalServer.layer` adds sign-in, credentials,
-and the Bun HTTP server. Database and server resources belong to the layer scope.
+and the Bun HTTP server. `LocalHost.HostLayer` names the layer supplied to the
+server. Database and server resources belong to the layer scope.
 
-The entry point reads Effect `Config`, selects the host layer, and launches the
-server through `BunRuntime.runMain`. Keep this execution boundary at the entry
-point so importing a constructor or layer module does not launch the application.
+`LocalConfig.load()` reads and validates Effect configuration before resource
+acquisition. `src/index.ts` selects the host layer and launches the server through
+`BunRuntime.runMain`. Keep execution at that entry point so importing configuration,
+constructor, or layer modules does not read settings or launch the application.
 Document constructor exports with `@category constructors` and layer exports
 with `@category layers`.
+
+## Tests and configuration
+
+Test configuration defaults, invalid values, and backend selection without opening
+resources. The local host accepts port `0` for an ephemeral listener. Missing
+settings may use defaults; explicitly empty settings must not silently select a
+different database. Keep credentials redacted in configuration errors.
+
+Mutable delivery state belongs to each HTTP fixture. Subprocess fixtures own
+temporary storage and an ephemeral port, remove inherited database selection,
+and disable environment-file loading. Drain stdout and stderr concurrently, bound
+startup, and terminate the child even when startup or the test callback fails.
+The [local host guide](./local/README.md) describes its configuration and verification.

@@ -10,8 +10,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LocalHost } from "../src/host.ts";
-import { LocalServer } from "../src/serve.ts";
-import { LocalSignIn } from "../src/sign-in.ts";
+import { LocalServer } from "../src/server.ts";
+import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
 
 const alice = Identity.HumanId.make("alice");
 const bob = Identity.HumanId.make("bob");
@@ -20,19 +20,24 @@ const asToken = (token: string) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 /** The real routes, gateway, and SQLite storage behind a Bun test server; codes are captured. */
-const delivered = new Map<string, string>();
-const server = (filename: string) =>
-  HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
+const server = (filename: string) => {
+  const delivered = new Map<string, string>();
+  const layer = HttpRouter.serve(LocalServer.layerRoutes, {
+    disableLogger: true,
+    disableListenLog: true,
+  }).pipe(
     Layer.provide(
       Layer.mergeAll(
         LocalHost.layerSqlite(filename),
-        LocalSignIn.layer((email, code) => Effect.sync(() => delivered.set(email, code))).pipe(
-          Layer.provide(BunCrypto.layer),
-        ),
+        DevelopmentAuthentication.layer((email, code) =>
+          Effect.sync(() => delivered.set(email, code)),
+        ).pipe(Layer.provide(BunCrypto.layer)),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
   );
+  return { layer, delivered };
+};
 const temporary = async (run: (filename: string) => Promise<void>) => {
   const directory = await mkdtemp(join(tmpdir(), "amends-http-"));
   try {
@@ -44,6 +49,7 @@ const temporary = async (run: (filename: string) => Promise<void>) => {
 
 test("the HTTP server carries the membership workflow over SQLite with bearer identities", async () =>
   temporary(async (filename) => {
+    const fixture = server(filename);
     const outcome = await Effect.runPromise(
       Effect.gen(function* () {
         const client = (token: string) =>
@@ -120,7 +126,7 @@ test("the HTTP server carries the membership workflow over SQLite with bearer id
           afterRemovalList,
           missingStatus: missing.status,
         };
-      }).pipe(Effect.scoped, Effect.provide(server(filename))),
+      }).pipe(Effect.scoped, Effect.provide(fixture.layer)),
     );
     expect(outcome.owner.identity).toEqual({ _tag: "Human", id: alice });
     expect(outcome.outsider).toMatchObject({ _tag: "Gateway.NotMember" });
@@ -149,12 +155,13 @@ test("the HTTP server carries the membership workflow over SQLite with bearer id
 
 test("email sign-in issues a session the server accepts, and the directory lists what it can reach", async () =>
   temporary(async (filename) => {
+    const fixture = server(filename);
     const outcome = await Effect.runPromise(
       Effect.gen(function* () {
         const anonymous = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken("")));
         const email = "jo@mercier.co";
         yield* anonymous.session.start({ payload: { email } });
-        const code = delivered.get(email);
+        const code = fixture.delivered.get(email);
         if (code === undefined) return yield* Effect.die("No code was delivered");
         const wrong = yield* Effect.flip(
           anonymous.session.complete({
@@ -182,7 +189,7 @@ test("email sign-in issues a session the server accepts, and the directory lists
         });
         const joined = yield* client.me.workspaces();
         return { wrong, session, reused, before, workspace, other, after, joined };
-      }).pipe(Effect.scoped, Effect.provide(server(filename))),
+      }).pipe(Effect.scoped, Effect.provide(fixture.layer)),
     );
     expect(outcome.wrong).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
     expect(outcome.session.humanId).toBe(Identity.HumanId.make("jo@mercier.co"));

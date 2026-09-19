@@ -1,33 +1,68 @@
 import { join } from "node:path";
 
+interface Options {
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly command?: ReadonlyArray<string>;
+  readonly startupTimeoutMs?: number;
+}
+
 /** One lifetime of the real server entry point over a database, on an ephemeral port. */
 export const withServer = async <A>(
   filename: string,
   run: (call: Call) => Promise<A>,
+  options: Options = {},
 ): Promise<A> => {
-  const child = Bun.spawn([process.execPath, "hosts/local/src/index.ts"], {
-    cwd: join(import.meta.dir, "../../.."),
-    env: { ...process.env, AMENDS_DATABASE: filename, AMENDS_PORT: "0" },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  try {
-    // The server announces its ephemeral port once it listens.
-    const reader = child.stdout.getReader();
-    let output = "";
-    let base: string | undefined;
-    while (base === undefined) {
-      const chunk = await reader.read();
-      if (chunk.done) throw new Error(`The server exited before listening: ${output}`);
-      output += new TextDecoder().decode(chunk.value);
-      base = /Listening on (http:\/\/[^\s]+)/.exec(output)?.[1];
-    }
-    // Keep draining so the child never blocks on a full pipe.
-    void (async () => {
-      while (!(await reader.read()).done) {
-        /* discard */
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    ...options.env,
+    AMENDS_DATABASE: filename,
+    AMENDS_PORT: "0",
+  };
+  delete env.AMENDS_DATABASE_URL;
+  const child = Bun.spawn(
+    [...(options.command ?? [process.execPath, "--no-env-file", "hosts/local/src/index.ts"])],
+    {
+      cwd: join(import.meta.dir, "../../.."),
+      env,
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  const ready = Promise.withResolvers<string>();
+  let output = "";
+  const drain = async (stream: ReadableStream<Uint8Array>) => {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let tail = "";
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        const text = decoder.decode(chunk.value, { stream: true });
+        output = (output + text).slice(-16_384);
+        tail = (tail + text).slice(-16_384);
+        const base = /Listening on (http:\/\/[^\s]+)(?=\s)/.exec(tail)?.[1];
+        if (base !== undefined) ready.resolve(base);
       }
-    })();
+    } finally {
+      reader.releaseLock();
+    }
+  };
+  const drains = [drain(child.stdout), drain(child.stderr)];
+  for (const draining of drains) void draining.catch(ready.reject);
+  const timeout = setTimeout(() => {
+    ready.reject(new Error(`Timed out waiting for the server to listen: ${output}`));
+  }, options.startupTimeoutMs ?? 3_000);
+  try {
+    const base = await Promise.race([
+      ready.promise,
+      child.exited.then(async (code) => {
+        await Promise.allSettled(drains);
+        throw new Error(`The server exited before listening (exit ${code}): ${output}`);
+      }),
+    ]);
+    clearTimeout(timeout);
     const call: Call = async (token, method, path, body) => {
       const headers = new Headers({ authorization: `Bearer ${token}` });
       const request: RequestInit = { method, headers };
@@ -41,8 +76,15 @@ export const withServer = async <A>(
     };
     return await run(call);
   } finally {
+    clearTimeout(timeout);
     child.kill();
-    await child.exited;
+    const forceStop = setTimeout(() => child.kill("SIGKILL"), 1_000);
+    try {
+      await child.exited;
+      await Promise.allSettled(drains);
+    } finally {
+      clearTimeout(forceStop);
+    }
   }
 };
 

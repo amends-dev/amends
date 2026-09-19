@@ -5,17 +5,15 @@ import { BunCrypto } from "@effect/platform-bun";
 import { Layer, type Redacted } from "effect";
 
 /** What a host supplies to the server: the gateway and the directory, however they are stored. */
-export type Host = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
+export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
 
 /**
  * The gateway and the workspace directory over one SQLite file, through the
- * storage adapter. Callers supply identities established by a trusted ingress:
- * the CLI treats its arguments as local operator assertions, and the HTTP
- * server resolves bearer tokens before calling it.
+ * storage adapter. The HTTP server resolves bearer tokens before entering the gateway.
  *
  * @category layers
  */
-export const layerSqlite = (filename: string): Host =>
+export const layerSqlite = (filename: string): HostLayer =>
   Gateway.layer.pipe(
     Layer.provideMerge(sqlite),
     Layer.provide(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
@@ -26,7 +24,7 @@ export const layerSqlite = (filename: string): Host =>
  *
  * @category layers
  */
-export const layerPostgres = (url: Redacted.Redacted<string>): Host =>
+export const layerPostgres = (url: Redacted.Redacted<string>): HostLayer =>
   Gateway.layer.pipe(
     Layer.provideMerge(postgres()),
     Layer.provide(Layer.mergeAll(PostgresDatabase.layer({ url }), BunCrypto.layer)),

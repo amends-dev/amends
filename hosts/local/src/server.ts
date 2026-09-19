@@ -3,7 +3,7 @@ import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Layer } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import type { LocalHost } from "./host.ts";
-import { LocalSignIn } from "./sign-in.ts";
+import { DevelopmentAuthentication } from "./authentication/authentication.ts";
 
 /**
  * Register the HTTP API, its OpenAPI document, and docs over the required host services.
@@ -17,10 +17,12 @@ export const layerRoutes = Layer.mergeAll(Routes.layer, Routes.layerDocs);
  *
  * @category layers
  */
-export const layer = (host: LocalHost.Host, port: number) =>
+export const layer = (host: LocalHost.HostLayer, port: number) =>
   HttpRouter.serve(layerRoutes).pipe(
-    Layer.provide(Layer.mergeAll(host, LocalSignIn.layer().pipe(Layer.provide(BunCrypto.layer)))),
+    Layer.provide(
+      Layer.mergeAll(host, DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer))),
+    ),
     Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port })),
   );
 
-export * as LocalServer from "./serve.ts";
+export * as LocalServer from "./server.ts";
