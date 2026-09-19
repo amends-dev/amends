@@ -39,11 +39,6 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
       success: Invitation.Record,
       error: [...ApiErrors.member, ...invitation],
     }),
-    HttpApiEndpoint.post("enable", "/enable", {
-      params: { workspaceId: Workspace.Id },
-      success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ApiErrors.NotWorkspaceOwner],
-    }),
   )
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/invitations") {}

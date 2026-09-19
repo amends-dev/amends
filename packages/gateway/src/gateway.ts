@@ -37,21 +37,6 @@ export interface Interface {
     identity: Identity.Reference,
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
-  /**
-   * Grant invitation management to the current owner of a workspace created
-   * before that permission existed. Initialization owns this upgrade, so it is
-   * the one operation offered here rather than through an application service.
-   */
-  readonly enableInvitations: (
-    workspaceId: Workspace.Id,
-    identity: Identity.Reference,
-  ) => Effect.Effect<
-    void,
-    | GatewayErrors.ExposedError<
-        Effect.Error<ReturnType<typeof WorkspaceInitialization.enableInvitations>>
-      >
-    | GatewayErrors.NotMember
-  >;
 }
 
 /** Workspace bootstrap and entry; core's application services are the operations. */
@@ -166,16 +151,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
     return yield* bind(workspaceId, withActor(workspaceId, identity, operation));
   });
 
-  const enableInvitations: Interface["enableInvitations"] = Effect.fn("Gateway.enableInvitations")(
-    function* (workspaceId: Workspace.Id, identity: Identity.Reference) {
-      yield* bind(
-        workspaceId,
-        withActor(workspaceId, identity, WorkspaceInitialization.enableInvitations()),
-      );
-    },
-  );
-
-  return Service.of({ createWorkspace, inWorkspace, asMember, enableInvitations });
+  return Service.of({ createWorkspace, inWorkspace, asMember });
 });
 
 /**

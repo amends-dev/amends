@@ -1,9 +1,6 @@
 import { Crypto, Effect, Option, Schema } from "effect";
 import { Assignment } from "../authorization/assignment/assignment.ts";
 import { AssignmentFacts } from "../authorization/assignment/facts.ts";
-import { AssignmentStore } from "../authorization/assignment/store.ts";
-import { Authorization } from "../authorization/authorization.ts";
-import { Actor } from "../identity/actor.ts";
 import { Grant } from "../authorization/grant.ts";
 import { Scope } from "../authorization/scope.ts";
 import { Identity } from "../identity/identity.ts";
@@ -22,14 +19,6 @@ export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()
     workspaceId: Workspace.Id,
   },
 ) {}
-
-export class NotOwner extends Schema.TaggedError<NotOwner>()("WorkspaceInitialization.NotOwner", {
-  workspaceId: Workspace.Id,
-}) {}
-
-/** Stable identity makes the explicit bootstrap upgrade safe to repeat, even after revocation. */
-export const invitationAssignmentId = (memberId: Member.Id) =>
-  Assignment.Id.make(`${memberId}:initial-invitation.manage`);
 
 /**
  * Trusted host entry point after creation entitlement is checked. The caller is
@@ -71,10 +60,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
       ]) {
         yield* journal.publish(AssignmentFacts.Created, {
           workspaceId: record.id,
-          assignmentId:
-            permission === InvitationPermissions.Manage
-              ? invitationAssignmentId(ownerMemberId)
-              : Assignment.Id.make(yield* crypto.randomUUIDv4),
+          assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
           memberId: ownerMemberId,
           source: Assignment.Source.cases.Direct.make({
             grant: Grant.make(
@@ -88,46 +74,5 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
     }),
   );
 });
-
-/**
- * Explicit upgrade for workspaces initialized before invitations existed. This
- * grants the new capability once to the active current owner. It is never run on
- * startup or acceptance, and an existing revoked assignment is never restored.
- */
-export const enableInvitations = Effect.fn("WorkspaceInitialization.enableInvitations")(
-  function* () {
-    const workspace = yield* WorkspaceStore.Service;
-    const journal = yield* Journal.Service;
-    const assignments = yield* AssignmentStore.Service;
-    const authorization = yield* Authorization.Service;
-    return yield* journal.commit(
-      Effect.gen(function* () {
-        yield* authorization.require([]);
-        const actor = yield* Actor.Service;
-        const found = yield* workspace.get;
-        if (
-          Option.isNone(found) ||
-          found.value.id !== workspace.workspaceId ||
-          actor.workspaceId !== workspace.workspaceId ||
-          actor.memberId !== found.value.ownerMemberId
-        )
-          return yield* new NotOwner({ workspaceId: workspace.workspaceId });
-        const assignmentId = invitationAssignmentId(actor.memberId);
-        if (Option.isSome(yield* assignments.get(assignmentId))) return;
-        yield* journal.publish(AssignmentFacts.Created, {
-          assignmentId,
-          workspaceId: workspace.workspaceId,
-          memberId: actor.memberId,
-          source: Assignment.Source.cases.Direct.make({
-            grant: Grant.make(
-              InvitationPermissions.Manage,
-              Scope.Value.cases.Workspace.make({ workspaceId: workspace.workspaceId }),
-            ),
-          }),
-        });
-      }),
-    );
-  },
-);
 
 export * as WorkspaceInitialization from "./initialization.ts";

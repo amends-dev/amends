@@ -6,7 +6,6 @@ import {
   MemberFacts,
   MemberPermissions,
   Workspace,
-  WorkspaceInitialization,
 } from "@amends/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -122,15 +121,20 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
           );
           const bound = yield* boundTo(workspace.id);
           if (change === "permission") {
+            const assignment = (yield* bound.assignments.listActiveByMember(
+              workspace.ownerMemberId,
+            )).find(
+              ({ source }) =>
+                source._tag === "Direct" &&
+                source.grant.permission === InvitationPermissions.Manage.name,
+            );
+            if (assignment === undefined) throw new Error("Missing invitation assignment");
             yield* Effect.flatMap(Journal.Service, (journal) =>
               journal.publish(AssignmentFacts.Revoked, {
                 workspaceId: workspace.id,
-                assignmentId: WorkspaceInitialization.invitationAssignmentId(
-                  workspace.ownerMemberId,
-                ),
+                assignmentId: assignment.id,
               }),
             ).pipe(Effect.provide(core(bound)));
-            yield* Operations.enableInvitations(workspace.id, alice);
           } else if (change === "membership") {
             yield* Effect.flatMap(Journal.Service, (journal) =>
               journal.publish(MemberFacts.Removed, {

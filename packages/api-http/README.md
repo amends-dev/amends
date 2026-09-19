@@ -48,8 +48,7 @@ so a client can import the complete contract without loading server code.
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;
   `POST` to the same path issues one. `POST …/:invitationId/accept` and
-  `POST …/:invitationId/revoke` change state; `POST …/enable` upgrades workspaces
-  created before invitations existed.
+  `POST …/:invitationId/revoke` change state.
 
 Workspace IDs travel in the path so a host can route a request to the right
 workspace before reading its body. Status codes follow `ApiErrors`: not a member,

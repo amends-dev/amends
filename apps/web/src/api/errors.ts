@@ -55,8 +55,6 @@ export const explain = (cause: Cause.Cause<unknown>): string => {
       return "Only the current owner can manage invitations.";
     case "InvitationApplication.NotRecipient":
       return "This invitation belongs to a different signed-in address.";
-    case "WorkspaceInitialization.NotOwner":
-      return "Only the current owner can enable invitations.";
     case "InvitationApplication.AlreadyMember":
       return "That person is already an active member.";
     case "InvitationApplication.InvalidExpiry":

@@ -51,9 +51,6 @@ is sufficient to type-check a supplied implementation.
   bypass the checks core performs inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for
   invitation acceptance where the recipient is not yet a member.
-- `enableInvitations` upgrades a workspace created before invitation
-  permissions existed. Initialization owns it, so it sits beside creation
-  rather than behind an application service.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns core's
 `HostServices` other than cryptography bound to one workspace, and

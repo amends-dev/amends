@@ -103,7 +103,6 @@ const gateway = Layer.succeed(
         operations,
       ) as Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
     },
-    enableInvitations: record("enableInvitations", () => Effect.void),
   }),
 );
 
@@ -281,8 +280,6 @@ test("invitation payloads round-trip dates and grants through JSON", async () =>
       },
     ],
   });
-  await run("alice", (client) => client.invitations.enable({ params: { workspaceId } }));
-  expect(calls[2]).toEqual({ operation: "enableInvitations", arguments: [workspaceId, alice] });
 });
 
 test("sign-in needs no credential, and the directory answers for the principal", async () => {

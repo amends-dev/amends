@@ -1,9 +1,5 @@
 import { Authorization, PermissionCatalog } from "@amends/core/authorization";
-import {
-  InvitationApplication,
-  MemberApplication,
-  WorkspaceInitialization,
-} from "@amends/core/workspace";
+import { InvitationApplication, MemberApplication } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
@@ -39,7 +35,6 @@ export const InvitationUnavailable = InvitationApplication.Unavailable.pipe(
 export const InvitationInvalidExpiry = InvitationApplication.InvalidExpiry.pipe(
   HttpApiSchema.status(400),
 );
-export const NotWorkspaceOwner = WorkspaceInitialization.NotOwner.pipe(HttpApiSchema.status(403));
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [

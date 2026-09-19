@@ -104,13 +104,6 @@ Repeating revocation is harmless. Revocation cannot undo an accepted membership;
 use member removal for that. Expiry is checked against the clock, so no
 background task is required to change expired rows.
 
-Workspaces created before this feature have no invitation permission. Their
-active owner can enable it once with `POST …/invitations/enable`. This
-publishes an assignment with a stable bootstrap ID. Repeating it preserves
-existing assignments, including revoked ones. Startup never grants or restores
-invitation access. SQL migration creates the invitation table, and the host
-catches up the new projection before application operations run.
-
 ## Initialization
 
 The host allocates the workspace ID and binds its storage views. Core initialization

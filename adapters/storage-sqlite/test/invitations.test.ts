@@ -51,9 +51,6 @@ test("owner invites a reader; concurrent repeat acceptance grants once and never
             Operations.invite(workspace.id, bob, request(workspace.id, yield* future, charlie.id)),
           ),
         ).toMatchObject({ _tag: "Authorization.Denied" });
-        expect(yield* Effect.flip(Operations.enableInvitations(workspace.id, bob))).toMatchObject({
-          _tag: "WorkspaceInitialization.NotOwner",
-        });
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
         expect(before).toHaveLength(3);
         expect(before[2]?.entries).toHaveLength(3);

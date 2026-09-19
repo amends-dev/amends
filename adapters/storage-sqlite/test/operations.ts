@@ -87,7 +87,4 @@ export const revokeInvitation = (
     ),
   );
 
-export const enableInvitations = (workspaceId: Workspace.Id, identity: Identity.Reference) =>
-  Effect.flatMap(Gateway.Service, (gateway) => gateway.enableInvitations(workspaceId, identity));
-
 export * as Operations from "./operations.ts";

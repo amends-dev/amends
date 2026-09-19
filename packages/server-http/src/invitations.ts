@@ -54,10 +54,6 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
-      enable: ({ params }) =>
-        Effect.flatMap(Principal, (principal) =>
-          gateway.enableInvitations(params.workspaceId, principal),
-        ),
     });
   }),
 );

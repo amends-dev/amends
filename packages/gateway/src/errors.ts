@@ -1,11 +1,6 @@
 import { Authorization, PermissionCatalog } from "@amends/core/authorization";
 import { Commit } from "@amends/core/journal";
-import {
-  InvitationApplication,
-  MemberApplication,
-  Workspace,
-  WorkspaceInitialization,
-} from "@amends/core/workspace";
+import { InvitationApplication, MemberApplication, Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -52,7 +47,6 @@ export const PublicError = Schema.Union([
   InvitationApplication.AlreadyMember,
   InvitationApplication.Unavailable,
   InvitationApplication.InvalidExpiry,
-  WorkspaceInitialization.NotOwner,
 ]);
 export type PublicError = typeof PublicError.Type;
 
