@@ -5,6 +5,8 @@ workflows. For server setup and development authentication, see the
 [local host guide](../hosts/local/README.md). The
 [HTTP contract](../packages/api-http/README.md) defines the available endpoints;
 [core design](./core-model.md) records the broader model and planned work.
+The [role and authorization review](./authorization-review.md) records the
+remaining UI consistency gaps in these workflows.
 
 The examples assume the local host is running on port 8787 and use its
 development bearer identities.
@@ -162,7 +164,8 @@ cancel the dialog and refresh ownership before reviewing another transfer.
 The ownership fact and metadata projection remain at version 1. Storage updates
 the existing owner field, so this workflow needs no database schema migration.
 Existing role bundles are not regenerated; use a fresh development workspace to
-receive the new owner-tier permission, or apply a deliberate recorded role update.
+receive the new owner-tier permission. During development, recreate the database
+when permission declarations change rather than synchronizing stored role bundles.
 
 ## Initialization
 
@@ -194,8 +197,8 @@ and `builtin:owner`. These identities are reserved for built-in definitions. Tie
 construct permission bundles; they do not authorize requests or confer delegation
 authority. The bundles are saved through role facts, so changing declarations affects
 new workspaces only. Existing workspaces retain their recorded roles or direct grants;
-updating them requires an explicit recorded policy change. Replay never regenerates
-roles from current declarations.
+development uses fresh data when definitions change. Replay never regenerates roles
+from current declarations.
 
 Initialization requires an absent workspace record. A repeated call returns
 `WorkspaceInitialization.AlreadyInitialized` without replacing ownership or
@@ -209,3 +212,6 @@ development change requires fresh SQLite and PostgreSQL development data. It doe
 not translate old invitation grants into roles or reset databases on startup.
 Fact and projection versions remain at 1 during development; versioned compatibility
 will be introduced when production data needs to be preserved.
+Permission additions and tier changes also use fresh development data. Recreate the
+development database and initialize workspaces from the current catalog; a workflow
+to synchronize existing role bundles is not required in this phase.
