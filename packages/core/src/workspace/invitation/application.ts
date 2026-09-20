@@ -9,6 +9,7 @@ import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Identity } from "../../identity/identity.ts";
 import { Journal } from "../../journal/journal.ts";
+import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Invitation } from "./invitation.ts";
@@ -150,6 +151,9 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     const issuedAt = yield* DateTime.now;
     if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
     yield* requireUnjoined(request.recipientId);
+    const provenance = yield* Publication.makeForActor(issuedAt).pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
     const details: Invitation.Issuance = {
       id: Invitation.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
@@ -159,7 +163,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       recipientId: request.recipientId,
       roleId: request.roleId,
     };
-    yield* journal.publish(InvitationFacts.Issued, details);
+    yield* journal.publish(InvitationFacts.Issued, details, provenance);
     return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
   }, journal.commit);
 
@@ -213,27 +217,47 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       identity: Identity.Reference.cases.Human.make({ id: recipient }),
       status: "active",
     };
-    yield* journal.publish(MemberFacts.Added, {
-      memberId: member.id,
+    const provenance = yield* Publication.make(
       workspaceId,
-      identity: member.identity,
-    });
-    yield* journal.publish(AssignmentFacts.Created, {
-      assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      memberId: member.id,
-      source: Assignment.Source.cases.Role.make({
-        roleId: details.roleId,
-        scope: { _tag: "Workspace", workspaceId },
-      }),
-    });
-    yield* journal.publish(InvitationFacts.Accepted, {
-      _tag: "Accepted",
-      workspaceId,
-      invitationId: id,
-      memberId: member.id,
+      {
+        _tag: "Identity",
+        identity: member.identity,
+      },
       acceptedAt,
-    });
+    ).pipe(Effect.provideService(Crypto.Crypto, crypto));
+    yield* journal.publish(
+      MemberFacts.Added,
+      {
+        memberId: member.id,
+        workspaceId,
+        identity: member.identity,
+      },
+      provenance,
+    );
+    yield* journal.publish(
+      AssignmentFacts.Created,
+      {
+        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+        workspaceId,
+        memberId: member.id,
+        source: Assignment.Source.cases.Role.make({
+          roleId: details.roleId,
+          scope: { _tag: "Workspace", workspaceId },
+        }),
+      },
+      provenance,
+    );
+    yield* journal.publish(
+      InvitationFacts.Accepted,
+      {
+        _tag: "Accepted",
+        workspaceId,
+        invitationId: id,
+        memberId: member.id,
+        acceptedAt,
+      },
+      provenance,
+    );
     return member;
   }, journal.commit);
 
@@ -248,7 +272,14 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       revokedBy: actor.memberId,
       revokedAt: yield* DateTime.now,
     });
-    yield* journal.publish(InvitationFacts.Revoked, { workspaceId, invitationId: id, ...state });
+    const provenance = yield* Publication.makeForActor(state.revokedAt).pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
+    yield* journal.publish(
+      InvitationFacts.Revoked,
+      { workspaceId, invitationId: id, ...state },
+      provenance,
+    );
     return { details: invitation.details, state } satisfies Invitation.Record;
   }, journal.commit);
 

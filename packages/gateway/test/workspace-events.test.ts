@@ -17,6 +17,7 @@ const batch = (workspaceId: Workspace.Id, id: string): CommittedEvents.Batch => 
       commitId: Commit.Id.make(id),
       index: 0,
       recordedAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+      provenance: null,
       name: "example.changed",
       version: 1,
       payload: { value: id },

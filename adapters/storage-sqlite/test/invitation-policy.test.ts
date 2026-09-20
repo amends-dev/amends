@@ -1,3 +1,4 @@
+import { testProvenance } from "./support.ts";
 import { expect, test } from "bun:test";
 import { AssignmentFacts, BuiltinRoles, Role } from "@amends/core/authorization";
 import { Journal, Log } from "@amends/core/journal";
@@ -140,17 +141,25 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
             );
             if (assignment === undefined) throw new Error("Missing Owner assignment");
             yield* Effect.flatMap(Journal.Service, (journal) =>
-              journal.publish(AssignmentFacts.Revoked, {
-                workspaceId: workspace.id,
-                assignmentId: assignment.id,
-              }),
+              journal.publish(
+                AssignmentFacts.Revoked,
+                {
+                  workspaceId: workspace.id,
+                  assignmentId: assignment.id,
+                },
+                testProvenance(workspace.id),
+              ),
             ).pipe(Effect.provide(core(bound)));
           } else if (change === "membership") {
             yield* Effect.flatMap(Journal.Service, (journal) =>
-              journal.publish(MemberFacts.Removed, {
-                workspaceId: workspace.id,
-                memberId: workspace.ownerMemberId,
-              }),
+              journal.publish(
+                MemberFacts.Removed,
+                {
+                  workspaceId: workspace.id,
+                  memberId: workspace.ownerMemberId,
+                },
+                testProvenance(workspace.id),
+              ),
             ).pipe(Effect.provide(core(bound)));
           } else {
             const sql = yield* SqlClient.SqlClient;

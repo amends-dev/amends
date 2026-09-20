@@ -53,6 +53,81 @@ const JournalLive = Journal.layer({
 Domains obtain the configured implementation with `yield* Journal.Service`.
 All normal writers to a domain log must use the same projection registrations.
 
+## Event provenance
+
+Every new `journal.publish(fact, payload, provenance)` requires `Event.Provenance`.
+The journal persists that context in `Event.Envelope` and exposes it on decoded
+events, projections, committed batches, and change-feed events. `Fact` continues
+to define only the domain statement. Generic `Log` entries retain their existing
+metadata and do not acquire domain attribution.
+
+| Field           | Meaning                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `workspaceId`   | The workspace where the action happened.                                                                         |
+| `performedBy`   | The responsible member, authenticated identity before membership, or explicitly identified system process.       |
+| `causedBy`      | The immediate upstream event, located by workspace, log, commit, and event IDs; `null` identifies a root action. |
+| `correlationId` | Groups a causal workflow across events and commits.                                                              |
+| `occurredAt`    | When the domain action happened, independently of the log's `recordedAt`.                                        |
+
+`Performer.Reference` has three variants. `Member` preserves both the membership ID
+and its stable human or agent identity. `Identity` records a human or agent before
+a membership exists. `System` requires a named system ID; it is never an automatic
+fallback for missing identity. Attribution is historical information, not proof
+of permission. Application operations still check current authority.
+
+Construct root provenance once per application operation using
+`Publication.makeForActor()`, which reads the current actor and generates a fresh
+correlation ID through `Crypto.Crypto`. Reuse the result for sibling facts. An
+operation with a domain timestamp can pass that timestamp to the constructor.
+Services capture cryptography during construction and provide it to this helper;
+they resolve the actor during the operation.
+
+For a workflow whose facts are `MemberFacts.Removed` and `InvitationFacts.Revoked`:
+
+```ts
+const remove = journal.commit(
+  Effect.gen(function* () {
+    // The application validates inputs and authorizes this operation first.
+    const provenance = yield* Publication.makeForActor();
+    const removed = yield* journal.publish(MemberFacts.Removed, removal, provenance);
+    const followUp = yield* Publication.makeCausedBy(removed);
+    yield* journal.publish(InvitationFacts.Revoked, revocation, followUp);
+  }),
+);
+```
+
+Here `removal` and `revocation` are validated fact payloads supplied by the workflow.
+`Publication.makeCausedBy` preserves the parent's correlation ID, records its
+reference, and captures a new occurrence time. Its optional performer and timestamp
+arguments support work performed later by a different member or system process.
+The cause must already be visible in the workspace transaction, including an
+earlier publication in the same commit. Publication rejects missing causes,
+foreign workspace attribution, and a correlation that differs from an attributed
+parent. Events in one commit are not automatically causes of one another.
+
+For bootstrap and invitation acceptance, call `Publication.make(workspaceId,
+performer, occurredAt?)` with the authenticated identity. Acceptance records the
+recipient even though its authority check temporarily evaluates the inviter.
+An agent's work records the agent as performer; the requester belongs in the causal
+history. Public request bodies do not select the performer. Current application
+operations construct their own root context; trusted domain workflows explicitly
+construct and pass follow-up context when they have an upstream event.
+
+The journal validates and snapshots provenance before publication. Attribution and
+its nested identity and cause references are immutable when delivered to projections
+and subscribers. Replay preserves recorded provenance without resolving a current
+actor, regenerating identifiers, or changing timestamps. Ordering uses log positions
+and indexes, not occurrence times. Correlation IDs group work; they are not
+idempotency keys and do not make retries safe. Domain explanations such as a rejection
+reason remain in the fact payload.
+
+Stored envelopes written before provenance was introduced omit its field. They
+remain readable through the existing binary format and decode to
+`event.provenance === null`. This means attribution was not recorded; it is distinct
+from `event.provenance.causedBy === null`, which identifies an attributed root action.
+New publications cannot omit provenance. This additive envelope change preserves
+fact versions, existing bytes, and SQL layouts; no data reset is needed.
+
 ## Commits and positions
 
 One commit can touch multiple logs. Each log has an independent position for that
@@ -73,10 +148,11 @@ fibers. Returned entry references are provisional until the outer commit succeed
 
 ```ts
 const incorporate = Effect.gen(function* () {
+  const provenance = yield* Publication.makeForActor();
   yield* journal.commit(
     Effect.gen(function* () {
       yield* turnLog.append(confirmation);
-      yield* journal.publish(InputIncorporated, { turnId, throughSequence });
+      yield* journal.publish(InputIncorporated, { turnId, throughSequence }, provenance);
     }),
   );
 });

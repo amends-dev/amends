@@ -1,3 +1,4 @@
+import { testProvenance } from "./support.ts";
 import { expect, test } from "bun:test";
 import { AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
@@ -259,10 +260,14 @@ test("invitation replay restores pending, accepted, and revoked records without 
         )).find(({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId);
         if (assignment === undefined) throw new Error("Missing Owner assignment");
         yield* Effect.flatMap(Journal.Service, (journal) =>
-          journal.publish(AssignmentFacts.Revoked, {
-            workspaceId: workspace.id,
-            assignmentId: assignment.id,
-          }),
+          journal.publish(
+            AssignmentFacts.Revoked,
+            {
+              workspaceId: workspace.id,
+              assignmentId: assignment.id,
+            },
+            testProvenance(workspace.id),
+          ),
         ).pipe(Effect.provide(core(bound)));
         const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
         const sql = yield* SqlClient.SqlClient;

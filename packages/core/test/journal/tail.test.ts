@@ -1,3 +1,4 @@
+import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Deferred, Effect, Fiber, Option, Ref, Schema, Stream } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -204,9 +205,9 @@ test("journal tails expose complete batches only after projection and cross-log 
       const writer = yield* journal
         .commit(
           Effect.gen(function* () {
-            yield* journal.publish(Changed, 1);
+            yield* journal.publish(Changed, 1, testProvenance(workspaceId));
             yield* turn.append("execution detail");
-            yield* journal.publish(Changed, 2);
+            yield* journal.publish(Changed, 2, testProvenance(workspaceId));
             yield* Deferred.succeed(staged, undefined);
             yield* Deferred.await(release);
           }),
@@ -241,16 +242,16 @@ test("tails ignore rolled-back appends and observe commits with lost acknowledgm
         yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
-              yield* journal.publish(Changed, 99);
+              yield* journal.publish(Changed, 99, testProvenance(workspaceId));
               return yield* Effect.fail("rollback");
             }),
           ),
         ),
       ).toBe("rollback");
       yield* fixture.loseNextAcknowledgment;
-      expect((yield* Effect.flip(journal.publish(Changed, 1)))._tag).toBe(
-        "JournalStore.CommitUncertain",
-      );
+      expect(
+        (yield* Effect.flip(journal.publish(Changed, 1, testProvenance(workspaceId))))._tag,
+      ).toBe("JournalStore.CommitUncertain");
       const batches = yield* Fiber.join(tail);
       const entry = batches[0]?.entries[0];
       if (entry === undefined) throw new Error("Missing committed event");

@@ -24,6 +24,7 @@ const batch = (id: string): CommittedEvents.Batch => ({
       commitId: Commit.Id.make(id),
       index: 0,
       recordedAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+      provenance: null,
       name: Changed.name,
       version: Changed.version,
       payload: { amount: 2, at: DateTime.makeUnsafe("2026-09-20T11:00:00.000Z") },

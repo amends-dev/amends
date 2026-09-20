@@ -48,7 +48,7 @@ const changed = (
   _tag: "Committed",
   workspaceId,
   commitId: Commit.Id.make("commit"),
-  events: [{ id: Entry.Id.make("entry"), name, version, recordedAt, payload }],
+  events: [{ id: Entry.Id.make("entry"), name, version, recordedAt, provenance: null, payload }],
 });
 const encodeMessage = Schema.encodeSync(ChangeFeed.Message);
 const encodeMember = Schema.encodeSync(Member.Record);

@@ -2,6 +2,8 @@ import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
+import { Publication } from "../../journal/publication.ts";
+import type { Event } from "../../journal/event.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Member } from "../../workspace/member/member.ts";
@@ -133,6 +135,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   }, journal.commit);
   const create = Effect.fn("AssignmentApplication.create")(function* (
     input: Assignment.AssignInput,
+    provenance: Event.Provenance,
   ) {
     const record = Assignment.Record.make({
       id: Assignment.Id.make(yield* crypto.randomUUIDv4),
@@ -144,12 +147,16 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
         scope: { _tag: "Workspace", workspaceId },
       }),
     });
-    yield* journal.publish(AssignmentFacts.Created, {
-      workspaceId,
-      assignmentId: record.id,
-      memberId: record.memberId,
-      source: record.source,
-    });
+    yield* journal.publish(
+      AssignmentFacts.Created,
+      {
+        workspaceId,
+        assignmentId: record.id,
+        memberId: record.memberId,
+        source: record.source,
+      },
+      provenance,
+    );
     return record;
   });
   const workspaceRole = (record: Assignment.Record) =>
@@ -166,7 +173,11 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
         record.source._tag === "Role" &&
         record.source.roleId === request.roleId,
     );
-    return existing ?? (yield* create(request));
+    if (existing !== undefined) return existing;
+    const provenance = yield* Publication.makeForActor().pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
+    return yield* create(request, provenance);
   }, journal.commit);
   const revoke = Effect.fn("AssignmentApplication.revoke")(function* (
     memberId: Member.Id,
@@ -184,7 +195,10 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
     if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
     if (record.status === "revoked") return record;
-    yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: id });
+    const provenance = yield* Publication.makeForActor().pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
+    yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: id }, provenance);
     return { ...record, status: "revoked" } satisfies Assignment.Record;
   }, journal.commit);
   const change = Effect.fn("AssignmentApplication.change")(function* (
@@ -206,9 +220,16 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       ({ source }) => source._tag === "Role" && source.roleId === request.roleId,
     );
     if (current.length === 1 && same !== undefined) return same;
+    const provenance = yield* Publication.makeForActor().pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
     for (const record of current)
-      yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: record.id });
-    return yield* create(request);
+      yield* journal.publish(
+        AssignmentFacts.Revoked,
+        { workspaceId, assignmentId: record.id },
+        provenance,
+      );
+    return yield* create(request, provenance);
   }, journal.commit);
   return Service.of({ roles: choices.pipe(journal.commit), list, assign, revoke, change });
 });

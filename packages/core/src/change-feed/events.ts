@@ -35,6 +35,7 @@ export const normalize = Effect.fn("ChangeFeedEvents.normalize")(function* (even
     name: event.name,
     version: event.version,
     recordedAt: event.recordedAt,
+    provenance: event.provenance,
     payload,
   });
 });

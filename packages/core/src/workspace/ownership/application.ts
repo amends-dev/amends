@@ -10,6 +10,8 @@ import { BuiltinRoles } from "../../authorization/role/builtin.ts";
 import type { Role } from "../../authorization/role/role.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
+import { Publication } from "../../journal/publication.ts";
+import type { Event } from "../../journal/event.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { WorkspaceFacts } from "../facts.ts";
@@ -180,16 +182,21 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   const createAssignment = Effect.fn("OwnershipApplication.createAssignment")(function* (
     memberId: Member.Id,
     roleId: Role.Id,
+    provenance: Event.Provenance,
   ) {
-    yield* journal.publish(AssignmentFacts.Created, {
-      assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      memberId,
-      source: Assignment.Source.cases.Role.make({
-        roleId,
-        scope: { _tag: "Workspace", workspaceId },
-      }),
-    });
+    yield* journal.publish(
+      AssignmentFacts.Created,
+      {
+        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+        workspaceId,
+        memberId,
+        source: Assignment.Source.cases.Role.make({
+          roleId,
+          scope: { _tag: "Workspace", workspaceId },
+        }),
+      },
+      provenance,
+    );
   });
   const transfer = Effect.fn("OwnershipApplication.transfer")(function* (
     input: Ownership.TransferInput,
@@ -226,6 +233,9 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
       )
     )
       return yield* new InvalidState({ message: "Owner assignment listings disagree" });
+    const provenance = yield* Publication.makeForActor().pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
     for (const records of [previousAssignments, recipientAssignments]) {
       for (const assignment of records) {
         const source = assignment.source;
@@ -234,19 +244,27 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
           source.scope._tag === "Workspace" &&
           builtins.includes(source.roleId)
         )
-          yield* journal.publish(AssignmentFacts.Revoked, {
-            workspaceId,
-            assignmentId: assignment.id,
-          });
+          yield* journal.publish(
+            AssignmentFacts.Revoked,
+            {
+              workspaceId,
+              assignmentId: assignment.id,
+            },
+            provenance,
+          );
       }
     }
-    yield* createAssignment(state.owner.id, BuiltinRoles.AdministratorId);
-    yield* createAssignment(recipient.id, BuiltinRoles.OwnerId);
-    yield* journal.publish(WorkspaceFacts.OwnershipTransferred, {
-      workspaceId,
-      previousOwnerMemberId: state.owner.id,
-      ownerMemberId: recipient.id,
-    });
+    yield* createAssignment(state.owner.id, BuiltinRoles.AdministratorId, provenance);
+    yield* createAssignment(recipient.id, BuiltinRoles.OwnerId, provenance);
+    yield* journal.publish(
+      WorkspaceFacts.OwnershipTransferred,
+      {
+        workspaceId,
+        previousOwnerMemberId: state.owner.id,
+        ownerMemberId: recipient.id,
+      },
+      provenance,
+    );
     const updated = yield* current;
     if (
       updated.owner.id !== recipient.id ||

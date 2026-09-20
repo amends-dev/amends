@@ -125,12 +125,22 @@ replay does not reauthorize the former owner.
 `CommittedEvents`, exported from `@amends/core/journal`, is a scoped, internal bus
 for one workspace. `make(workspaceId, { capacity })` constructs it, and `layer`
 delegates to that constructor. The default capacity is 256 committed batches.
-`Event.Record` describes the existing canonical decoded event shape with an unknown
+`Event.Record` describes the canonical decoded event shape with an unknown
 payload; each fact's schema supplies its specific payload type. `CommittedEvents.Batch`
 groups those events in publication order with their workspace and commit IDs.
 
+Every `Journal.publish` takes explicit `Event.Provenance`: workspace, performer,
+immediate cause, correlation ID, and occurrence time. `Publication.makeForActor`
+creates root context from the operation's actor; `Publication.make` supports
+authenticated identities before membership and explicit system performers.
+`Publication.makeCausedBy` continues an event's causal chain. See the
+[publication pattern](../../docs/journal.md#event-provenance) for attribution rules,
+validation, and examples. New events return `Event.Published<F>` with complete
+provenance; older stored envelopes decode with `provenance: null`.
+
 The bus validates batch metadata and workspace binding. It owns frozen copies of
-the envelope, event array, and event metadata. Decoded payloads retain their original
+the envelope, event array, and event metadata, including nested provenance references.
+Decoded payloads retain their original
 values and are shared read-only; producers and consumers must not mutate them.
 This is an internal event model, not a public HTTP or persistence codec for arbitrary
 payloads. The bus does not verify that a transaction committed: the publisher must
@@ -165,7 +175,7 @@ Gateway's `WorkspaceEvents` registry manages shared bus lifetimes across request
 `ChangeFeedApplication.watch`. The operation checks active membership, registers
 with the workspace bus, and returns a stream in the caller's scope. It emits
 `Ready { workspaceId }` first, then `Committed { workspaceId, commitId, events }`.
-Each event carries `id`, `name`, `version`, `recordedAt`, and a JSON-compatible
+Each event carries `id`, `name`, `version`, `recordedAt`, `provenance`, and a JSON-compatible
 `payload` encoded through its fact schema. Commit order is preserved within each
 batch. Events committed after subscription are retained even before Ready is read.
 
@@ -237,7 +247,7 @@ consistent across modules. Typed errors retain tagged error schemas.
 
 Supporting types name their actual role. `Invitation.Issuance` is the immutable
 issuance record retained through acceptance or revocation. `Event.Envelope`
-contains a fact's name, version, and encoded payload; `Fact.Payload<F>` is the
+contains a fact's name, version, encoded payload, and provenance; `Fact.Payload<F>` is the
 decoded domain payload. `Log.Entry<A>` carries a decoded payload and entry
 metadata. `Codec.PayloadCodec<S>` handles a payload schema, while
 `Codec.FactCodec<F>` pairs that codec with its fact definition.

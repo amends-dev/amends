@@ -1,3 +1,4 @@
+import { testProvenance } from "./support.ts";
 import { expect, test } from "bun:test";
 import {
   Assignment,
@@ -68,22 +69,26 @@ test("transfer replaces workspace roles, preserves separate access and attributi
         });
         const preservedId = Assignment.Id.make("separate-access");
         yield* Effect.flatMap(Journal.Service, (journal) =>
-          journal.publish(AssignmentFacts.Created, {
-            workspaceId: workspace.id,
-            assignmentId: preservedId,
-            memberId: recipient.id,
-            source: {
-              _tag: "Direct",
-              grant: Grant.make(MemberPermissions.Read, {
-                _tag: "Target",
-                target: {
-                  _tag: "Member",
-                  workspaceId: workspace.id,
-                  memberId: workspace.ownerMemberId,
-                },
-              }),
+          journal.publish(
+            AssignmentFacts.Created,
+            {
+              workspaceId: workspace.id,
+              assignmentId: preservedId,
+              memberId: recipient.id,
+              source: {
+                _tag: "Direct",
+                grant: Grant.make(MemberPermissions.Read, {
+                  _tag: "Target",
+                  target: {
+                    _tag: "Member",
+                    workspaceId: workspace.id,
+                    memberId: workspace.ownerMemberId,
+                  },
+                }),
+              },
             },
-          }),
+            testProvenance(workspace.id),
+          ),
         ).pipe(Effect.provide(core(bound)));
         const preserved = yield* bound.assignments.get(preservedId);
         const changed = yield* Operations.transferOwnership(workspace.id, alice, {
@@ -144,11 +149,15 @@ test("only a permitted current owner can transfer to another active human in the
         const { workspace, recipient, other, view, bound } = yield* setup;
         const agentId = Member.Id.make("agent");
         yield* Effect.flatMap(Journal.Service, (journal) =>
-          journal.publish(MemberFacts.Added, {
-            workspaceId: workspace.id,
-            memberId: agentId,
-            identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
-          }),
+          journal.publish(
+            MemberFacts.Added,
+            {
+              workspaceId: workspace.id,
+              memberId: agentId,
+              identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
+            },
+            testProvenance(workspace.id),
+          ),
         ).pipe(Effect.provide(core(bound)));
         yield* Operations.removeMember(workspace.id, alice, other.id);
         const elsewhere = yield* Operations.createWorkspace(alice.id);
@@ -182,18 +191,22 @@ test("only a permitted current owner can transfer to another active human in the
         ).toMatchObject({ _tag: "Authorization.Denied" });
         // Having the action permission alone does not confer ownership.
         yield* Effect.flatMap(Journal.Service, (journal) =>
-          journal.publish(AssignmentFacts.Created, {
-            workspaceId: workspace.id,
-            assignmentId: Assignment.Id.make("transfer-permission"),
-            memberId: recipient.id,
-            source: {
-              _tag: "Direct",
-              grant: Grant.make(OwnershipPermissions.Transfer, {
-                _tag: "Workspace",
-                workspaceId: workspace.id,
-              }),
+          journal.publish(
+            AssignmentFacts.Created,
+            {
+              workspaceId: workspace.id,
+              assignmentId: Assignment.Id.make("transfer-permission"),
+              memberId: recipient.id,
+              source: {
+                _tag: "Direct",
+                grant: Grant.make(OwnershipPermissions.Transfer, {
+                  _tag: "Workspace",
+                  workspaceId: workspace.id,
+                }),
+              },
             },
-          }),
+            testProvenance(workspace.id),
+          ),
         ).pipe(Effect.provide(core(bound)));
         expect(
           yield* Effect.flip(
@@ -204,11 +217,15 @@ test("only a permitted current owner can transfer to another active human in the
           ),
         ).toMatchObject({ _tag: "OwnershipApplication.NotOwner" });
         yield* Effect.flatMap(Journal.Service, (journal) =>
-          journal.publish(RoleFacts.PermissionsChanged, {
-            workspaceId: workspace.id,
-            roleId: BuiltinRoles.OwnerId,
-            permissions: [MemberPermissions.Read.name],
-          }),
+          journal.publish(
+            RoleFacts.PermissionsChanged,
+            {
+              workspaceId: workspace.id,
+              roleId: BuiltinRoles.OwnerId,
+              permissions: [MemberPermissions.Read.name],
+            },
+            testProvenance(workspace.id),
+          ),
         ).pipe(Effect.provide(core(bound)));
         expect((yield* Operations.ownership(workspace.id, alice)).canTransfer).toBe(false);
         expect(

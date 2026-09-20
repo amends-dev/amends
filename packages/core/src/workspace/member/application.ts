@@ -1,10 +1,12 @@
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import type { PlatformError } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
+import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import type { Transaction } from "../../journal/transaction.ts";
@@ -54,6 +56,7 @@ export type Error =
 
 export type RemoveError =
   | Error
+  | PlatformError.PlatformError
   | Delegation.Error
   | WorkspaceStore.Failure
   | InvitationStore.Failure
@@ -117,6 +120,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | Authorization.Service
   | Delegation.Service
   | Journal.Service
+  | Crypto.Crypto
 > {
   const members = yield* MemberStore.Service;
   const workspace = yield* WorkspaceStore.Service;
@@ -124,6 +128,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
+  const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, members.workspaceId);
   yield* requireWorkspace(workspaceId, workspace.workspaceId);
@@ -193,10 +198,22 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     if (member.status === "removed")
       return yield* new AlreadyRemoved({ workspaceId, memberId: id });
     yield* delegation.requireRemoval(id);
-    yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
+    const provenance = yield* Publication.makeForActor().pipe(
+      Effect.provideService(Crypto.Crypto, crypto),
+    );
+    const removed = yield* journal.publish(
+      MemberFacts.Removed,
+      { workspaceId, memberId: id },
+      provenance,
+    );
     if (member.identity._tag === "Human") {
       const actor = yield* Actor.Service;
       const revokedAt = yield* DateTime.now;
+      const revocationProvenance = yield* Publication.makeCausedBy(
+        removed,
+        provenance.performedBy,
+        revokedAt,
+      );
       for (const pending of yield* invitations.listPendingByRecipient(member.identity.id)) {
         const invitation = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(pending);
         if (
@@ -207,13 +224,17 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
           return yield* new InvalidResponse({
             message: "Invitation store returned a different recipient, workspace, or state",
           });
-        yield* journal.publish(InvitationFacts.Revoked, {
-          workspaceId,
-          invitationId: invitation.details.id,
-          _tag: "Revoked",
-          revokedBy: actor.memberId,
-          revokedAt,
-        });
+        yield* journal.publish(
+          InvitationFacts.Revoked,
+          {
+            workspaceId,
+            invitationId: invitation.details.id,
+            _tag: "Revoked",
+            revokedBy: actor.memberId,
+            revokedAt,
+          },
+          revocationProvenance,
+        );
       }
     }
     return {

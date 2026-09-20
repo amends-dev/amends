@@ -13,5 +13,6 @@ export { Fact } from "./fact.ts";
 export { Journal } from "./journal.ts";
 export { Log } from "./log.ts";
 export { Projection } from "./projection.ts";
+export { Publication } from "./publication.ts";
 export { Store } from "./store.ts";
 export { Transaction } from "./transaction.ts";

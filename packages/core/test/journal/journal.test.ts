@@ -1,3 +1,4 @@
+import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Deferred, Effect, Fiber, Option, Schema, Stream } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -53,7 +54,7 @@ test("facts and turn output use independent logs through the same storage", asyn
     fixture,
     Effect.gen(function* () {
       const { journal, turn } = yield* setup;
-      const event = yield* journal.publish(Changed, { amount: 2 });
+      const event = yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
       yield* turn.append({ _tag: "Text", text: "working" });
       yield* turn.append({ _tag: "Finished" });
       const domain = yield* journal.log.read({ limit: 10 });
@@ -85,9 +86,11 @@ test("one explicit commit spans logs, nested commits, and projections", async ()
       const { journal, turn } = yield* setup;
       const entries = yield* journal.commit(
         Effect.gen(function* () {
-          const first = yield* journal.publish(Changed, { amount: 1 });
+          const first = yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
           const output = yield* turn.append({ _tag: "Text", text: "inside" });
-          const second = yield* journal.commit(journal.publish(Changed, { amount: 2 }));
+          const second = yield* journal.commit(
+            journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId)),
+          );
           expect(yield* (yield* Counter).get).toBe(3);
           return [first, output, second];
         }),
@@ -117,7 +120,9 @@ test("a caught projection failure still rolls back all logs and projection state
         journal.commit(
           Effect.gen(function* () {
             yield* turn.append({ _tag: "Text", text: "will roll back" });
-            yield* journal.publish(Changed, { amount: 7 }).pipe(Effect.catch(() => Effect.void));
+            yield* journal
+              .publish(Changed, { amount: 7 }, testProvenance(workspaceId))
+              .pipe(Effect.catch(() => Effect.void));
           }),
         ),
       );
@@ -136,9 +141,13 @@ test("parallel publications preserve append and projection order", async () => {
     Effect.gen(function* () {
       const { journal } = yield* setup;
       yield* journal.commit(
-        Effect.forEach([1, 2, 3, 4], (amount) => journal.publish(Changed, { amount }), {
-          concurrency: "unbounded",
-        }),
+        Effect.forEach(
+          [1, 2, 3, 4],
+          (amount) => journal.publish(Changed, { amount }, testProvenance(workspaceId)),
+          {
+            concurrency: "unbounded",
+          },
+        ),
       );
       const batches = yield* journal.log.read({ limit: 10 });
       expect(batches).toHaveLength(1);
@@ -159,7 +168,7 @@ test("interruption rolls back staged entries and projection changes", async () =
         .commit(
           Effect.gen(function* () {
             yield* turn.append({ _tag: "Text", text: "pending" });
-            yield* journal.publish(Changed, { amount: 5 });
+            yield* journal.publish(Changed, { amount: 5 }, testProvenance(workspaceId));
             yield* Deferred.succeed(ready, undefined);
             return yield* Effect.never;
           }),
@@ -183,7 +192,9 @@ test("projections cannot recursively append execution or fact entries", async ()
         turn.append({ _tag: "Finished" }).pipe(Effect.asVoid),
       );
       const journal = yield* Journal.make({ logId: Log.Id.make("domain"), projections: [invalid] });
-      const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
+      const failure = yield* Effect.flip(
+        journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId)),
+      );
       expect(failure).toMatchObject({
         _tag: "Projection.Failure",
         phase: "apply",
@@ -201,7 +212,9 @@ test("uncertain commit outcomes preserve identity and are not automatically retr
     Effect.gen(function* () {
       const { journal } = yield* setup;
       yield* fixture.loseNextAcknowledgment;
-      const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
+      const failure = yield* Effect.flip(
+        journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId)),
+      );
       if (failure._tag !== "JournalStore.CommitUncertain")
         throw new Error("Expected uncertain outcome");
       expect(Option.isSome(yield* journal.log.get(failure.commitId))).toBe(true);
@@ -238,7 +251,7 @@ test("expected positions and replay cursors are scoped to their log", async () =
         { _tag: "Text", text: "first" },
         { expectedAfter: Option.none() },
       );
-      yield* journal.publish(Changed, { amount: 1 });
+      yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
       yield* turn.append({ _tag: "Finished" }, { expectedAfter: Option.some(first.position) });
       const conflict = yield* Effect.flip(
         turn.append({ _tag: "Finished" }, { expectedAfter: Option.none() }),
@@ -257,7 +270,7 @@ test("readers reject batches from another log", async () => {
     fixture,
     Effect.gen(function* () {
       const { journal, turn } = yield* setup;
-      yield* journal.publish(Changed, { amount: 1 });
+      yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
       yield* turn.append({ _tag: "Finished" });
     }),
   );

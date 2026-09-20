@@ -1,3 +1,4 @@
+import { testProvenance } from "./support.ts";
 import { expect } from "bun:test";
 import { BuiltinRoles, RoleFacts } from "@amends/core/authorization";
 import { Journal, Log, Store } from "@amends/core/journal";
@@ -88,11 +89,15 @@ it("replay restores ownership, membership, and recorded roles without regenerati
         const workspace = yield* initialized(bound);
         // A recorded policy change must survive replay even when the current template differs.
         yield* Effect.flatMap(Journal.Service, (journal) =>
-          journal.publish(RoleFacts.PermissionsChanged, {
-            workspaceId,
-            roleId: BuiltinRoles.OwnerId,
-            permissions: [MemberPermissions.Read.name],
-          }),
+          journal.publish(
+            RoleFacts.PermissionsChanged,
+            {
+              workspaceId,
+              roleId: BuiltinRoles.OwnerId,
+              permissions: [MemberPermissions.Read.name],
+            },
+            testProvenance(workspaceId),
+          ),
         ).pipe(Effect.provide(core(bound)));
         const roleIds = [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
         const roles = yield* Effect.forEach(roleIds, (id) => bound.roles.get(id));

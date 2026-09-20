@@ -1,3 +1,4 @@
+import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Array, DateTime, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect";
 import { Authorization } from "../../src/authorization/authorization.ts";
@@ -88,21 +89,33 @@ test("registers before Ready, skips history and preserves committed batches with
     Effect.gen(function* () {
       const journal = yield* Journal.Service;
       const changes = yield* ChangeFeedApplication.Service;
-      yield* journal.publish(MemberFacts.Added, {
-        workspaceId,
-        memberId: actor.memberId,
-        identity: actor.identity,
-      });
+      yield* journal.publish(
+        MemberFacts.Added,
+        {
+          workspaceId,
+          memberId: actor.memberId,
+          identity: actor.identity,
+        },
+        testProvenance(workspaceId),
+      );
       const stream = yield* changes.watch;
       // Publish before even pulling Ready: a successful subscription must retain this commit.
       const events = yield* journal.commit(
         Effect.gen(function* () {
-          const first = yield* journal.publish(MemberFacts.Added, {
-            workspaceId,
-            memberId: actor.memberId,
-            identity: actor.identity,
-          });
-          const second = yield* journal.publish(InvitationFacts.Issued, invitation);
+          const first = yield* journal.publish(
+            MemberFacts.Added,
+            {
+              workspaceId,
+              memberId: actor.memberId,
+              identity: actor.identity,
+            },
+            testProvenance(workspaceId),
+          );
+          const second = yield* journal.publish(
+            InvitationFacts.Issued,
+            invitation,
+            testProvenance(workspaceId),
+          );
           return [first, second] as const;
         }),
       );
@@ -118,6 +131,7 @@ test("registers before Ready, skips history and preserves committed batches with
             name: event.name,
             version: event.version,
             recordedAt: event.recordedAt,
+            provenance: event.provenance,
             payload:
               event.name === MemberFacts.Added.name
                 ? event.payload
@@ -159,16 +173,20 @@ test("lag fails the stream so a reconnect must establish a fresh Ready boundary"
         const journal = yield* Journal.Service;
         const stream = yield* changes.watch;
         for (let index = 0; index < 3; index++)
-          yield* journal.publish(MemberFacts.Added, {
-            workspaceId,
-            memberId: actor.memberId,
-            identity: actor.identity,
-          });
+          yield* journal.publish(
+            MemberFacts.Added,
+            {
+              workspaceId,
+              memberId: actor.memberId,
+              identity: actor.identity,
+            },
+            testProvenance(workspaceId),
+          );
         expect(yield* stream.pipe(Stream.runDrain, Effect.flip)).toEqual(
           new ChangeFeed.Unavailable({}),
         );
         const fresh = yield* changes.watch;
-        yield* journal.publish(InvitationFacts.Issued, invitation);
+        yield* journal.publish(InvitationFacts.Issued, invitation, testProvenance(workspaceId));
         expect(
           (yield* fresh.pipe(Stream.take(2), Stream.runCollect)).map((message) => message._tag),
         ).toEqual(["Ready", "Committed"]);
@@ -181,7 +199,7 @@ test("unknown fact versions fail normalization instead of emitting an incomplete
     Effect.gen(function* () {
       const stream = yield* (yield* ChangeFeedApplication.Service).watch;
       const future = Fact.make(MemberFacts.Added.name, { version: 2, payload: Schema.Struct({}) });
-      yield* (yield* Journal.Service).publish(future, {});
+      yield* (yield* Journal.Service).publish(future, {}, testProvenance(workspaceId));
       expect(yield* stream.pipe(Stream.runDrain, Effect.flip)).toEqual(
         new ChangeFeed.Unavailable({}),
       );
@@ -201,7 +219,11 @@ test("closing the caller scope interrupts pending reads without closing another 
       );
       yield* Scope.close(scope, Exit.void);
       expect(Exit.hasInterrupts(yield* Fiber.await(pending))).toBe(true);
-      yield* (yield* Journal.Service).publish(InvitationFacts.Issued, invitation);
+      yield* (yield* Journal.Service).publish(
+        InvitationFacts.Issued,
+        invitation,
+        testProvenance(workspaceId),
+      );
       expect(yield* other.pipe(Stream.take(2), Stream.runCollect)).toHaveLength(2);
     }),
   ));

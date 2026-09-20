@@ -1,3 +1,4 @@
+import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, test } from "bun:test";
 import { Cause, Context, Effect, Exit, Layer, Option, Ref, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -83,15 +84,15 @@ test.each(["make", "layer"] as const)(
       expect(Option.isNone(yield* Effect.serviceOption(Audit))).toBe(true);
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, 2);
-          yield* journal.commit(journal.publish(Changed, 3));
+          yield* journal.publish(Changed, 2, testProvenance(workspaceId));
+          yield* journal.commit(journal.publish(Changed, 3, testProvenance(workspaceId)));
         }),
       );
       expect(yield* fixture.counter.get).toBe(5);
       expect(yield* Ref.get(finalized)).toBe(2);
       yield* journal.replay;
       yield* Ref.set(reject, true);
-      const error = yield* journal.publish(Changed, 7).pipe(
+      const error = yield* journal.publish(Changed, 7, testProvenance(workspaceId)).pipe(
         Effect.match({
           onFailure: (failure) => failure,
           onSuccess: () => undefined,
@@ -172,19 +173,23 @@ test("binding inside an earlier commit never reuses its transaction or scope", a
           return yield* Journal.make({ logId: Log.Id.make("domain"), projections: [scoped] });
         }),
       );
-      yield* journal.publish(Changed, 1);
+      yield* journal.publish(Changed, 1, testProvenance(workspaceId));
       expect(yield* Ref.get(finalized)).toBe(1);
       yield* journal.commit(
-        Effect.forEach([2, 3], (amount) => journal.publish(Changed, amount), {
-          concurrency: "unbounded",
-        }),
+        Effect.forEach(
+          [2, 3],
+          (amount) => journal.publish(Changed, amount, testProvenance(workspaceId)),
+          {
+            concurrency: "unbounded",
+          },
+        ),
       );
       expect(yield* Ref.get(finalized)).toBe(3);
       expect(yield* fixture.counter.get).toBe(6);
       expect(yield* fixture.attempts).toBe(3);
 
       const source = yield* Journal.make({ logId: Log.Id.make("history"), projections: [] });
-      yield* source.publish(Changed, 4);
+      yield* source.publish(Changed, 4, testProvenance(workspaceId));
       const bound = yield* logs.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
@@ -222,7 +227,7 @@ test("projection defects remain defects and still roll back the publication", as
   await Effect.runPromise(
     Effect.gen(function* () {
       const journal = yield* Journal.Service;
-      const exit = yield* Effect.exit(journal.publish(Changed, 1));
+      const exit = yield* Effect.exit(journal.publish(Changed, 1, testProvenance(workspaceId)));
       if (!Exit.isFailure(exit)) throw new Error("Expected defect");
       expect(Cause.hasDies(exit.cause)).toBe(true);
       expect(Cause.hasFails(exit.cause)).toBe(false);

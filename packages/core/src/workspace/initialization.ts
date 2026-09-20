@@ -7,6 +7,7 @@ import { RoleFacts } from "../authorization/role/facts.ts";
 import { Scope } from "../authorization/scope.ts";
 import { Identity } from "../identity/identity.ts";
 import { Journal } from "../journal/journal.ts";
+import { Publication } from "../journal/publication.ts";
 import { WorkspaceFacts } from "./facts.ts";
 import { MemberFacts } from "./member/facts.ts";
 import { Member } from "./member/member.ts";
@@ -37,6 +38,10 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const catalog = yield* PermissionCatalog.Service;
+  const provenance = yield* Publication.make(workspace.workspaceId, {
+    _tag: "Identity",
+    identity: Identity.Reference.cases.Human.make({ id: createdBy }),
+  });
   return yield* journal.commit(
     Effect.gen(function* () {
       if (Option.isSome(yield* workspace.get))
@@ -48,29 +53,41 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         createdBy,
         ownerMemberId,
       });
-      yield* journal.publish(WorkspaceFacts.Initialized, record);
-      yield* journal.publish(MemberFacts.Added, {
-        workspaceId: record.id,
-        memberId: ownerMemberId,
-        identity: Identity.Reference.cases.Human.make({ id: createdBy }),
-      });
+      yield* journal.publish(WorkspaceFacts.Initialized, record, provenance);
+      yield* journal.publish(
+        MemberFacts.Added,
+        {
+          workspaceId: record.id,
+          memberId: ownerMemberId,
+          identity: Identity.Reference.cases.Human.make({ id: createdBy }),
+        },
+        provenance,
+      );
       for (const role of BuiltinRoles.make(record.id, catalog.definitions)) {
-        yield* journal.publish(RoleFacts.Created, {
-          roleId: role.id,
-          workspaceId: role.workspaceId,
-          name: role.name,
-          permissions: role.permissions,
-        });
+        yield* journal.publish(
+          RoleFacts.Created,
+          {
+            roleId: role.id,
+            workspaceId: role.workspaceId,
+            name: role.name,
+            permissions: role.permissions,
+          },
+          provenance,
+        );
       }
-      yield* journal.publish(AssignmentFacts.Created, {
-        workspaceId: record.id,
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        memberId: ownerMemberId,
-        source: Assignment.Source.cases.Role.make({
-          roleId: BuiltinRoles.OwnerId,
-          scope: Scope.Value.cases.Workspace.make({ workspaceId: record.id }),
-        }),
-      });
+      yield* journal.publish(
+        AssignmentFacts.Created,
+        {
+          workspaceId: record.id,
+          assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+          memberId: ownerMemberId,
+          source: Assignment.Source.cases.Role.make({
+            roleId: BuiltinRoles.OwnerId,
+            scope: Scope.Value.cases.Workspace.make({ workspaceId: record.id }),
+          }),
+        },
+        provenance,
+      );
       return record;
     }),
   );

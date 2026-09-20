@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { Commit } from "../journal/commit.ts";
 import { Entry } from "../journal/entry.ts";
+import { Event as JournalEvent } from "../journal/event.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 
 /** Consumer-facing event; its payload is the fact schema's JSON-encoded representation. */
@@ -9,6 +10,7 @@ export const Event = Schema.Struct({
   name: Schema.NonEmptyString,
   version: Schema.Finite,
   recordedAt: Schema.DateTimeUtcFromString,
+  provenance: Schema.NullOr(JournalEvent.Provenance),
   payload: Schema.Json,
 }).annotate({ identifier: "ChangeFeedEvent" });
 export interface Event extends Schema.Schema.Type<typeof Event> {}

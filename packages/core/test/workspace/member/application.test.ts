@@ -1,5 +1,6 @@
+import { testCrypto, testProvenance } from "../../publication.ts";
 import { expect, expectTypeOf, test } from "bun:test";
-import { Effect, Layer, Option } from "effect";
+import { Crypto, Effect, Layer, Option } from "effect";
 import { AssignmentFacts } from "../../../src/authorization/assignment/facts.ts";
 import { AssignmentProjection } from "../../../src/authorization/assignment/projection.ts";
 import { AssignmentStore } from "../../../src/authorization/assignment/store.ts";
@@ -138,6 +139,7 @@ const run = <A, E>(
     | WorkspaceStore.Service
     | InvitationStore.Service
     | Actor.Service
+    | Crypto.Crypto
   >,
   actor: Actor.Value = alice,
   overrides: Partial<MemberStore.Interface> = {},
@@ -147,6 +149,7 @@ const run = <A, E>(
     program.pipe(
       Effect.provide(configured(fixture, overrides, workspaceOverrides)),
       Effect.provideService(Actor.Service, actor),
+      Effect.provideService(Crypto.Crypto, testCrypto),
     ),
   );
 const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = []) =>
@@ -176,6 +179,7 @@ test("member reads require only the current actor and leave the journal unchange
     | Authorization.Service
     | Delegation.Service
     | Journal.Service
+    | Crypto.Crypto
   >();
   expectTypeOf<
     Layer.Error<typeof MemberApplication.layer>
@@ -264,13 +268,21 @@ test("member reads join the current commit and see staged grants and membership 
       const application = yield* MemberApplication.Service;
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(AssignmentFacts.Created, {
-            assignmentId: readBob.id,
-            workspaceId,
-            memberId: alice.memberId,
-            source: readBob.source,
-          });
-          yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: bob.id });
+          yield* journal.publish(
+            AssignmentFacts.Created,
+            {
+              assignmentId: readBob.id,
+              workspaceId,
+              memberId: alice.memberId,
+              source: readBob.source,
+            },
+            testProvenance(workspaceId),
+          );
+          yield* journal.publish(
+            MemberFacts.Removed,
+            { workspaceId, memberId: bob.id },
+            testProvenance(workspaceId),
+          );
           expect(yield* application.get(bob.id)).toMatchObject({ id: bob.id, status: "removed" });
         }),
       );
@@ -296,10 +308,14 @@ test("a staged revocation denies the read and rolls back the enclosing commit", 
       const application = yield* MemberApplication.Service;
       return yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(AssignmentFacts.Revoked, {
-            workspaceId,
-            assignmentId: readBob.id,
-          });
+          yield* journal.publish(
+            AssignmentFacts.Revoked,
+            {
+              workspaceId,
+              assignmentId: readBob.id,
+            },
+            testProvenance(workspaceId),
+          );
           return yield* application.get(bob.id);
         }),
       );
@@ -519,12 +535,16 @@ test("removal joins an outer commit, sees staged permission, and rolls back with
     const application = yield* MemberApplication.Service;
     return yield* journal.commit(
       Effect.gen(function* () {
-        yield* journal.publish(AssignmentFacts.Created, {
-          assignmentId: granted.id,
-          workspaceId,
-          memberId: alice.memberId,
-          source: granted.source,
-        });
+        yield* journal.publish(
+          AssignmentFacts.Created,
+          {
+            assignmentId: granted.id,
+            workspaceId,
+            memberId: alice.memberId,
+            source: granted.source,
+          },
+          testProvenance(workspaceId),
+        );
         return yield* application.remove(bob.id);
       }),
     );

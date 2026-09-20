@@ -1,8 +1,8 @@
 import { afterAll, test } from "bun:test";
 import * as Core from "@amends/core";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
-import { Identity } from "@amends/core/identity";
-import { Checkpoint, CommittedEvents, Log, Store } from "@amends/core/journal";
+import { Identity, Performer } from "@amends/core/identity";
+import { Event, Checkpoint, CommittedEvents, Log, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   InvitationStore,
@@ -78,4 +78,13 @@ export const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { 
 
 export const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   return yield* (yield* views()).forWorkspace(workspaceId);
+});
+
+/** Attribution for low-level fixture writes outside application operations. */
+export const testProvenance = (id = workspaceId): Event.Provenance => ({
+  workspaceId: id,
+  performedBy: { _tag: "System", id: Performer.SystemId.make("test-fixture") },
+  causedBy: null,
+  correlationId: Event.CorrelationId.make("test-operation"),
+  occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
 });

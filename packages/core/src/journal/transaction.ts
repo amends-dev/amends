@@ -1,5 +1,6 @@
 import { Array, Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect";
 import type { Cause, Scope } from "effect";
+import type { WorkspaceId } from "../workspace/id.ts";
 import { CommittedEvents } from "./committed-events.ts";
 import type { Event } from "./event.ts";
 import { Store } from "./store.ts";
@@ -24,6 +25,7 @@ export type Error =
 export type Remaining<R> = Exclude<Exclude<R, Scope.Scope>, Store.Transaction>;
 
 export interface Interface {
+  readonly workspaceId: WorkspaceId.Id;
   readonly run: <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Error, Remaining<R>>;
@@ -190,7 +192,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     );
   });
 
-  return Service.of({ run, operation, recordEvent });
+  return Service.of({ workspaceId: committed.workspaceId, run, operation, recordEvent });
 });
 
 /**

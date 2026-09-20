@@ -1,3 +1,4 @@
+import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -39,7 +40,11 @@ test("the empty notification projection catches up and checkpoints live batches 
     fixture,
     Effect.gen(function* () {
       const source = yield* Journal.make({ logId, projections: [] });
-      const historical = yield* source.publish(Source, "before registration");
+      const historical = yield* source.publish(
+        Source,
+        "before registration",
+        testProvenance(workspaceId),
+      );
       const journal = yield* Journal.make({
         logId,
         projections: [NotificationProjection.definition],
@@ -55,8 +60,8 @@ test("the empty notification projection catches up and checkpoints live batches 
       );
       const last = yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Source, "first in batch");
-          return yield* journal.publish(Source, "last in batch");
+          yield* journal.publish(Source, "first in batch", testProvenance(workspaceId));
+          return yield* journal.publish(Source, "last in batch", testProvenance(workspaceId));
         }),
       );
       const expected = Option.some({

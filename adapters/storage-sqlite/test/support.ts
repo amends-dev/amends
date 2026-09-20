@@ -1,7 +1,7 @@
 import * as Core from "@amends/core";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
-import { Identity } from "@amends/core/identity";
-import { Checkpoint, CommittedEvents, Store } from "@amends/core/journal";
+import { Identity, Performer } from "@amends/core/identity";
+import { Event, Checkpoint, CommittedEvents, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   InvitationStore,
@@ -13,7 +13,7 @@ import {
 import { Gateway, WorkspaceEvents, type WorkspaceStorage } from "@amends/gateway";
 import { layer, SqliteDatabase, SqliteStorage } from "../src/index.ts";
 import { BunCrypto } from "@effect/platform-bun";
-import { Context, Effect, Layer } from "effect";
+import { Context, DateTime, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -69,4 +69,13 @@ export const temporary = async (run: (filename: string) => Promise<void>) => {
 
 export const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   return yield* (yield* views).forWorkspace(workspaceId);
+});
+
+/** Attribution for low-level fixture writes outside application operations. */
+export const testProvenance = (id = workspaceId): Event.Provenance => ({
+  workspaceId: id,
+  performedBy: { _tag: "System", id: Performer.SystemId.make("test-fixture") },
+  causedBy: null,
+  correlationId: Event.CorrelationId.make("test-operation"),
+  occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
 });
