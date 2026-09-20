@@ -99,6 +99,7 @@ export const make = Effect.fn("Journal.make")(function* <
         });
         const event = yield* Event.decode(fact, entry);
         for (const runner of runners) yield* runner.apply(entry, event);
+        yield* transaction.recordEvent(event);
         return event;
       }),
     );

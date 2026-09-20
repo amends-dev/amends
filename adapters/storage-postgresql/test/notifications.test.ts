@@ -7,7 +7,7 @@ import {
   NotificationStore,
 } from "@amends/core/notification";
 import { Member, type Workspace } from "@amends/core/workspace";
-import { Gateway, WorkspaceStorage } from "@amends/gateway";
+import { Gateway, WorkspaceEvents, WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -434,7 +434,7 @@ it("gateway notification reads enforce recipient and workspace isolation with re
           _tag: "Gateway.NotMember",
         });
         expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
-      }),
+      }).pipe(Effect.provide(WorkspaceEvents.layer())),
     ),
   ));
 

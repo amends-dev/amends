@@ -55,7 +55,11 @@ Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
 `Crypto.Crypto`; credential construction is synchronous. Neither needs HTTP
 services or issues codes during construction. Database and server resources belong
-to their layer scopes. Storage behavior is documented by the
+to their layer scopes. Each host also provides one `WorkspaceEvents` registry shared
+by gateway requests and internal consumers. Acquiring a workspace bus and its
+subscription requires holding their scope open; commits publish canonical event
+batches only after storage confirms success. This does not expose an SSE endpoint.
+Storage behavior is documented by the
 [SQLite](../../adapters/storage-sqlite/README.md) and
 [PostgreSQL](../../adapters/storage-postgresql/README.md) adapters.
 

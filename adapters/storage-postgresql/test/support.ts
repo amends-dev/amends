@@ -2,7 +2,7 @@ import { afterAll, test } from "bun:test";
 import * as Core from "@amends/core";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
-import { Checkpoint, Log, Store } from "@amends/core/journal";
+import { Checkpoint, CommittedEvents, Log, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   InvitationStore,
@@ -11,7 +11,7 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway, type WorkspaceStorage } from "@amends/gateway";
+import { Gateway, WorkspaceEvents, type WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -57,6 +57,7 @@ export const database = (url: string) =>
   PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 });
 export const core = (bound: Bound) =>
   Core.layer.pipe(
+    Layer.provideMerge(CommittedEvents.layer(bound.workspace.workspaceId)),
     Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
   );
 export const inDatabase = <A, E>(
@@ -69,6 +70,7 @@ export const initialized = (bound: Bound, creator = alice.id) =>
   );
 export const host = (url: string, options: PostgresStorage.Options = {}) =>
   Gateway.layer.pipe(
+    Layer.provideMerge(WorkspaceEvents.layer()),
     Layer.provideMerge(layer(options)),
     Layer.provideMerge(Layer.mergeAll(database(url), BunCrypto.layer)),
   );

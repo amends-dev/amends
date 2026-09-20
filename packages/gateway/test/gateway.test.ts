@@ -19,6 +19,7 @@ import { Cause, Context, Crypto, Effect, Exit, Layer, Option, Result, Schema } f
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
+import { WorkspaceEvents } from "../src/workspace-events.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -122,6 +123,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
 
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
+    WorkspaceEvents.layer(),
     Layer.succeed(WorkspaceStorage.Service, storage),
     Layer.succeed(
       Crypto.Crypto,

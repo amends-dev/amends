@@ -5,9 +5,13 @@ import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
+import { WorkspaceId } from "../../src/workspace/id.ts";
+import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { NotificationProjection } from "../../src/notification/projection.ts";
 import { make, type Fixture } from "../memory-store.ts";
+
+const workspaceId = WorkspaceId.Id.make("workspace-one");
 
 const logId = Log.Id.make("journal");
 const Source = Fact.make("notification-test.source", { version: 1, payload: Schema.String });
@@ -24,6 +28,7 @@ const run = <A, E>(
     program.pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
+      Effect.provide(CommittedEvents.layer(workspaceId)),
       Effect.provideService(Checkpoint.Service, fixture.checkpoints),
     ),
   );

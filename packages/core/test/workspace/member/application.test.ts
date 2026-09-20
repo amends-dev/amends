@@ -18,6 +18,7 @@ import { Checkpoint } from "../../../src/journal/checkpoint.ts";
 import { Journal } from "../../../src/journal/journal.ts";
 import { Log } from "../../../src/journal/log.ts";
 import { Store } from "../../../src/journal/store.ts";
+import { CommittedEvents } from "../../../src/journal/committed-events.ts";
 import { InvitationStore } from "../../../src/workspace/invitation/store.ts";
 import { MemberApplication } from "../../../src/workspace/member/application.ts";
 import { MemberFacts } from "../../../src/workspace/member/facts.ts";
@@ -78,6 +79,7 @@ const configured = (
   const host = Layer.mergeAll(
     members,
     Layer.succeed(Store.Service, fixture.store),
+    CommittedEvents.layer(workspaceId),
     Layer.succeed(Checkpoint.Service, fixture.checkpoints),
     Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
     Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),

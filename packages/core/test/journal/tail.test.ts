@@ -7,8 +7,12 @@ import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Projection } from "../../src/journal/projection.ts";
 import { Store } from "../../src/journal/store.ts";
+import { WorkspaceId } from "../../src/workspace/id.ts";
+import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
+
+const workspaceId = WorkspaceId.Id.make("workspace-one");
 
 const logId = Log.Id.make("turn/one");
 const open = Effect.map(Log.Service, (logs) => logs.open({ id: logId, schema: Schema.String }));
@@ -20,6 +24,7 @@ const run = <A, E>(
     program.pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
+      Effect.provide(CommittedEvents.layer(workspaceId)),
       Effect.provideService(Checkpoint.Service, fixture.checkpoints),
       Effect.provideService(Counter, fixture.counter),
     ),

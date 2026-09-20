@@ -1,10 +1,11 @@
 import type * as Core from "@amends/core";
+import type { CommittedEvents } from "@amends/core/journal";
 import type { Workspace } from "@amends/core/workspace";
 import { Context } from "effect";
 import type { Crypto, Effect } from "effect";
 
-/** Core's host services that belong to workspace storage; the gateway supplies cryptography itself. */
-export type Bindings = Exclude<Core.HostServices, Crypto.Crypto>;
+/** Storage-only dependencies; the gateway supplies cryptography and the shared event bus. */
+export type Bindings = Exclude<Core.HostServices, Crypto.Crypto | CommittedEvents.Service>;
 
 export interface Interface {
   /**

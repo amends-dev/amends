@@ -12,6 +12,7 @@ import { Entry } from "../../src/journal/entry.ts";
 import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
+import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Notification } from "../../src/notification/notification.ts";
 import { NotificationApplication } from "../../src/notification/application.ts";
 import { NotificationStore } from "../../src/notification/store.ts";
@@ -89,6 +90,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
   });
   const host = Layer.mergeAll(
     Layer.succeed(Store.Service, fixture.store),
+    CommittedEvents.layer(workspaceId),
     Layer.succeed(Checkpoint.Service, fixture.checkpoints),
     Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
     Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),

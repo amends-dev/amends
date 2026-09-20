@@ -45,6 +45,7 @@ export interface Interface {
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
     native: (session: TransactionState) => TransactionHandle,
+    options?: Store.TransactionOptions,
   ) => Effect.Effect<
     A,
     E | Store.Failure | Store.Conflict | Store.CommitUncertain,
@@ -104,7 +105,11 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
     A,
     E,
     R,
-  >(program: Effect.Effect<A, E, R>, native: (session: TransactionState) => TransactionHandle) {
+  >(
+    program: Effect.Effect<A, E, R>,
+    native: (session: TransactionState) => TransactionHandle,
+    options?: Store.TransactionOptions,
+  ) {
     yield* check(false);
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* new Store.Failure({
@@ -165,6 +170,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
               cause: commit.cause,
             });
           }
+          yield* Store.notifyCommit(session.commit.id, options);
           return exit.value;
         }),
       ),

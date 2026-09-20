@@ -114,6 +114,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
 
   const transaction = Effect.fn("JournalTest.transaction")(function* <A, E, R>(
     program: Effect.Effect<A, E, R>,
+    options?: Store.TransactionOptions,
   ) {
     return yield* gate.withPermits(1)(
       Effect.uninterruptibleMask((restore) =>
@@ -231,6 +232,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
               cause: "lost acknowledgment",
             });
           }
+          yield* Store.notifyCommit(session.commit.id, options);
           return result;
         }),
       ),

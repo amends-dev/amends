@@ -45,10 +45,21 @@ store conflict without retrying. A transaction
 whose rollback failed marks the connection broken, and later transactions
 refuse until the file is reopened. Waiting readers poll the log.
 
+The optional `Store.transaction` observer runs after a confirmed native COMMIT,
+inside its uninterruptible completion boundary. It is skipped on rollback and
+uncertain outcomes. `Store.notifyCommit` logs observer failures without changing
+the committed result. Observers must not access storage or wait for consumers;
+the connection is still reserved. Core uses this hook to publish its collected
+domain events to the workspace's process-local bus.
+
 ## Composition
 
 ```ts
-Gateway.layer.pipe(Layer.provideMerge(layer), Layer.provide(SqliteDatabase.layer(filename)));
+Gateway.layer.pipe(
+  Layer.provideMerge(WorkspaceEvents.layer()),
+  Layer.provideMerge(layer),
+  Layer.provide(SqliteDatabase.layer(filename)),
+);
 ```
 
 The root `layer` provides both gateway contracts; `SqliteDatabase.layer` opens the

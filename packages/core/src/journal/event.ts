@@ -29,6 +29,15 @@ export const Metadata = Entry.Metadata;
 
 export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}
 
+/** A canonical decoded event; consumers use its fact definition to narrow the payload. */
+export const Record = Schema.Struct({
+  ...Metadata.fields,
+  name: Schema.String,
+  version: Schema.Finite,
+  payload: Schema.Unknown,
+});
+export interface Record extends Schema.Schema.Type<typeof Record> {}
+
 export type Type<F extends Fact.Definition> = ReturnType<
   typeof makeSchema<F["name"], F["version"], F["payload"]>
 >["Type"];
@@ -61,9 +70,11 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
     return yield* new FactMismatch({ name: fact.name, version: fact.version });
   }
   const payload = yield* Codec.make(fact).decode(entry.payload.payload);
-  return yield* Schema.decodeUnknownEffect(
+  const event = yield* Schema.decodeUnknownEffect(
     Schema.toType(makeSchema<F["name"], F["version"], F["payload"]>(fact)),
   )({ ...entry, name: fact.name, version: fact.version, payload });
+  // Retain the concrete metadata shape even for a generic fact payload schema.
+  return Object.assign(event, { ...entry, name: fact.name, version: fact.version, payload });
 });
 
 export * as Event from "./event.ts";

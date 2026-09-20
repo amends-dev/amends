@@ -56,10 +56,18 @@ refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
 Waiting readers poll the log every `pollInterval` (100 milliseconds by default).
 
+The optional `Store.transaction` observer runs after PostgreSQL confirms COMMIT,
+inside its uninterruptible completion boundary. It is skipped on rollback and
+uncertain outcomes. `Store.notifyCommit` logs observer failures without changing
+the committed result. Observers must not access storage or wait for consumers;
+the connection is still reserved. Core uses this hook to publish its collected
+domain events to the workspace's process-local bus.
+
 ## Composition
 
 ```ts
 Gateway.layer.pipe(
+  Layer.provideMerge(WorkspaceEvents.layer()),
   Layer.provideMerge(layer()),
   Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) })),
 );

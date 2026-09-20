@@ -6,8 +6,12 @@ import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Projection } from "../../src/journal/projection.ts";
 import { Store } from "../../src/journal/store.ts";
+import { WorkspaceId } from "../../src/workspace/id.ts";
+import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make } from "../memory-store.ts";
+
+const workspaceId = WorkspaceId.Id.make("workspace-one");
 
 const Changed = Fact.make("counter.changed", { version: 1, payload: Schema.Finite });
 const counter = Projection.make("counter", { version: 1 }).on(
@@ -66,7 +70,11 @@ test.each(["make", "layer"] as const)(
         ),
       }),
     );
-    const live = configured.pipe(Layer.provide(Log.layer), Layer.provide(host));
+    const live = configured.pipe(
+      Layer.provide(Log.layer),
+      Layer.provide(host),
+      Layer.provide(CommittedEvents.layer(workspaceId)),
+    );
     expectTypeOf<Layer.Services<typeof live>>().toEqualTypeOf<never>();
 
     const consume = Effect.gen(function* () {
@@ -111,7 +119,7 @@ test.each(["make", "layer"] as const)(
     }).pipe(Effect.provide(host));
     const direct = Effect.flatMap(acquire, (journal) =>
       consume.pipe(Effect.provideService(Journal.Service, journal)),
-    );
+    ).pipe(Effect.provide(CommittedEvents.layer(workspaceId)));
     expectTypeOf<Effect.Services<typeof direct>>().toEqualTypeOf<never>();
     await Effect.runPromise(construction === "make" ? direct : consume.pipe(Effect.provide(live)));
   },
@@ -121,7 +129,9 @@ test("each evaluation of the transaction constructor owns a separate coordinator
   const fixture = await Effect.runPromise(make());
   const acquire = Transaction.make();
   expectTypeOf<Effect.Success<typeof acquire>>().toEqualTypeOf<Transaction.Interface>();
-  expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<Store.Service>();
+  expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<
+    Store.Service | CommittedEvents.Service
+  >();
   expectTypeOf<Effect.Success<ReturnType<typeof Log.make>>>().toEqualTypeOf<Log.Interface>();
   expectTypeOf<Effect.Services<ReturnType<typeof Log.make>>>().toEqualTypeOf<
     Store.Service | Transaction.Service
@@ -135,7 +145,10 @@ test("each evaluation of the transaction constructor owns a separate coordinator
       expect(yield* fixture.attempts).toBe(1);
       yield* second.run(second.run(Effect.void));
       expect(yield* fixture.attempts).toBe(2);
-    }).pipe(Effect.provideService(Store.Service, fixture.store)),
+    }).pipe(
+      Effect.provideService(Store.Service, fixture.store),
+      Effect.provide(CommittedEvents.layer(workspaceId)),
+    ),
   );
 });
 
@@ -185,6 +198,7 @@ test("binding inside an earlier commit never reuses its transaction or scope", a
     }).pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
+      Effect.provide(CommittedEvents.layer(workspaceId)),
       Effect.provideService(Checkpoint.Service, fixture.checkpoints),
       Effect.provideService(Counter, fixture.counter),
     ),
@@ -199,6 +213,7 @@ test("projection defects remain defects and still roll back the publication", as
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(Store.Service, fixture.store),
+        CommittedEvents.layer(workspaceId),
         Layer.succeed(Checkpoint.Service, fixture.checkpoints),
         Layer.succeed(Counter, fixture.counter),
       ),

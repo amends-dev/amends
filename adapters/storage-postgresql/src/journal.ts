@@ -207,11 +207,15 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   return Store.Service.of({
-    transaction: (program) =>
-      transaction(program, (session) => ({
-        id: session.commit.id,
-        append: (request) => guard(append(session, request), true),
-      })),
+    transaction: (program, options) =>
+      transaction(
+        program,
+        (session) => ({
+          id: session.commit.id,
+          append: (request) => guard(append(session, request), true),
+        }),
+        options,
+      ),
     get: Effect.fn("Journal.get")(function* (logId, commitId) {
       return yield* guard(
         batches(headers().where(and(scoped(logId), eq(logBatches.commitId, commitId)))),

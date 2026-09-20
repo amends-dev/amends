@@ -1,11 +1,12 @@
 import * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Store } from "@amends/core/journal";
+import { CommittedEvents, Journal, Store } from "@amends/core/journal";
 import { MemberStore, Workspace, WorkspaceInitialization } from "@amends/core/workspace";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
+import { WorkspaceEvents } from "./workspace-events.ts";
 
 export interface Interface {
   /**
@@ -83,7 +84,7 @@ const expose = <A, E, R>(
 type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
 
 /**
- * Construct the gateway from workspace storage and cryptography. Identities come
+ * Construct the gateway from workspace storage, the shared event registry, and cryptography. Identities come
  * from a trusted ingress; the gateway never accepts client-asserted actors or member IDs.
  *
  * @category constructors
@@ -91,9 +92,10 @@ type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
 export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
   Interface,
   never,
-  WorkspaceStorage.Service | Crypto.Crypto
+  WorkspaceStorage.Service | WorkspaceEvents.Service | Crypto.Crypto
 > {
   const storage = yield* WorkspaceStorage.Service;
+  const events = yield* WorkspaceEvents.Service;
   const cryptography = yield* Crypto.Crypto;
 
   // Failures while binding storage, building core, or catching up projections
@@ -103,9 +105,21 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
     program: Effect.Effect<A, E, Provided>,
   ) {
     const bindings = yield* storage.forWorkspace(workspaceId);
+    const bus = yield* Effect.orDie(events.forWorkspace(workspaceId));
+    if (bus.workspaceId !== workspaceId)
+      return yield* Effect.die(
+        new CommittedEvents.WorkspaceMismatch({
+          expectedWorkspaceId: workspaceId,
+          actualWorkspaceId: bus.workspaceId,
+        }),
+      );
     const services = Core.layer.pipe(
       Layer.provideMerge(
-        Layer.mergeAll(Layer.succeedContext(bindings), Layer.succeed(Crypto.Crypto, cryptography)),
+        Layer.mergeAll(
+          Layer.succeedContext(bindings),
+          Layer.succeed(Crypto.Crypto, cryptography),
+          Layer.succeed(CommittedEvents.Service, bus),
+        ),
       ),
       Layer.orDie,
     );
@@ -113,7 +127,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
       yield* Effect.orDie((yield* Journal.Service).replay);
       return yield* program;
     }).pipe(Effect.provide(services));
-  });
+  }, Effect.scoped);
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
     workspaceId: Workspace.Id,

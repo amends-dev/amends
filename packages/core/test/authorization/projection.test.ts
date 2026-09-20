@@ -16,6 +16,7 @@ import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
+import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { MemberFacts } from "../../src/workspace/member/facts.ts";
 import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
@@ -90,6 +91,7 @@ const run = <A, E>(
     program.pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
+      Effect.provide(CommittedEvents.layer(workspaceId)),
       Effect.provideService(Checkpoint.Service, fixture.checkpoints),
       Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
       Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),

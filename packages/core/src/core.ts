@@ -79,7 +79,7 @@ export const layer = operations.pipe(
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores,
- * the checkpoint store, and cryptography. Adding a required store changes this
+ * the checkpoint store, cryptography, and the shared committed-event bus. Adding a required store changes this
  * type and makes incomplete host compositions fail type checking.
  *
  * @category models

@@ -119,6 +119,45 @@ applies the recorded change only if the previous owner matches, preserving all o
 metadata. The ownership fact is projected alongside the recorded assignment changes;
 replay does not reauthorize the former owner.
 
+## Committed event bus
+
+`CommittedEvents`, exported from `@amends/core/journal`, is a scoped, internal bus
+for one workspace. `make(workspaceId, { capacity })` constructs it, and `layer`
+delegates to that constructor. The default capacity is 256 committed batches.
+`Event.Record` describes the existing canonical decoded event shape with an unknown
+payload; each fact's schema supplies its specific payload type. `CommittedEvents.Batch`
+groups those events in publication order with their workspace and commit IDs.
+
+The bus validates batch metadata and workspace binding. It owns frozen copies of
+the envelope, event array, and event metadata. Decoded payloads retain their original
+values and are shared read-only; producers and consumers must not mutate them.
+This is an internal event model, not a public HTTP or persistence codec for arbitrary
+payloads. The bus does not verify that a transaction committed: the publisher must
+call it only after a confirmed commit. `Journal.publish` collects canonical events
+after their projections succeed. The outer transaction publishes one batch through
+the adapter's confirmed-commit observer. Nested commits share that collection;
+rollback, uncertain commits, reads, replay, and execution-log-only writes publish nothing.
+
+The observer runs inside the native commit's uninterruptible completion boundary,
+so pending cancellation cannot skip publication after a confirmed commit. It must
+not access storage or wait for subscribers because the adapter may still hold its
+connection. Observer failures are logged with the commit ID and do not change the
+committed result or retry the write. This is process-local live delivery; recovery
+from missed publication and other writers remains separate work.
+
+`subscribe` registers eagerly and returns a single-consumer stream in the caller's
+scope. Registration therefore completes before a future transport sends its ready
+message. It delivers only subsequent publications, with no replay or deduplication.
+The buffer slides instead of making publishers wait for slow consumers. A private
+sequence detects lost batches and fails that subscription with `CommittedEvents.Lagged`;
+the consumer must resubscribe and recover its view. The sequence is local to the bus,
+not a journal position or browser cursor. Closing the subscriber scope interrupts its
+pending read; closing the bus scope stops all subscriptions and rejects further use.
+
+Consumers authorize and transform events for their own purposes. The bus contains no
+recipient rules, frontend query keys, application-notification handling, or SSE behavior.
+Gateway's `WorkspaceEvents` registry manages shared bus lifetimes across requests.
+
 ## Module dependencies and exports
 
 Models and ID modules are independent of application services, projections, and

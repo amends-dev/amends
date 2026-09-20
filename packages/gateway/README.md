@@ -28,8 +28,8 @@ and `WorkspaceDirectoryListing` for public API documentation.
 
 ## Construction
 
-`Gateway.make()` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`
-and `Crypto.Crypto`. It captures those stable dependencies without opening a
+`Gateway.make()` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
+`WorkspaceEvents.Service`, and `Crypto.Crypto`. It captures those stable dependencies without opening a
 workspace or resolving an actor. `Gateway.layer` delegates to that constructor
 and provides `Gateway.Service`, with the same dependencies left to the caller.
 
@@ -39,6 +39,29 @@ adapters or hosts; they have no default `make` or `layer` here. `Service.of(...)
 is sufficient to type-check a supplied implementation.
 
 ## Surface
+
+### Workspace event bus foundation
+
+`WorkspaceEvents.make()` constructs a process-local registry of core's
+`CommittedEvents` buses. `WorkspaceEvents.layer(options?)` delegates to it. Provide
+one registry in the host scope and use `forWorkspace(workspaceId)` to acquire a bus
+for a request or subscriber scope. Concurrent acquisitions of the same workspace
+share one instance; different workspaces and different registries remain isolated.
+
+Effect's `RcMap` owns acquisition and reference counting. A subscriber holds its
+workspace lease for its entire lifetime. Releasing the last lease immediately
+closes that bus; a later acquisition creates a fresh live bus. Registry shutdown
+closes all buses even when callers still hold leases. No workspace data, event
+history, authorization decisions, or idle buses are retained by this registry.
+
+This service is internal infrastructure, not a core application operation or an
+authorized subscription endpoint. The gateway acquires a bus lease in each operation's
+scope and injects it alongside workspace storage. Both local host compositions provide
+one shared registry. Journal commits publish to that bus after the adapter confirms
+success. SSE authorization, cross-process recovery, and browser handling remain
+separate work.
+
+### Workspace operations
 
 - `createWorkspace(creator, input)` accepts `Workspace.CreateInput` with a required
   name, allocates a workspace ID, and runs core initialization for the creator.
@@ -52,9 +75,9 @@ is sufficient to type-check a supplied implementation.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for
   invitation acceptance where the recipient is not yet a member.
 
-A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns core's
-`HostServices` other than cryptography bound to one workspace, and
-`Crypto.Crypto`. Before each program the gateway catches up registered
+A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
+part of core's `HostServices` bound to one workspace, plus `WorkspaceEvents.Service`
+and `Crypto.Crypto`. The event bus is not a storage-adapter responsibility. Before each program the gateway catches up registered
 projections and builds a fresh core layer over the bound views; no actor is
 cached between calls. Identities must come from a trusted ingress, never from
 client input.

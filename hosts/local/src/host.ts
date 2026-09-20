@@ -1,11 +1,14 @@
-import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import { Gateway, WorkspaceEvents, type WorkspaceDirectory } from "@amends/gateway";
 import { PostgresDatabase, layer as postgres } from "@amends/storage-postgresql";
 import { SqliteDatabase, layer as sqlite } from "@amends/storage-sqlite";
 import { BunCrypto } from "@effect/platform-bun";
 import { Layer, type Redacted } from "effect";
 
-/** What a host supplies to the server: the gateway and the directory, however they are stored. */
-export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
+/** Gateway, directory, and shared event registry owned by one host lifetime. */
+export type HostLayer = Layer.Layer<
+  Gateway.Service | WorkspaceDirectory.Service | WorkspaceEvents.Service,
+  unknown
+>;
 
 /**
  * The gateway and the workspace directory over one SQLite file, through the
@@ -15,6 +18,7 @@ export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service
  */
 export const layerSqlite = (filename: string): HostLayer =>
   Gateway.layer.pipe(
+    Layer.provideMerge(WorkspaceEvents.layer()),
     Layer.provideMerge(sqlite),
     Layer.provide(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
   );
@@ -26,6 +30,7 @@ export const layerSqlite = (filename: string): HostLayer =>
  */
 export const layerPostgres = (url: Redacted.Redacted<string>): HostLayer =>
   Gateway.layer.pipe(
+    Layer.provideMerge(WorkspaceEvents.layer()),
     Layer.provideMerge(postgres()),
     Layer.provide(Layer.mergeAll(PostgresDatabase.layer({ url }), BunCrypto.layer)),
   );
