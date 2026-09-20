@@ -53,43 +53,31 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         createdBy,
         ownerMemberId,
       });
-      yield* journal.publish(WorkspaceFacts.Initialized, record, provenance);
-      yield* journal.publish(
-        MemberFacts.Added,
-        {
-          workspaceId: record.id,
-          memberId: ownerMemberId,
-          identity: Identity.Reference.cases.Human.make({ id: createdBy }),
-        },
-        provenance,
-      );
+      yield* journal.publish(WorkspaceFacts.Initialized, record);
+      yield* journal.publish(MemberFacts.Added, {
+        workspaceId: record.id,
+        memberId: ownerMemberId,
+        identity: Identity.Reference.cases.Human.make({ id: createdBy }),
+      });
       for (const role of BuiltinRoles.make(record.id, catalog.definitions)) {
-        yield* journal.publish(
-          RoleFacts.Created,
-          {
-            roleId: role.id,
-            workspaceId: role.workspaceId,
-            name: role.name,
-            permissions: role.permissions,
-          },
-          provenance,
-        );
+        yield* journal.publish(RoleFacts.Created, {
+          roleId: role.id,
+          workspaceId: role.workspaceId,
+          name: role.name,
+          permissions: role.permissions,
+        });
       }
-      yield* journal.publish(
-        AssignmentFacts.Created,
-        {
-          workspaceId: record.id,
-          assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-          memberId: ownerMemberId,
-          source: Assignment.Source.cases.Role.make({
-            roleId: BuiltinRoles.OwnerId,
-            scope: Scope.Value.cases.Workspace.make({ workspaceId: record.id }),
-          }),
-        },
-        provenance,
-      );
+      yield* journal.publish(AssignmentFacts.Created, {
+        workspaceId: record.id,
+        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+        memberId: ownerMemberId,
+        source: Assignment.Source.cases.Role.make({
+          roleId: BuiltinRoles.OwnerId,
+          scope: Scope.Value.cases.Workspace.make({ workspaceId: record.id }),
+        }),
+      });
       return record;
-    }),
+    }).pipe(Effect.provideService(Publication.Service, provenance)),
   );
 });
 

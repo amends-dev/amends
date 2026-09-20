@@ -1,3 +1,4 @@
+import { Publication } from "../../../src/journal/publication.ts";
 import { testProvenance } from "../../publication.ts";
 import { expect, test } from "bun:test";
 import { Effect, Option } from "effect";
@@ -36,11 +37,16 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Service | Transaction.Service | Checkpoint.Service | MemberStore.Service
+    | Publication.Service
+    | Log.Service
+    | Transaction.Service
+    | Checkpoint.Service
+    | MemberStore.Service
   >,
 ) =>
   Effect.runPromise(
     program.pipe(
+      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
       Effect.provide(CommittedEvents.layer(workspaceId)),
@@ -58,11 +64,7 @@ test("membership projection adds humans and agents, preserves removal, and admit
       const members = yield* MemberStore.Service;
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            MemberFacts.Added,
-            added(firstId, human),
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(MemberFacts.Added, added(firstId, human));
           expect(yield* members.findActive(human)).toEqual(
             Option.some({
               id: firstId,
@@ -71,11 +73,7 @@ test("membership projection adds humans and agents, preserves removal, and admit
               status: "active",
             }),
           );
-          yield* journal.publish(
-            MemberFacts.Added,
-            added(agentId, agent),
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(MemberFacts.Added, added(agentId, agent));
         }),
       );
       expect(yield* members.findActive(agent)).toEqual(
@@ -88,17 +86,9 @@ test("membership projection adds humans and agents, preserves removal, and admit
       );
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            MemberFacts.Removed,
-            removed(firstId),
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(MemberFacts.Removed, removed(firstId));
           expect(Option.isNone(yield* members.findActive(human))).toBe(true);
-          yield* journal.publish(
-            MemberFacts.Added,
-            added(secondId, human),
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(MemberFacts.Added, added(secondId, human));
         }),
       );
       expect(yield* members.get(firstId)).toEqual(
@@ -118,17 +108,13 @@ test("membership projection adds humans and agents, preserves removal, and admit
         }),
       );
       expect(
-        yield* Effect.flip(
-          journal.publish(MemberFacts.Added, added(firstId, human), testProvenance(workspaceId)),
-        ),
+        yield* Effect.flip(journal.publish(MemberFacts.Added, added(firstId, human))),
       ).toMatchObject({
         _tag: "Projection.Failure",
         cause: { _tag: "MemberStore.Conflict", operation: "insert" },
       });
       expect(
-        yield* Effect.flip(
-          journal.publish(MemberFacts.Removed, removed(firstId), testProvenance(workspaceId)),
-        ),
+        yield* Effect.flip(journal.publish(MemberFacts.Removed, removed(firstId))),
       ).toMatchObject({
         _tag: "Projection.Failure",
         cause: { _tag: "MemberStore.Conflict", operation: "markRemoved" },
@@ -148,24 +134,12 @@ test("replay reconstructs membership history and resumes without reapplying addi
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      yield* journal.publish(MemberFacts.Added, added(firstId, human), testProvenance(workspaceId));
+      yield* journal.publish(MemberFacts.Added, added(firstId, human));
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            MemberFacts.Removed,
-            removed(firstId),
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            MemberFacts.Added,
-            added(secondId, human),
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            MemberFacts.Added,
-            added(agentId, agent),
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(MemberFacts.Removed, removed(firstId));
+          yield* journal.publish(MemberFacts.Added, added(secondId, human));
+          yield* journal.publish(MemberFacts.Added, added(agentId, agent));
         }),
       );
       expect((yield* fixture.snapshot).members.size).toBe(0);
@@ -215,35 +189,25 @@ test("workspace mismatches reject added and removed facts during publication and
       const journal = yield* setup;
       expect(
         yield* Effect.flip(
-          journal.publish(
-            MemberFacts.Added,
-            {
-              memberId: firstId,
-              workspaceId: foreign,
-              identity: human,
-            },
-            testProvenance(workspaceId),
-          ),
+          journal.publish(MemberFacts.Added, {
+            memberId: firstId,
+            workspaceId: foreign,
+            identity: human,
+          }),
         ),
       ).toMatchObject(mismatch);
       expect((yield* fixture.snapshot).members.size).toBe(0);
       expect((yield* fixture.snapshot).logs.size).toBe(0);
-      yield* journal.publish(MemberFacts.Added, added(firstId, human), testProvenance(workspaceId));
+      yield* journal.publish(MemberFacts.Added, added(firstId, human));
       const before = yield* fixture.snapshot;
       const foreignRemoval = { memberId: firstId, workspaceId: foreign };
       expect(
-        yield* Effect.flip(
-          journal.publish(MemberFacts.Removed, foreignRemoval, testProvenance(workspaceId)),
-        ),
+        yield* Effect.flip(journal.publish(MemberFacts.Removed, foreignRemoval)),
       ).toMatchObject(mismatch);
       expect((yield* fixture.snapshot).members).toEqual(before.members);
       expect((yield* fixture.snapshot).checkpoints).toEqual(before.checkpoints);
       // Simulate history written without this projection, then attempt to replay it.
-      yield* (yield* source).publish(
-        MemberFacts.Removed,
-        foreignRemoval,
-        testProvenance(workspaceId),
-      );
+      yield* (yield* source).publish(MemberFacts.Removed, foreignRemoval);
       expect(yield* Effect.flip(journal.replay)).toMatchObject(mismatch);
       expect((yield* fixture.snapshot).members).toEqual(before.members);
       expect((yield* fixture.snapshot).checkpoints).toEqual(before.checkpoints);
@@ -260,13 +224,9 @@ test("a caught membership conflict rolls back the journal, member records, and c
       const failure = yield* Effect.flip(
         journal.commit(
           Effect.gen(function* () {
-            yield* journal.publish(
-              MemberFacts.Added,
-              added(firstId, human),
-              testProvenance(workspaceId),
-            );
+            yield* journal.publish(MemberFacts.Added, added(firstId, human));
             yield* journal
-              .publish(MemberFacts.Added, added(secondId, human), testProvenance(workspaceId))
+              .publish(MemberFacts.Added, added(secondId, human))
               .pipe(Effect.catch(() => Effect.void));
           }),
         ),
@@ -280,7 +240,7 @@ test("a caught membership conflict rolls back the journal, member records, and c
         [firstId, secondId],
         (id) =>
           journal
-            .publish(MemberFacts.Added, added(id, human), testProvenance(workspaceId))
+            .publish(MemberFacts.Added, added(id, human))
             .pipe(Effect.match({ onFailure: (error) => error._tag, onSuccess: () => "success" })),
         { concurrency: "unbounded" },
       );
@@ -298,15 +258,11 @@ test("a failed removal rolls back the entire replay batch while retaining earlie
     fixture,
     Effect.gen(function* () {
       const writer = yield* source;
-      yield* writer.publish(MemberFacts.Added, added(firstId, human), testProvenance(workspaceId));
+      yield* writer.publish(MemberFacts.Added, added(firstId, human));
       yield* writer.commit(
         Effect.gen(function* () {
-          yield* writer.publish(MemberFacts.Removed, removed(firstId), testProvenance(workspaceId));
-          yield* writer.publish(
-            MemberFacts.Removed,
-            removed(Member.Id.make("missing")),
-            testProvenance(workspaceId),
-          );
+          yield* writer.publish(MemberFacts.Removed, removed(firstId));
+          yield* writer.publish(MemberFacts.Removed, removed(Member.Id.make("missing")));
         }),
       );
       const journal = yield* setup;
@@ -347,11 +303,9 @@ test("membership changes roll back when the checkpoint cannot be persisted", asy
     broken,
     Effect.gen(function* () {
       const journal = yield* setup;
-      expect(
-        yield* Effect.flip(
-          journal.publish(MemberFacts.Added, added(firstId, human), testProvenance(workspaceId)),
-        ),
-      ).toBe(failure);
+      expect(yield* Effect.flip(journal.publish(MemberFacts.Added, added(firstId, human)))).toBe(
+        failure,
+      );
       const state = yield* fixture.snapshot;
       expect(state.members.size).toBe(0);
       expect(state.logs.size).toBe(0);

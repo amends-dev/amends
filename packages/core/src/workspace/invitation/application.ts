@@ -144,28 +144,32 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       return yield* new AlreadyMember({ recipientId });
   });
 
-  const issue = Effect.fn("InvitationApplication.issue")(function* (input: Invitation.IssueInput) {
-    yield* authorization.require([manage]);
-    const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input);
-    const actor = yield* authorizeAccess(request);
-    const issuedAt = yield* DateTime.now;
-    if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
-    yield* requireUnjoined(request.recipientId);
-    const provenance = yield* Publication.makeForActor(issuedAt).pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    const details: Invitation.Issuance = {
-      id: Invitation.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      inviterMemberId: actor.memberId,
-      issuedAt,
-      expiresAt: request.expiresAt,
-      recipientId: request.recipientId,
-      roleId: request.roleId,
-    };
-    yield* journal.publish(InvitationFacts.Issued, details, provenance);
-    return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
-  }, journal.commit);
+  const issue = Effect.fn("InvitationApplication.issue")(
+    function* (input: Invitation.IssueInput) {
+      yield* authorization.require([manage]);
+      const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input);
+      const actor = yield* authorizeAccess(request);
+      const issuedAt = yield* DateTime.now;
+      if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
+      yield* requireUnjoined(request.recipientId);
+      const details: Invitation.Issuance = {
+        id: Invitation.Id.make(yield* crypto.randomUUIDv4),
+        workspaceId,
+        inviterMemberId: actor.memberId,
+        issuedAt,
+        expiresAt: request.expiresAt,
+        recipientId: request.recipientId,
+        roleId: request.roleId,
+      };
+      yield* journal
+        .publish(InvitationFacts.Issued, details)
+        .pipe(Publication.withOccurredAt(issuedAt));
+      return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
   const accept = Effect.fn("InvitationApplication.accept")(function* (
     id: Invitation.Id,
@@ -225,18 +229,13 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       },
       acceptedAt,
     ).pipe(Effect.provideService(Crypto.Crypto, crypto));
-    yield* journal.publish(
-      MemberFacts.Added,
-      {
+    return yield* Effect.gen(function* () {
+      yield* journal.publish(MemberFacts.Added, {
         memberId: member.id,
         workspaceId,
         identity: member.identity,
-      },
-      provenance,
-    );
-    yield* journal.publish(
-      AssignmentFacts.Created,
-      {
+      });
+      yield* journal.publish(AssignmentFacts.Created, {
         assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
         workspaceId,
         memberId: member.id,
@@ -244,44 +243,39 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
           roleId: details.roleId,
           scope: { _tag: "Workspace", workspaceId },
         }),
-      },
-      provenance,
-    );
-    yield* journal.publish(
-      InvitationFacts.Accepted,
-      {
+      });
+      yield* journal.publish(InvitationFacts.Accepted, {
         _tag: "Accepted",
         workspaceId,
         invitationId: id,
         memberId: member.id,
         acceptedAt,
-      },
-      provenance,
-    );
-    return member;
+      });
+      return member;
+    }).pipe(Effect.provideService(Publication.Service, provenance));
   }, journal.commit);
 
-  const revoke = Effect.fn("InvitationApplication.revoke")(function* (id: Invitation.Id) {
-    yield* authorization.require([manage]);
-    const invitation = yield* load(id);
-    const actor = yield* authorizeAccess(invitation.details);
-    if (invitation.state._tag === "Revoked") return invitation;
-    if (invitation.state._tag === "Accepted")
-      return yield* new Unavailable({ invitationId: id, reason: "accepted" });
-    const state = Invitation.State.cases.Revoked.make({
-      revokedBy: actor.memberId,
-      revokedAt: yield* DateTime.now,
-    });
-    const provenance = yield* Publication.makeForActor(state.revokedAt).pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    yield* journal.publish(
-      InvitationFacts.Revoked,
-      { workspaceId, invitationId: id, ...state },
-      provenance,
-    );
-    return { details: invitation.details, state } satisfies Invitation.Record;
-  }, journal.commit);
+  const revoke = Effect.fn("InvitationApplication.revoke")(
+    function* (id: Invitation.Id) {
+      yield* authorization.require([manage]);
+      const invitation = yield* load(id);
+      const actor = yield* authorizeAccess(invitation.details);
+      if (invitation.state._tag === "Revoked") return invitation;
+      if (invitation.state._tag === "Accepted")
+        return yield* new Unavailable({ invitationId: id, reason: "accepted" });
+      const state = Invitation.State.cases.Revoked.make({
+        revokedBy: actor.memberId,
+        revokedAt: yield* DateTime.now,
+      });
+      yield* journal
+        .publish(InvitationFacts.Revoked, { workspaceId, invitationId: id, ...state })
+        .pipe(Publication.withOccurredAt(state.revokedAt));
+      return { details: invitation.details, state } satisfies Invitation.Record;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
   const list = Effect.gen(function* () {
     yield* authorization.require([manage]);

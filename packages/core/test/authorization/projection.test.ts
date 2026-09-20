@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Effect, Option } from "effect";
@@ -80,6 +81,7 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
+    | Publication.Service
     | Log.Service
     | Transaction.Service
     | Checkpoint.Service
@@ -90,6 +92,7 @@ const run = <A, E>(
 ) =>
   Effect.runPromise(
     program.pipe(
+      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
       Effect.provide(CommittedEvents.layer(workspaceId)),
@@ -112,21 +115,15 @@ test("live role and assignment projections preserve role references, queries, an
       const otherAssignmentId = Assignment.Id.make("other-recipient-assignment");
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(RoleFacts.Created, createdRole, testProvenance(workspaceId));
-          yield* journal.publish(
-            AssignmentFacts.Created,
-            assigned(roleAssignmentId),
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(RoleFacts.Created, createdRole);
+          yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
           yield* journal.publish(
             AssignmentFacts.Created,
             assigned(directAssignmentId, directSource),
-            testProvenance(workspaceId),
           );
           yield* journal.publish(
             AssignmentFacts.Created,
             assigned(otherAssignmentId, roleSource, otherMemberId),
-            testProvenance(workspaceId),
           );
           expect(yield* roles.get(roleId)).toEqual(Option.some(initialRole));
           expect(
@@ -141,20 +138,12 @@ test("live role and assignment projections preserve role references, queries, an
       );
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            RoleFacts.Renamed,
-            { roleId, workspaceId, name: "Renamed role" },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            RoleFacts.PermissionsChanged,
-            {
-              roleId,
-              workspaceId,
-              permissions: [MemberPermissions.Read.name],
-            },
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(RoleFacts.Renamed, { roleId, workspaceId, name: "Renamed role" });
+          yield* journal.publish(RoleFacts.PermissionsChanged, {
+            roleId,
+            workspaceId,
+            permissions: [MemberPermissions.Read.name],
+          });
           expect(yield* roles.get(roleId)).toEqual(
             Option.some({
               ...initialRole,
@@ -162,23 +151,15 @@ test("live role and assignment projections preserve role references, queries, an
               permissions: [MemberPermissions.Read.name],
             }),
           );
-          yield* journal.publish(
-            RoleFacts.PermissionsChanged,
-            {
-              roleId,
-              workspaceId,
-              permissions: [],
-            },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            AssignmentFacts.Revoked,
-            {
-              assignmentId: roleAssignmentId,
-              workspaceId,
-            },
-            testProvenance(workspaceId),
-          );
+          yield* journal.publish(RoleFacts.PermissionsChanged, {
+            roleId,
+            workspaceId,
+            permissions: [],
+          });
+          yield* journal.publish(AssignmentFacts.Revoked, {
+            assignmentId: roleAssignmentId,
+            workspaceId,
+          });
           expect((yield* assignments.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
             directAssignmentId,
           ]);
@@ -210,35 +191,21 @@ test("live role and assignment projections preserve role references, queries, an
       );
       const before = yield* fixture.snapshot;
       expect(
-        yield* Effect.flip(
-          journal.publish(
-            AssignmentFacts.Created,
-            assigned(roleAssignmentId),
-            testProvenance(workspaceId),
-          ),
-        ),
+        yield* Effect.flip(journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId))),
       ).toMatchObject({
         _tag: "Projection.Failure",
         cause: { _tag: "AssignmentStore.Conflict", operation: "insert" },
       });
       expect(
         yield* Effect.flip(
-          journal.publish(
-            AssignmentFacts.Revoked,
-            { assignmentId: roleAssignmentId, workspaceId },
-            testProvenance(workspaceId),
-          ),
+          journal.publish(AssignmentFacts.Revoked, { assignmentId: roleAssignmentId, workspaceId }),
         ),
       ).toMatchObject({
         _tag: "Projection.Failure",
         cause: { _tag: "AssignmentStore.Conflict", operation: "markRevoked" },
       });
       expect(yield* fixture.snapshot).toEqual(before);
-      yield* journal.publish(
-        AssignmentFacts.Created,
-        assigned(Assignment.Id.make("reassigned")),
-        testProvenance(workspaceId),
-      );
+      yield* journal.publish(AssignmentFacts.Created, assigned(Assignment.Id.make("reassigned")));
       expect(yield* assignments.listActiveByMember(memberId)).toHaveLength(2);
       yield* journal.replay;
       expect((yield* fixture.snapshot).assignments.size).toBe(4);
@@ -254,43 +221,26 @@ test("fresh projection runners replay both read models and resume at their own c
       const writer = yield* sourceJournal;
       yield* writer.commit(
         Effect.gen(function* () {
-          yield* writer.publish(RoleFacts.Created, createdRole, testProvenance(workspaceId));
-          yield* writer.publish(
-            AssignmentFacts.Created,
-            assigned(roleAssignmentId),
-            testProvenance(workspaceId),
-          );
+          yield* writer.publish(RoleFacts.Created, createdRole);
+          yield* writer.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
           yield* writer.publish(
             AssignmentFacts.Created,
             assigned(directAssignmentId, directSource),
-            testProvenance(workspaceId),
           );
         }),
       );
       const last = yield* writer.commit(
         Effect.gen(function* () {
-          yield* writer.publish(
-            RoleFacts.Renamed,
-            { roleId, workspaceId, name: "Replayed role" },
-            testProvenance(workspaceId),
-          );
-          yield* writer.publish(
-            RoleFacts.PermissionsChanged,
-            {
-              roleId,
-              workspaceId,
-              permissions: [],
-            },
-            testProvenance(workspaceId),
-          );
-          return yield* writer.publish(
-            AssignmentFacts.Revoked,
-            {
-              assignmentId: roleAssignmentId,
-              workspaceId,
-            },
-            testProvenance(workspaceId),
-          );
+          yield* writer.publish(RoleFacts.Renamed, { roleId, workspaceId, name: "Replayed role" });
+          yield* writer.publish(RoleFacts.PermissionsChanged, {
+            roleId,
+            workspaceId,
+            permissions: [],
+          });
+          return yield* writer.publish(AssignmentFacts.Revoked, {
+            assignmentId: roleAssignmentId,
+            workspaceId,
+          });
         }),
       );
       expect((yield* fixture.snapshot).roles.size).toBe(0);
@@ -326,11 +276,7 @@ test("fresh projection runners replay both read models and resume at their own c
       const fresh = yield* setup;
       yield* fresh.replay;
       expect(yield* fixture.snapshot).toEqual(before);
-      yield* fresh.publish(
-        RoleFacts.Renamed,
-        { roleId, workspaceId, name: "After catch-up" },
-        testProvenance(workspaceId),
-      );
+      yield* fresh.publish(RoleFacts.Renamed, { roleId, workspaceId, name: "After catch-up" });
       expect(Option.map(yield* (yield* RoleStore.Service).get(roleId), (r) => r.name)).toEqual(
         Option.some("After catch-up"),
       );
@@ -346,11 +292,7 @@ test("every authorization handler rejects another workspace during publication a
       tag: "RoleProjection.WorkspaceMismatch",
       publish: (journal: Journal.Interface) =>
         journal
-          .publish(
-            RoleFacts.Created,
-            { ...createdRole, workspaceId: foreign },
-            testProvenance(workspaceId),
-          )
+          .publish(RoleFacts.Created, { ...createdRole, workspaceId: foreign })
           .pipe(Effect.asVoid),
     },
     {
@@ -358,11 +300,7 @@ test("every authorization handler rejects another workspace during publication a
       tag: "RoleProjection.WorkspaceMismatch",
       publish: (journal: Journal.Interface) =>
         journal
-          .publish(
-            RoleFacts.Renamed,
-            { roleId, workspaceId: foreign, name: "Foreign" },
-            testProvenance(workspaceId),
-          )
+          .publish(RoleFacts.Renamed, { roleId, workspaceId: foreign, name: "Foreign" })
           .pipe(Effect.asVoid),
     },
     {
@@ -370,11 +308,7 @@ test("every authorization handler rejects another workspace during publication a
       tag: "RoleProjection.WorkspaceMismatch",
       publish: (journal: Journal.Interface) =>
         journal
-          .publish(
-            RoleFacts.PermissionsChanged,
-            { roleId, workspaceId: foreign, permissions: [] },
-            testProvenance(workspaceId),
-          )
+          .publish(RoleFacts.PermissionsChanged, { roleId, workspaceId: foreign, permissions: [] })
           .pipe(Effect.asVoid),
     },
     {
@@ -382,18 +316,14 @@ test("every authorization handler rejects another workspace during publication a
       tag: "AssignmentProjection.WorkspaceMismatch",
       publish: (journal: Journal.Interface) =>
         journal
-          .publish(
-            AssignmentFacts.Created,
-            {
-              ...assigned(roleAssignmentId),
-              workspaceId: foreign,
-              source: Assignment.Source.cases.Role.make({
-                roleId,
-                scope: Scope.Value.cases.Workspace.make({ workspaceId: foreign }),
-              }),
-            },
-            testProvenance(workspaceId),
-          )
+          .publish(AssignmentFacts.Created, {
+            ...assigned(roleAssignmentId),
+            workspaceId: foreign,
+            source: Assignment.Source.cases.Role.make({
+              roleId,
+              scope: Scope.Value.cases.Workspace.make({ workspaceId: foreign }),
+            }),
+          })
           .pipe(Effect.asVoid),
     },
     {
@@ -401,14 +331,10 @@ test("every authorization handler rejects another workspace during publication a
       tag: "AssignmentProjection.WorkspaceMismatch",
       publish: (journal: Journal.Interface) =>
         journal
-          .publish(
-            AssignmentFacts.Revoked,
-            {
-              assignmentId: roleAssignmentId,
-              workspaceId: foreign,
-            },
-            testProvenance(workspaceId),
-          )
+          .publish(AssignmentFacts.Revoked, {
+            assignmentId: roleAssignmentId,
+            workspaceId: foreign,
+          })
           .pipe(Effect.asVoid),
     },
   ];
@@ -458,38 +384,22 @@ test("a caught assignment conflict rolls back member, role, assignment, journal,
       const failure = yield* Effect.flip(
         journal.commit(
           Effect.gen(function* () {
-            yield* journal.publish(
-              MemberFacts.Added,
-              {
-                memberId,
-                workspaceId,
-                identity: Identity.Reference.cases.Human.make({
-                  id: Identity.HumanId.make("human"),
-                }),
-              },
-              testProvenance(workspaceId),
-            );
-            yield* journal.publish(RoleFacts.Created, createdRole, testProvenance(workspaceId));
-            yield* journal.publish(
-              AssignmentFacts.Created,
-              assigned(roleAssignmentId),
-              testProvenance(workspaceId),
-            );
-            yield* journal.publish(
-              RoleFacts.PermissionsChanged,
-              {
-                roleId,
-                workspaceId,
-                permissions: [],
-              },
-              testProvenance(workspaceId),
-            );
+            yield* journal.publish(MemberFacts.Added, {
+              memberId,
+              workspaceId,
+              identity: Identity.Reference.cases.Human.make({
+                id: Identity.HumanId.make("human"),
+              }),
+            });
+            yield* journal.publish(RoleFacts.Created, createdRole);
+            yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
+            yield* journal.publish(RoleFacts.PermissionsChanged, {
+              roleId,
+              workspaceId,
+              permissions: [],
+            });
             yield* journal
-              .publish(
-                AssignmentFacts.Created,
-                assigned(roleAssignmentId),
-                testProvenance(workspaceId),
-              )
+              .publish(AssignmentFacts.Created, assigned(roleAssignmentId))
               .pipe(Effect.catch(() => Effect.void));
           }),
         ),
@@ -522,12 +432,8 @@ test("checkpoint failure after both projection writes rolls back the entire live
         yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
-              yield* journal.publish(RoleFacts.Created, createdRole, testProvenance(workspaceId));
-              yield* journal.publish(
-                AssignmentFacts.Created,
-                assigned(roleAssignmentId),
-                testProvenance(workspaceId),
-              );
+              yield* journal.publish(RoleFacts.Created, createdRole);
+              yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
             }),
           ),
         ),
@@ -543,32 +449,20 @@ test("a failed role replay batch restores its prior name, permissions, and check
     fixture,
     Effect.gen(function* () {
       const writer = yield* sourceJournal;
-      yield* writer.publish(RoleFacts.Created, createdRole, testProvenance(workspaceId));
+      yield* writer.publish(RoleFacts.Created, createdRole);
       yield* writer.commit(
         Effect.gen(function* () {
-          yield* writer.publish(
-            RoleFacts.Renamed,
-            { roleId, workspaceId, name: "Rolled back" },
-            testProvenance(workspaceId),
-          );
-          yield* writer.publish(
-            RoleFacts.PermissionsChanged,
-            {
-              roleId,
-              workspaceId,
-              permissions: [],
-            },
-            testProvenance(workspaceId),
-          );
-          yield* writer.publish(
-            RoleFacts.Renamed,
-            {
-              roleId: Role.Id.make("missing"),
-              workspaceId,
-              name: "Missing",
-            },
-            testProvenance(workspaceId),
-          );
+          yield* writer.publish(RoleFacts.Renamed, { roleId, workspaceId, name: "Rolled back" });
+          yield* writer.publish(RoleFacts.PermissionsChanged, {
+            roleId,
+            workspaceId,
+            permissions: [],
+          });
+          yield* writer.publish(RoleFacts.Renamed, {
+            roleId: Role.Id.make("missing"),
+            workspaceId,
+            name: "Missing",
+          });
         }),
       );
       expect(yield* Effect.flip((yield* setup).replay)).toMatchObject({
@@ -592,34 +486,21 @@ test("a failed assignment replay batch restores active access and earlier checkp
     fixture,
     Effect.gen(function* () {
       const writer = yield* sourceJournal;
-      yield* writer.publish(
-        AssignmentFacts.Created,
-        assigned(roleAssignmentId),
-        testProvenance(workspaceId),
-      );
+      yield* writer.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
       yield* writer.commit(
         Effect.gen(function* () {
-          yield* writer.publish(
-            AssignmentFacts.Revoked,
-            {
-              assignmentId: roleAssignmentId,
-              workspaceId,
-            },
-            testProvenance(workspaceId),
-          );
+          yield* writer.publish(AssignmentFacts.Revoked, {
+            assignmentId: roleAssignmentId,
+            workspaceId,
+          });
           yield* writer.publish(
             AssignmentFacts.Created,
             assigned(directAssignmentId, directSource),
-            testProvenance(workspaceId),
           );
-          yield* writer.publish(
-            AssignmentFacts.Revoked,
-            {
-              assignmentId: Assignment.Id.make("missing"),
-              workspaceId,
-            },
-            testProvenance(workspaceId),
-          );
+          yield* writer.publish(AssignmentFacts.Revoked, {
+            assignmentId: Assignment.Id.make("missing"),
+            workspaceId,
+          });
         }),
       );
       expect(yield* Effect.flip((yield* setup).replay)).toMatchObject({

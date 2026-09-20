@@ -179,71 +179,65 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     return readable;
   }).pipe(journal.commit, Effect.withSpan("MemberApplication.list"));
 
-  const remove = Effect.fn("MemberApplication.remove")(function* (memberId: Member.Id) {
-    const id = yield* decodeId(memberId);
-    yield* authorization.require([
-      Requirement.make(
-        MemberPermissions.Remove,
-        Target.Reference.cases.Member.make({ workspaceId, memberId: id }),
-      ),
-    ]);
-    const member = yield* load(id);
-    const found = yield* workspace.get;
-    if (Option.isNone(found))
-      return yield* new InvalidResponse({ message: "Workspace metadata is missing" });
-    const record = yield* Schema.decodeEffect(Workspace.Record)(found.value);
-    yield* requireWorkspace(workspaceId, record.id);
-    if (record.ownerMemberId === id)
-      return yield* new OwnerProtected({ workspaceId, memberId: id });
-    if (member.status === "removed")
-      return yield* new AlreadyRemoved({ workspaceId, memberId: id });
-    yield* delegation.requireRemoval(id);
-    const provenance = yield* Publication.makeForActor().pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    const removed = yield* journal.publish(
-      MemberFacts.Removed,
-      { workspaceId, memberId: id },
-      provenance,
-    );
-    if (member.identity._tag === "Human") {
-      const actor = yield* Actor.Service;
-      const revokedAt = yield* DateTime.now;
-      const revocationProvenance = yield* Publication.makeCausedBy(
-        removed,
-        provenance.performedBy,
-        revokedAt,
-      );
-      for (const pending of yield* invitations.listPendingByRecipient(member.identity.id)) {
-        const invitation = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(pending);
-        if (
-          invitation.details.workspaceId !== workspaceId ||
-          invitation.details.recipientId !== member.identity.id ||
-          invitation.state._tag !== "Pending"
-        )
-          return yield* new InvalidResponse({
-            message: "Invitation store returned a different recipient, workspace, or state",
-          });
-        yield* journal.publish(
-          InvitationFacts.Revoked,
-          {
-            workspaceId,
-            invitationId: invitation.details.id,
-            _tag: "Revoked",
-            revokedBy: actor.memberId,
-            revokedAt,
-          },
-          revocationProvenance,
-        );
+  const remove = Effect.fn("MemberApplication.remove")(
+    function* (memberId: Member.Id) {
+      const id = yield* decodeId(memberId);
+      yield* authorization.require([
+        Requirement.make(
+          MemberPermissions.Remove,
+          Target.Reference.cases.Member.make({ workspaceId, memberId: id }),
+        ),
+      ]);
+      const member = yield* load(id);
+      const found = yield* workspace.get;
+      if (Option.isNone(found))
+        return yield* new InvalidResponse({ message: "Workspace metadata is missing" });
+      const record = yield* Schema.decodeEffect(Workspace.Record)(found.value);
+      yield* requireWorkspace(workspaceId, record.id);
+      if (record.ownerMemberId === id)
+        return yield* new OwnerProtected({ workspaceId, memberId: id });
+      if (member.status === "removed")
+        return yield* new AlreadyRemoved({ workspaceId, memberId: id });
+      yield* delegation.requireRemoval(id);
+      const removed = yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
+      if (member.identity._tag === "Human") {
+        const recipientId = member.identity.id;
+        const actor = yield* Actor.Service;
+        const revokedAt = yield* DateTime.now;
+        yield* Effect.gen(function* () {
+          for (const pending of yield* invitations.listPendingByRecipient(recipientId)) {
+            const invitation = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(
+              pending,
+            );
+            if (
+              invitation.details.workspaceId !== workspaceId ||
+              invitation.details.recipientId !== member.identity.id ||
+              invitation.state._tag !== "Pending"
+            )
+              return yield* new InvalidResponse({
+                message: "Invitation store returned a different recipient, workspace, or state",
+              });
+            yield* journal.publish(InvitationFacts.Revoked, {
+              workspaceId,
+              invitationId: invitation.details.id,
+              _tag: "Revoked",
+              revokedBy: actor.memberId,
+              revokedAt,
+            });
+          }
+        }).pipe(Publication.withCause(removed, revokedAt));
       }
-    }
-    return {
-      id,
-      workspaceId,
-      identity: member.identity,
-      status: "removed",
-    } satisfies Member.Record;
-  }, journal.commit);
+      return {
+        id,
+        workspaceId,
+        identity: member.identity,
+        status: "removed",
+      } satisfies Member.Record;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
   return Service.of({ workspaceId, get, list, remove });
 });

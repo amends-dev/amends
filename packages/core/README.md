@@ -129,11 +129,13 @@ delegates to that constructor. The default capacity is 256 committed batches.
 payload; each fact's schema supplies its specific payload type. `CommittedEvents.Batch`
 groups those events in publication order with their workspace and commit IDs.
 
-Every `Journal.publish` takes explicit `Event.Provenance`: workspace, performer,
-immediate cause, correlation ID, and occurrence time. `Publication.makeForActor`
-creates root context from the operation's actor; `Publication.make` supports
-authenticated identities before membership and explicit system performers.
-`Publication.makeCausedBy` continues an event's causal chain. See the
+Every `Journal.publish(fact, payload)` reads `Publication.Service` at invocation:
+workspace, performer, immediate cause, correlation ID, and occurrence time.
+`Publication.withActor` establishes root context when absent and reuses it in nested
+operations. `Publication.make` supports explicit context for authenticated identities
+before membership and system performers. `Publication.withCause` continues an event's
+causal chain while retaining the current performer; `withPerformer` and `withOccurredAt`
+scope overrides to one effect or block. See the
 [publication pattern](../../docs/journal.md#event-provenance) for attribution rules,
 validation, and examples. New events return `Event.Published<F>` with complete
 provenance; older stored envelopes decode with `provenance: null`.
@@ -346,8 +348,8 @@ meaning rather than using it as a synonym for a constructor.
 | Invitation operations | `InvitationApplication.make()`        | `InvitationApplication.Service`         |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
-`Actor.Service` and `Store.Transaction` identify invocation context supplied by
-trusted ingress and storage. These contracts have no default implementation or
+`Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation
+context supplied by trusted ingress, application operations, and storage. These contracts have no default implementation or
 pass-through `make`/`layer` wrappers in core. Private transaction tags coordinate
 operations and are not public construction APIs.
 

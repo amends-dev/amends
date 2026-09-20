@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, test } from "bun:test";
 import { Effect, Layer } from "effect";
@@ -178,58 +179,48 @@ test("one resolver observes staged journal changes, later role edits, and assign
       });
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            RoleFacts.Created,
-            {
+          yield* journal
+            .publish(RoleFacts.Created, {
               roleId,
               workspaceId,
               name: role.name,
               permissions: role.permissions,
-            },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            AssignmentFacts.Created,
-            {
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          yield* journal
+            .publish(AssignmentFacts.Created, {
               assignmentId: roleAssignmentId,
               workspaceId,
               memberId,
               source: roleSource(),
-            },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            AssignmentFacts.Created,
-            {
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          yield* journal
+            .publish(AssignmentFacts.Created, {
               assignmentId: directAssignmentId,
               workspaceId,
               memberId,
               source: directSource(MemberPermissions.Read.name, memberScope),
-            },
-            testProvenance(workspaceId),
-          );
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           expect(yield* resolver.resolve(memberId)).toHaveLength(3);
         }),
       );
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            RoleFacts.PermissionsChanged,
-            {
+          yield* journal
+            .publish(RoleFacts.PermissionsChanged, {
               roleId,
               workspaceId,
               permissions: [MemberPermissions.Read.name],
-            },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            AssignmentFacts.Revoked,
-            {
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          yield* journal
+            .publish(AssignmentFacts.Revoked, {
               assignmentId: directAssignmentId,
               workspaceId,
-            },
-            testProvenance(workspaceId),
-          );
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           expect(yield* resolver.resolve(memberId)).toEqual([
             Grant.make(MemberPermissions.Read, workspaceScope),
           ]);
@@ -238,14 +229,12 @@ test("one resolver observes staged journal changes, later role edits, and assign
       expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([
         Grant.make(MemberPermissions.Read, workspaceScope),
       ]);
-      yield* journal.publish(
-        AssignmentFacts.Revoked,
-        {
+      yield* journal
+        .publish(AssignmentFacts.Revoked, {
           assignmentId: roleAssignmentId,
           workspaceId,
-        },
-        testProvenance(workspaceId),
-      );
+        })
+        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
       expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([]);
     }).pipe(
       Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),

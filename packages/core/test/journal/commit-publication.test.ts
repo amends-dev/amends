@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Deferred, Effect, Exit, Fiber, Layer, Logger, Schema, Stream } from "effect";
@@ -23,6 +24,7 @@ const projection = Projection.make("counter", { version: 1 }).on(Changed, (event
 );
 const setup = Journal.make({ logId: Log.Id.make("journal"), projections: [projection] });
 type Services =
+  | Publication.Service
   | Log.Service
   | Transaction.Service
   | Store.Service
@@ -50,6 +52,7 @@ const run = <A, E>(
           ),
       });
       return yield* use(fixture, published).pipe(
+        Effect.provideService(Publication.Service, testProvenance(workspaceId)),
         Effect.provide(Log.layer),
         Effect.provideService(Store.Service, fixture.store),
         Effect.provideService(Checkpoint.Service, fixture.checkpoints),
@@ -66,10 +69,8 @@ test("one outer commit publishes canonical events once, in order, after its proj
       const stream = yield* (yield* CommittedEvents.Service).subscribe;
       const events = yield* journal.commit(
         Effect.gen(function* () {
-          const first = yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
-          const second = yield* journal.commit(
-            journal.publish(Changed, { amount: 3 }, testProvenance(workspaceId)),
-          );
+          const first = yield* journal.publish(Changed, { amount: 2 });
+          const second = yield* journal.commit(journal.publish(Changed, { amount: 3 }));
           expect(published).toEqual([]);
           expect((yield* fixture.snapshot).logs.size).toBe(0);
           return [first, second];
@@ -91,7 +92,7 @@ test("rollback and caught nested failure discard every collected event", async (
       const rollback = yield* Effect.flip(
         journal.commit(
           Effect.gen(function* () {
-            yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
+            yield* journal.publish(Changed, { amount: 2 });
             return yield* Effect.fail("rollback");
           }),
         ),
@@ -100,7 +101,7 @@ test("rollback and caught nested failure discard every collected event", async (
       const caught = yield* Effect.flip(
         journal.commit(
           Effect.gen(function* () {
-            yield* journal.publish(Changed, { amount: 3 }, testProvenance(workspaceId));
+            yield* journal.publish(Changed, { amount: 3 });
             yield* journal.commit(Effect.fail("nested failure")).pipe(Effect.ignore);
           }),
         ),
@@ -125,9 +126,7 @@ test("failed projections never publish, even when the application catches their 
       expect(
         yield* Effect.flip(
           journal.commit(
-            journal
-              .publish(Changed, { amount: 4 }, testProvenance(workspaceId))
-              .pipe(Effect.catch(() => Effect.void)),
+            journal.publish(Changed, { amount: 4 }).pipe(Effect.catch(() => Effect.void)),
           ),
         ),
       ).toMatchObject({ _tag: "Commit.Aborted" });
@@ -142,7 +141,7 @@ test("reads, replay, and execution-log-only commits do not publish domain events
       const journal = yield* setup;
       const logs = yield* Log.Service;
       const turn = logs.open({ id: Log.Id.make("turn/one"), schema: Schema.String });
-      yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
+      yield* journal.publish(Changed, { amount: 1 });
       expect(published).toHaveLength(1);
       yield* journal.commit(journal.log.read({ limit: 10 }));
       yield* journal.replay;
@@ -161,9 +160,9 @@ test("reads, replay, and execution-log-only commits do not publish domain events
       });
       yield* logs.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
+          yield* journal.publish(Changed, { amount: 2 });
           yield* turn.append("more progress");
-          yield* secondJournal.publish(Changed, { amount: 3 }, testProvenance(workspaceId));
+          yield* secondJournal.publish(Changed, { amount: 3 });
         }),
       );
       expect(published).toHaveLength(2);
@@ -183,7 +182,7 @@ test("interruption before commit rolls back and publishes nothing", async () =>
       const writer = yield* journal
         .commit(
           Effect.gen(function* () {
-            yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
+            yield* journal.publish(Changed, { amount: 1 });
             yield* Deferred.succeed(staged, undefined);
             return yield* Effect.never;
           }),
@@ -217,9 +216,7 @@ test("a pending interrupt after native commit cannot skip publication", async ()
         Effect.provide(Layer.fresh(Log.layer)),
         Effect.provideService(Store.Service, wrapped),
       );
-      const writer = yield* journal
-        .publish(Changed, { amount: 1 }, testProvenance(workspaceId))
-        .pipe(Effect.forkChild);
+      const writer = yield* journal.publish(Changed, { amount: 1 }).pipe(Effect.forkChild);
       yield* Deferred.await(committed);
       expect((yield* fixture.snapshot).value).toBe(1);
       expect(published).toEqual([]);
@@ -236,9 +233,7 @@ test("an uncertain acknowledgment preserves its outcome without publishing or re
     Effect.gen(function* () {
       const journal = yield* setup;
       yield* fixture.loseNextAcknowledgment;
-      expect(
-        yield* Effect.flip(journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId))),
-      ).toMatchObject({
+      expect(yield* Effect.flip(journal.publish(Changed, { amount: 1 }))).toMatchObject({
         _tag: "JournalStore.CommitUncertain",
       });
       expect(published).toEqual([]);
@@ -269,7 +264,7 @@ test.each(["failure", "defect"] as const)(
           Effect.provideService(CommittedEvents.Service, failed),
         );
         const event = yield* journal
-          .publish(Changed, { amount: 5 }, testProvenance(workspaceId))
+          .publish(Changed, { amount: 5 })
           .pipe(Effect.provide(Logger.layer([logger])));
         expect(event.payload.amount).toBe(5);
         expect((yield* fixture.snapshot).value).toBe(5);

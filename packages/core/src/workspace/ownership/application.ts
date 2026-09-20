@@ -11,7 +11,6 @@ import type { Role } from "../../authorization/role/role.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
-import type { Event } from "../../journal/event.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { WorkspaceFacts } from "../facts.ts";
@@ -182,100 +181,87 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   const createAssignment = Effect.fn("OwnershipApplication.createAssignment")(function* (
     memberId: Member.Id,
     roleId: Role.Id,
-    provenance: Event.Provenance,
   ) {
-    yield* journal.publish(
-      AssignmentFacts.Created,
-      {
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        memberId,
-        source: Assignment.Source.cases.Role.make({
-          roleId,
-          scope: { _tag: "Workspace", workspaceId },
-        }),
-      },
-      provenance,
-    );
+    yield* journal.publish(AssignmentFacts.Created, {
+      assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+      workspaceId,
+      memberId,
+      source: Assignment.Source.cases.Role.make({
+        roleId,
+        scope: { _tag: "Workspace", workspaceId },
+      }),
+    });
   });
-  const transfer = Effect.fn("OwnershipApplication.transfer")(function* (
-    input: Ownership.TransferInput,
-  ) {
-    yield* authorization.require([requirement]);
-    const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
-    const state = yield* current;
-    const actor = yield* Actor.Service;
-    if (actor.memberId !== state.owner.id || actor.identity._tag !== "Human")
-      return yield* new NotOwner({ workspaceId });
-    if (request.expectedOwnerAssignmentId !== state.assignment.id)
-      return yield* new Changed({ workspaceId });
-    if (request.memberId === state.owner.id)
-      return yield* new InvalidRecipient({ memberId: request.memberId, reason: "same-owner" });
-    const recipient = yield* loadMember(request.memberId);
-    if (recipient.status !== "active")
-      return yield* new InvalidRecipient({ memberId: recipient.id, reason: "removed" });
-    if (recipient.identity._tag !== "Human")
-      return yield* new InvalidRecipient({ memberId: recipient.id, reason: "agent" });
-    const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
-    yield* delegation.loadRole(BuiltinRoles.AdministratorId);
-    if (!ownerRole.permissions.includes(OwnershipPermissions.Transfer.name))
-      return yield* new InvalidState({
-        message: "The Owner role must retain ownership-transfer permission",
-      });
-    // Replace built-in workspace roles only. Direct grants and scoped assignments retain their identity.
-    const previousAssignments = yield* delegation.assignmentsFor(state.owner.id);
-    const recipientAssignments = yield* delegation.assignmentsFor(recipient.id);
-    const sameAssignment = Schema.toEquivalence(Assignment.Record);
-    if (
-      !previousAssignments.some((record) => sameAssignment(record, state.assignment)) ||
-      recipientAssignments.some(
-        ({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId,
-      )
-    )
-      return yield* new InvalidState({ message: "Owner assignment listings disagree" });
-    const provenance = yield* Publication.makeForActor().pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    for (const records of [previousAssignments, recipientAssignments]) {
-      for (const assignment of records) {
-        const source = assignment.source;
-        if (
-          source._tag === "Role" &&
-          source.scope._tag === "Workspace" &&
-          builtins.includes(source.roleId)
+  const transfer = Effect.fn("OwnershipApplication.transfer")(
+    function* (input: Ownership.TransferInput) {
+      yield* authorization.require([requirement]);
+      const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
+      const state = yield* current;
+      const actor = yield* Actor.Service;
+      if (actor.memberId !== state.owner.id || actor.identity._tag !== "Human")
+        return yield* new NotOwner({ workspaceId });
+      if (request.expectedOwnerAssignmentId !== state.assignment.id)
+        return yield* new Changed({ workspaceId });
+      if (request.memberId === state.owner.id)
+        return yield* new InvalidRecipient({ memberId: request.memberId, reason: "same-owner" });
+      const recipient = yield* loadMember(request.memberId);
+      if (recipient.status !== "active")
+        return yield* new InvalidRecipient({ memberId: recipient.id, reason: "removed" });
+      if (recipient.identity._tag !== "Human")
+        return yield* new InvalidRecipient({ memberId: recipient.id, reason: "agent" });
+      const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
+      yield* delegation.loadRole(BuiltinRoles.AdministratorId);
+      if (!ownerRole.permissions.includes(OwnershipPermissions.Transfer.name))
+        return yield* new InvalidState({
+          message: "The Owner role must retain ownership-transfer permission",
+        });
+      // Replace built-in workspace roles only. Direct grants and scoped assignments retain their identity.
+      const previousAssignments = yield* delegation.assignmentsFor(state.owner.id);
+      const recipientAssignments = yield* delegation.assignmentsFor(recipient.id);
+      const sameAssignment = Schema.toEquivalence(Assignment.Record);
+      if (
+        !previousAssignments.some((record) => sameAssignment(record, state.assignment)) ||
+        recipientAssignments.some(
+          ({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId,
         )
-          yield* journal.publish(
-            AssignmentFacts.Revoked,
-            {
+      )
+        return yield* new InvalidState({ message: "Owner assignment listings disagree" });
+      for (const records of [previousAssignments, recipientAssignments]) {
+        for (const assignment of records) {
+          const source = assignment.source;
+          if (
+            source._tag === "Role" &&
+            source.scope._tag === "Workspace" &&
+            builtins.includes(source.roleId)
+          )
+            yield* journal.publish(AssignmentFacts.Revoked, {
               workspaceId,
               assignmentId: assignment.id,
-            },
-            provenance,
-          );
+            });
+        }
       }
-    }
-    yield* createAssignment(state.owner.id, BuiltinRoles.AdministratorId, provenance);
-    yield* createAssignment(recipient.id, BuiltinRoles.OwnerId, provenance);
-    yield* journal.publish(
-      WorkspaceFacts.OwnershipTransferred,
-      {
+      yield* createAssignment(state.owner.id, BuiltinRoles.AdministratorId);
+      yield* createAssignment(recipient.id, BuiltinRoles.OwnerId);
+      yield* journal.publish(WorkspaceFacts.OwnershipTransferred, {
         workspaceId,
         previousOwnerMemberId: state.owner.id,
         ownerMemberId: recipient.id,
-      },
-      provenance,
-    );
-    const updated = yield* current;
-    if (
-      updated.owner.id !== recipient.id ||
-      updated.workspace.name !== state.workspace.name ||
-      updated.workspace.createdBy !== state.workspace.createdBy
-    )
-      return yield* new InvalidState({
-        message: "Ownership transfer changed unrelated metadata or the wrong owner",
       });
-    return updated.workspace;
-  }, journal.commit);
+      const updated = yield* current;
+      if (
+        updated.owner.id !== recipient.id ||
+        updated.workspace.name !== state.workspace.name ||
+        updated.workspace.createdBy !== state.workspace.createdBy
+      )
+        return yield* new InvalidState({
+          message: "Ownership transfer changed unrelated metadata or the wrong owner",
+        });
+      return updated.workspace;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
   return Service.of({ get, transfer });
 });
 

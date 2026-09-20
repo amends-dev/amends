@@ -55,8 +55,10 @@ All normal writers to a domain log must use the same projection registrations.
 
 ## Event provenance
 
-Every new `journal.publish(fact, payload, provenance)` requires `Event.Provenance`.
-The journal persists that context in `Event.Envelope` and exposes it on decoded
+Every new `journal.publish(fact, payload)` requires `Publication.Service` in its
+Effect context. This service holds the operation's `Event.Provenance`. The journal
+reads it at publication time, validates and snapshots it, then persists it in
+`Event.Envelope` and exposes it on decoded
 events, projections, committed batches, and change-feed events. `Fact` continues
 to define only the domain statement. Generic `Log` entries retain their existing
 metadata and do not acquire domain attribution.
@@ -75,12 +77,19 @@ a membership exists. `System` requires a named system ID; it is never an automat
 fallback for missing identity. Attribution is historical information, not proof
 of permission. Application operations still check current authority.
 
-Construct root provenance once per application operation using
-`Publication.makeForActor()`, which reads the current actor and generates a fresh
-correlation ID through `Crypto.Crypto`. Reuse the result for sibling facts. An
-operation with a domain timestamp can pass that timestamp to the constructor.
-Services capture cryptography during construction and provide it to this helper;
-they resolve the actor during the operation.
+Wrap an ordinary application operation with `Publication.withActor`. If no
+publication context exists, it reads the current actor and creates root provenance
+once through `Publication.makeForActor()`, using `Crypto.Crypto` for a fresh
+correlation ID and the clock for the occurrence time. Nested operations reuse
+the existing context, including any explicit overrides. Publishing another fact
+does not regenerate the correlation or timestamp.
+
+Application services capture cryptography during construction and provide it to
+the wrapper; identity is resolved when the operation runs. `Publication.Service`
+belongs around the operation's effect, never in a shared application layer.
+`Journal.make` and `Journal.layer` do not capture it. A direct publication without
+the service is a missing dependency at compile time and a defect at runtime;
+the journal never falls back to an authorization actor or system identity.
 
 For a workflow whose facts are `MemberFacts.Removed` and `InvitationFacts.Revoked`:
 
@@ -88,30 +97,41 @@ For a workflow whose facts are `MemberFacts.Removed` and `InvitationFacts.Revoke
 const remove = journal.commit(
   Effect.gen(function* () {
     // The application validates inputs and authorizes this operation first.
-    const provenance = yield* Publication.makeForActor();
-    const removed = yield* journal.publish(MemberFacts.Removed, removal, provenance);
-    const followUp = yield* Publication.makeCausedBy(removed);
-    yield* journal.publish(InvitationFacts.Revoked, revocation, followUp);
-  }),
+    const removed = yield* journal.publish(MemberFacts.Removed, removal);
+    yield* journal
+      .publish(InvitationFacts.Revoked, revocation)
+      .pipe(Publication.withCause(removed));
+  }).pipe(Publication.withActor),
 );
 ```
 
 Here `removal` and `revocation` are validated fact payloads supplied by the workflow.
-`Publication.makeCausedBy` preserves the parent's correlation ID, records its
-reference, and captures a new occurrence time. Its optional performer and timestamp
-arguments support work performed later by a different member or system process.
+`Publication.withCause(parent, occurredAt?)` derives the parent's correlation ID,
+records its reference, and captures a new occurrence time unless one is supplied.
+It retains the current operation's performer and workspace. A worker processing
+another actor's event therefore records itself as performer. A cause cannot switch
+the current workspace. `Publication.withPerformer(performer)` and
+`Publication.withOccurredAt(time)` provide focused overrides of those fields.
+Each wrapper applies only to the enclosed effect or block; the surrounding context
+is restored after success or failure, and concurrent fibers retain their own values.
+
 The cause must already be visible in the workspace transaction, including an
 earlier publication in the same commit. Publication rejects missing causes,
 foreign workspace attribution, and a correlation that differs from an attributed
 parent. Events in one commit are not automatically causes of one another.
 
 For bootstrap and invitation acceptance, call `Publication.make(workspaceId,
-performer, occurredAt?)` with the authenticated identity. Acceptance records the
+performer, occurredAt?)` with the authenticated identity and provide the result
+around the publication block using `Effect.provideService(Publication.Service,
+provenance)`. These operations explicitly establish their authenticated performer's
+context because membership may not exist yet. Acceptance records the
 recipient even though its authority check temporarily evaluates the inviter.
 An agent's work records the agent as performer; the requester belongs in the causal
-history. Public request bodies do not select the performer. Current application
-operations construct their own root context; trusted domain workflows explicitly
-construct and pass follow-up context when they have an upstream event.
+history. Public request bodies do not select the performer. Trusted callers can
+also provide a complete context directly. The low-level `Publication.makeCausedBy`
+constructor remains available for explicitly constructing follow-up provenance;
+its default performer is the parent event's performer, while `withCause` retains
+the current operation's performer.
 
 The journal validates and snapshots provenance before publication. Attribution and
 its nested identity and cause references are immutable when delivered to projections
@@ -148,12 +168,11 @@ fibers. Returned entry references are provisional until the outer commit succeed
 
 ```ts
 const incorporate = Effect.gen(function* () {
-  const provenance = yield* Publication.makeForActor();
   yield* journal.commit(
     Effect.gen(function* () {
       yield* turnLog.append(confirmation);
-      yield* journal.publish(InputIncorporated, { turnId, throughSequence }, provenance);
-    }),
+      yield* journal.publish(InputIncorporated, { turnId, throughSequence });
+    }).pipe(Publication.withActor),
   );
 });
 ```

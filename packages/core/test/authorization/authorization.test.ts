@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, test } from "bun:test";
 import { Effect, Layer, Option } from "effect";
@@ -457,11 +458,9 @@ test("authorization observes transactional changes and protects the mutation in 
       yield* journal.commit(
         Effect.gen(function* () {
           yield* authorization.require([removeBob]);
-          yield* journal.publish(
-            MemberFacts.Removed,
-            { workspaceId, memberId: bob.memberId },
-            testProvenance(workspaceId),
-          );
+          yield* journal
+            .publish(MemberFacts.Removed, { workspaceId, memberId: bob.memberId })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
         }),
       );
       expect(
@@ -475,79 +474,65 @@ test("authorization observes transactional changes and protects the mutation in 
       const denied = yield* Effect.flip(
         journal.commit(
           Effect.gen(function* () {
-            yield* journal.publish(
-              RoleFacts.PermissionsChanged,
-              {
+            yield* journal
+              .publish(RoleFacts.PermissionsChanged, {
                 roleId,
                 workspaceId,
                 permissions: [],
-              },
-              testProvenance(workspaceId),
-            );
+              })
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
             yield* authorization.require([removeCharlie]);
-            yield* journal.publish(
-              MemberFacts.Removed,
-              {
+            yield* journal
+              .publish(MemberFacts.Removed, {
                 workspaceId,
                 memberId: charlie.memberId,
-              },
-              testProvenance(workspaceId),
-            );
+              })
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           }),
         ),
       );
       expect(denied._tag).toBe("Authorization.Denied");
       expect(yield* fixture.snapshot).toEqual(before);
-      yield* journal.publish(
-        RoleFacts.PermissionsChanged,
-        {
+      yield* journal
+        .publish(RoleFacts.PermissionsChanged, {
           roleId,
           workspaceId,
           permissions: [],
-        },
-        testProvenance(workspaceId),
-      );
+        })
+        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
       expect(
         yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
       ).toMatchObject({ _tag: "Authorization.Denied" });
-      yield* journal.publish(
-        RoleFacts.PermissionsChanged,
-        {
+      yield* journal
+        .publish(RoleFacts.PermissionsChanged, {
           roleId,
           workspaceId,
           permissions: [MemberPermissions.Remove.name],
-        },
-        testProvenance(workspaceId),
-      );
-      yield* journal.publish(
-        AssignmentFacts.Revoked,
-        { assignmentId, workspaceId },
-        testProvenance(workspaceId),
-      );
+        })
+        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+      yield* journal
+        .publish(AssignmentFacts.Revoked, { assignmentId, workspaceId })
+        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
       expect(
         yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
       ).toMatchObject({ _tag: "Authorization.Denied" });
-      yield* journal.publish(
-        AssignmentFacts.Created,
-        {
+      yield* journal
+        .publish(AssignmentFacts.Created, {
           assignmentId: Assignment.Id.make("reassigned"),
           workspaceId,
           memberId: alice.memberId,
           source,
-        },
-        testProvenance(workspaceId),
-      );
+        })
+        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
       yield* journal.commit(authorization.require([removeCharlie]));
 
       const beforeRemoval = yield* fixture.snapshot;
       const inactive = yield* Effect.flip(
         journal.commit(
           Effect.gen(function* () {
-            yield* journal.publish(
-              MemberFacts.Removed,
-              { workspaceId, memberId: alice.memberId },
-              testProvenance(workspaceId),
-            );
+            yield* journal
+              .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
             yield* authorization.require([removeCharlie]);
           }),
         ),
@@ -557,11 +542,9 @@ test("authorization observes transactional changes and protects the mutation in 
         reason: "membership-removed",
       });
       expect(yield* fixture.snapshot).toEqual(beforeRemoval);
-      yield* journal.publish(
-        MemberFacts.Removed,
-        { workspaceId, memberId: alice.memberId },
-        testProvenance(workspaceId),
-      );
+      yield* journal
+        .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
+        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
       expect(
         yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
       ).toMatchObject({ _tag: "Authorization.InvalidActor", reason: "membership-removed" });

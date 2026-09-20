@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Context, Deferred, Effect, Fiber, Option, Ref, Schema, SchemaGetter } from "effect";
@@ -34,10 +35,15 @@ const runner = Effect.gen(function* () {
 
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Log.Service | Transaction.Service | Counter | Checkpoint.Service>,
+  program: Effect.Effect<
+    A,
+    E,
+    Publication.Service | Log.Service | Transaction.Service | Counter | Checkpoint.Service
+  >,
 ) =>
   Effect.runPromise(
     program.pipe(
+      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
       Effect.provide(CommittedEvents.layer(workspaceId)),
@@ -54,12 +60,12 @@ test("replay checkpoints a complete batch and resumes with a fresh runner", asyn
       const journal = yield* source;
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
-          yield* journal.publish(Changed, { amount: 3 }, testProvenance(workspaceId));
+          yield* journal.publish(Changed, { amount: 2 });
+          yield* journal.publish(Changed, { amount: 3 });
         }),
       );
-      yield* journal.publish(Unrelated, "ignored", testProvenance(workspaceId));
-      yield* journal.publish(Changed, { amount: 7 }, testProvenance(workspaceId));
+      yield* journal.publish(Unrelated, "ignored");
+      yield* journal.publish(Changed, { amount: 7 });
       const first = yield* runner;
       const cursor = yield* first.step;
       expect(Option.isSome(cursor) && cursor.value.index).toBe(1);
@@ -86,14 +92,14 @@ test("a failed batch rolls back every handler and preserves previously committed
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
+      yield* journal.publish(Changed, { amount: 1 });
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
-          yield* journal.publish(Changed, { amount: 3 }, testProvenance(workspaceId));
+          yield* journal.publish(Changed, { amount: 2 });
+          yield* journal.publish(Changed, { amount: 3 });
         }),
       );
-      yield* journal.publish(Changed, { amount: 4 }, testProvenance(workspaceId));
+      yield* journal.publish(Changed, { amount: 4 });
       const rejecting = definition.on(Changed, (event) =>
         event.payload.amount === 3 ? Effect.fail("rejected") : Effect.void,
       );
@@ -120,7 +126,7 @@ test("checkpoint persistence failures roll back replay and live projection write
   await run(
     fixture,
     Effect.gen(function* () {
-      yield* (yield* source).publish(Changed, { amount: 2 }, testProvenance(workspaceId));
+      yield* (yield* source).publish(Changed, { amount: 2 });
     }),
   );
   const broken = {
@@ -140,10 +146,9 @@ test("checkpoint persistence failures roll back replay and live projection write
         logId: Log.Id.make("new-domain"),
         projections: [definition],
       });
-      expect(
-        (yield* Effect.flip(journal.publish(Changed, { amount: 5 }, testProvenance(workspaceId))))
-          ._tag,
-      ).toBe("JournalStore.Failure");
+      expect((yield* Effect.flip(journal.publish(Changed, { amount: 5 })))._tag).toBe(
+        "JournalStore.Failure",
+      );
       expect(yield* (yield* Counter).get).toBe(0);
       expect((yield* fixture.snapshot).checkpoints.size).toBe(0);
       expect((yield* fixture.snapshot).logs.size).toBe(1);
@@ -157,8 +162,7 @@ test("independent concurrent runners serialize progress instead of applying a ba
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      for (const amount of [1, 2, 3])
-        yield* journal.publish(Changed, { amount }, testProvenance(workspaceId));
+      for (const amount of [1, 2, 3]) yield* journal.publish(Changed, { amount });
     }),
   );
   const drain = Effect.gen(function* () {
@@ -174,23 +178,20 @@ test("live publishing requires catch-up and shares replay checkpoints across nes
     fixture,
     Effect.gen(function* () {
       const writer = yield* source;
-      yield* writer.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
+      yield* writer.publish(Changed, { amount: 1 });
       const journal = yield* Journal.make({ logId, projections: [definition] });
-      expect(
-        (yield* Effect.flip(journal.publish(Changed, { amount: 100 }, testProvenance(workspaceId))))
-          ._tag,
-      ).toBe("Projection.Behind");
+      expect((yield* Effect.flip(journal.publish(Changed, { amount: 100 })))._tag).toBe(
+        "Projection.Behind",
+      );
       expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(1);
       expect(yield* (yield* Counter).get).toBe(0);
       yield* journal.replay;
       const last = yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
+          yield* journal.publish(Changed, { amount: 2 });
           yield* journal.replay;
-          yield* journal.commit(
-            journal.publish(Unrelated, "checkpoint this too", testProvenance(workspaceId)),
-          );
-          return yield* journal.publish(Changed, { amount: 3 }, testProvenance(workspaceId));
+          yield* journal.commit(journal.publish(Unrelated, "checkpoint this too"));
+          return yield* journal.publish(Changed, { amount: 3 });
         }),
       );
       yield* journal.replay;
@@ -219,11 +220,11 @@ test("unrelated facts advance progress but unsupported versions fail without ski
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      yield* journal.publish(Unrelated, "unrelated", testProvenance(workspaceId));
+      yield* journal.publish(Unrelated, "unrelated");
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
-          yield* journal.publish(ChangedV2, { amount: 2 }, testProvenance(workspaceId));
+          yield* journal.publish(Changed, { amount: 1 });
+          yield* journal.publish(ChangedV2, { amount: 2 });
         }),
       );
       const original = yield* runner;
@@ -251,8 +252,8 @@ test("invalid or partial durable checkpoints fail before applying more events", 
       const journal = yield* source;
       const first = yield* journal.commit(
         Effect.gen(function* () {
-          const entry = yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
-          yield* journal.publish(Changed, { amount: 2 }, testProvenance(workspaceId));
+          const entry = yield* journal.publish(Changed, { amount: 1 });
+          yield* journal.publish(Changed, { amount: 2 });
           return entry;
         }),
       );
@@ -280,7 +281,7 @@ test("interruption during replay rolls back projection changes and progress toge
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      yield* journal.publish(Changed, { amount: 4 }, testProvenance(workspaceId));
+      yield* journal.publish(Changed, { amount: 4 });
       const ready = yield* Deferred.make<void>();
       const blocking = definition.on(Changed, () =>
         Deferred.succeed(ready, undefined).pipe(Effect.andThen(Effect.never)),
@@ -302,7 +303,7 @@ test("an uncertain replay commit can resume from its persisted checkpoint withou
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      yield* journal.publish(Changed, { amount: 4 }, testProvenance(workspaceId));
+      yield* journal.publish(Changed, { amount: 4 });
       const bound = yield* runner;
       yield* fixture.loseNextAcknowledgment;
       expect((yield* Effect.flip(bound.step))._tag).toBe("JournalStore.CommitUncertain");
@@ -326,7 +327,7 @@ test("replay handlers cannot append and a caught failure poisons the outer commi
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
+      yield* journal.publish(Changed, { amount: 1 });
       const turn = (yield* Log.Service).open({
         id: Log.Id.make("turn/one"),
         schema: Schema.String,
@@ -356,8 +357,8 @@ test("checkpoint keys isolate log, projection name, and version; duplicate regis
     Effect.gen(function* () {
       const journal = yield* source;
       const other = yield* Journal.make({ logId: Log.Id.make("other"), projections: [] });
-      yield* journal.publish(Unrelated, "one", testProvenance(workspaceId));
-      yield* other.publish(Unrelated, "two", testProvenance(workspaceId));
+      yield* journal.publish(Unrelated, "one");
+      yield* other.publish(Unrelated, "two");
       for (const [log, name, version] of [
         [journal.log, "a", 1],
         [journal.log, "b", 1],
@@ -410,16 +411,12 @@ test("historical decoding resolves services, runs once per event, and cannot app
   await run(
     fixture,
     Effect.gen(function* () {
-      yield* (yield* source)
-        .publish(Decoded, 2, testProvenance(workspaceId))
-        .pipe(Effect.provideService(Decoder, decoder));
+      yield* (yield* source).publish(Decoded, 2).pipe(Effect.provideService(Decoder, decoder));
       const journal = yield* Journal.make({ logId, projections: [decoded] }).pipe(
         Effect.provideService(Decoder, decoder),
       );
       yield* journal.replay;
-      yield* journal
-        .publish(Decoded, 3, testProvenance(workspaceId))
-        .pipe(Effect.provideService(Decoder, decoder));
+      yield* journal.publish(Decoded, 3).pipe(Effect.provideService(Decoder, decoder));
       expect(yield* (yield* Counter).get).toBe(5);
       expect(yield* Ref.get(decodes)).toBe(3);
       const turn = (yield* Log.Service).open({
@@ -481,7 +478,7 @@ test("live projection application rejects entries from another native transactio
     fixture,
     Effect.gen(function* () {
       const journal = yield* source;
-      const event = yield* journal.publish(Changed, { amount: 1 }, testProvenance(workspaceId));
+      const event = yield* journal.publish(Changed, { amount: 1 });
       const batch = yield* journal.log.get(event.commitId);
       if (Option.isNone(batch)) throw new Error("Missing source batch");
       const entry = batch.value.entries[0];

@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, test } from "bun:test";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -240,11 +241,9 @@ test("notification reads join an outer commit and observe staged membership remo
             const native = yield* Store.Transaction;
             expect(yield* notifications.get(mine.id)).toEqual(mine);
             expect((yield* Store.Transaction).id).toBe(native.id);
-            yield* journal.publish(
-              MemberFacts.Removed,
-              { workspaceId, memberId: alice.memberId },
-              testProvenance(workspaceId),
-            );
+            yield* journal
+              .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
             return yield* notifications.listPending(page);
           }),
         ),

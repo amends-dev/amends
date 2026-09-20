@@ -1,3 +1,4 @@
+import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
 import { Effect, Option, Schema } from "effect";
@@ -23,10 +24,15 @@ const key = {
 };
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Log.Service | Transaction.Service | Checkpoint.Service>,
+  program: Effect.Effect<
+    A,
+    E,
+    Publication.Service | Log.Service | Transaction.Service | Checkpoint.Service
+  >,
 ) =>
   Effect.runPromise(
     program.pipe(
+      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
       Effect.provide(CommittedEvents.layer(workspaceId)),
@@ -40,11 +46,7 @@ test("the empty notification projection catches up and checkpoints live batches 
     fixture,
     Effect.gen(function* () {
       const source = yield* Journal.make({ logId, projections: [] });
-      const historical = yield* source.publish(
-        Source,
-        "before registration",
-        testProvenance(workspaceId),
-      );
+      const historical = yield* source.publish(Source, "before registration");
       const journal = yield* Journal.make({
         logId,
         projections: [NotificationProjection.definition],
@@ -60,8 +62,8 @@ test("the empty notification projection catches up and checkpoints live batches 
       );
       const last = yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Source, "first in batch", testProvenance(workspaceId));
-          return yield* journal.publish(Source, "last in batch", testProvenance(workspaceId));
+          yield* journal.publish(Source, "first in batch");
+          return yield* journal.publish(Source, "last in batch");
         }),
       );
       const expected = Option.some({

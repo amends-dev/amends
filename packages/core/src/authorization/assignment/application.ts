@@ -3,7 +3,6 @@ import type { PlatformError } from "effect";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
-import type { Event } from "../../journal/event.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Member } from "../../workspace/member/member.ts";
@@ -135,7 +134,6 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   }, journal.commit);
   const create = Effect.fn("AssignmentApplication.create")(function* (
     input: Assignment.AssignInput,
-    provenance: Event.Provenance,
   ) {
     const record = Assignment.Record.make({
       id: Assignment.Id.make(yield* crypto.randomUUIDv4),
@@ -147,90 +145,81 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
         scope: { _tag: "Workspace", workspaceId },
       }),
     });
-    yield* journal.publish(
-      AssignmentFacts.Created,
-      {
-        workspaceId,
-        assignmentId: record.id,
-        memberId: record.memberId,
-        source: record.source,
-      },
-      provenance,
-    );
+    yield* journal.publish(AssignmentFacts.Created, {
+      workspaceId,
+      assignmentId: record.id,
+      memberId: record.memberId,
+      source: record.source,
+    });
     return record;
   });
   const workspaceRole = (record: Assignment.Record) =>
     record.source._tag === "Role" && record.source.scope._tag === "Workspace";
-  const assign = Effect.fn("AssignmentApplication.assign")(function* (
-    input: Assignment.AssignInput,
-  ) {
-    const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input);
-    yield* recipient(request.memberId);
-    yield* delegation.requireGrant(request.roleId);
-    const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
-      (record) =>
-        workspaceRole(record) &&
-        record.source._tag === "Role" &&
-        record.source.roleId === request.roleId,
-    );
-    if (existing !== undefined) return existing;
-    const provenance = yield* Publication.makeForActor().pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    return yield* create(request, provenance);
-  }, journal.commit);
-  const revoke = Effect.fn("AssignmentApplication.revoke")(function* (
-    memberId: Member.Id,
-    assignmentId: Assignment.Id,
-  ) {
-    yield* recipient(memberId);
-    const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
-    const found = yield* assignments.get(id);
-    if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
-    const record = yield* Schema.decodeEffect(Assignment.Record)(found.value);
-    if (record.workspaceId !== workspaceId || record.id !== id)
-      return yield* new Delegation.InvalidResponse({
-        message: "Assignment store returned a different assignment or workspace",
-      });
-    if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
-    if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
-    if (record.status === "revoked") return record;
-    const provenance = yield* Publication.makeForActor().pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: id }, provenance);
-    return { ...record, status: "revoked" } satisfies Assignment.Record;
-  }, journal.commit);
-  const change = Effect.fn("AssignmentApplication.change")(function* (
-    input: Assignment.ChangeInput,
-  ) {
-    const request = yield* Schema.decodeEffect(Assignment.ChangeInput)(input);
-    yield* recipient(request.memberId);
-    yield* delegation.requireGrant(request.roleId);
-    const current = (yield* delegation.assignmentsFor(request.memberId)).filter(workspaceRole);
-    if (
-      current.length !== request.expectedAssignmentIds.length ||
-      current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
-    )
-      return yield* new Changed({ memberId: request.memberId });
-    for (const record of current) {
-      if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
-    }
-    const same = current.find(
-      ({ source }) => source._tag === "Role" && source.roleId === request.roleId,
-    );
-    if (current.length === 1 && same !== undefined) return same;
-    const provenance = yield* Publication.makeForActor().pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-    );
-    for (const record of current)
-      yield* journal.publish(
-        AssignmentFacts.Revoked,
-        { workspaceId, assignmentId: record.id },
-        provenance,
+  const assign = Effect.fn("AssignmentApplication.assign")(
+    function* (input: Assignment.AssignInput) {
+      const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input);
+      yield* recipient(request.memberId);
+      yield* delegation.requireGrant(request.roleId);
+      const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
+        (record) =>
+          workspaceRole(record) &&
+          record.source._tag === "Role" &&
+          record.source.roleId === request.roleId,
       );
-    return yield* create(request, provenance);
-  }, journal.commit);
+      if (existing !== undefined) return existing;
+      return yield* create(request);
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  const revoke = Effect.fn("AssignmentApplication.revoke")(
+    function* (memberId: Member.Id, assignmentId: Assignment.Id) {
+      yield* recipient(memberId);
+      const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
+      const found = yield* assignments.get(id);
+      if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
+      const record = yield* Schema.decodeEffect(Assignment.Record)(found.value);
+      if (record.workspaceId !== workspaceId || record.id !== id)
+        return yield* new Delegation.InvalidResponse({
+          message: "Assignment store returned a different assignment or workspace",
+        });
+      if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
+      if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
+      if (record.status === "revoked") return record;
+      yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: id });
+      return { ...record, status: "revoked" } satisfies Assignment.Record;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  const change = Effect.fn("AssignmentApplication.change")(
+    function* (input: Assignment.ChangeInput) {
+      const request = yield* Schema.decodeEffect(Assignment.ChangeInput)(input);
+      yield* recipient(request.memberId);
+      yield* delegation.requireGrant(request.roleId);
+      const current = (yield* delegation.assignmentsFor(request.memberId)).filter(workspaceRole);
+      if (
+        current.length !== request.expectedAssignmentIds.length ||
+        current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
+      )
+        return yield* new Changed({ memberId: request.memberId });
+      for (const record of current) {
+        if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
+      }
+      const same = current.find(
+        ({ source }) => source._tag === "Role" && source.roleId === request.roleId,
+      );
+      if (current.length === 1 && same !== undefined) return same;
+      for (const record of current)
+        yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: record.id });
+      return yield* create(request);
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
   return Service.of({ roles: choices.pipe(journal.commit), list, assign, revoke, change });
 });
 

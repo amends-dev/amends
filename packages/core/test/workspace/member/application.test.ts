@@ -1,3 +1,4 @@
+import { Publication } from "../../../src/journal/publication.ts";
 import { testCrypto, testProvenance } from "../../publication.ts";
 import { expect, expectTypeOf, test } from "bun:test";
 import { Crypto, Effect, Layer, Option } from "effect";
@@ -268,21 +269,17 @@ test("member reads join the current commit and see staged grants and membership 
       const application = yield* MemberApplication.Service;
       yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            AssignmentFacts.Created,
-            {
+          yield* journal
+            .publish(AssignmentFacts.Created, {
               assignmentId: readBob.id,
               workspaceId,
               memberId: alice.memberId,
               source: readBob.source,
-            },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            MemberFacts.Removed,
-            { workspaceId, memberId: bob.id },
-            testProvenance(workspaceId),
-          );
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          yield* journal
+            .publish(MemberFacts.Removed, { workspaceId, memberId: bob.id })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           expect(yield* application.get(bob.id)).toMatchObject({ id: bob.id, status: "removed" });
         }),
       );
@@ -308,14 +305,12 @@ test("a staged revocation denies the read and rolls back the enclosing commit", 
       const application = yield* MemberApplication.Service;
       return yield* journal.commit(
         Effect.gen(function* () {
-          yield* journal.publish(
-            AssignmentFacts.Revoked,
-            {
+          yield* journal
+            .publish(AssignmentFacts.Revoked, {
               workspaceId,
               assignmentId: readBob.id,
-            },
-            testProvenance(workspaceId),
-          );
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           return yield* application.get(bob.id);
         }),
       );
@@ -535,16 +530,14 @@ test("removal joins an outer commit, sees staged permission, and rolls back with
     const application = yield* MemberApplication.Service;
     return yield* journal.commit(
       Effect.gen(function* () {
-        yield* journal.publish(
-          AssignmentFacts.Created,
-          {
+        yield* journal
+          .publish(AssignmentFacts.Created, {
             assignmentId: granted.id,
             workspaceId,
             memberId: alice.memberId,
             source: granted.source,
-          },
-          testProvenance(workspaceId),
-        );
+          })
+          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
         return yield* application.remove(bob.id);
       }),
     );

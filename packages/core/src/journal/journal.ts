@@ -4,6 +4,7 @@ import { Event } from "./event.ts";
 import type { Fact } from "./fact.ts";
 import { Log } from "./log.ts";
 import { Projection } from "./projection.ts";
+import { Publication } from "./publication.ts";
 import { Transaction } from "./transaction.ts";
 
 export { Envelope, FactMismatch, decode } from "./event.ts";
@@ -17,11 +18,11 @@ export interface Interface {
   readonly publish: <F extends Fact.Definition>(
     fact: F,
     payload: Fact.Payload<NoInfer<F>>,
-    provenance: Event.Provenance,
   ) => Effect.Effect<
     Event.Published<F>,
     Projection.Error | Log.WriteError,
-    Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
+    | Publication.Service
+    | Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
   >;
 }
 
@@ -95,11 +96,12 @@ export const make = Effect.fn("Journal.make")(function* <
   const publish = Effect.fn("Journal.publish")(function* <F extends Fact.Definition>(
     fact: F,
     payload: Fact.Payload<NoInfer<F>>,
-    input: Event.Provenance,
   ) {
     return yield* transaction.operation(
       Effect.gen(function* () {
-        const provenance = Event.snapshotProvenance(yield* validateProvenance(input));
+        const provenance = Event.snapshotProvenance(
+          yield* validateProvenance(yield* Publication.Service),
+        );
         if (provenance.causedBy !== null) {
           const cause = provenance.causedBy;
           const source = logs.open({ id: cause.logId, schema: Event.Envelope });

@@ -1,3 +1,4 @@
+import { Publication } from "@amends/core/journal";
 import { testProvenance } from "./support.ts";
 import { expect } from "bun:test";
 import { AssignmentFacts, Role, RoleFacts } from "@amends/core/authorization";
@@ -18,40 +19,32 @@ it("the persistent role and assignment projections support edits and independent
         yield* Effect.gen(function* () {
           const journal = yield* Journal.Service;
           const roleId = Role.Id.make("reader");
-          yield* journal.publish(
-            RoleFacts.Created,
-            {
+          yield* journal
+            .publish(RoleFacts.Created, {
               workspaceId,
               roleId,
               name: "Reader",
               permissions: [],
-            },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            RoleFacts.Renamed,
-            { workspaceId, roleId, name: "Renamed" },
-            testProvenance(workspaceId),
-          );
-          yield* journal.publish(
-            RoleFacts.PermissionsChanged,
-            {
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          yield* journal
+            .publish(RoleFacts.Renamed, { workspaceId, roleId, name: "Renamed" })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          yield* journal
+            .publish(RoleFacts.PermissionsChanged, {
               workspaceId,
               roleId,
               permissions: [MemberPermissions.Read.name],
-            },
-            testProvenance(workspaceId),
-          );
+            })
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           const grants = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
           for (const grant of grants)
-            yield* journal.publish(
-              AssignmentFacts.Revoked,
-              {
+            yield* journal
+              .publish(AssignmentFacts.Revoked, {
                 workspaceId,
                 assignmentId: grant.id,
-              },
-              testProvenance(workspaceId),
-            );
+              })
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
           expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual([]);
           const actor = Actor.Value.make({
             workspaceId,
