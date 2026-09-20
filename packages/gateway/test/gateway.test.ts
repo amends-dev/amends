@@ -48,6 +48,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       get: unexpected,
       read: options.read ?? (() => Effect.succeed([])),
       waitForAppend: unexpected,
+      getAppend: unexpected,
     }),
   ).pipe(
     Context.add(

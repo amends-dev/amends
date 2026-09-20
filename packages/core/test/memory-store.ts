@@ -14,6 +14,7 @@ import type { Workspace } from "../src/workspace/workspace.ts";
 
 interface State {
   readonly logs: Map<Entry.LogId, Array<Store.Batch>>;
+  readonly appends: Map<Entry.LogId, Map<Store.IdempotencyKey, Store.AppendReceipt>>;
   readonly checkpoints: Map<string, Checkpoint.Cursor>;
   readonly members: Map<string, Member.Record>;
   readonly roles: Map<string, Role.Record>;
@@ -47,12 +48,27 @@ const cloneState = (state: State): State => ({
   value: state.value,
   checkpoints: new Map([...state.checkpoints].map(([key, cursor]) => [key, cloneCursor(cursor)])),
   logs: new Map([...state.logs].map(([id, batches]) => [id, batches.map(cloneBatch)])),
+  appends: new Map(
+    [...state.appends].map(([id, receipts]) => [
+      id,
+      new Map([...receipts].map(([key, receipt]) => [key, cloneReceipt(receipt)])),
+    ]),
+  ),
   members: new Map([...state.members].map(([key, member]) => [key, cloneMember(member)])),
   roles: new Map([...state.roles].map(([key, role]) => [key, cloneRole(role)])),
   assignments: new Map(
     [...state.assignments].map(([key, assignment]) => [key, cloneAssignment(assignment)]),
   ),
 });
+const cloneReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
+  Schema.decodeUnknownSync(Schema.toType(Store.AppendReceipt))({
+    logId: receipt.logId,
+    key: receipt.key,
+    commitId: receipt.commitId,
+    firstIndex: receipt.firstIndex,
+    entryCount: receipt.entryCount,
+    entries: receipt.entries.map((entry) => ({ ...entry, payload: entry.payload.slice() })),
+  });
 const cloneMember = (member: Member.Record): Member.Record => ({
   id: member.id,
   workspaceId: member.workspaceId,
@@ -92,6 +108,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   const owner = Symbol("memory store");
   const state = yield* Ref.make<State>({
     logs: new Map(),
+    appends: new Map(),
     checkpoints: new Map(),
     members: new Map(),
     roles: new Map(),
@@ -133,9 +150,35 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
 
           const native = Store.Transaction.of({
             id: session.commit.id,
-            append: Effect.fn("JournalTest.append")(function* (request) {
+            append: Effect.fn("JournalTest.append")(function* (input) {
               if (!session.active)
                 return yield* new Store.Failure({ operation: "append", cause: "closed" });
+              const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(
+                input,
+              ).pipe(
+                Effect.mapError(
+                  () =>
+                    new Store.Conflict({ operation: "append", message: "Invalid append request" }),
+                ),
+              );
+              if (request.idempotencyKey !== undefined) {
+                const previous = session.state.appends
+                  .get(request.logId)
+                  ?.get(request.idempotencyKey);
+                if (previous !== undefined) {
+                  if (
+                    !Store.samePayloads(
+                      request.payloads,
+                      previous.entries.map((entry) => entry.payload),
+                    )
+                  )
+                    return yield* new Store.Conflict({
+                      operation: "append",
+                      message: "Idempotency key is already associated with different content",
+                    });
+                  return cloneReceipt(previous).entries;
+                }
+              }
               const batches = session.state.logs.get(request.logId) ?? [];
               const last = Array.last(batches);
               if (request.expectedAfter !== undefined) {
@@ -203,6 +246,25 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
                   ),
                 );
               }
+              if (request.idempotencyKey !== undefined) {
+                const receipts =
+                  session.state.appends.get(request.logId) ??
+                  new Map<Store.IdempotencyKey, Store.AppendReceipt>();
+                const receipt = yield* Schema.decodeUnknownEffect(
+                  Schema.toType(Store.AppendReceipt),
+                )({
+                  logId: request.logId,
+                  key: request.idempotencyKey,
+                  commitId: session.commit.id,
+                  firstIndex: existing.length,
+                  entryCount: entries.length,
+                  entries,
+                }).pipe(
+                  Effect.mapError((cause) => new Store.Failure({ operation: "append", cause })),
+                );
+                receipts.set(request.idempotencyKey, receipt);
+                session.state.appends.set(request.logId, receipts);
+              }
               return entries.map((entry) => ({ ...entry, payload: entry.payload.slice() }));
             }),
           });
@@ -240,6 +302,10 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   });
 
   const store = Store.Service.of({
+    getAppend: Effect.fn("JournalTest.getAppend")(function* (logId, key) {
+      const saved = (yield* view).appends.get(logId)?.get(key);
+      return saved === undefined ? Option.none() : Option.some(cloneReceipt(saved));
+    }),
     transaction,
     get: Effect.fn("JournalTest.get")(function* (logId, commitId) {
       return Option.map(

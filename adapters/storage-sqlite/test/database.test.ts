@@ -36,7 +36,7 @@ test("the notification migration upgrades existing storage without changing work
         expect(yield* sql`SELECT COUNT(*) AS count FROM notifications`).toEqual([{ count: 0 }]);
         expect(
           yield* sql`SELECT migration_id FROM effect_sql_migrations ORDER BY migration_id`,
-        ).toEqual([{ migration_id: 1 }, { migration_id: 2 }]);
+        ).toEqual([{ migration_id: 1 }, { migration_id: 2 }, { migration_id: 3 }]);
       }),
     );
   }));

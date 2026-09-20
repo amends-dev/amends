@@ -140,6 +140,18 @@ scope overrides to one effect or block. See the
 validation, and examples. New events return `Event.Published<F>` with complete
 provenance; older stored envelopes decode with `provenance: null`.
 
+Facts can declare `occurrence: (payload) => [stableId]` to make publication
+idempotent automatically. The journal namespaces the tuple by fact name and scopes
+it to the workspace/log. A declaration can return `null` for repeatable payloads.
+Explicit `idempotencyKey` options remain available for facts without a derived key
+and for execution-log appends; they cannot override a declared occurrence.
+Matching retries return the original event or append slice without rerunning
+projections or broadcasting another batch. Conflicting content fails. `getAppend`
+on log readers supports transactional lookup by key, and `Fact.makeOccurrenceKey`
+derives the lookup key from a payload. See
+[idempotent publication](../../docs/journal.md#idempotent-publication-and-append)
+for payload matching, expected-position precedence, and composing larger operations.
+
 The bus validates batch metadata and workspace binding. It owns frozen copies of
 the envelope, event array, and event metadata, including nested provenance references.
 Decoded payloads retain their original
@@ -257,6 +269,15 @@ metadata. `Codec.PayloadCodec<S>` handles a payload schema, while
 Inline payload structs can stay inside their fact declarations. Obtain their
 types through `Fact.Payload<typeof MemberFacts.Added>` rather than adding a
 second exported schema name without a separate use case.
+
+Put natural occurrence identity in that same declaration, using a pure function
+of the decoded payload. Use stable record IDs for creation and terminal facts;
+repeatable changes need a request or occurrence ID, not just the affected record's
+ID. `occurrence` returns a nonempty array of nonblank strings or `null`. The journal
+validates these parts and derives an unambiguous key without the schema version.
+Keep identity rules stable across retries and schema changes. Adding a rule does
+not deduplicate older unkeyed history automatically. Facts registered under the
+same name/version must share their payload schema and occurrence function.
 
 Schemas used as public HTTP models carry stable identifiers for generated API
 documentation: `Workspace`, `WorkspaceMember`, `WorkspaceInvitation`,

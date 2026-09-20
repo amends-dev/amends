@@ -38,6 +38,12 @@ The notification projection currently has no generation handlers.
 
 ## Transactions
 
+`log_append_keys` stores durable append receipts, scoped by workspace, log, and
+idempotency key. Key lookup precedes expected-position checks; matching bytes
+return the original append slice, while conflicting bytes or count fail. The key,
+entries, and projection writes commit or roll back together. The additive migration
+preserves old journal data. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
+
 One connection serves every workspace, so commits sharing that client wait for
 its connection semaphore and run one at a time. Competing connections contend at
 `BEGIN IMMEDIATE`; with `busyTimeout: 0`, a busy writer fails immediately as a

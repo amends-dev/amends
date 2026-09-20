@@ -12,6 +12,7 @@ export const Added = Fact.make("workspace.member.added", {
     workspaceId: Workspace.Id,
     identity: Identity.Reference,
   }),
+  occurrence: (payload) => [payload.memberId],
 });
 
 /** Removal is terminal for this membership; rejoining uses Added with a new ID. */
@@ -21,6 +22,7 @@ export const Removed = Fact.make("workspace.member.removed", {
     memberId: Member.Id,
     workspaceId: Workspace.Id,
   }),
+  occurrence: (payload) => [payload.memberId],
 });
 
 export * as MemberFacts from "./facts.ts";

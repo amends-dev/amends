@@ -12,6 +12,7 @@ export const Created = Fact.make("workspace.role.created", {
     name: Role.Record.fields.name,
     permissions: Role.Record.fields.permissions,
   }),
+  occurrence: (payload) => [payload.roleId],
 });
 
 /** Changes the display name while retaining the role's identity. */

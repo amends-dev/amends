@@ -1,9 +1,9 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
-import { and, asc, count, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, lt, inArray } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
-import { commits, logBatches, logEntries } from "./schema.ts";
+import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
 
 const BatchHeaderRow = Schema.Struct({
   logId: Entry.LogId,
@@ -17,6 +17,15 @@ const EntryRows = Schema.Array(
     ...Entry.Metadata.fields,
     recordedAt: Schema.DateTimeUtcFromDate,
     payload: Schema.Uint8Array,
+  }),
+);
+const AppendHeaderRows = Schema.Array(
+  Schema.Struct({
+    logId: Entry.LogId,
+    key: Store.IdempotencyKey,
+    commitId: Commit.Id,
+    firstIndex: Schema.Natural,
+    entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
   }),
 );
 
@@ -55,6 +64,54 @@ export const make = Effect.fn("Journal.make")(function* () {
         commits,
         and(eq(commits.workspaceId, logBatches.workspaceId), eq(commits.id, logBatches.commitId)),
       );
+
+  const getAppend = Effect.fn("Journal.getAppend")(function* (
+    logId: Entry.LogId,
+    key: Store.IdempotencyKey,
+  ) {
+    yield* Schema.decodeEffect(Entry.LogId)(logId);
+    yield* Schema.decodeEffect(Store.IdempotencyKey)(key);
+    const found = yield* db
+      .select({
+        logId: logAppendKeys.logId,
+        key: logAppendKeys.key,
+        commitId: logAppendKeys.commitId,
+        firstIndex: logAppendKeys.firstIndex,
+        entryCount: logAppendKeys.entryCount,
+      })
+      .from(logAppendKeys)
+      .where(
+        and(
+          eq(logAppendKeys.workspaceId, workspaceId),
+          eq(logAppendKeys.logId, logId),
+          eq(logAppendKeys.key, key),
+        ),
+      )
+      .pipe(Effect.flatMap(Schema.decodeUnknownEffect(AppendHeaderRows)));
+    const header = Array.head(found);
+    if (Option.isNone(header)) return Option.none<Store.AppendReceipt>();
+    const row = header.value;
+    const values = yield* db
+      .select(entryColumns)
+      .from(logEntries)
+      .where(
+        and(
+          eq(logEntries.workspaceId, workspaceId),
+          eq(logEntries.logId, logId),
+          eq(logEntries.commitId, row.commitId),
+          gte(logEntries.entryIndex, row.firstIndex),
+          lt(logEntries.entryIndex, row.firstIndex + row.entryCount),
+        ),
+      )
+      .orderBy(asc(logEntries.entryIndex))
+      .pipe(Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)));
+    return Option.some(
+      yield* Schema.decodeUnknownEffect(Schema.toType(Store.AppendReceipt))({
+        ...row,
+        entries: values,
+      }),
+    );
+  });
 
   /** Complete batches for the selected headers, each with its entries in index order. */
   const batches = Effect.fnUntraced(function* (
@@ -113,6 +170,24 @@ export const make = Effect.fn("Journal.make")(function* () {
     const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(input).pipe(
       Effect.mapError(storeConflict(Store, "append")),
     );
+    if (request.idempotencyKey !== undefined) {
+      const previous = yield* getAppend(request.logId, request.idempotencyKey).pipe(
+        Effect.mapError(storeFailure(Store, "append")),
+      );
+      if (Option.isSome(previous)) {
+        if (
+          !Store.samePayloads(
+            request.payloads,
+            previous.value.entries.map((entry) => entry.payload),
+          )
+        )
+          return yield* new Store.Conflict({
+            operation: "append",
+            message: "Idempotency key is already associated with different content",
+          });
+        return previous.value.entries;
+      }
+    }
     const last = yield* db
       .select({ position: logBatches.position, commitId: logBatches.commitId })
       .from(logBatches)
@@ -203,10 +278,24 @@ export const make = Effect.fn("Journal.make")(function* () {
     yield* sql`UPDATE commits SET entry_count = entry_count + ${result.length} WHERE workspace_id = ${workspaceId} AND id = ${session.commit.id}`.pipe(
       Effect.mapError(storeError(Store, "append")),
     );
+    if (request.idempotencyKey !== undefined)
+      yield* db
+        .insert(logAppendKeys)
+        .values({
+          workspaceId,
+          logId: request.logId,
+          key: request.idempotencyKey,
+          commitId: session.commit.id,
+          firstIndex: written,
+          entryCount: result.length,
+        })
+        .pipe(Effect.mapError(storeError(Store, "append")));
     return result;
   });
 
   return Store.Service.of({
+    getAppend: (logId, key) =>
+      guard(getAppend(logId, key)).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
     transaction: (program, options) =>
       transaction(
         program,

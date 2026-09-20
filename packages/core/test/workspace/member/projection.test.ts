@@ -107,18 +107,11 @@ test("membership projection adds humans and agents, preserves removal, and admit
           status: "active",
         }),
       );
-      expect(
-        yield* Effect.flip(journal.publish(MemberFacts.Added, added(firstId, human))),
-      ).toMatchObject({
-        _tag: "Projection.Failure",
-        cause: { _tag: "MemberStore.Conflict", operation: "insert" },
-      });
-      expect(
-        yield* Effect.flip(journal.publish(MemberFacts.Removed, removed(firstId))),
-      ).toMatchObject({
-        _tag: "Projection.Failure",
-        cause: { _tag: "MemberStore.Conflict", operation: "markRemoved" },
-      });
+      const beforeRetry = yield* fixture.snapshot;
+      yield* journal.publish(MemberFacts.Added, added(firstId, human));
+      yield* journal.publish(MemberFacts.Removed, removed(firstId));
+      // Reusing creation cannot reactivate the removed membership or replace its successor.
+      expect(yield* fixture.snapshot).toEqual(beforeRetry);
       yield* journal.replay;
       expect((yield* fixture.snapshot).members.size).toBe(3);
       expect((yield* journal.log.read({ limit: 10 })).map((batch) => batch.entries.length)).toEqual(

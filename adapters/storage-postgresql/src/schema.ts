@@ -279,6 +279,28 @@ export const logEntries = pgTable(
   ],
 );
 
+export const logAppendKeys = pgTable(
+  "log_append_keys",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    logId: text("log_id").notNull(),
+    key: text("idempotency_key").notNull(),
+    commitId: text("commit_id").notNull(),
+    firstIndex: integer("first_index").notNull(),
+    entryCount: integer("entry_count").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.logId, table.key] }),
+    check("log_append_keys_first_index", sql`${table.firstIndex} >= 0`),
+    check("log_append_keys_entry_count", sql`${table.entryCount} > 0`),
+    foreignKey({
+      columns: [table.workspaceId, table.logId, table.commitId],
+      foreignColumns: [logBatches.workspaceId, logBatches.logId, logBatches.commitId],
+      name: "log_append_keys_batch",
+    }),
+  ],
+);
+
 export const checkpoints = pgTable(
   "checkpoints",
   {

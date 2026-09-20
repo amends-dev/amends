@@ -9,6 +9,8 @@ export const Id = StoredEntry.LogId;
 export type Id = StoredEntry.LogId;
 export const Position = StoredEntry.Position;
 export type Position = StoredEntry.Position;
+export const IdempotencyKey = Store.IdempotencyKey;
+export type IdempotencyKey = Store.IdempotencyKey;
 
 /** A log entry with its payload decoded by the log's schema. */
 export interface Entry<A> extends StoredEntry.Metadata {
@@ -34,6 +36,14 @@ export type TailError = ReadError | TailInTransaction;
 export interface Handle<S extends Schema.Constraint> {
   readonly id: Id;
   readonly schema: S;
+  /** Read the original append slice for a durable key, including own staged writes. */
+  readonly getAppend: (
+    key: IdempotencyKey,
+  ) => Effect.Effect<
+    Option.Option<ReadonlyArray<Entry<S["Type"]>>>,
+    ReadError,
+    S["DecodingServices"]
+  >;
   readonly append: (
     value: S["Type"],
     options?: Store.AppendOptions,
@@ -77,7 +87,7 @@ export interface Handle<S extends Schema.Constraint> {
 /** Domain journals expose their underlying log through this read-only view. */
 export type Reader<S extends Schema.Constraint> = Pick<
   Handle<S>,
-  "id" | "schema" | "get" | "read" | "stream" | "tail"
+  "id" | "schema" | "get" | "getAppend" | "read" | "stream" | "tail"
 >;
 
 export interface Interface {
@@ -164,6 +174,27 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       };
     });
 
+    const receipt = Effect.fnUntraced(function* (key: IdempotencyKey) {
+      const validKey = yield* Schema.decodeEffect(IdempotencyKey)(key);
+      return yield* Schema.decodeEffect(
+        Schema.Option(
+          Schema.toType(Store.AppendReceipt).check(
+            Schema.makeFilter((value) =>
+              value.logId === id && value.key === validKey
+                ? undefined
+                : "Append receipt belongs to another log or key",
+            ),
+          ),
+        ),
+      )(yield* store.getAppend(id, validKey));
+    });
+    const getAppend = Effect.fn("Log.getAppend")(function* (key: IdempotencyKey) {
+      const found = yield* receipt(key);
+      return Option.isNone(found)
+        ? Option.none()
+        : Option.some(yield* Effect.forEach(found.value.entries, decodeEntry));
+    });
+
     const appendAll = Effect.fn("Log.appendAll")(function* (
       values: ReadonlyArray<S["Type"]>,
       options: Store.AppendOptions = {},
@@ -173,6 +204,8 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
           const request = yield* validateAppend(options);
           const native = yield* Store.Transaction;
           const payloads = yield* Effect.forEach(values, codec.encode);
+          if (request.idempotencyKey !== undefined)
+            yield* Schema.decodeUnknownEffect(Schema.NonEmptyArray(Schema.Uint8Array))(payloads);
           const responseSchema = Schema.Array(Schema.toType(StoredEntry.Record)).check(
             Schema.makeFilter((entries) => {
               if (entries.length !== payloads.length)
@@ -181,12 +214,17 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
               let previous: StoredEntry.Record | undefined;
               for (const [index, entry] of entries.entries()) {
                 const payload = payloads[index];
-                if (entry.logId !== id || entry.commitId !== native.id)
+                if (
+                  entry.logId !== id ||
+                  (request.idempotencyKey === undefined && entry.commitId !== native.id)
+                )
                   return "Append returned a different log or commit";
                 if (ids.has(entry.id)) return "Append returned duplicate entry ids";
                 if (
                   previous !== undefined &&
-                  (entry.position !== previous.position || entry.index !== previous.index + 1)
+                  (entry.commitId !== previous.commitId ||
+                    entry.position !== previous.position ||
+                    entry.index !== previous.index + 1)
                 ) {
                   return "Append entries must be consecutive in one log batch";
                 }
@@ -205,6 +243,16 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
           const entries = yield* Schema.decodeEffect(responseSchema)(
             yield* native.append({ logId: id, payloads, ...request }),
           );
+          if (request.idempotencyKey !== undefined) {
+            const saved = yield* receipt(request.idempotencyKey);
+            const sameEntries = Schema.toEquivalence(
+              Schema.Array(Schema.toType(StoredEntry.Record)),
+            );
+            if (Option.isNone(saved) || !sameEntries(entries, saved.value.entries))
+              return yield* new InvalidResponse({
+                message: "Append result does not match its durable key receipt",
+              });
+          }
           return yield* Effect.forEach(entries, decodeEntry);
         }),
       );
@@ -294,7 +342,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         }),
       ).pipe(Stream.withSpan("Log.tail"));
 
-    return { id, schema, append, appendAll, get, read, stream, tail };
+    return { id, schema, append, appendAll, get, getAppend, read, stream, tail };
   };
 
   return Service.of({ open, commit: transaction.run });

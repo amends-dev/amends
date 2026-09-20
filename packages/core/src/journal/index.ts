@@ -12,6 +12,7 @@ export { Event } from "./event.ts";
 export { Fact } from "./fact.ts";
 export { Journal } from "./journal.ts";
 export { Log } from "./log.ts";
+export { Occurrence } from "./occurrence.ts";
 export { Projection } from "./projection.ts";
 export { Publication } from "./publication.ts";
 export { Store } from "./store.ts";

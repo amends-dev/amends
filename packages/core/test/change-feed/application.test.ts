@@ -93,7 +93,7 @@ test("registers before Ready, skips history and preserves committed batches with
       yield* journal
         .publish(MemberFacts.Added, {
           workspaceId,
-          memberId: actor.memberId,
+          memberId: Member.Id.make("historical-member"),
           identity: actor.identity,
         })
         .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
@@ -171,7 +171,7 @@ test("lag fails the stream so a reconnect must establish a fresh Ready boundary"
           yield* journal
             .publish(MemberFacts.Added, {
               workspaceId,
-              memberId: actor.memberId,
+              memberId: Member.Id.make(`member-${index}`),
               identity: actor.identity,
             })
             .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));

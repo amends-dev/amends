@@ -13,6 +13,7 @@ export const Created = Fact.make("workspace.assignment.created", {
     memberId: Member.Id,
     source: Assignment.Source,
   }).check(Assignment.SourceInWorkspace),
+  occurrence: (payload) => [payload.assignmentId],
 });
 
 /** Revocation is terminal; assigning access again uses Created with a new ID. */
@@ -22,6 +23,7 @@ export const Revoked = Fact.make("workspace.assignment.revoked", {
     assignmentId: Assignment.Id,
     workspaceId: Workspace.Id,
   }),
+  occurrence: (payload) => [payload.assignmentId],
 });
 
 export * as AssignmentFacts from "./facts.ts";

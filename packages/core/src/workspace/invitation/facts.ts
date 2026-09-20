@@ -6,6 +6,7 @@ import { Workspace } from "../workspace.ts";
 export const Issued = Fact.make("workspace.invitation.issued", {
   version: 1,
   payload: Invitation.Issuance,
+  occurrence: (payload) => [payload.id],
 });
 export const Accepted = Fact.make("workspace.invitation.accepted", {
   version: 1,
@@ -14,6 +15,7 @@ export const Accepted = Fact.make("workspace.invitation.accepted", {
     invitationId: Invitation.Id,
     ...Invitation.State.cases.Accepted.fields,
   }),
+  occurrence: (payload) => [payload.invitationId],
 });
 export const Revoked = Fact.make("workspace.invitation.revoked", {
   version: 1,
@@ -22,6 +24,7 @@ export const Revoked = Fact.make("workspace.invitation.revoked", {
     invitationId: Invitation.Id,
     ...Invitation.State.cases.Revoked.fields,
   }),
+  occurrence: (payload) => [payload.invitationId],
 });
 
 export * as InvitationFacts from "./facts.ts";

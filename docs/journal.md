@@ -7,7 +7,8 @@ execution entries through `Log`, without running domain projections.
 
 ## Ownership
 
-- **Fact** defines a domain statement's name, version, and payload schema.
+- **Fact** defines a domain statement's name, version, payload schema, and optional
+  occurrence identity.
 - **Log** provides typed appends, lookup, paged reads, finite streams, and live tails
   for a log ID.
   Opening a handle performs no storage operation; the first append creates the
@@ -52,6 +53,126 @@ const JournalLive = Journal.layer({
 
 Domains obtain the configured implementation with `yield* Journal.Service`.
 All normal writers to a domain log must use the same projection registrations.
+
+## Idempotent publication and append
+
+Declare a fact's natural occurrence identity beside its payload schema. The journal
+derives the key automatically, so callers publish the fact and payload:
+
+```ts
+export const Removed = Fact.make("workspace.member.removed", {
+  version: 1,
+  payload: Schema.Struct({ workspaceId: Workspace.Id, memberId: Member.Id }),
+  occurrence: (payload) => [payload.memberId],
+});
+
+const event = yield * journal.publish(MemberFacts.Removed, { workspaceId, memberId });
+```
+
+`occurrence` is a pure, deterministic function of the validated decoded payload.
+It returns a nonempty tuple of nonblank strings, or `null` when that payload has
+no natural identity. The journal preserves each component exactly and encodes the
+key as `fact:` followed by `JSON.stringify([fact.name, parts])`. Tuple encoding
+avoids delimiter collisions, and the fact name separates creation from removal
+for the same record ID. Schema versions are excluded: publishing another version
+of an existing occurrence conflicts rather than creating a second occurrence.
+
+The key identifies one occurrence within a workspace and log. Another workspace
+or log has an independent key space. `Occurrence.Key`, `Store.IdempotencyKey`, and
+`Log.IdempotencyKey` refer to the same branded schema. Treat the fact name, identity
+components, and key encoding as persistence contracts. Definitions registered for
+the same fact name and version must share both the payload schema and occurrence
+function. Publication checks that same contract against registered definitions.
+
+Existing creation and terminal facts use their stable record IDs: workspace
+initialization, member addition/removal, invitation issuance/acceptance/revocation,
+role creation, and assignment creation/revocation. Repeating a creation fact after
+removal or revocation returns its original event; it does not reactivate the record.
+Role renames, permission changes, and ownership transfers remain repeatable and
+have no default occurrence identity.
+
+`Journal.publish` accepts an explicit `idempotencyKey` only when the fact has no
+occurrence function or it returns `null`. Supplying one when the fact derives a
+key fails with `Store.Conflict`; callers cannot override the declared identity.
+Use an explicit key for request-level retries of a repeatable fact:
+
+```ts
+const options = { idempotencyKey: Log.IdempotencyKey.make(operationId) };
+const event = yield * journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options);
+```
+
+`Log.append` and `Log.appendAll` continue to accept explicit keys because execution
+entries have no fact definition. Calls without a derived or explicit key append
+every time. The application still authorizes the operation and supplies
+`Publication.Service`. Reuse the occurrence inputs or explicit key on retry; a new
+UUID on every attempt identifies a different occurrence. Correlation IDs can group
+several facts and must not automatically become their shared idempotency key.
+
+| Key state                      | Outcome                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Absent                         | Check `expectedAfter`, if supplied, then append and persist the key in the same transaction.     |
+| Present with matching content  | Return the original entries, including their IDs, commit, positions, timestamps, and provenance. |
+| Present with different content | Fail with `Store.Conflict`; a core commit aborts even if the publication error is caught.        |
+
+A matching key is resolved before evaluating the expected-position precondition.
+Retrying with a stale `expectedAfter` returns the original result when the first
+attempt committed. A new key still has to satisfy that precondition. Schema
+validation applies to all supplied options, including on retries.
+
+For `Log`, matching content means byte-identical encoded payloads in the same
+order and count. One `appendAll` key identifies that call's nonempty slice, even
+when other appends share its commit. Keyed empty appends are rejected. The storage
+adapter returns independently owned bytes and never appends a second slice for a
+matching key.
+
+For `Journal`, matching content means the same fact name, version, and encoded
+domain payload. Attempt provenance is not part of the comparison: a retry can
+have a fresh correlation, performer, cause, or occurrence time, but it returns
+the first event's recorded provenance. The invocation still needs valid provenance
+for the bound workspace. Reuse runs no projections, advances no checkpoints or
+log positions, and publishes no new committed-event batch. If an uncertain first
+commit missed live delivery, retry does not rebroadcast it; consumers recover
+through durable history or refresh as before.
+
+`log.getAppend(key)` and `journal.log.getAppend(key)` return `None` or the original
+append's decoded entries. For facts with an occurrence rule,
+`Fact.makeOccurrenceKey(fact, payload)` validates the decoded payload before
+returning its derived key or `null`; it also returns `null` for facts without a
+rule. Use it when the payload is available. `Occurrence.makeKey(fact.name, parts)` constructs the same key from
+known identity components when looking up an occurrence before generating the
+rest of its payload. Keep those components consistent with the fact's declaration.
+Reads inside a transaction see its own staged keys.
+The returned entries remain provisional until their owning commit succeeds.
+`Store.getAppend` supplies a validated receipt with the key, commit, first index,
+count, and exact entries. Both adapters persist receipts in `log_append_keys`,
+using a unique workspace/log/key constraint and their existing writer serialization.
+
+Rollback removes both the append and its key. After `Store.CommitUncertain`, retry
+the same keyed intent: a committed first attempt is reused, and a rolled-back one
+can be appended. Storage contention may still return `Store.Conflict`; neither
+core nor the adapters automatically retry transaction programs. Keys have no expiry
+and must be retained with their referenced history. Migrations add the receipt
+table without changing existing entries; old unkeyed events are not retroactively
+deduplicated. Adding an occurrence rule to a previously unkeyed fact does not
+backfill receipts. Deduplicating against that older history requires an explicit
+backfill or a deliberate development-data reset.
+
+### Composing larger operations
+
+A keyed append does not skip arbitrary effects before or after that call. For turn
+creation, channel receipts, or shared delivery creation, the domain must identify
+the logical request and keep creation/reuse, related writes, and acknowledgment
+inside one `journal.commit`. State derived through the keyed fact's projections
+is applied only on the first publication. Other effects need their own conditional
+or idempotent handling.
+
+When an operation generates IDs or other payload fields, reuse those values on
+retry. A domain can use `getAppend` inside the same commit to find an existing
+occurrence before generating another ID, checking its recorded business input
+before reuse. Looking up a key outside the transaction and then writing is not
+an atomic create-or-reuse operation. A fresh generated payload under an old key
+correctly conflicts. This primitive does not make existing HTTP operations or
+external sends automatically idempotent.
 
 ## Event provenance
 
@@ -201,7 +322,8 @@ still reported at the outer commit boundary as `Commit.Aborted`.
 
 Adapters report unconfirmed commit outcomes with `Store.CommitUncertain`, including
 the commit ID for lookup and reconciliation. The core does not automatically retry
-the program. Optional expected-position checks support conditional appends.
+the program. Optional expected-position checks support conditional appends;
+idempotency keys separately support retrying the same append or publication.
 
 ## Reading and replay
 

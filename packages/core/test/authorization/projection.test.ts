@@ -190,19 +190,10 @@ test("live role and assignment projections preserve role references, queries, an
         }),
       );
       const before = yield* fixture.snapshot;
-      expect(
-        yield* Effect.flip(journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId))),
-      ).toMatchObject({
-        _tag: "Projection.Failure",
-        cause: { _tag: "AssignmentStore.Conflict", operation: "insert" },
-      });
-      expect(
-        yield* Effect.flip(
-          journal.publish(AssignmentFacts.Revoked, { assignmentId: roleAssignmentId, workspaceId }),
-        ),
-      ).toMatchObject({
-        _tag: "Projection.Failure",
-        cause: { _tag: "AssignmentStore.Conflict", operation: "markRevoked" },
+      yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
+      yield* journal.publish(AssignmentFacts.Revoked, {
+        assignmentId: roleAssignmentId,
+        workspaceId,
       });
       expect(yield* fixture.snapshot).toEqual(before);
       yield* journal.publish(AssignmentFacts.Created, assigned(Assignment.Id.make("reassigned")));
@@ -399,7 +390,7 @@ test("a caught assignment conflict rolls back member, role, assignment, journal,
               permissions: [],
             });
             yield* journal
-              .publish(AssignmentFacts.Created, assigned(roleAssignmentId))
+              .publish(AssignmentFacts.Created, assigned(roleAssignmentId, directSource))
               .pipe(Effect.catch(() => Effect.void));
           }),
         ),

@@ -13,6 +13,15 @@ const BatchHeaderRow = Schema.Struct({
 });
 const BatchHeaderRows = Schema.Array(BatchHeaderRow);
 const EntryRows = Schema.Array(Entry.Record);
+const AppendHeaderRows = Schema.Array(
+  Schema.Struct({
+    logId: Entry.LogId,
+    key: Store.IdempotencyKey,
+    commitId: Commit.Id,
+    firstIndex: Schema.Natural,
+    entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
+  }),
+);
 
 /**
  * The workspace's logs: appends inside a transaction, reads of committed batches, and waiting.
@@ -27,6 +36,31 @@ export const make = Effect.fn("Journal.make")(function* () {
     sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${commitId} ORDER BY entry_index`.pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)),
     );
+
+  const getAppend = Effect.fn("Journal.getAppend")(function* (
+    logId: Entry.LogId,
+    key: Store.IdempotencyKey,
+  ) {
+    yield* Schema.decodeEffect(Entry.LogId)(logId);
+    yield* Schema.decodeEffect(Store.IdempotencyKey)(key);
+    const headers =
+      yield* sql`SELECT log_id AS logId, idempotency_key AS key, commit_id AS commitId, first_index AS firstIndex, entry_count AS entryCount FROM log_append_keys WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND idempotency_key = ${key}`.pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(AppendHeaderRows)),
+      );
+    const header = Array.head(headers);
+    if (Option.isNone(header)) return Option.none<Store.AppendReceipt>();
+    const row = header.value;
+    const values =
+      yield* sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${row.commitId} AND entry_index >= ${row.firstIndex} AND entry_index < ${row.firstIndex + row.entryCount} ORDER BY entry_index`.pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)),
+      );
+    return Option.some(
+      yield* Schema.decodeUnknownEffect(Schema.toType(Store.AppendReceipt))({
+        ...row,
+        entries: values,
+      }),
+    );
+  });
 
   /** Complete batches for the selected headers, each with its entries in index order. */
   const batches = Effect.fnUntraced(function* (
@@ -70,6 +104,24 @@ export const make = Effect.fn("Journal.make")(function* () {
     const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(input).pipe(
       Effect.mapError(storeConflict(Store, "append")),
     );
+    if (request.idempotencyKey !== undefined) {
+      const previous = yield* getAppend(request.logId, request.idempotencyKey).pipe(
+        Effect.mapError(storeFailure(Store, "append")),
+      );
+      if (Option.isSome(previous)) {
+        if (
+          !Store.samePayloads(
+            request.payloads,
+            previous.value.entries.map((entry) => entry.payload),
+          )
+        )
+          return yield* new Store.Conflict({
+            operation: "append",
+            message: "Idempotency key is already associated with different content",
+          });
+        return previous.value.entries;
+      }
+    }
     const last =
       yield* sql`SELECT position, commit_id AS commitId FROM log_batches WHERE workspace_id = ${workspaceId} AND log_id = ${request.logId} ORDER BY position DESC LIMIT 1`.pipe(
         Effect.flatMap(
@@ -126,10 +178,16 @@ export const make = Effect.fn("Journal.make")(function* () {
     yield* sql`UPDATE commits SET entry_count = entry_count + ${result.length} WHERE workspace_id = ${workspaceId} AND id = ${session.commit.id}`.pipe(
       Effect.mapError(storeError(Store, "append")),
     );
+    if (request.idempotencyKey !== undefined)
+      yield* sql`INSERT INTO log_append_keys (workspace_id, log_id, idempotency_key, commit_id, first_index, entry_count) VALUES (${workspaceId}, ${request.logId}, ${request.idempotencyKey}, ${session.commit.id}, ${written}, ${result.length})`.pipe(
+        Effect.mapError(storeError(Store, "append")),
+      );
     return result;
   });
 
   return Store.Service.of({
+    getAppend: (logId, key) =>
+      guard(getAppend(logId, key)).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
     transaction: (program, options) =>
       transaction(
         program,

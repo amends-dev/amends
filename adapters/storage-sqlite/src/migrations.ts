@@ -25,6 +25,10 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE INDEX notifications_by_recipient ON notifications(workspace_id, json_extract(record, '$.recipient._tag'), json_extract(record, '$.recipient.id'), recorded_at, id COLLATE BINARY)`;
     yield* sql`CREATE INDEX pending_notifications_by_recipient ON notifications(workspace_id, json_extract(record, '$.recipient._tag'), json_extract(record, '$.recipient.id'), recorded_at, id COLLATE BINARY) WHERE json_extract(record, '$.state._tag') = 'Pending'`;
   }),
+  "0003_log_append_keys": Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE log_append_keys (workspace_id TEXT NOT NULL, log_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, commit_id TEXT NOT NULL, first_index INTEGER NOT NULL CHECK(first_index >= 0), entry_count INTEGER NOT NULL CHECK(entry_count > 0), PRIMARY KEY(workspace_id, log_id, idempotency_key), FOREIGN KEY(workspace_id, log_id, commit_id) REFERENCES log_batches(workspace_id, log_id, commit_id))`;
+  }),
 });
 
 export * as Migrations from "./migrations.ts";
