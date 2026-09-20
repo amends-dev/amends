@@ -54,6 +54,35 @@ const JournalLive = Journal.layer({
 Domains obtain the configured implementation with `yield* Journal.Service`.
 All normal writers to a domain log must use the same projection registrations.
 
+## Storage envelope
+
+`Store.Content` separates optional `Event.Header` metadata from binary `payload`
+bytes. `Store.Entry` adds the entry ID, commit, log position, index, and recording
+time. The journal supplies the fact name, version, and provenance as the header;
+only the domain payload is encoded through its fact schema. `Event.Envelope`
+remains the in-memory shape used by journal readers and projections, without a
+second binary wrapper in storage.
+
+Both adapters store `fact_name` and `fact_version` as columns in `log_entries`,
+indexed by workspace, log, name, position, and entry index. SQLite stores provenance
+as schema-validated JSON in its own column. PostgreSQL stores its performer, cause,
+correlation, and occurrence time in separate columns. Workspace IDs in PostgreSQL
+provenance are reconstructed from the containing row; writes validate workspace
+consistency before omitting those repeated IDs. Neither adapter duplicates the
+fact name or version inside the payload bytes.
+
+Generic execution logs have no fact header and continue to encode their complete
+schema-defined value. `Log.open` defaults to `Codec.makeEntryCodec(schema)`;
+the journal explicitly selects `Event.storageCodec` to preserve the header.
+Opening a fact log with an ordinary payload codec fails on read rather than
+silently discarding its metadata. The storage adapter receives the distinction
+directly and never infers a new entry's kind by inspecting its bytes.
+
+Each adapter has one baseline for fresh local databases. Schema changes update
+that baseline and development databases are reset. There is no upgrade chain,
+legacy-envelope decoder, data backfill, or support for unattributed fact events.
+Generic execution logs still have no fact header.
+
 ## Idempotent publication and append
 
 Declare a fact's natural occurrence identity beside its payload schema. The journal
@@ -119,8 +148,9 @@ Retrying with a stale `expectedAfter` returns the original result when the first
 attempt committed. A new key still has to satisfy that precondition. Schema
 validation applies to all supplied options, including on retries.
 
-For `Log`, matching content means byte-identical encoded payloads in the same
-order and count. One `appendAll` key identifies that call's nonempty slice, even
+At the native store and `Log` boundary, matching content means identical fact
+metadata, when present, and byte-identical encoded payloads in the same order and
+count. One `appendAll` key identifies that call's nonempty slice, even
 when other appends share its commit. Keyed empty appends are rejected. The storage
 adapter returns independently owned bytes and never appends a second slice for a
 matching key.
@@ -151,11 +181,8 @@ Rollback removes both the append and its key. After `Store.CommitUncertain`, ret
 the same keyed intent: a committed first attempt is reused, and a rolled-back one
 can be appended. Storage contention may still return `Store.Conflict`; neither
 core nor the adapters automatically retry transaction programs. Keys have no expiry
-and must be retained with their referenced history. Migrations add the receipt
-table without changing existing entries; old unkeyed events are not retroactively
-deduplicated. Adding an occurrence rule to a previously unkeyed fact does not
-backfill receipts. Deduplicating against that older history requires an explicit
-backfill or a deliberate development-data reset.
+and must be retained with their referenced history. Changing occurrence rules during
+local development requires a data reset; there is no receipt backfill.
 
 ### Composing larger operations
 
@@ -178,8 +205,8 @@ external sends automatically idempotent.
 
 Every new `journal.publish(fact, payload)` requires `Publication.Service` in its
 Effect context. This service holds the operation's `Event.Provenance`. The journal
-reads it at publication time, validates and snapshots it, then persists it in
-`Event.Envelope` and exposes it on decoded
+reads it at publication time, validates and snapshots it, then persists it as
+structured event metadata and exposes it on decoded
 events, projections, committed batches, and change-feed events. `Fact` continues
 to define only the domain statement. Generic `Log` entries retain their existing
 metadata and do not acquire domain attribution.
@@ -262,12 +289,9 @@ and indexes, not occurrence times. Correlation IDs group work; they are not
 idempotency keys and do not make retries safe. Domain explanations such as a rejection
 reason remain in the fact payload.
 
-Stored envelopes written before provenance was introduced omit its field. They
-remain readable through the existing binary format and decode to
-`event.provenance === null`. This means attribution was not recorded; it is distinct
-from `event.provenance.causedBy === null`, which identifies an attributed root action.
-New publications cannot omit provenance. This additive envelope change preserves
-fact versions, existing bytes, and SQL layouts; no data reset is needed.
+All fact events require provenance, including stored entries, replayed events,
+and change-feed messages. `event.provenance.causedBy === null` identifies a root
+action; provenance itself cannot be missing or null.
 
 ## Commits and positions
 
@@ -327,6 +351,30 @@ idempotency keys separately support retrying the same append or publication.
 
 ## Reading and replay
 
+`journal.read({ name, version?, after?, limit })` queries matching fact entries
+directly in storage. Omitting `version` includes every stored version of that name;
+supplying it selects an exact version. Results are `Log.Entry<Event.Envelope>`
+values, whose domain payload bytes can be decoded with the corresponding fact:
+
+```ts
+const readCreatedRoles = Effect.gen(function* () {
+  const entries = yield* journal.read({
+    name: RoleFacts.Created.name,
+    version: RoleFacts.Created.version,
+    limit: 100,
+  });
+  return yield* Effect.forEach(entries, (entry) => Event.decode(RoleFacts.Created, entry));
+});
+```
+
+Here `limit` counts matching entries. Resume with the last returned entry's
+`{ position, index }`; the cursor is exclusive and can fall inside a commit.
+Filtering never renumbers entries or returns partial batches as though they were
+complete. Reads are workspace/log scoped and see staged writes in the active
+transaction. They do not apply projections or advance checkpoints. Authorization
+for any exposed history operation remains the application's responsibility.
+
+The existing `journal.log.read` and log streams continue to read complete batches.
 Log readers validate batch ownership, positions, indexes, identifiers, and counts,
 then decode payloads with the log's schema. `stream` reads complete batches until
 it observes an empty page. It may include new commits encountered while reading;

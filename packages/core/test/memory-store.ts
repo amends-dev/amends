@@ -166,12 +166,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
                   .get(request.logId)
                   ?.get(request.idempotencyKey);
                 if (previous !== undefined) {
-                  if (
-                    !Store.samePayloads(
-                      request.payloads,
-                      previous.entries.map((entry) => entry.payload),
-                    )
-                  )
+                  if (!Store.sameContents(request.entries, previous.entries))
                     return yield* new Store.Conflict({
                       operation: "append",
                       message: "Idempotency key is already associated with different content",
@@ -196,22 +191,23 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
                   }
                 }
               }
-              if (request.payloads.length === 0) return [];
+              if (request.entries.length === 0) return [];
               const extending = Option.isSome(last) && last.value.commit.id === session.commit.id;
               const position = Entry.Position.make(
                 Option.isNone(last) ? 0 : last.value.position + (extending ? 0 : 1),
               );
               const existing = extending && Option.isSome(last) ? last.value.entries : [];
               const recordedAt = yield* DateTime.now;
-              const entries = request.payloads.map((payload, index) =>
-                Entry.Record.make({
+              const entries = request.entries.map((content, index) =>
+                Store.Entry.make({
                   id: Entry.Id.make(`entry-${nextEntry++}`),
                   logId: request.logId,
                   position,
                   commitId: session.commit.id,
                   index: existing.length + index,
                   recordedAt,
-                  payload: payload.slice(),
+                  ...content,
+                  payload: content.payload.slice(),
                 }),
               );
               session.commit = {
@@ -307,6 +303,22 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
       return saved === undefined ? Option.none() : Option.some(cloneReceipt(saved));
     }),
     transaction,
+    readFacts: Effect.fn("JournalTest.readFacts")(function* (logId, input) {
+      const options = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input).pipe(
+        Effect.mapError((cause) => new Store.Failure({ operation: "readFacts", cause })),
+      );
+      return ((yield* view).logs.get(logId) ?? [])
+        .flatMap((batch) => cloneBatch(batch).entries)
+        .filter(
+          (entry) =>
+            entry.fact?.name === options.name &&
+            (options.version === undefined || entry.fact.version === options.version) &&
+            (options.after === undefined ||
+              entry.position > options.after.position ||
+              (entry.position === options.after.position && entry.index > options.after.index)),
+        )
+        .slice(0, options.limit);
+    }),
     get: Effect.fn("JournalTest.get")(function* (logId, commitId) {
       return Option.map(
         Array.findFirst(

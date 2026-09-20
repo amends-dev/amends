@@ -50,7 +50,7 @@ export const makeForActor = Effect.fn("Publication.makeForActor")(function* (
 
 /** Continue a causal workflow, optionally with a different performer or occurrence time. @category constructors */
 export const makeCausedBy = Effect.fn("Publication.makeCausedBy")(function* (
-  event: Event.Record & { readonly provenance: Event.Provenance },
+  event: Event.Record,
   performedBy: Performer.Reference = event.provenance.performedBy,
   occurredAt?: DateTime.Utc,
 ) {
@@ -75,10 +75,7 @@ export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(
 });
 
 /** Override only this effect's immediate cause and correlation, retaining its current performer. */
-export const withCause = (
-  event: Event.Record & { readonly provenance: Event.Provenance },
-  occurredAt?: DateTime.Utc,
-) =>
+export const withCause = (event: Event.Record, occurredAt?: DateTime.Utc) =>
   Effect.fn("Publication.withCause")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     const current = yield* Service;
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))({

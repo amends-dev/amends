@@ -137,8 +137,8 @@ before membership and system performers. `Publication.withCause` continues an ev
 causal chain while retaining the current performer; `withPerformer` and `withOccurredAt`
 scope overrides to one effect or block. See the
 [publication pattern](../../docs/journal.md#event-provenance) for attribution rules,
-validation, and examples. New events return `Event.Published<F>` with complete
-provenance; older stored envelopes decode with `provenance: null`.
+validation, and examples. Events use `Event.Type<F>` with required provenance throughout storage, replay,
+and delivery.
 
 Facts can declare `occurrence: (payload) => [stableId]` to make publication
 idempotent automatically. The journal namespaces the tuple by fact name and scopes
@@ -151,6 +151,15 @@ on log readers supports transactional lookup by key, and `Fact.makeOccurrenceKey
 derives the lookup key from a payload. See
 [idempotent publication](../../docs/journal.md#idempotent-publication-and-append)
 for payload matching, expected-position precedence, and composing larger operations.
+
+The storage envelope separates `Event.Header` (name, version, provenance) from
+encoded domain payload bytes. `Store.Content` represents append content and
+`Store.Entry` adds the log entry metadata. Journal entries use `Event.storageCodec`;
+ordinary execution logs use the default payload codec and have no fact header.
+Both adapters persist fact names and versions as indexed columns. Read matching
+history with `journal.read({ name, version?, after?, limit })`, using a
+`{ position, index }` cursor and `Event.decode(fact, entry)` for payload decoding.
+The existing journal log reader and projection replay retain complete-batch reads.
 
 The bus validates batch metadata and workspace binding. It owns frozen copies of
 the envelope, event array, and event metadata, including nested provenance references.
@@ -249,7 +258,7 @@ consistent across modules. Typed errors retain tagged error schemas.
 
 | Name                 | Meaning and examples                                                                                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Record`             | A complete domain record with its identity and recorded fields: `Member.Record`, `Invitation.Record`, `Entry.Record`. Adapter-specific database row shapes stay in adapters.    |
+| `Record`             | A complete domain record with its identity and recorded fields: `Member.Record`, `Invitation.Record`, `Event.Record`. Adapter-specific database row shapes stay in adapters.    |
 | `Value`              | The primary value object in a focused module: `Actor.Value`, `Grant.Value`, `Requirement.Value`, `Scope.Value`. Prefer a more specific noun when it clarifies the value's role. |
 | `Reference`          | Enough information to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                                   |
 | `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                                             |
@@ -264,7 +273,9 @@ issuance record retained through acceptance or revocation. `Event.Envelope`
 contains a fact's name, version, encoded payload, and provenance; `Fact.Payload<F>` is the
 decoded domain payload. `Log.Entry<A>` carries a decoded payload and entry
 metadata. `Codec.PayloadCodec<S>` handles a payload schema, while
-`Codec.FactCodec<F>` pairs that codec with its fact definition.
+`Codec.FactCodec<F>` pairs that codec with its fact definition. `Codec.EntryCodec<S>`
+maps a log's values to structured `Store.Content`; the journal uses it to persist
+the envelope header separately rather than wrapping everything in binary.
 
 Inline payload structs can stay inside their fact declarations. Obtain their
 types through `Fact.Payload<typeof MemberFacts.Added>` rather than adding a
@@ -275,8 +286,8 @@ of the decoded payload. Use stable record IDs for creation and terminal facts;
 repeatable changes need a request or occurrence ID, not just the affected record's
 ID. `occurrence` returns a nonempty array of nonblank strings or `null`. The journal
 validates these parts and derives an unambiguous key without the schema version.
-Keep identity rules stable across retries and schema changes. Adding a rule does
-not deduplicate older unkeyed history automatically. Facts registered under the
+Keep identity rules stable across retries. During local development, reset data
+when changing an identity rule. Facts registered under the
 same name/version must share their payload schema and occurrence function.
 
 Schemas used as public HTTP models carry stable identifiers for generated API
@@ -294,11 +305,9 @@ Source names and serialized names are separate contracts. Preserve fact names,
 versions, brands, error tags, service keys, projection keys, and encoded fields
 during organizational changes. In particular, `Invitation.Record.details` still
 holds `Invitation.Issuance`; changing its TypeScript name does not rename the
-persisted or HTTP field. Contract changes require an explicit compatibility or
-migration decision. During the current development phase, change fact and projection
-schemas in place at version 1 rather than adding compatibility versions. Breaking
-development-data changes require a deliberate reset decision. Versioned evolution
-will begin when production data must be preserved.
+persisted or HTTP field. During local development, update schemas in place at version 1 and reset
+development data. Keep one current database baseline; do not add upgrade migrations,
+backfills, or legacy decoding paths.
 
 ## Constructors and layers
 

@@ -5,6 +5,7 @@ import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Entry } from "../../src/journal/entry.ts";
 import { Event } from "../../src/journal/event.ts";
 import { Fact } from "../../src/journal/fact.ts";
+import { testProvenance } from "../publication.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");
@@ -24,7 +25,7 @@ const batch = (id: string): CommittedEvents.Batch => ({
       commitId: Commit.Id.make(id),
       index: 0,
       recordedAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
-      provenance: null,
+      provenance: testProvenance(workspaceId),
       name: Changed.name,
       version: Changed.version,
       payload: { amount: 2, at: DateTime.makeUnsafe("2026-09-20T11:00:00.000Z") },
@@ -97,6 +98,7 @@ test("foreign workspaces and malformed batches cannot enter a bus", async () =>
       const stream = yield* bus.subscribe;
       const foreign = batch("foreign");
       Reflect.set(foreign, "workspaceId", otherWorkspaceId);
+      Reflect.set(foreign.events[0], "provenance", testProvenance(otherWorkspaceId));
       expect(yield* Effect.flip(bus.publish(foreign))).toMatchObject({
         _tag: "CommittedEvents.WorkspaceMismatch",
         expectedWorkspaceId: workspaceId,
@@ -108,7 +110,11 @@ test("foreign workspaces and malformed batches cannot enter a bus", async () =>
       Reflect.set(empty.events, "length", 0);
       const duplicate = batch("duplicate");
       Reflect.set(duplicate, "events", [duplicate.events[0], duplicate.events[0]]);
-      for (const invalid of [wrongCommit, empty, duplicate])
+      const unattributed = batch("unattributed");
+      Reflect.set(unattributed.events[0], "provenance", null);
+      const missingAttribution = batch("missing-attribution");
+      Reflect.deleteProperty(missingAttribution.events[0], "provenance");
+      for (const invalid of [wrongCommit, empty, duplicate, unattributed, missingAttribution])
         expect(yield* Effect.flip(bus.publish(invalid))).toMatchObject({ _tag: "SchemaError" });
       const good = batch("good");
       yield* bus.publish(good);

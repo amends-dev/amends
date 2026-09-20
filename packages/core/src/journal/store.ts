@@ -1,20 +1,44 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import { Commit } from "./commit.ts";
-import { Entry } from "./entry.ts";
+import { Entry as LogEntry } from "./entry.ts";
+import { Event } from "./event.ts";
 import { Occurrence } from "./occurrence.ts";
+
+/** Domain journals provide a fact header; generic logs provide only payload bytes. */
+export const Content = Schema.Struct({
+  payload: Schema.Uint8Array,
+  fact: Schema.optionalKey(Event.Header),
+});
+export interface Content extends Schema.Schema.Type<typeof Content> {}
+
+/** Complete persisted entry, with queryable metadata beside the payload. */
+export const Entry = Schema.Struct({ ...LogEntry.Metadata.fields, ...Content.fields });
+export interface Entry extends Schema.Schema.Type<typeof Entry> {}
+
+export const Cursor = Schema.Struct({ position: LogEntry.Position, index: Schema.Natural });
+export interface Cursor extends Schema.Schema.Type<typeof Cursor> {}
+
+/** Entry pagination is independent of the complete-batch replay cursor. */
+export const ReadFactsOptions = Schema.Struct({
+  name: Event.Header.fields.name,
+  version: Schema.optionalKey(Event.Header.fields.version),
+  after: Schema.optionalKey(Cursor),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ReadFactsOptions extends Schema.Schema.Type<typeof ReadFactsOptions> {}
 
 /** All entries written to one log by one commit. */
 export const Batch = Schema.Struct({
-  logId: Entry.LogId,
-  position: Entry.Position,
+  logId: LogEntry.LogId,
+  position: LogEntry.Position,
   commit: Commit.Record,
-  entries: Schema.NonEmptyArray(Entry.Record),
+  entries: Schema.NonEmptyArray(Entry),
 });
 export interface Batch extends Schema.Schema.Type<typeof Batch> {}
 
 export const ReadOptions = Schema.Struct({
-  after: Schema.optionalKey(Entry.Position),
+  after: Schema.optionalKey(LogEntry.Position),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
 });
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
@@ -25,18 +49,18 @@ export type IdempotencyKey = typeof IdempotencyKey.Type;
 
 export const AppendOptions = Schema.Struct({
   /** None requires an empty log; Some requires the specified current position. */
-  expectedAfter: Schema.optionalKey(Schema.Option(Entry.Position)),
+  expectedAfter: Schema.optionalKey(Schema.Option(LogEntry.Position)),
   idempotencyKey: Schema.optionalKey(IdempotencyKey),
 });
 export interface AppendOptions extends Schema.Schema.Type<typeof AppendOptions> {}
 
 export const AppendInput = Schema.Struct({
-  logId: Entry.LogId,
-  payloads: Schema.Array(Schema.Uint8Array),
+  logId: LogEntry.LogId,
+  entries: Schema.Array(Content),
   ...AppendOptions.fields,
 }).check(
   Schema.makeFilter((input) =>
-    input.idempotencyKey === undefined || input.payloads.length > 0
+    input.idempotencyKey === undefined || input.entries.length > 0
       ? undefined
       : "A keyed append must contain at least one entry",
   ),
@@ -45,16 +69,16 @@ export interface AppendInput extends Schema.Schema.Type<typeof AppendInput> {}
 
 /** A durable key binds the exact slice written by one append, not its entire commit. */
 export const AppendReceipt = Schema.Struct({
-  logId: Entry.LogId,
+  logId: LogEntry.LogId,
   key: IdempotencyKey,
   commitId: Commit.Id,
   firstIndex: Schema.Natural,
   entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
-  entries: Schema.NonEmptyArray(Entry.Record),
+  entries: Schema.NonEmptyArray(Entry),
 }).check(
   Schema.makeFilter((receipt) => {
     if (receipt.entries.length !== receipt.entryCount) return "Incomplete keyed append receipt";
-    const ids = new Set<Entry.Id>();
+    const ids = new Set<LogEntry.Id>();
     for (const [offset, entry] of receipt.entries.entries()) {
       if (
         entry.logId !== receipt.logId ||
@@ -86,6 +110,17 @@ export const samePayloads = (
     );
   });
 
+const sameHeader = Schema.toEquivalence(Schema.UndefinedOr(Event.Header));
+/** Native retries compare the complete content, including structured attribution. */
+export const sameContents = (
+  left: ReadonlyArray<Content>,
+  right: ReadonlyArray<Content>,
+): boolean =>
+  samePayloads(
+    left.map((entry) => entry.payload),
+    right.map((entry) => entry.payload),
+  ) && left.every((entry, index) => sameHeader(entry.fact, right[index]?.fact));
+
 export class Failure extends Schema.TaggedError<Failure>()("JournalStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
@@ -113,13 +148,13 @@ export class Transaction extends Context.Service<
      * visible in increasing order, with no late insertion below a visible cursor.
      * Check expectedAfter atomically against the transaction's current log view.
      * Resolve a matching idempotency key first: return its original entries without
-     * appending or checking expectedAfter. Different bytes or payload count conflict.
+     * appending or checking expectedAfter. Different bytes, fact metadata, or count conflict.
      * Persist the key and append slice in this same transaction; rollback releases it.
      * Copy input bytes and reject expired handles. Returned entries are provisional.
      */
     readonly append: (
       request: AppendInput,
-    ) => Effect.Effect<ReadonlyArray<Entry.Record>, Failure | Conflict>;
+    ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict>;
   }
 >()("@amends/core/journal/store/Transaction") {}
 
@@ -151,7 +186,7 @@ export const notifyCommit = (
 export interface Interface {
   /** Lookup is workspace-bound and sees this transaction's staged keys when present. */
   readonly getAppend: (
-    logId: Entry.LogId,
+    logId: LogEntry.LogId,
     key: IdempotencyKey,
   ) => Effect.Effect<Option.Option<AppendReceipt>, Failure>;
   /**
@@ -169,7 +204,7 @@ export interface Interface {
 
   /** Reads use the current transaction when present, otherwise committed state. */
   readonly get: (
-    logId: Entry.LogId,
+    logId: LogEntry.LogId,
     commitId: Commit.Id,
   ) => Effect.Effect<Option.Option<Batch>, Failure>;
   /**
@@ -179,9 +214,15 @@ export interface Interface {
    * and records from caller mutation.
    */
   readonly read: (
-    logId: Entry.LogId,
+    logId: LogEntry.LogId,
     options: ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Batch>, Failure>;
+
+  /** Filter in storage and page individual facts by (position, index), across versions by default. */
+  readonly readFacts: (
+    logId: LogEntry.LogId,
+    options: ReadFactsOptions,
+  ) => Effect.Effect<ReadonlyArray<Entry>, Failure>;
 
   /**
    * Wait outside a transaction for committed entries beyond the exclusive cursor
@@ -193,8 +234,8 @@ export interface Interface {
    * instead of buffering entries, and release waiting resources on interruption.
    */
   readonly waitForAppend: (
-    logId: Entry.LogId,
-    after: Option.Option<Entry.Position>,
+    logId: LogEntry.LogId,
+    after: Option.Option<LogEntry.Position>,
   ) => Effect.Effect<void, Failure>;
 }
 

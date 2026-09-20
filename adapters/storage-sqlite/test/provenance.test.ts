@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Codec, Event, Log } from "@amends/core/journal";
+import { Event, Log } from "@amends/core/journal";
 import { DateTime, Effect } from "effect";
 import { Operations } from "./operations.ts";
 import { alice, bob, boundTo, future, request, runHost, temporary } from "./invitation-support.ts";
@@ -35,7 +35,7 @@ test("bootstrap, acceptance and removal retain truthful attribution after reopen
         const batches = yield* bound.store.read(Log.Id.make("journal"), { limit: 10 });
         const decoded = yield* Effect.forEach(batches, (batch) =>
           Effect.forEach(batch.entries, (entry) =>
-            Effect.map(Codec.makeForSchema(Event.Envelope).decode(entry.payload), (event) => ({
+            Effect.map(Event.storageCodec.decode(entry), (event) => ({
               ...entry,
               event,
             })),

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "ac67a524-73c7-48b6-a0c8-de5c9c326f32",
+  "id": "7ddabcde-0cf6-4c68-86a7-23b2106105d6",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -26,13 +26,13 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "invitation_grants",
+      "name": "invitations",
       "entityType": "tables",
       "schema": "public"
     },
     {
       "isRlsEnabled": false,
-      "name": "invitations",
+      "name": "log_append_keys",
       "entityType": "tables",
       "schema": "public"
     },
@@ -51,6 +51,12 @@
     {
       "isRlsEnabled": false,
       "name": "members",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "notifications",
       "entityType": "tables",
       "schema": "public"
     },
@@ -363,97 +369,6 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "invitation_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "position",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "permission",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "scope_kind",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "target_kind",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "target_member_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "workspace_id",
-      "entityType": "columns",
-      "schema": "public",
       "table": "invitations"
     },
     {
@@ -491,6 +406,19 @@
       "generated": null,
       "identity": null,
       "name": "inviter_member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "invitations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "role_id",
       "entityType": "columns",
       "schema": "public",
       "table": "invitations"
@@ -585,6 +513,84 @@
       "entityType": "columns",
       "schema": "public",
       "table": "invitations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "log_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "idempotency_key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "commit_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "first_index",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entry_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_append_keys"
     },
     {
       "type": "text",
@@ -745,6 +751,162 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "fact_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "fact_version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "performer_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "performer_member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "performer_identity_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "performer_identity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "performer_system_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cause_log_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cause_commit_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cause_entry_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "correlation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "occurred_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -806,6 +968,110 @@
       "entityType": "columns",
       "schema": "public",
       "table": "members"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_log_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_entry_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recorded_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "state",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
     },
     {
       "type": "text",
@@ -1125,6 +1391,55 @@
           "opclass": null
         },
         {
+          "value": "log_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "fact_name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "entry_index",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "log_entries_by_fact",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "identity_kind",
           "isExpression": false,
           "asc": true,
@@ -1148,6 +1463,153 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "members"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "source_log_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "source_entry_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recipient_kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recipient_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "notifications_by_source_recipient",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recipient_kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recipient_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recorded_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "notifications_by_recipient",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recipient_kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recipient_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "recorded_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"state\" = 'Pending'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pending_notifications_by_recipient",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "notifications"
     },
     {
       "nameExplicit": true,
@@ -1207,25 +1669,6 @@
     {
       "nameExplicit": true,
       "columns": [
-        "workspace_id",
-        "invitation_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "invitations",
-      "columnsTo": [
-        "workspace_id",
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "invitation_grants_invitation",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
         "workspace_id"
       ],
       "schemaTo": "public",
@@ -1258,6 +1701,27 @@
       "entityType": "fks",
       "schema": "public",
       "table": "invitations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "log_id",
+        "commit_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "log_batches",
+      "columnsTo": [
+        "workspace_id",
+        "log_id",
+        "commit_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "log_append_keys_batch",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "log_append_keys"
     },
     {
       "nameExplicit": true,
@@ -1328,6 +1792,23 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "name": "notifications_workspace",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "workspaces",
+      "columnsTo": [
+        "workspace_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
       "name": "roles_workspace",
       "entityType": "fks",
       "schema": "public",
@@ -1371,18 +1852,6 @@
     {
       "columns": [
         "workspace_id",
-        "invitation_id",
-        "position"
-      ],
-      "nameExplicit": false,
-      "name": "invitation_grants_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
-      "columns": [
-        "workspace_id",
         "id"
       ],
       "nameExplicit": false,
@@ -1390,6 +1859,18 @@
       "entityType": "pks",
       "schema": "public",
       "table": "invitations"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "log_id",
+        "idempotency_key"
+      ],
+      "nameExplicit": false,
+      "name": "log_append_keys_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "log_append_keys"
     },
     {
       "columns": [
@@ -1431,6 +1912,17 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "notifications_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "roles_pkey",
       "entityType": "pks",
       "schema": "public",
@@ -1461,18 +1953,60 @@
       "table": "assignments"
     },
     {
-      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL)))",
-      "name": "invitation_grants_scope_agrees",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "invitation_grants"
-    },
-    {
       "value": "(\"state\" = 'Pending' AND \"accepted_member_id\" IS NULL AND \"accepted_at\" IS NULL AND \"revoked_by_member_id\" IS NULL AND \"revoked_at\" IS NULL) OR (\"state\" = 'Accepted' AND \"accepted_member_id\" IS NOT NULL AND \"accepted_at\" IS NOT NULL AND \"revoked_by_member_id\" IS NULL AND \"revoked_at\" IS NULL) OR (\"state\" = 'Revoked' AND \"revoked_by_member_id\" IS NOT NULL AND \"revoked_at\" IS NOT NULL AND \"accepted_member_id\" IS NULL AND \"accepted_at\" IS NULL)",
       "name": "invitations_state_agrees",
       "entityType": "checks",
       "schema": "public",
       "table": "invitations"
+    },
+    {
+      "value": "\"first_index\" >= 0",
+      "name": "log_append_keys_first_index",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "value": "\"entry_count\" > 0",
+      "name": "log_append_keys_entry_count",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "log_append_keys"
+    },
+    {
+      "value": "(\"fact_name\" IS NULL AND \"fact_version\" IS NULL AND \"performer_kind\" IS NULL) OR (\"fact_name\" IS NOT NULL AND \"fact_version\" IS NOT NULL AND \"performer_kind\" IS NOT NULL)",
+      "name": "log_entries_fact_header",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "value": "(\"performer_kind\" IS NULL AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IS NULL AND \"performer_identity_id\" IS NULL AND \"performer_system_id\" IS NULL AND \"correlation_id\" IS NULL AND \"occurred_at\" IS NULL AND \"cause_log_id\" IS NULL AND \"cause_commit_id\" IS NULL AND \"cause_entry_id\" IS NULL) OR (\"performer_kind\" IS NOT NULL AND \"correlation_id\" IS NOT NULL AND \"occurred_at\" IS NOT NULL AND ((\"performer_kind\" = 'Member' AND \"performer_member_id\" IS NOT NULL AND \"performer_identity_kind\" IN ('Human', 'Agent') AND \"performer_identity_kind\" IS NOT NULL AND \"performer_identity_id\" IS NOT NULL AND \"performer_system_id\" IS NULL) OR (\"performer_kind\" = 'Identity' AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IN ('Human', 'Agent') AND \"performer_identity_kind\" IS NOT NULL AND \"performer_identity_id\" IS NOT NULL AND \"performer_system_id\" IS NULL) OR (\"performer_kind\" = 'System' AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IS NULL AND \"performer_identity_id\" IS NULL AND \"performer_system_id\" IS NOT NULL)))",
+      "name": "log_entries_provenance",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "value": "(\"cause_log_id\" IS NULL AND \"cause_commit_id\" IS NULL AND \"cause_entry_id\" IS NULL) OR (\"cause_log_id\" IS NOT NULL AND \"cause_commit_id\" IS NOT NULL AND \"cause_entry_id\" IS NOT NULL)",
+      "name": "log_entries_cause",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "value": "\"recipient_kind\" IN ('Human', 'Agent')",
+      "name": "notifications_recipient_kind",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "value": "\"state\" = 'Pending'",
+      "name": "notifications_state",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "notifications"
     }
   ],
   "renames": []

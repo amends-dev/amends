@@ -9,9 +9,19 @@ Each record is stored as the JSON of its schema's encoded form in a `record`
 column, keyed by workspace and ID, with indexes over the JSON fields the stores
 filter on. Notifications also store an indexed epoch-millisecond timestamp so
 pagination orders instants correctly, independent of their string representation.
-Journal tables hold their fields as columns. Migrations live in
-`src/migrations.ts` and apply in `SqliteDatabase.make()`, before it returns the
-database service. `SqliteDatabase.layer(filename)` uses the same constructor.
+Journal tables hold their fields as columns. `src/migrations.ts` contains one
+fresh-database baseline, applied once by `SqliteDatabase.make()`. During local
+development, update that baseline and reset the database after schema changes. `SqliteDatabase.layer(filename)` uses the same constructor.
+
+Journal entries keep `fact_name` and `fact_version` in columns, provenance as
+schema-validated JSON in its own column, and only the domain payload as binary.
+Generic execution entries leave fact metadata null. `log_entries_by_fact` supports
+workspace/log/name reads ordered by position and entry index. These filtered
+entry pages are separate from complete-batch reads used for replay.
+
+Fact entries require complete provenance. There are no upgrade migrations,
+backfills, or legacy envelope formats. See the
+[storage envelope](../../docs/journal.md#storage-envelope).
 
 ## Layout
 
@@ -41,8 +51,7 @@ The notification projection currently has no generation handlers.
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes
 return the original append slice, while conflicting bytes or count fail. The key,
-entries, and projection writes commit or roll back together. The additive migration
-preserves old journal data. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
+entries, and projection writes commit or roll back together. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
 
 One connection serves every workspace, so commits sharing that client wait for
 its connection semaphore and run one at a time. Competing connections contend at
@@ -73,7 +82,7 @@ file and migrates it. The local host also supplies cryptography and uses SQLite
 unless `AMENDS_DATABASE_URL` selects PostgreSQL.
 
 `SqliteDatabase.make()` instead accepts `SqlClient.SqlClient` through Effect's
-context and prepares it using the same migrations. Keep that client's scope open
+context and initializes it using the same baseline. Keep that client's scope open
 while using the result. Reuse the resulting database service across bindings so
 all workspace views share its connection health state. The ready-made layer sets
 `busyTimeout: 0`; callers supplying their own SQLite client must configure the
@@ -83,7 +92,7 @@ same timeout to retain the adapter's immediate-contention behavior.
 
 Each test opens its own file in a temporary directory and removes it afterwards.
 Construction tests cover both `make` and `layer`, reopening without data loss,
-and rollback of a failed migration before an explicit retry.
+and rollback of failed schema initialization before an explicit retry.
 
 The suites separate database construction, transactions, journal behavior,
 authorization, gateway workflows, and invitation lifecycle, policy, and replay.

@@ -1,6 +1,6 @@
 import { ChangeFeed } from "@amends/core/change-feed";
 import { Identity } from "@amends/core/identity";
-import { Commit, Entry } from "@amends/core/journal";
+import { Commit, Entry, Event } from "@amends/core/journal";
 import { Notification } from "@amends/core/notification";
 import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends/core/workspace";
 import { SignIn } from "@amends/gateway/sign-in";
@@ -48,7 +48,22 @@ const changed = (
   _tag: "Committed",
   workspaceId,
   commitId: Commit.Id.make("commit"),
-  events: [{ id: Entry.Id.make("entry"), name, version, recordedAt, provenance: null, payload }],
+  events: [
+    {
+      id: Entry.Id.make("entry"),
+      name,
+      version,
+      recordedAt,
+      provenance: {
+        workspaceId,
+        performedBy: { _tag: "Identity", identity: member.identity },
+        causedBy: null,
+        correlationId: Event.CorrelationId.make("test"),
+        occurredAt: recordedAt,
+      },
+      payload,
+    },
+  ],
 });
 const encodeMessage = Schema.encodeSync(ChangeFeed.Message);
 const encodeMember = Schema.encodeSync(Member.Record);

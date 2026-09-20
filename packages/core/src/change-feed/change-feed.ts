@@ -10,7 +10,7 @@ export const Event = Schema.Struct({
   name: Schema.NonEmptyString,
   version: Schema.Finite,
   recordedAt: Schema.DateTimeUtcFromString,
-  provenance: Schema.NullOr(JournalEvent.Provenance),
+  provenance: JournalEvent.Provenance,
   payload: Schema.Json,
 }).annotate({ identifier: "ChangeFeedEvent" });
 export interface Event extends Schema.Schema.Type<typeof Event> {}

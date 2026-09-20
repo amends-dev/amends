@@ -14,7 +14,6 @@ import {
 import { Actor } from "../../src/identity/actor.ts";
 import { Identity } from "../../src/identity/identity.ts";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Codec } from "../../src/journal/codec.ts";
 import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Entry } from "../../src/journal/entry.ts";
 import { Event } from "../../src/journal/event.ts";
@@ -205,27 +204,12 @@ test("foreign workspaces, dangling causes and changed correlations reject writes
   );
 });
 
-test("old binary envelopes remain readable and replay preserves original attribution without a current actor", async () => {
+test("replay preserves recorded attribution without a current publication context", async () => {
   const fixture = await Effect.runPromise(make());
-  let published: Event.Record | undefined;
-  await run(
+  const published = await run(
     fixture,
     Effect.gen(function* () {
-      const logs = yield* Log.Service;
-      const legacy = logs.open({
-        id: logId,
-        schema: Schema.Struct({
-          name: Schema.String,
-          version: Schema.Finite,
-          payload: Schema.Uint8Array,
-        }),
-      });
-      yield* legacy.append({
-        name: Changed.name,
-        version: Changed.version,
-        payload: yield* Codec.make(Changed).encode(1),
-      });
-      published = yield* (yield* setup)
+      return yield* (yield* setup)
         .publish(Changed, 2)
         .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
     }),
@@ -241,13 +225,9 @@ test("old binary envelopes remain readable and replay preserves original attribu
       );
       const journal = yield* Journal.make({ logId, projections: [projection] });
       yield* journal.replay;
-      expect(seen).toHaveLength(2);
-      expect(seen[0]?.provenance).toBeNull();
-      expect(seen[1]).toEqual(published);
-      const bytesBefore = (yield* fixture.snapshot).logs.get(logId);
+      expect(seen).toEqual([published]);
       yield* journal.replay;
-      expect(seen).toHaveLength(2);
-      expect((yield* fixture.snapshot).logs.get(logId)).toEqual(bytesBefore);
+      expect(seen).toEqual([published]);
     }),
   );
 });

@@ -38,15 +38,29 @@ export const Provenance = Schema.Struct({
 );
 export interface Provenance extends Schema.Schema.Type<typeof Provenance> {}
 
-/** Wraps a fact's name, version, and encoded payload for the domain journal's log. */
-export const Envelope = Schema.Struct({
+/** Queryable fact metadata, stored separately from the encoded domain payload. */
+export const Header = Schema.Struct({
   name: Schema.String,
   version: Schema.Finite,
-  payload: Schema.Uint8Array,
-  /** Only historical envelopes may omit provenance. New publications require it. */
-  provenance: Schema.optionalKey(Provenance),
+  provenance: Provenance,
 });
+export interface Header extends Schema.Schema.Type<typeof Header> {}
+
+/** In-memory envelope; only payload is stored as binary by the journal's entry codec. */
+export const Envelope = Schema.Struct({ ...Header.fields, payload: Schema.Uint8Array });
 export interface Envelope extends Schema.Schema.Type<typeof Envelope> {}
+
+/** Preserve the envelope's typed metadata without encoding a second binary wrapper. */
+export const storageCodec: Codec.EntryCodec<typeof Envelope> = {
+  encode: Effect.fn("Event.encodeEntry")(function* (input) {
+    const { payload, ...fact } = yield* Schema.decodeEffect(Schema.toType(Envelope))(input);
+    return { fact, payload: payload.slice() };
+  }),
+  decode: Effect.fn("Event.decodeEntry")(function* (entry) {
+    const fact = yield* Schema.decodeUnknownEffect(Schema.toType(Header))(entry.fact);
+    return { ...fact, payload: entry.payload.slice() };
+  }),
+};
 
 export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Journal.FactMismatch", {
   name: Schema.String,
@@ -62,8 +76,7 @@ export type CommitId = typeof CommitId.Type;
 /** A published fact carries the metadata of its underlying log entry. */
 export const Metadata = Schema.Struct({
   ...Entry.Metadata.fields,
-  /** Null means attribution was not recorded in the historical envelope. */
-  provenance: Schema.NullOr(Provenance),
+  provenance: Provenance,
 });
 
 export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}
@@ -81,11 +94,8 @@ export type Type<F extends Fact.Definition> = ReturnType<
   typeof makeSchema<F["name"], F["version"], F["payload"]>
 >["Type"];
 
-/** New publications always have complete provenance. */
-export type Published<F extends Fact.Definition> = Type<F> & { readonly provenance: Provenance };
-
 /** Construct a durable reference to an attributed event. @category constructors */
-export const makeReference = (event: Record & { readonly provenance: Provenance }): Reference => ({
+export const makeReference = (event: Record): Reference => ({
   workspaceId: event.provenance.workspaceId,
   logId: event.logId,
   commitId: event.commitId,
@@ -136,8 +146,7 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
     return yield* new FactMismatch({ name: fact.name, version: fact.version });
   }
   const payload = yield* Codec.make(fact).decode(entry.payload.payload);
-  const provenance =
-    entry.payload.provenance === undefined ? null : snapshotProvenance(entry.payload.provenance);
+  const provenance = snapshotProvenance(entry.payload.provenance);
   const event = yield* Schema.decodeUnknownEffect(
     Schema.toType(makeSchema<F["name"], F["version"], F["payload"]>(fact)),
   )({ ...entry, provenance, name: fact.name, version: fact.version, payload });

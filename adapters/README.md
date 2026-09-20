@@ -85,7 +85,7 @@ Both storage adapters use the same construction boundaries:
 
 | Module        | `make` constructs                                        | Dependencies                   |
 | ------------- | -------------------------------------------------------- | ------------------------------ |
-| Database      | A database facade after applying pending migrations      | An existing Effect SQL client  |
+| Database      | A database facade after applying the current baseline    | An existing Effect SQL client  |
 | Binding       | One workspace's database view and transaction operations | The adapter's database service |
 | Store modules | Implementations of core's store contracts                | The workspace binding          |
 | Storage       | The gateway's workspace-storage implementation           | The adapter's database service |
@@ -94,8 +94,8 @@ Both storage adapters use the same construction boundaries:
 `Database.make()` initializes a supplied client; it does not open a connection
 or pool. `Database.layer(config)` supplies the driver's client layer and delegates
 initialization to `make`. It exposes the database and the underlying SQL client
-services, which refer to the same connection or pool. A migration failure prevents
-the database service from being returned. Reopening applies only pending migrations.
+services, which refer to the same connection or pool. A schema-initialization failure prevents the database service from being returned.
+Reopening a database already using the current baseline preserves its data.
 
 Acquire the database once and share it across workspace views. Direct callers must
 keep the client's owning scope alive while using the database, bindings, or stores.
@@ -128,6 +128,8 @@ tests. Keep the scenarios in both `test/contracts.test.ts` files aligned. They
 exercise direct store calls, so core's application validation cannot hide an
 adapter's missing checks.
 
-Treat applied migrations as immutable. SQLite's migration declarations live in
-`src/migrations.ts`; PostgreSQL's generated migrations live in `drizzle/`.
-Source-only validation and naming changes do not rewrite existing migrations.
+During local development, keep one initial schema baseline per adapter. SQLite's
+initializer lives in `src/migrations.ts`; PostgreSQL's generated baseline lives in
+`drizzle/`. Update or regenerate the baseline when the schema changes and reset
+development databases. Do not add upgrade chains, backfills, or legacy decoding
+paths to preserve disposable local data.

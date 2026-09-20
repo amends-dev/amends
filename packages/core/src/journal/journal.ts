@@ -8,10 +8,14 @@ import { Publication } from "./publication.ts";
 import { Store } from "./store.ts";
 import { Transaction } from "./transaction.ts";
 
-export { Envelope, FactMismatch, decode } from "./event.ts";
+export { Envelope, FactMismatch, decode, storageCodec } from "./event.ts";
 
 export interface Interface {
   readonly log: Log.Reader<typeof Event.Envelope>;
+  /** Read matching envelopes by fact name, ordered by position and entry index. */
+  readonly read: (
+    options: Store.ReadFactsOptions,
+  ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
   readonly commit: Transaction.Interface["run"];
   /** Catch up registered projections before accepting new publications. */
   readonly replay: Effect.Effect<void, Projection.Error>;
@@ -25,7 +29,7 @@ export interface Interface {
     payload: Fact.Payload<NoInfer<F>>,
     options?: Store.AppendOptions,
   ) => Effect.Effect<
-    Event.Published<F>,
+    Event.Type<F>,
     Projection.Error | Log.WriteError,
     | Publication.Service
     | Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
@@ -61,7 +65,11 @@ export const make = Effect.fn("Journal.make")(function* <
 >(options: Options<Requirements>) {
   const logs = yield* Log.Service;
   const transaction = yield* Transaction.Service;
-  const log = logs.open({ id: options.logId, schema: Event.Envelope });
+  const log = logs.open({
+    id: options.logId,
+    schema: Event.Envelope,
+    storageCodec: Event.storageCodec,
+  });
   const validateProvenance = Schema.decodeUnknownEffect(
     Schema.toType(Event.Provenance).check(
       Schema.makeFilter((value) =>
@@ -144,26 +152,28 @@ export const make = Effect.fn("Journal.make")(function* <
                 operation: "publish",
                 message: "Idempotency key is already associated with different content",
               });
-            const original = yield* validateProvenance(entry.payload.provenance);
-            return Object.assign(yield* Event.decode(fact, entry), {
-              provenance: Event.snapshotProvenance(original),
-            });
+            yield* validateProvenance(entry.payload.provenance);
+            return yield* Event.decode(fact, entry);
           }
         }
         if (provenance.causedBy !== null) {
           const cause = provenance.causedBy;
-          const source = logs.open({ id: cause.logId, schema: Event.Envelope });
+          const source = logs.open({
+            id: cause.logId,
+            schema: Event.Envelope,
+            storageCodec: Event.storageCodec,
+          });
           const batch = yield* source.get(cause.commitId);
           const parent = Option.isSome(batch)
             ? batch.value.entries.find((entry) => entry.id === cause.id)
             : undefined;
-          yield* Schema.decodeUnknownEffect(Schema.Literal(cause.id))(parent?.id);
-          if (parent?.payload.provenance !== undefined) {
-            yield* validateProvenance(parent.payload.provenance);
-            yield* Schema.decodeEffect(Schema.Literal(parent.payload.provenance.correlationId))(
-              provenance.correlationId,
-            );
-          }
+          const parentEnvelope = yield* Schema.decodeUnknownEffect(Schema.toType(Event.Envelope))(
+            parent?.payload,
+          );
+          yield* validateProvenance(parentEnvelope.provenance);
+          yield* Schema.decodeEffect(Schema.Literal(parentEnvelope.provenance.correlationId))(
+            provenance.correlationId,
+          );
         }
         const entry = yield* log.append(
           {
@@ -174,7 +184,7 @@ export const make = Effect.fn("Journal.make")(function* <
           },
           appendOptions,
         );
-        const event = Object.assign(yield* Event.decode(fact, entry), { provenance });
+        const event = yield* Event.decode(fact, entry);
         for (const runner of runners) yield* runner.apply(entry, event);
         yield* transaction.recordEvent(event);
         return event;
@@ -194,7 +204,8 @@ export const make = Effect.fn("Journal.make")(function* <
   const replay = Effect.forEach(runners, (runner) => runner.replay, { discard: true }).pipe(
     Effect.withSpan("Journal.replay"),
   );
-  return Service.of({ log: reader, commit: transaction.run, replay, publish });
+
+  return Service.of({ log: reader, read: log.readFacts, commit: transaction.run, replay, publish });
 });
 
 /**

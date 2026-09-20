@@ -1,6 +1,7 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
-import { and, asc, count, desc, eq, gt, gte, lt, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, lt, inArray, or } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
+import { JournalEntry } from "./journal-entry.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
@@ -12,13 +13,6 @@ const BatchHeaderRow = Schema.Struct({
   recordedAt: Schema.DateTimeUtcFromDate,
   entryCount: Schema.Natural,
 });
-const EntryRows = Schema.Array(
-  Schema.Struct({
-    ...Entry.Metadata.fields,
-    recordedAt: Schema.DateTimeUtcFromDate,
-    payload: Schema.Uint8Array,
-  }),
-);
 const AppendHeaderRows = Schema.Array(
   Schema.Struct({
     logId: Entry.LogId,
@@ -47,15 +41,8 @@ export const make = Effect.fn("Journal.make")(function* () {
     recordedAt: commits.recordedAt,
     entryCount: commits.entryCount,
   };
-  const entryColumns = {
-    id: logEntries.id,
-    logId: logEntries.logId,
-    position: logEntries.position,
-    commitId: logEntries.commitId,
-    index: logEntries.entryIndex,
-    recordedAt: logEntries.recordedAt,
-    payload: logEntries.payload,
-  };
+  const entryColumns = JournalEntry.columns;
+  const decodeEntries = (input: unknown) => JournalEntry.decodeRows(workspaceId, input);
   const headers = () =>
     db
       .select(headerColumns)
@@ -104,7 +91,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         ),
       )
       .orderBy(asc(logEntries.entryIndex))
-      .pipe(Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)));
+      .pipe(Effect.flatMap(decodeEntries));
     return Option.some(
       yield* Schema.decodeUnknownEffect(Schema.toType(Store.AppendReceipt))({
         ...row,
@@ -135,7 +122,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         ),
       )
       .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
-      .pipe(Effect.flatMap(Schema.decodeUnknownEffect(EntryRows)));
+      .pipe(Effect.flatMap(decodeEntries));
     const byPosition = Array.groupBy(rows, (row) => String(row.position));
     return yield* Effect.forEach(selected, (header) => {
       const values = byPosition[String(header.position)];
@@ -170,17 +157,21 @@ export const make = Effect.fn("Journal.make")(function* () {
     const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(input).pipe(
       Effect.mapError(storeConflict(Store, "append")),
     );
+    if (
+      request.entries.some(
+        (entry) => entry.fact !== undefined && entry.fact.provenance.workspaceId !== workspaceId,
+      )
+    )
+      return yield* new Store.Conflict({
+        operation: "append",
+        message: "Fact belongs to another workspace",
+      });
     if (request.idempotencyKey !== undefined) {
       const previous = yield* getAppend(request.logId, request.idempotencyKey).pipe(
         Effect.mapError(storeFailure(Store, "append")),
       );
       if (Option.isSome(previous)) {
-        if (
-          !Store.samePayloads(
-            request.payloads,
-            previous.value.entries.map((entry) => entry.payload),
-          )
-        )
+        if (!Store.sameContents(request.entries, previous.value.entries))
           return yield* new Store.Conflict({
             operation: "append",
             message: "Idempotency key is already associated with different content",
@@ -211,7 +202,7 @@ export const make = Effect.fn("Journal.make")(function* () {
           message: "Expected log position changed",
         });
     }
-    if (request.payloads.length === 0) return [];
+    if (request.entries.length === 0) return [];
     const extending = Option.isSome(last) && last.value.commitId === session.commit.id;
     const position = Entry.Position.make(
       Option.isNone(last) ? 0 : last.value.position + (extending ? 0 : 1),
@@ -248,8 +239,8 @@ export const make = Effect.fn("Journal.make")(function* () {
         .insert(logBatches)
         .values({ workspaceId, logId: request.logId, position, commitId: session.commit.id })
         .pipe(Effect.mapError(storeError(Store, "append")));
-    const result: Array<Entry.Record> = [];
-    for (const [offset, payload] of request.payloads.entries()) {
+    const result: Array<Store.Entry> = [];
+    for (const [offset, content] of request.entries.entries()) {
       const id = Entry.Id.make(crypto.randomUUID());
       const index = written + offset;
       yield* db
@@ -262,7 +253,8 @@ export const make = Effect.fn("Journal.make")(function* () {
           commitId: session.commit.id,
           entryIndex: index,
           recordedAt: DateTime.toDate(recordedAt),
-          payload: payload.slice(),
+          payload: content.payload.slice(),
+          ...JournalEntry.toColumns(content),
         })
         .pipe(Effect.mapError(storeError(Store, "append")));
       result.push({
@@ -272,7 +264,8 @@ export const make = Effect.fn("Journal.make")(function* () {
         commitId: session.commit.id,
         index,
         recordedAt,
-        payload: payload.slice(),
+        ...content,
+        payload: content.payload.slice(),
       });
     }
     yield* sql`UPDATE commits SET entry_count = entry_count + ${result.length} WHERE workspace_id = ${workspaceId} AND id = ${session.commit.id}`.pipe(
@@ -294,6 +287,39 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   return Store.Service.of({
+    readFacts: Effect.fn("Journal.readFacts")(function* (logId, input) {
+      return yield* guard(
+        Effect.gen(function* () {
+          yield* Schema.decodeEffect(Entry.LogId)(logId);
+          const options = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input);
+          return yield* db
+            .select(entryColumns)
+            .from(logEntries)
+            .where(
+              and(
+                eq(logEntries.workspaceId, workspaceId),
+                eq(logEntries.logId, logId),
+                eq(logEntries.factName, options.name),
+                options.version === undefined
+                  ? undefined
+                  : eq(logEntries.factVersion, options.version),
+                options.after === undefined
+                  ? undefined
+                  : or(
+                      gt(logEntries.position, options.after.position),
+                      and(
+                        eq(logEntries.position, options.after.position),
+                        gt(logEntries.entryIndex, options.after.index),
+                      ),
+                    ),
+              ),
+            )
+            .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
+            .limit(options.limit)
+            .pipe(Effect.flatMap(decodeEntries));
+        }),
+      ).pipe(Effect.mapError(storeFailure(Store, "readFacts")));
+    }),
     getAppend: (logId, key) =>
       guard(getAppend(logId, key)).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
     transaction: (program, options) =>

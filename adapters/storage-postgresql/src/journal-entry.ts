@@ -1,0 +1,159 @@
+import { Event, Store } from "@amends/core/journal";
+import { Workspace } from "@amends/core/workspace";
+import { DateTime, Effect, Schema } from "effect";
+import { logEntries } from "./schema.ts";
+
+export const columns = {
+  id: logEntries.id,
+  logId: logEntries.logId,
+  position: logEntries.position,
+  commitId: logEntries.commitId,
+  index: logEntries.entryIndex,
+  recordedAt: logEntries.recordedAt,
+  payload: logEntries.payload,
+  factName: logEntries.factName,
+  factVersion: logEntries.factVersion,
+  performerKind: logEntries.performerKind,
+  performerMemberId: logEntries.performerMemberId,
+  performerIdentityKind: logEntries.performerIdentityKind,
+  performerIdentityId: logEntries.performerIdentityId,
+  performerSystemId: logEntries.performerSystemId,
+  causeLogId: logEntries.causeLogId,
+  causeCommitId: logEntries.causeCommitId,
+  causeEntryId: logEntries.causeEntryId,
+  correlationId: logEntries.correlationId,
+  occurredAt: logEntries.occurredAt,
+};
+
+const headerFields = {
+  factName: Schema.NullOr(Event.Header.fields.name),
+  factVersion: Schema.NullOr(Event.Header.fields.version),
+  performerKind: Schema.NullOr(Schema.Literals(["Member", "Identity", "System"])),
+  performerMemberId: Schema.NullOr(Schema.String),
+  performerIdentityKind: Schema.NullOr(Schema.Literals(["Human", "Agent"])),
+  performerIdentityId: Schema.NullOr(Schema.String),
+  performerSystemId: Schema.NullOr(Schema.String),
+  causeLogId: Schema.NullOr(Schema.String),
+  causeCommitId: Schema.NullOr(Schema.String),
+  causeEntryId: Schema.NullOr(Schema.String),
+  correlationId: Schema.NullOr(Schema.String),
+  occurredAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+};
+const Row = Schema.Struct({
+  ...Store.Entry.fields,
+  recordedAt: Schema.DateTimeUtcFromDate,
+  ...headerFields,
+}).check(
+  Schema.makeFilter((row) => {
+    if ((row.factName === null) !== (row.factVersion === null)) return "Incomplete fact metadata";
+    if ((row.factName === null) !== (row.performerKind === null))
+      return "Fact attribution is required";
+    const empty =
+      row.performerMemberId === null &&
+      row.performerIdentityKind === null &&
+      row.performerIdentityId === null &&
+      row.performerSystemId === null;
+    if (row.performerKind === null)
+      return empty &&
+        row.correlationId === null &&
+        row.occurredAt === null &&
+        row.causeLogId === null &&
+        row.causeCommitId === null &&
+        row.causeEntryId === null
+        ? undefined
+        : "Incomplete provenance";
+    if (row.factName === null || row.correlationId === null || row.occurredAt === null)
+      return "Incomplete provenance";
+    if (
+      (row.causeLogId === null) !== (row.causeCommitId === null) ||
+      (row.causeLogId === null) !== (row.causeEntryId === null)
+    )
+      return "Incomplete cause";
+    if (row.performerKind === "System")
+      return row.performerSystemId !== null &&
+        row.performerMemberId === null &&
+        row.performerIdentityKind === null &&
+        row.performerIdentityId === null
+        ? undefined
+        : "Invalid system performer";
+    return row.performerIdentityKind !== null &&
+      row.performerIdentityId !== null &&
+      row.performerSystemId === null &&
+      (row.performerKind === "Member"
+        ? row.performerMemberId !== null
+        : row.performerMemberId === null)
+      ? undefined
+      : "Invalid identity performer";
+  }),
+);
+
+export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
+  workspaceId: Workspace.Id,
+  input: unknown,
+) {
+  const rows = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(input);
+  return yield* Effect.forEach(rows, (row) => {
+    const identity = { _tag: row.performerIdentityKind, id: row.performerIdentityId };
+    return Schema.decodeUnknownEffect(Schema.toType(Store.Entry))({
+      id: row.id,
+      logId: row.logId,
+      position: row.position,
+      commitId: row.commitId,
+      index: row.index,
+      recordedAt: row.recordedAt,
+      payload: row.payload.slice(),
+      ...(row.factName === null
+        ? {}
+        : {
+            fact: {
+              name: row.factName,
+              version: row.factVersion,
+              provenance: {
+                workspaceId,
+                correlationId: row.correlationId,
+                occurredAt: row.occurredAt,
+                performedBy:
+                  row.performerKind === "System"
+                    ? { _tag: "System", id: row.performerSystemId }
+                    : row.performerKind === "Member"
+                      ? { _tag: "Member", memberId: row.performerMemberId, identity }
+                      : { _tag: "Identity", identity },
+                causedBy:
+                  row.causeLogId === null
+                    ? null
+                    : {
+                        workspaceId,
+                        logId: row.causeLogId,
+                        commitId: row.causeCommitId,
+                        id: row.causeEntryId,
+                      },
+              },
+            },
+          }),
+    });
+  });
+});
+
+/** Call only after validating the complete content and its workspace binding. */
+export const toColumns = (entry: Store.Content) => {
+  const provenance = entry.fact?.provenance;
+  const performer = provenance?.performedBy;
+  return {
+    factName: entry.fact?.name ?? null,
+    factVersion: entry.fact?.version ?? null,
+    performerKind: performer?._tag ?? null,
+    performerMemberId: performer?._tag === "Member" ? performer.memberId : null,
+    performerIdentityKind:
+      performer !== undefined && performer._tag !== "System" ? performer.identity._tag : null,
+    performerIdentityId:
+      performer !== undefined && performer._tag !== "System" ? performer.identity.id : null,
+    performerSystemId: performer?._tag === "System" ? performer.id : null,
+    causeLogId: provenance?.causedBy?.logId ?? null,
+    causeCommitId: provenance?.causedBy?.commitId ?? null,
+    causeEntryId: provenance?.causedBy?.id ?? null,
+    correlationId: provenance?.correlationId ?? null,
+    occurredAt: provenance === undefined ? null : DateTime.toDate(provenance.occurredAt),
+  };
+};
+
+export * as JournalEntry from "./journal-entry.ts";

@@ -110,7 +110,11 @@ it("native keyed append validates content, rolls its receipt back, and preserves
         const bound = yield* (yield* views).forWorkspace(workspaceId);
         const append = (payloads: ReadonlyArray<Uint8Array>, idempotencyKey = key) =>
           Effect.flatMap(Store.Transaction, (native) =>
-            native.append({ logId: executionId, payloads, idempotencyKey }),
+            native.append({
+              logId: executionId,
+              entries: payloads.map((payload) => ({ payload })),
+              idempotencyKey,
+            }),
           );
         const input = [new Uint8Array([1, 2]), new Uint8Array([3])];
         const failed = yield* Effect.flip(
@@ -145,7 +149,7 @@ it("native keyed append validates content, rolls its receipt back, and preserves
         ).toBe("JournalStore.Conflict");
         const invalid: Store.AppendInput = {
           logId: executionId,
-          payloads: input,
+          entries: input.map((payload) => ({ payload })),
           idempotencyKey: Log.IdempotencyKey.make("valid"),
         };
         Reflect.set(invalid, "idempotencyKey", " ");
@@ -173,7 +177,7 @@ it("independent connections converge concurrent keyed attempts on one durable ap
           const append = Effect.flatMap(Store.Transaction, (native) =>
             native.append({
               logId: executionId,
-              payloads: [new Uint8Array([7])],
+              entries: [{ payload: new Uint8Array([7]) }],
               idempotencyKey: key,
             }),
           );

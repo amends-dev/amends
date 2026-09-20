@@ -14,7 +14,7 @@ export const Batch = Schema.Struct({
     const ids = new Set<Event.Id>();
     for (const event of batch.events) {
       if (event.commitId !== batch.commitId) return "Events must belong to the batch's commit";
-      if (event.provenance !== null && event.provenance.workspaceId !== batch.workspaceId)
+      if (event.provenance.workspaceId !== batch.workspaceId)
         return "Event provenance must belong to the batch's workspace";
       if (ids.has(event.id)) return "A batch cannot contain duplicate events";
       ids.add(event.id);
@@ -109,8 +109,7 @@ export const make = Effect.fn("CommittedEvents.make")(function* (
         Array.map(batch.events, (event) =>
           Object.freeze({
             ...event,
-            provenance:
-              event.provenance === null ? null : Event.snapshotProvenance(event.provenance),
+            provenance: Event.snapshotProvenance(event.provenance),
           }),
         ),
       ),

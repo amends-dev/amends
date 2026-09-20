@@ -21,8 +21,4 @@ export const Metadata = Schema.Struct({
 });
 export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}
 
-/** Storage preserves opaque payload bytes; the log owns their codec. */
-export const Record = Schema.Struct({ ...Metadata.fields, payload: Schema.Uint8Array });
-export interface Record extends Schema.Schema.Type<typeof Record> {}
-
 export * as Entry from "./entry.ts";

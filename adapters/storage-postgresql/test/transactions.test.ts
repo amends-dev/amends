@@ -128,7 +128,7 @@ it("workspace stores reject foreign and expired transactions, including escaped 
         expect(
           yield* Effect.flip(
             a.store.transaction(
-              native.append({ logId: journalLog, payloads: [new Uint8Array([1])] }),
+              native.append({ logId: journalLog, entries: [{ payload: new Uint8Array([1]) }] }),
             ),
           ),
         ).toMatchObject({ _tag: "JournalStore.Failure" });

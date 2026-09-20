@@ -1,4 +1,5 @@
-import { Commit, CommittedEvents, Entry } from "@amends/core/journal";
+import { Commit, CommittedEvents, Entry, Event } from "@amends/core/journal";
+import { Performer } from "@amends/core/identity";
 import { Workspace } from "@amends/core/workspace";
 import { expect, test } from "bun:test";
 import { Context, DateTime, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect";
@@ -17,7 +18,13 @@ const batch = (workspaceId: Workspace.Id, id: string): CommittedEvents.Batch => 
       commitId: Commit.Id.make(id),
       index: 0,
       recordedAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
-      provenance: null,
+      provenance: {
+        workspaceId,
+        performedBy: { _tag: "System", id: Performer.SystemId.make("test") },
+        causedBy: null,
+        correlationId: Event.CorrelationId.make(id),
+        occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+      },
       name: "example.changed",
       version: 1,
       payload: { value: id },

@@ -92,7 +92,7 @@ test("a commit between the empty read and wait registration is not lost", async 
           yield* fixture.store
             .transaction(
               Effect.gen(function* () {
-                yield* (yield* Store.Transaction).append({ logId: id, payloads: [payload] });
+                yield* (yield* Store.Transaction).append({ logId: id, entries: [{ payload }] });
               }),
             )
             .pipe(

@@ -182,7 +182,7 @@ it("notifications, source entries, and checkpoints share staged reads and rollba
           const native = yield* Store.Transaction;
           const [entry] = yield* native.append({
             logId: sourceLog,
-            payloads: [new Uint8Array([1])],
+            entries: [{ payload: new Uint8Array([1]) }],
           });
           if (entry === undefined) return yield* Effect.die("Expected a source entry");
           const value = record("atomic", { source: { logId: entry.logId, entryId: entry.id } });

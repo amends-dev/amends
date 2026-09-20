@@ -451,14 +451,24 @@ test("corrupt fact payloads roll back earlier handlers in the same replay batch"
   await run(
     fixture,
     Effect.gen(function* () {
-      const raw = (yield* Log.Service).open({ id: logId, schema: Journal.Envelope });
+      const raw = (yield* Log.Service).open({
+        id: logId,
+        schema: Journal.Envelope,
+        storageCodec: Journal.storageCodec,
+      });
       yield* raw.appendAll([
         {
           name: Changed.name,
           version: Changed.version,
           payload: yield* Codec.make(Changed).encode({ amount: 1 }),
+          provenance: testProvenance(workspaceId),
         },
-        { name: Changed.name, version: Changed.version, payload: new Uint8Array() },
+        {
+          name: Changed.name,
+          version: Changed.version,
+          payload: new Uint8Array(),
+          provenance: testProvenance(workspaceId),
+        },
       ]);
       const bound = yield* runner;
       expect(yield* Effect.flip(bound.step)).toMatchObject({

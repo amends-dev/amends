@@ -229,7 +229,7 @@ it("checkpoint validation rejects invalid progress without leaving a partial che
             const native = yield* Store.Transaction;
             const [entry] = yield* native.append({
               logId: Entry.LogId.make("checkpoint-contract"),
-              payloads: [new Uint8Array([1])],
+              entries: [{ payload: new Uint8Array([1]) }],
             });
             if (entry === undefined) return yield* Effect.die("Append returned no entry");
             const key = { logId: entry.logId, name: "contract-projection", version: 1 };

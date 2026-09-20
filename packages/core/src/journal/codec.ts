@@ -1,6 +1,29 @@
 import { Effect, Schema } from "effect";
 import { SchemaBinary } from "effect/unstable/encoding";
 import type { Fact } from "./fact.ts";
+import type { Store } from "./store.ts";
+
+/** Maps a log's values to structured storage content, retaining schema requirements. */
+export interface EntryCodec<S extends Schema.Constraint> {
+  readonly encode: (
+    value: S["Type"],
+  ) => Effect.Effect<Store.Content, Schema.SchemaError, S["EncodingServices"]>;
+  readonly decode: (
+    entry: Store.Content,
+  ) => Effect.Effect<S["Type"], Schema.SchemaError, S["DecodingServices"]>;
+}
+
+/** Ordinary logs encode their entire value and have no fact metadata. */
+export const makeEntryCodec = <S extends Schema.Constraint>(schema: S): EntryCodec<S> => {
+  const codec = makeForSchema(schema);
+  return {
+    encode: (value) => Effect.map(codec.encode(value), (payload) => ({ payload })),
+    decode: Effect.fn("LogCodec.decodeEntry")(function* (entry) {
+      yield* Schema.decodeUnknownEffect(Schema.Undefined)(entry.fact);
+      return yield* codec.decode(entry.payload);
+    }),
+  };
+};
 
 /** The same schema-derived payload format is used by every kind of log. */
 export interface PayloadCodec<S extends Schema.Constraint> {

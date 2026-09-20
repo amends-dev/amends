@@ -13,10 +13,22 @@ workspace as part of a composite foreign key, so a join that starts scoped stays
 scoped. Tagged unions become a discriminator column plus the columns each case
 needs, with a check constraint that they agree. Invitations store a required role ID; role permissions are a text array.
 
-Migrations live in `drizzle/`, generated from the schema. After changing the
-schema, run `bun run --filter @amends/storage-postgresql generate` and commit the
-new migration. `PostgresDatabase.make()` applies pending migrations before it
-returns the database service. `PostgresDatabase.layer(config)` uses that constructor.
+`drizzle/` contains one generated baseline for fresh databases. During local
+development, update `src/schema.ts`, remove the previous generated baseline, and
+run `bun run --filter @amends/storage-postgresql generate --name=workspace_storage`.
+Commit the replacement baseline and reset the development database.
+`PostgresDatabase.make()` applies that baseline once before returning the service. `PostgresDatabase.layer(config)` uses that constructor.
+
+Journal entries keep `fact_name` and `fact_version` in columns and only the domain
+payload as binary. Provenance has separate performer, cause, correlation, and time
+columns; the containing row supplies its workspace ID. Check constraints enforce
+complete headers and performer/cause variants. Generic execution entries leave
+these columns null. `log_entries_by_fact` supports ordered queries by fact name;
+filtered entry pages remain separate from complete-batch replay reads.
+
+Fact entries require complete provenance. There are no upgrade migrations,
+backfills, or legacy envelope formats. See the
+[storage envelope](../../docs/journal.md#storage-envelope).
 
 ## Layout
 
@@ -51,8 +63,7 @@ generation handlers.
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes
 return the original append slice, while conflicting bytes or count fail. The key,
-entries, and projection writes commit or roll back together. The generated additive
-migration preserves old journal data. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
+entries, and projection writes commit or roll back together. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
 
 Writers to one workspace take turns: each commit takes a transaction-scoped
 advisory lock keyed by the workspace before it runs, bounded by `lockTimeout`

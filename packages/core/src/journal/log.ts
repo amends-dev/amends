@@ -60,6 +60,9 @@ export interface Handle<S extends Schema.Constraint> {
     WriteError,
     Transaction.Remaining<S["EncodingServices"] | S["DecodingServices"]>
   >;
+  readonly readFacts: (
+    options: Store.ReadFactsOptions,
+  ) => Effect.Effect<ReadonlyArray<Entry<S["Type"]>>, ReadError, S["DecodingServices"]>;
   readonly get: (
     commitId: Commit.Id,
   ) => Effect.Effect<Option.Option<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
@@ -95,6 +98,7 @@ export interface Interface {
   readonly open: <S extends Schema.Constraint>(options: {
     readonly id: Id;
     readonly schema: S;
+    readonly storageCodec?: Codec.EntryCodec<S>;
   }) => Handle<S>;
   readonly commit: Transaction.Interface["run"];
 }
@@ -144,17 +148,19 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
   const open = <S extends Schema.Constraint>({
     id,
     schema,
+    storageCodec,
   }: {
     readonly id: Id;
     readonly schema: S;
+    readonly storageCodec?: Codec.EntryCodec<S>;
   }): Handle<S> => {
-    const codec = Codec.makeForSchema(schema);
+    const codec = storageCodec ?? Codec.makeEntryCodec(schema);
     const ownedBatch = batchSchema.check(
       Schema.makeFilter((batch) =>
         batch.logId === id ? undefined : "Batch belongs to a different log",
       ),
     );
-    const decodeEntry = Effect.fnUntraced(function* (entry: StoredEntry.Record) {
+    const decodeEntry = Effect.fnUntraced(function* (entry: Store.Entry) {
       return {
         id: entry.id,
         logId: entry.logId,
@@ -162,7 +168,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         commitId: entry.commitId,
         index: entry.index,
         recordedAt: entry.recordedAt,
-        payload: yield* codec.decode(entry.payload),
+        payload: yield* codec.decode(entry),
       };
     });
     const decodeBatch = Effect.fnUntraced(function* (batch: Store.Batch) {
@@ -203,17 +209,19 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         Effect.gen(function* () {
           const request = yield* validateAppend(options);
           const native = yield* Store.Transaction;
-          const payloads = yield* Effect.forEach(values, codec.encode);
+          const contents = yield* Effect.forEach(values, codec.encode);
           if (request.idempotencyKey !== undefined)
-            yield* Schema.decodeUnknownEffect(Schema.NonEmptyArray(Schema.Uint8Array))(payloads);
-          const responseSchema = Schema.Array(Schema.toType(StoredEntry.Record)).check(
+            yield* Schema.decodeUnknownEffect(Schema.NonEmptyArray(Schema.toType(Store.Content)))(
+              contents,
+            );
+          const responseSchema = Schema.Array(Schema.toType(Store.Entry)).check(
             Schema.makeFilter((entries) => {
-              if (entries.length !== payloads.length)
+              if (entries.length !== contents.length)
                 return "Append response count does not match the request";
               const ids = new Set<string>();
-              let previous: StoredEntry.Record | undefined;
+              let previous: Store.Entry | undefined;
               for (const [index, entry] of entries.entries()) {
-                const payload = payloads[index];
+                const content = contents[index];
                 if (
                   entry.logId !== id ||
                   (request.idempotencyKey === undefined && entry.commitId !== native.id)
@@ -228,12 +236,8 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
                 ) {
                   return "Append entries must be consecutive in one log batch";
                 }
-                if (
-                  payload === undefined ||
-                  payload.length !== entry.payload.length ||
-                  !payload.every((byte, offset) => byte === entry.payload[offset])
-                )
-                  return "Append changed the payload bytes";
+                if (content === undefined || !Store.sameContents([content], [entry]))
+                  return "Append changed the entry content";
                 ids.add(entry.id);
                 previous = entry;
               }
@@ -241,13 +245,11 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
             }),
           );
           const entries = yield* Schema.decodeEffect(responseSchema)(
-            yield* native.append({ logId: id, payloads, ...request }),
+            yield* native.append({ logId: id, entries: contents, ...request }),
           );
           if (request.idempotencyKey !== undefined) {
             const saved = yield* receipt(request.idempotencyKey);
-            const sameEntries = Schema.toEquivalence(
-              Schema.Array(Schema.toType(StoredEntry.Record)),
-            );
+            const sameEntries = Schema.toEquivalence(Schema.Array(Schema.toType(Store.Entry)));
             if (Option.isNone(saved) || !sameEntries(entries, saved.value.entries))
               return yield* new InvalidResponse({
                 message: "Append result does not match its durable key receipt",
@@ -342,7 +344,38 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         }),
       ).pipe(Stream.withSpan("Log.tail"));
 
-    return { id, schema, append, appendAll, get, getAppend, read, stream, tail };
+    const readFacts = Effect.fn("Log.readFacts")(function* (input: Store.ReadFactsOptions) {
+      const request = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input);
+      const entries = yield* Schema.decodeEffect(
+        Schema.Array(Schema.toType(Store.Entry)).check(
+          Schema.makeFilter((entries) => {
+            if (entries.length > request.limit) return "Page exceeds requested limit";
+            let previous = request.after;
+            const ids = new Set<string>();
+            for (const entry of entries) {
+              if (
+                entry.logId !== id ||
+                entry.fact?.name !== request.name ||
+                (request.version !== undefined && entry.fact.version !== request.version)
+              )
+                return "Fact does not match query";
+              if (
+                previous !== undefined &&
+                (entry.position < previous.position ||
+                  (entry.position === previous.position && entry.index <= previous.index))
+              )
+                return "Fact cursor must advance";
+              if (ids.has(entry.id)) return "Duplicate entry in fact page";
+              ids.add(entry.id);
+              previous = entry;
+            }
+            return undefined;
+          }),
+        ),
+      )(yield* store.readFacts(id, request));
+      return yield* Effect.forEach(entries, decodeEntry);
+    });
+    return { id, schema, append, appendAll, get, getAppend, read, readFacts, stream, tail };
   };
 
   return Service.of({ open, commit: transaction.run });
