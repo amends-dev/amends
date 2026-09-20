@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/core.ts",
     "./authorization": "./src/authorization/index.ts",
+    "./change-feed": "./src/change-feed/index.ts",
     "./identity": "./src/identity/index.ts",
     "./journal": "./src/journal/index.ts",
     "./notification": "./src/notification/index.ts",

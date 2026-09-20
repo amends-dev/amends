@@ -7,7 +7,7 @@ import { keys } from "./keys.ts";
 export const list = (workspaceId: Workspace.Id) =>
   ApiClient.query("invitations", "list", {
     params: { workspaceId },
-    reactivityKeys: [keys.invitations.list(workspaceId)],
+    reactivityKeys: [keys.workspace(workspaceId), keys.invitations.list(workspaceId)],
   });
 export const makeIssue = () =>
   ApiClient.runtime.fn(

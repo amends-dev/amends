@@ -109,6 +109,7 @@ const operations = Layer.mergeAll(
 const gateway = Layer.succeed(
   Gateway.Service,
   Gateway.Service.of({
+    asMemberScoped: () => Effect.die("unused"),
     createWorkspace: record("createWorkspace", () => Effect.succeed(workspace)),
     inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, Core.Operations>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] });

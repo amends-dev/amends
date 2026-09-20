@@ -16,6 +16,14 @@ page size, cursor, and optional pending-only filter; core derives the recipient
 from the actor and checks active membership and recipient ownership in the read
 transaction. The HTTP layer adds no notification generation or delivery.
 
+`ChangesHandlers.watch` enters through `Gateway.asMemberScoped` and calls
+`ChangeFeedApplication.watch`. Effect's HTTP server transfers the request scope
+to the response stream, keeping the workspace services, bus lease and subscription
+alive until completion or disconnect. HTTP owns SSE encoding, cache headers,
+and comment heartbeats; core owns Ready/Committed schemas and payload normalization.
+The handler sends no frontend query keys. It checks endpoint access on entry;
+per-event authorization remains deferred.
+
 ## Organization
 
 Keep one focused handler module per HTTP group, with filenames matching
@@ -62,3 +70,6 @@ Notification tests cover cursor and date round-trips, filter selection, malforme
 queries, human and agent inbox isolation, workspace boundaries, and loss of access
 after membership removal. Host fixtures seed notification records because their
 generation projection is still empty.
+Change-feed host tests exercise real streaming response lifetimes, two subscribers,
+cross-user delivery, workspace isolation, payload encoding, active membership,
+and reconnects without history.

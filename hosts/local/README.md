@@ -58,7 +58,10 @@ services or issues codes during construction. Database and server resources belo
 to their layer scopes. Each host also provides one `WorkspaceEvents` registry shared
 by gateway requests and internal consumers. Acquiring a workspace bus and its
 subscription requires holding their scope open; commits publish canonical event
-batches only after storage confirms success. This does not expose an SSE endpoint.
+batches only after storage confirms success. `GET /workspaces/:workspaceId/changes`
+exposes the core change feed through authenticated SSE. A stream holds its workspace
+bus lease until disconnect; ordinary requests hold a lease only for their operation.
+Delivery is process-local, with no cross-process recovery in this version.
 Storage behavior is documented by the
 [SQLite](../../adapters/storage-sqlite/README.md) and
 [PostgreSQL](../../adapters/storage-postgresql/README.md) adapters.

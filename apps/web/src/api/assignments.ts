@@ -8,12 +8,12 @@ import { keys } from "./keys.ts";
 export const roles = (workspaceId: Workspace.Id) =>
   ApiClient.query("assignments", "roles", {
     params: { workspaceId },
-    reactivityKeys: [keys.access(workspaceId)],
+    reactivityKeys: [keys.workspace(workspaceId), keys.access(workspaceId)],
   });
 export const list = (workspaceId: Workspace.Id, memberId: Member.Id) =>
   ApiClient.query("assignments", "list", {
     params: { workspaceId, memberId },
-    reactivityKeys: [keys.access(workspaceId)],
+    reactivityKeys: [keys.workspace(workspaceId), keys.access(workspaceId)],
   });
 export const makeChange = () =>
   ApiClient.runtime.fn(

@@ -5,6 +5,7 @@ import {
   PermissionCatalog,
 } from "@amends/core/authorization";
 import { Commit } from "@amends/core/journal";
+import { ChangeFeed } from "@amends/core/change-feed";
 import { NotificationApplication } from "@amends/core/notification";
 import {
   InvitationApplication,
@@ -42,6 +43,7 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.In
  * their original cause for host logging.
  */
 export const PublicError = Schema.Union([
+  ChangeFeed.Unavailable,
   NotMember,
   Conflict,
   Uncertain,

@@ -6,6 +6,7 @@ import { MembersGroup } from "./members.ts";
 import { NotificationsGroup } from "./notifications.ts";
 import { SessionGroup } from "./session.ts";
 import { WorkspacesGroup } from "./workspaces.ts";
+import { ChangesGroup } from "./changes.ts";
 
 /** The public HTTP contract. Servers implement its groups; clients are generated from it. */
 export class Api extends HttpApi.make("amends")
@@ -16,4 +17,5 @@ export class Api extends HttpApi.make("amends")
   .add(InvitationsGroup)
   .add(AssignmentsGroup)
   .add(NotificationsGroup)
+  .add(ChangesGroup)
   .annotateMerge(OpenApi.annotations({ title: "Amends API" })) {}

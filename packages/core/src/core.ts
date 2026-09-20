@@ -4,6 +4,7 @@
  * runs the application operations.
  */
 import { Layer } from "effect";
+import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { AssignmentProjection } from "./authorization/assignment/projection.ts";
 import { AssignmentApplication } from "./authorization/assignment/application.ts";
 import { AssignmentPermissions } from "./authorization/assignment/permissions.ts";
@@ -64,6 +65,7 @@ const operations = Layer.mergeAll(
   AssignmentApplication.layer,
   OwnershipApplication.layer,
   NotificationApplication.layer,
+  ChangeFeedApplication.layer,
 ).pipe(Layer.provide(Delegation.layer));
 
 /**

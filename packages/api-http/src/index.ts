@@ -1,4 +1,5 @@
 export { Api } from "./api.ts";
+export { ChangesGroup } from "./changes.ts";
 export { Authentication, Principal, Unauthorized } from "./authentication.ts";
 export { ApiErrors } from "./errors.ts";
 export { InvitationsGroup } from "./invitations.ts";

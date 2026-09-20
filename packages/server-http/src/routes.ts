@@ -9,6 +9,7 @@ import { MembersHandlers } from "./members.ts";
 import { NotificationsHandlers } from "./notifications.ts";
 import { SessionHandlers } from "./session.ts";
 import { WorkspacesHandlers } from "./workspaces.ts";
+import { ChangesHandlers } from "./changes.ts";
 
 /**
  * Provide every group's handlers and authentication over the required host services.
@@ -23,6 +24,7 @@ export const layerHandlers = Layer.mergeAll(
   InvitationsHandlers.layer,
   AssignmentsHandlers.layer,
   NotificationsHandlers.layer,
+  ChangesHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 
 /**

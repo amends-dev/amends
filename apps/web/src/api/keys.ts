@@ -3,6 +3,7 @@ import type { Notification } from "@amends/core/notification";
 
 /** Every entry is one invalidation key, scoped to the complete resource identity. */
 export const keys = {
+  workspace: (workspaceId: Workspace.Id) => JSON.stringify(["workspace", workspaceId]),
   ownership: (workspaceId: Workspace.Id) => JSON.stringify(["ownership", workspaceId]),
   access: (workspaceId: Workspace.Id) => JSON.stringify(["access", workspaceId]),
   me: { workspaces: JSON.stringify(["me", "workspaces"]) },

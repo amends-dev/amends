@@ -58,8 +58,8 @@ This service is internal infrastructure, not a core application operation or an
 authorized subscription endpoint. The gateway acquires a bus lease in each operation's
 scope and injects it alongside workspace storage. Both local host compositions provide
 one shared registry. Journal commits publish to that bus after the adapter confirms
-success. SSE authorization, cross-process recovery, and browser handling remain
-separate work.
+success. The change-feed application consumes the bus; cross-process recovery
+remains separate work.
 
 ### Workspace operations
 
@@ -74,6 +74,10 @@ separate work.
   bypass the checks core performs inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for
   invitation acceptance where the recipient is not yet a member.
+- `asMemberScoped(workspaceId, identity, program)` uses the caller's scope for
+  workspace services and the event-bus lease. Streaming ingress uses it to keep
+  resources alive until disconnect. Programs may additionally require `Scope`.
+  `asMember` wraps this operation in a short scope for ordinary request/response work.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace, plus `WorkspaceEvents.Service`

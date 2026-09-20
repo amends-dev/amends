@@ -62,6 +62,36 @@ so a client can import the complete contract without loading server code.
   human or agent's inbox. `GET …/:notificationId` reads one notification. Active
   membership is required, and a missing record or another recipient's notification
   returns the same 404. The caller cannot select a different recipient.
+- `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream.
+  Authentication and active membership are checked on entry. The stream currently
+  forwards every supported event in that workspace, without per-event filtering.
+
+### Live changes
+
+`ChangesGroup.watch` reuses core's `ChangeFeed.Message` through `StreamSse`.
+The generated client returns a typed Effect stream. Raw clients send the bearer
+credential, for example:
+
+```sh
+curl -N -H "Authorization: Bearer $TOKEN" "$API/workspaces/$WORKSPACE_ID/changes"
+```
+
+The first SSE `message` has JSON data such as
+`{ "_tag": "Ready", "workspaceId": "workspace-one" }`. Ready is sent after
+subscription registration. Later messages contain `_tag: "Committed"`, `workspaceId`,
+`commitId`, and an ordered nonempty `events` array. Each event contains `id`, `name`,
+`version`, `recordedAt` (UTC ISO string), and its fact-schema-encoded `payload`.
+The server sends no query keys. Clients refresh on every Ready and choose which
+queries to invalidate for each commit.
+
+There are no SSE event IDs, cursor parameters, or replay on reconnect;
+`Last-Event-ID` has no effect. Five-second SSE comments keep idle connections open
+without producing application messages. Responses use `Cache-Control: no-store`
+and disable proxy buffering where supported. Missing/rejected credentials return
+401; absent active membership returns 403. A closed bus during acquisition returns 503. Failures after streaming starts use Effect's SSE failure encoding with
+`ChangeFeed.Unavailable`; reconnect and refresh to recover the current view.
+Delivery covers confirmed commits in the serving process. Other processes and
+missed publications need a future recovery mechanism.
 
 Notification lists require an integer `limit` from 1 to 100. The optional
 `pendingOnly=true` filter selects pending records; omission or `false` lists all

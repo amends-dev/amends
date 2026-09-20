@@ -7,12 +7,12 @@ import { keys } from "./keys.ts";
 export const list = (workspaceId: Workspace.Id) =>
   ApiClient.query("members", "list", {
     params: { workspaceId },
-    reactivityKeys: [keys.members.list(workspaceId)],
+    reactivityKeys: [keys.workspace(workspaceId), keys.members.list(workspaceId)],
   });
 export const get = (workspaceId: Workspace.Id, memberId: Member.Id) =>
   ApiClient.query("members", "get", {
     params: { workspaceId, memberId },
-    reactivityKeys: [keys.members.get(workspaceId, memberId)],
+    reactivityKeys: [keys.workspace(workspaceId), keys.members.get(workspaceId, memberId)],
   });
 export const makeRemove = () =>
   ApiClient.runtime.fn(

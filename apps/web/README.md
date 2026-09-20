@@ -91,7 +91,7 @@ Construct endpoint reads in their owning API module:
 export const get = (workspaceId: Workspace.Id, memberId: Member.Id) =>
   ApiClient.query("members", "get", {
     params: { workspaceId, memberId },
-    reactivityKeys: [keys.members.get(workspaceId, memberId)],
+    reactivityKeys: [keys.workspace(workspaceId), keys.members.get(workspaceId, memberId)],
   });
 ```
 
@@ -125,7 +125,8 @@ outside that dialog.
 
 API commands invalidate related reads after success. Removing a member refreshes that
 workspace's member list/detail and invitations, plus the current user's workspace
-directory. Invalidations are local to this session's registry, not a cross-user feed.
+directory. These immediate local invalidations also cover commands performed
+outside a mounted workspace. The live change feed refreshes changes from other users.
 Unknown commit outcomes retain the commit reference and ask the user to reload before
 retrying. Aborting a browser request does not establish server rollback.
 
@@ -139,6 +140,27 @@ backend failures keep their specific explanations in `api/errors.ts`.
 Queries currently have no idle retention or automatic polling. They remain active while
 mounted. Add retention explicitly when needed; Effect's `timeToLive` retains idle atoms,
 not freshness or a polling interval.
+
+### Live workspace changes
+
+The workspace layout mounts `Changes.watch(workspaceId)` once per active workspace
+and credential session. The generated client opens an authenticated SSE stream.
+Every Ready invalidates `keys.workspace(workspaceId)` and the current directory,
+covering commits missed before connection or during a disconnect. Every workspace
+query must register that workspace key, including detail queries and inbox pages.
+
+`api/changes.ts` owns the fact-to-key mapping. Known invitation and member-addition
+events refresh their dependent views; access changes, unknown names or versions,
+and malformed member payloads conservatively refresh the workspace. Extend this
+mapping as features add facts or derived views. A commit's keys are deduplicated.
+The server publishes events and never knows query keys.
+
+EOF and transient failures reconnect with exponential backoff and jitter, capped
+at 30 seconds. Rejected credentials or lost membership stop retries and use the
+existing session/access handling. No cursor is retained and queries do not poll.
+Workspace switches, session replacement and sign-out dispose the subscription;
+messages for a different workspace are rejected before invalidation. This feed
+covers local confirmed commits; backend recovery across processes remains deferred.
 
 ### Notification reads
 
@@ -160,8 +182,9 @@ Notification queries register these session-local invalidation keys:
 - `keys.notifications.get(workspaceId, notificationId)` refreshes that detail query.
 - `keys.notifications.all(workspaceId)` refreshes both lists and details in the workspace.
 
-A future browser stream can pass those keys to `Reactivity.invalidate` in the API runtime
-owned by the current session. No polling or stream subscription is installed here.
+These queries also register `keys.workspace(workspaceId)` for change-feed Ready
+and conservative refreshes. Future notification generation must add the originating
+facts to the frontend dependency mapping for these inbox keys.
 Notification 404s suppress previously cached data through the shared result policy.
 Notification generation and inbox presentation remain separate steps.
 

@@ -16,13 +16,18 @@ export const list = (workspaceId: Workspace.Id, options: ListOptions) =>
         ? {}
         : { after: { recordedAt: options.after.recordedAt, id: options.after.id } }),
     },
-    reactivityKeys: [keys.notifications.all(workspaceId), keys.notifications.list(workspaceId)],
+    reactivityKeys: [
+      keys.workspace(workspaceId),
+      keys.notifications.all(workspaceId),
+      keys.notifications.list(workspaceId),
+    ],
   });
 
 export const get = (workspaceId: Workspace.Id, notificationId: Notification.Id) =>
   ApiClient.query("notifications", "get", {
     params: { workspaceId, notificationId },
     reactivityKeys: [
+      keys.workspace(workspaceId),
       keys.notifications.all(workspaceId),
       keys.notifications.get(workspaceId, notificationId),
     ],

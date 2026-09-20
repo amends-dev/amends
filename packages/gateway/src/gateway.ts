@@ -4,11 +4,18 @@ import { Actor, Identity } from "@amends/core/identity";
 import { CommittedEvents, Journal, Store } from "@amends/core/journal";
 import { MemberStore, Workspace, WorkspaceInitialization } from "@amends/core/workspace";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
+import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceEvents } from "./workspace-events.ts";
 
 export interface Interface {
+  /** Keep workspace services and the bus lease in the caller's scope, including a response stream's lifetime. */
+  readonly asMemberScoped: <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
+    workspaceId: Workspace.Id,
+    identity: Identity.Reference,
+    program: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember, Scope.Scope>;
   /**
    * Allocate a workspace ID and run core initialization for its creator. The
    * caller has authenticated the creator and checked their entitlement.
@@ -102,7 +109,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
   // are host defects, not outcomes of the operation being run.
   const bind = Effect.fn("Gateway.bind")(function* <A, E>(
     workspaceId: Workspace.Id,
-    program: Effect.Effect<A, E, Provided>,
+    program: Effect.Effect<A, E, Provided | Scope.Scope>,
   ) {
     const bindings = yield* storage.forWorkspace(workspaceId);
     const bus = yield* Effect.orDie(events.forWorkspace(workspaceId));
@@ -123,11 +130,12 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
       ),
       Layer.orDie,
     );
+    const context = yield* Layer.build(services);
     return yield* Effect.gen(function* () {
       yield* Effect.orDie((yield* Journal.Service).replay);
       return yield* program;
-    }).pipe(Effect.provide(services));
-  }, Effect.scoped);
+    }).pipe(Effect.provide(context));
+  });
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
     workspaceId: Workspace.Id,
@@ -143,7 +151,9 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
   const createWorkspace: Interface["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(
     function* (creator: Identity.HumanId, input: Workspace.CreateInput) {
       const id = Workspace.Id.make(yield* Effect.orDie(cryptography.randomUUIDv4));
-      return yield* bind(id, expose(id, WorkspaceInitialization.initialize(creator, input)));
+      return yield* Effect.scoped(
+        bind(id, expose(id, WorkspaceInitialization.initialize(creator, input))),
+      );
     },
   );
 
@@ -153,19 +163,24 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
     R extends Core.Operations,
   >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, R>) {
     const operation: Effect.Effect<A, E, Core.Operations> = program;
-    return yield* bind(workspaceId, expose(workspaceId, operation));
+    return yield* Effect.scoped(bind(workspaceId, expose(workspaceId, operation)));
   });
 
-  const asMember: Interface["asMember"] = Effect.fn("Gateway.asMember")(function* <
-    A,
-    E,
-    R extends Core.Operations | Actor.Service,
-  >(workspaceId: Workspace.Id, identity: Identity.Reference, program: Effect.Effect<A, E, R>) {
-    const operation: Effect.Effect<A, E, Core.Operations | Actor.Service> = program;
-    return yield* bind(workspaceId, withActor(workspaceId, identity, operation));
-  });
+  const asMemberScoped: Interface["asMemberScoped"] = Effect.fn("Gateway.asMemberScoped")(
+    function* <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
+      workspaceId: Workspace.Id,
+      identity: Identity.Reference,
+      program: Effect.Effect<A, E, R>,
+    ) {
+      const operation: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope> = program;
+      return yield* bind(workspaceId, withActor(workspaceId, identity, operation));
+    },
+  );
 
-  return Service.of({ createWorkspace, inWorkspace, asMember });
+  const asMember: Interface["asMember"] = (workspaceId, identity, program) =>
+    Effect.scoped(asMemberScoped(workspaceId, identity, program));
+
+  return Service.of({ createWorkspace, inWorkspace, asMember, asMemberScoped });
 });
 
 /**

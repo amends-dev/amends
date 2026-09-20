@@ -16,6 +16,7 @@ export const ownership = (workspaceId: Workspace.Id) =>
   ApiClient.query("workspaces", "ownership", {
     params: { workspaceId },
     reactivityKeys: [
+      keys.workspace(workspaceId),
       keys.ownership(workspaceId),
       keys.access(workspaceId),
       keys.members.list(workspaceId),

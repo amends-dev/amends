@@ -20,6 +20,7 @@ The current domains contain these features:
 | `identity`      | Stable human and agent references and the actor resolved for an operation.                       |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
 | `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -157,6 +158,28 @@ pending read; closing the bus scope stops all subscriptions and rejects further 
 Consumers authorize and transform events for their own purposes. The bus contains no
 recipient rules, frontend query keys, application-notification handling, or SSE behavior.
 Gateway's `WorkspaceEvents` registry manages shared bus lifetimes across requests.
+
+## Change feed
+
+`@amends/core/change-feed` exports `ChangeFeed` schemas and
+`ChangeFeedApplication.watch`. The operation checks active membership, registers
+with the workspace bus, and returns a stream in the caller's scope. It emits
+`Ready { workspaceId }` first, then `Committed { workspaceId, commitId, events }`.
+Each event carries `id`, `name`, `version`, `recordedAt`, and a JSON-compatible
+`payload` encoded through its fact schema. Commit order is preserved within each
+batch. Events committed after subscription are retained even before Ready is read.
+
+The feature has no store, projection, facts, cursor, or history API. It consumes
+confirmed local publications and does not create application notifications.
+Membership is checked when opening the subscription; per-event authorization and
+field filtering are deferred. This version forwards every supported workspace event.
+Lag or an unsupported payload/version fails the stream with `ChangeFeed.Unavailable`;
+consumers reconnect and refresh on the new Ready rather than resume a cursor.
+
+When adding a fact or version, register its `Event.makeSchema` in
+`src/change-feed/events.ts`. This is the change-feed consumer's encoding catalog;
+the shared bus continues to carry the original decoded event. The HTTP contract
+reuses these core message schemas. Frontend query dependencies belong in the client.
 
 ## Module dependencies and exports
 

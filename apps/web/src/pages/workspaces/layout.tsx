@@ -5,6 +5,7 @@ import { Navigate, useParams } from "@solidjs/router";
 import { Schema } from "effect";
 import { createEffect, Show, Suspense, type ParentProps } from "solid-js";
 import { Me } from "../../api/me.ts";
+import { Changes } from "../../api/changes.ts";
 import { useQuery } from "../../api/hooks.ts";
 import { explain, failureOf } from "../../api/errors.ts";
 import { AccountMenu } from "../../features/session/account-menu.tsx";
@@ -40,6 +41,7 @@ export function WorkspaceLayout(props: ParentProps) {
 }
 function WorkspaceFrame(props: ParentProps) {
   const membership = useWorkspace();
+  useQuery(() => Changes.watch(membership().workspace.id));
   const setLast = useAtomSet(() => lastWorkspaceAtom);
   const directory = useQuery(Me.workspaces);
   createEffect(() => setLast(membership().workspace.id));
