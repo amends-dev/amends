@@ -54,7 +54,9 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
                 (event.name === GroupFacts.Created.name &&
                   event.version === GroupFacts.Created.version) ||
                 (event.name === GroupMembershipFacts.Added.name &&
-                  event.version === GroupMembershipFacts.Added.version)
+                  event.version === GroupMembershipFacts.Added.version) ||
+                (event.name === GroupMembershipFacts.Removed.name &&
+                  event.version === GroupMembershipFacts.Removed.version)
               ),
           );
           const events = yield* Effect.forEach(visible, ChangeFeedEvents.normalize);

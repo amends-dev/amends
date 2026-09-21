@@ -10,4 +10,12 @@ export const Added = Fact.make("group.membership.added", {
   payload: Schema.Struct({ ...GroupMembership.Record.fields, status: Schema.Literal("active") }),
 });
 
+/** Ends exactly one admission. Rejoining records Added with a fresh ID. */
+export const Removed = Fact.make("group.membership.removed", {
+  version: 1,
+  subject: (payload) => Subject.make("group-membership", payload.membershipId),
+  occurrence: (payload) => [payload.membershipId],
+  payload: GroupMembership.Removal,
+});
+
 export * as GroupMembershipFacts from "./facts.ts";

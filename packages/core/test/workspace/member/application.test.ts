@@ -1,4 +1,5 @@
 import { Publication } from "../../../src/journal/publication.ts";
+import { GroupMembershipStore } from "../../../src/group/membership/store.ts";
 import { testCrypto, testProvenance } from "../../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Crypto, Effect, Layer, Option } from "effect";
@@ -112,12 +113,23 @@ const configured = (
     insert: () => Effect.die("Invitation insertion is not used in these member tests"),
     settle: () => Effect.die("These member tests have no pending invitations"),
   });
+  const groupMemberships = Layer.succeed(GroupMembershipStore.Service, {
+    workspaceId,
+    listActiveByMember: () => Effect.succeed([]),
+    get: () => Effect.die("These member tests have no group admissions"),
+    findActive: () => Effect.die("These member tests have no group admissions"),
+    listByGroup: () => Effect.die("These member tests have no group admissions"),
+    insert: () => Effect.die("These member tests have no group admissions"),
+    markRemoved: () => Effect.die("These member tests have no group admissions"),
+  });
   const delegation = Delegation.layer.pipe(
     Layer.provide(Layer.mergeAll(services, workspace, host)),
   );
   // Keep the journal available to exercise reads inside an outer application commit.
   return MemberApplication.layer.pipe(
-    Layer.provideMerge(Layer.mergeAll(services, workspace, invitations, delegation)),
+    Layer.provideMerge(
+      Layer.mergeAll(services, workspace, invitations, groupMemberships, delegation),
+    ),
     Layer.provide(members),
   );
 };
@@ -138,6 +150,7 @@ const run = <A, E>(
     | Delegation.Service
     | WorkspaceStore.Service
     | InvitationStore.Service
+    | GroupMembershipStore.Service
     | Actor.Service
     | Crypto.Crypto
   >,
@@ -172,6 +185,7 @@ it.effect("member reads require only the current actor and leave the journal unc
       | MemberStore.Service
       | WorkspaceStore.Service
       | InvitationStore.Service
+      | GroupMembershipStore.Service
       | Authorization.Service
       | Delegation.Service
       | Journal.Service

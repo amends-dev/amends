@@ -51,7 +51,13 @@ including expired invitations still recorded as pending. This is part of removal
 and requires no additional `invitation.manage` grant. Accepted receipts and
 invitations for other people or workspaces are preserved.
 
-Authorization, the ownership check, the removal and invitation revocation facts,
+For humans and agents, removal also ends every active group admission tied to that workspace
+member ID. This requires no additional `group.membership.manage` grant. Each departure retains
+the admission's history and records `workspace-removed`, with the workspace-removal event as
+its cause. Already ended admissions and other members are unchanged. Rejoining the workspace
+does not restore old group admissions. See [group departures](group-workflows.md#workspace-member-removal).
+
+Authorization, the ownership check, the member/group removal and invitation revocation facts,
 projections, and checkpoints share one transaction. A failure rolls them back
 together. Repeating a removal returns `MemberApplication.AlreadyRemoved` without
 publishing another fact; the caller must still be active and authorized.
@@ -194,9 +200,10 @@ Ownership transfer is the first owner-tier permission. Delegation separately res
 administrator management for the current owner.
 
 `group.create` authorizes [private team-group creation](group-workflows.md).
-`group.membership.manage` separately authorizes [adding a member](group-workflows.md#adding-a-member)
-on a Group target. Default bundle placement does not limit either permission to a role name;
-any role or direct grant can supply it.
+`group.membership.manage` separately authorizes [adding](group-workflows.md#adding-a-member) and
+[removing](group-workflows.md#removing-a-member-or-leaving) members on a Group target.
+Default bundle placement does not limit either permission to a role name; any role or direct
+grant can supply it. Self-leave requires active workspace membership, with no management grant.
 
 Role IDs are stable within each workspace: `builtin:viewer`, `builtin:administrator`,
 and `builtin:owner`. These identities are reserved for built-in definitions. Tiers

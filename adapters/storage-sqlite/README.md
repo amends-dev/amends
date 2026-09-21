@@ -69,7 +69,11 @@ The group suite covers permission grants, rollback, reopening, replay, and direc
 constraints. See [group creation](../../docs/group-workflows.md) for the implemented scope.
 Later member additions reuse the same store and admission facts. The membership suite
 also verifies exact group grants, concurrent additions over independent connections,
-duplicate rejection, current eligibility, rollback, and replay.
+duplicate rejection, current eligibility, rollback, and replay. Removal and self-leave end a
+specific admission through a conditional status update; readmission uses a fresh ID. Workspace
+removal lists and settles active group admissions within the same transaction. Departure tests
+cover attribution, stale requests, partial-cleanup rollback, replay, and concurrent departure
+and admission/removal races. Departure reuses the existing schema baseline.
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

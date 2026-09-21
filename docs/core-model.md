@@ -640,8 +640,13 @@ For a human, removal also revokes all pending invitations for that recipient in 
 same workspace. This is part of removal authority and requires no separate invitation
 permission. Accepted receipts and invitations in other workspaces are unchanged.
 
+For humans and agents, removal also ends all active group admissions tied to that workspace
+membership. This cleanup is part of workspace-removal authority and requires no separate
+group-management grant. Each departure records its admission ID and `workspace-removed`
+reason, with the workspace-removal fact as its cause. Previous departures remain historical.
+
 Authorization, the current-owner check, and publication and projection of removal
-and invitation revocations share one journal commit. The member becomes removed; its record and permission
+and group departures and invitation revocations share one journal commit. The member becomes removed; its record and permission
 assignments remain for history. Subsequent authorization rejects that membership,
 including an actor resolved before removal. Other workspace memberships are unchanged.
 Authorized readers may still inspect the historical record. Repeating removal of
@@ -2305,6 +2310,15 @@ permission and cannot be used to remove someone else. Humans and agents follow t
 rule. Being the group's creator or the workspace owner does not prevent leaving a group;
 workspace ownership and membership remain unchanged.
 
+For private team groups, `GroupMembershipApplication.remove` and `leave` address a specific
+`{ groupId, membershipId }`. Removal requires `group.membership.manage` on that group;
+self-leave verifies the admission belongs to the caller. A successful departure records
+`group.membership.removed` and ends that admission without deleting it. The payload records
+the reason, while event provenance records the performer and time. Repeating the operation
+returns `AlreadyRemoved`; a later authorized addition creates a new admission ID that an old
+departure request cannot affect. These operations and workspace-removal cleanup are implemented
+in core and both adapters; their group HTTP/UI surface remains future work.
+
 Membership management concerns the group's membership, rather than access to its thread
 content. A member's management permission authorizes the metadata needed for that
 operation even when that member does not participate in the group. Reading its
@@ -2401,8 +2415,9 @@ sharing rules remain open; group membership is not inferred from contact partici
 The group/thread relationship, inherited audience, standalone admission, separation from
 notification selection, permission-based group management, and self-service departure are
 agreed. Any active workspace member can start a DM. Private team-group creation is implemented
-through `group.create`, and member addition through `group.membership.manage`. Their default
-role placement does not limit future grants or roles.
+through `group.create`, and member addition/removal through `group.membership.manage`.
+Self-leave and group cleanup during workspace-member removal are also implemented.
+Default role placement does not limit future grants or roles.
 Other group operations, their permission declarations, broader group schemas, and admission
 UI remain contract work.
 Whether a pair has one reusable DM group and its readmission behavior, public-group discovery,

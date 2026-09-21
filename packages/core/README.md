@@ -21,7 +21,7 @@ The current domains contain these features:
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
 | `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
-| `group`         | Permission-based private team creation and member addition, facts, projections, and storage.     |
+| `group`         | Private team creation, membership admission/departure, facts, projections, and storage.          |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
@@ -112,7 +112,7 @@ it; their names play no part in authorization.
 
 Initial members are explicit and may be empty. The creator is admitted only if included.
 `GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
-own ID and workspace-membership reference. Public group reads, removal and self-leave, DMs,
+own ID and workspace-membership reference. Authorized group reads, DMs,
 public groups, threads, and HTTP/UI workflows remain separate work. See
 [group creation](../../docs/group-workflows.md) for the current contract and verification.
 
@@ -124,6 +124,15 @@ checks and writes share one commit. The caller need not belong to the group when
 grants authorize management. Creation permission and group membership confer no management
 authority by themselves. Both operations check current permissions, including staged changes
 in a caller's transaction. See [adding a member](../../docs/group-workflows.md#adding-a-member).
+
+`GroupMembershipApplication.remove({ groupId, membershipId })` uses the same management
+permission. `leave` takes that same address but requires only active workspace membership
+and the caller's own admission. Both record a terminal departure and preserve admission
+history; rejoining through `add` creates a new ID, safe from stale departure requests.
+`MemberApplication.remove` also records departures for all of the member's active group
+admissions in its existing commit, with no extra group-management grant. The departure fact
+records its reason and uses journal provenance for actor and time. See
+[departures](../../docs/group-workflows.md#removing-a-member-or-leaving).
 
 ## Identity and target boundaries
 
@@ -140,7 +149,7 @@ scopes compare the workspace, kind, and ID; a workspace scope covers targets in
 that workspace. Adding a Thread target supplies scoped grant storage. The
 [planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
 also requires group access or standalone participation alongside action permissions.
-Group creation and member addition are implemented; group/thread reads and that audience policy are not.
+Group creation and membership admission/departure are implemented; group/thread reads and that audience policy are not.
 The thread module currently contains only its ID.
 
 ## Permission declarations and built-in roles
@@ -272,7 +281,7 @@ batch. Events committed after subscription are retained even before Ready is rea
 The feature has no store, projection, facts, cursor, or history API. It consumes
 confirmed local publications and does not create application notifications.
 Membership is checked when opening the subscription; per-event authorization and
-field filtering are deferred. Private group creation and admission facts are withheld,
+field filtering are deferred. Private group creation, admission, and departure facts are withheld,
 including their provenance, until audience-aware group delivery exists. Commits containing
 only those facts emit no public change; mixed commits retain their other supported events.
 Lag or an unsupported payload/version fails the stream with `ChangeFeed.Unavailable`;
@@ -293,7 +302,7 @@ Application modules coordinate authorization, stores, and journal publication.
 
 A workflow may reference another feature's models, facts, or store contracts
 when it owns their coordination. For example, removing a member revokes pending
-invitations in the same commit. Keep that workflow in the responsible application
+invitations and ends active group admissions in the same commit. Keep that workflow in the responsible application
 module and preserve its authorization and transaction boundaries.
 
 Inside core, import the owning leaf module directly. Each leaf establishes its
@@ -452,7 +461,7 @@ meaning rather than using it as a synonym for a constructor.
 | Member operations     | `MemberApplication.make()`                    | `MemberApplication.Service`             |
 | Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
 | Private team creation | `GroupApplication.make()`                     | `GroupApplication.Service`              |
-| Group member addition | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
+| Group membership      | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
 | Assignment operations | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
 | Delegation policy     | `Delegation.make()`                           | `Delegation.Service`                    |
 | Invitation operations | `InvitationApplication.make()`                | `InvitationApplication.Service`         |

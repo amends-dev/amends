@@ -26,4 +26,23 @@ export const AddInput = Schema.Struct({
 });
 export interface AddInput extends Schema.Schema.Type<typeof AddInput> {}
 
+/** Address one admission, never whichever admission is currently active. */
+export const RemoveInput = Schema.Struct({
+  groupId: GroupId.Id,
+  membershipId: Id,
+});
+export interface RemoveInput extends Schema.Schema.Type<typeof RemoveInput> {}
+
+export const LeaveInput = RemoveInput;
+export interface LeaveInput extends Schema.Schema.Type<typeof LeaveInput> {}
+
+/** Terminal change; the journal envelope records its performer and occurrence time. */
+export const Removal = Schema.Struct({
+  ...RemoveInput.fields,
+  workspaceId: WorkspaceId.Id,
+  memberId: MemberId.Id,
+  reason: Schema.Literals(["removed", "left", "workspace-removed"]),
+});
+export interface Removal extends Schema.Schema.Type<typeof Removal> {}
+
 export * as GroupMembership from "./membership.ts";

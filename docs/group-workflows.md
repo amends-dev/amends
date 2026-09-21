@@ -1,6 +1,6 @@
 # Group workflows
 
-Core implements private team-group creation and adding members to existing groups over
+Core implements private team-group creation, member addition, removal, and self-leave over
 SQLite and PostgreSQL. These operations are available through `GroupApplication.Service`
 and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
@@ -57,7 +57,52 @@ honor staged changes in an outer transaction. Concurrent additions cannot create
 active admissions: a later serialized request sees `AlreadyMember`, while storage contention
 can return a conflict. The operation does not automatically retry the transaction.
 
-## Atomic creation and recorded history
+## Removing a member or leaving
+
+`GroupMembershipApplication.remove({ groupId, membershipId })` requires
+`group.membership.manage` on that group. The caller need not belong to the group or hold
+a separate read permission. `group.create`, creator attribution, and role names do not
+authorize removal.
+
+`GroupMembershipApplication.leave({ groupId, membershipId })` requires active workspace
+membership and an admission belonging to the acting member. It needs no management or read
+grant. Humans, agents, creators, and workspace owners follow the same rule; leaving a group
+does not change workspace membership, ownership, or grants. The group may become empty.
+
+Both operations target a specific admission ID and return its record with `status: "removed"`.
+They preserve the original group, member, and admission time. Missing, foreign, and wrong-group
+admission IDs return `GroupMembershipApplication.NotFound`. Self-leave also returns `NotFound`
+for another member's admission, including one already ended. Managed removal checks group
+existence after authorization and returns `GroupNotFound` when it is missing.
+
+Repeating a departure of the same admission returns `AlreadyRemoved` without another fact.
+Authorized addition after departure creates a fresh admission ID; neither an old removal nor
+an old leave request can end it. Leaving does not grant authority to add oneself back.
+The gateway preserves these public outcomes. Concurrent departures can produce only one
+terminal change; the other operation sees `AlreadyRemoved` or a storage conflict.
+
+Each departure publishes `group.membership.removed`, recording the admission, group, workspace
+member, and reason (`removed`, `left`, or `workspace-removed`). The event's provenance records
+who acted and when. The admission row retains its original fields with terminal status;
+departure attribution and reason remain in the journal. Checks, publication, projection,
+and checkpoint advancement share one commit and honor an enclosing transaction.
+
+## Workspace-member removal
+
+`MemberApplication.remove` ends all active group admissions for that exact workspace-member
+ID in the same commit as workspace removal and pending human-invitation revocations.
+The existing workspace-removal authority covers this cleanup; it requires no additional
+group-management or invitation-management grants. Group departure facts use
+`workspace-removed` and refer to the workspace-removal fact as their immediate cause.
+Already ended admissions keep their original departure history, and other members and
+workspaces are unchanged. Failure at any step rolls back the whole workflow.
+
+Concurrent member addition and workspace removal use the same workspace transaction boundary.
+An addition that commits first is included in cleanup; after removal, an addition is rejected
+because its recipient is inactive. Storage contention can reject an attempt without applying it.
+A later workspace readmission has a new member ID and inherits no prior group admissions.
+
+## Atomic changes and recorded history
 
 Authorization, input validation, membership checks, and publication run inside one journal
 commit. An existing caller commit is honored, including its staged permission or membership
@@ -72,9 +117,7 @@ their own operation's provenance and admission time.
 
 Group membership is distinct from workspace membership and thread participation. References
 to workspace membership IDs prevent a later workspace readmission from silently inheriting
-an old admission. A future group readmission must also have a fresh admission ID. The model
-can represent removed admissions, but this slice supplies no removal or rejoining operation.
-Workspace-member removal does not yet update group admission rows.
+an old admission. Group readmission through `add` also uses a fresh admission ID.
 
 Both projections preserve recorded IDs, timestamps, and attribution. Replay does not check
 the original actor's current permissions or whether an originally admitted workspace member
@@ -82,7 +125,7 @@ is still active. Both adapters validate records before storage conversion and en
 active admission per group/workspace-member pair. Store reads are internal and honor the
 current transaction; they are not authorized product read operations.
 
-Creation and admission facts use their stable IDs as occurrence identities. Repeating those
+Creation, admission, and departure facts use their stable IDs as occurrence identities. Repeating those
 facts with matching content reuses the original events. Calling `createPrivateTeam` again
 generates new IDs and creates another group; the complete operation has no request-level
 idempotency contract yet. An uncertain commit must be reconciled before another invocation.
@@ -95,19 +138,22 @@ them over the same workspace transaction. Authorization targets now include `Gro
 both adapters preserve exact group scopes in grants. Target support alone does not implement
 group reads or thread-audience authorization.
 
-Private group and admission facts remain on the internal committed-event bus but are
+Private group, admission, and departure facts remain on the internal committed-event bus but are
 withheld from the workspace-wide change feed. A commit containing only those facts emits
 no public change; a mixed commit retains its other supported events in order. Group discovery
 and live delivery will need their own audience-aware contract. Creation generates no
 notifications because notifications originate from thread activity, which is not implemented.
 
-DMs, public-group joining/discovery, removal and self-leave, thread creation, and HTTP/UI workflows
+DMs, public-group joining/discovery, thread creation, and group HTTP/UI workflows
 remain separate implementation steps. See [known limitations](current-status.md).
+Thread participation, notifications, and agent-turn cancellation are not implemented; this
+membership lifecycle supplies the departure boundary those future workflows must honor.
 
 Group creation introduced new storage baselines. Adding members reuses those tables and facts;
 it adds `group.membership.manage` to newly initialized permission bundles. Existing stored
 roles are not updated automatically. Development uses recreated databases after permission
 changes; no migration or data reset is performed by this operation.
+Departure reuses the existing admission status and tables and introduces no new permission.
 
 ## Verification
 
@@ -117,5 +163,8 @@ partial projection, outer transaction rollback, reopening, replay, and store con
 The membership suites also cover management scoped to one group, independence from creation
 permission and group membership, duplicate requests, concurrent connections, current eligibility,
 outer transaction changes, projection rollback, gateway error exposure, and later-admission replay.
+Departure coverage includes grant-free self-leave, fresh readmission and stale requests,
+workspace cleanup, causal attribution, rollback after partial cleanup, historical replay,
+concurrent departure and admission/removal races, and conditional storage transitions.
 Core tests cover schema boundaries, exact group scopes, and withholding private group facts
 from the public change feed. Run `bun run check` and `bun run test` from the repository root.

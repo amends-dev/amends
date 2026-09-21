@@ -11,7 +11,7 @@ remaining gaps with links to their owning code.
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [Repository README](../README.md)                                                                       | Setup, workspace layout, tooling, and dependency updates.                                                           |
 | [Workspace workflows](workspace-workflows.md)                                                           | Creation, membership, invitations, access, and ownership transfer.                                                  |
-| [Group workflows](group-workflows.md)                                                                   | Permission-based private team creation and member addition, storage, replay, and current limits.                    |
+| [Group workflows](group-workflows.md)                                                                   | Private team creation, membership admission/departure, workspace cleanup, replay, and current limits.               |
 | [Journal and logs](journal.md)                                                                          | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
 | [Testing](testing.md)                                                                                   | Test commands, Effect test APIs, and database fixtures.                                                             |
 | [Shared packages](../packages/README.md)                                                                | Package boundaries, names, and construction conventions.                                                            |
@@ -28,7 +28,7 @@ remaining gaps with links to their owning code.
 ## Design and historical references
 
 - [Core model](core-model.md) is living design intent. Workspace management is
-  implemented, along with private team creation and member addition in core; other group workflows, thread access and activity, turns, execution, notification generation, triage,
+  implemented, along with private team creation and membership admission/departure in core; other group workflows, thread access and activity, turns, execution, notification generation, triage,
   and channel delivery remain planned. Its opening status note links to current guides.
 - [Effect capability map](effect-capability-map.md) records an earlier source review
   and architecture proposal. Its module inventory reflects the pinned source;

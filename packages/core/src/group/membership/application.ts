@@ -3,7 +3,7 @@ import type { PlatformError } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
-import type { Actor } from "../../identity/actor.ts";
+import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
@@ -34,6 +34,14 @@ export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
   "GroupMembershipApplication.AlreadyMember",
   { groupId: Group.Id, memberId: Member.Id },
 ) {}
+export class NotFound extends Schema.TaggedError<NotFound>()(
+  "GroupMembershipApplication.NotFound",
+  GroupMembership.RemoveInput.fields,
+) {}
+export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
+  "GroupMembershipApplication.AlreadyRemoved",
+  GroupMembership.RemoveInput.fields,
+) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupMembershipApplication.InvalidResponse",
   { message: Schema.String },
@@ -52,6 +60,8 @@ export type Error =
   | MemberNotFound
   | InactiveMember
   | AlreadyMember
+  | NotFound
+  | AlreadyRemoved
   | InvalidResponse;
 
 export interface Interface {
@@ -64,6 +74,14 @@ export interface Interface {
   readonly add: (
     input: GroupMembership.AddInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
+  /** End this admission after requiring group.membership.manage on its group. */
+  readonly remove: (
+    input: GroupMembership.RemoveInput,
+  ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
+  /** End only the actor's own admission; active workspace membership is sufficient. */
+  readonly leave: (
+    input: GroupMembership.LeaveInput,
+  ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -73,6 +91,7 @@ export class Service extends Context.Service<Service, Interface>()(
 const invalidRecord = (cause: Schema.SchemaError) =>
   new InvalidResponse({ message: `Membership storage returned invalid data: ${cause.message}` });
 const decodeInput = Schema.decodeEffect(GroupMembership.AddInput);
+const decodeRemovalInput = Schema.decodeEffect(GroupMembership.RemoveInput);
 const decodeGroup = Schema.decodeEffect(Schema.toType(Group.Record));
 const decodeMember = Schema.decodeEffect(Member.Record);
 const decodeMembership = Schema.decodeEffect(Schema.toType(GroupMembership.Record));
@@ -104,22 +123,29 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       message: "Group membership services belong to different workspaces",
     });
 
+  const requireManagement = (groupId: Group.Id) =>
+    authorization.require([
+      Requirement.make(
+        GroupMembershipPermissions.Manage,
+        Target.Reference.cases.Group.make({ workspaceId, groupId }),
+      ),
+    ]);
+  const loadGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+    const foundGroup = yield* groups.get(groupId);
+    if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
+    const group = yield* decodeGroup(foundGroup.value).pipe(Effect.mapError(invalidRecord));
+    if (group.workspaceId !== workspaceId || group.id !== groupId)
+      return yield* new InvalidResponse({
+        message: "Group store returned another group or workspace",
+      });
+    return group;
+  });
+
   const add = Effect.fn("GroupMembershipApplication.add")(
     function* (input: GroupMembership.AddInput) {
       const { groupId, memberId } = yield* decodeInput(input);
-      yield* authorization.require([
-        Requirement.make(
-          GroupMembershipPermissions.Manage,
-          Target.Reference.cases.Group.make({ workspaceId, groupId }),
-        ),
-      ]);
-      const foundGroup = yield* groups.get(groupId);
-      if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
-      const group = yield* decodeGroup(foundGroup.value).pipe(Effect.mapError(invalidRecord));
-      if (group.workspaceId !== workspaceId || group.id !== groupId)
-        return yield* new InvalidResponse({
-          message: "Group store returned another group or workspace",
-        });
+      yield* requireManagement(groupId);
+      yield* loadGroup(groupId);
 
       const foundMember = yield* members.get(memberId);
       if (Option.isNone(foundMember)) return yield* new MemberNotFound({ memberId });
@@ -166,7 +192,73 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     journal.commit,
   );
 
-  return Service.of({ workspaceId, add });
+  const loadMembership = Effect.fnUntraced(function* (input: GroupMembership.RemoveInput) {
+    const found = yield* memberships.get(input.membershipId);
+    if (Option.isNone(found)) return yield* new NotFound(input);
+    const membership = yield* decodeMembership(found.value).pipe(Effect.mapError(invalidRecord));
+    if (membership.workspaceId !== workspaceId || membership.id !== input.membershipId)
+      return yield* new InvalidResponse({
+        message: "Membership store returned another admission or workspace",
+      });
+    if (membership.groupId !== input.groupId) return yield* new NotFound(input);
+    return membership;
+  });
+  const depart = Effect.fnUntraced(function* (
+    membership: GroupMembership.Record,
+    reason: "removed" | "left",
+  ) {
+    if (membership.status === "removed")
+      return yield* new AlreadyRemoved({
+        groupId: membership.groupId,
+        membershipId: membership.id,
+      });
+    const occurredAt = yield* DateTime.now;
+    yield* journal
+      .publish(GroupMembershipFacts.Removed, {
+        workspaceId,
+        groupId: membership.groupId,
+        membershipId: membership.id,
+        memberId: membership.memberId,
+        reason,
+      })
+      .pipe(Publication.withOccurredAt(occurredAt));
+    return {
+      id: membership.id,
+      workspaceId,
+      groupId: membership.groupId,
+      memberId: membership.memberId,
+      admittedAt: membership.admittedAt,
+      status: "removed",
+    } satisfies GroupMembership.Record;
+  });
+  const remove = Effect.fn("GroupMembershipApplication.remove")(
+    function* (input: GroupMembership.RemoveInput) {
+      const checked = yield* decodeRemovalInput(input);
+      yield* requireManagement(checked.groupId);
+      yield* loadGroup(checked.groupId);
+      return yield* depart(yield* loadMembership(checked), "removed");
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  const leave = Effect.fn("GroupMembershipApplication.leave")(
+    function* (input: GroupMembership.LeaveInput) {
+      const checked = yield* decodeRemovalInput(input);
+      yield* authorization.require([]);
+      const actor = yield* Actor.Service;
+      const membership = yield* loadMembership(checked);
+      // Do not disclose another member's admission or departure state through self-service.
+      if (membership.memberId !== actor.memberId) return yield* new NotFound(checked);
+      yield* loadGroup(checked.groupId);
+      return yield* depart(membership, "left");
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  return Service.of({ workspaceId, add, remove, leave });
 });
 
 /** Provide membership operations over the workspace's existing stores and journal. @category layers */

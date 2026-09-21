@@ -66,6 +66,57 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
     ),
+    listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
+      function* (input) {
+        const memberId = yield* Schema.decodeEffect(Member.Id)(input);
+        return yield* guard(
+          db
+            .select()
+            .from(groupMemberships)
+            .where(
+              and(
+                inWorkspace,
+                eq(groupMemberships.memberId, memberId),
+                eq(groupMemberships.status, "active"),
+              ),
+            )
+            .orderBy(sql`${groupMemberships.id} COLLATE "C"`),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "listActiveByMember")),
+    ),
+    markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (input) {
+      yield* Store.Transaction;
+      const removal = yield* Schema.decodeEffect(GroupMembership.Removal)(input).pipe(
+        Effect.mapError(storeConflict(GroupMembershipStore, "markRemoved")),
+      );
+      if (removal.workspaceId !== workspaceId)
+        return yield* new GroupMembershipStore.Conflict({
+          operation: "markRemoved",
+          message: "Removal belongs to another workspace",
+        });
+      const rows = yield* guard(
+        db
+          .update(groupMemberships)
+          .set({ status: "removed" })
+          .where(
+            and(
+              inWorkspace,
+              eq(groupMemberships.id, removal.membershipId),
+              eq(groupMemberships.groupId, removal.groupId),
+              eq(groupMemberships.memberId, removal.memberId),
+              eq(groupMemberships.status, "active"),
+            ),
+          )
+          .returning({ id: groupMemberships.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(GroupMembershipStore, "markRemoved")));
+      if (rows.length === 0)
+        return yield* new GroupMembershipStore.Conflict({
+          operation: "markRemoved",
+          message: "Expected the specified active group admission",
+        });
+    }),
     insert: Effect.fn("GroupMemberships.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validateRecord(input).pipe(

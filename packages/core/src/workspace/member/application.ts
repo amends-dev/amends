@@ -5,6 +5,9 @@ import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
+import { GroupMembership } from "../../group/membership/membership.ts";
+import { GroupMembershipFacts } from "../../group/membership/facts.ts";
+import { GroupMembershipStore } from "../../group/membership/store.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
@@ -58,6 +61,7 @@ export type RemoveError =
   | Delegation.Error
   | WorkspaceStore.Failure
   | InvitationStore.Failure
+  | GroupMembershipStore.Failure
   | Projection.Error
   | Log.WriteError
   | OwnerProtected
@@ -81,7 +85,7 @@ export interface Interface {
   /**
    * Require member.remove on an active target, protect current ownership, and
    * publish its removal and revoke its human recipient's pending invitations in
-   * one commit. Historical membership and grants remain;
+   * one commit, ending all of its active group admissions. Historical membership and grants remain;
    * authorization rejects removed members. Rejoining requires a new member ID.
    */
   readonly remove: (
@@ -115,6 +119,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | MemberStore.Service
   | WorkspaceStore.Service
   | InvitationStore.Service
+  | GroupMembershipStore.Service
   | Authorization.Service
   | Delegation.Service
   | Journal.Service
@@ -123,6 +128,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const members = yield* MemberStore.Service;
   const workspace = yield* WorkspaceStore.Service;
   const invitations = yield* InvitationStore.Service;
+  const groupMemberships = yield* GroupMembershipStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -131,6 +137,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   yield* requireWorkspace(workspaceId, members.workspaceId);
   yield* requireWorkspace(workspaceId, workspace.workspaceId);
   yield* requireWorkspace(workspaceId, invitations.workspaceId);
+  yield* requireWorkspace(workspaceId, groupMemberships.workspaceId);
   yield* requireWorkspace(workspaceId, delegation.workspaceId);
 
   const load = Effect.fnUntraced(function* (id: Member.Id) {
@@ -198,6 +205,28 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
         return yield* new AlreadyRemoved({ workspaceId, memberId: id });
       yield* delegation.requireRemoval(id);
       const removed = yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
+      yield* Effect.gen(function* () {
+        for (const found of yield* groupMemberships.listActiveByMember(id)) {
+          const membership = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
+            found,
+          );
+          if (
+            membership.workspaceId !== workspaceId ||
+            membership.memberId !== id ||
+            membership.status !== "active"
+          )
+            return yield* new InvalidResponse({
+              message: "Group membership store returned another member, workspace, or state",
+            });
+          yield* journal.publish(GroupMembershipFacts.Removed, {
+            workspaceId,
+            groupId: membership.groupId,
+            membershipId: membership.id,
+            memberId: id,
+            reason: "workspace-removed",
+          });
+        }
+      }).pipe(Publication.withCause(removed, removed.provenance.occurredAt));
       if (member.identity._tag === "Human") {
         const recipientId = member.identity.id;
         const actor = yield* Actor.Service;

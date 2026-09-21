@@ -66,6 +66,35 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
     ),
+    listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
+      function* (input) {
+        const memberId = yield* Schema.decodeEffect(Member.Id)(input);
+        return yield* guard(
+          sql`SELECT ${columns} FROM group_memberships WHERE workspace_id = ${workspaceId} AND member_id = ${memberId} AND json_extract(record, '$.status') = 'active' ORDER BY id COLLATE BINARY`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "listActiveByMember")),
+    ),
+    markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (input) {
+      yield* Store.Transaction;
+      const removal = yield* Schema.decodeEffect(GroupMembership.Removal)(input).pipe(
+        Effect.mapError(storeConflict(GroupMembershipStore, "markRemoved")),
+      );
+      if (removal.workspaceId !== workspaceId)
+        return yield* new GroupMembershipStore.Conflict({
+          operation: "markRemoved",
+          message: "Removal belongs to another workspace",
+        });
+      const rows = yield* guard(
+        sql`UPDATE group_memberships SET record = json_set(record, '$.status', 'removed') WHERE workspace_id = ${workspaceId} AND id = ${removal.membershipId} AND group_id = ${removal.groupId} AND member_id = ${removal.memberId} AND json_extract(record, '$.status') = 'active' RETURNING id`,
+        true,
+      ).pipe(Effect.mapError(storeError(GroupMembershipStore, "markRemoved")));
+      if (rows.length === 0)
+        return yield* new GroupMembershipStore.Conflict({
+          operation: "markRemoved",
+          message: "Expected the specified active group admission",
+        });
+    }),
     insert: Effect.fn("GroupMemberships.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validateRecord(input).pipe(

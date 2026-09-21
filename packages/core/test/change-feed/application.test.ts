@@ -240,6 +240,13 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             status: "active",
             admittedAt: group.createdAt,
           });
+          yield* journal.publish(GroupMembershipFacts.Removed, {
+            workspaceId,
+            groupId: group.id,
+            membershipId: GroupMembership.Id.make("private-membership"),
+            memberId: actor.memberId,
+            reason: "left",
+          });
         }).pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
       );
       const publicEvent = yield* journal.commit(
@@ -247,6 +254,13 @@ it.effect("private group commits are withheld and mixed commits retain only publ
           yield* journal.publish(GroupFacts.Created, {
             ...group,
             id: Group.Id.make("another-private-group"),
+          });
+          yield* journal.publish(GroupMembershipFacts.Removed, {
+            workspaceId,
+            groupId: Group.Id.make("another-private-group"),
+            membershipId: GroupMembership.Id.make("another-private-membership"),
+            memberId: actor.memberId,
+            reason: "workspace-removed",
           });
           return yield* journal.publish(InvitationFacts.Issued, invitation);
         }).pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),

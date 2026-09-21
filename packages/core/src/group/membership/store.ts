@@ -29,6 +29,10 @@ export interface Interface {
   readonly listByGroup: (
     groupId: GroupId.Id,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+  /** Active admissions for workspace departure, in stable admission-ID order. Internal only. */
+  readonly listActiveByMember: (
+    memberId: MemberId.Id,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
   /**
    * Insert an active admission. Reject malformed/foreign records, missing group or workspace
    * member, reused admission IDs, and duplicate active group/member pairs. Current workspace
@@ -36,6 +40,14 @@ export interface Interface {
    */
   readonly insert: (
     record: GroupMembership.Record,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * End the specified active admission, preserving its other fields. Reject malformed or
+   * foreign input, missing/ended admissions, and mismatched group/member references.
+   * Reason and attribution remain in the journal; replay never checks current authority.
+   */
+  readonly markRemoved: (
+    removal: GroupMembership.Removal,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 
