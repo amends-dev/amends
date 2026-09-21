@@ -1,3 +1,4 @@
+import { ThreadId } from "@amends/core/thread";
 import { expect } from "bun:test";
 import { Assignment, Grant, Role, Scope, Target } from "@amends/core/authorization";
 import { Entry, Store } from "@amends/core/journal";
@@ -18,16 +19,21 @@ const { it, withDatabase } = await setup();
 const permission = MemberPermissions.Read.name;
 const roleId = Role.Id.make("contract-role");
 const localScope = (
-  kind: "Workspace" | "TargetWorkspace" | "TargetMember",
+  kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread",
   id: Workspace.Id,
   memberId: Member.Id,
 ): Scope.Value => {
   if (kind === "Workspace") return Scope.Value.cases.Workspace.make({ workspaceId: id });
   return Scope.Value.cases.Target.make({
     target:
-      kind === "TargetMember"
-        ? Target.Reference.cases.Member.make({ workspaceId: id, memberId })
-        : Target.Reference.cases.Workspace.make({ workspaceId: id }),
+      kind === "TargetThread"
+        ? Target.Reference.cases.Thread.make({
+            workspaceId: id,
+            threadId: ThreadId.Id.make("thread"),
+          })
+        : kind === "TargetMember"
+          ? Target.Reference.cases.Member.make({ workspaceId: id, memberId })
+          : Target.Reference.cases.Workspace.make({ workspaceId: id }),
   });
 };
 const source = (kind: "Role" | "Direct", scope: Scope.Value): Assignment.Source =>
@@ -89,9 +95,11 @@ it.each([
   ["Role", "Workspace"],
   ["Role", "TargetWorkspace"],
   ["Role", "TargetMember"],
+  ["Role", "TargetThread"],
   ["Direct", "Workspace"],
   ["Direct", "TargetWorkspace"],
   ["Direct", "TargetMember"],
+  ["Direct", "TargetThread"],
 ] as const)(
   "%s assignments reject a foreign %s scope before converting columns",
   async (kind, scopeKind) =>
@@ -352,6 +360,46 @@ it("ownership storage validates transitions and changes only the owner when the 
             bound.workspace.transferOwnership(change).pipe(Effect.provide(expired)),
           ),
         ).toMatchObject({ _tag: "WorkspaceStore.Failure" });
+      }),
+    ),
+  ));
+
+it("contact identities cannot be persisted as workspace memberships", async () =>
+  withDatabase(async (location) =>
+    inDatabase(
+      location,
+      Effect.gen(function* () {
+        const bound = yield* boundTo(workspaceId);
+        yield* initialized(bound);
+        const invalid: Member.Record = {
+          id: Member.Id.make("contact-member"),
+          workspaceId,
+          status: "active",
+          identity: Identity.MemberReference.cases.Human.make({
+            id: Identity.HumanId.make("external"),
+          }),
+        };
+        Reflect.set(
+          invalid,
+          "identity",
+          Identity.Reference.cases.Contact.make({ id: Identity.ContactId.make("external") }),
+        );
+        yield* bound.store.transaction(
+          Effect.gen(function* () {
+            expect(yield* Effect.flip(bound.members.insert(invalid))).toMatchObject({
+              _tag: "MemberStore.Conflict",
+            });
+            expect(yield* bound.members.get(invalid.id)).toEqual(Option.none());
+            yield* bound.members.insert(
+              Object.assign({}, invalid, {
+                identity: Identity.MemberReference.cases.Human.make({
+                  id: Identity.HumanId.make("valid"),
+                }),
+              }),
+            );
+          }),
+        );
+        expect(Option.isSome(yield* bound.members.get(invalid.id))).toBe(true);
       }),
     ),
   ));

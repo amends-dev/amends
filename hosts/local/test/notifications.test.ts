@@ -29,7 +29,7 @@ const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(as
 
 /** Real HTTP, gateway and storage; explicit credentials also exercise an agent principal. */
 const server = (filename: string) => {
-  const identities = new Map<string, Identity.Reference>([
+  const identities = new Map<string, Identity.MemberReference>([
     ["human", alice],
     ["bob", bob],
     ["agent", agent],

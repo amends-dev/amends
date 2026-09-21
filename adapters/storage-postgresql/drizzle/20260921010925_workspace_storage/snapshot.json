@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "7ddabcde-0cf6-4c68-86a7-23b2106105d6",
+  "id": "4e0e50b5-d22e-41c9-84f5-3fca9353917d",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -198,6 +198,19 @@
       "generated": null,
       "identity": null,
       "name": "target_member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "assignments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "target_thread_id",
       "entityType": "columns",
       "schema": "public",
       "table": "assignments"
@@ -756,6 +769,19 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "name": "subject",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
       "name": "fact_name",
       "entityType": "columns",
       "schema": "public",
@@ -1037,7 +1063,7 @@
     {
       "type": "text",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -1398,6 +1424,55 @@
           "opclass": null
         },
         {
+          "value": "subject",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "entry_index",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "log_entries_by_subject",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "log_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "log_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "fact_name",
           "isExpression": false,
           "asc": true,
@@ -1496,8 +1571,8 @@
           "opclass": null
         },
         {
-          "value": "recipient_id",
-          "isExpression": false,
+          "value": "coalesce(\"recipient_id\", '')",
+          "isExpression": true,
           "asc": true,
           "nullsFirst": false,
           "opclass": null
@@ -1531,8 +1606,8 @@
           "opclass": null
         },
         {
-          "value": "recipient_id",
-          "isExpression": false,
+          "value": "coalesce(\"recipient_id\", '')",
+          "isExpression": true,
           "asc": true,
           "nullsFirst": false,
           "opclass": null
@@ -1580,8 +1655,8 @@
           "opclass": null
         },
         {
-          "value": "recipient_id",
-          "isExpression": false,
+          "value": "coalesce(\"recipient_id\", '')",
+          "isExpression": true,
           "asc": true,
           "nullsFirst": false,
           "opclass": null
@@ -1946,7 +2021,7 @@
       "table": "assignments"
     },
     {
-      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL)))",
+      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_thread_id\" IS NOT NULL AND \"target_member_id\" IS NULL)))",
       "name": "assignments_scope_agrees",
       "entityType": "checks",
       "schema": "public",
@@ -1974,14 +2049,14 @@
       "table": "log_append_keys"
     },
     {
-      "value": "(\"fact_name\" IS NULL AND \"fact_version\" IS NULL AND \"performer_kind\" IS NULL) OR (\"fact_name\" IS NOT NULL AND \"fact_version\" IS NOT NULL AND \"performer_kind\" IS NOT NULL)",
+      "value": "(\"subject\" IS NULL AND \"fact_name\" IS NULL AND \"fact_version\" IS NULL AND \"performer_kind\" IS NULL) OR (\"subject\" IS NOT NULL AND \"fact_name\" IS NOT NULL AND \"fact_version\" IS NOT NULL AND \"performer_kind\" IS NOT NULL)",
       "name": "log_entries_fact_header",
       "entityType": "checks",
       "schema": "public",
       "table": "log_entries"
     },
     {
-      "value": "(\"performer_kind\" IS NULL AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IS NULL AND \"performer_identity_id\" IS NULL AND \"performer_system_id\" IS NULL AND \"correlation_id\" IS NULL AND \"occurred_at\" IS NULL AND \"cause_log_id\" IS NULL AND \"cause_commit_id\" IS NULL AND \"cause_entry_id\" IS NULL) OR (\"performer_kind\" IS NOT NULL AND \"correlation_id\" IS NOT NULL AND \"occurred_at\" IS NOT NULL AND ((\"performer_kind\" = 'Member' AND \"performer_member_id\" IS NOT NULL AND \"performer_identity_kind\" IN ('Human', 'Agent') AND \"performer_identity_kind\" IS NOT NULL AND \"performer_identity_id\" IS NOT NULL AND \"performer_system_id\" IS NULL) OR (\"performer_kind\" = 'Identity' AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IN ('Human', 'Agent') AND \"performer_identity_kind\" IS NOT NULL AND \"performer_identity_id\" IS NOT NULL AND \"performer_system_id\" IS NULL) OR (\"performer_kind\" = 'System' AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IS NULL AND \"performer_identity_id\" IS NULL AND \"performer_system_id\" IS NOT NULL)))",
+      "value": "(\"performer_kind\" IS NULL AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IS NULL AND \"performer_identity_id\" IS NULL AND \"performer_system_id\" IS NULL AND \"correlation_id\" IS NULL AND \"occurred_at\" IS NULL AND \"cause_log_id\" IS NULL AND \"cause_commit_id\" IS NULL AND \"cause_entry_id\" IS NULL) OR (\"performer_kind\" IS NOT NULL AND \"correlation_id\" IS NOT NULL AND \"occurred_at\" IS NOT NULL AND ((\"performer_kind\" = 'Member' AND \"performer_member_id\" IS NOT NULL AND \"performer_identity_kind\" IN ('Human', 'Agent') AND \"performer_identity_kind\" IS NOT NULL AND \"performer_identity_id\" IS NOT NULL AND \"performer_system_id\" IS NULL) OR (\"performer_kind\" = 'Identity' AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IN ('Human', 'Agent', 'Contact') AND \"performer_identity_kind\" IS NOT NULL AND \"performer_identity_id\" IS NOT NULL AND \"performer_system_id\" IS NULL) OR (\"performer_kind\" = 'System' AND \"performer_member_id\" IS NULL AND \"performer_identity_kind\" IS NULL AND \"performer_identity_id\" IS NULL AND \"performer_system_id\" IS NOT NULL)))",
       "name": "log_entries_provenance",
       "entityType": "checks",
       "schema": "public",
@@ -1995,7 +2070,14 @@
       "table": "log_entries"
     },
     {
-      "value": "\"recipient_kind\" IN ('Human', 'Agent')",
+      "value": "\"identity_kind\" IN ('Human', 'Agent')",
+      "name": "members_identity_kind",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "members"
+    },
+    {
+      "value": "(\"recipient_kind\" = 'Triage' AND \"recipient_id\" IS NULL) OR (\"recipient_kind\" IN ('Human', 'Agent', 'Contact') AND \"recipient_id\" IS NOT NULL AND \"recipient_id\" <> '')",
       "name": "notifications_recipient_kind",
       "entityType": "checks",
       "schema": "public",

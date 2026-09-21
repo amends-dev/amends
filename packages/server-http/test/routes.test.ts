@@ -117,7 +117,7 @@ const gateway = Layer.succeed(
     },
     asMember: <A, E>(
       id: Workspace.Id,
-      identity: Identity.Reference,
+      identity: Identity.MemberReference,
       program: Effect.Effect<A, E, Core.Operations | Actor.Service>,
     ) => {
       calls.push({ operation: "asMember", arguments: [id, identity] });

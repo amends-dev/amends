@@ -4,8 +4,9 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { Codec } from "./codec.ts";
 import { Commit } from "./commit.ts";
 import { Entry } from "./entry.ts";
-import type { Fact } from "./fact.ts";
+import { Fact } from "./fact.ts";
 import type { Log } from "./log.ts";
+import { Subject } from "./subject.ts";
 
 /** Enough information to locate a particular event in a workspace journal. */
 export const Reference = Schema.Struct({
@@ -40,6 +41,7 @@ export interface Provenance extends Schema.Schema.Type<typeof Provenance> {}
 
 /** Queryable fact metadata, stored separately from the encoded domain payload. */
 export const Header = Schema.Struct({
+  subject: Subject.Value,
   name: Schema.String,
   version: Schema.Finite,
   provenance: Provenance,
@@ -76,6 +78,7 @@ export type CommitId = typeof CommitId.Type;
 /** A published fact carries the metadata of its underlying log entry. */
 export const Metadata = Schema.Struct({
   ...Entry.Metadata.fields,
+  subject: Subject.Value,
   provenance: Provenance,
 });
 
@@ -109,11 +112,13 @@ export const snapshotProvenance = (value: Provenance): Provenance => {
     workspaceId: value.workspaceId,
     correlationId: value.correlationId,
     occurredAt: value.occurredAt,
-    performedBy: Object.freeze(
-      performedBy._tag === "System"
-        ? { ...performedBy }
-        : { ...performedBy, identity: Object.freeze({ ...performedBy.identity }) },
-    ),
+    performedBy: Performer.Reference.match(performedBy, {
+      System: (performer): Performer.Reference => Object.freeze({ ...performer }),
+      Member: (performer): Performer.Reference =>
+        Object.freeze({ ...performer, identity: Object.freeze({ ...performer.identity }) }),
+      Identity: (performer): Performer.Reference =>
+        Object.freeze({ ...performer, identity: Object.freeze({ ...performer.identity }) }),
+    }),
     causedBy: value.causedBy === null ? null : Object.freeze({ ...value.causedBy }),
   });
 };
@@ -146,13 +151,17 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
     return yield* new FactMismatch({ name: fact.name, version: fact.version });
   }
   const payload = yield* Codec.make(fact).decode(entry.payload.payload);
+  const subject = yield* Fact.makeSubject(fact, payload);
+  if (entry.payload.subject !== subject)
+    return yield* new FactMismatch({ name: fact.name, version: fact.version });
   const provenance = snapshotProvenance(entry.payload.provenance);
   const event = yield* Schema.decodeUnknownEffect(
     Schema.toType(makeSchema<F["name"], F["version"], F["payload"]>(fact)),
-  )({ ...entry, provenance, name: fact.name, version: fact.version, payload });
+  )({ ...entry, subject, provenance, name: fact.name, version: fact.version, payload });
   // Retain the concrete metadata shape even for a generic fact payload schema.
   return Object.assign(event, {
     ...entry,
+    subject,
     provenance,
     name: fact.name,
     version: fact.version,

@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { expect, test } from "bun:test";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -14,10 +15,16 @@ import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 import { testProvenance } from "../publication.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Log.Id.make("journal");
 const key = Log.IdempotencyKey.make("operation/one");
-const Changed = Fact.make("counter.changed", { version: 1, payload: Schema.Finite });
+const Changed = Fact.make("counter.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.Finite,
+});
 const projection = Projection.make("counter", { version: 1 }).on(Changed, (event) =>
   Effect.flatMap(Counter, (counter) => counter.add(event.payload)),
 );
@@ -169,8 +176,8 @@ test("conflicting key reuse aborts the enclosing commit and failed projections r
       expect(yield* journal.log.getAppend(second)).toEqual(Option.none());
       expect(yield* fixture.counter.get).toBe(1);
       for (const fact of [
-        Fact.make("another.fact", { version: 1, payload: Schema.Finite }),
-        Fact.make(Changed.name, { version: 2, payload: Schema.Finite }),
+        Fact.make("another.fact", { subject: testSubject, version: 1, payload: Schema.Finite }),
+        Fact.make(Changed.name, { subject: testSubject, version: 2, payload: Schema.Finite }),
       ])
         expect((yield* Effect.flip(journal.publish(fact, 1, { idempotencyKey: key })))._tag).toBe(
           "JournalStore.Conflict",

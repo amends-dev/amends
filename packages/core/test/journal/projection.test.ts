@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
@@ -15,14 +16,21 @@ import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 
 const logId = Log.Id.make("domain");
 const Changed = Fact.make("counter.changed", {
+  subject: testSubject,
   version: 1,
   payload: Schema.Struct({ amount: Schema.FiniteFromString }),
 });
-const Unrelated = Fact.make("unrelated", { version: 1, payload: Schema.String });
+const Unrelated = Fact.make("unrelated", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
 const add = Effect.fn("ProjectionTest.add")(function* (event: Projection.Input<typeof Changed>) {
   yield* (yield* Counter).add(event.payload.amount);
 });
@@ -213,6 +221,7 @@ test("live publishing requires catch-up and shares replay checkpoints across nes
 test("unrelated facts advance progress but unsupported versions fail without skipping history", async () => {
   const fixture = await Effect.runPromise(make());
   const ChangedV2 = Fact.make(Changed.name, {
+    subject: testSubject,
     version: 2,
     payload: Schema.Struct({ amount: Schema.Finite }),
   });
@@ -395,7 +404,7 @@ test("historical decoding resolves services, runs once per event, and cannot app
       encode: SchemaGetter.passthrough(),
     }),
   );
-  const Decoded = Fact.make("decoded", { version: 1, payload });
+  const Decoded = Fact.make("decoded", { subject: testSubject, version: 1, payload });
   const decoded = Projection.make("decoded", { version: 1 })
     .on(
       Decoded,
@@ -458,12 +467,14 @@ test("corrupt fact payloads roll back earlier handlers in the same replay batch"
       });
       yield* raw.appendAll([
         {
+          subject: testSubject(),
           name: Changed.name,
           version: Changed.version,
           payload: yield* Codec.make(Changed).encode({ amount: 1 }),
           provenance: testProvenance(workspaceId),
         },
         {
+          subject: testSubject(),
           name: Changed.name,
           version: Changed.version,
           payload: new Uint8Array(),

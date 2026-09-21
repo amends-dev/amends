@@ -1,14 +1,17 @@
+import { Subject } from "../../journal/subject.ts";
 import { Schema } from "effect";
 import { Fact } from "../../journal/fact.ts";
 import { Invitation } from "./invitation.ts";
 import { Workspace } from "../workspace.ts";
 
 export const Issued = Fact.make("workspace.invitation.issued", {
+  subject: (payload) => Subject.make("invitation", payload.id),
   version: 1,
   payload: Invitation.Issuance,
   occurrence: (payload) => [payload.id],
 });
 export const Accepted = Fact.make("workspace.invitation.accepted", {
+  subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
     workspaceId: Workspace.Id,
@@ -18,6 +21,7 @@ export const Accepted = Fact.make("workspace.invitation.accepted", {
   occurrence: (payload) => [payload.invitationId],
 });
 export const Revoked = Fact.make("workspace.invitation.revoked", {
+  subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
     workspaceId: Workspace.Id,

@@ -174,7 +174,16 @@ function Detail() {
     <>
       <button onClick={query.refresh}>refresh notification</button>
       <QueryView result={query.result()} retry={query.refresh} loading="loading notification">
-        {(value) => <p>{value().recipient.id}</p>}
+        {(value) => (
+          <p>
+            {Notification.Recipient.match(value().recipient, {
+              Human: ({ id }) => id,
+              Agent: ({ id }) => id,
+              Contact: ({ id }) => id,
+              Triage: () => "Triage",
+            })}
+          </p>
+        )}
       </QueryView>
     </>
   );

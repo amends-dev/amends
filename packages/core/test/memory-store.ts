@@ -311,7 +311,9 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
         .flatMap((batch) => cloneBatch(batch).entries)
         .filter(
           (entry) =>
-            entry.fact?.name === options.name &&
+            entry.fact !== undefined &&
+            (options.name === undefined || entry.fact.name === options.name) &&
+            (options.subject === undefined || entry.fact.subject === options.subject) &&
             (options.version === undefined || entry.fact.version === options.version) &&
             (options.after === undefined ||
               entry.position > options.after.position ||

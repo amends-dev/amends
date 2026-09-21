@@ -53,7 +53,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         ? sql``
         : sql`AND (recorded_at > ${DateTime.toEpochMillis(request.after.recordedAt)} OR (recorded_at = ${DateTime.toEpochMillis(request.after.recordedAt)} AND id COLLATE BINARY > ${request.after.id}))`;
     return yield* guard(
-      sql`SELECT ${columns} FROM notifications WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.recipient._tag') = ${target._tag} AND json_extract(record, '$.recipient.id') = ${target.id} ${pending} ${after} ORDER BY recorded_at, id COLLATE BINARY LIMIT ${request.limit}`,
+      sql`SELECT ${columns} FROM notifications WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.recipient._tag') = ${target._tag} AND coalesce(json_extract(record, '$.recipient.id'), '') = ${target._tag === "Triage" ? "" : target.id} ${pending} ${after} ORDER BY recorded_at, id COLLATE BINARY LIMIT ${request.limit}`,
     ).pipe(Effect.flatMap(decode), Effect.map(records));
   });
 

@@ -23,7 +23,7 @@ const secondId = Member.Id.make("member-two");
 const agentId = Member.Id.make("member-agent");
 const human = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") });
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") });
-const added = (memberId: Member.Id, identity: Identity.Reference) => ({
+const added = (memberId: Member.Id, identity: Identity.MemberReference) => ({
   memberId,
   workspaceId,
   identity,

@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
@@ -13,6 +14,8 @@ import { WorkspaceId } from "../../src/workspace/id.ts";
 import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
+
+const testSubject = () => Subject.make("test", "entity");
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 
@@ -172,7 +175,11 @@ test("short pages and a slow consumer preserve order without reading ahead", asy
   );
 });
 
-const Changed = Fact.make("counter.changed", { version: 1, payload: Schema.Finite });
+const Changed = Fact.make("counter.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.Finite,
+});
 const projection = Projection.make("counter", { version: 1 }).on(
   Changed,
   Effect.fn("TailTest.project")(function* (event) {

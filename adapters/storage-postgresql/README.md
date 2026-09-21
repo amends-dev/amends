@@ -19,12 +19,16 @@ run `bun run --filter @amends/storage-postgresql generate --name=workspace_stora
 Commit the replacement baseline and reset the development database.
 `PostgresDatabase.make()` applies that baseline once before returning the service. `PostgresDatabase.layer(config)` uses that constructor.
 
-Journal entries keep `fact_name` and `fact_version` in columns and only the domain
+Journal entries keep `subject`, `fact_name`, and `fact_version` in columns and only the domain
 payload as binary. Provenance has separate performer, cause, correlation, and time
 columns; the containing row supplies its workspace ID. Check constraints enforce
 complete headers and performer/cause variants. Generic execution entries leave
 these columns null. `log_entries_by_fact` supports ordered queries by fact name;
 filtered entry pages remain separate from complete-batch replay reads.
+
+`log_entries_by_subject` supports entity history across fact names using the
+workspace, log, subject, position, and entry index. Fact subjects are required;
+generic execution entries leave the entire fact header null.
 
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
@@ -51,6 +55,9 @@ Invalid write values return the corresponding store's `Conflict` before any
 statement changes data. Query results are assembled as encoded records and then
 decoded with core schemas; corrupt rows remain `Failure` outcomes.
 
+Notification recipients are Human, Agent, Contact, or workspace-singleton Triage.
+Triage has no person ID. Recipient indexes normalize the missing ID only for
+indexing, preserving source/recipient uniqueness for concurrent Triage inserts.
 Notification reads match both recipient kind and ID, with bounded pages ordered
 by recorded time and ID using `COLLATE "C"` to match SQLite's binary ordering.
 Notification IDs and source/recipient associations are unique within the workspace.

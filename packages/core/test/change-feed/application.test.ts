@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
@@ -25,6 +26,8 @@ import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
 import { Role } from "../../src/authorization/role/role.ts";
 import { make, type Fixture } from "../memory-store.ts";
+
+const testSubject = () => Subject.make("test", "entity");
 
 const workspaceId = Workspace.Id.make("workspace");
 const actor = Actor.Value.make({
@@ -195,7 +198,11 @@ test("unknown fact versions fail normalization instead of emitting an incomplete
   run(() =>
     Effect.gen(function* () {
       const stream = yield* (yield* ChangeFeedApplication.Service).watch;
-      const future = Fact.make(MemberFacts.Added.name, { version: 2, payload: Schema.Struct({}) });
+      const future = Fact.make(MemberFacts.Added.name, {
+        subject: testSubject,
+        version: 2,
+        payload: Schema.Struct({}),
+      });
       yield* (yield* Journal.Service)
         .publish(future, {})
         .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));

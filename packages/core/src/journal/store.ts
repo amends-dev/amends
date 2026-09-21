@@ -21,11 +21,20 @@ export interface Cursor extends Schema.Schema.Type<typeof Cursor> {}
 
 /** Entry pagination is independent of the complete-batch replay cursor. */
 export const ReadFactsOptions = Schema.Struct({
-  name: Event.Header.fields.name,
+  name: Schema.optionalKey(Event.Header.fields.name),
+  subject: Schema.optionalKey(Event.Header.fields.subject),
   version: Schema.optionalKey(Event.Header.fields.version),
   after: Schema.optionalKey(Cursor),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+}).check(
+  Schema.makeFilter((options) => {
+    if (options.name === undefined && options.subject === undefined)
+      return "A fact name or subject is required";
+    if (options.version !== undefined && options.name === undefined)
+      return "A fact version requires a fact name";
+    return undefined;
+  }),
+);
 export interface ReadFactsOptions extends Schema.Schema.Type<typeof ReadFactsOptions> {}
 
 /** All entries written to one log by one commit. */

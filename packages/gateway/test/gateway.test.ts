@@ -325,7 +325,7 @@ test.each(["make", "layer"] as const)(
 
 test("one gateway resolves each caller's current membership and stops after revocation", async () => {
   let active = true;
-  const seen: Array<Identity.Reference> = [];
+  const seen: Array<Identity.MemberReference> = [];
   await run(
     (gateway) =>
       Effect.gen(function* () {

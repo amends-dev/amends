@@ -32,7 +32,7 @@ export interface Interface {
 
   /** Match both the identity kind and ID, returning only an active membership. */
   readonly findActive: (
-    identity: Identity.Reference,
+    identity: Identity.MemberReference,
   ) => Effect.Effect<Option.Option<Member.Record>, Failure>;
 
   /** Every membership in this workspace, active and removed, in a stable order. */

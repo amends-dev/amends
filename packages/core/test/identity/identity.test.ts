@@ -1,0 +1,43 @@
+import { expect, test } from "bun:test";
+import { Option, Schema } from "effect";
+import { Actor, Identity, Performer } from "@amends/core/identity";
+import { Notification } from "@amends/core/notification";
+import { Member } from "@amends/core/workspace";
+
+test("contact authorship does not make a contact a member, authenticated actor, or member performer", () => {
+  const contact = Identity.Reference.cases.Contact.make({
+    id: Identity.ContactId.make("external-person"),
+  });
+  expect(Schema.decodeSync(Identity.Reference)(contact)).toEqual(contact);
+  expect(Schema.decodeSync(Performer.Reference)({ _tag: "Identity", identity: contact })).toEqual({
+    _tag: "Identity",
+    identity: contact,
+  });
+  expect(Schema.decodeSync(Notification.Recipient)(contact)).toEqual(contact);
+  for (const decoded of [
+    Schema.decodeUnknownOption(Identity.MemberReference)(contact),
+    Schema.decodeUnknownOption(Member.Record)({
+      id: "member",
+      workspaceId: "workspace",
+      identity: contact,
+      status: "active",
+    }),
+    Schema.decodeUnknownOption(Actor.Value)({
+      memberId: "member",
+      workspaceId: "workspace",
+      identity: contact,
+    }),
+    Schema.decodeUnknownOption(Performer.Reference)({
+      _tag: "Member",
+      memberId: "member",
+      identity: contact,
+    }),
+  ])
+    expect(decoded._tag).toBe("None");
+});
+
+test("triage is a workspace recipient without a person identity", () => {
+  const triage = Notification.Recipient.cases.Triage.make({});
+  expect(Schema.encodeSync(Notification.Recipient)(triage)).toEqual({ _tag: "Triage" });
+  expect(Option.isNone(Schema.decodeUnknownOption(Identity.Reference)(triage))).toBe(true);
+});

@@ -11,6 +11,7 @@ export const columns = {
   index: logEntries.entryIndex,
   recordedAt: logEntries.recordedAt,
   payload: logEntries.payload,
+  subject: logEntries.subject,
   factName: logEntries.factName,
   factVersion: logEntries.factVersion,
   performerKind: logEntries.performerKind,
@@ -26,11 +27,12 @@ export const columns = {
 };
 
 const headerFields = {
+  subject: Schema.NullOr(Event.Header.fields.subject),
   factName: Schema.NullOr(Event.Header.fields.name),
   factVersion: Schema.NullOr(Event.Header.fields.version),
   performerKind: Schema.NullOr(Schema.Literals(["Member", "Identity", "System"])),
   performerMemberId: Schema.NullOr(Schema.String),
-  performerIdentityKind: Schema.NullOr(Schema.Literals(["Human", "Agent"])),
+  performerIdentityKind: Schema.NullOr(Schema.Literals(["Human", "Agent", "Contact"])),
   performerIdentityId: Schema.NullOr(Schema.String),
   performerSystemId: Schema.NullOr(Schema.String),
   causeLogId: Schema.NullOr(Schema.String),
@@ -45,6 +47,7 @@ const Row = Schema.Struct({
   ...headerFields,
 }).check(
   Schema.makeFilter((row) => {
+    if ((row.factName === null) !== (row.subject === null)) return "Incomplete fact subject";
     if ((row.factName === null) !== (row.factVersion === null)) return "Incomplete fact metadata";
     if ((row.factName === null) !== (row.performerKind === null))
       return "Fact attribution is required";
@@ -106,6 +109,7 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
         ? {}
         : {
             fact: {
+              subject: row.subject,
               name: row.factName,
               version: row.factVersion,
               provenance: {
@@ -139,6 +143,7 @@ export const toColumns = (entry: Store.Content) => {
   const provenance = entry.fact?.provenance;
   const performer = provenance?.performedBy;
   return {
+    subject: entry.fact?.subject ?? null,
     factName: entry.fact?.name ?? null,
     factVersion: entry.fact?.version ?? null,
     performerKind: performer?._tag ?? null,

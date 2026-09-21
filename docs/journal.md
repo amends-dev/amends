@@ -7,8 +7,8 @@ execution entries through `Log`, without running domain projections.
 
 ## Ownership
 
-- **Fact** defines a domain statement's name, version, payload schema, and optional
-  occurrence identity.
+- **Fact** defines a domain statement's name, version, payload schema, required
+  subject rule, and optional occurrence identity.
 - **Log** provides typed appends, lookup, paged reads, finite streams, and live tails
   for a log ID.
   Opening a handle performs no storage operation; the first append creates the
@@ -58,18 +58,19 @@ All normal writers to a domain log must use the same projection registrations.
 
 `Store.Content` separates optional `Event.Header` metadata from binary `payload`
 bytes. `Store.Entry` adds the entry ID, commit, log position, index, and recording
-time. The journal supplies the fact name, version, and provenance as the header;
+time. The journal supplies the fact subject, name, version, and provenance as the header;
 only the domain payload is encoded through its fact schema. `Event.Envelope`
 remains the in-memory shape used by journal readers and projections, without a
 second binary wrapper in storage.
 
-Both adapters store `fact_name` and `fact_version` as columns in `log_entries`,
-indexed by workspace, log, name, position, and entry index. SQLite stores provenance
+Both adapters store `subject`, `fact_name`, and `fact_version` as columns in
+`log_entries`. Separate indexes cover workspace/log/name and workspace/log/subject,
+each ordered by position and entry index. SQLite stores provenance
 as schema-validated JSON in its own column. PostgreSQL stores its performer, cause,
 correlation, and occurrence time in separate columns. Workspace IDs in PostgreSQL
 provenance are reconstructed from the containing row; writes validate workspace
 consistency before omitting those repeated IDs. Neither adapter duplicates the
-fact name or version inside the payload bytes.
+fact header inside a second binary wrapper.
 
 Generic execution logs have no fact header and continue to encode their complete
 schema-defined value. `Log.open` defaults to `Codec.makeEntryCodec(schema)`;
@@ -83,6 +84,32 @@ that baseline and development databases are reset. There is no upgrade chain,
 legacy-envelope decoder, data backfill, or support for unattributed fact events.
 Generic execution logs still have no fact header.
 
+## Fact subjects and filtered reads
+
+Every fact declares a pure `subject(payload)` function returning a `Subject.Value`.
+Use `Subject.make("thread", threadId)` to construct a `kind:id` key. The namespace
+starts with a lowercase letter and contains only lowercase letters, digits, or
+hyphens; IDs are nonempty and may contain colons. Thus different entity kinds
+cannot collide even when their IDs match. Subjects are local to the workspace;
+queries additionally select a log.
+
+Publication validates the decoded payload before deriving and validating its
+subject. It persists that subject on the header and exposes it on decoded events.
+`Event.decode` checks the persisted subject against the fact's declaration,
+including during projection replay. Generic execution entries have no subject.
+All domain facts require one; there is no fallback or legacy null-subject path.
+
+`journal.read({ subject, after?, limit })` reads an entity's facts across names and
+versions. A name can narrow that query, and name-only queries remain supported.
+At least one of subject or name is required; a version filter also requires a
+name. Pages use an exclusive `{ position, index }` cursor, so filtering or splitting
+one commit across pages cannot skip its remaining matching entries. Reads are
+bounded and ordered by that cursor. Use `Event.decode(fact, entry)` for payloads.
+
+Filtered entry pages do not replace complete-batch replay or its checkpoints.
+A fact subject also does not establish thread activity, participant access, or a
+thread-specific sequence; those remain responsibilities of the thread domain.
+
 ## Idempotent publication and append
 
 Declare a fact's natural occurrence identity beside its payload schema. The journal
@@ -92,6 +119,7 @@ derives the key automatically, so callers publish the fact and payload:
 export const Removed = Fact.make("workspace.member.removed", {
   version: 1,
   payload: Schema.Struct({ workspaceId: Workspace.Id, memberId: Member.Id }),
+  subject: (payload) => Subject.make("member", payload.memberId),
   occurrence: (payload) => [payload.memberId],
 });
 
@@ -110,7 +138,7 @@ The key identifies one occurrence within a workspace and log. Another workspace
 or log has an independent key space. `Occurrence.Key`, `Store.IdempotencyKey`, and
 `Log.IdempotencyKey` refer to the same branded schema. Treat the fact name, identity
 components, and key encoding as persistence contracts. Definitions registered for
-the same fact name and version must share both the payload schema and occurrence
+the same fact name and version must share the payload schema, subject function, and occurrence
 function. Publication checks that same contract against registered definitions.
 
 Existing creation and terminal facts use their stable record IDs: workspace
@@ -155,7 +183,7 @@ when other appends share its commit. Keyed empty appends are rejected. The stora
 adapter returns independently owned bytes and never appends a second slice for a
 matching key.
 
-For `Journal`, matching content means the same fact name, version, and encoded
+For `Journal`, matching content means the same subject, fact name, version, and encoded
 domain payload. Attempt provenance is not part of the comparison: a retry can
 have a fresh correlation, performer, cause, or occurrence time, but it returns
 the first event's recorded provenance. The invocation still needs valid provenance
@@ -214,14 +242,14 @@ metadata and do not acquire domain attribution.
 | Field           | Meaning                                                                                                          |
 | --------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `workspaceId`   | The workspace where the action happened.                                                                         |
-| `performedBy`   | The responsible member, authenticated identity before membership, or explicitly identified system process.       |
+| `performedBy`   | The responsible member, non-member identity (including a contact), or explicitly identified system process.      |
 | `causedBy`      | The immediate upstream event, located by workspace, log, commit, and event IDs; `null` identifies a root action. |
 | `correlationId` | Groups a causal workflow across events and commits.                                                              |
 | `occurredAt`    | When the domain action happened, independently of the log's `recordedAt`.                                        |
 
 `Performer.Reference` has three variants. `Member` preserves both the membership ID
 and its stable human or agent identity. `Identity` records a human or agent before
-a membership exists. `System` requires a named system ID; it is never an automatic
+a membership exists, or an external contact without workspace membership. `System` requires a named system ID; it is never an automatic
 fallback for missing identity. Attribution is historical information, not proof
 of permission. Application operations still check current authority.
 

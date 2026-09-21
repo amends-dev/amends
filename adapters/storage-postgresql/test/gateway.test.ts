@@ -21,7 +21,7 @@ it("the gateway runs the membership workflow over two isolated workspaces", asyn
         const entry = yield* Gateway.Service;
         const a = yield* entry.createWorkspace(alice.id, { name: "Alice workspace" });
         const b = yield* entry.createWorkspace(bob.id, { name: "Bob workspace" });
-        const getMember = (workspace: Workspace.Record, identity: Identity.Reference) =>
+        const getMember = (workspace: Workspace.Record, identity: Identity.MemberReference) =>
           entry.asMember(
             workspace.id,
             identity,

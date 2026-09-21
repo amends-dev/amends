@@ -34,6 +34,8 @@ const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
 });
 const human = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("recipient") });
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("recipient") });
+const contact = Identity.Reference.cases.Contact.make({ id: Identity.ContactId.make("recipient") });
+const triage = Notification.Recipient.cases.Triage.make({});
 const another = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("another") });
 const recordedAt = DateTime.makeUnsafe("2026-09-19T12:00:00.123Z");
 const record = (id: string, overrides: Partial<Notification.Record> = {}): Notification.Record => ({
@@ -52,6 +54,8 @@ it("notification storage persists across reopening and isolates workspaces and r
     const one = record("same-id");
     const two = record("agent", { source: one.source, recipient: agent });
     const three = record("another", { source: one.source, recipient: another });
+    const four = record("contact", { source: one.source, recipient: contact });
+    const five = record("triage", { source: one.source, recipient: triage });
     const foreign = record("same-id", { workspaceId: otherWorkspaceId });
     await inDatabase(
       location,
@@ -60,7 +64,9 @@ it("notification storage persists across reopening and isolates workspaces and r
         const b = yield* boundTo(otherWorkspaceId);
         yield* initialized(a);
         yield* initialized(b);
-        yield* a.store.transaction(Effect.forEach([one, two, three], a.notifications.insert));
+        yield* a.store.transaction(
+          Effect.forEach([one, two, three, four, five], a.notifications.insert),
+        );
         yield* b.store.transaction(b.notifications.insert(foreign));
       }),
     );
@@ -76,6 +82,9 @@ it("notification storage persists across reopening and isolates workspaces and r
         expect(yield* a.notifications.listByRecipient(human, page)).toEqual([one]);
         expect(yield* a.notifications.listPendingByRecipient(agent, page)).toEqual([two]);
         expect(yield* a.notifications.listByRecipient(another, page)).toEqual([three]);
+        expect(yield* a.notifications.listByRecipient(contact, page)).toEqual([four]);
+        expect(yield* a.notifications.listPendingByRecipient(triage, page)).toEqual([five]);
+        expect(yield* b.notifications.listByRecipient(triage, page)).toEqual([]);
         expect(yield* b.notifications.listPendingByRecipient(human, page)).toEqual([foreign]);
       }),
     );
@@ -144,30 +153,35 @@ it("notification uniqueness rejects reused IDs and duplicate source-recipient as
     ),
   ));
 
-it("competing notification insertions produce only one source-recipient record", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        yield* initialized(bound);
-        const first = record("first");
-        const second = record("second", { source: first.source });
-        const outcomes = yield* Effect.forEach(
-          [first, second],
-          (input) =>
-            bound.store
-              .transaction(bound.notifications.insert(input))
-              .pipe(
-                Effect.match({ onSuccess: () => "Inserted", onFailure: (error) => error._tag }),
-              ),
-          { concurrency: "unbounded" },
-        );
-        expect(outcomes.sort()).toEqual(["Inserted", "NotificationStore.Conflict"]);
-        expect(yield* bound.notifications.listPendingByRecipient(human, page)).toHaveLength(1);
-      }),
+it.each([human, agent, contact, triage])(
+  "competing notification insertions produce only one source-recipient record for %o",
+  async (recipient) =>
+    withDatabase(async (location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          yield* initialized(bound);
+          const first = record("first", { recipient });
+          const second = record("second", { source: first.source, recipient });
+          const outcomes = yield* Effect.forEach(
+            [first, second],
+            (input) =>
+              bound.store
+                .transaction(bound.notifications.insert(input))
+                .pipe(
+                  Effect.match({ onSuccess: () => "Inserted", onFailure: (error) => error._tag }),
+                ),
+            { concurrency: "unbounded" },
+          );
+          expect(outcomes.sort()).toEqual(["Inserted", "NotificationStore.Conflict"]);
+          expect(yield* bound.notifications.listPendingByRecipient(recipient, page)).toHaveLength(
+            1,
+          );
+        }),
+      ),
     ),
-  ));
+);
 
 it("notifications, source entries, and checkpoints share staged reads and rollback", async () =>
   withDatabase(async (location) =>
@@ -225,7 +239,7 @@ it("invalid notification writes conflict before conversion without poisoning the
           (value) => Reflect.set(value, "workspaceId", otherWorkspaceId),
           (value) => Reflect.set(value.source, "logId", ""),
           (value) => Reflect.set(value.source, "entryId", ""),
-          (value) => Reflect.set(value.recipient, "_tag", "Contact"),
+          (value) => Reflect.set(value.recipient, "_tag", "Unknown"),
           (value) => Reflect.set(value.recipient, "id", ""),
           (value) => Reflect.set(value, "recordedAt", "not-a-date"),
           (value) => Reflect.set(value.state, "_tag", "Acknowledged"),
@@ -259,7 +273,7 @@ it("notification reads reject invalid paging and recipient input as typed failur
         const badCursor = { recordedAt, id: Notification.Id.make("cursor") };
         Reflect.set(badCursor, "recordedAt", "not-a-date");
         const badRecipient = { ...human };
-        Reflect.set(badRecipient, "_tag", "Contact");
+        Reflect.set(badRecipient, "_tag", "Unknown");
         for (const read of [
           bound.notifications.listByRecipient,
           bound.notifications.listPendingByRecipient,

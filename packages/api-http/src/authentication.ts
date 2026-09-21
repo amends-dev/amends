@@ -7,7 +7,7 @@ import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
  *
  * @category services
  */
-export class Principal extends Context.Service<Principal, Identity.Reference>()(
+export class Principal extends Context.Service<Principal, Identity.MemberReference>()(
   "@amends/api-http/authentication/Principal",
 ) {}
 

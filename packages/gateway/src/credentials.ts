@@ -15,7 +15,7 @@ export interface Interface {
    */
   readonly resolve: (
     token: Redacted.Redacted<string>,
-  ) => Effect.Effect<Identity.Reference, Rejected>;
+  ) => Effect.Effect<Identity.MemberReference, Rejected>;
 }
 
 /**

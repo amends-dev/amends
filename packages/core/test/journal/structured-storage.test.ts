@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { expect, test } from "bun:test";
 import { Effect, Schema } from "effect";
 import { Codec } from "../../src/journal/codec.ts";
@@ -14,11 +15,25 @@ import { WorkspaceId } from "../../src/workspace/id.ts";
 import { make, type Fixture } from "../memory-store.ts";
 import { testProvenance } from "../publication.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Log.Id.make("journal");
-const Changed = Fact.make("example.changed", { version: 1, payload: Schema.FiniteFromString });
-const Changed2 = Fact.make(Changed.name, { version: 2, payload: Schema.FiniteFromString });
-const Other = Fact.make("example.other", { version: 1, payload: Schema.String });
+const Changed = Fact.make("example.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.FiniteFromString,
+});
+const Changed2 = Fact.make(Changed.name, {
+  subject: testSubject,
+  version: 2,
+  payload: Schema.FiniteFromString,
+});
+const Other = Fact.make("example.other", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
@@ -55,22 +70,35 @@ test("storage keeps the fact header separate and filtered entry pages preserve m
       const stored = (yield* fixture.store.read(logId, { limit: 1 }))[0]?.entries;
       expect(stored).toHaveLength(4);
       expect(stored?.[0]?.fact).toEqual({
+        subject: testSubject(),
         name: Changed.name,
         version: 1,
         provenance: events[0]?.provenance,
       });
       expect(stored?.[0]?.payload).toEqual(yield* Codec.make(Changed).encode(1));
-      const firstPage = yield* journal.read({ name: Changed.name, limit: 1 });
+      const firstPage = yield* journal.read({
+        subject: testSubject(),
+        name: Changed.name,
+        limit: 1,
+      });
       const first = firstPage[0];
       if (first === undefined) return yield* Effect.die("Missing first fact");
       expect(yield* Event.decode(Changed, first)).toEqual(events[0]);
-      const secondPage = yield* journal.read({ name: Changed.name, after: first, limit: 2 });
+      const secondPage = yield* journal.read({
+        subject: testSubject(),
+        name: Changed.name,
+        after: first,
+        limit: 2,
+      });
       expect(secondPage.map((entry) => entry.id)).toEqual(events.slice(1).map((event) => event.id));
       expect(secondPage.map((entry) => entry.index)).toEqual([2, 3]);
       expect(
-        (yield* journal.read({ name: Changed.name, version: 2, limit: 10 })).map(
-          (entry) => entry.id,
-        ),
+        (yield* journal.read({
+          subject: testSubject(),
+          name: Changed.name,
+          version: 2,
+          limit: 10,
+        })).map((entry) => entry.id),
       ).toEqual([events[2]?.id]);
       expect(yield* journal.read({ name: "absent", limit: 10 })).toEqual([]);
       expect((yield* journal.log.read({ limit: 1 }))[0]?.entries).toHaveLength(4);
@@ -102,6 +130,7 @@ test("filtered reads reject malformed adapter pages instead of skipping or leaki
     [...original, first],
     [{ ...first, logId: Log.Id.make("other") }],
     [{ ...first, fact: { ...first.fact, name: Other.name } }],
+    [{ ...first, fact: { ...first.fact, subject: Subject.make("test", "other") } }],
     [withoutFact],
   ]) {
     const broken: Fixture = {
@@ -112,10 +141,77 @@ test("filtered reads reject malformed adapter pages instead of skipping or leaki
       broken,
       Effect.gen(function* () {
         const journal = yield* Journal.make({ logId, projections: [] });
-        expect((yield* Effect.flip(journal.read({ name: Changed.name, limit: 2 })))._tag).toBe(
-          "SchemaError",
-        );
+        expect(
+          (yield* Effect.flip(
+            journal.read({ subject: testSubject(), name: Changed.name, limit: 2 }),
+          ))._tag,
+        ).toBe("SchemaError");
       }),
     );
   }
+});
+
+test("subjects are required, namespaced, and derived only from validated payloads", async () => {
+  expect(Subject.make("thread", "same:id")).not.toBe(Subject.make("member", "same:id"));
+  expect(() => Subject.make("thread:one", "two")).toThrow();
+  expect(() => Subject.make("thread", "")).toThrow();
+  let calls = 0;
+  const fact = Fact.make("subject.validated", {
+    version: 1,
+    payload: Schema.Struct({ id: Schema.NonEmptyString }),
+    subject: ({ id }) => {
+      calls++;
+      return Subject.make("thread", id);
+    },
+  });
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      expect((yield* Effect.flip(Fact.makeSubject(fact, { id: "" })))._tag).toBe("SchemaError");
+      expect(calls).toBe(0);
+      expect(yield* Fact.makeSubject(fact, { id: "one" })).toBe(Subject.make("thread", "one"));
+      const malformed = { ...fact };
+      Reflect.set(malformed, "subject", () => "unqualified");
+      expect((yield* Effect.flip(Fact.makeSubject(malformed, { id: "one" })))._tag).toBe(
+        "SchemaError",
+      );
+    }),
+  );
+  const decode = Schema.decodeUnknownOption(Store.ReadFactsOptions);
+  expect(decode({ limit: 1 })._tag).toBe("None");
+  expect(decode({ subject: Subject.make("thread", "one"), version: 1, limit: 1 })._tag).toBe(
+    "None",
+  );
+});
+
+test("publication retries and replay decoding reject changed subject intent", async () => {
+  const fixture = await Effect.runPromise(make());
+  await run(
+    fixture,
+    Effect.gen(function* () {
+      const journal = yield* Journal.make({ logId, projections: [] });
+      const key = Store.IdempotencyKey.make("subject-retry");
+      const first = yield* journal.publish(Changed, 1, { idempotencyKey: key });
+      expect(yield* journal.publish(Changed, 1, { idempotencyKey: key })).toEqual(first);
+      const changed = Fact.make(Changed.name, {
+        version: Changed.version,
+        payload: Changed.payload,
+        subject: () => Subject.make("test", "other"),
+      });
+      expect((yield* Effect.flip(journal.publish(changed, 1, { idempotencyKey: key })))._tag).toBe(
+        "JournalStore.Conflict",
+      );
+      const page = yield* journal.read({ subject: testSubject(), limit: 10 });
+      const entry = page[0];
+      if (entry === undefined) return yield* Effect.die("Missing event");
+      expect(
+        (yield* Effect.flip(
+          Event.decode(Changed, {
+            ...entry,
+            payload: Object.assign({}, entry.payload, { subject: Subject.make("test", "wrong") }),
+          }),
+        ))._tag,
+      ).toBe("Journal.FactMismatch");
+      expect(page).toHaveLength(1);
+    }),
+  );
 });

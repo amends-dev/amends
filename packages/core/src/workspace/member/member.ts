@@ -14,7 +14,7 @@ export type Status = typeof Status.Type;
 export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
-  identity: Identity.Reference,
+  identity: Identity.MemberReference,
   status: Status,
 }).annotate({ identifier: "WorkspaceMember" });
 export interface Record extends Schema.Schema.Type<typeof Record> {}

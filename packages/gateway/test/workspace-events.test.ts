@@ -1,4 +1,4 @@
-import { Commit, CommittedEvents, Entry, Event } from "@amends/core/journal";
+import { Commit, CommittedEvents, Entry, Event, Subject } from "@amends/core/journal";
 import { Performer } from "@amends/core/identity";
 import { Workspace } from "@amends/core/workspace";
 import { expect, test } from "bun:test";
@@ -25,6 +25,7 @@ const batch = (workspaceId: Workspace.Id, id: string): CommittedEvents.Batch => 
         correlationId: Event.CorrelationId.make(id),
         occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
       },
+      subject: Subject.make("test", id),
       name: "example.changed",
       version: 1,
       payload: { value: id },

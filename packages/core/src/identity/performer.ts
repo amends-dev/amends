@@ -9,7 +9,7 @@ export type SystemId = typeof SystemId.Type;
 
 /** Historical attribution, independent of the authority used to authorize an operation. */
 export const Reference = Schema.TaggedUnion({
-  Member: { memberId: MemberId.Id, identity: Identity.Reference },
+  Member: { memberId: MemberId.Id, identity: Identity.MemberReference },
   Identity: { identity: Identity.Reference },
   System: { id: SystemId },
 });

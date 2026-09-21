@@ -11,7 +11,7 @@ test.each(["make", "layer"] as const)(
   "bearer %s resolves each request and observes credential revocation",
   async (construction) => {
     const resolutions: Array<string> = [];
-    const principals: Array<Identity.Reference> = [];
+    const principals: Array<Identity.MemberReference> = [];
     await Effect.runPromise(
       Effect.gen(function* () {
         const token = yield* Ref.make("alice");

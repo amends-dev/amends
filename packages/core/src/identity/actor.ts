@@ -7,7 +7,7 @@ import { Identity } from "./identity.ts";
 export const Value = Schema.Struct({
   workspaceId: Workspace.Id,
   memberId: Member.Id,
-  identity: Identity.Reference,
+  identity: Identity.MemberReference,
 });
 export interface Value extends Schema.Schema.Type<typeof Value> {}
 

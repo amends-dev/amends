@@ -26,12 +26,14 @@ const bytes = customType<{ data: Uint8Array; driverData: Uint8Array }>({
 });
 const instant = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 
-export const identityKinds = ["Human", "Agent"] as const;
+export const memberIdentityKinds = ["Human", "Agent"] as const;
+export const identityKinds = [...memberIdentityKinds, "Contact"] as const;
+export const recipientKinds = [...identityKinds, "Triage"] as const;
 export const memberStatuses = ["active", "removed"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = ["Workspace", "Member"] as const;
+export const targetKinds = ["Workspace", "Member", "Thread"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 export const notificationStates = ["Pending"] as const;
 
@@ -40,11 +42,12 @@ const scopeColumns = {
   scopeKind: text("scope_kind", { enum: scopeKinds }).notNull(),
   targetKind: text("target_kind", { enum: targetKinds }),
   targetMemberId: text("target_member_id"),
+  targetThreadId: text("target_thread_id"),
 };
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) =>
   check(
     name,
-    sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${columns.targetMemberId} IS NULL) OR (${columns.scopeKind} = 'Target' AND ((${columns.targetKind} = 'Workspace' AND ${columns.targetMemberId} IS NULL) OR (${columns.targetKind} = 'Member' AND ${columns.targetMemberId} IS NOT NULL)))`,
+    sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL) OR (${columns.scopeKind} = 'Target' AND ${columns.targetKind} IS NOT NULL AND ((${columns.targetKind} = 'Workspace' AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL) OR (${columns.targetKind} = 'Member' AND ${columns.targetMemberId} IS NOT NULL AND ${columns.targetThreadId} IS NULL) OR (${columns.targetKind} = 'Thread' AND ${columns.targetThreadId} IS NOT NULL AND ${columns.targetMemberId} IS NULL)))`,
   );
 
 export const workspaces = pgTable("workspaces", {
@@ -60,7 +63,7 @@ export const members = pgTable(
   {
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
-    identityKind: text("identity_kind", { enum: identityKinds }).notNull(),
+    identityKind: text("identity_kind", { enum: memberIdentityKinds }).notNull(),
     identityId: text("identity_id").notNull(),
     status: text("status", { enum: memberStatuses }).notNull(),
   },
@@ -71,6 +74,7 @@ export const members = pgTable(
       foreignColumns: [workspaces.workspaceId],
       name: "members_workspace",
     }).onDelete("cascade"),
+    check("members_identity_kind", sql`${table.identityKind} IN ('Human', 'Agent')`),
     uniqueIndex("active_member_identity")
       .on(table.workspaceId, table.identityKind, table.identityId)
       .where(sql`${table.status} = 'active'`),
@@ -180,8 +184,8 @@ export const notifications = pgTable(
     id: text("id").notNull(),
     sourceLogId: text("source_log_id").notNull(),
     sourceEntryId: text("source_entry_id").notNull(),
-    recipientKind: text("recipient_kind", { enum: identityKinds }).notNull(),
-    recipientId: text("recipient_id").notNull(),
+    recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
+    recipientId: text("recipient_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
   },
@@ -198,12 +202,12 @@ export const notifications = pgTable(
       table.sourceLogId,
       table.sourceEntryId,
       table.recipientKind,
-      table.recipientId,
+      sql`coalesce(${table.recipientId}, '')`,
     ),
     index("notifications_by_recipient").on(
       table.workspaceId,
       table.recipientKind,
-      table.recipientId,
+      sql`coalesce(${table.recipientId}, '')`,
       table.recordedAt,
       sql`${table.id} COLLATE "C"`,
     ),
@@ -211,12 +215,15 @@ export const notifications = pgTable(
       .on(
         table.workspaceId,
         table.recipientKind,
-        table.recipientId,
+        sql`coalesce(${table.recipientId}, '')`,
         table.recordedAt,
         sql`${table.id} COLLATE "C"`,
       )
       .where(sql`${table.state} = 'Pending'`),
-    check("notifications_recipient_kind", sql`${table.recipientKind} IN ('Human', 'Agent')`),
+    check(
+      "notifications_recipient_kind",
+      sql`(${table.recipientKind} = 'Triage' AND ${table.recipientId} IS NULL) OR (${table.recipientKind} IN ('Human', 'Agent', 'Contact') AND ${table.recipientId} IS NOT NULL AND ${table.recipientId} <> '')`,
+    ),
     check("notifications_state", sql`${table.state} = 'Pending'`),
   ],
 );
@@ -262,6 +269,7 @@ export const logEntries = pgTable(
     entryIndex: integer("entry_index").notNull(),
     recordedAt: instant("recorded_at").notNull(),
     payload: bytes("payload").notNull(),
+    subject: text("subject"),
     factName: text("fact_name"),
     factVersion: doublePrecision("fact_version"),
     performerKind: text("performer_kind", { enum: ["Member", "Identity", "System"] }),
@@ -283,6 +291,13 @@ export const logEntries = pgTable(
       table.position,
       table.entryIndex,
     ),
+    index("log_entries_by_subject").on(
+      table.workspaceId,
+      table.logId,
+      table.subject,
+      table.position,
+      table.entryIndex,
+    ),
     index("log_entries_by_fact").on(
       table.workspaceId,
       table.logId,
@@ -292,11 +307,11 @@ export const logEntries = pgTable(
     ),
     check(
       "log_entries_fact_header",
-      sql`(${table.factName} IS NULL AND ${table.factVersion} IS NULL AND ${table.performerKind} IS NULL) OR (${table.factName} IS NOT NULL AND ${table.factVersion} IS NOT NULL AND ${table.performerKind} IS NOT NULL)`,
+      sql`(${table.subject} IS NULL AND ${table.factName} IS NULL AND ${table.factVersion} IS NULL AND ${table.performerKind} IS NULL) OR (${table.subject} IS NOT NULL AND ${table.factName} IS NOT NULL AND ${table.factVersion} IS NOT NULL AND ${table.performerKind} IS NOT NULL)`,
     ),
     check(
       "log_entries_provenance",
-      sql`(${table.performerKind} IS NULL AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NULL AND ${table.correlationId} IS NULL AND ${table.occurredAt} IS NULL AND ${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.performerKind} IS NOT NULL AND ${table.correlationId} IS NOT NULL AND ${table.occurredAt} IS NOT NULL AND ((${table.performerKind} = 'Member' AND ${table.performerMemberId} IS NOT NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'Identity' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'System' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NOT NULL)))`,
+      sql`(${table.performerKind} IS NULL AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NULL AND ${table.correlationId} IS NULL AND ${table.occurredAt} IS NULL AND ${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.performerKind} IS NOT NULL AND ${table.correlationId} IS NOT NULL AND ${table.occurredAt} IS NOT NULL AND ((${table.performerKind} = 'Member' AND ${table.performerMemberId} IS NOT NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'Identity' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent', 'Contact') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'System' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NOT NULL)))`,
     ),
     check(
       "log_entries_cause",

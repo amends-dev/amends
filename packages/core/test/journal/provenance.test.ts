@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { expect, expectTypeOf, test } from "bun:test";
 import {
   Cause,
@@ -29,9 +30,15 @@ import { MemberId } from "../../src/workspace/member/id.ts";
 import { make, type Fixture } from "../memory-store.ts";
 import { testCrypto, testProvenance } from "../publication.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Log.Id.make("journal");
-const Changed = Fact.make("example.changed", { version: 1, payload: Schema.Finite });
+const Changed = Fact.make("example.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.Finite,
+});
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<

@@ -17,7 +17,7 @@ The current domains contain these features:
 | --------------- | ------------------------------------------------------------------------------------------------ |
 | `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features. |
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
-| `identity`      | Stable human and agent references and the actor resolved for an operation.                       |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
 | `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
@@ -28,8 +28,9 @@ domains; workspace scoping alone does not make a feature part of workspace
 management.
 
 The notification foundation is exported as `@amends/core/notification`. A record
-references a source log entry and a human or agent recipient and currently supports
-only `Pending` state. Both storage adapters implement its bounded recipient reads
+references a source log entry and a Human, Agent, Contact, or Triage recipient and
+currently supports only `Pending` state. Triage is one recipient per workspace,
+represented by `{ _tag: "Triage" }` without a person ID. Both storage adapters implement its bounded recipient reads
 and transactional insert. `NotificationApplication.get`, `list`, and `listPending`
 require current active membership and derive the recipient from the acting identity.
 They expose only that recipient's inbox; missing and other recipients' IDs both
@@ -38,7 +39,9 @@ state without opening a transaction, honoring an outer commit when present. Read
 notification or grants access to its source. Core now requires `NotificationStore`.
 
 The HTTP API exposes these reads, and the web client provides session-scoped query
-atoms. Generation, acknowledgment, and delivery remain deferred. The empty projection
+atoms. Contact and Triage recipients are available to internal storage consumers; the
+member inbox API remains limited to the acting human or agent. Generation,
+acknowledgment, and delivery remain deferred. The empty projection
 still advances its checkpoint; introducing historical generation requires fresh
 development data or explicit projection preparation.
 
@@ -96,6 +99,21 @@ and projections inside one `journal.commit`. Policy checks performed earlier to
 build a read screen do not authorize a later write. Stores still require a valid
 workspace transaction for every mutation. A read invoked inside an existing commit
 uses that transaction and sees its staged changes without opening another one.
+
+## Identity and target boundaries
+
+`Identity.Reference` identifies a Human, Agent, or Contact. `Identity.MemberReference`
+is the Human/Agent subset used by members, actors, credential resolution, and the
+gateway. External authors use `Performer.Reference.Identity` with a Contact;
+`Performer.Reference.Member` always carries a member identity. Attribution does
+not grant authority, and a contact identity does not select an external reply destination.
+
+`Target.Reference` supports Workspace, Member, and Thread. Thread targets carry
+`workspaceId` and `ThreadId.Id`, exported from `@amends/core/thread`. Exact target
+scopes compare the workspace, kind, and ID; a workspace scope covers targets in
+that workspace. Adding a Thread target supplies scoped grant storage, not a
+participant-access policy. Thread operations must define and enforce that policy
+when implemented. The thread module currently contains only its ID.
 
 ## Permission declarations and built-in roles
 
@@ -171,12 +189,14 @@ derives the lookup key from a payload. See
 [idempotent publication](../../docs/journal.md#idempotent-publication-and-append)
 for payload matching, expected-position precedence, and composing larger operations.
 
-The storage envelope separates `Event.Header` (name, version, provenance) from
+The storage envelope separates `Event.Header` (subject, name, version, provenance) from
 encoded domain payload bytes. `Store.Content` represents append content and
 `Store.Entry` adds the log entry metadata. Journal entries use `Event.storageCodec`;
 ordinary execution logs use the default payload codec and have no fact header.
-Both adapters persist fact names and versions as indexed columns. Read matching
-history with `journal.read({ name, version?, after?, limit })`, using a
+Both adapters persist fact subjects, names, and versions as columns, with separate
+name and subject indexes. Read matching history with
+`journal.read({ subject?, name?, version?, after?, limit })`: supply a subject, a
+name, or both; version requires a name. Reads use a
 `{ position, index }` cursor and `Event.decode(fact, entry)` for payload decoding.
 The existing journal log reader and projection replay retain complete-batch reads.
 
@@ -300,6 +320,13 @@ Inline payload structs can stay inside their fact declarations. Obtain their
 types through `Fact.Payload<typeof MemberFacts.Added>` rather than adding a
 second exported schema name without a separate use case.
 
+Every fact declares `subject: (payload) => Subject.make(kind, id)`, a pure function
+of its validated decoded payload. Use the affected entity: workspace, member,
+invitation, role, or assignment. Subjects use `kind:id` with a lowercase namespace
+containing letters, digits, and hyphens and a nonempty ID. They identify an entity,
+not a unique occurrence or an authorization target. Publication persists the
+subject, retries compare it, and replay decoding verifies it against the payload.
+
 Put natural occurrence identity in that same declaration, using a pure function
 of the decoded payload. Use stable record IDs for creation and terminal facts;
 repeatable changes need a request or occurrence ID, not just the affected record's
@@ -307,7 +334,7 @@ ID. `occurrence` returns a nonempty array of nonblank strings or `null`. The jou
 validates these parts and derives an unambiguous key without the schema version.
 Keep identity rules stable across retries. During local development, reset data
 when changing an identity rule. Facts registered under the
-same name/version must share their payload schema and occurrence function.
+same name/version must share their payload schema, subject function, and occurrence function.
 
 Schemas used as public HTTP models carry stable identifiers for generated API
 documentation: `Workspace`, `WorkspaceMember`, `WorkspaceInvitation`,

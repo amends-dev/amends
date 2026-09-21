@@ -20,7 +20,12 @@ const toEncodedRecord = (row: NotificationRow) => ({
   id: row.id,
   workspaceId: row.workspaceId,
   source: { logId: row.sourceLogId, entryId: row.sourceEntryId },
-  recipient: { _tag: row.recipientKind, id: row.recipientId },
+  recipient:
+    row.recipientKind === "Triage"
+      ? row.recipientId === null
+        ? { _tag: "Triage" }
+        : undefined
+      : { _tag: row.recipientKind, id: row.recipientId },
   recordedAt: row.recordedAt,
   state: { _tag: row.state },
 });
@@ -51,7 +56,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
           and(
             inWorkspace,
             eq(notifications.recipientKind, target._tag),
-            eq(notifications.recipientId, target.id),
+            eq(
+              sql`coalesce(${notifications.recipientId}, '')`,
+              target._tag === "Triage" ? "" : target.id,
+            ),
             pendingOnly ? eq(notifications.state, "Pending") : undefined,
             after === undefined
               ? undefined
@@ -111,7 +119,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           sourceLogId: record.source.logId,
           sourceEntryId: record.source.entryId,
           recipientKind: record.recipient._tag,
-          recipientId: record.recipient.id,
+          recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
           recordedAt: DateTime.toDate(record.recordedAt),
           state: record.state._tag,
         }),

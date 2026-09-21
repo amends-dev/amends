@@ -299,7 +299,8 @@ export const make = Effect.fn("Journal.make")(function* () {
               and(
                 eq(logEntries.workspaceId, workspaceId),
                 eq(logEntries.logId, logId),
-                eq(logEntries.factName, options.name),
+                options.name === undefined ? undefined : eq(logEntries.factName, options.name),
+                options.subject === undefined ? undefined : eq(logEntries.subject, options.subject),
                 options.version === undefined
                   ? undefined
                   : eq(logEntries.factVersion, options.version),

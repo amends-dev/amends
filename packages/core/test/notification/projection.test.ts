@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
@@ -13,10 +14,16 @@ import { Transaction } from "../../src/journal/transaction.ts";
 import { NotificationProjection } from "../../src/notification/projection.ts";
 import { make, type Fixture } from "../memory-store.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 
 const logId = Log.Id.make("journal");
-const Source = Fact.make("notification-test.source", { version: 1, payload: Schema.String });
+const Source = Fact.make("notification-test.source", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
 const key = {
   logId,
   name: NotificationProjection.definition.name,

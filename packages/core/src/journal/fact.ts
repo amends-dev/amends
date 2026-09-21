@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { Occurrence } from "./occurrence.ts";
+import { Subject } from "./subject.ts";
 
 /** A domain fact's contract, before the journal adds publication metadata. */
 export interface Definition<
@@ -10,6 +11,8 @@ export interface Definition<
   readonly name: Name;
   readonly version: Version;
   readonly payload: PayloadSchema;
+  /** Pure, deterministic entity identity, derived from the validated payload. */
+  subject(payload: PayloadSchema["Type"]): Subject.Value;
   /** Pure, deterministic identity of this occurrence; null leaves this payload repeatable. */
   occurrence?(payload: PayloadSchema["Type"]): ReadonlyArray<string> | null;
 }
@@ -31,6 +34,7 @@ export const make = <
   options: {
     readonly version: Version;
     readonly payload: PayloadSchema;
+    readonly subject: (payload: NoInfer<PayloadSchema["Type"]>) => Subject.Value;
     readonly occurrence?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<string> | null;
   },
 ): Readonly<Definition<Name, Version, PayloadSchema>> =>
@@ -38,6 +42,7 @@ export const make = <
     name,
     version: options.version,
     payload: options.payload,
+    subject: options.subject,
     ...(options.occurrence === undefined ? {} : { occurrence: options.occurrence }),
   });
 
@@ -52,6 +57,15 @@ export const makeOccurrenceKey = Effect.fn("Fact.makeOccurrenceKey")(function* <
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
   const parts = fact.occurrence(validated);
   return parts === null ? null : yield* Occurrence.makeKey(fact.name, parts);
+});
+
+/** Validate the payload and its declared subject. @category constructors */
+export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends Definition>(
+  fact: F,
+  payload: Payload<NoInfer<F>>,
+) {
+  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
+  return yield* Schema.decodeEffect(Subject.Value)(fact.subject(validated));
 });
 
 export * as Fact from "./fact.ts";

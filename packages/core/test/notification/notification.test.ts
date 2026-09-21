@@ -13,7 +13,7 @@ const wire = {
   state: { _tag: "Pending" },
 } as const;
 
-test.each(["Human", "Agent"] as const)(
+test.each(["Human", "Agent", "Contact"] as const)(
   "a %s notification preserves its source, recipient kind, and recorded time through codecs",
   async (kind) => {
     const encoded = { ...wire, recipient: { ...wire.recipient, _tag: kind } };
@@ -37,7 +37,7 @@ test("notification decoding rejects malformed references and unsupported recipie
     { ...wire, source: { ...wire.source, logId: "" } },
     { ...wire, source: { ...wire.source, entryId: "" } },
     { ...wire, recipient: { _tag: "Human", id: "" } },
-    { ...wire, recipient: { _tag: "Contact", id: "recipient-one" } },
+    { ...wire, recipient: { _tag: "Unknown", id: "recipient-one" } },
     { ...wire, state: { _tag: "Acknowledged" } },
     { ...wire, recordedAt: "not-a-date" },
   ]) {

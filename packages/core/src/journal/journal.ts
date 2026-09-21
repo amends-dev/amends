@@ -12,7 +12,7 @@ export { Envelope, FactMismatch, decode, storageCodec } from "./event.ts";
 
 export interface Interface {
   readonly log: Log.Reader<typeof Event.Envelope>;
-  /** Read matching envelopes by fact name, ordered by position and entry index. */
+  /** Read matching envelopes by fact name and/or subject, ordered by position and entry index. */
   readonly read: (
     options: Store.ReadFactsOptions,
   ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
@@ -55,7 +55,7 @@ export interface Options<Requirements extends ReadonlyArray<unknown> = readonly 
 
 /**
  * Construct a domain journal from a log and its projections. Definitions sharing a fact
- * name and version must share its payload schema and occurrence function. Projection
+ * name and version must share its payload schema, subject function, and occurrence function. Projection
  * dependencies are supplied here; the resulting service interface is independent of registration.
  *
  * @category constructors
@@ -90,7 +90,9 @@ export const make = Effect.fn("Journal.make")(function* <
     const existing = versions.get(fact.version);
     if (
       existing !== undefined &&
-      (existing.payload !== fact.payload || existing.occurrence !== fact.occurrence)
+      (existing.payload !== fact.payload ||
+        existing.occurrence !== fact.occurrence ||
+        existing.subject !== fact.subject)
     ) {
       return yield* new Event.FactMismatch({ name: fact.name, version: fact.version });
     }
@@ -124,11 +126,14 @@ export const make = Effect.fn("Journal.make")(function* <
         const registered = definitions.get(fact.name)?.get(fact.version);
         if (
           registered !== undefined &&
-          (registered.payload !== fact.payload || registered.occurrence !== fact.occurrence)
+          (registered.payload !== fact.payload ||
+            registered.occurrence !== fact.occurrence ||
+            registered.subject !== fact.subject)
         ) {
           return yield* new Event.FactMismatch({ name: fact.name, version: fact.version });
         }
         const encoded = yield* Codec.make(fact).encode(payload);
+        const subject = yield* Fact.makeSubject(fact, payload);
         const occurrenceKey = yield* Fact.makeOccurrenceKey(fact, payload);
         if (occurrenceKey !== null && request.idempotencyKey !== undefined)
           return yield* new Store.Conflict({
@@ -146,6 +151,7 @@ export const make = Effect.fn("Journal.make")(function* <
               entry === undefined ||
               entry.payload.name !== fact.name ||
               entry.payload.version !== fact.version ||
+              entry.payload.subject !== subject ||
               !Store.samePayloads([entry.payload.payload], [encoded])
             )
               return yield* new Store.Conflict({
@@ -178,6 +184,7 @@ export const make = Effect.fn("Journal.make")(function* <
         const entry = yield* log.append(
           {
             provenance,
+            subject,
             name: fact.name,
             version: fact.version,
             payload: encoded,

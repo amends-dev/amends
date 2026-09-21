@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, test } from "bun:test";
@@ -14,8 +15,11 @@ import { Transaction } from "../../src/journal/transaction.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const Changed = Fact.make("counter.changed", {
+  subject: testSubject,
   version: 1,
   payload: Schema.Struct({ amount: Schema.FiniteFromString }),
 });
@@ -73,7 +77,7 @@ test("one outer commit publishes canonical events once, in order, after its proj
           const second = yield* journal.commit(journal.publish(Changed, { amount: 3 }));
           expect(published).toEqual([]);
           expect((yield* fixture.snapshot).logs.size).toBe(0);
-          return [first, second];
+          return [first, second] as const;
         }),
       );
       expect(published).toHaveLength(1);

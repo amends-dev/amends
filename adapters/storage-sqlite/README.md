@@ -13,11 +13,15 @@ Journal tables hold their fields as columns. `src/migrations.ts` contains one
 fresh-database baseline, applied once by `SqliteDatabase.make()`. During local
 development, update that baseline and reset the database after schema changes. `SqliteDatabase.layer(filename)` uses the same constructor.
 
-Journal entries keep `fact_name` and `fact_version` in columns, provenance as
+Journal entries keep `subject`, `fact_name`, and `fact_version` in columns, provenance as
 schema-validated JSON in its own column, and only the domain payload as binary.
 Generic execution entries leave fact metadata null. `log_entries_by_fact` supports
 workspace/log/name reads ordered by position and entry index. These filtered
 entry pages are separate from complete-batch reads used for replay.
+
+`log_entries_by_subject` supports entity history across fact names using the
+workspace, log, subject, position, and entry index. Fact subjects are required;
+generic execution entries leave the entire fact header null.
 
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
@@ -40,6 +44,9 @@ are validated before JSON encoding, edited fields use their core schemas, and
 invalid writes return the corresponding store's `Conflict`. Reads decode stored
 JSON back into validated domain records; corrupt data remains a `Failure`.
 
+Notification recipients are Human, Agent, Contact, or workspace-singleton Triage.
+Triage has no person ID. Recipient indexes normalize the missing ID only for
+indexing, preserving source/recipient uniqueness for concurrent Triage inserts.
 Notification reads match both recipient kind and ID, with bounded pages ordered
 by recorded time and binary ID order. Notification IDs and source/recipient
 associations are unique within the workspace. Inserts join the journal transaction;

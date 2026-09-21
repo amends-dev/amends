@@ -14,7 +14,7 @@ export interface Interface {
   /** Keep the workspace lease and operation resources in the caller's scope, including response streams. */
   readonly asMemberScoped: <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
     workspaceId: Workspace.Id,
-    identity: Identity.Reference,
+    identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember, Scope.Scope>;
   /**
@@ -43,7 +43,7 @@ export interface Interface {
    */
   readonly asMember: <A, E, R extends Core.Operations | Actor.Service>(
     workspaceId: Workspace.Id,
-    identity: Identity.Reference,
+    identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
 }
@@ -112,7 +112,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
     workspaceId: Workspace.Id,
-    identity: Identity.Reference,
+    identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
   ) {
     const membership = yield* Effect.orDie((yield* MemberStore.Service).findActive(identity));
@@ -142,7 +142,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
   const asMemberScoped: Interface["asMemberScoped"] = Effect.fn("Gateway.asMemberScoped")(
     function* <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
       workspaceId: Workspace.Id,
-      identity: Identity.Reference,
+      identity: Identity.MemberReference,
       program: Effect.Effect<A, E, R>,
     ) {
       const operation: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope> = program;

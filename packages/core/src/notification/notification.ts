@@ -13,9 +13,14 @@ export const Source = Schema.Struct({
 });
 export interface Source extends Schema.Schema.Type<typeof Source> {}
 
-/** Human and agent recipients retain their identity kind even when their IDs coincide. */
-export const Recipient = Identity.Reference;
-export type Recipient = Identity.Reference;
+/** Triage is one workspace-local recipient; people and agents retain their identity kind. */
+export const Recipient = Schema.TaggedUnion({
+  Human: Identity.Reference.cases.Human.fields,
+  Agent: Identity.Reference.cases.Agent.fields,
+  Contact: Identity.Reference.cases.Contact.fields,
+  Triage: {},
+});
+export type Recipient = typeof Recipient.Type;
 
 /** Acknowledgment outcomes will extend this state when their operations are implemented. */
 export const State = Schema.TaggedUnion({ Pending: {} });

@@ -1,3 +1,6 @@
+import { Identity } from "@amends/core/identity";
+import { boundTo } from "./support.ts";
+import { Subject } from "@amends/core/journal";
 import { expect, test as it } from "bun:test";
 import {
   temporary as withDatabase,
@@ -12,10 +15,24 @@ import { Codec, Event, Fact, Journal, Log, Publication, Store } from "@amends/co
 import { Effect, Option, Schema } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const logId = Log.Id.make("journal");
-const Changed = Fact.make("storage.changed", { version: 1, payload: Schema.String });
-const Changed2 = Fact.make(Changed.name, { version: 2, payload: Schema.String });
-const Other = Fact.make("storage.other", { version: 1, payload: Schema.String });
+const Changed = Fact.make("storage.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
+const Changed2 = Fact.make(Changed.name, {
+  subject: testSubject,
+  version: 2,
+  payload: Schema.String,
+});
+const Other = Fact.make("storage.other", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
 
 it("fact metadata is stored in columns and indexed reads page matching entries across versions and commits", async () =>
   withDatabase(async (location) => {
@@ -102,7 +119,7 @@ it("native idempotency compares fact metadata and rejects foreign provenance bef
         const bound = yield* (yield* views).forWorkspace(workspaceId);
         const provenance = testProvenance(workspaceId);
         const content = {
-          fact: { name: Changed.name, version: 1, provenance },
+          fact: { subject: testSubject(), name: Changed.name, version: 1, provenance },
           payload: yield* Codec.make(Changed).encode("same"),
         };
         const key = Log.IdempotencyKey.make("native-fact");
@@ -117,6 +134,7 @@ it("native idempotency compares fact metadata and rejects foreign provenance bef
         for (const fact of [
           { ...content.fact, name: Other.name },
           { ...content.fact, version: 2 },
+          { ...content.fact, subject: Subject.make("test", "another") },
           {
             ...content.fact,
             provenance: Object.assign({}, provenance, {
@@ -139,6 +157,9 @@ it("native idempotency compares fact metadata and rejects foreign provenance bef
         const missingAttribution = { ...content, fact: { ...content.fact } };
         Reflect.deleteProperty(missingAttribution.fact, "provenance");
         expect((yield* Effect.flip(append(missingAttribution)))._tag).toBe("JournalStore.Conflict");
+        const missingSubject = { ...content, fact: { ...content.fact } };
+        Reflect.deleteProperty(missingSubject.fact, "subject");
+        expect((yield* Effect.flip(append(missingSubject)))._tag).toBe("JournalStore.Conflict");
         const nullAttribution = { ...content, fact: { ...content.fact } };
         Reflect.set(nullAttribution.fact, "provenance", null);
         expect((yield* Effect.flip(append(nullAttribution)))._tag).toBe("JournalStore.Conflict");
@@ -146,6 +167,99 @@ it("native idempotency compares fact metadata and rejects foreign provenance bef
         expect(yield* bound.store.readFacts(logId, { name: Changed.name, limit: 10 })).toHaveLength(
           1,
         );
+      }),
+    );
+  }));
+
+it("subject reads span fact names, preserve entry cursors, and persist contact attribution", async () =>
+  withDatabase(async (location) => {
+    const Payload = Schema.Struct({ threadId: Schema.NonEmptyString, text: Schema.String });
+    const subject = (payload: typeof Payload.Type) => Subject.make("thread", payload.threadId);
+    const Message = Fact.make("thread.message", { version: 1, payload: Payload, subject });
+    const Activity = Fact.make("thread.activity", { version: 1, payload: Payload, subject });
+    const target = subject({ threadId: "one", text: "" });
+    const contact = Identity.Reference.cases.Contact.make({
+      id: Identity.ContactId.make("external-author"),
+    });
+    const events = await inDatabase(
+      location,
+      Effect.gen(function* () {
+        const bound = yield* boundTo(workspaceId);
+        return yield* Effect.gen(function* () {
+          const journal = yield* Journal.Service;
+          const saved = yield* journal.commit(
+            Effect.gen(function* () {
+              const first = yield* journal.publish(Message, { threadId: "one", text: "first" });
+              yield* journal.publish(Message, { threadId: "two", text: "unrelated" });
+              const second = yield* journal.publish(Activity, { threadId: "one", text: "second" });
+              return [first, second] as const;
+            }),
+          );
+          const third = yield* journal.publish(Message, { threadId: "one", text: "third" });
+          const all = [...saved, third];
+          for (const event of all) {
+            expect(event.subject).toBe(target);
+            expect(event.provenance.performedBy).toEqual({ _tag: "Identity", identity: contact });
+          }
+          let after: Store.Cursor | undefined;
+          for (const event of all) {
+            const page = yield* journal.read({
+              subject: target,
+              limit: 1,
+              ...(after === undefined ? {} : { after }),
+            });
+            expect(page.map((entry) => entry.id)).toEqual([event.id]);
+            after = event;
+          }
+          expect(yield* journal.read({ subject: target, limit: 1, after })).toEqual([]);
+          expect(
+            (yield* journal.read({ subject: target, name: Activity.name, limit: 10 })).map(
+              (entry) => entry.id,
+            ),
+          ).toEqual([saved[1].id]);
+          expect(
+            yield* journal.read({ subject: Subject.make("member", "one"), limit: 10 }),
+          ).toEqual([]);
+          expect((yield* journal.log.read({ limit: 1 }))[0]?.entries).toHaveLength(3);
+          const other = yield* Journal.make({
+            logId: Log.Id.make("other-subject-log"),
+            projections: [],
+          });
+          yield* other.publish(Message, { threadId: "one", text: "other log" });
+          expect(yield* journal.read({ subject: target, limit: 10 })).toHaveLength(3);
+          const foreign = yield* boundTo(otherWorkspaceId);
+          expect(yield* foreign.store.readFacts(logId, { subject: target, limit: 10 })).toEqual([]);
+          const plain = (yield* Log.Service).open({ id: logId, schema: Schema.String });
+          yield* plain.append("execution");
+          expect(yield* journal.read({ subject: target, limit: 10 })).toHaveLength(3);
+          return all;
+        }).pipe(
+          Effect.provideService(
+            Publication.Service,
+            Object.assign({}, testProvenance(workspaceId), {
+              performedBy: { _tag: "Identity" as const, identity: contact },
+            }),
+          ),
+          Effect.provide(core(bound)),
+        );
+      }),
+    );
+    await inDatabase(
+      location,
+      Effect.gen(function* () {
+        const bound = yield* boundTo(workspaceId);
+        const entries = yield* bound.store.readFacts(logId, { subject: target, limit: 10 });
+        expect(entries.map((entry) => entry.id)).toEqual(events.map((event) => event.id));
+        for (const entry of entries) {
+          expect(entry.fact?.subject).toBe(target);
+          expect(entry.fact?.provenance.performedBy).toEqual({
+            _tag: "Identity",
+            identity: contact,
+          });
+        }
+        const rows =
+          yield* (yield* SqlClient.SqlClient)`SELECT subject FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND subject = ${target}`;
+        expect(rows).toHaveLength(3);
       }),
     );
   }));

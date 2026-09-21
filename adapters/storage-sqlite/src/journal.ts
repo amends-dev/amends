@@ -34,7 +34,7 @@ export const make = Effect.fn("Journal.make")(function* () {
   const decodeEntries = (input: unknown) => JournalEntry.decodeRows(workspaceId, input);
 
   const entries = (logId: Entry.LogId, commitId: Commit.Id) =>
-    sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${commitId} ORDER BY entry_index`.pipe(
+    sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, subject, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${commitId} ORDER BY entry_index`.pipe(
       Effect.flatMap(decodeEntries),
     );
 
@@ -52,7 +52,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     if (Option.isNone(header)) return Option.none<Store.AppendReceipt>();
     const row = header.value;
     const values =
-      yield* sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${row.commitId} AND entry_index >= ${row.firstIndex} AND entry_index < ${row.firstIndex + row.entryCount} ORDER BY entry_index`.pipe(
+      yield* sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, subject, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND commit_id = ${row.commitId} AND entry_index >= ${row.firstIndex} AND entry_index < ${row.firstIndex + row.entryCount} ORDER BY entry_index`.pipe(
         Effect.flatMap(decodeEntries),
       );
     return Option.some(
@@ -170,7 +170,7 @@ export const make = Effect.fn("Journal.make")(function* () {
       const columns = yield* JournalEntry.toColumns(content).pipe(
         Effect.mapError(storeFailure(Store, "append")),
       );
-      yield* sql`INSERT INTO log_entries (workspace_id, id, log_id, position, commit_id, entry_index, recorded_at, payload, fact_name, fact_version, provenance) VALUES (${workspaceId}, ${id}, ${request.logId}, ${position}, ${session.commit.id}, ${index}, ${DateTime.formatIso(recordedAt)}, ${content.payload}, ${columns.factName}, ${columns.factVersion}, ${columns.provenance})`.pipe(
+      yield* sql`INSERT INTO log_entries (workspace_id, id, log_id, position, commit_id, entry_index, recorded_at, payload, subject, fact_name, fact_version, provenance) VALUES (${workspaceId}, ${id}, ${request.logId}, ${position}, ${session.commit.id}, ${index}, ${DateTime.formatIso(recordedAt)}, ${content.payload}, ${columns.subject}, ${columns.factName}, ${columns.factVersion}, ${columns.provenance})`.pipe(
         Effect.mapError(storeError(Store, "append")),
       );
       result.push({
@@ -200,9 +200,12 @@ export const make = Effect.fn("Journal.make")(function* () {
         Effect.gen(function* () {
           yield* Schema.decodeEffect(Entry.LogId)(logId);
           const options = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input);
+          const name = options.name === undefined ? sql`` : sql`AND fact_name = ${options.name}`;
+          const subject =
+            options.subject === undefined ? sql`` : sql`AND subject = ${options.subject}`;
           const version =
             options.version === undefined ? sql`` : sql`AND fact_version = ${options.version}`;
-          return yield* sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND fact_name = ${options.name} ${version} AND (position, entry_index) > (${options.after?.position ?? -1}, ${options.after?.index ?? -1}) ORDER BY position, entry_index LIMIT ${options.limit}`.pipe(
+          return yield* sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, subject, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND fact_name IS NOT NULL ${name} ${subject} ${version} AND (position, entry_index) > (${options.after?.position ?? -1}, ${options.after?.index ?? -1}) ORDER BY position, entry_index LIMIT ${options.limit}`.pipe(
             Effect.flatMap(decodeEntries),
           );
         }),

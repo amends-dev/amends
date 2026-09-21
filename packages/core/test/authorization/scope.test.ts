@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { ThreadId } from "@amends/core/thread";
 import { Scope } from "../../src/authorization/scope.ts";
 import { Target } from "../../src/authorization/target.ts";
 import { Member } from "../../src/workspace/member/member.ts";
@@ -44,4 +45,21 @@ test("an exact workspace target covers the workspace itself without covering its
   expect(Scope.covers(scope, { ...workspace })).toBe(true);
   expect(Scope.covers(scope, otherWorkspace)).toBe(false);
   expect(Scope.covers(scope, member)).toBe(false);
+});
+
+test("thread targets preserve exact scope and workspace boundaries even when IDs coincide", () => {
+  const thread = Target.Reference.cases.Thread.make({
+    workspaceId,
+    threadId: ThreadId.Id.make(memberId),
+  });
+  const exact = Scope.Value.cases.Target.make({ target: thread });
+  expect(Scope.covers(exact, thread)).toBe(true);
+  expect(Scope.covers(exact, member)).toBe(false);
+  expect(Scope.covers(exact, { ...thread, threadId: ThreadId.Id.make("another") })).toBe(false);
+  expect(Scope.covers(exact, { ...thread, workspaceId: otherWorkspaceId })).toBe(false);
+  expect(Scope.covers(Scope.Value.cases.Workspace.make({ workspaceId }), thread)).toBe(true);
+  expect(
+    Scope.covers(Scope.Value.cases.Workspace.make({ workspaceId: otherWorkspaceId }), thread),
+  ).toBe(false);
+  expect(Scope.covers(Scope.Value.cases.Target.make({ target: workspace }), thread)).toBe(false);
 });

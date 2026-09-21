@@ -16,4 +16,5 @@ export { Occurrence } from "./occurrence.ts";
 export { Projection } from "./projection.ts";
 export { Publication } from "./publication.ts";
 export { Store } from "./store.ts";
+export { Subject } from "./subject.ts";
 export { Transaction } from "./transaction.ts";

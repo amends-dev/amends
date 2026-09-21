@@ -5,11 +5,13 @@ import { Effect, Schema } from "effect";
 const provenance = Schema.fromJsonString(Event.Provenance);
 const Row = Schema.Struct({
   ...Store.Entry.fields,
+  subject: Schema.NullOr(Event.Header.fields.subject),
   factName: Schema.NullOr(Event.Header.fields.name),
   factVersion: Schema.NullOr(Event.Header.fields.version),
   provenance: Schema.NullOr(provenance),
 }).check(
   Schema.makeFilter((row) =>
+    (row.factName === null) !== (row.subject === null) ||
     (row.factName === null) !== (row.factVersion === null) ||
     (row.factName === null) !== (row.provenance === null)
       ? "Incomplete fact metadata"
@@ -24,7 +26,7 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
   const rows = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(input);
   return yield* Effect.forEach(
     rows,
-    Effect.fnUntraced(function* ({ factName, factVersion, provenance, ...entry }) {
+    Effect.fnUntraced(function* ({ subject, factName, factVersion, provenance, ...entry }) {
       if (provenance !== null && provenance.workspaceId !== workspaceId)
         return yield* new Store.Failure({
           operation: "read",
@@ -37,6 +39,7 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
           ? {}
           : {
               fact: {
+                subject,
                 name: factName,
                 version: factVersion,
                 provenance,
@@ -49,6 +52,7 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
 
 export const toColumns = Effect.fn("JournalEntry.toColumns")(function* (entry: Store.Content) {
   return {
+    subject: entry.fact?.subject ?? null,
     factName: entry.fact?.name ?? null,
     factVersion: entry.fact?.version ?? null,
     provenance:

@@ -27,7 +27,7 @@ export interface Interface {
    * host-owned indexes across workspaces. Removed memberships stay listed so a
    * client can explain them. Invitations are listed for humans only.
    */
-  readonly list: (identity: Identity.Reference) => Effect.Effect<Listing>;
+  readonly list: (identity: Identity.MemberReference) => Effect.Effect<Listing>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(

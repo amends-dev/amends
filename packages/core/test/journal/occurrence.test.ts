@@ -1,3 +1,4 @@
+import { Subject } from "@amends/core/journal";
 import { expect, expectTypeOf, test } from "bun:test";
 import { Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -13,6 +14,8 @@ import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 import { testProvenance } from "../publication.ts";
 
+const testSubject = () => Subject.make("test", "entity");
+
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Log.Id.make("journal");
 const Payload = Schema.Struct({
@@ -23,6 +26,7 @@ const Payload = Schema.Struct({
 const identity = (payload: typeof Payload.Type) =>
   payload.requestId === null ? null : [payload.source, payload.requestId];
 const Received = Fact.make("counter.received", {
+  subject: testSubject,
   version: 1,
   payload: Payload,
   occurrence: identity,
@@ -53,8 +57,18 @@ const run = <A, E>(
 
 test("occurrence tuples have a stable, namespaced encoding without delimiter collisions or schema versions", async () => {
   expectTypeOf<Fact.Payload<typeof Received>>().toEqualTypeOf<typeof Payload.Type>();
-  const version2 = Fact.make(Received.name, { version: 2, payload: Payload, occurrence: identity });
-  const other = Fact.make("counter.other", { version: 1, payload: Payload, occurrence: identity });
+  const version2 = Fact.make(Received.name, {
+    subject: testSubject,
+    version: 2,
+    payload: Payload,
+    occurrence: identity,
+  });
+  const other = Fact.make("counter.other", {
+    subject: testSubject,
+    version: 1,
+    payload: Payload,
+    occurrence: identity,
+  });
   await Effect.runPromise(
     Effect.gen(function* () {
       const key = yield* Fact.makeOccurrenceKey(Received, input);
@@ -100,6 +114,7 @@ test("publication deduplicates concurrent attempts without explicit keys and rej
         "JournalStore.Conflict",
       );
       const version2 = Fact.make(Received.name, {
+        subject: testSubject,
         version: 2,
         payload: Payload,
         occurrence: identity,
@@ -179,6 +194,7 @@ test("invalid payloads are rejected before identity extraction, and invalid iden
   const fixture = await Effect.runPromise(make());
   let calls = 0;
   const derived = Fact.make("validated", {
+    subject: testSubject,
     version: 1,
     payload: Payload,
     occurrence: (payload) => {
@@ -202,6 +218,7 @@ test("invalid payloads are rejected before identity extraction, and invalid iden
       expect(calls).toBe(1);
       for (const parts of [[], [""], ["  "], ["valid", ""]]) {
         const bad = Fact.make("bad-parts", {
+          subject: testSubject,
           version: 1,
           payload: Payload,
           occurrence: () => parts,
@@ -215,19 +232,30 @@ test("invalid payloads are rejected before identity extraction, and invalid iden
   );
 });
 
-test("registered fact versions cannot change or discard their occurrence rule", async () => {
+test("registered fact versions cannot change their subject or occurrence rules", async () => {
   const fixture = await Effect.runPromise(make());
   await run(
     fixture,
     Effect.gen(function* () {
       const journal = yield* setup;
-      const unkeyed = Fact.make(Received.name, { version: 1, payload: Payload });
+      const unkeyed = Fact.make(Received.name, {
+        subject: testSubject,
+        version: 1,
+        payload: Payload,
+      });
       const changed = Fact.make(Received.name, {
+        subject: testSubject,
         version: 1,
         payload: Payload,
         occurrence: () => ["different"],
       });
-      for (const fact of [unkeyed, changed]) {
+      const otherSubject = Fact.make(Received.name, {
+        subject: () => Subject.make("test", "other"),
+        version: 1,
+        payload: Payload,
+        occurrence: identity,
+      });
+      for (const fact of [unkeyed, changed, otherSubject]) {
         expect((yield* Effect.flip(journal.publish(fact, input)))._tag).toBe(
           "Journal.FactMismatch",
         );

@@ -355,7 +355,9 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
             for (const entry of entries) {
               if (
                 entry.logId !== id ||
-                entry.fact?.name !== request.name ||
+                entry.fact === undefined ||
+                (request.name !== undefined && entry.fact.name !== request.name) ||
+                (request.subject !== undefined && entry.fact.subject !== request.subject) ||
                 (request.version !== undefined && entry.fact.version !== request.version)
               )
                 return "Fact does not match query";

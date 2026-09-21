@@ -23,7 +23,7 @@ const Membership = Schema.Struct({
 export const make = Effect.fn("PostgresDirectory.make")(function* () {
   const { db } = yield* PostgresDatabase.Service;
   const list: WorkspaceDirectory.Interface["list"] = Effect.fn("PostgresDirectory.list")(function* (
-    identity: Identity.Reference,
+    identity: Identity.MemberReference,
   ) {
     const active = db
       .select({
