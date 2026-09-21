@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
+import { GroupStore, GroupMembershipStore } from "@amends/core/group";
 import { Checkpoint, Commit, CommittedEvents, Store } from "@amends/core/journal";
 import {
   Notification,
@@ -118,6 +119,20 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         listByRecipient: unexpected,
         listPendingByRecipient: unexpected,
+        insert: unexpected,
+      }),
+    ),
+    Context.add(
+      GroupStore.Service,
+      GroupStore.Service.of({ workspaceId: boundWorkspaceId, get: unexpected, insert: unexpected }),
+    ),
+    Context.add(
+      GroupMembershipStore.Service,
+      GroupMembershipStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        get: unexpected,
+        findActive: unexpected,
+        listByGroup: unexpected,
         insert: unexpected,
       }),
     ),
@@ -394,11 +409,11 @@ it.effect("concurrent requests share boot and later requests do not replay or re
           yield* Deferred.succeed(resume, undefined);
           yield* Fiber.join(requests);
           expect(executed).toBe(20);
-          expect(reads).toBe(6);
+          expect(reads).toBe(8);
           yield* gateway.asMember(workspaceId, alice, operation);
           yield* gateway.inWorkspace(workspaceId, operation);
           expect(bound).toBe(1);
-          expect(reads).toBe(6);
+          expect(reads).toBe(8);
           expect(executed).toBe(22);
         }).pipe(Effect.provide(host(storage)));
       }),

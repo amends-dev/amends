@@ -9,21 +9,26 @@ implementation. The discussion is grounded in the work users want to do and the 
 of external systems. Existing implementation choices do not constrain the design.
 
 For current behavior, read [workspace workflows](workspace-workflows.md), the
-[core package guide](../packages/core/README.md), and [known limitations](current-status.md).
+[group creation](group-workflows.md), the [core package guide](../packages/core/README.md),
+and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
-and process-local live changes are implemented. Thread participation/activity,
+and process-local live changes are implemented. Core and both adapters also implement
+permission-authorized private team-group creation with initial memberships. Other group
+workflows, thread access and participation/activity,
 turns, execution, notification generation/acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
 
 ## Architecture summary
 
-The thread holds the conversation and its ordered activity. That timeline is the sole
-source of notifications. Thread participants supply the possible recipients, the activity narrows
-them, and each recipient decides how to respond. An agent accepts work into a durable turn,
-which executes through an environment, records its execution, and conditionally publishes
-its final response when there is one. The sections below retain the detailed decisions and
-rationale.
+Groups provide lasting spaces for multiple conversations. A thread belongs to one group
+or stands alone. Its access audience comes from its group or its standalone participation;
+action permissions still apply. The thread holds the conversation and its ordered activity.
+That timeline is the sole source of notifications. Thread participants supply the possible
+recipients, the activity narrows them, and each recipient decides how to respond.
+An agent accepts work into a durable turn, which executes through an environment,
+records its execution, and conditionally publishes its final response when there is one.
+The sections below retain the detailed decisions and rationale.
 
 ### Work flow
 
@@ -107,9 +112,13 @@ flowchart TB
   implementation declares support for toolkits, channels, model inference, or a combination;
   each connection's configuration and authorization determine readiness. Connecting a
   server does not create a toolkit or grant an agent its tools.
-- **Thread:** has participants and a sequenced timeline of typed activity, including published
-  messages, turn lifecycle events, and task updates. It owns their order without taking
-  over the underlying domains' state or execution machinery.
+- **Group:** a lasting conversation space within a workspace, with an access audience and
+  multiple threads. A DM is a group for two human or agent members. Group membership
+  does not automatically establish participation or request agent work in its threads.
+- **Thread:** one conversation, in one group or standalone, with participants and a
+  sequenced timeline of typed activity, including published messages, turn lifecycle events,
+  and task updates. It owns their order without taking over the underlying domains' state
+  or execution machinery.
 - **Turn:** one agent's attempt on one thread. Owns accepted input, incorporation progress,
   execution history, the model/provider selection and settings actually used, environments
   used, snapshot references, and outcome.
@@ -132,7 +141,8 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  TASK["Task"] -->|Unique working thread| THREAD["Thread"]
+  GROUP["Group"] -->|Contains many; each thread has at most one| THREAD["Thread"]
+  TASK["Task"] -->|Unique working thread| THREAD
   MESSAGE["Message"] -->|threadId| THREAD
   TURN["Turn"] -->|threadId| THREAD
   RESOURCE["Resource"] -->|Creating turn| TURN
@@ -147,7 +157,9 @@ flowchart LR
 Thread activity is the timeline item itself, not a second event stream. Messages and turns
 retain their own thread references; activity references them or records a change to the
 thread's task. The task stores the task-to-thread association without a reciprocal task
-reference on the thread record. A thread may exist without a task.
+reference on the thread record. A thread may exist without a task or group.
+The group relationship determines inherited access; the origin relationship records where
+the conversation came from and grants no access by itself.
 
 ### Workspace membership and authorization
 
@@ -168,14 +180,43 @@ its required internal steps, such as creating a task's working thread. Reads, li
 subscriptions also enforce the acting member's access. Audit records distinguish the
 requesting activities from the agent and turn that performed the resulting operations.
 
+### Groups, access audiences, and participation
+
+A group holds multiple threads. A DM is a group for two members, with both participating
+initially in each new thread. A team group's threads inherit the group's access audience,
+while their initial participants are the author and explicitly mentioned eligible members.
+A standalone thread establishes its own access audience through authorized participation.
+
+Members with group-creation permission can create team groups; membership changes require
+the relevant management permission. These permissions initially belong to the Administrator
+and Owner bundles, but any role or direct grant can supply them. Any active workspace member
+can start a DM with another active member. A current group member can leave their own
+membership without membership-management authority. Operations check permissions and
+preserve the group's audience rules.
+
+For human and agent operations, active workspace membership, inclusion in the thread's
+access audience, and the required action permissions must all hold. Group members can
+read a thread without participating when permitted. Reading does not subscribe them or
+request agent work. Replying, explicitly following, or an authorized mention can establish
+participation. Grouped threads do not admit outsiders through thread participation alone.
+
+Unfollowing a grouped thread ends participation while retaining inherited access. Leaving
+a standalone thread removes the access supplied by participation. Losing group or workspace
+membership ends the corresponding access and participation. Human muting changes notification
+presentation while retaining access, participation, and recorded recipient selection.
+See [groups and thread audiences](#agreed-groups-provide-a-shared-home-for-threads).
+
 ### Thread participants, addressing, and history
 
-- A DM contains its two participants, each a human or agent. A new group thread contains
-  its author and explicitly mentioned participants. Later mentions can add participants.
+- A new thread in a DM group starts with both group members as participants. A new thread
+  in a team group starts with its author and explicitly mentioned eligible members.
+  A standalone thread starts with its author and explicitly admitted participants.
+  Later mentions can add participants under the thread's audience and admission rules.
 - External people participate as separate contacts, preserving the actual author of each
   incoming message. Several contacts can belong to the same thread and external conversation.
 - Committed thread activity is the sole source of notifications. Participants at that
-  activity's position supplies the audience; activity-specific rules narrow it.
+  activity's position supply the possible recipients; activity-specific rules narrow them.
+  Other members with access to the thread are not automatically notified.
 - For message-publication activity, notify explicitly mentioned participants, or all current
   participants when there are no mentions. This applies equally to user and assistant messages.
 - Humans acknowledge notifications. Agents accept work from relevant user messages and
@@ -442,9 +483,9 @@ and revise this document when the reasoning changes. Keep one current explanatio
 concept rather than accumulating contradictory proposals.
 
 This pass covers workspace membership, invitations, permissions, roles, harnesses, sandboxes,
-environments, agents, model selection, tools, toolkits, connections, threads, messages, turns,
+environments, agents, model selection, tools, toolkits, connections, groups, threads, messages, turns,
 tasks, resources, notifications, triage, channels, contacts, and channel deliveries.
-DMs and group conversations inform the thread participation rules.
+DMs and team groups establish spaces and access audiences for multiple threads.
 Detailed connection and credential lifecycles and provider-specific transport contracts remain open.
 Existing concepts, including sessions, must earn their place through a clear responsibility.
 
@@ -465,7 +506,8 @@ and relationships; detailed schemas and lifecycle rules remain open where stated
 | Tool             | One callable operation with its own input and output contracts and behavior.                                                                                                                                                          | Lets an agent gain information or perform an action through a defined operation.                                      |
 | Toolkit          | A configured collection of tools, with settings and a connection reference when external access is required.                                                                                                                          | Groups tools for configuration and selection by agents without duplicating external credentials.                      |
 | Connection       | Workspace-owned access to an external system, with provider or endpoint settings, authentication configuration, protected credential references, and declared support for toolkits, channels, model inference, or a combination.      | Supplies external access to compatible consumers while keeping access separate from their behavior.                   |
-| Thread           | A conversation with participants and an ordered timeline of message, turn, and task activity. A thread created for a task can reference the conversation it originated from.                                                          | Preserves the conversation and its activity, and establishes the source and audience of notifications.                |
+| Group            | A lasting space within a workspace for multiple threads, with a shared access audience. A DM is a group for two human or agent members.                                                                                               | Lets related conversations share access without making everyone participate in every thread.                          |
+| Thread           | One conversation in a group or standalone, with participants and an ordered timeline of message, turn, and task activity. It can reference an originating conversation independently of its group.                                    | Preserves the conversation and its activity, and establishes the source and possible recipients of notifications.     |
 | Message          | Input or output in a thread's conversation. Several user messages can contribute to one turn; its final assistant response is published when it can close.                                                                            | Records communication while the turn log retains the detailed execution history.                                      |
 | Turn             | One bounded attempt to perform work on a thread using an agent and an environment. Effects can occur during the attempt.                                                                                                              | Identifies an attempt so its activity, effects, and outcome can be understood together.                               |
 | Task             | An objective that can be assigned to an agent and worked on across turns. Each task references its own unique working thread.                                                                                                         | Gives work an objective, assignment, and lifecycle beyond one attempt.                                                |
@@ -534,16 +576,21 @@ describe different responsibilities; their exact record shapes remain open.
 
 ### Workspace membership and thread participation serve different purposes
 
-Use **member** for workspace membership and **participant** for participation in a thread.
-Workspace membership establishes participation and permissions in the workspace. Thread
-participants establish the audience for conversation activity.
-Joining a thread does not by itself grant workspace administration or access to unrelated
-conversations, tasks, agents, or connections.
+Use **workspace member** for membership in the workspace, **group member** for membership
+in a conversation group, and **participant** for participation in a thread. Workspace
+membership establishes eligibility and permission assignments in the workspace. Group
+membership supplies the access audience inherited by its threads. Thread participation
+supplies possible notification recipients; standalone participation also establishes that
+thread's access audience. The required action permissions apply in each case.
+Joining a thread does not grant workspace administration or access to unrelated
+conversations, tasks, agents, or connections. The
+[thread access rules](#agreed-thread-access-combines-audience-and-action-permissions)
+define these relationships independently of the eventual storage representation.
 
 External contacts may be participants in a thread without becoming workspace members. Their
 presence in a conversation does not give them the workspace permissions of an invited
-human or configured agent. The exact relationship between thread participation and permission
-to read or publish in that thread remains part of the access policy to define.
+human or configured agent. Contact handling uses the channel's authorized intake and delivery
+contracts; appearing as a participant grants no authenticated workspace or group access.
 
 ### Humans join through invitations; agent creation establishes agent membership
 
@@ -759,18 +806,24 @@ of externally requested operations.
 ### Thread creation is one domain operation used by several workflows
 
 Thread creation belongs to the thread domain. The task workflow coordinates it with task
-creation; ownership does not move into the task domain. Starting a channel conversation or
-DM can use that same thread-creation implementation.
+creation; ownership does not move into the task domain. Starting a thread in a DM or team
+group, a standalone conversation, or a channel conversation uses that same thread-creation
+implementation. Creating or selecting a group is a separate responsibility from creating
+one of its threads.
 
-| Requested operation                 | Authorization concerns                                                   | Required internal work                                 |
-| ----------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
-| Create a task                       | Creating that task in the target workspace and its requested setup.      | Create the working thread and the task referencing it. |
-| Send the first message in a channel | Starting a conversation in that channel with the requested participants. | Create the thread and publish the first message.       |
-| Start a DM                          | Starting a conversation with those participants.                         | Create the thread and publish the first message.       |
+| Requested operation                 | Authorization concerns                                                                          | Required internal work                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Create a task                       | Creating that task, its thread placement, and its requested audience.                           | Create the working thread and the task referencing it.                                      |
+| Send the first message in a channel | Starting a conversation through that channel's intake and audience rules.                       | Create the thread and publish the first message.                                            |
+| Start a DM with its first message   | Active workspace membership, the selected counterpart, and agent-use authority when applicable. | Establish the DM group and its pair, create the thread, and publish the first message.      |
+| Start a thread in a group           | Group access, starting a thread, and its requested participants.                                | Create the thread, establish participation, and publish the first message.                  |
+| Start a standalone thread           | Starting a conversation and admitting the selected participants.                                | Create the thread, establish its audience and participation, and publish the first message. |
 
 The internal thread-creation operation does not repeat a separate member-level
 `thread.create` check when it is a required step of one of those authorized workflows.
-It still validates the thread's own rules, including workspace and participant references.
+It still validates the thread's own rules, including workspace, group, origin, and
+participant references. Placement, participation, and initial publication commit together
+when the requested workflow creates a conversation with a first message.
 
 If direct empty-thread creation is exposed as a caller-requested operation, that operation
 needs authorization of its own before calling the same internal implementation. The rule
@@ -2174,28 +2227,209 @@ Successful response publication and successful turn closure must be coordinated 
 a publication conflict leaves the turn able to incorporate input and continue. The storage
 mechanism, retry scheduling, and exact ordering of completion records remain contract work.
 
+## Agreed: groups provide a shared home for threads
+
+A group is a lasting conversation space within one workspace. It owns the shared audience
+for multiple threads. Each thread belongs to at most one group in that same workspace;
+a thread without a group is standalone. Each thread retains its own conversation, timeline,
+and participation history.
+
+A DM is a group for two members, each a human or agent. The pair can create multiple
+threads for different conversations. A team group provides the same structure for a larger
+set of members. Adding a third person to a DM requires a separate conversation space;
+mentioning that person does not expand the DM's audience.
+
+The initial group model uses explicit membership drawn from active workspace members.
+Members with the relevant permissions create team groups and manage group membership;
+any active workspace member can start a DM, and current group members can leave themselves,
+as described below. Workspace membership alone does not enroll someone in a group.
+Joining a group makes its existing
+threads available under their action permissions, including earlier conversation history;
+it does not enroll the member in every thread or create historical notifications.
+
+```text
+Workspace
+  DM group: Alice and Bob
+    Thread: Release planning
+    Thread: Investigating a bug
+  Team group: Engineering
+    Thread: API changes
+    Thread: Build failures
+  Standalone thread: Review this proposal
+```
+
+Groups and channels have separate responsibilities. A group supplies an internal conversation
+space and shared audience. A channel supplies external intake and delivery through its
+connection and transport adapter. Groups can exist without a channel. Mapping external
+conversations into groups requires an explicit routing and audience contract; transport
+configuration alone does not establish group membership.
+
+### Group permissions govern creation and membership management
+
+| Requested action                                   | Who can perform it                                                        |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| Create a team group and select its initial members | Members with group-creation permission in the workspace.                  |
+| Start a DM with one other active workspace member  | Any active workspace member, with agent-use authority when applicable.    |
+| Add a member to an existing group                  | Members with the required membership-management permission for the group. |
+| Remove another member from a group                 | Members with the required membership-management permission for the group. |
+| Leave one's own group membership                   | Any current group member with active workspace membership.                |
+
+Application operations check the required permission and its workspace or group target;
+they do not compare role names. Team-group creation uses `group.create` on the workspace.
+Its initial `administrator` built-in tier places it in the Administrator and Owner bundles;
+that placement is a default bundle choice, not a restriction on who may hold the permission.
+Another role, including a future role between Viewer and Administrator, or a direct grant
+can authorize the same operation. Holding an Administrator role without the permission does
+not authorize it. Group-membership management will follow the same rule; its exact permission
+names remain contract work.
+
+The implemented first operation creates a private team group and an explicit list of initial
+memberships atomically. Its creation permission covers that requested audience without a
+second membership-management check. The creator joins only if included in the list. See
+[group creation](group-workflows.md) for its implemented contract and remaining workflows.
+
+Starting a DM is a member operation. The initiating member is one of its two members and
+selects one other active human or agent member in the same workspace. Selecting an agent
+also requires authority to use that agent. The authorized DM workflow covers establishing
+the group and its initial pair; it does not require the permission to create
+team groups or manage arbitrary group memberships. The group domain still owns creation
+and validates its invariants when called from that workflow. The permission to start a DM
+does not authorize expanding an existing DM beyond its pair.
+
+Leaving is a self-service operation bounded to the acting member's own current group
+membership. It requires no membership-management authority or separate read
+permission and cannot be used to remove someone else. Humans and agents follow the same
+rule. Being the group's creator or the workspace owner does not prevent leaving a group;
+workspace ownership and membership remain unchanged.
+
+Membership management concerns the group's membership, rather than access to its thread
+content. A member's management permission authorizes the metadata needed for that
+operation even when that member does not participate in the group. Reading its
+conversations still requires inclusion in the audience and the applicable action permission.
+A member with the required management permission can explicitly add themselves when the group's admission rules permit it;
+that recorded membership change supplies access. A DM's two-person audience still constrains
+membership management; management authority does not expand it to a third person.
+
+Adding someone requires active membership in the same workspace and grants the group's
+inherited thread access, subject to action permissions. It does not change workspace roles,
+enroll the member in existing threads, or request agent work. Removing another member and
+leaving oneself have the same access and participation consequences under the
+[departure rules](#unfollowing-leaving-and-muting-have-different-access-effects).
+Rejoining after departure requires authorized addition; the ability to leave does not grant
+the ability to add oneself back.
+
+DM reuse and readmission after departure remain contract work. Starting a DM must not
+silently reactivate an ended membership or restore access to an earlier DM's history.
+
+## Agreed: thread access combines audience and action permissions
+
+For a human or agent operation on a thread, all of the following must hold:
+
+1. The actor has active membership in the thread's workspace.
+2. The actor belongs to the thread's access audience.
+3. The actor has the required permission for the requested action and target.
+4. The operation's domain rules permit the requested change.
+
+Audience determines which conversation the member can access. Permissions determine the
+actions the member can perform there, such as reading, publishing, or managing participation.
+An audience relationship does not grant unrelated permissions. A broad action grant does
+not bypass the audience requirement; workspace ownership or an administrator role does not
+implicitly make someone a member of every conversation. Any broader inspection policy
+requires an explicit future design.
+
+### Grouped threads inherit access; standalone threads establish their own audience
+
+| Thread location | Access audience for workspace members                          | Initial participants                              |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| DM group        | The group's two members.                                       | Both members.                                     |
+| Team group      | Current group members.                                         | Author and explicitly mentioned eligible members. |
+| Standalone      | Current participants admitted through an authorized operation. | Author and explicitly admitted participants.      |
+
+All threads in a group inherit its audience. A member with read permission can browse and
+read its threads without participating, including their earlier history. Private subsets
+within a group and individual-thread sharing with group outsiders are outside the initial
+policy. For a narrower or different audience, create a standalone thread or a separate group.
+
+Adding a participant to a grouped thread requires that human or agent to have group access.
+A mention cannot silently grant access to the group or to just one of its threads. When the
+selected person lacks group access, the UI can offer an authorized group-membership change
+or a separate standalone conversation. Granting group membership exposes the group's other
+threads as well, subject to action permissions; the choice must make that audience change clear.
+
+For a standalone thread, authorized admission establishes participation and the thread's
+access audience together. A mention that would add someone is therefore an audience change
+and requires the same admission authority. Possessing a thread link, knowing its ID, or
+requesting to follow it does not admit a nonparticipant. The admitted member can read the
+earlier conversation when permitted; old activity becomes history without retroactive
+notifications or work requests.
+
+### Access, participation, and recipient selection have separate effects
+
+Reading a grouped thread does not establish participation. An eligible member can become
+a participant by replying, explicitly following, or being added through an authorized
+mention or workflow. Validate participation changes consistently with the activity that
+introduces them. Following is involvement in the conversation, not a work request by itself.
+
+For example, Alice, Bob, and Reviewer belong to Engineering. Alice starts a thread with a
+message addressed to Reviewer. Alice and Reviewer participate. Bob can read the thread
+without receiving its activity notifications; replying adds Bob as a participant. Reviewer
+is asked to work by Alice's addressed message, not by its membership in Engineering.
+
+Thread participants supply possible notification recipients. Activity selects among them
+using the existing addressing rules, and the recipient decides how to handle the notification.
+Access by itself generates no notification and requests no agent work. Mentioning an agent
+also remains subject to authority to use that agent; its execution uses its own permissions.
+
+The policy applies to discovery, lists, reads, publishing, and live subscriptions. A member
+outside the audience must not obtain conversation details through list previews, activity
+payloads, or notification-source resolution. A historical notification preserves who was
+selected at publication; it is not continuing authority to read its source after losing access.
+An open subscription must stop exposing protected content after access is lost. Exact
+subscription enforcement and storage coordination remain implementation work.
+
+These member-access rules do not turn contacts or triage into workspace members. Contacts
+participate through authorized channel intake and delivery; triage uses its policy-processing
+contract. Neither gains authenticated workspace or group access by appearing in a thread.
+Standalone threads can host these workflows. Grouped external-conversation routing and its
+sharing rules remain open; group membership is not inferred from contact participation.
+
+### Remaining group and audience contract details
+
+The group/thread relationship, inherited audience, standalone admission, separation from
+notification selection, permission-based group management, and self-service departure are
+agreed. Any active workspace member can start a DM. Private team-group creation is implemented
+through `group.create`; its default role placement does not limit future grants or roles.
+Other group operations, their permission declarations, broader group schemas, and admission
+UI remain contract work.
+Whether a pair has one reusable DM group and its readmission behavior, public-group discovery,
+group lifecycle, and moving existing threads
+between groups remain open. Standalone admission authority is also separate from group
+membership management and remains to be defined. Moving or copying existing conversation
+content requires an explicit audience decision; an origin link does not perform it.
+
 ## Agreed: thread participants determine which agents take part
 
 A thread has participants, including humans and agents. External people are represented by
 individual contacts. Task workflows can also involve a participant that handles triage;
-its exact representation remains open. A DM contains its
-two participants: the initiating user and the human or agent whose DM it is. A
-human-to-human DM does not invoke an agent.
+its exact representation remains open. A new thread in a DM group starts with both group
+members participating. A human-to-human DM group does not invoke an agent.
 
-A group thread begins with its author and the participants explicitly mentioned in the
-initial message. Mentioning another participant later adds that participant to the thread.
-An initial group message with no mentions does not invoke agents merely because they belong
-to the surrounding channel.
+A thread in a team group begins with its author and the eligible members explicitly mentioned
+in the initial message. An initial message with no mentions does not invoke agents merely
+because they belong to the group. A standalone thread begins with its author and explicitly
+admitted participants. Later mentions can add participants under the
+[audience and admission rules](#grouped-threads-inherit-access-standalone-threads-establish-their-own-audience).
 
 These are thread participation rules. The initiating application operation must authorize
 the requested conversation and participant changes. Adding a thread participant does not create
 a workspace membership or confer unrelated workspace permissions. Access to use an agent
 is separate from that agent's permissions when executing the requested work.
 
-Thread participants supply the audience for every activity. The activity narrows that
-audience according to its type and addressing. For a published message, explicit mentions
-select recipients; with no mentions, all current participants are notified. That message rule
-applies equally to user and assistant authors. Other activity types have their own
+Thread participants supply the possible notification recipients for every activity. The
+activity narrows those recipients according to its type and addressing. For a published
+message, explicit mentions select recipients; with no mentions, all current participants
+are notified. That message rule applies equally to user and assistant authors.
+Other activity types have their own
 recipient rules, rather than being treated as synthetic user messages.
 
 Addressing does not limit which messages can be supplied as conversational history.
@@ -2218,11 +2452,36 @@ requests or their notifications.
 
 For a human, departure stops future notifications without cancelling work already requested
 from other participants. Thread departure does not by itself remove workspace membership
-or redefine workspace permissions. If the departing participant is the current task assignee,
-use the unassignment or reassignment workflow so the task is not left assigned to someone
-outside its thread.
+or change permission assignments. Its access consequences follow the audience rules below.
+If the departing participant is the current task assignee, use the unassignment or
+reassignment workflow so the task is not left assigned to someone outside its thread.
+
+### Unfollowing, leaving, and muting have different access effects
+
+| Action                                       | Access effect                                           | Participation and notification effect                                                        |
+| -------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Unfollow a grouped thread                    | Inherited group access remains, subject to permissions. | Ends participation and future recipient selection until an authorized rejoin.                |
+| Leave or be removed from a standalone thread | Removes the access supplied by participation.           | Ends participation and future recipient selection.                                           |
+| Leave or be removed from a group             | Removes inherited access to all its threads.            | Ends participation in those threads; the agent departure rules apply where relevant.         |
+| Lose workspace membership                    | Removes access to its groups and threads.               | Ends the corresponding active participation; the agent departure rules apply where relevant. |
+| Mute a thread as a human                     | Access remains.                                         | Participation and durable notifications remain; presentation can suppress alerts.            |
+
+Group or workspace removal must stop new recipient selection for the affected member
+consistently with the access change. Historical contributions and previously selected
+recipients remain recorded. Agent cancellation still distinguishes a request to stop from
+confirmation that execution stopped; loss of access does not erase completed effects.
+Detailed coordination across affected threads remains implementation work.
+
+Muting does not acknowledge notifications, advance input progress, or cancel agent work.
+It is a human presentation preference. Its exact UI and alert settings remain open.
 
 ### Rejoining establishes a new history boundary
+
+Rejoining requires group access for a grouped thread or authorized readmission for a
+standalone thread. Returning to a group restores eligible access to its threads but does
+not restore earlier participation or automatically revive work. After workspace readmission,
+group and standalone admission
+must also be established again; old memberships and participation remain historical.
 
 Record the new joining position. Earlier conversation becomes history, including requests
 left unfinished before departure and activity while the participant was absent. The message,
@@ -2558,13 +2817,16 @@ purposes; observing new timeline activity alone is not evidence of harness incor
 ## Agreed: joining distinguishes previous history from new input
 
 The thread records the position at which a participant joins and the associated activity. This
-may be a message or activity such as task assignment. That position establishes the
-boundary for the participant:
+may be a message, explicit follow, or activity such as task assignment. Access gained through
+a group alone does not establish thread participation or an input boundary. A standalone
+admission establishes access and participation consistently. The introducing position
+establishes the boundary for the participant:
 
 - Earlier conversation and activity are history, even though this participant has never handled them.
 - A human-authored message that causes the participant to join is initial input for that participant.
 - Task assignment can also provide initial work through its activity notification.
 - An explicit agent work request can provide initial work through its addressed activity.
+- Following or admission without actionable input does not request agent work.
 - Subsequent human messages without mentions are new input for the participant.
 - Subsequent human messages explicitly mentioning the participant are new input for that participant.
 - Subsequent task activity becomes input when its recipient and handling rules require work.
@@ -2732,9 +2994,15 @@ flowchart LR
 This allows independently assigned tasks to have separate conversations and attempts while
 retaining their connection to the discussion that produced them.
 
-The origin reference establishes a relationship. Which context is supplied from the
-originating thread, and at what point in its history, remain open. The reference alone does
-not define automatic inheritance of subsequent messages or shared filesystem state.
+The working thread can belong to a group or be standalone. Task creation must authorize
+that placement and its audience, including admission of the requested assignee. An assignee
+in a grouped thread needs group access; assignment cannot silently grant it. The origin
+reference does not choose the group, copy participants, or grant access to either conversation.
+
+Which context is supplied from the originating thread, and at what point in its history,
+remain open. Any supplied context must follow the applicable authorization and sharing rules,
+including the agreed agent-execution authority. The reference alone does not define automatic
+inheritance of subsequent messages or shared filesystem state.
 
 ## Agreed: channels connect external conversations through contact participants
 
@@ -2742,6 +3010,8 @@ A channel is a configured communication point through which conversations enter 
 amends, such as a Slack destination, an email address, or a Telegram entry point. One
 channel can carry many conversations. A channel adapter implements the provider-specific
 transport and message format; the channel does not own triage or agent execution.
+A channel is separate from an internal group. External conversation routing does not
+implicitly create a group or give contacts access to other threads in one.
 
 A channel references a connection whose implementation supports the channel contract and
 uses that connection's external access. A compatible toolkit can share the connection.

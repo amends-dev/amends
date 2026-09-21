@@ -1,6 +1,8 @@
-import { Context, Effect, Layer, Stream } from "effect";
+import { Array, Context, Effect, Layer, Result, Stream } from "effect";
 import type { Scope } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
+import { GroupFacts } from "../group/facts.ts";
+import { GroupMembershipFacts } from "../group/membership/facts.ts";
 import type { Actor } from "../identity/actor.ts";
 import { CommittedEvents } from "../journal/committed-events.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
@@ -11,7 +13,8 @@ export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   /**
    * Check active membership on entry and register before returning Ready. The caller owns
-   * the subscription scope. This version forwards all workspace events without per-event rules.
+   * the subscription scope. Private group facts are withheld until an audience-aware group
+   * feed exists. Other supported workspace events retain their existing delivery rules.
    */
   readonly watch: Effect.Effect<
     Stream.Stream<ChangeFeed.Message, ChangeFeed.Unavailable>,
@@ -41,15 +44,28 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
       Effect.mapError(() => new ChangeFeed.Unavailable({})),
     );
     const updates = subscription.pipe(
-      Stream.mapEffect(
+      Stream.filterMapEffect(
         Effect.fn("ChangeFeedApplication.normalize")(function* (batch) {
           if (batch.workspaceId !== workspaceId) return yield* new ChangeFeed.Unavailable({});
-          const events = yield* Effect.forEach(batch.events, ChangeFeedEvents.normalize);
-          return ChangeFeed.Message.cases.Committed.make({
-            workspaceId,
-            commitId: batch.commitId,
-            events,
-          });
+          // Private names, audiences, and provenance must not enter the workspace-wide feed.
+          const visible = batch.events.filter(
+            (event) =>
+              !(
+                (event.name === GroupFacts.Created.name &&
+                  event.version === GroupFacts.Created.version) ||
+                (event.name === GroupMembershipFacts.Added.name &&
+                  event.version === GroupMembershipFacts.Added.version)
+              ),
+          );
+          const events = yield* Effect.forEach(visible, ChangeFeedEvents.normalize);
+          if (!Array.isArrayNonEmpty(events)) return Result.fail(undefined);
+          return Result.succeed(
+            ChangeFeed.Message.cases.Committed.make({
+              workspaceId,
+              commitId: batch.commitId,
+              events,
+            }),
+          );
         }),
       ),
       Stream.mapError(() => new ChangeFeed.Unavailable({})),

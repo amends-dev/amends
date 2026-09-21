@@ -64,7 +64,8 @@ so a client can import the complete contract without loading server code.
   returns the same 404. The caller cannot select a different recipient.
 - `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream.
   Authentication and active membership are checked on entry. The stream currently
-  forwards every supported event in that workspace, without per-event filtering.
+  forwards supported workspace-management events. Private group creation and admission
+  facts are withheld until audience-aware group delivery exists.
 
 ### Live changes
 
@@ -94,6 +95,8 @@ and disable proxy buffering where supported. Missing/rejected credentials return
 `ChangeFeed.Unavailable`; reconnect and refresh to recover the current view.
 Delivery covers confirmed commits in the serving process. Other processes and
 missed publications need a future recovery mechanism.
+Private group facts and their provenance are omitted. A group-only commit emits no message;
+a mixed commit includes its other supported events in order. There are no group HTTP endpoints yet.
 Membership is not rechecked after entry, so removal does not itself terminate an
 existing subscription. There is no per-event permission check or field redaction.
 See [known limitations](../../docs/current-status.md) for delivery and edge controls.

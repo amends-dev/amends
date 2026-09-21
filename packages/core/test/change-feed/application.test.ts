@@ -1,4 +1,5 @@
 import { Subject } from "@amends/core/journal";
+import { Group, GroupFacts, GroupMembership, GroupMembershipFacts } from "@amends/core/group";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
@@ -210,6 +211,54 @@ it.effect("unknown fact versions fail normalization instead of emitting an incom
       expect(yield* stream.pipe(Stream.runDrain, Effect.flip)).toEqual(
         new ChangeFeed.Unavailable({}),
       );
+    }),
+  ),
+);
+
+it.effect("private group commits are withheld and mixed commits retain only public events", () =>
+  run(() =>
+    Effect.gen(function* () {
+      const stream = yield* (yield* ChangeFeedApplication.Service).watch;
+      const journal = yield* Journal.Service;
+      const group = {
+        id: Group.Id.make("private-group"),
+        workspaceId,
+        kind: "Team" as const,
+        visibility: "Private" as const,
+        name: "Private name",
+        createdBy: actor.memberId,
+        createdAt: invitation.issuedAt,
+      };
+      yield* journal.commit(
+        Effect.gen(function* () {
+          yield* journal.publish(GroupFacts.Created, group);
+          yield* journal.publish(GroupMembershipFacts.Added, {
+            id: GroupMembership.Id.make("private-membership"),
+            workspaceId,
+            groupId: group.id,
+            memberId: actor.memberId,
+            status: "active",
+            admittedAt: group.createdAt,
+          });
+        }).pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
+      );
+      const publicEvent = yield* journal.commit(
+        Effect.gen(function* () {
+          yield* journal.publish(GroupFacts.Created, {
+            ...group,
+            id: Group.Id.make("another-private-group"),
+          });
+          return yield* journal.publish(InvitationFacts.Issued, invitation);
+        }).pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
+      );
+      const messages = yield* stream.pipe(Stream.take(2), Stream.runCollect);
+      expect(messages[0]).toEqual({ _tag: "Ready", workspaceId });
+      const committed = messages[1];
+      if (committed?._tag !== "Committed") return yield* Effect.die("Missing public change");
+      expect(committed.commitId).toBe(publicEvent.commitId);
+      expect(committed.events.map(({ name }) => name)).toEqual([InvitationFacts.Issued.name]);
+      expect(JSON.stringify(messages)).not.toContain("private-group");
+      expect(JSON.stringify(messages)).not.toContain("Private name");
     }),
   ),
 );

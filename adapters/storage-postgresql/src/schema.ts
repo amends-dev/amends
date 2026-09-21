@@ -33,7 +33,7 @@ export const memberStatuses = ["active", "removed"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = ["Workspace", "Member", "Thread"] as const;
+export const targetKinds = ["Workspace", "Member", "Thread", "Group"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 export const notificationStates = ["Pending"] as const;
 
@@ -43,11 +43,12 @@ const scopeColumns = {
   targetKind: text("target_kind", { enum: targetKinds }),
   targetMemberId: text("target_member_id"),
   targetThreadId: text("target_thread_id"),
+  targetGroupId: text("target_group_id"),
 };
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) =>
   check(
     name,
-    sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL) OR (${columns.scopeKind} = 'Target' AND ${columns.targetKind} IS NOT NULL AND ((${columns.targetKind} = 'Workspace' AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL) OR (${columns.targetKind} = 'Member' AND ${columns.targetMemberId} IS NOT NULL AND ${columns.targetThreadId} IS NULL) OR (${columns.targetKind} = 'Thread' AND ${columns.targetThreadId} IS NOT NULL AND ${columns.targetMemberId} IS NULL)))`,
+    sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.scopeKind} = 'Target' AND ${columns.targetKind} IS NOT NULL AND ((${columns.targetKind} = 'Workspace' AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.targetKind} = 'Member' AND ${columns.targetMemberId} IS NOT NULL AND ${columns.targetThreadId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.targetKind} = 'Thread' AND ${columns.targetThreadId} IS NOT NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.targetKind} = 'Group' AND ${columns.targetGroupId} IS NOT NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL)))`,
   );
 
 export const workspaces = pgTable("workspaces", {
@@ -78,6 +79,63 @@ export const members = pgTable(
     uniqueIndex("active_member_identity")
       .on(table.workspaceId, table.identityKind, table.identityId)
       .where(sql`${table.status} = 'active'`),
+  ],
+);
+
+export const groups = pgTable(
+  "groups",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    kind: text("kind", { enum: ["Team"] }).notNull(),
+    visibility: text("visibility", { enum: ["Private"] }).notNull(),
+    name: text("name").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    foreignKey({
+      columns: [table.workspaceId, table.createdBy],
+      foreignColumns: [members.workspaceId, members.id],
+      name: "groups_creator",
+    }),
+    check("groups_kind", sql`${table.kind} = 'Team'`),
+    check("groups_visibility", sql`${table.visibility} = 'Private'`),
+  ],
+);
+
+export const groupMemberships = pgTable(
+  "group_memberships",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    groupId: text("group_id").notNull(),
+    memberId: text("member_id").notNull(),
+    admittedAt: instant("admitted_at").notNull(),
+    status: text("status", { enum: memberStatuses }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    foreignKey({
+      columns: [table.workspaceId, table.groupId],
+      foreignColumns: [groups.workspaceId, groups.id],
+      name: "group_memberships_group",
+    }),
+    foreignKey({
+      columns: [table.workspaceId, table.memberId],
+      foreignColumns: [members.workspaceId, members.id],
+      name: "group_memberships_member",
+    }),
+    check("group_memberships_status", sql`${table.status} IN ('active', 'removed')`),
+    uniqueIndex("active_group_membership")
+      .on(table.workspaceId, table.groupId, table.memberId)
+      .where(sql`${table.status} = 'active'`),
+    index("group_memberships_by_group").on(
+      table.workspaceId,
+      table.groupId,
+      sql`${table.id} COLLATE "C"`,
+    ),
   ],
 );
 

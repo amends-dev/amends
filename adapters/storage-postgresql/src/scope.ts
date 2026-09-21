@@ -8,6 +8,7 @@ export interface Columns {
   readonly targetKind: (typeof targetKinds)[number] | null;
   readonly targetMemberId: string | null;
   readonly targetThreadId: string | null;
+  readonly targetGroupId: string | null;
 }
 
 /** The scope's workspace is the row's, so only the shape and target survive. */
@@ -18,6 +19,7 @@ export const encode = (scope: Scope.Value): Columns => {
       targetKind: null,
       targetMemberId: null,
       targetThreadId: null,
+      targetGroupId: null,
     }),
     Target: ({ target }): Columns => ({
       scopeKind: "Target",
@@ -26,16 +28,25 @@ export const encode = (scope: Scope.Value): Columns => {
           targetKind: "Workspace",
           targetMemberId: null,
           targetThreadId: null,
+          targetGroupId: null,
         }),
         Member: ({ memberId }): Omit<Columns, "scopeKind"> => ({
           targetKind: "Member",
           targetMemberId: memberId,
           targetThreadId: null,
+          targetGroupId: null,
         }),
         Thread: ({ threadId }): Omit<Columns, "scopeKind"> => ({
           targetKind: "Thread",
           targetMemberId: null,
           targetThreadId: threadId,
+          targetGroupId: null,
+        }),
+        Group: ({ groupId }): Omit<Columns, "scopeKind"> => ({
+          targetKind: "Group",
+          targetMemberId: null,
+          targetThreadId: null,
+          targetGroupId: groupId,
         }),
       }),
     }),
@@ -47,28 +58,35 @@ export const decode = (workspaceId: Workspace.Id, columns: Columns): unknown => 
   if (columns.scopeKind === "Workspace")
     return columns.targetKind === null &&
       columns.targetMemberId === null &&
-      columns.targetThreadId === null
+      columns.targetThreadId === null &&
+      columns.targetGroupId === null
       ? { _tag: "Workspace", workspaceId }
       : undefined;
   if (columns.scopeKind !== "Target") return undefined;
   switch (columns.targetKind) {
     case "Workspace":
-      return columns.targetMemberId === null && columns.targetThreadId === null
+      return columns.targetMemberId === null &&
+        columns.targetThreadId === null &&
+        columns.targetGroupId === null
         ? { _tag: "Target", target: { _tag: "Workspace", workspaceId } }
         : undefined;
     case "Member":
-      return columns.targetThreadId === null
+      return columns.targetThreadId === null && columns.targetGroupId === null
         ? {
             _tag: "Target",
             target: { _tag: "Member", workspaceId, memberId: columns.targetMemberId },
           }
         : undefined;
     case "Thread":
-      return columns.targetMemberId === null
+      return columns.targetMemberId === null && columns.targetGroupId === null
         ? {
             _tag: "Target",
             target: { _tag: "Thread", workspaceId, threadId: columns.targetThreadId },
           }
+        : undefined;
+    case "Group":
+      return columns.targetMemberId === null && columns.targetThreadId === null
+        ? { _tag: "Target", target: { _tag: "Group", workspaceId, groupId: columns.targetGroupId } }
         : undefined;
     default:
       return undefined;

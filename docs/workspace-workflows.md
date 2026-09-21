@@ -184,14 +184,17 @@ Each registered permission declares a required `builtinTier`. Viewer includes
 `viewer` permissions, Administrator also includes `administrator` permissions,
 and Owner includes all three tiers, including `owner`. The current bundles are:
 
-| Role          | Stored permissions                                                                                                          |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Viewer        | `member.read`, `assignment.read`                                                                                            |
-| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`                                 |
-| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership` |
+| Role          | Stored permissions                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Viewer        | `member.read`, `assignment.read`                                                                                                            |
+| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `group.create`                                 |
+| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership`, `group.create` |
 
 Ownership transfer is the first owner-tier permission. Delegation separately reserves
 administrator management for the current owner.
+
+`group.create` authorizes [private team-group creation](group-workflows.md). Its default
+bundle placement does not limit it to a role name; any role or direct grant can supply it.
 
 Role IDs are stable within each workspace: `builtin:viewer`, `builtin:administrator`,
 and `builtin:owner`. These identities are reserved for built-in definitions. Tiers

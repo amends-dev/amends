@@ -14,14 +14,15 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features. |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
-| `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
+| Domain          | Ownership                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features.   |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                      |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                    |
+| `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.    |
+| `group`         | Permission-based private team creation, initial group admissions, facts, projections, and storage. |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                              |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -101,6 +102,20 @@ build a read screen do not authorize a later write. Stores still require a valid
 workspace transaction for every mutation. A read invoked inside an existing commit
 uses that transaction and sees its staged changes without opening another one.
 
+## Private team-group creation
+
+`@amends/core/group` exposes `GroupApplication.createPrivateTeam({ name, memberIds })`.
+It requires `group.create` on the workspace, validates the name and distinct active workspace
+membership IDs, and records the group and its initial admissions in one commit. Any role or
+direct grant can provide that permission. The default Administrator and Owner bundles include
+it; their names play no part in authorization.
+
+Initial members are explicit and may be empty. The creator is admitted only if included.
+`GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
+own ID and workspace-membership reference. Public group reads, membership changes, DMs,
+public groups, threads, and HTTP/UI workflows remain separate work. See
+[group creation](../../docs/group-workflows.md) for the current contract and verification.
+
 ## Identity and target boundaries
 
 `Identity.Reference` identifies a Human, Agent, or Contact. `Identity.MemberReference`
@@ -109,12 +124,15 @@ gateway. External authors use `Performer.Reference.Identity` with a Contact;
 `Performer.Reference.Member` always carries a member identity. Attribution does
 not grant authority, and a contact identity does not select an external reply destination.
 
-`Target.Reference` supports Workspace, Member, and Thread. Thread targets carry
+`Target.Reference` supports Workspace, Member, Group, and Thread. Group targets carry
+`workspaceId` and `Group.Id`; thread targets carry
 `workspaceId` and `ThreadId.Id`, exported from `@amends/core/thread`. Exact target
 scopes compare the workspace, kind, and ID; a workspace scope covers targets in
-that workspace. Adding a Thread target supplies scoped grant storage, not a
-participant-access policy. Thread operations must define and enforce that policy
-when implemented. The thread module currently contains only its ID.
+that workspace. Adding a Thread target supplies scoped grant storage. The
+[planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
+also requires group access or standalone participation alongside action permissions.
+Group creation is implemented; group/thread reads and that audience policy are not.
+The thread module currently contains only its ID.
 
 ## Permission declarations and built-in roles
 
@@ -245,7 +263,9 @@ batch. Events committed after subscription are retained even before Ready is rea
 The feature has no store, projection, facts, cursor, or history API. It consumes
 confirmed local publications and does not create application notifications.
 Membership is checked when opening the subscription; per-event authorization and
-field filtering are deferred. This version forwards every supported workspace event.
+field filtering are deferred. Private group creation and admission facts are withheld,
+including their provenance, until audience-aware group delivery exists. Commits containing
+only those facts emit no public change; mixed commits retain their other supported events.
 Lag or an unsupported payload/version fails the stream with `ChangeFeed.Unavailable`;
 consumers reconnect and refresh on the new Ready rather than resume a cursor.
 
@@ -422,6 +442,7 @@ meaning rather than using it as a synonym for a constructor.
 | Authorization         | `Authorization.make()`                        | `Authorization.Service`                 |
 | Member operations     | `MemberApplication.make()`                    | `MemberApplication.Service`             |
 | Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
+| Private team creation | `GroupApplication.make()`                     | `GroupApplication.Service`              |
 | Assignment operations | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
 | Delegation policy     | `Delegation.make()`                           | `Delegation.Service`                    |
 | Invitation operations | `InvitationApplication.make()`                | `InvitationApplication.Service`         |

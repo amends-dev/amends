@@ -1,5 +1,6 @@
 import { Record, Schema } from "effect";
 import { ThreadId } from "../thread/id.ts";
+import { GroupId } from "../group/id.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
 
@@ -8,6 +9,7 @@ export const Reference = Schema.TaggedUnion({
   Workspace: { workspaceId: Workspace.Id },
   Member: { workspaceId: Workspace.Id, memberId: Member.Id },
   Thread: { workspaceId: Workspace.Id, threadId: ThreadId.Id },
+  Group: { workspaceId: Workspace.Id, groupId: GroupId.Id },
 });
 export type Reference = typeof Reference.Type;
 

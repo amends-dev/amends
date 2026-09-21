@@ -2,6 +2,8 @@ import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer } from "effect";
 import { Assignments } from "./assignments.ts";
+import { Groups } from "./groups.ts";
+import { GroupMemberships } from "./group-memberships.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { SqliteDatabase } from "./database.ts";
@@ -27,6 +29,8 @@ const layerStores = Layer.mergeAll(
   Assignments.layer,
   Invitations.layer,
   Notifications.layer,
+  Groups.layer,
+  GroupMemberships.layer,
 );
 
 /**

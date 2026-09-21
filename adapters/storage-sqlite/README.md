@@ -35,7 +35,8 @@ backfills, or legacy envelope formats. See the
 
 One module per store, each exporting `make` and a `layer` for the core service
 it implements: `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`,
-`roles.ts`, `assignments.ts`, `invitations.ts`, and `notifications.ts`. They share `binding.ts`,
+`roles.ts`, `assignments.ts`, `invitations.ts`, `notifications.ts`, `groups.ts`, and
+`group-memberships.ts`. They share `binding.ts`,
 which is one workspace's view of the database: its identity, the transaction
 boundary, and the guard each statement runs under. `storage.ts` exports
 `layerWorkspace(workspaceId)` to compose the store layers over a binding for the
@@ -58,6 +59,14 @@ source existence and recipient selection remain generation responsibilities.
 The notification projection currently has no generation handlers.
 
 ## Transactions
+
+Private team creation records its group and explicit initial admissions in the shared
+workspace commit. Group admissions reference workspace memberships and have distinct IDs;
+a unique index prevents competing active admissions for the same group/member pair.
+Stores validate records and workspace references before writes. Replay accepts historical
+references to removed workspace members; current eligibility belongs to application operations.
+The group suite covers permission grants, rollback, reopening, replay, and direct-store
+constraints. See [group creation](../../docs/group-workflows.md) for the implemented scope.
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

@@ -5,6 +5,10 @@
  */
 import { Layer } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
+import { GroupApplication } from "./group/application.ts";
+import { GroupProjection } from "./group/projection.ts";
+import { GroupMembershipProjection } from "./group/membership/projection.ts";
+import { GroupPermissions } from "./group/permissions.ts";
 import { AssignmentProjection } from "./authorization/assignment/projection.ts";
 import { AssignmentApplication } from "./authorization/assignment/application.ts";
 import { AssignmentPermissions } from "./authorization/assignment/permissions.ts";
@@ -34,6 +38,8 @@ const projections = [
   RoleProjection.definition,
   AssignmentProjection.definition,
   InvitationProjection.definition,
+  GroupProjection.definition,
+  GroupMembershipProjection.definition,
   NotificationProjection.definition,
 ] as const;
 
@@ -45,6 +51,7 @@ const permissions = [
   AssignmentPermissions.Read,
   AssignmentPermissions.Manage,
   OwnershipPermissions.Transfer,
+  GroupPermissions.Create,
 ];
 
 /** The domain journal and its log, over host storage. */
@@ -66,6 +73,7 @@ const operations = Layer.mergeAll(
   OwnershipApplication.layer,
   NotificationApplication.layer,
   ChangeFeedApplication.layer,
+  GroupApplication.layer,
 ).pipe(Layer.provide(Delegation.layer));
 
 /**

@@ -1,3 +1,4 @@
+import { Group } from "@amends/core/group";
 import { ThreadId } from "@amends/core/thread";
 import { describe, it, expect } from "@effect/vitest";
 import { Assignment, Grant, Role, Scope, Target } from "@amends/core/authorization";
@@ -20,21 +21,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
   const permission = MemberPermissions.Read.name;
   const roleId = Role.Id.make("contract-role");
   const localScope = (
-    kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread",
+    kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread" | "TargetGroup",
     id: Workspace.Id,
     memberId: Member.Id,
   ): Scope.Value => {
     if (kind === "Workspace") return Scope.Value.cases.Workspace.make({ workspaceId: id });
     return Scope.Value.cases.Target.make({
       target:
-        kind === "TargetThread"
-          ? Target.Reference.cases.Thread.make({
-              workspaceId: id,
-              threadId: ThreadId.Id.make("thread"),
-            })
-          : kind === "TargetMember"
-            ? Target.Reference.cases.Member.make({ workspaceId: id, memberId })
-            : Target.Reference.cases.Workspace.make({ workspaceId: id }),
+        kind === "TargetGroup"
+          ? Target.Reference.cases.Group.make({ workspaceId: id, groupId: Group.Id.make("group") })
+          : kind === "TargetThread"
+            ? Target.Reference.cases.Thread.make({
+                workspaceId: id,
+                threadId: ThreadId.Id.make("thread"),
+              })
+            : kind === "TargetMember"
+              ? Target.Reference.cases.Member.make({ workspaceId: id, memberId })
+              : Target.Reference.cases.Workspace.make({ workspaceId: id }),
     });
   };
   const source = (kind: "Role" | "Direct", scope: Scope.Value): Assignment.Source =>
@@ -99,10 +102,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
     ["Role", "TargetWorkspace"],
     ["Role", "TargetMember"],
     ["Role", "TargetThread"],
+    ["Role", "TargetGroup"],
     ["Direct", "Workspace"],
     ["Direct", "TargetWorkspace"],
     ["Direct", "TargetMember"],
     ["Direct", "TargetThread"],
+    ["Direct", "TargetGroup"],
   ] as const)(
     "%s assignments reject a foreign %s scope before converting columns",
     ([kind, scopeKind]) =>

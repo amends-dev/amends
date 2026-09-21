@@ -7,6 +7,7 @@ import {
 import { Commit } from "@amends/core/journal";
 import { ChangeFeed } from "@amends/core/change-feed";
 import { NotificationApplication } from "@amends/core/notification";
+import { GroupApplication } from "@amends/core/group";
 import {
   InvitationApplication,
   MemberApplication,
@@ -67,6 +68,8 @@ export const PublicError = Schema.Union([
   MemberApplication.OwnerProtected,
   MemberApplication.AlreadyRemoved,
   NotificationApplication.NotFound,
+  GroupApplication.MemberNotFound,
+  GroupApplication.InactiveMember,
   InvitationApplication.NotFound,
   InvitationApplication.NotRecipient,
   InvitationApplication.AlreadyMember,

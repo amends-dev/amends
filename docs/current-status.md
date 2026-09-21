@@ -7,8 +7,14 @@ Workspace creation, membership, required-role invitations, assignment management
 and ownership transfer are implemented through core, the gateway, HTTP, and the
 Solid web app. SQLite and PostgreSQL persist their journal and projections. See
 [workspace workflows](workspace-workflows.md) for the available operations.
-Thread activity, turns, agent execution, triage, and channel delivery remain design
-work; the thread package currently supplies only an ID.
+Core and both adapters implement [private team-group creation](group-workflows.md) with
+explicit initial memberships and permission-based authorization. Group reads, later membership
+changes, DMs, public groups, and group HTTP/UI workflows remain unimplemented.
+Thread access and activity, turns, agent execution, triage, and channel delivery remain
+design work; the thread package currently supplies only an ID.
+The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
+are agreed design intent. Inherited thread access, standalone admission, and participation
+cleanup are not implemented. Workspace-member removal does not yet settle group memberships.
 
 ## Notification recipients and generation
 
@@ -37,7 +43,9 @@ cross-process fan-out, or replay on the public SSE endpoint. A missed publicatio
 or another process's commit can leave a connected client's view stale.
 
 [ChangeFeedApplication.watch](../packages/core/src/change-feed/application.ts) checks
-membership at subscription time and forwards every supported workspace event.
+membership at subscription time and forwards supported workspace-management events.
+Private group creation and admission facts are withheld, including their provenance;
+group-only commits produce no public change until audience-aware group delivery exists.
 It does not filter fields or events by permission, or continuously recheck membership.
 Removal therefore does not itself close an existing subscription. Reconnecting
 checks access again, and Ready refreshes the browser's current view.

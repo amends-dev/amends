@@ -9,6 +9,10 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE TABLE workspaces (workspace_id TEXT PRIMARY KEY, record TEXT NOT NULL CHECK(json_valid(record)))`;
     yield* sql`CREATE TABLE members (workspace_id TEXT NOT NULL, id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
     yield* sql`CREATE UNIQUE INDEX active_member_identity ON members(workspace_id, json_extract(record, '$.identity._tag'), json_extract(record, '$.identity.id')) WHERE json_extract(record, '$.status') = 'active'`;
+    yield* sql`CREATE TABLE groups (workspace_id TEXT NOT NULL, id TEXT NOT NULL, created_by TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id), FOREIGN KEY(workspace_id, created_by) REFERENCES members(workspace_id, id))`;
+    yield* sql`CREATE TABLE group_memberships (workspace_id TEXT NOT NULL, id TEXT NOT NULL, group_id TEXT NOT NULL, member_id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id), FOREIGN KEY(workspace_id, group_id) REFERENCES groups(workspace_id, id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id))`;
+    yield* sql`CREATE UNIQUE INDEX active_group_membership ON group_memberships(workspace_id, group_id, member_id) WHERE json_extract(record, '$.status') = 'active'`;
+    yield* sql`CREATE INDEX group_memberships_by_group ON group_memberships(workspace_id, group_id, id COLLATE BINARY)`;
     yield* sql`CREATE TABLE roles (workspace_id TEXT NOT NULL, id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
     yield* sql`CREATE TABLE assignments (workspace_id TEXT NOT NULL, id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
     yield* sql`CREATE INDEX assignments_by_member ON assignments(workspace_id, json_extract(record, '$.memberId'), json_extract(record, '$.status'))`;

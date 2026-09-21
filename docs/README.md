@@ -11,6 +11,7 @@ remaining gaps with links to their owning code.
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [Repository README](../README.md)                                                                       | Setup, workspace layout, tooling, and dependency updates.                                                           |
 | [Workspace workflows](workspace-workflows.md)                                                           | Creation, membership, invitations, access, and ownership transfer.                                                  |
+| [Group creation](group-workflows.md)                                                                    | Permission-based private team creation, initial admissions, storage, replay, and current limits.                    |
 | [Journal and logs](journal.md)                                                                          | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
 | [Testing](testing.md)                                                                                   | Test commands, Effect test APIs, and database fixtures.                                                             |
 | [Shared packages](../packages/README.md)                                                                | Package boundaries, names, and construction conventions.                                                            |
@@ -27,7 +28,7 @@ remaining gaps with links to their owning code.
 ## Design and historical references
 
 - [Core model](core-model.md) is living design intent. Workspace management is
-  implemented; thread activity, turns, execution, notification generation, triage,
+  implemented, along with private team creation in core; other group workflows, thread access and activity, turns, execution, notification generation, triage,
   and channel delivery remain planned. Its opening status note links to current guides.
 - [Effect capability map](effect-capability-map.md) records an earlier source review
   and architecture proposal. Its module inventory reflects the pinned source;

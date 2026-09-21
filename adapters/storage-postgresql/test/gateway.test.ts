@@ -1,6 +1,7 @@
 import { describe, it, expect } from "@effect/vitest";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
+import { GroupPermissions } from "@amends/core/group";
 import {
   InvitationApplication,
   InvitationPermissions,
@@ -145,6 +146,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                       AssignmentPermissions.Read.name,
                       AssignmentPermissions.Manage.name,
                       ...(id === BuiltinRoles.OwnerId ? [OwnershipPermissions.Transfer.name] : []),
+                      GroupPermissions.Create.name,
                     ],
                   }),
                 );
