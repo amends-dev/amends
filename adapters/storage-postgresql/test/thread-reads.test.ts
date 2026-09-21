@@ -166,7 +166,7 @@ const prepare = Effect.fnUntraced(function* () {
     agent: actorFor(agentId),
   };
 });
-/** Seed further canonical activity to verify paging before the reply operation exists. */
+/** Seed nonmonotonic timestamps and canonical activity to isolate pagination behavior. */
 const append = (bound: Bound, thread: Thread.Record, sequence: number) =>
   publish(
     bound,

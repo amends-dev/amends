@@ -4,10 +4,8 @@ import { AgentPermissions } from "../agent/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
 import { Group } from "../group/group.ts";
 import { GroupAudience } from "../group/audience.ts";
-import { GroupMembership } from "../group/membership/membership.ts";
 import { GroupMembershipStore } from "../group/membership/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
@@ -18,15 +16,15 @@ import { Publication } from "../journal/publication.ts";
 import { Thread } from "./thread.ts";
 import { ThreadStore } from "./store.ts";
 import { ThreadCreation } from "./creation.ts";
+import { ThreadAccess } from "./access.ts";
+import { ThreadParticipationAdmission } from "./participation/admission.ts";
+import { ThreadMessagePublication } from "./message/publication.ts";
 import { ThreadPermissions } from "./permissions.ts";
 import { ThreadMessage } from "./message/message.ts";
-import { ThreadMessageFacts } from "./message/facts.ts";
 import { ThreadMessageStore } from "./message/store.ts";
 import { ThreadParticipation } from "./participation/participation.ts";
-import { ThreadParticipationFacts } from "./participation/facts.ts";
 import { ThreadParticipationStore } from "./participation/store.ts";
 import { ThreadActivity } from "./activity/activity.ts";
-import { ThreadActivityFacts } from "./activity/facts.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
 /** Missing, foreign, and outside-audience threads share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadApplication.NotFound", {
@@ -52,6 +50,7 @@ export type Error =
   | Authorization.Error
   | GroupAudience.InvalidResponse
   | ThreadCreation.Error
+  | Exclude<ThreadMessagePublication.Error, ThreadParticipationAdmission.Unavailable>
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
@@ -102,31 +101,30 @@ export class Service extends Context.Service<Service, Interface>()(
 const invalidReadRecord = (cause: Schema.SchemaError) =>
   new InvalidResponse({ message: `Thread storage returned invalid data: ${cause.message}` });
 const decodeThread = Schema.decodeEffect(Schema.toType(Thread.Record));
-const sameIdentity = Schema.toEquivalence(Identity.MemberReference);
 /** Capture bound services; authorize the complete requested conversation inside its commit. @category constructors */
 export const make = Effect.fn("ThreadApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const audience = yield* GroupAudience.Service;
-  const memberships = yield* GroupMembershipStore.Service;
-  const members = yield* MemberStore.Service;
   const creation = yield* ThreadCreation.Service;
+  const access = yield* ThreadAccess.Service;
+  const admissions = yield* ThreadParticipationAdmission.Service;
+  const publication = yield* ThreadMessagePublication.Service;
   const threads = yield* ThreadStore.Service;
   const messages = yield* ThreadMessageStore.Service;
   const activities = yield* ThreadActivityStore.Service;
-  const participations = yield* ThreadParticipationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   if (
     [
       audience.workspaceId,
-      memberships.workspaceId,
-      members.workspaceId,
       creation.workspaceId,
+      access.workspaceId,
+      admissions.workspaceId,
+      publication.workspaceId,
       threads.workspaceId,
       messages.workspaceId,
       activities.workspaceId,
-      participations.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -152,33 +150,13 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const eligible = new Map<
-        Member.Id,
-        { admission: GroupMembership.Record; member: Member.Record }
-      >();
-      const seen = new Set<GroupMembership.Id>();
-      for (const found of yield* memberships.listByGroup(request.groupId)) {
-        const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(found);
-        if (
-          admission.workspaceId !== workspaceId ||
-          admission.groupId !== request.groupId ||
-          seen.has(admission.id)
-        )
-          return yield* new InvalidResponse({ message: "Group admissions are inconsistent" });
-        seen.add(admission.id);
-        if (admission.status !== "active") continue;
-        if (eligible.has(admission.memberId))
-          return yield* new InvalidResponse({ message: "Duplicate active group admission" });
-        const foundMember = yield* members.get(admission.memberId);
-        if (Option.isNone(foundMember))
-          return yield* new InvalidResponse({ message: "Group admission has no workspace member" });
-        const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value);
-        if (member.id !== admission.memberId || member.workspaceId !== workspaceId)
-          return yield* new InvalidResponse({
-            message: "Group member belongs to another membership or workspace",
-          });
-        if (member.status === "active") eligible.set(member.id, { admission, member });
-      }
+      const eligible = yield* admissions
+        .eligible(request.groupId)
+        .pipe(
+          Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
+            Effect.fail(new InvalidResponse({ message: error.message })),
+          ),
+        );
       if (eligible.get(actor.memberId)?.admission.id !== authorAdmission.id)
         return yield* new InvalidResponse({
           message: "Group listing omitted the author's current admission",
@@ -202,63 +180,26 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         createdAt: occurredAt,
       });
       const thread = created.payload;
-      const participants: Array<ThreadParticipation.Record> = [];
-      for (const memberId of selected) {
-        const entry = eligible.get(memberId);
-        if (entry === undefined)
-          return yield* new InvalidResponse({ message: "Selected participant disappeared" });
-        const participant = {
-          id: ThreadParticipation.Id.make(yield* crypto.randomUUIDv4),
-          workspaceId,
+      const published = yield* publication
+        .publish({
           threadId: thread.id,
-          memberId,
-          groupMembershipId: entry.admission.id,
-          identity: entry.member.identity,
-          joinedAt: occurredAt,
-          joinedAtSequence: 1,
-          status: "active",
-          endedAt: null,
-        } satisfies ThreadParticipation.Record;
-        yield* journal
-          .publish(ThreadParticipationFacts.Added, participant)
-          .pipe(Publication.withCause(created, occurredAt));
-        participants.push(participant);
-      }
-      const message = {
-        id: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        threadId: thread.id,
-        authorMemberId: actor.memberId,
-        kind: "User",
-        text: request.text,
-        mentions: request.mentions,
-        publishedAt: occurredAt,
-      } satisfies ThreadMessage.Record;
-      const published = yield* journal
-        .publish(ThreadMessageFacts.Published, message)
-        .pipe(Publication.withCause(created, occurredAt));
-      const activity = {
-        id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        threadId: thread.id,
-        sequence: 1,
-        kind: "MessagePublished",
-        messageId: message.id,
-        occurredAt,
-      } satisfies ThreadActivity.Record;
-      const recipients = participants
-        .filter(
-          (participant) =>
-            request.mentions.length === 0 || request.mentions.includes(participant.memberId),
-        )
-        .map((participant) => ({
-          participationId: participant.id,
-          identity: participant.identity,
-        }));
-      yield* journal
-        .publish(ThreadActivityFacts.Recorded, { activity, recipients })
-        .pipe(Publication.withCause(published, occurredAt));
-      return { thread, message, activity } satisfies Thread.Started;
+          authorMemberId: actor.memberId,
+          text: request.text,
+          mentions: request.mentions,
+          participantIds: selected,
+          occurredAt,
+        })
+        .pipe(
+          Publication.withCause(created, occurredAt),
+          Effect.catchTag("ThreadParticipationAdmission.Unavailable", (error) =>
+            Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
+          ),
+        );
+      return {
+        thread,
+        message: published.message,
+        activity: published.activity,
+      } satisfies Thread.Started;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -267,24 +208,19 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   // All read entry points use this check before exposing conversation data. It is deliberately
   // outside journal.commit; an enclosing caller transaction remains authoritative when present.
   const get = Effect.fn("ThreadApplication.get")(function* (threadId: Thread.Id) {
-    const id = yield* Schema.decodeEffect(Thread.Id)(threadId);
-    yield* authorization.require([]);
-    const found = yield* threads.get(id);
-    if (Option.isNone(found)) return yield* new NotFound({ threadId: id });
-    const thread = yield* decodeThread(found.value).pipe(Effect.mapError(invalidReadRecord));
-    if (thread.workspaceId !== workspaceId || thread.id !== id)
-      return yield* new InvalidResponse({
-        message: "Thread store returned another thread or workspace",
-      });
-    yield* audience
-      .require(thread.groupId)
-      .pipe(
-        Effect.catchTag("GroupAudience.NotMember", () =>
-          Effect.fail(new NotFound({ threadId: id })),
-        ),
-      );
+    const thread = yield* access.require(threadId).pipe(
+      Effect.catchTags({
+        "ThreadAccess.NotFound": (error) => Effect.fail(new NotFound({ threadId: error.threadId })),
+        "ThreadAccess.InvalidResponse": (error) =>
+          Effect.fail(new InvalidResponse({ message: error.message })),
+      }),
+    );
     yield* authorization.require([
-      Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId: id }),
+      Requirement.make(ThreadPermissions.Read, {
+        _tag: "Thread",
+        workspaceId,
+        threadId: thread.id,
+      }),
     ]);
     return thread;
   });
@@ -379,62 +315,21 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     threadId: Thread.Id,
   ) {
     const thread = yield* get(threadId);
-    const current: Array<ThreadParticipation.Summary> = [];
-    const seen = new Set<ThreadParticipation.Id>();
-    const seenMembers = new Set<Member.Id>();
-    for (const found of yield* participations.listByThread(thread.id)) {
-      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-        found,
-      ).pipe(Effect.mapError(invalidReadRecord));
-      if (
-        participant.workspaceId !== workspaceId ||
-        participant.threadId !== thread.id ||
-        seen.has(participant.id)
-      )
-        return yield* new InvalidResponse({
-          message: "Participation store returned an inconsistent thread listing",
-        });
-      seen.add(participant.id);
-      if (participant.status !== "active") continue;
-      if (seenMembers.has(participant.memberId))
-        return yield* new InvalidResponse({
-          message: "Participation store returned duplicate active members",
-        });
-      seenMembers.add(participant.memberId);
-      const foundAdmission = yield* memberships.get(participant.groupMembershipId);
-      const foundMember = yield* members.get(participant.memberId);
-      if (Option.isNone(foundAdmission) || Option.isNone(foundMember))
-        return yield* new InvalidResponse({
-          message: "Participation references a missing admission or workspace member",
-        });
-      const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
-        foundAdmission.value,
-      ).pipe(Effect.mapError(invalidReadRecord));
-      const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value).pipe(
-        Effect.mapError(invalidReadRecord),
+    const participants = yield* admissions
+      .current(thread)
+      .pipe(
+        Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
+          Effect.fail(new InvalidResponse({ message: error.message })),
+        ),
       );
-      if (
-        admission.id !== participant.groupMembershipId ||
-        admission.workspaceId !== workspaceId ||
-        admission.groupId !== thread.groupId ||
-        admission.memberId !== participant.memberId ||
-        member.workspaceId !== workspaceId ||
-        member.id !== participant.memberId ||
-        !sameIdentity(member.identity, participant.identity)
-      )
-        return yield* new InvalidResponse({
-          message: "Participation references another admission, group, member, or workspace",
-        });
-      if (admission.status !== "active" || member.status !== "active") continue;
-      current.push({
-        id: participant.id,
-        workspaceId,
-        threadId: thread.id,
-        memberId: participant.memberId,
-        joinedAt: participant.joinedAt,
-        joinedAtSequence: participant.joinedAtSequence,
-      });
-    }
+    const current: Array<ThreadParticipation.Summary> = participants.map((participant) => ({
+      id: participant.id,
+      workspaceId,
+      threadId: thread.id,
+      memberId: participant.memberId,
+      joinedAt: participant.joinedAt,
+      joinedAtSequence: participant.joinedAtSequence,
+    }));
     return current;
   });
   return Service.of({
@@ -446,6 +341,6 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     listParticipants,
   });
 });
-/** Provide opening-message workflows and authorized reads; further publication and execution are separate workflows. @category layers */
+/** Provide opening-message workflows and authorized reads; replies use ThreadMessageApplication. @category layers */
 export const layer = Layer.effect(Service, make());
 export * as ThreadApplication from "./application.ts";

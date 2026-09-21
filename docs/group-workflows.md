@@ -187,12 +187,12 @@ store contracts. Core requires `GroupStore` and `GroupMembershipStore`; both ada
 them over the same workspace transaction. Authorization targets now include `Group`, and
 both adapters preserve exact group scopes in grants. Target support alone does not implement
 thread-audience authorization. The read operations and shared group audience policy above
-are implemented; thread starts now use that policy.
+are implemented; thread starts, reads, and replies use that policy.
 
 Private group, admission, and departure facts remain on the internal committed-event bus but are
 withheld from the workspace-wide change feed. A commit containing only those facts emits
 no public change; a mixed commit retains its other supported events in order. Group discovery
-and live delivery will need their own audience-aware HTTP/UI contract. Group creation generates no notifications. Opening-message activity generates notifications
+and live delivery will need their own audience-aware HTTP/UI contract. Group creation generates no notifications. Opening and reply message activity generates notifications
 through the [thread workflow](thread-workflows.md).
 
 DMs, public-group joining/discovery, further thread workflows, and group/thread HTTP/UI workflows

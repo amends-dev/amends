@@ -30,6 +30,10 @@ export interface Interface {
   readonly listByThread: (
     id: ThreadId.Id,
   ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+  /** Latest activity in this thread, using the caller's transaction when present. */
+  readonly latest: (
+    id: ThreadId.Id,
+  ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
   /** At most limit activities, strictly after the cursor, in ascending sequence order. No shared snapshot across pages. */
   readonly readPage: (
     id: ThreadId.Id,

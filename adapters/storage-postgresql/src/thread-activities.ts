@@ -2,7 +2,7 @@ import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread
 
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { threadActivities, threadMessages } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -47,6 +47,20 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows));
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
+    ),
+    latest: Effect.fn("ThreadActivities.latest")(
+      function* (input) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+        return yield* guard(
+          db
+            .select()
+            .from(threadActivities)
+            .where(and(inWorkspace, eq(threadActivities.threadId, id)))
+            .orderBy(desc(threadActivities.sequence))
+            .limit(1),
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "latest")),
     ),
     readPage: Effect.fn("ThreadActivities.readPage")(
       function* (input, options) {

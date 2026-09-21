@@ -29,7 +29,7 @@ remaining gaps with links to their owning code.
 ## Design and historical references
 
 - [Core model](core-model.md) is living design intent. Workspace management is
-  implemented, along with private team creation, authorized reads, and membership admission/departure in core; private-group opening messages also create participation, ordered activity, and notifications. Authorized thread reads are implemented; other group workflows, replies, turns, execution, triage,
+  implemented, along with private team creation, authorized reads, and membership admission/departure in core; private-group opening messages also create participation, ordered activity, and notifications. Authorized thread reads and human replies are implemented; other group workflows, turns, execution, triage,
   and channel delivery remain planned. Its opening status note links to current guides.
 - [Effect capability map](effect-capability-map.md) records an earlier source review
   and architecture proposal. Its module inventory reflects the pinned source;

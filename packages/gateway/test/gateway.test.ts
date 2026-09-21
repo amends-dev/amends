@@ -149,6 +149,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       insert: unexpected,
     }),
     Context.add(ThreadActivityStore.Service, {
+      latest: unexpected,
       workspaceId: boundWorkspaceId,
       get: unexpected,
       listByThread: unexpected,

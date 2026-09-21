@@ -1,6 +1,11 @@
 import { AgentPermissions } from "./agent/permissions.ts";
 import { ThreadApplication } from "./thread/application.ts";
 import { ThreadCreation } from "./thread/creation.ts";
+import { ThreadAccess } from "./thread/access.ts";
+import { ThreadMessageApplication } from "./thread/message/application.ts";
+import { ThreadMessagePublication } from "./thread/message/publication.ts";
+import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
+import { ThreadParticipationAdmission } from "./thread/participation/admission.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
 import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
@@ -71,6 +76,7 @@ const permissions = [
   GroupMembershipPermissions.Manage,
   ThreadPermissions.Start,
   ThreadPermissions.Read,
+  ThreadMessagePermissions.Publish,
   AgentPermissions.Use,
 ];
 
@@ -81,6 +87,10 @@ const journal = Journal.layer({ logId: Log.Id.make("journal"), projections }).pi
 
 /** Authorization for the acting member, with its grant resolution. */
 const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
+
+const admissions = ThreadParticipationAdmission.layer;
+const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(admissions));
+const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
 
 /**
  * Application operations, sharing one journal and one authorization check. These
@@ -96,7 +106,19 @@ const operations = Layer.mergeAll(
   GroupApplication.layer,
   GroupMembershipApplication.layer,
   ThreadApplication.layer,
-).pipe(Layer.provide(Layer.mergeAll(Delegation.layer, GroupAudience.layer, ThreadCreation.layer)));
+  ThreadMessageApplication.layer,
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Delegation.layer,
+      GroupAudience.layer,
+      ThreadCreation.layer,
+      threadAccess,
+      admissions,
+      messagePublication,
+    ),
+  ),
+);
 
 /**
  * Complete core for one workspace: application operations over the journal,

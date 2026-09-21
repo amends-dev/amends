@@ -17,7 +17,8 @@ private team-group creation, membership admission/departure, workspace-removal c
 authorized group reads, and a shared group-audience check. Human opening messages in private
 groups now create threads, initial participation, ordered message activity, and pending notifications
 atomically; see [thread workflows](thread-workflows.md). Authorized group-thread discovery,
-metadata, timeline pages, and current-participant summaries are also implemented. Replies, general participation
+metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
+`ThreadMessageApplication`, admitting the author and eligible mentions in the same commit. General participation
 management, DMs, public groups, group/thread HTTP/UI, turns, execution, general acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
@@ -2016,8 +2017,8 @@ make it responsible for spawning environments or implementing turn execution. Th
 continues to own its execution lifecycle, transcript, configuration, and snapshots.
 
 Thread activity is the timeline item already established in this design. The implemented
-opening-message workflow records `MessagePublished` activity referencing a separate message,
-starting at sequence 1. Further publication and lifecycle variants remain future work. It is a defined
+opening-message and human-reply workflows record `MessagePublished` activity referencing a separate message,
+starting at sequence 1 and appending replies at the next sequence. Assistant publication and lifecycle variants remain future work. It is a defined
 set of activity types, including message publication, turn lifecycle activity such as
 turn started, and task updates. It is not another log beside the timeline. The remaining
 discriminators and payload schemas remain to be specified.
@@ -2383,7 +2384,7 @@ Discovery filters unreadable threads. Timeline pages follow an exclusive sequenc
 resolve message content under the same check. Participant summaries expose member references
 and joining details, while routing identities and ended participation remain internal.
 Reading requires no participation, creates none, and neither acknowledges input nor requests work.
-Writes, subscriptions, notification-source resolution, and standalone audiences retain their
+Subscriptions, notification-source resolution, and standalone audiences retain their
 separate authorization contracts. See [thread reads](thread-workflows.md#reading-conversations).
 
 ### Grouped threads inherit access; standalone threads establish their own audience
@@ -2452,7 +2453,10 @@ Self-leave and group cleanup during workspace-member removal are also implemente
 Private-group reads use `group.read` plus audience membership, with separate management
 inspection and a reusable audience check. Starting a private-group thread with a human text
 message, initial participation, and notifications is implemented; group/thread HTTP/UI,
-further publication and subscriptions remain future work. Thread reads now require current
+assistant publication and subscriptions remain future work. Human replies require current group access and
+`thread.publish`, with `agent.use` for selected agent recipients. Their required participation and publication
+steps share internal services with starts; starting does not additionally require `thread.publish`.
+Thread reads now require current
 group access and `thread.read`, with no participation side effects.
 Default role placement does not limit future grants or roles.
 Other group operations, their permission declarations, broader group schemas, and admission

@@ -89,7 +89,9 @@ cryptography, and workspace event bus a host must supply, derived from that laye
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/group`, `@amends/core/thread`, and
 `@amends/core/agent`, and `@amends/core/workspace`, each exposing the records, facts, stores, projections,
 and operations it implements. The thread surface implements private-group starts with initial
-participation, a text message, ordered activity, and notification generation. Its authorized
+participation, a text message, ordered activity, and notification generation.
+`ThreadMessageApplication.publish` adds human replies under `thread.publish`; starts and replies
+reuse internal admission and publication services without requiring each other’s action grants. Its authorized
 reads provide group discovery, metadata, timeline pages, and current participant summaries,
 with group audience and `thread.read` checked independently of participation. Agent-use permission
 is declared in the agent domain; execution remains future work.
@@ -98,7 +100,7 @@ and membership admission/departure, with
 separate creation and Group-scoped membership-management permissions. Self-leave needs no
 management grant; workspace removal also settles group admissions. Ordinary group reads require
 membership and `group.read`; separate management reads expose known-group metadata and current
-admissions under `group.membership.manage`. The notification surface includes its record, store contract, authorized inbox reads, opening-activity generation, and pending-agent-input settlement. Notification reads derive the recipient from the current actor and
+admissions under `group.membership.manage`. The notification surface includes its record, store contract, authorized inbox reads, message-activity generation, and pending-agent-input settlement. Notification reads derive the recipient from the current actor and
 require active membership. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 

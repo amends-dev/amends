@@ -64,7 +64,7 @@ Notification reads match both recipient kind and ID, with bounded pages ordered
 by recorded time and ID using `COLLATE "C"` to match SQLite's binary ordering.
 Notification IDs and source/recipient associations are unique within the workspace.
 Inserts join the journal transaction; source existence and recipient selection
-remain generation responsibilities. The notification projection generates opening-message notifications from recorded thread activity
+remain generation responsibilities. The notification projection generates opening and reply message notifications from recorded thread activity
 and discards pending agent input when its participation ends.
 
 ## Transactions
@@ -97,6 +97,10 @@ Thread reads enforce audience and action permissions in core. Timeline paging us
 workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema
 is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged
 activity, current grants and admission state, and rejection of inconsistent references.
+Human replies use the same tables and transaction boundary. The latest-activity lookup uses
+the workspace/thread/sequence index; insertion still rejects duplicate positions and gaps.
+Reply tests cover scoped publishing grants, new and returning participants, addressing, concurrent
+replies/departures, rollback, reopening, and replay. This slice adds no schema migration.
 These tables and notification fields are part of the updated development baseline: recreate
 disposable databases rather than applying an upgrade chain. See [thread workflows](../../docs/thread-workflows.md).
 

@@ -1,8 +1,8 @@
 # Thread workflows
 
-Core and both storage adapters implement human opening messages and authorized reads in
-private team groups. Call `ThreadApplication` through `Gateway.asMember` or a trusted workspace
-context. Replies, HTTP/UI, DMs,
+Core and both storage adapters implement human opening messages, replies, and authorized reads in
+private team groups. Call `ThreadApplication` and `ThreadMessageApplication` through
+`Gateway.asMember` or a trusted workspace context. HTTP/UI, DMs,
 standalone threads, attachments, and agent execution remain separate implementation steps.
 
 ## Starting a conversation
@@ -62,8 +62,8 @@ remain in the inherited access audience when mentions narrow participation and c
 the thread when they hold `thread.read`. Reading does not enroll them.
 
 A later group addition does not enroll that member in existing threads or create retroactive
-notifications. Future unmentioned replies will address that thread's current participants,
-without enrolling the whole group again. Following, replies, and later mentions are future workflows.
+notifications. Unmentioned replies address that thread's current participants plus their author,
+without enrolling the whole group again. Explicit following remains a future workflow.
 
 Broadcast agent notifications represent input for recipient evaluation. The agreed design allows
 an agent to ask a question, perform work, reply, or finish silently after evaluating relevance.
@@ -71,6 +71,61 @@ An explicit mention makes the request direct; it does not require a meaningless 
 Ordinary assistant replies remain informational to other agents; explicit work requests can
 ask them to act. These handling rules remain design intent: this slice creates durable pending
 notifications and launches no turns, models, harnesses, or background recipient processors.
+
+## Replying to a conversation
+
+```ts
+import { Thread, ThreadMessageApplication } from "@amends/core/thread";
+import { Effect } from "effect";
+
+const reply = (threadId: Thread.Id) =>
+  Effect.gen(function* () {
+    const messages = yield* ThreadMessageApplication.Service;
+    return yield* messages.publish({ threadId, text: "Here's my feedback", mentions: [] });
+  });
+```
+
+The result contains `message` and `activity`, with no internal participation or recipient
+snapshots. Text and structured mentions use the same validation as opening messages.
+Every invocation publishes a new message; there is no request-level idempotency receipt.
+Reconcile an uncertain commit before submitting the operation again.
+
+The caller must be a human with active workspace membership, current membership in the
+thread's group, and `thread.publish` on that Thread target. `ThreadMessagePermissions.Publish`
+declares this permission with a Viewer default tier. New Viewer and higher-tier bundles include
+it; existing stored roles need an explicit grant or update. Publication does not require
+`thread.read`, `thread.start`, `group.read`, or membership-management permission. Audience
+membership and authorship alone do not authorize a reply.
+
+The author joins the thread if necessary. Explicit mentions also admit eligible group members
+who are not participating. An existing participant keeps their participation ID and joining
+boundary; a returning member whose prior participation ended receives a fresh participation tied
+to their current group admission. Its `joinedAtSequence` is the introducing message's sequence.
+Earlier messages remain history, without retroactive notifications.
+
+| Reply addressing  | Notification recipients                                                     |
+| ----------------- | --------------------------------------------------------------------------- |
+| No mentions       | Current active thread participants, including the replying author.          |
+| Explicit mentions | Only the mentioned eligible members, admitted in the same commit if needed. |
+
+Mentions do not remove existing participants. Group members outside the thread are not enrolled
+by an unmentioned reply, including members added to the group after the thread started. There
+is no sender exclusion: an author receives their broadcast, or a message mentioning themselves.
+Each selected agent requires `agent.use` on its Member target. A broadcast therefore requires
+authority over participating agents; a message addressed only to humans does not. Missing agent
+authority rejects the whole publication instead of silently dropping recipients.
+
+Missing, foreign, and outside-audience thread IDs share `ThreadMessageApplication.NotFound`.
+Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`; agent callers get
+`ThreadMessageApplication.HumanAuthorRequired`. The gateway preserves these errors and converts
+malformed input to `Gateway.InvalidInput`. Storage and consistency failures remain failures.
+
+Authorization, admission, message publication, next-sequence activity, notifications, and
+checkpoints share one journal commit. An outer transaction is honored, including earlier replies,
+grant changes, and group departures. Concurrent writers use the existing workspace transaction
+boundary; storage still rejects timeline gaps and duplicate positions. Contention can reject an
+attempt and does not trigger an automatic retry. Notification records remain pending input;
+publication starts no agent execution.
 
 ## Reading conversations
 
@@ -105,8 +160,8 @@ The cursor belongs to the selected thread; it is not a journal position or notif
 The application validates page bounds and order, then verifies that every referenced message
 belongs to that thread and workspace. Missing or inconsistent messages, duplicate or unordered
 activity, and storage failures fail the read instead of producing partial content or empty pages.
-Additional activity in paging tests is seeded through internal facts; a public reply workflow
-is not implemented yet.
+Paging tests also seed canonical activity with nonmonotonic timestamps to isolate ordering;
+reply tests verify pages containing messages published through the application.
 
 ### Current participants and access loss
 
@@ -144,6 +199,14 @@ with indexed identity and relationship columns.
 references and requires an existing transaction and publication context. It is excluded from
 `Core.Operations` and performs no additional member-level permission check. There is no public
 empty-thread operation. The complete start workflow owns participation and initial publication.
+
+`ThreadMessageApplication` owns reply authorization and its transaction. Both starts and replies
+use internal `ThreadMessagePublication` and `ThreadParticipationAdmission` services. Those services
+validate domain relationships and require the caller's transaction and publication context; they
+do not impose another action permission or open another commit. `ThreadAccess` shares current
+audience checks between reads and replies without imposing a read grant on a write. All these
+internal services are excluded from `Core.Operations`. The opening message remains covered by
+`thread.start`; it does not call the public reply operation or require `thread.publish`.
 
 Thread creation, participation admissions, message publication, timeline activity, notification
 inserts, and checkpoints commit together. Any failure rolls back all of them. An enclosing caller
@@ -184,16 +247,16 @@ other supported public events. A thread-only commit therefore provides no inbox 
 through that feed. Audience-aware thread subscriptions and live notification delivery remain work.
 Notifications expose source references, not continuing authority to read the source conversation.
 
-The public surface provides starts and the authorized reads above. Internal store reads are not
-authorized thread APIs. Notification-source resolution, replies, participation management, general
+The public surface provides starts, human replies, and the authorized reads above. Internal store reads are not
+authorized thread APIs. Notification-source resolution, explicit follow/unfollow, other participation management, general
 acknowledgment, silent agent completion, turn execution, task activity, DMs, and standalone threads
 remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
 The opening-message implementation updated both development schema baselines. Recreate disposable
 development databases when adopting that baseline; no upgrade chain or automatic data reset is provided. New permission bundles also
 apply only to fresh workspace initialization unless stored roles are explicitly updated.
-The read slice adds no tables or schema migration. Existing stored roles do not automatically gain
-`thread.read`; assign an explicit grant or update those roles before using the new read operations.
+The read and reply slices add no tables or schema migration. Existing stored roles do not automatically gain
+`thread.read` or `thread.publish`; assign explicit grants or update those roles before using the new operations.
 
 ## Verification
 
@@ -203,4 +266,7 @@ failures, outer transactions, concurrent departure, readmission, reopening, repl
 store constraints. Read suites cover exact grants, nonparticipant and later-member access,
 pagination, private identity filtering, no-write reads, current revocation, outer transactions,
 and rejection of corrupt cross-thread references. Core tests verify withholding private thread facts from the public change feed.
+Reply suites cover scoped action grants, live access changes, initial and returning admissions,
+mention and broadcast selection, concurrent sequencing and removal, projection/checkpoint failures,
+outer commits, reopening, and replay after grants or membership change.
 Run `bun run check` and `bun run test` from the repository root.

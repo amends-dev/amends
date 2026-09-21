@@ -14,17 +14,17 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features. |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
-| `notification`  | Notification records, inbox reads, opening-activity generation, and departure settlement.        |
-| `thread`        | Private-group starts, participation, user messages, timeline activity, and projection storage.   |
-| `agent`         | Permission to direct input to an agent workspace member.                                         |
-| `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.     |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
+| Domain          | Ownership                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features.                 |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
+| `notification`  | Notification records, inbox reads, message-activity generation, and departure settlement.                        |
+| `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
+| `agent`         | Permission to direct input to an agent workspace member.                                                         |
+| `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.                     |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -45,7 +45,7 @@ notification or grants access to its source. Core now requires `NotificationStor
 The HTTP API exposes these reads, and the web client provides session-scoped query
 atoms. Contact and Triage recipients are available to internal storage consumers; the
 member inbox API remains limited to the acting human or agent. The projection now generates
-notifications from recorded opening-message activity and settles pending agent input on group
+notifications from recorded opening and reply message activity and settles pending agent input on group
 departure. It preserves historical recipient selection and references the originating participation.
 General acknowledgment, recipient processing, and delivery remain deferred.
 
@@ -169,7 +169,7 @@ also requires group access or standalone participation alongside action permissi
 Group creation, reads, admission/departure, and the shared group-audience policy are implemented.
 Group-thread reads enforce audience membership and `thread.read`; standalone threads and
 subscription enforcement remain future work.
-The thread module supplies the opening-message workflow described below.
+The thread module supplies opening-message and human-reply workflows described below.
 
 ## Starting a thread in a private group
 
@@ -187,7 +187,7 @@ discards pending agent input. Replay uses recorded recipients and stable notific
 
 These operations reuse the existing workspace journal; the timeline is a read model of ordered
 activity, not an independent second event stream. Authorized reads now provide discovery,
-metadata, timeline pages, and current-participant summaries. Reply, HTTP/UI, and agent-turn
+metadata, timeline pages, and current-participant summaries. HTTP/UI and agent-turn
 execution workflows remain separate work. See [thread workflows](../../docs/thread-workflows.md).
 
 Thread reads use `ThreadApplication.get`, `listInGroup`, `readTimeline`, and `listParticipants`.
@@ -199,6 +199,22 @@ Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional
 Reads honor caller transactions but open none, and make no notification or checkpoint changes.
 New Viewer bundles include the permission; stored role records are unchanged. See
 [thread reads](../../docs/thread-workflows.md#reading-conversations).
+
+## Publishing a human reply
+
+`ThreadMessageApplication.publish({ threadId, text, mentions })` publishes a human reply under
+current group access and `ThreadMessagePermissions.Publish` (`thread.publish`) on the Thread target.
+The author and eligible mentions join when necessary; unmentioned replies address current thread
+participants plus the author. Each selected agent requires `agent.use`. The result contains only
+`message` and `activity`. New Viewer and higher-tier bundles include publish permission, while
+existing roles keep their stored grants. See [human replies](../../docs/thread-workflows.md#replying-to-a-conversation).
+
+Starts and replies reuse `ThreadParticipationAdmission` and `ThreadMessagePublication` internally.
+These services validate references and record domain facts within the caller's transaction and
+publication context. They perform no independent action authorization and are excluded from
+`Core.Operations`. `ThreadAccess` shares audience validation between reads and replies; each
+application checks its own action. Starting includes its initial publication under `thread.start`
+without requiring `thread.publish`; replies require neither `thread.read` nor `thread.start`.
 
 ## Permission declarations and built-in roles
 
@@ -497,26 +513,27 @@ meaning rather than using it as a synonym for a constructor.
 
 ## Service boundaries
 
-| Implementation        | Constructor                                   | Layer provides                          |
-| --------------------- | --------------------------------------------- | --------------------------------------- |
-| Transaction           | `Transaction.make()`                          | `Transaction.Service`                   |
-| Log                   | `Log.make()`                                  | `Log.Service` and `Transaction.Service` |
-| Journal               | `Journal.make(options)`                       | `Journal.Service`                       |
-| Committed-event bus   | `CommittedEvents.make(workspaceId, options?)` | `CommittedEvents.Service`               |
-| Permission catalog    | `PermissionCatalog.make(definitions)`         | `PermissionCatalog.Service`             |
-| Grant resolver        | `GrantResolver.make()`                        | `GrantResolver.Service`                 |
-| Authorization         | `Authorization.make()`                        | `Authorization.Service`                 |
-| Member operations     | `MemberApplication.make()`                    | `MemberApplication.Service`             |
-| Thread operations     | `ThreadApplication.make()`                    | `ThreadApplication.Service`             |
-| Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
-| Private team creation | `GroupApplication.make()`                     | `GroupApplication.Service`              |
-| Group membership      | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
-| Group audience policy | `GroupAudience.make()`                        | `GroupAudience.Service`                 |
-| Assignment operations | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
-| Delegation policy     | `Delegation.make()`                           | `Delegation.Service`                    |
-| Invitation operations | `InvitationApplication.make()`                | `InvitationApplication.Service`         |
-| Ownership operations  | `OwnershipApplication.make()`                 | `OwnershipApplication.Service`          |
-| Change feed           | `ChangeFeedApplication.make()`                | `ChangeFeedApplication.Service`         |
+| Implementation            | Constructor                                   | Layer provides                          |
+| ------------------------- | --------------------------------------------- | --------------------------------------- |
+| Transaction               | `Transaction.make()`                          | `Transaction.Service`                   |
+| Log                       | `Log.make()`                                  | `Log.Service` and `Transaction.Service` |
+| Journal                   | `Journal.make(options)`                       | `Journal.Service`                       |
+| Committed-event bus       | `CommittedEvents.make(workspaceId, options?)` | `CommittedEvents.Service`               |
+| Permission catalog        | `PermissionCatalog.make(definitions)`         | `PermissionCatalog.Service`             |
+| Grant resolver            | `GrantResolver.make()`                        | `GrantResolver.Service`                 |
+| Authorization             | `Authorization.make()`                        | `Authorization.Service`                 |
+| Member operations         | `MemberApplication.make()`                    | `MemberApplication.Service`             |
+| Thread operations         | `ThreadApplication.make()`                    | `ThreadApplication.Service`             |
+| Human message publication | `ThreadMessageApplication.make()`             | `ThreadMessageApplication.Service`      |
+| Notification reads        | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
+| Private team creation     | `GroupApplication.make()`                     | `GroupApplication.Service`              |
+| Group membership          | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
+| Group audience policy     | `GroupAudience.make()`                        | `GroupAudience.Service`                 |
+| Assignment operations     | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
+| Delegation policy         | `Delegation.make()`                           | `Delegation.Service`                    |
+| Invitation operations     | `InvitationApplication.make()`                | `InvitationApplication.Service`         |
+| Ownership operations      | `OwnershipApplication.make()`                 | `OwnershipApplication.Service`          |
+| Change feed               | `ChangeFeedApplication.make()`                | `ChangeFeedApplication.Service`         |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
 `Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation

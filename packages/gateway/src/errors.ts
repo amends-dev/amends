@@ -1,4 +1,4 @@
-import { ThreadApplication } from "@amends/core/thread";
+import { ThreadApplication, ThreadMessageApplication } from "@amends/core/thread";
 import {
   AssignmentApplication,
   Authorization,
@@ -73,6 +73,9 @@ export const PublicError = Schema.Union([
   ThreadApplication.NotFound,
   ThreadApplication.ParticipantUnavailable,
   ThreadApplication.HumanAuthorRequired,
+  ThreadMessageApplication.NotFound,
+  ThreadMessageApplication.ParticipantUnavailable,
+  ThreadMessageApplication.HumanAuthorRequired,
   GroupApplication.MemberNotFound,
   GroupApplication.NotFound,
   GroupApplication.InactiveMember,

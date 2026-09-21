@@ -1,4 +1,4 @@
-import { ThreadPermissions } from "@amends/core/thread";
+import { ThreadPermissions, ThreadMessagePermissions } from "@amends/core/thread";
 import { AgentPermissions } from "@amends/core/agent";
 import { describe, it, expect } from "@effect/vitest";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
@@ -135,6 +135,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                     GroupPermissions.Read.name,
                     ThreadPermissions.Start.name,
                     ThreadPermissions.Read.name,
+                    ThreadMessagePermissions.Publish.name,
                     AgentPermissions.Use.name,
                   ],
                 }),
@@ -160,6 +161,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                       GroupMembershipPermissions.Manage.name,
                       ThreadPermissions.Start.name,
                       ThreadPermissions.Read.name,
+                      ThreadMessagePermissions.Publish.name,
                       AgentPermissions.Use.name,
                     ],
                   }),
