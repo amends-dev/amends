@@ -127,13 +127,14 @@ const run = <A, E>(
 
 test("notification reads require the current actor, need no role grant, and leave the journal unchanged", async () => {
   expectTypeOf<Layer.Services<typeof NotificationApplication.layer>>().toEqualTypeOf<
-    NotificationStore.Service | Authorization.Service | Journal.Service
+    NotificationStore.Service | Authorization.Service
   >();
   expectTypeOf<
     Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>
   >().toEqualTypeOf<Actor.Service>();
   const fixture = await Effect.runPromise(make());
   await seed(fixture);
+  const attempts = await Effect.runPromise(fixture.attempts);
   await run(
     fixture,
     Effect.gen(function* () {
@@ -145,6 +146,7 @@ test("notification reads require the current actor, need no role grant, and leav
       expect(yield* (yield* Journal.Service).log.read({ limit: 10 })).toEqual([]);
     }),
   );
+  expect(await Effect.runPromise(fixture.attempts)).toBe(attempts);
 });
 
 test("one notification service resolves each caller, including humans and agents with the same identity ID", async () => {

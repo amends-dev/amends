@@ -3,8 +3,6 @@ import type { Scope } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import type { Actor } from "../identity/actor.ts";
 import { CommittedEvents } from "../journal/committed-events.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Transaction } from "../journal/transaction.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { ChangeFeed } from "./change-feed.ts";
 import { ChangeFeedEvents } from "./events.ts";
@@ -17,7 +15,7 @@ export interface Interface {
    */
   readonly watch: Effect.Effect<
     Stream.Stream<ChangeFeed.Message, ChangeFeed.Unavailable>,
-    Authorization.Error | Transaction.Error | ChangeFeed.Unavailable,
+    Authorization.Error | ChangeFeed.Unavailable,
     Actor.Service | Scope.Scope
   >;
 }
@@ -30,7 +28,6 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
   const bus = yield* CommittedEvents.Service;
   const authorization = yield* Authorization.Service;
-  const journal = yield* Journal.Service;
   const workspaceId = authorization.workspaceId;
   if (bus.workspaceId !== workspaceId)
     return yield* new Authorization.WorkspaceMismatch({
@@ -39,7 +36,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
     });
 
   const watch = Effect.gen(function* () {
-    yield* journal.commit(authorization.require([]));
+    yield* authorization.require([]);
     const subscription = yield* bus.subscribe.pipe(
       Effect.mapError(() => new ChangeFeed.Unavailable({})),
     );

@@ -83,12 +83,9 @@ const resolve = Effect.gen(function* () {
 });
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, GrantResolver.Service | Store.Transaction>,
+  program: Effect.Effect<A, E, GrantResolver.Service>,
   overrides: Overrides = {},
-) =>
-  Effect.runPromise(
-    fixture.store.transaction(program).pipe(Effect.provide(configured(fixture, overrides))),
-  );
+) => Effect.runPromise(program.pipe(Effect.provide(configured(fixture, overrides))));
 const seed = (
   fixture: Fixture,
   roles: ReadonlyArray<Role.Record>,
@@ -103,7 +100,7 @@ const seed = (
     ),
   );
 
-test("the resolver exposes a stable service and requires the caller's transaction", async () => {
+test("the resolver reads current state without requiring a transaction", async () => {
   expectTypeOf<Layer.Services<typeof GrantResolver.layer>>().toEqualTypeOf<
     AssignmentStore.Service | RoleStore.Service | PermissionCatalog.Service
   >();
@@ -113,9 +110,7 @@ test("the resolver exposes a stable service and requires the caller's transactio
   expectTypeOf<
     Effect.Success<ReturnType<typeof GrantResolver.make>>
   >().toEqualTypeOf<GrantResolver.Interface>();
-  expectTypeOf<Effect.Services<typeof resolve>>().toEqualTypeOf<
-    GrantResolver.Service | Store.Transaction
-  >();
+  expectTypeOf<Effect.Services<typeof resolve>>().toEqualTypeOf<GrantResolver.Service>();
   expectTypeOf<Effect.Error<typeof resolve>>().toEqualTypeOf<GrantResolver.Error>();
   const fixture = await Effect.runPromise(make());
   await seed(
@@ -128,7 +123,7 @@ test("the resolver exposes a stable service and requires the caller's transactio
     fixture.store.transaction(GrantResolver.make()).pipe(Effect.provide(dependencies(fixture))),
   );
   expect(resolver.workspaceId).toBe(workspaceId);
-  expect(await Effect.runPromise(fixture.store.transaction(resolver.resolve(memberId)))).toEqual([
+  expect(await Effect.runPromise(resolver.resolve(memberId))).toEqual([
     Grant.make(MemberPermissions.Read, memberScope),
   ]);
 });

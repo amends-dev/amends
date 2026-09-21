@@ -1,6 +1,5 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Actor } from "../identity/actor.ts";
-import { Store } from "../journal/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
 import { WorkspaceStore } from "../workspace/store.ts";
@@ -50,24 +49,18 @@ export type Error =
   | InvalidResponse;
 export interface Interface {
   readonly workspaceId: Workspace.Id;
-  readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error, Store.Transaction>;
+  readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
   readonly assignmentsFor: (
     memberId: Member.Id,
-  ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Error, Store.Transaction>;
+  ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Error>;
   /** Requires assignment.manage. Only current ownership allows delegating Administrator. */
-  readonly requireGrant: (
-    roleId: Role.Id,
-  ) => Effect.Effect<Role.Record, Error, Actor.Service | Store.Transaction>;
+  readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Record, Error, Actor.Service>;
   /** Operation permissions are checked by the caller. Owners are always protected. */
-  readonly requireRecipient: (
-    memberId: Member.Id,
-  ) => Effect.Effect<void, Error, Actor.Service | Store.Transaction>;
+  readonly requireRecipient: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Service>;
   /** Authorized non-owners may leave without gaining authority to change their own roles. */
-  readonly requireRemoval: (
-    memberId: Member.Id,
-  ) => Effect.Effect<void, Error, Actor.Service | Store.Transaction>;
+  readonly requireRemoval: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Service>;
 }
-/** Transaction ownership belongs to the calling application operation. @effect-expect-leaking Transaction */
+/** Read screens check current policy; write operations check it inside their commit. */
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/authorization/delegation/Service",
 ) {}
@@ -106,7 +99,6 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     return record.ownerMemberId;
   });
   const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.Id) {
-    yield* Store.Transaction;
     const id = yield* Schema.decodeEffect(Role.Id)(roleId);
     if (![BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
       return yield* new UnsupportedRole({ roleId: id });
@@ -127,7 +119,6 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     return role;
   });
   const assignmentsFor = Effect.fn("Delegation.assignmentsFor")(function* (memberId: Member.Id) {
-    yield* Store.Transaction;
     const records = yield* Schema.decodeEffect(Schema.Array(Assignment.Record))(
       yield* assignments.listActiveByMember(memberId),
     );

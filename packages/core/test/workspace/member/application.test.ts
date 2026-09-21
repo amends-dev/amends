@@ -196,7 +196,7 @@ test("member reads require only the current actor and leave the journal unchange
   const before = await Effect.runPromise(fixture.snapshot);
   const attempts = await Effect.runPromise(fixture.attempts);
   expect(await run(fixture, get(bob.id))).toEqual(bob);
-  expect(await Effect.runPromise(fixture.attempts)).toBe(attempts + 1);
+  expect(await Effect.runPromise(fixture.attempts)).toBe(attempts);
   expect(await Effect.runPromise(fixture.snapshot)).toEqual(before);
 
   await Effect.runPromise(

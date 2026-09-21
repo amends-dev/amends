@@ -73,6 +73,11 @@ refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
 Waiting readers poll the log every `pollInterval` (100 milliseconds by default).
 
+Ordinary application reads and SSE authorization do not open a transaction or take
+the workspace advisory lock. They use available pool connections to query committed
+state while writers hold that lock. Separate queries may observe concurrent changes;
+reads inside an existing transaction use its staged state.
+
 The optional `Store.transaction` observer runs after PostgreSQL confirms COMMIT,
 inside its uninterruptible completion boundary. It is skipped on rollback and
 uncertain outcomes. `Store.notifyCommit` logs observer failures without changing

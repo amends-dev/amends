@@ -60,6 +60,12 @@ store conflict without retrying. A transaction
 whose rollback failed marks the connection broken, and later transactions
 refuse until the file is reopened. Waiting readers poll the log.
 
+Ordinary application reads and SSE authorization do not open a transaction or run
+`BEGIN IMMEDIATE`. With WAL enabled, they can read committed state while another
+connection holds the writer lock. They still wait for the shared connection when
+that same client has an active transaction; this adapter does not have a separate
+reader pool. Reads inside an existing transaction use its staged state.
+
 The optional `Store.transaction` observer runs after a confirmed native COMMIT,
 inside its uninterruptible completion boundary. It is skipped on rollback and
 uncertain outcomes. `Store.notifyCommit` logs observer failures without changing

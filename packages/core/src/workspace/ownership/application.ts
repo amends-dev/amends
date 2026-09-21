@@ -176,7 +176,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
       canTransfer,
       candidates,
     });
-  }).pipe(journal.commit, Effect.withSpan("OwnershipApplication.get"));
+  }).pipe(Effect.withSpan("OwnershipApplication.get"));
   const builtins = [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
   const createAssignment = Effect.fn("OwnershipApplication.createAssignment")(function* (
     memberId: Member.Id,

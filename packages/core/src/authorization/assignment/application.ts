@@ -131,7 +131,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       roles: yield* choices,
       canManage: record.status === "active" && (yield* allowed(recipient(memberId))),
     });
-  }, journal.commit);
+  });
   const create = Effect.fn("AssignmentApplication.create")(function* (
     input: Assignment.AssignInput,
   ) {
@@ -220,7 +220,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ roles: choices.pipe(journal.commit), list, assign, revoke, change });
+  return Service.of({ roles: choices, list, assign, revoke, change });
 });
 
 /** @category layers */

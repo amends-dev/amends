@@ -145,14 +145,16 @@ test("registers before Ready, skips history and preserves committed batches with
     }),
   ));
 
-test("checks current membership before opening a stream, and subscription itself appends nothing", async () =>
+test("checks current membership and opens a stream without a transaction", async () =>
   run((fixture) =>
     Effect.gen(function* () {
       const changes = yield* ChangeFeedApplication.Service;
+      const attempts = yield* fixture.attempts;
       expect(yield* (yield* changes.watch).pipe(Stream.take(1), Stream.runCollect)).toEqual([
         { _tag: "Ready", workspaceId },
       ]);
       expect(yield* (yield* Journal.Service).log.read({ limit: 10 })).toEqual([]);
+      expect(yield* fixture.attempts).toBe(attempts);
       yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId));
       expect(yield* Effect.flip(changes.watch)).toMatchObject({
         _tag: "Authorization.InvalidActor",

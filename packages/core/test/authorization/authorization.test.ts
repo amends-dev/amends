@@ -123,17 +123,15 @@ const check = Effect.fn("AuthorizationTest.check")(function* (
 });
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Authorization.Service | Actor.Service | Store.Transaction>,
+  program: Effect.Effect<A, E, Authorization.Service | Actor.Service>,
   actor: Actor.Value = alice,
   overrides: Overrides = {},
 ) =>
   Effect.runPromise(
-    fixture.store
-      .transaction(program)
-      .pipe(
-        Effect.provide(configured(fixture, overrides)),
-        Effect.provideService(Actor.Service, actor),
-      ),
+    program.pipe(
+      Effect.provide(configured(fixture, overrides)),
+      Effect.provideService(Actor.Service, actor),
+    ),
   );
 const seed = (
   fixture: Fixture,
@@ -159,9 +157,9 @@ test("authorization reads each caller's actor and uses an agent's own grants", a
   expectTypeOf<
     Layer.Error<typeof Authorization.layer>
   >().toEqualTypeOf<Authorization.WorkspaceMismatch>();
-  expectTypeOf<Effect.Services<ReturnType<Authorization.Interface["require"]>>>().toEqualTypeOf<
-    Actor.Service | Store.Transaction
-  >();
+  expectTypeOf<
+    Effect.Services<ReturnType<Authorization.Interface["require"]>>
+  >().toEqualTypeOf<Actor.Service>();
   expectTypeOf<
     Effect.Success<ReturnType<typeof Authorization.make>>
   >().toEqualTypeOf<Authorization.Interface>();

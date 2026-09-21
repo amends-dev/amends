@@ -33,8 +33,8 @@ only `Pending` state. Both storage adapters implement its bounded recipient read
 and transactional insert. `NotificationApplication.get`, `list`, and `listPending`
 require current active membership and derive the recipient from the acting identity.
 They expose only that recipient's inbox; missing and other recipients' IDs both
-return `NotificationApplication.NotFound`. Authorization and reads share a journal
-transaction, joining an outer commit when present. Reading never acknowledges a
+return `NotificationApplication.NotFound`. Authorization and reads query current
+state without opening a transaction, honoring an outer commit when present. Reading never acknowledges a
 notification or grants access to its source. Core now requires `NotificationStore`.
 
 The HTTP API exposes these reads, and the web client provides session-scoped query
@@ -77,6 +77,25 @@ unrelated types in a general `schema.ts` or `types.ts` file.
 Core tests follow the domain and feature directories under `test/`. Tests that
 cover several authorization features live at `test/authorization/`; shared
 in-memory storage support remains in `test/memory-store.ts`.
+
+## Read and write boundaries
+
+Read operations check the current actor's membership and permissions, then query
+the stores without opening a journal commit or acquiring the workspace writer
+lock. This includes membership, invitation, role, assignment, ownership, and
+notification reads, and opening the change feed. Authorization, grant resolution,
+and delegation helpers can all run without `Store.Transaction`.
+
+Reads intentionally allow concurrent changes between permission checks and data
+queries. Multiple queries do not promise one shared snapshot, and a revocation
+does not cancel an already-authorized read. A read that needs a consistent snapshot
+must request that guarantee explicitly rather than changing the default for all reads.
+
+Write operations run their authorization checks, validation, journal publications,
+and projections inside one `journal.commit`. Policy checks performed earlier to
+build a read screen do not authorize a later write. Stores still require a valid
+workspace transaction for every mutation. A read invoked inside an existing commit
+uses that transaction and sees its staged changes without opening another one.
 
 ## Permission declarations and built-in roles
 

@@ -1,5 +1,4 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { Store } from "../journal/store.ts";
 import type { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
 import { AssignmentStore } from "./assignment/store.ts";
@@ -38,13 +37,12 @@ export type Error =
 export interface Interface {
   readonly workspaceId: Workspace.Id;
   /**
-   * Resolve all active assignments using the caller's transaction. Any invalid
+   * Resolve active assignments from current state, using an existing transaction
+   * when the caller supplies one. This does not open a transaction. Any invalid
    * assignment fails the whole operation. Overlapping grants may repeat.
    * Actor identity, active membership, and action requirements are checked by authorization.
    */
-  readonly resolve: (
-    memberId: Member.Id,
-  ) => Effect.Effect<ReadonlyArray<Grant.Value>, Error, Store.Transaction>;
+  readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Value>, Error>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -84,7 +82,6 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   });
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
-    yield* Store.Transaction;
     const records = yield* decodeAssignments(yield* assignments.listActiveByMember(memberId));
     const grants: Array<Grant.Value> = [];
     const seen = new Set<Assignment.Id>();

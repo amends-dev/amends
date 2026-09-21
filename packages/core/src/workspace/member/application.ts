@@ -9,7 +9,6 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
-import type { Transaction } from "../../journal/transaction.ts";
 import { Invitation } from "../invitation/invitation.ts";
 import { InvitationFacts } from "../invitation/facts.ts";
 import { InvitationStore } from "../invitation/store.ts";
@@ -48,7 +47,6 @@ export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
 export type Error =
   | Authorization.Error
   | MemberStore.Failure
-  | Transaction.Error
   | Schema.SchemaError
   | NotFound
   | WorkspaceMismatch
@@ -69,15 +67,15 @@ export interface Interface {
   readonly workspaceId: Workspace.Id;
   /**
    * Read an active or removed membership after requiring member.read on it.
-   * Authorization and lookup share one journal transaction, joining an existing
-   * commit when present. Only authorized callers can receive NotFound.
+   * Authorization and lookup read current state without opening a transaction.
+   * They use an existing commit when present. Only authorized callers can receive NotFound.
    */
   readonly get: (memberId: Member.Id) => Effect.Effect<Member.Record, Error, Actor.Service>;
   /**
    * List the memberships the actor may read, active and removed. Active
    * membership is required; each record is then included only when member.read
    * covers it, so a workspace-scoped grant sees everyone and an exact grant sees
-   * that member. Authorization and the listing share one journal transaction.
+   * that member. This does not open a transaction or promise a shared snapshot.
    */
   readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Error, Actor.Service>;
   /**
@@ -155,7 +153,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       ),
     ]);
     return yield* load(id);
-  }, journal.commit);
+  });
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -177,7 +175,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       if (allowed) readable.push(member);
     }
     return readable;
-  }).pipe(journal.commit, Effect.withSpan("MemberApplication.list"));
+  }).pipe(Effect.withSpan("MemberApplication.list"));
 
   const remove = Effect.fn("MemberApplication.remove")(
     function* (memberId: Member.Id) {

@@ -96,7 +96,9 @@ builds core, and completes journal replay before exposing the prepared context.
 Concurrent callers await the same boot. Later requests reuse that context without
 replaying history or rebuilding services. Membership, authorization, transactions,
 and subscription scopes are resolved during each operation; boot uses the host's
-context rather than inheriting the first request's actor or transaction.
+context rather than inheriting the first request's actor or transaction. Ordinary
+reads and SSE setup check authorization without opening a transaction; write
+operations check authorization inside their commit.
 
 Successful runtimes remain until the host scope closes, including while idle.
 Memory therefore grows with the workspaces acquired during that host lifetime.

@@ -39,7 +39,7 @@ export interface Interface {
   ) => Effect.Effect<A, GatewayErrors.ExposedError<E>>;
   /**
    * Run core operations as the identity's active membership. Core rechecks
-   * membership and permissions inside each operation's transaction.
+   * membership and permissions per operation; writes do so inside their transaction.
    */
   readonly asMember: <A, E, R extends Core.Operations | Actor.Service>(
     workspaceId: Workspace.Id,

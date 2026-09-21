@@ -14,6 +14,10 @@ module dependencies, schema names, and construction conventions.
   operation inputs/options, `State`, `Status`, and service `Interface`.
 - Preserve serialized contracts and service keys when moving or renaming source.
 - Keep tests grouped by domain and feature under `test/`.
+- Read operations authorize and query current state without opening a transaction.
+  Read-only policy helpers must not require `Store.Transaction`. An existing caller
+  transaction is honored. Write operations must authorize and mutate inside the
+  same journal commit; use explicit snapshots only for reads that require them.
 - Keep `make` as the public construction path and have `layer` delegate to it.
   Preserve the distinction between stable construction dependencies and actor,
   transaction, and scope requirements supplied during operations.

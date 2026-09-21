@@ -1,8 +1,6 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Transaction } from "../journal/transaction.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
@@ -26,7 +24,6 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 export type Error =
   | Authorization.Error
   | NotificationStore.Failure
-  | Transaction.Error
   | Schema.SchemaError
   | NotFound
   | WorkspaceMismatch
@@ -35,7 +32,8 @@ export type Error =
 /**
  * Read the acting identity's inbox within one workspace. Active membership is
  * required; owning a role does not grant access to another recipient's inbox.
- * Authorization and reads share one journal transaction, joining an outer commit.
+ * Authorization and reads use current state without opening a transaction; an
+ * existing caller transaction is honored, including its staged changes.
  * Reading a notification neither acknowledges it nor grants access to its source.
  */
 export interface Interface {
@@ -77,11 +75,10 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
-  NotificationStore.Service | Authorization.Service | Journal.Service
+  NotificationStore.Service | Authorization.Service
 > {
   const notifications = yield* NotificationStore.Service;
   const authorization = yield* Authorization.Service;
-  const journal = yield* Journal.Service;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, notifications.workspaceId);
 
@@ -102,7 +99,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     if (!sameRecipient(record.recipient, target))
       return yield* new NotFound({ workspaceId, notificationId: id });
     return record;
-  }, journal.commit);
+  });
 
   const read = Effect.fnUntraced(function* (
     options: NotificationStore.ReadOptions,
@@ -136,13 +133,11 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     return records;
   });
 
-  const list = Effect.fn("NotificationApplication.list")(
-    (options: NotificationStore.ReadOptions) => read(options, false),
-    journal.commit,
+  const list = Effect.fn("NotificationApplication.list")((options: NotificationStore.ReadOptions) =>
+    read(options, false),
   );
   const listPending = Effect.fn("NotificationApplication.listPending")(
     (options: NotificationStore.ReadOptions) => read(options, true),
-    journal.commit,
   );
 
   return Service.of({ workspaceId, get, list, listPending });

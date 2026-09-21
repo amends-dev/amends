@@ -289,7 +289,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       records.push(record);
     }
     return records;
-  }).pipe(journal.commit, Effect.withSpan("InvitationApplication.list"));
+  }).pipe(Effect.withSpan("InvitationApplication.list"));
 
   return Service.of({ issue, accept, revoke, list });
 });

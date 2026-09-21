@@ -1,7 +1,6 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
-import { Store } from "../journal/store.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
@@ -42,13 +41,14 @@ export interface Interface {
   readonly workspaceId: Workspace.Id;
   /**
    * Check the current actor and require every declared permission on its target.
-   * Run this and the protected operation in the same transaction. An empty list
+   * Reads check current state without opening a transaction. Write operations
+   * must run this check and their mutation inside the same commit. An empty list
    * checks active membership only. Target existence and business rules belong to
    * the application operation.
    */
   readonly require: (
     requirements: ReadonlyArray<Requirement.Value>,
-  ) => Effect.Effect<void, Error, Actor.Service | Store.Transaction>;
+  ) => Effect.Effect<void, Error, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -88,7 +88,6 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   const requirePermissions = Effect.fn("Authorization.require")(function* (
     requirements: ReadonlyArray<Requirement.Value>,
   ) {
-    yield* Store.Transaction;
     const actor = yield* decodeActor(yield* Actor.Service);
     yield* requireWorkspace(workspaceId, actor.workspaceId);
     const found = yield* members.get(actor.memberId);

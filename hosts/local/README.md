@@ -94,8 +94,9 @@ Restarting the server discards pending codes.
 Requests without a token receive 401. Non-members receive 403 with
 `Gateway.NotMember`; core outcomes keep their tags, such as
 `MemberApplication.NotFound` with 404. The gateway resolves the active membership
-and supplies the actor. Core rechecks membership and permission in each operation's
-transaction.
+and supplies the actor. Core rechecks membership and permission for each operation.
+Reads query current state without opening a transaction; writes check permission
+inside the same transaction as their changes.
 
 ## Verify
 
