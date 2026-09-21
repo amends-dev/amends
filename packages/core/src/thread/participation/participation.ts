@@ -31,4 +31,14 @@ export const Admission = Schema.Struct({
   status: Schema.Literal("active"),
   endedAt: Schema.Null,
 });
+/** Public current-participant view. Routing identities and admission linkage remain internal. */
+export const Summary = Schema.Struct({
+  id: Id,
+  workspaceId: WorkspaceId.Id,
+  threadId: ThreadId.Id,
+  memberId: MemberId.Id,
+  joinedAt: Record.fields.joinedAt,
+  joinedAtSequence: Record.fields.joinedAtSequence,
+});
+export interface Summary extends Schema.Schema.Type<typeof Summary> {}
 export * as ThreadParticipation from "./participation.ts";

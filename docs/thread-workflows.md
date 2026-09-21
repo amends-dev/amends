@@ -1,8 +1,8 @@
 # Thread workflows
 
-Core and both storage adapters implement starting a thread with a human-authored text
-message in an existing private team group. Call `ThreadApplication.startInGroup` through
-`Gateway.asMember` or a trusted workspace context. Thread reads, replies, HTTP/UI, DMs,
+Core and both storage adapters implement human opening messages and authorized reads in
+private team groups. Call `ThreadApplication` through `Gateway.asMember` or a trusted workspace
+context. Replies, HTTP/UI, DMs,
 standalone threads, attachments, and agent execution remain separate implementation steps.
 
 ## Starting a conversation
@@ -24,7 +24,7 @@ const start = (groupId: Group.Id) =>
 ```
 
 The result contains `thread`, `message`, and `activity`. Internal participation identity snapshots
-are not returned; participant browsing will require an authorized thread read operation. The operation accepts
+are not returned; authorized participant reads provide public summaries instead. The operation accepts
 non-whitespace text and preserves it verbatim, including indentation and newlines. `mentions`
 is an explicit array of distinct workspace-member IDs. An empty array means broadcast;
 text such as `@Reviewer` does not itself create structured addressing.
@@ -58,8 +58,8 @@ The gateway preserves these outcomes and maps malformed input to `Gateway.Invali
 An author mentioned explicitly appears only once. There is no implicit sender exclusion:
 broadcast includes the author; a narrowed message not mentioning its author does not notify them.
 Participation and notification selection are separate recorded decisions. Other group members
-remain in the inherited access audience when mentions narrow participation, but thread read
-operations are not implemented yet.
+remain in the inherited access audience when mentions narrow participation and can read
+the thread when they hold `thread.read`. Reading does not enroll them.
 
 A later group addition does not enroll that member in existing threads or create retroactive
 notifications. Future unmentioned replies will address that thread's current participants,
@@ -71,6 +71,64 @@ An explicit mention makes the request direct; it does not require a meaningless 
 Ordinary assistant replies remain informational to other agents; explicit work requests can
 ask them to act. These handling rules remain design intent: this slice creates durable pending
 notifications and launches no turns, models, harnesses, or background recipient processors.
+
+## Reading conversations
+
+Every thread read requires active workspace membership, current membership in its group,
+and `thread.read` on that Thread target. `ThreadPermissions.Read` is included in newly initialized
+Viewer and higher-tier bundles. Roles and direct grants can supply it at workspace scope or
+for an exact thread. Membership, authorship, ownership, group management, `group.read`, and
+`thread.start` do not replace the read grant. No additional `group.read`, `member.read`, or
+`agent.use` grant is required to read an accessible thread. Humans and agents follow the same policy.
+
+| Operation                                           | Result                                                                                                                |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `get(threadId)`                                     | The thread's metadata.                                                                                                |
+| `listInGroup(groupId)`                              | Current readable threads in that group, in stable thread-ID order. Threads without a covering read grant are omitted. |
+| `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values, each containing the activity and its resolved message.    |
+| `listParticipants(threadId)`                        | Current `ThreadParticipation.Summary` values in participation-ID order.                                               |
+
+A nonparticipant can read the complete earlier conversation when they have group access and
+the action grant. Reading neither creates participation nor acknowledges or generates notifications.
+It never requests agent work. Later group members can read earlier history without receiving
+retroactive notifications; a returning group member can read again without reviving old participation.
+
+### Timeline pagination
+
+`limit` is a positive safe integer. `afterSequence` is an optional nonnegative safe integer;
+omission or zero starts before the first activity. Pages contain at most `limit` items,
+strictly after that sequence, ordered by sequence rather than timestamps. Pass the last
+returned item's `activity.sequence` as the next cursor. An empty page means no later activity
+is currently available. Later appended activity can be read using that same boundary.
+The cursor belongs to the selected thread; it is not a journal position or notification cursor.
+
+The application validates page bounds and order, then verifies that every referenced message
+belongs to that thread and workspace. Missing or inconsistent messages, duplicate or unordered
+activity, and storage failures fail the read instead of producing partial content or empty pages.
+Additional activity in paging tests is seeded through internal facts; a public reply workflow
+is not implemented yet.
+
+### Current participants and access loss
+
+Participant summaries contain `id`, `workspaceId`, `threadId`, `memberId`, `joinedAt`, and
+`joinedAtSequence`. They omit routing identities, group-admission linkage, and ended participation
+history. A record appears only while its participation, exact original group admission, and
+workspace membership are all active. Rejoining a group under a new admission cannot make an
+old participation current again. Member profiles are read through their own authorized operations.
+
+Missing, foreign, and outside-audience thread IDs share `ThreadApplication.NotFound` for metadata,
+timeline, and participant reads. An inaccessible group list returns `ThreadApplication.GroupNotFound`.
+A member in the audience without the action grant receives `Authorization.Denied` for a single
+thread read; discovery omits unreadable threads. Removed or identity-mismatched actors fail the
+current workspace-membership check. The gateway preserves these outcomes and maps invalid page
+options to `Gateway.InvalidInput`. Existing notifications never bypass source access checks;
+notification-source resolution remains a separate workflow.
+
+Reads open no transaction and perform no journal, checkpoint, participation, or notification
+writes. An enclosing caller transaction is honored, including staged activity, admissions,
+departures, and grant changes. Separate reads and pages do not promise a shared snapshot;
+revocation affects subsequent authorization checks but does not cancel an already-authorized read.
+Thread discovery and participant lists are currently unpaginated.
 
 ## Recorded changes and replay
 
@@ -126,19 +184,23 @@ other supported public events. A thread-only commit therefore provides no inbox 
 through that feed. Audience-aware thread subscriptions and live notification delivery remain work.
 Notifications expose source references, not continuing authority to read the source conversation.
 
-The public surface currently contains only `startInGroup`. Internal store reads are not authorized
-thread APIs. Thread browsing and source resolution, replies, participation management, general
+The public surface provides starts and the authorized reads above. Internal store reads are not
+authorized thread APIs. Notification-source resolution, replies, participation management, general
 acknowledgment, silent agent completion, turn execution, task activity, DMs, and standalone threads
 remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
-This change updates both development schema baselines. Recreate disposable development databases
-before using it; no upgrade chain or automatic data reset is provided. New permission bundles also
+The opening-message implementation updated both development schema baselines. Recreate disposable
+development databases when adopting that baseline; no upgrade chain or automatic data reset is provided. New permission bundles also
 apply only to fresh workspace initialization unless stored roles are explicitly updated.
+The read slice adds no tables or schema migration. Existing stored roles do not automatically gain
+`thread.read`; assign an explicit grant or update those roles before using the new read operations.
 
 ## Verification
 
 The mirrored adapter suites cover broadcast and mention routing, agent-use authority, custom
 scopes, inaccessible references, validation without partial writes, notification and checkpoint
 failures, outer transactions, concurrent departure, readmission, reopening, replay, and direct
-store constraints. Core tests verify withholding private thread facts from the public change feed.
+store constraints. Read suites cover exact grants, nonparticipant and later-member access,
+pagination, private identity filtering, no-write reads, current revocation, outer transactions,
+and rejection of corrupt cross-thread references. Core tests verify withholding private thread facts from the public change feed.
 Run `bun run check` and `bun run test` from the repository root.

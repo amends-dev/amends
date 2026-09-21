@@ -27,4 +27,10 @@ export const Started = Schema.Struct({
   activity: ThreadActivity.Record,
 });
 export interface Started extends Schema.Schema.Type<typeof Started> {}
+/** One ordered activity with its message resolved after authorizing the thread. */
+export const TimelineItem = Schema.Struct({
+  activity: ThreadActivity.Record,
+  message: ThreadMessage.Record,
+});
+export interface TimelineItem extends Schema.Schema.Type<typeof TimelineItem> {}
 export * as Thread from "./thread.ts";

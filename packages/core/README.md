@@ -167,7 +167,8 @@ that workspace. Adding a Thread target supplies scoped grant storage. The
 [planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
 also requires group access or standalone participation alongside action permissions.
 Group creation, reads, admission/departure, and the shared group-audience policy are implemented.
-Thread reads and their complete audience/action policy are not.
+Group-thread reads enforce audience membership and `thread.read`; standalone threads and
+subscription enforcement remain future work.
 The thread module supplies the opening-message workflow described below.
 
 ## Starting a thread in a private group
@@ -185,8 +186,19 @@ activity. Participations reference the exact group admission; group departure en
 discards pending agent input. Replay uses recorded recipients and stable notification IDs.
 
 These operations reuse the existing workspace journal; the timeline is a read model of ordered
-activity, not an independent second event stream. No thread read, reply, HTTP/UI, or agent-turn
-execution workflow is supplied yet. See [thread workflows](../../docs/thread-workflows.md).
+activity, not an independent second event stream. Authorized reads now provide discovery,
+metadata, timeline pages, and current-participant summaries. Reply, HTTP/UI, and agent-turn
+execution workflows remain separate work. See [thread workflows](../../docs/thread-workflows.md).
+
+Thread reads use `ThreadApplication.get`, `listInGroup`, `readTimeline`, and `listParticipants`.
+All require current workspace/group membership and `thread.read` on the Thread target; lists
+omit threads outside the caller's grants. Participation is not required or created by reading.
+Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional nonnegative
+`afterSequence`) and return activity/message pairs in sequence order. Current participants use
+`ThreadParticipation.Summary`, excluding internal identity snapshots and ended admissions.
+Reads honor caller transactions but open none, and make no notification or checkpoint changes.
+New Viewer bundles include the permission; stored role records are unchanged. See
+[thread reads](../../docs/thread-workflows.md#reading-conversations).
 
 ## Permission declarations and built-in roles
 
@@ -495,6 +507,7 @@ meaning rather than using it as a synonym for a constructor.
 | Grant resolver        | `GrantResolver.make()`                        | `GrantResolver.Service`                 |
 | Authorization         | `Authorization.make()`                        | `Authorization.Service`                 |
 | Member operations     | `MemberApplication.make()`                    | `MemberApplication.Service`             |
+| Thread operations     | `ThreadApplication.make()`                    | `ThreadApplication.Service`             |
 | Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
 | Private team creation | `GroupApplication.make()`                     | `GroupApplication.Service`              |
 | Group membership      | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |

@@ -16,7 +16,8 @@ and process-local live changes are implemented. Core and both adapters also impl
 private team-group creation, membership admission/departure, workspace-removal cleanup,
 authorized group reads, and a shared group-audience check. Human opening messages in private
 groups now create threads, initial participation, ordered message activity, and pending notifications
-atomically; see [thread workflows](thread-workflows.md). Thread reads, replies, general participation
+atomically; see [thread workflows](thread-workflows.md). Authorized group-thread discovery,
+metadata, timeline pages, and current-participant summaries are also implemented. Replies, general participation
 management, DMs, public groups, group/thread HTTP/UI, turns, execution, general acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
@@ -2376,6 +2377,15 @@ not bypass the audience requirement; workspace ownership or an administrator rol
 implicitly make someone a member of every conversation. Any broader inspection policy
 requires an explicit future design.
 
+For implemented group threads, `ThreadApplication.get`, `listInGroup`, `readTimeline`, and
+`listParticipants` enforce current group access and `thread.read` on the Thread target.
+Discovery filters unreadable threads. Timeline pages follow an exclusive sequence cursor and
+resolve message content under the same check. Participant summaries expose member references
+and joining details, while routing identities and ended participation remain internal.
+Reading requires no participation, creates none, and neither acknowledges input nor requests work.
+Writes, subscriptions, notification-source resolution, and standalone audiences retain their
+separate authorization contracts. See [thread reads](thread-workflows.md#reading-conversations).
+
 ### Grouped threads inherit access; standalone threads establish their own audience
 
 | Thread location | Access audience for workspace members                          | Initial participants                                                                   |
@@ -2442,7 +2452,8 @@ Self-leave and group cleanup during workspace-member removal are also implemente
 Private-group reads use `group.read` plus audience membership, with separate management
 inspection and a reusable audience check. Starting a private-group thread with a human text
 message, initial participation, and notifications is implemented; group/thread HTTP/UI,
-thread reads, further publication, and full thread enforcement remain future work.
+further publication and subscriptions remain future work. Thread reads now require current
+group access and `thread.read`, with no participation side effects.
 Default role placement does not limit future grants or roles.
 Other group operations, their permission declarations, broader group schemas, and admission
 UI remain contract work.

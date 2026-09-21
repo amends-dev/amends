@@ -152,6 +152,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       workspaceId: boundWorkspaceId,
       get: unexpected,
       listByThread: unexpected,
+      readPage: unexpected,
       insert: unexpected,
     }),
     Context.add(

@@ -57,6 +57,16 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
     ),
+    readPage: Effect.fn("ThreadActivities.readPage")(
+      function* (input, options) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+        const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
+        return yield* guard(
+          sql`SELECT ${columns} FROM thread_activities WHERE workspace_id = ${workspaceId} AND thread_id = ${id} AND sequence > ${request.afterSequence ?? 0} ORDER BY sequence LIMIT ${request.limit}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
+    ),
     insert: Effect.fn("ThreadActivities.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validate(input).pipe(

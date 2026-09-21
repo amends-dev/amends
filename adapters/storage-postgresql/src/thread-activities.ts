@@ -2,7 +2,7 @@ import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread
 
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { threadActivities, threadMessages } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -47,6 +47,27 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows));
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
+    ),
+    readPage: Effect.fn("ThreadActivities.readPage")(
+      function* (input, options) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+        const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
+        return yield* guard(
+          db
+            .select()
+            .from(threadActivities)
+            .where(
+              and(
+                inWorkspace,
+                eq(threadActivities.threadId, id),
+                gt(threadActivities.sequence, sql`${request.afterSequence ?? 0}::bigint`),
+              ),
+            )
+            .orderBy(threadActivities.sequence)
+            .limit(request.limit),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
     ),
     insert: Effect.fn("ThreadActivities.insert")(function* (input) {
       yield* Store.Transaction;

@@ -13,14 +13,16 @@ inspection of known groups. DMs, public groups,
 and group HTTP/UI workflows remain unimplemented.
 [Starting a private-group thread](thread-workflows.md) with a human text message, initial
 participation, timeline activity, and notifications is implemented in core and both adapters.
-Thread reads, replies, general participation management, turns, agent execution, triage,
+Authorized thread discovery, metadata, sequence-paginated timelines, and current-participant
+summaries are also implemented. Replies, general participation management, turns, agent execution, triage,
 and channel delivery remain future work.
 The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
-are agreed design intent. Inherited thread access, standalone admission, and participation
+include implemented group-inherited read access. Standalone admission and general participation
 management remain incomplete. Group departure ends its associated thread participations and
 discards their pending agent input; workspace-member removal uses the same cleanup.
 Thread starts use the shared group-audience check.
-Group lists and current rosters are unpaginated, and separate reads do not share a snapshot.
+Group and thread discovery and current-participant lists are unpaginated; timelines have
+sequence-based pages. Separate reads and pages do not share a snapshot.
 
 ## Notification recipients and generation
 

@@ -86,6 +86,10 @@ Thread opening persists the thread, its initial participants, a text message, or
 and notifications in one workspace commit. Broadcast enrolls current group members; mentions
 narrow the initial set. Participation references the exact group admission; departure ends it
 and discards pending agent input. Activity facts preserve recipient selection for replay.
+Thread reads enforce audience and action permissions in core. Timeline paging uses the existing
+workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema
+is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged
+activity, current grants and admission state, and rejection of inconsistent references.
 These tables and notification fields are part of the updated development baseline: recreate
 disposable databases rather than applying an upgrade chain. See [thread workflows](../../docs/thread-workflows.md).
 

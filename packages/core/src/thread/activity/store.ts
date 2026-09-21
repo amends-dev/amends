@@ -6,6 +6,13 @@ import type { ThreadActivity } from "./activity.ts";
 
 import type { ThreadId } from "../id.ts";
 
+/** Exclusive sequence boundary within one thread. Zero or omission starts before its first activity. */
+export const ReadOptions = Schema.Struct({
+  afterSequence: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
+
 export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
@@ -22,6 +29,11 @@ export interface Interface {
   ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
   readonly listByThread: (
     id: ThreadId.Id,
+  ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+  /** At most limit activities, strictly after the cursor, in ascending sequence order. No shared snapshot across pages. */
+  readonly readPage: (
+    id: ThreadId.Id,
+    options: ReadOptions,
   ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
   /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
   readonly insert: (

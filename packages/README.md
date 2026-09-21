@@ -89,7 +89,9 @@ cryptography, and workspace event bus a host must supply, derived from that laye
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/group`, `@amends/core/thread`, and
 `@amends/core/agent`, and `@amends/core/workspace`, each exposing the records, facts, stores, projections,
 and operations it implements. The thread surface implements private-group starts with initial
-participation, a text message, ordered activity, and notification generation. Agent-use permission
+participation, a text message, ordered activity, and notification generation. Its authorized
+reads provide group discovery, metadata, timeline pages, and current participant summaries,
+with group audience and `thread.read` checked independently of participation. Agent-use permission
 is declared in the agent domain; execution remains future work.
 The group surface supplies private team creation, authorized reads, an internal audience check,
 and membership admission/departure, with

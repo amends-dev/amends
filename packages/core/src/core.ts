@@ -70,6 +70,7 @@ const permissions = [
   GroupPermissions.Read,
   GroupMembershipPermissions.Manage,
   ThreadPermissions.Start,
+  ThreadPermissions.Read,
   AgentPermissions.Use,
 ];
 

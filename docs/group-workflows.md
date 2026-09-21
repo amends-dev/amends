@@ -5,8 +5,8 @@ SQLite and PostgreSQL. These operations are available through `GroupApplication.
 and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
-broader design; DMs, public groups, and thread reads remain future work.
-[Thread workflows](thread-workflows.md) now cover starting conversations in private groups.
+broader design; DMs and public groups remain future work.
+[Thread workflows](thread-workflows.md) cover starting and reading conversations in private groups.
 
 ## Permission and input
 
