@@ -1,4 +1,4 @@
-import { expect, expectTypeOf, test } from "bun:test";
+import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema, SchemaIssue } from "effect";
 import { Permission } from "../../src/authorization/permission.ts";
 import { Requirement } from "../../src/authorization/requirement.ts";
@@ -15,13 +15,11 @@ const ManageWorkspace = Permission.make("test.workspace.manage", {
   targetKind: "Workspace",
   builtinTier: "administrator",
 });
-
-test("requirements pair declared permissions with concrete targets", () => {
+it("requirements pair declared permissions with concrete targets", () => {
   expectTypeOf(MemberPermissions.Read.targetKind).toEqualTypeOf<"Member">();
   expectTypeOf(MemberPermissions.Remove.targetKind).toEqualTypeOf<"Member">();
   expectTypeOf(ManageWorkspace.targetKind).toEqualTypeOf<"Workspace">();
   expectTypeOf<Target.Kind>().toEqualTypeOf<Target.Reference["_tag"]>();
-
   expect(Requirement.make(MemberPermissions.Read, member)).toEqual({
     permission: { name: MemberPermissions.Read.name, targetKind: "Member" },
     target: member,
@@ -35,22 +33,18 @@ test("requirements pair declared permissions with concrete targets", () => {
     target: workspace,
   });
 });
-
-test("requirements retain their encoded contract without tier metadata", async () => {
-  const encoded = {
-    permission: { name: "member.read", targetKind: "Member" },
-    target: { _tag: "Member", workspaceId, memberId },
-  } as const;
-  const requirement = Requirement.make(MemberPermissions.Read, member);
-  expect(await Effect.runPromise(Schema.encodeEffect(Requirement.Value)(requirement))).toEqual(
-    encoded,
-  );
-  expect(await Effect.runPromise(Schema.decodeEffect(Requirement.Value)(encoded))).toEqual(
-    requirement,
-  );
-});
-
-test("requirement construction rejects the wrong target kind in types and at runtime", () => {
+it.effect("requirements retain their encoded contract without tier metadata", () =>
+  Effect.gen(function* () {
+    const encoded = {
+      permission: { name: "member.read", targetKind: "Member" },
+      target: { _tag: "Member", workspaceId, memberId },
+    } as const;
+    const requirement = Requirement.make(MemberPermissions.Read, member);
+    expect(yield* Schema.encodeEffect(Requirement.Value)(requirement)).toEqual(encoded);
+    expect(yield* Schema.decodeEffect(Requirement.Value)(encoded)).toEqual(requirement);
+  }),
+);
+it("requirement construction rejects the wrong target kind in types and at runtime", () => {
   expect(() => {
     // @ts-expect-error A member permission requires a member target.
     Requirement.make(MemberPermissions.Read, workspace);
@@ -64,22 +58,22 @@ test("requirement construction rejects the wrong target kind in types and at run
     Requirement.make(ManageWorkspace, member);
   }).toThrow("Schema validation failed");
 });
-
-test("schema decoding and effectful construction also reject mismatched requirements", async () => {
-  const decode = Schema.decodeUnknownEffect(Requirement.Value);
-  const valid = Requirement.make(MemberPermissions.Remove, member);
-  expect(await Effect.runPromise(decode(valid))).toEqual(valid);
-
-  for (const input of [
-    { permission: MemberPermissions.Remove, target: workspace },
-    { permission: ManageWorkspace, target: member },
-  ]) {
-    const error = await Effect.runPromise(decode(input).pipe(Effect.flip));
-    const issue = await Effect.runPromise(Requirement.Value.makeEffect(input).pipe(Effect.flip));
-    expect(error._tag).toBe("SchemaError");
-    for (const message of [error.message, SchemaIssue.makeFormatterDefault()(issue)]) {
-      expect(message).toContain(`requires a ${input.permission.targetKind} target`);
-      expect(message).toContain('["target"]');
+it.effect("schema decoding and effectful construction also reject mismatched requirements", () =>
+  Effect.gen(function* () {
+    const decode = Schema.decodeUnknownEffect(Requirement.Value);
+    const valid = Requirement.make(MemberPermissions.Remove, member);
+    expect(yield* decode(valid)).toEqual(valid);
+    for (const input of [
+      { permission: MemberPermissions.Remove, target: workspace },
+      { permission: ManageWorkspace, target: member },
+    ]) {
+      const error = yield* decode(input).pipe(Effect.flip);
+      const issue = yield* Requirement.Value.makeEffect(input).pipe(Effect.flip);
+      expect(error._tag).toBe("SchemaError");
+      for (const message of [error.message, SchemaIssue.makeFormatterDefault()(issue)]) {
+        expect(message).toContain(`requires a ${input.permission.targetKind} target`);
+        expect(message).toContain('["target"]');
+      }
     }
-  }
-});
+  }),
+);

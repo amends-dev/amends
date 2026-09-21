@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import { colors } from "../src/tokens/index.ts";
 
 type RGB = readonly [number, number, number];

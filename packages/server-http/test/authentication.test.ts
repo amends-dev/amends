@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Api, Authentication } from "@amends/api-http";
 import { Identity } from "@amends/core/identity";
 import { Credentials, WorkspaceDirectory } from "@amends/gateway";
@@ -7,13 +7,13 @@ import { HttpClientRequest, HttpServer } from "effect/unstable/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
 import { BearerAuthentication, MeHandlers } from "../src/index.ts";
 
-test.each(["make", "layer"] as const)(
+it.effect.each(["make", "layer"] as const)(
   "bearer %s resolves each request and observes credential revocation",
-  async (construction) => {
-    const resolutions: Array<string> = [];
-    const principals: Array<Identity.MemberReference> = [];
-    await Effect.runPromise(
-      Effect.gen(function* () {
+  (construction) =>
+    Effect.gen(function* () {
+      const resolutions: Array<string> = [];
+      const principals: Array<Identity.MemberReference> = [];
+      yield* Effect.gen(function* () {
         const token = yield* Ref.make("alice");
         const revoked = yield* Ref.make(false);
         const credentials = Credentials.Service.of({
@@ -57,7 +57,6 @@ test.each(["make", "layer"] as const)(
           clientAuthentication,
           HttpServer.layerServices,
         ).pipe(Layer.provideMerge(authentication), Layer.provide(directory));
-
         yield* Effect.gen(function* () {
           const client = yield* HttpApiTest.groups(Api, ["me"]);
           expect(resolutions).toEqual([]);
@@ -76,7 +75,6 @@ test.each(["make", "layer"] as const)(
             Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
           ]);
         }).pipe(Effect.provide(services));
-      }).pipe(Effect.scoped),
-    );
-  },
+      }).pipe(Effect.scoped);
+    }),
 );

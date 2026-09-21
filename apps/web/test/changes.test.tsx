@@ -8,7 +8,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-li
 import { DateTime, Effect, Schema } from "effect";
 import { AsyncResult, AtomRegistry } from "effect/unstable/reactivity";
 import { createSignal, Show } from "solid-js";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "@effect/vitest";
 import { Changes } from "../src/api/changes.ts";
 import { useQuery } from "../src/api/hooks.ts";
 import { keys } from "../src/api/keys.ts";
@@ -127,15 +127,15 @@ const installTransport = () =>
   });
 const count = (path: string, token = session.token) =>
   reads.get(`Bearer ${token} /api${path}`) ?? 0;
-const connect = async (store: AtomRegistry.AtomRegistry, id = workspaceId) => {
+const connect = Effect.fnUntraced(function* (store: AtomRegistry.AtomRegistry, id = workspaceId) {
   const index = connections.length;
   const unmount = store.mount(Changes.watch(id));
-  await waitFor(() => expect(connections.length).toBe(index + 1));
+  yield* Effect.promise(() => waitFor(() => expect(connections.length).toBe(index + 1)));
   const connection = connections[index]!;
   connection.send({ _tag: "Ready", workspaceId: id });
-  await Effect.runPromise(AtomRegistry.getResult(store, Changes.watch(id)));
+  yield* AtomRegistry.getResult(store, Changes.watch(id));
   return { connection, unmount };
-};
+});
 beforeEach(() => {
   localStorage.clear();
   saveSession(session);
@@ -182,75 +182,97 @@ it("maps facts to frontend keys, deduplicates commits and falls back for new ver
   }
 });
 
-it("Ready refreshes mounted workspace list and detail queries, while commits refresh the relevant views", async () => {
-  const store = registry();
-  const otherSession = registry(nextSession);
-  const list = Notifications.list(workspaceId, { limit: 10 });
-  const detail = Notifications.get(workspaceId, notification.id);
-  const members = Members.list(workspaceId);
-  const memberDetail = Members.get(workspaceId, member.id);
-  const other = Notifications.list(otherWorkspaceId, { limit: 10 });
-  store.mount(list);
-  store.mount(detail);
-  store.mount(members);
-  store.mount(memberDetail);
-  store.mount(other);
-  otherSession.mount(list);
-  await Effect.runPromise(
-    Effect.all([
-      AtomRegistry.getResult(store, list),
-      AtomRegistry.getResult(store, detail),
-      AtomRegistry.getResult(store, members),
-      AtomRegistry.getResult(store, memberDetail),
-      AtomRegistry.getResult(store, other),
-      AtomRegistry.getResult(otherSession, list),
-    ]),
-  );
-  const { connection } = await connect(store);
-  await waitFor(() => expect(count("/workspaces/workspace-a/notifications/notification")).toBe(2));
-  expect(count("/workspaces/workspace-a/notifications")).toBe(2);
-  expect(count("/workspaces/workspace-b/notifications")).toBe(1);
-  expect(count("/workspaces/workspace-a/notifications", nextSession.token)).toBe(1);
-  expect(connection.request.headers.get("authorization")).toBe("Bearer credential-a");
-  expect(connection.request.headers.has("last-event-id")).toBe(false);
-  connection.send(changed());
-  await waitFor(() => expect(count("/workspaces/workspace-a/members/member")).toBe(3));
-  expect(count("/workspaces/workspace-a/members")).toBe(3);
-  expect(count("/workspaces/workspace-a/notifications")).toBe(2);
-  connection.send(changed("future.changed"));
-  await waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(3));
-});
+it.effect(
+  "Ready refreshes mounted workspace list and detail queries, while commits refresh the relevant views",
+  () =>
+    Effect.gen(function* () {
+      const store = registry();
+      const otherSession = registry(nextSession);
+      const list = Notifications.list(workspaceId, { limit: 10 });
+      const detail = Notifications.get(workspaceId, notification.id);
+      const members = Members.list(workspaceId);
+      const memberDetail = Members.get(workspaceId, member.id);
+      const other = Notifications.list(otherWorkspaceId, { limit: 10 });
+      store.mount(list);
+      store.mount(detail);
+      store.mount(members);
+      store.mount(memberDetail);
+      store.mount(other);
+      otherSession.mount(list);
+      yield* Effect.all([
+        AtomRegistry.getResult(store, list),
+        AtomRegistry.getResult(store, detail),
+        AtomRegistry.getResult(store, members),
+        AtomRegistry.getResult(store, memberDetail),
+        AtomRegistry.getResult(store, other),
+        AtomRegistry.getResult(otherSession, list),
+      ]);
+      const { connection } = yield* connect(store);
+      yield* Effect.promise(() =>
+        waitFor(() => expect(count("/workspaces/workspace-a/notifications/notification")).toBe(2)),
+      );
+      expect(count("/workspaces/workspace-a/notifications")).toBe(2);
+      expect(count("/workspaces/workspace-b/notifications")).toBe(1);
+      expect(count("/workspaces/workspace-a/notifications", nextSession.token)).toBe(1);
+      expect(connection.request.headers.get("authorization")).toBe("Bearer credential-a");
+      expect(connection.request.headers.has("last-event-id")).toBe(false);
+      connection.send(changed());
+      yield* Effect.promise(() =>
+        waitFor(() => expect(count("/workspaces/workspace-a/members/member")).toBe(3)),
+      );
+      expect(count("/workspaces/workspace-a/members")).toBe(3);
+      expect(count("/workspaces/workspace-a/notifications")).toBe(2);
+      connection.send(changed("future.changed"));
+      yield* Effect.promise(() =>
+        waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(3)),
+      );
+    }),
+);
 
-it("reconnects after EOF and refreshes missed changes on Ready, sharing one stream per workspace", async () => {
-  const store = registry();
-  const query = Notifications.list(workspaceId, { limit: 10 });
-  store.mount(query);
-  await Effect.runPromise(AtomRegistry.getResult(store, query));
-  const { connection } = await connect(store);
-  store.mount(Changes.watch(workspaceId));
-  await waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(2));
-  expect(connections).toHaveLength(1);
-  connection.end();
-  await waitFor(() => expect(connections).toHaveLength(2), { timeout: 3000 });
-  expect(count("/workspaces/workspace-a/notifications")).toBe(2);
-  connections[1]!.send({ _tag: "Ready", workspaceId });
-  await waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(3));
-});
+it.effect(
+  "reconnects after EOF and refreshes missed changes on Ready, sharing one stream per workspace",
+  () =>
+    Effect.gen(function* () {
+      const store = registry();
+      const query = Notifications.list(workspaceId, { limit: 10 });
+      store.mount(query);
+      yield* AtomRegistry.getResult(store, query);
+      const { connection } = yield* connect(store);
+      store.mount(Changes.watch(workspaceId));
+      yield* Effect.promise(() =>
+        waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(2)),
+      );
+      expect(connections).toHaveLength(1);
+      connection.end();
+      yield* Effect.promise(() =>
+        waitFor(() => expect(connections).toHaveLength(2), { timeout: 3000 }),
+      );
+      expect(count("/workspaces/workspace-a/notifications")).toBe(2);
+      connections[1]!.send({ _tag: "Ready", workspaceId });
+      yield* Effect.promise(() =>
+        waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(3)),
+      );
+    }),
+);
 
-it("keeps mounted queries unchanged as time passes while the stream is open", async () => {
-  vi.useFakeTimers();
-  const store = registry();
-  const query = Notifications.list(workspaceId, { limit: 10 });
-  store.mount(query);
-  store.mount(Changes.watch(workspaceId));
-  await vi.waitFor(() => expect(connections).toHaveLength(1));
-  await Effect.runPromise(AtomRegistry.getResult(store, query));
-  connections[0]!.send({ _tag: "Ready", workspaceId });
-  await vi.waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(2));
-  await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-  expect(connections).toHaveLength(1);
-  expect(count("/workspaces/workspace-a/notifications")).toBe(2);
-});
+it.effect("keeps mounted queries unchanged as time passes while the stream is open", () =>
+  Effect.gen(function* () {
+    vi.useFakeTimers();
+    const store = registry();
+    const query = Notifications.list(workspaceId, { limit: 10 });
+    store.mount(query);
+    store.mount(Changes.watch(workspaceId));
+    yield* Effect.promise(() => vi.waitFor(() => expect(connections).toHaveLength(1)));
+    yield* AtomRegistry.getResult(store, query);
+    connections[0]!.send({ _tag: "Ready", workspaceId });
+    yield* Effect.promise(() =>
+      vi.waitFor(() => expect(count("/workspaces/workspace-a/notifications")).toBe(2)),
+    );
+    yield* Effect.promise(() => vi.advanceTimersByTimeAsync(5 * 60 * 1000));
+    expect(connections).toHaveLength(1);
+    expect(count("/workspaces/workspace-a/notifications")).toBe(2);
+  }),
+);
 
 it.each([
   [401, { _tag: "Api.Unauthorized" }],
@@ -304,14 +326,16 @@ it("closes streams on workspace switches, session replacement and sign-out", asy
   await waitFor(() => expect(connections[2]!.cancelled).toBe(true));
 });
 
-it("rejects a message for a different workspace before invalidating anything", async () => {
-  const store = registry();
-  const query = Notifications.list(otherWorkspaceId, { limit: 10 });
-  store.mount(query);
-  await Effect.runPromise(AtomRegistry.getResult(store, query));
-  const { connection, unmount } = await connect(store);
-  connection.send({ _tag: "Ready", workspaceId: otherWorkspaceId });
-  await waitFor(() => expect(connection.cancelled).toBe(true));
-  expect(count("/workspaces/workspace-b/notifications")).toBe(1);
-  unmount();
-});
+it.effect("rejects a message for a different workspace before invalidating anything", () =>
+  Effect.gen(function* () {
+    const store = registry();
+    const query = Notifications.list(otherWorkspaceId, { limit: 10 });
+    store.mount(query);
+    yield* AtomRegistry.getResult(store, query);
+    const { connection, unmount } = yield* connect(store);
+    connection.send({ _tag: "Ready", workspaceId: otherWorkspaceId });
+    yield* Effect.promise(() => waitFor(() => expect(connection.cancelled).toBe(true)));
+    expect(count("/workspaces/workspace-b/notifications")).toBe(1);
+    unmount();
+  }),
+);

@@ -1,4 +1,4 @@
-import { expect, test as it } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Actor, Identity } from "@amends/core/identity";
 import { Entry, Journal, Store } from "@amends/core/journal";
 import {
@@ -48,50 +48,56 @@ const record = (id: string, overrides: Partial<Notification.Record> = {}): Notif
   ...overrides,
 });
 const page = { limit: 20 };
-
-it("notification storage persists across reopening and isolates workspaces and recipient kinds", async () =>
-  withDatabase(async (location) => {
-    const one = record("same-id");
-    const two = record("agent", { source: one.source, recipient: agent });
-    const three = record("another", { source: one.source, recipient: another });
-    const four = record("contact", { source: one.source, recipient: contact });
-    const five = record("triage", { source: one.source, recipient: triage });
-    const foreign = record("same-id", { workspaceId: otherWorkspaceId });
-    await inDatabase(
-      location,
+it.effect(
+  "notification storage persists across reopening and isolates workspaces and recipient kinds",
+  () =>
+    withDatabase((location) =>
       Effect.gen(function* () {
-        const a = yield* boundTo(workspaceId);
-        const b = yield* boundTo(otherWorkspaceId);
-        yield* initialized(a);
-        yield* initialized(b);
-        yield* a.store.transaction(
-          Effect.forEach([one, two, three, four, five], a.notifications.insert),
+        const one = record("same-id");
+        const two = record("agent", { source: one.source, recipient: agent });
+        const three = record("another", { source: one.source, recipient: another });
+        const four = record("contact", { source: one.source, recipient: contact });
+        const five = record("triage", { source: one.source, recipient: triage });
+        const foreign = record("same-id", { workspaceId: otherWorkspaceId });
+        yield* inDatabase(
+          location,
+          Effect.gen(function* () {
+            const a = yield* boundTo(workspaceId);
+            const b = yield* boundTo(otherWorkspaceId);
+            yield* initialized(a);
+            yield* initialized(b);
+            yield* a.store.transaction(
+              Effect.forEach([one, two, three, four, five], a.notifications.insert),
+            );
+            yield* b.store.transaction(b.notifications.insert(foreign));
+          }),
         );
-        yield* b.store.transaction(b.notifications.insert(foreign));
+        yield* inDatabase(
+          location,
+          Effect.gen(function* () {
+            const a = yield* boundTo(workspaceId);
+            const b = yield* boundTo(otherWorkspaceId);
+            expect(yield* a.notifications.get(one.id)).toEqual(Option.some(one));
+            expect(yield* b.notifications.get(one.id)).toEqual(Option.some(foreign));
+            expect(yield* b.notifications.get(two.id)).toEqual(Option.none());
+            expect(yield* a.notifications.get(Notification.Id.make("absent"))).toEqual(
+              Option.none(),
+            );
+            expect(yield* a.notifications.listByRecipient(human, page)).toEqual([one]);
+            expect(yield* a.notifications.listPendingByRecipient(agent, page)).toEqual([two]);
+            expect(yield* a.notifications.listByRecipient(another, page)).toEqual([three]);
+            expect(yield* a.notifications.listByRecipient(contact, page)).toEqual([four]);
+            expect(yield* a.notifications.listPendingByRecipient(triage, page)).toEqual([five]);
+            expect(yield* b.notifications.listByRecipient(triage, page)).toEqual([]);
+            expect(yield* b.notifications.listPendingByRecipient(human, page)).toEqual([foreign]);
+          }),
+        );
       }),
-    );
-    await inDatabase(
-      location,
-      Effect.gen(function* () {
-        const a = yield* boundTo(workspaceId);
-        const b = yield* boundTo(otherWorkspaceId);
-        expect(yield* a.notifications.get(one.id)).toEqual(Option.some(one));
-        expect(yield* b.notifications.get(one.id)).toEqual(Option.some(foreign));
-        expect(yield* b.notifications.get(two.id)).toEqual(Option.none());
-        expect(yield* a.notifications.get(Notification.Id.make("absent"))).toEqual(Option.none());
-        expect(yield* a.notifications.listByRecipient(human, page)).toEqual([one]);
-        expect(yield* a.notifications.listPendingByRecipient(agent, page)).toEqual([two]);
-        expect(yield* a.notifications.listByRecipient(another, page)).toEqual([three]);
-        expect(yield* a.notifications.listByRecipient(contact, page)).toEqual([four]);
-        expect(yield* a.notifications.listPendingByRecipient(triage, page)).toEqual([five]);
-        expect(yield* b.notifications.listByRecipient(triage, page)).toEqual([]);
-        expect(yield* b.notifications.listPendingByRecipient(human, page)).toEqual([foreign]);
-      }),
-    );
-  }));
+    ),
+);
 
-it("both notification lists paginate exclusively by instant and binary ID order", async () =>
-  withDatabase(async (location) =>
+it.effect("both notification lists paginate exclusively by instant and binary ID order", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -121,42 +127,49 @@ it("both notification lists paginate exclusively by instant and binary ID order"
         }
       }),
     ),
-  ));
+  ),
+);
 
-it("notification uniqueness rejects reused IDs and duplicate source-recipient associations", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        yield* initialized(bound);
-        const saved = record("saved");
-        yield* bound.store.transaction(bound.notifications.insert(saved));
-        for (const duplicate of [
-          record("saved", { source: record("different").source }),
-          record("duplicate", { source: saved.source }),
-        ]) {
-          expect(
-            yield* Effect.flip(bound.store.transaction(bound.notifications.insert(duplicate))),
-          ).toMatchObject({ _tag: "NotificationStore.Conflict", operation: "insert" });
-        }
-        const otherLog = record("other-log", {
-          source: { ...saved.source, logId: Entry.LogId.make("another-log") },
-        });
-        yield* bound.store.transaction(bound.notifications.insert(otherLog));
-        expect(yield* bound.notifications.get(saved.id)).toEqual(Option.some(saved));
-        expect(yield* bound.notifications.get(Notification.Id.make("duplicate"))).toEqual(
-          Option.none(),
-        );
-        expect(yield* bound.notifications.listByRecipient(human, page)).toHaveLength(2);
-      }),
+it.effect(
+  "notification uniqueness rejects reused IDs and duplicate source-recipient associations",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          yield* initialized(bound);
+          const saved = record("saved");
+          yield* bound.store.transaction(bound.notifications.insert(saved));
+          for (const duplicate of [
+            record("saved", { source: record("different").source }),
+            record("duplicate", { source: saved.source }),
+          ]) {
+            expect(
+              yield* Effect.flip(bound.store.transaction(bound.notifications.insert(duplicate))),
+            ).toMatchObject({
+              _tag: "NotificationStore.Conflict",
+              operation: "insert",
+            });
+          }
+          const otherLog = record("other-log", {
+            source: { ...saved.source, logId: Entry.LogId.make("another-log") },
+          });
+          yield* bound.store.transaction(bound.notifications.insert(otherLog));
+          expect(yield* bound.notifications.get(saved.id)).toEqual(Option.some(saved));
+          expect(yield* bound.notifications.get(Notification.Id.make("duplicate"))).toEqual(
+            Option.none(),
+          );
+          expect(yield* bound.notifications.listByRecipient(human, page)).toHaveLength(2);
+        }),
+      ),
     ),
-  ));
+);
 
-it.each([human, agent, contact, triage])(
+it.effect.each([human, agent, contact, triage])(
   "competing notification insertions produce only one source-recipient record for %o",
-  async (recipient) =>
-    withDatabase(async (location) =>
+  (recipient) =>
+    withDatabase((location) =>
       inDatabase(
         location,
         Effect.gen(function* () {
@@ -183,8 +196,8 @@ it.each([human, agent, contact, triage])(
     ),
 );
 
-it("notifications, source entries, and checkpoints share staged reads and rollback", async () =>
-  withDatabase(async (location) =>
+it.effect("notifications, source entries, and checkpoints share staged reads and rollback", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -225,46 +238,52 @@ it("notifications, source entries, and checkpoints share staged reads and rollba
         expect(Option.isSome(yield* bound.checkpoints.get(key))).toBe(true);
       }),
     ),
-  ));
+  ),
+);
 
-it("invalid notification writes conflict before conversion without poisoning the transaction", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        yield* initialized(bound);
-        const corrupt: ReadonlyArray<(value: Notification.Record) => void> = [
-          (value) => Reflect.set(value, "id", ""),
-          (value) => Reflect.set(value, "workspaceId", otherWorkspaceId),
-          (value) => Reflect.set(value.source, "logId", ""),
-          (value) => Reflect.set(value.source, "entryId", ""),
-          (value) => Reflect.set(value.recipient, "_tag", "Unknown"),
-          (value) => Reflect.set(value.recipient, "id", ""),
-          (value) => Reflect.set(value, "recordedAt", "not-a-date"),
-          (value) => Reflect.set(value.state, "_tag", "Acknowledged"),
-        ];
-        yield* bound.store.transaction(
-          Effect.gen(function* () {
-            for (const change of corrupt) {
-              const invalid = record("invalid");
-              change(invalid);
-              expect(yield* Effect.flip(bound.notifications.insert(invalid))).toMatchObject({
-                _tag: "NotificationStore.Conflict",
-                operation: "insert",
-              });
-              expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([]);
-            }
-            yield* bound.notifications.insert(record("valid"));
-          }),
-        );
-        expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([record("valid")]);
-      }),
+it.effect(
+  "invalid notification writes conflict before conversion without poisoning the transaction",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          yield* initialized(bound);
+          const corrupt: ReadonlyArray<(value: Notification.Record) => void> = [
+            (value) => Reflect.set(value, "id", ""),
+            (value) => Reflect.set(value, "workspaceId", otherWorkspaceId),
+            (value) => Reflect.set(value.source, "logId", ""),
+            (value) => Reflect.set(value.source, "entryId", ""),
+            (value) => Reflect.set(value.recipient, "_tag", "Unknown"),
+            (value) => Reflect.set(value.recipient, "id", ""),
+            (value) => Reflect.set(value, "recordedAt", "not-a-date"),
+            (value) => Reflect.set(value.state, "_tag", "Acknowledged"),
+          ];
+          yield* bound.store.transaction(
+            Effect.gen(function* () {
+              for (const change of corrupt) {
+                const invalid = record("invalid");
+                change(invalid);
+                expect(yield* Effect.flip(bound.notifications.insert(invalid))).toMatchObject({
+                  _tag: "NotificationStore.Conflict",
+                  operation: "insert",
+                });
+                expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([]);
+              }
+              yield* bound.notifications.insert(record("valid"));
+            }),
+          );
+          expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([
+            record("valid"),
+          ]);
+        }),
+      ),
     ),
-  ));
+);
 
-it("notification reads reject invalid paging and recipient input as typed failures", async () =>
-  withDatabase(async (location) =>
+it.effect("notification reads reject invalid paging and recipient input as typed failures", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -295,45 +314,49 @@ it("notification reads reject invalid paging and recipient input as typed failur
         }
       }),
     ),
-  ));
+  ),
+);
 
-it("notification operations reject foreign, expired, and incomplete transaction contexts", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const a = yield* boundTo(workspaceId);
-        const b = yield* boundTo(otherWorkspaceId);
-        yield* initialized(a);
-        yield* initialized(b);
-        const value = record("guarded");
-        const expired = yield* a.store.transaction(Effect.context<Store.Transaction>());
-        const native = Context.get(expired, Store.Transaction);
-        const failures = [
-          a.notifications.get(value.id).pipe(Effect.provide(expired)),
-          a.notifications.listByRecipient(human, page).pipe(Effect.provide(expired)),
-          a.notifications.listPendingByRecipient(human, page).pipe(Effect.provide(expired)),
-          a.notifications.insert(value).pipe(Effect.provide(expired)),
-          a.notifications.insert(value).pipe(Effect.provideService(Store.Transaction, native)),
-          a.store.transaction(b.notifications.get(value.id)),
-          a.store.transaction(b.notifications.listByRecipient(human, page)),
-          a.store.transaction(
-            b.notifications.insert(record("guarded", { workspaceId: otherWorkspaceId })),
-          ),
-        ];
-        for (const operation of failures) {
-          expect(yield* Effect.flip(operation)).toMatchObject({
-            _tag: "NotificationStore.Failure",
-          });
-        }
-        expect(yield* a.notifications.get(value.id)).toEqual(Option.none());
-        expect(yield* b.notifications.get(value.id)).toEqual(Option.none());
-      }),
+it.effect(
+  "notification operations reject foreign, expired, and incomplete transaction contexts",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const a = yield* boundTo(workspaceId);
+          const b = yield* boundTo(otherWorkspaceId);
+          yield* initialized(a);
+          yield* initialized(b);
+          const value = record("guarded");
+          const expired = yield* a.store.transaction(Effect.context<Store.Transaction>());
+          const native = Context.get(expired, Store.Transaction);
+          const failures = [
+            a.notifications.get(value.id).pipe(Effect.provide(expired)),
+            a.notifications.listByRecipient(human, page).pipe(Effect.provide(expired)),
+            a.notifications.listPendingByRecipient(human, page).pipe(Effect.provide(expired)),
+            a.notifications.insert(value).pipe(Effect.provide(expired)),
+            a.notifications.insert(value).pipe(Effect.provideService(Store.Transaction, native)),
+            a.store.transaction(b.notifications.get(value.id)),
+            a.store.transaction(b.notifications.listByRecipient(human, page)),
+            a.store.transaction(
+              b.notifications.insert(record("guarded", { workspaceId: otherWorkspaceId })),
+            ),
+          ];
+          for (const operation of failures) {
+            expect(yield* Effect.flip(operation)).toMatchObject({
+              _tag: "NotificationStore.Failure",
+            });
+          }
+          expect(yield* a.notifications.get(value.id)).toEqual(Option.none());
+          expect(yield* b.notifications.get(value.id)).toEqual(Option.none());
+        }),
+      ),
     ),
-  ));
+);
 
-it("notification storage isolates input and returned nested records from mutation", async () =>
-  withDatabase(async (location) =>
+it.effect("notification storage isolates input and returned nested records from mutation", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -352,10 +375,11 @@ it("notification storage isolates input and returned nested records from mutatio
         expect(yield* bound.notifications.get(input.id)).toEqual(Option.some(record("isolated")));
       }),
     ),
-  ));
+  ),
+);
 
-it("malformed persisted notifications fail reads instead of returning invalid records", async () =>
-  withDatabase(async (location) =>
+it.effect("malformed persisted notifications fail reads instead of returning invalid records", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -377,115 +401,122 @@ it("malformed persisted notifications fail reads instead of returning invalid re
         }
       }),
     ),
-  ));
+  ),
+);
 
-it("gateway notification reads enforce recipient and workspace isolation with real pagination", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const a = yield* boundTo(workspaceId);
-        const b = yield* boundTo(otherWorkspaceId);
-        const workspace = yield* initialized(a, human.id);
-        yield* initialized(b, human.id);
-        const first = record("a");
-        const second = record("b");
-        const forAgent = record("agent", { recipient: agent });
-        const forAnother = record("another", { recipient: another });
-        const foreign = record("a", { workspaceId: otherWorkspaceId });
-        yield* a.store.transaction(
-          Effect.gen(function* () {
-            yield* a.members.insert({
-              id: Member.Id.make("notification-agent"),
-              workspaceId,
-              identity: agent,
-              status: "active",
-            });
-            yield* Effect.forEach([second, forAnother, forAgent, first], a.notifications.insert);
-          }),
-        );
-        yield* b.store.transaction(b.notifications.insert(foreign));
-        const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 });
-        const gateway = yield* Gateway.make().pipe(
-          Effect.provideService(WorkspaceStorage.Service, yield* SqliteStorage.make()),
-          Effect.provide(BunCrypto.layer),
-        );
-        yield* gateway.asMember(
-          workspaceId,
-          human,
-          Effect.gen(function* () {
-            const notifications = yield* NotificationApplication.Service;
-            expect(yield* notifications.get(first.id)).toEqual(first);
-            expect(yield* notifications.list({ limit: 1 })).toEqual([first]);
-            const options = { limit: 1, after: { recordedAt: first.recordedAt, id: first.id } };
-            expect(yield* notifications.list(options)).toEqual([second]);
-            expect(yield* notifications.listPending(options)).toEqual([second]);
-          }),
-        );
-        const list = Effect.flatMap(NotificationApplication.Service, (notifications) =>
-          notifications.list(page),
-        );
-        expect(yield* gateway.asMember(workspaceId, agent, list)).toEqual([forAgent]);
-        expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
-        for (const id of [forAgent.id, forAnother.id, Notification.Id.make("missing")]) {
-          const get = Effect.flatMap(NotificationApplication.Service, (notifications) =>
-            notifications.get(id),
+it.effect(
+  "gateway notification reads enforce recipient and workspace isolation with real pagination",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const a = yield* boundTo(workspaceId);
+          const b = yield* boundTo(otherWorkspaceId);
+          const workspace = yield* initialized(a, human.id);
+          yield* initialized(b, human.id);
+          const first = record("a");
+          const second = record("b");
+          const forAgent = record("agent", { recipient: agent });
+          const forAnother = record("another", { recipient: another });
+          const foreign = record("a", { workspaceId: otherWorkspaceId });
+          yield* a.store.transaction(
+            Effect.gen(function* () {
+              yield* a.members.insert({
+                id: Member.Id.make("notification-agent"),
+                workspaceId,
+                identity: agent,
+                status: "active",
+              });
+              yield* Effect.forEach([second, forAnother, forAgent, first], a.notifications.insert);
+            }),
           );
-          expect(yield* Effect.flip(gateway.asMember(workspaceId, human, get))).toMatchObject({
-            _tag: "NotificationApplication.NotFound",
+          yield* b.store.transaction(b.notifications.insert(foreign));
+          const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 });
+          const gateway = yield* Gateway.make().pipe(
+            Effect.provideService(WorkspaceStorage.Service, yield* SqliteStorage.make()),
+            Effect.provide(BunCrypto.layer),
+          );
+          yield* gateway.asMember(
             workspaceId,
-            notificationId: id,
+            human,
+            Effect.gen(function* () {
+              const notifications = yield* NotificationApplication.Service;
+              expect(yield* notifications.get(first.id)).toEqual(first);
+              expect(yield* notifications.list({ limit: 1 })).toEqual([first]);
+              const options = { limit: 1, after: { recordedAt: first.recordedAt, id: first.id } };
+              expect(yield* notifications.list(options)).toEqual([second]);
+              expect(yield* notifications.listPending(options)).toEqual([second]);
+            }),
+          );
+          const list = Effect.flatMap(NotificationApplication.Service, (notifications) =>
+            notifications.list(page),
+          );
+          expect(yield* gateway.asMember(workspaceId, agent, list)).toEqual([forAgent]);
+          expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
+          for (const id of [forAgent.id, forAnother.id, Notification.Id.make("missing")]) {
+            const get = Effect.flatMap(NotificationApplication.Service, (notifications) =>
+              notifications.get(id),
+            );
+            expect(yield* Effect.flip(gateway.asMember(workspaceId, human, get))).toMatchObject({
+              _tag: "NotificationApplication.NotFound",
+              workspaceId,
+              notificationId: id,
+            });
+          }
+          expect(yield* Effect.flip(gateway.asMember(workspaceId, another, list))).toMatchObject({
+            _tag: "Gateway.NotMember",
           });
-        }
-        expect(yield* Effect.flip(gateway.asMember(workspaceId, another, list))).toMatchObject({
-          _tag: "Gateway.NotMember",
-        });
-        expect(yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before);
-        yield* a.store.transaction(a.members.markRemoved(workspace.ownerMemberId));
-        expect(yield* Effect.flip(gateway.asMember(workspaceId, human, list))).toMatchObject({
-          _tag: "Gateway.NotMember",
-        });
-        expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
-      }).pipe(Effect.scoped, Effect.provide(WorkspaceEvents.layer())),
+          expect(yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before);
+          yield* a.store.transaction(a.members.markRemoved(workspace.ownerMemberId));
+          expect(yield* Effect.flip(gateway.asMember(workspaceId, human, list))).toMatchObject({
+            _tag: "Gateway.NotMember",
+          });
+          expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
+        }).pipe(Effect.scoped, Effect.provide(WorkspaceEvents.layer())),
+      ),
     ),
-  ));
+);
 
-it("notification application reads see staged inserts in the outer commit and respect rollback", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        const workspace = yield* initialized(bound, human.id);
-        const actor = Actor.Value.make({
-          workspaceId,
-          memberId: workspace.ownerMemberId,
-          identity: human,
-        });
-        const value = record("staged");
-        yield* Effect.gen(function* () {
-          const notifications = yield* NotificationApplication.Service;
-          const journal = yield* Journal.Service;
-          expect(
-            yield* Effect.flip(
-              journal.commit(
-                Effect.gen(function* () {
-                  yield* bound.notifications.insert(value);
-                  expect(yield* notifications.get(value.id)).toEqual(value);
-                  expect(yield* notifications.list(page)).toEqual([value]);
-                  expect(yield* notifications.listPending(page)).toEqual([value]);
-                  return yield* Effect.fail("rollback");
-                }),
-              ),
-            ),
-          ).toBe("rollback");
-          expect(yield* notifications.list(page)).toEqual([]);
-          expect(yield* Effect.flip(notifications.get(value.id))).toMatchObject({
-            _tag: "NotificationApplication.NotFound",
+it.effect(
+  "notification application reads see staged inserts in the outer commit and respect rollback",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          const workspace = yield* initialized(bound, human.id);
+          const actor = Actor.Value.make({
+            workspaceId,
+            memberId: workspace.ownerMemberId,
+            identity: human,
           });
-          yield* journal.commit(bound.notifications.insert(value));
-          expect(yield* notifications.get(value.id)).toEqual(value);
-        }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
-      }),
+          const value = record("staged");
+          yield* Effect.gen(function* () {
+            const notifications = yield* NotificationApplication.Service;
+            const journal = yield* Journal.Service;
+            expect(
+              yield* Effect.flip(
+                journal.commit(
+                  Effect.gen(function* () {
+                    yield* bound.notifications.insert(value);
+                    expect(yield* notifications.get(value.id)).toEqual(value);
+                    expect(yield* notifications.list(page)).toEqual([value]);
+                    expect(yield* notifications.listPending(page)).toEqual([value]);
+                    return yield* Effect.fail("rollback");
+                  }),
+                ),
+              ),
+            ).toBe("rollback");
+            expect(yield* notifications.list(page)).toEqual([]);
+            expect(yield* Effect.flip(notifications.get(value.id))).toMatchObject({
+              _tag: "NotificationApplication.NotFound",
+            });
+            yield* journal.commit(bound.notifications.insert(value));
+            expect(yield* notifications.get(value.id)).toEqual(value);
+          }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
+        }),
+      ),
     ),
-  ));
+);

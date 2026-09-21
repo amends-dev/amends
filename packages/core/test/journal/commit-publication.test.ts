@@ -1,7 +1,7 @@
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Exit, Fiber, Layer, Logger, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
@@ -16,7 +16,6 @@ import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 
 const testSubject = () => Subject.make("test", "entity");
-
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
@@ -39,57 +38,57 @@ type Services =
 const run = <A, E>(
   use: (fixture: Fixture, published: Array<CommittedEvents.Batch>) => Effect.Effect<A, E, Services>,
 ) =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const fixture = yield* make();
-      const bus = yield* CommittedEvents.make(workspaceId);
-      const published: Array<CommittedEvents.Batch> = [];
-      const events = CommittedEvents.Service.of({
-        ...bus,
-        publish: (batch) =>
-          bus.publish(batch).pipe(
-            Effect.tap(() =>
-              Effect.sync(() => {
-                published.push(batch);
-              }),
-            ),
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const bus = yield* CommittedEvents.make(workspaceId);
+    const published: Array<CommittedEvents.Batch> = [];
+    const events = CommittedEvents.Service.of({
+      ...bus,
+      publish: (batch) =>
+        bus.publish(batch).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              published.push(batch);
+            }),
           ),
-      });
-      return yield* use(fixture, published).pipe(
-        Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-        Effect.provide(Log.layer),
-        Effect.provideService(Store.Service, fixture.store),
-        Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-        Effect.provideService(Counter, fixture.counter),
-        Effect.provideService(CommittedEvents.Service, events),
-      );
-    }).pipe(Effect.scoped),
-  );
+        ),
+    });
+    return yield* use(fixture, published).pipe(
+      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+      Effect.provide(Log.layer),
+      Effect.provideService(Store.Service, fixture.store),
+      Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+      Effect.provideService(Counter, fixture.counter),
+      Effect.provideService(CommittedEvents.Service, events),
+    );
+  }).pipe(Effect.scoped);
+it.effect(
+  "one outer commit publishes canonical events once, in order, after its projections commit",
+  () =>
+    run((fixture, published) =>
+      Effect.gen(function* () {
+        const journal = yield* setup;
+        const stream = yield* (yield* CommittedEvents.Service).subscribe;
+        const events = yield* journal.commit(
+          Effect.gen(function* () {
+            const first = yield* journal.publish(Changed, { amount: 2 });
+            const second = yield* journal.commit(journal.publish(Changed, { amount: 3 }));
+            expect(published).toEqual([]);
+            expect((yield* fixture.snapshot).logs.size).toBe(0);
+            return [first, second] as const;
+          }),
+        );
+        expect(published).toHaveLength(1);
+        expect(published[0]).toMatchObject({ workspaceId, events });
+        expect(published[0]?.events.map((event) => event.index)).toEqual([0, 1]);
+        expect(published[0]?.events[0]?.payload).toBe(events[0]?.payload);
+        expect((yield* fixture.snapshot).value).toBe(5);
+        expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toEqual(published);
+      }),
+    ),
+);
 
-test("one outer commit publishes canonical events once, in order, after its projections commit", async () =>
-  run((fixture, published) =>
-    Effect.gen(function* () {
-      const journal = yield* setup;
-      const stream = yield* (yield* CommittedEvents.Service).subscribe;
-      const events = yield* journal.commit(
-        Effect.gen(function* () {
-          const first = yield* journal.publish(Changed, { amount: 2 });
-          const second = yield* journal.commit(journal.publish(Changed, { amount: 3 }));
-          expect(published).toEqual([]);
-          expect((yield* fixture.snapshot).logs.size).toBe(0);
-          return [first, second] as const;
-        }),
-      );
-      expect(published).toHaveLength(1);
-      expect(published[0]).toMatchObject({ workspaceId, events });
-      expect(published[0]?.events.map((event) => event.index)).toEqual([0, 1]);
-      expect(published[0]?.events[0]?.payload).toBe(events[0]?.payload);
-      expect((yield* fixture.snapshot).value).toBe(5);
-      expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toEqual(published);
-    }),
-  ));
-
-test("rollback and caught nested failure discard every collected event", async () =>
+it.effect("rollback and caught nested failure discard every collected event", () =>
   run((fixture, published) =>
     Effect.gen(function* () {
       const journal = yield* setup;
@@ -115,9 +114,10 @@ test("rollback and caught nested failure discard every collected event", async (
       expect((yield* fixture.snapshot).logs.size).toBe(0);
       expect((yield* fixture.snapshot).value).toBe(0);
     }),
-  ));
+  ),
+);
 
-test("failed projections never publish, even when the application catches their failure", async () =>
+it.effect("failed projections never publish, even when the application catches their failure", () =>
   run((fixture, published) =>
     Effect.gen(function* () {
       const fail = Projection.make("fail", { version: 1 }).on(Changed, () =>
@@ -137,9 +137,10 @@ test("failed projections never publish, even when the application catches their 
       expect(published).toEqual([]);
       expect((yield* fixture.snapshot).value).toBe(0);
     }),
-  ));
+  ),
+);
 
-test("reads, replay, and execution-log-only commits do not publish domain events", async () =>
+it.effect("reads, replay, and execution-log-only commits do not publish domain events", () =>
   run((_, published) =>
     Effect.gen(function* () {
       const journal = yield* setup;
@@ -176,9 +177,10 @@ test("reads, replay, and execution-log-only commits do not publish domain events
       ]);
       expect(new Set(published[1]?.events.map((event) => event.commitId)).size).toBe(1);
     }),
-  ));
+  ),
+);
 
-test("interruption before commit rolls back and publishes nothing", async () =>
+it.effect("interruption before commit rolls back and publishes nothing", () =>
   run((fixture, published) =>
     Effect.gen(function* () {
       const journal = yield* setup;
@@ -198,9 +200,10 @@ test("interruption before commit rolls back and publishes nothing", async () =>
       expect(published).toEqual([]);
       expect((yield* fixture.snapshot).logs.size).toBe(0);
     }),
-  ));
+  ),
+);
 
-test("a pending interrupt after native commit cannot skip publication", async () =>
+it.effect("a pending interrupt after native commit cannot skip publication", () =>
   run((fixture, published) =>
     Effect.gen(function* () {
       const committed = yield* Deferred.make<void>();
@@ -230,9 +233,10 @@ test("a pending interrupt after native commit cannot skip publication", async ()
       expect(Exit.hasInterrupts(yield* Fiber.await(writer))).toBe(true);
       expect(published).toHaveLength(1);
     }),
-  ));
+  ),
+);
 
-test("an uncertain acknowledgment preserves its outcome without publishing or retrying", async () =>
+it.effect("an uncertain acknowledgment preserves its outcome without publishing or retrying", () =>
   run((fixture, published) =>
     Effect.gen(function* () {
       const journal = yield* setup;
@@ -244,11 +248,12 @@ test("an uncertain acknowledgment preserves its outcome without publishing or re
       expect(yield* fixture.attempts).toBe(1);
       expect((yield* fixture.snapshot).value).toBe(1);
     }),
-  ));
+  ),
+);
 
-test.each(["failure", "defect"] as const)(
+it.effect.each(["failure", "defect"] as const)(
   "a publication %s is logged without changing the committed result",
-  async (kind) =>
+  (kind) =>
     run((fixture) =>
       Effect.gen(function* () {
         const logs: unknown[] = [];

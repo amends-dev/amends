@@ -3,6 +3,12 @@
 Use Bun for dependency installation, scripts, and application execution.
 Use TypeScript 7 for type-checking, Oxlint for linting, and Oxfmt for formatting.
 Run `bun run check` after changes and `bun run test` after changing behavior.
+Tests use `@effect/vitest` through Vitest running on Bun. Use `it.effect` for Effect
+programs, `it.live` only for integrations that need live clocks, and plain `it`
+for synchronous assertions and Promise-based UI or subprocess tests. Test helpers
+return Effects; do not run them with `Effect.runPromise` or `Effect.runSync`.
+Use `TestClock` and explicit concurrency signals, and scope acquired resources.
+See [docs/testing.md](docs/testing.md) for commands, fixtures, and examples.
 `bun run start` serves the local host on port 8787 and keeps running; after
 changing runtime setup, start it in the background with `AMENDS_PORT=0`, confirm
 the "Listening on" line, and stop it. The host tests also spawn the server entry

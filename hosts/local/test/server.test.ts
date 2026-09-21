@@ -1,5 +1,5 @@
 import { Assignment, BuiltinRoles } from "@amends/core/authorization";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends/core/identity";
 import { Invitation, Member, Ownership, Workspace } from "@amends/core/workspace";
 import { DateTime, Schema } from "effect";
@@ -14,13 +14,13 @@ const charlie = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make(
 const temporary = async (run: (filename: string) => Promise<void>) => {
   const directory = await mkdtemp(join(tmpdir(), "amends-server-"));
   try {
-    await run(join(directory, "test.sqlite"));
+    await run(join(directory, "it.sqlite"));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 };
 
-test("ownership endpoints transfer to an active human, update directory state, and reject the previous owner's authority", async () =>
+it("ownership endpoints transfer to an active human, update directory state, and reject the previous owner's authority", async () =>
   temporary(async (filename) =>
     withServer(filename, async (call) => {
       const workspace = Schema.decodeUnknownSync(Workspace.Record)(
@@ -89,7 +89,7 @@ test("ownership endpoints transfer to an active human, update directory state, a
     }),
   ));
 
-test("role invitations and assignment endpoints enforce required roles, delegation, and stale changes", async () =>
+it("role invitations and assignment endpoints enforce required roles, delegation, and stale changes", async () =>
   temporary(async (filename) =>
     withServer(filename, async (call) => {
       const workspace = Schema.decodeUnknownSync(Workspace.Record)(
@@ -188,7 +188,7 @@ test("role invitations and assignment endpoints enforce required roles, delegati
     }),
   ));
 
-test("workspace creation requires a name and preserves it across server restarts", async () =>
+it("workspace creation requires a name and preserves it across server restarts", async () =>
   temporary(async (filename) => {
     const workspace = await withServer(filename, async (call) => {
       for (const payload of [undefined, {}, { name: "" }, { name: " \t\n" }, { name: 42 }]) {
@@ -211,7 +211,7 @@ test("workspace creation requires a name and preserves it across server restarts
     });
   }));
 
-test("the server entry point serves persisted memberships to another process, and denies another identity", async () =>
+it("the server entry point serves persisted memberships to another process, and denies another identity", async () =>
   temporary(async (filename) => {
     const workspace = await withServer(filename, async (call) => {
       const created = await call(alice.id, "POST", "/workspaces", { name: "Test workspace" });
@@ -230,7 +230,7 @@ test("the server entry point serves persisted memberships to another process, an
     });
   }));
 
-test("invitation, acceptance, revocation, and removal survive separate server processes", async () =>
+it("invitation, acceptance, revocation, and removal survive separate server processes", async () =>
   temporary(async (filename) => {
     const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
     const first = await withServer(filename, async (call) => {

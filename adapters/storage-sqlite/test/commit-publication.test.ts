@@ -1,4 +1,4 @@
-import { expect, test as it } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { alice, bob, workspaceId, boundTo, host, temporary as withDatabase } from "./support.ts";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Entry } from "@amends/core/journal";
@@ -16,9 +16,10 @@ const issue = InvitationApplication.Service.use((invitations) =>
   ),
 );
 
-it("gateway operations publish into the host's shared workspace bus after durable projection writes", async () =>
-  withDatabase(async (location) => {
-    await Effect.runPromise(
+it.effect(
+  "gateway operations publish into the host's shared workspace bus after durable projection writes",
+  () =>
+    withDatabase((location) =>
       Effect.gen(function* () {
         const gateway = yield* Gateway.Service;
         const registry = yield* WorkspaceEvents.Service;
@@ -47,11 +48,9 @@ it("gateway operations publish into the host's shared workspace bus after durabl
           expect(stored.value.entries.map((entry) => entry.id)).toEqual(
             confirmed.events.map((event) => event.id),
           );
-
         yield* gateway.asMember(second.id, alice, issue);
         const batchesB = yield* changesB.pipe(Stream.take(1), Stream.runCollect);
         expect(batchesB.map((batch) => batch.workspaceId)).toEqual([second.id]);
-
         yield* gateway.asMember(
           first.id,
           alice,
@@ -71,40 +70,39 @@ it("gateway operations publish into the host's shared workspace bus after durabl
         );
         expect(yield* registry.forWorkspace(first.id)).toBe(a);
       }).pipe(Effect.scoped, Effect.provide(host(location))),
-    );
-  }));
+    ),
+);
 
-it("native commit observers skip rollback and complete despite a pending cancellation", async () =>
-  withDatabase(async (location) => {
-    await Effect.runPromise(
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        const committed = yield* Deferred.make<void>();
-        const release = yield* Deferred.make<void>();
-        let calls = 0;
-        const observer = Effect.gen(function* () {
-          // Hold the confirmed-commit boundary open deterministically for this test.
-          yield* Deferred.succeed(committed, undefined);
-          yield* Deferred.await(release);
-          calls++;
-        });
-        expect(
-          yield* Effect.flip(
-            bound.store.transaction(Effect.fail("rollback"), { onCommit: observer }),
-          ),
-        ).toBe("rollback");
-        expect(calls).toBe(0);
-        const writer = yield* bound.store
-          .transaction(Effect.succeed("committed"), { onCommit: observer })
-          .pipe(Effect.forkChild);
-        yield* Deferred.await(committed);
-        const fiberId = yield* Effect.fiberId;
-        yield* Effect.sync(() => writer.interruptUnsafe(fiberId));
-        yield* Deferred.succeed(release, undefined);
-        expect(Exit.hasInterrupts(yield* Fiber.await(writer))).toBe(true);
-        expect(calls).toBe(1);
-        // The connection and workspace transaction remain usable after cancellation.
-        expect(yield* bound.store.transaction(Effect.succeed("next"))).toBe("next");
-      }).pipe(Effect.scoped, Effect.provide(host(location))),
-    );
-  }));
+it.effect("native commit observers skip rollback and complete despite a pending cancellation", () =>
+  withDatabase((location) =>
+    Effect.gen(function* () {
+      const bound = yield* boundTo(workspaceId);
+      const committed = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      let calls = 0;
+      const observer = Effect.gen(function* () {
+        // Hold the confirmed-commit boundary open deterministically for this test.
+        yield* Deferred.succeed(committed, undefined);
+        yield* Deferred.await(release);
+        calls++;
+      });
+      expect(
+        yield* Effect.flip(
+          bound.store.transaction(Effect.fail("rollback"), { onCommit: observer }),
+        ),
+      ).toBe("rollback");
+      expect(calls).toBe(0);
+      const writer = yield* bound.store
+        .transaction(Effect.succeed("committed"), { onCommit: observer })
+        .pipe(Effect.forkChild);
+      yield* Deferred.await(committed);
+      const fiberId = yield* Effect.fiberId;
+      yield* Effect.sync(() => writer.interruptUnsafe(fiberId));
+      yield* Deferred.succeed(release, undefined);
+      expect(Exit.hasInterrupts(yield* Fiber.await(writer))).toBe(true);
+      expect(calls).toBe(1);
+      // The connection and workspace transaction remain usable after cancellation.
+      expect(yield* bound.store.transaction(Effect.succeed("next"))).toBe("next");
+    }).pipe(Effect.scoped, Effect.provide(host(location))),
+  ),
+);

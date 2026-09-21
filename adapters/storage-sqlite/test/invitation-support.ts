@@ -13,7 +13,7 @@ export const charlie = Identity.Reference.cases.Human.make({
 export const runHost = <A, E>(
   filename: string,
   program: Effect.Effect<A, E, Gateway.Service | SqliteDatabase.Service | SqlClient.SqlClient>,
-) => Effect.runPromise(program.pipe(Effect.provide(host(filename))));
+) => program.pipe(Effect.provide(host(filename)));
 
 export const scope = (workspaceId: Workspace.Id) =>
   Scope.Value.cases.Workspace.make({ workspaceId });

@@ -1,15 +1,20 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Option, Schema } from "effect";
 import { Actor, Identity, Performer } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
 import { Member } from "@amends/core/workspace";
 
-test("contact authorship does not make a contact a member, authenticated actor, or member performer", () => {
+it("contact authorship does not make a contact a member, authenticated actor, or member performer", () => {
   const contact = Identity.Reference.cases.Contact.make({
     id: Identity.ContactId.make("external-person"),
   });
   expect(Schema.decodeSync(Identity.Reference)(contact)).toEqual(contact);
-  expect(Schema.decodeSync(Performer.Reference)({ _tag: "Identity", identity: contact })).toEqual({
+  expect(
+    Schema.decodeSync(Performer.Reference)({
+      _tag: "Identity",
+      identity: contact,
+    }),
+  ).toEqual({
     _tag: "Identity",
     identity: contact,
   });
@@ -36,7 +41,7 @@ test("contact authorship does not make a contact a member, authenticated actor, 
     expect(decoded._tag).toBe("None");
 });
 
-test("triage is a workspace recipient without a person identity", () => {
+it("triage is a workspace recipient without a person identity", () => {
   const triage = Notification.Recipient.cases.Triage.make({});
   expect(Schema.encodeSync(Notification.Recipient)(triage)).toEqual({ _tag: "Triage" });
   expect(Option.isNone(Schema.decodeUnknownOption(Identity.Reference)(triage))).toBe(true);

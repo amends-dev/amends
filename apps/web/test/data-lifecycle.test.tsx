@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { RegistryContext } from "@effect/atom-solid";
 import { Member, Workspace } from "@amends/core/workspace";
@@ -92,82 +92,85 @@ afterEach(() => {
 });
 
 describe("query identity and refresh", () => {
-  it("shares an in-flight read and keeps workspaces separate", async () => {
-    const delayed = pendingResponse();
-    const fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const request = requestOf(input, init);
-      expect(request.headers.get("authorization")).toBe("Bearer credential-a");
-      return request.url.includes("workspace-a")
-        ? delayed.promise
-        : Promise.resolve(response([member("other", otherWorkspaceId)]));
-    });
-    stubFetch(fetch);
-    const store = registry();
-    const first = Members.list(workspaceId);
-    const second = Members.list(workspaceId);
-    expect(second).toBe(first);
-    store.mount(first);
-    store.mount(second);
-    store.mount(Members.list(otherWorkspaceId));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    delayed.resolve(response([member("first")]));
-    const a = await Effect.runPromise(AtomRegistry.getResult(store, first));
-    const b = await Effect.runPromise(
-      AtomRegistry.getResult(store, Members.list(otherWorkspaceId)),
-    );
-    expect(a[0]?.id).toBe("first");
-    expect(b[0]?.id).toBe("other");
-  });
-
-  it("refreshes all removal effects in the affected workspace, only after success", async () => {
-    const reads = new Map<string, number>();
-    let failRemoval = true;
-    stubFetch(
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  it.effect("shares an in-flight read and keeps workspaces separate", () =>
+    Effect.gen(function* () {
+      const delayed = pendingResponse();
+      const fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const request = requestOf(input, init);
-        const path = new URL(request.url).pathname;
-        if (request.method === "DELETE")
-          return failRemoval
-            ? response(
-                { _tag: "MemberApplication.OwnerProtected", workspaceId, memberId: "target" },
-                409,
-              )
-            : response(member("target", workspaceId, "removed"));
-        reads.set(path, (reads.get(path) ?? 0) + 1);
-        if (path.endsWith("/me/workspaces")) return response({ memberships: [], invitations: [] });
-        if (path.endsWith("/invitations")) return response([]);
-        if (path.endsWith("/members/target")) return response(member("target"));
-        return response([]);
-      }),
-    );
-    const store = registry();
-    const queries = [
-      Members.list(workspaceId),
-      Members.get(workspaceId, Member.Id.make("target")),
-      Invitations.list(workspaceId),
-      Me.workspaces(),
-      Members.list(otherWorkspaceId),
-    ];
-    queries.forEach((query) => store.mount<unknown>(query));
-    await waitFor(() => expect(reads.size).toBe(5));
-    const command = Members.makeRemove();
-    store.mount(command);
-    const input = { workspaceId, memberId: Member.Id.make("target") };
-    store.set(command, input);
-    expect(
-      Exit.isFailure(
-        await Effect.runPromiseExit(
-          AtomRegistry.getResult(store, command, { suspendOnWaiting: true }),
+        expect(request.headers.get("authorization")).toBe("Bearer credential-a");
+        return request.url.includes("workspace-a")
+          ? delayed.promise
+          : Promise.resolve(response([member("other", otherWorkspaceId)]));
+      });
+      stubFetch(fetch);
+      const store = registry();
+      const first = Members.list(workspaceId);
+      const second = Members.list(workspaceId);
+      expect(second).toBe(first);
+      store.mount(first);
+      store.mount(second);
+      store.mount(Members.list(otherWorkspaceId));
+      yield* Effect.promise(() => waitFor(() => expect(fetch).toHaveBeenCalledTimes(2)));
+      delayed.resolve(response([member("first")]));
+      const a = yield* AtomRegistry.getResult(store, first);
+      const b = yield* AtomRegistry.getResult(store, Members.list(otherWorkspaceId));
+      expect(a[0]?.id).toBe("first");
+      expect(b[0]?.id).toBe("other");
+    }),
+  );
+
+  it.effect("refreshes all removal effects in the affected workspace, only after success", () =>
+    Effect.gen(function* () {
+      const reads = new Map<string, number>();
+      let failRemoval = true;
+      stubFetch(
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          const request = requestOf(input, init);
+          const path = new URL(request.url).pathname;
+          if (request.method === "DELETE")
+            return failRemoval
+              ? response(
+                  { _tag: "MemberApplication.OwnerProtected", workspaceId, memberId: "target" },
+                  409,
+                )
+              : response(member("target", workspaceId, "removed"));
+          reads.set(path, (reads.get(path) ?? 0) + 1);
+          if (path.endsWith("/me/workspaces"))
+            return response({ memberships: [], invitations: [] });
+          if (path.endsWith("/invitations")) return response([]);
+          if (path.endsWith("/members/target")) return response(member("target"));
+          return response([]);
+        }),
+      );
+      const store = registry();
+      const queries = [
+        Members.list(workspaceId),
+        Members.get(workspaceId, Member.Id.make("target")),
+        Invitations.list(workspaceId),
+        Me.workspaces(),
+        Members.list(otherWorkspaceId),
+      ];
+      queries.forEach((query) => store.mount<unknown>(query));
+      yield* Effect.promise(() => waitFor(() => expect(reads.size).toBe(5)));
+      const command = Members.makeRemove();
+      store.mount(command);
+      const input = { workspaceId, memberId: Member.Id.make("target") };
+      store.set(command, input);
+      expect(
+        Exit.isFailure(
+          yield* Effect.exit(AtomRegistry.getResult(store, command, { suspendOnWaiting: true })),
         ),
-      ),
-    ).toBe(true);
-    expect([...reads.values()]).toEqual([1, 1, 1, 1, 1]);
-    failRemoval = false;
-    store.set(command, input);
-    await Effect.runPromise(AtomRegistry.getResult(store, command, { suspendOnWaiting: true }));
-    await waitFor(() => expect(reads.get("/api/workspaces/workspace-a/invitations")).toBe(2));
-    for (const [path, count] of reads) expect(count).toBe(path.includes("workspace-b") ? 1 : 2);
-  });
+      ).toBe(true);
+      expect([...reads.values()]).toEqual([1, 1, 1, 1, 1]);
+      failRemoval = false;
+      store.set(command, input);
+      yield* AtomRegistry.getResult(store, command, { suspendOnWaiting: true });
+      yield* Effect.promise(() =>
+        waitFor(() => expect(reads.get("/api/workspaces/workspace-a/invitations")).toBe(2)),
+      );
+      for (const [path, count] of reads) expect(count).toBe(path.includes("workspace-b") ? 1 : 2);
+    }),
+  );
 });
 
 function RemoveControl(props: { id: string; onSuccess?: () => void }) {

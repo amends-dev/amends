@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { rejects } from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,7 +15,7 @@ const temporary = async (use: (directory: string) => Promise<void>) => {
 };
 const script = (source: string) => [process.execPath, "--no-env-file", "-e", source];
 
-test("the subprocess fixture ignores inherited database selection and uses its temporary SQLite file", async () =>
+it("the subprocess fixture ignores inherited database selection and uses its temporary SQLite file", async () =>
   temporary(async (directory) => {
     const filename = join(directory, "fixture.sqlite");
     await withServer(
@@ -36,7 +36,7 @@ test("the subprocess fixture ignores inherited database selection and uses its t
     expect(await Bun.file(filename).exists()).toBe(true);
   }));
 
-test("startup failure drains stderr and includes the final diagnostic", async () =>
+it("startup failure drains stderr and includes the final diagnostic", async () =>
   temporary(async (directory) => {
     await rejects(
       withServer(join(directory, "unused.sqlite"), async () => {}, {
@@ -48,7 +48,7 @@ test("startup failure drains stderr and includes the final diagnostic", async ()
     );
   }));
 
-test("startup timeout terminates the child before releasing the fixture", async () =>
+it("startup timeout terminates the child before releasing the fixture", async () =>
   temporary(async (directory) => {
     const pidFile = join(directory, "pid");
     await rejects(
@@ -64,7 +64,7 @@ test("startup timeout terminates the child before releasing the fixture", async 
     expect(() => process.kill(pid, 0)).toThrow();
   }));
 
-test("callback failure still terminates the child", async () =>
+it("callback failure still terminates the child", async () =>
   temporary(async (directory) => {
     const pidFile = join(directory, "pid");
     await rejects(
@@ -85,7 +85,7 @@ test("callback failure still terminates the child", async () =>
     expect(() => process.kill(pid, 0)).toThrow();
   }));
 
-test("invalid startup configuration fails before creating the database", async () =>
+it("invalid startup configuration fails before creating the database", async () =>
   temporary(async (directory) => {
     const filename = join(directory, "unused.sqlite");
     await rejects(
@@ -99,7 +99,7 @@ test("invalid startup configuration fails before creating the database", async (
     expect(await Bun.file(filename).exists()).toBe(false);
   }));
 
-test("importing host modules does not read configuration or launch the application", async () =>
+it("importing host modules does not read configuration or launch the application", async () =>
   temporary(async (directory) => {
     const filename = join(directory, "unused.sqlite");
     await rejects(

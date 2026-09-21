@@ -8,6 +8,21 @@
     "correctness": "error"
   },
   "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "bun:test",
+            "message": "Import test APIs from @effect/vitest. Run tests with bun run test."
+          },
+          {
+            "name": "vitest",
+            "message": "Import test APIs from @effect/vitest so Effect tests use the scoped runner."
+          }
+        ]
+      }
+    ],
     "typescript/no-floating-promises": "error",
     "typescript/no-misused-promises": "error"
   },

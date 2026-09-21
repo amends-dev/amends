@@ -23,6 +23,5 @@ export default defineConfig({
     name: "@amends/web",
     environment: "happy-dom",
     include: ["test/**/*.test.{ts,tsx}"],
-    passWithNoTests: true,
   },
 });

@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 interface Options {
   readonly env?: Readonly<Record<string, string | undefined>>;
@@ -22,7 +22,7 @@ export const withServer = async <A>(
   const child = Bun.spawn(
     [...(options.command ?? [process.execPath, "--no-env-file", "hosts/local/src/index.ts"])],
     {
-      cwd: join(import.meta.dir, "../../.."),
+      cwd: fileURLToPath(new URL("../../../", import.meta.url)),
       env,
       stdin: "ignore",
       stdout: "pipe",

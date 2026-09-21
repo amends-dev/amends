@@ -1,5 +1,5 @@
 import { ThreadId } from "@amends/core/thread";
-import { expect, test as it } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Assignment, Grant, Role, Scope, Target } from "@amends/core/authorization";
 import { Entry, Store } from "@amends/core/journal";
 import { Identity } from "@amends/core/identity";
@@ -51,46 +51,48 @@ const seed = (bound: Bound) =>
     yield* bound.store.transaction(bound.roles.insert(role));
     return { workspace, role };
   });
-
-it("role validation rejects invalid inserts and edits without poisoning the transaction or record", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        const { role } = yield* seed(bound);
-        yield* bound.store.transaction(
-          Effect.gen(function* () {
-            for (const record of [
-              { ...role, id: Role.Id.make("invalid"), name: "" },
-              { ...role, id: Role.Id.make("invalid"), permissions: [permission, permission] },
-            ]) {
-              expect(yield* Effect.flip(bound.roles.insert(record))).toMatchObject({
+it.effect(
+  "role validation rejects invalid inserts and edits without poisoning the transaction or record",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          const { role } = yield* seed(bound);
+          yield* bound.store.transaction(
+            Effect.gen(function* () {
+              for (const record of [
+                { ...role, id: Role.Id.make("invalid"), name: "" },
+                { ...role, id: Role.Id.make("invalid"), permissions: [permission, permission] },
+              ]) {
+                expect(yield* Effect.flip(bound.roles.insert(record))).toMatchObject({
+                  _tag: "RoleStore.Conflict",
+                  operation: "insert",
+                });
+              }
+              expect(yield* bound.roles.get(Role.Id.make("invalid"))).toEqual(Option.none());
+              expect(yield* Effect.flip(bound.roles.rename(roleId, ""))).toMatchObject({
                 _tag: "RoleStore.Conflict",
-                operation: "insert",
+                operation: "rename",
               });
-            }
-            expect(yield* bound.roles.get(Role.Id.make("invalid"))).toEqual(Option.none());
-            expect(yield* Effect.flip(bound.roles.rename(roleId, ""))).toMatchObject({
-              _tag: "RoleStore.Conflict",
-              operation: "rename",
-            });
-            expect(
-              yield* Effect.flip(bound.roles.setPermissions(roleId, [permission, permission])),
-            ).toMatchObject({ _tag: "RoleStore.Conflict", operation: "setPermissions" });
-            expect(yield* bound.roles.get(roleId)).toEqual(Option.some(role));
-            yield* bound.roles.rename(roleId, "Renamed");
-            yield* bound.roles.setPermissions(roleId, []);
-          }),
-        );
-        expect(yield* bound.roles.get(roleId)).toEqual(
-          Option.some({ ...role, name: "Renamed", permissions: [] }),
-        );
-      }),
+              expect(
+                yield* Effect.flip(bound.roles.setPermissions(roleId, [permission, permission])),
+              ).toMatchObject({ _tag: "RoleStore.Conflict", operation: "setPermissions" });
+              expect(yield* bound.roles.get(roleId)).toEqual(Option.some(role));
+              yield* bound.roles.rename(roleId, "Renamed");
+              yield* bound.roles.setPermissions(roleId, []);
+            }),
+          );
+          expect(yield* bound.roles.get(roleId)).toEqual(
+            Option.some({ ...role, name: "Renamed", permissions: [] }),
+          );
+        }),
+      ),
     ),
-  ));
+);
 
-it.each([
+it.effect.each([
   ["Role", "Workspace"],
   ["Role", "TargetWorkspace"],
   ["Role", "TargetMember"],
@@ -101,8 +103,8 @@ it.each([
   ["Direct", "TargetThread"],
 ] as const)(
   "%s assignments reject a foreign %s scope before converting columns",
-  async (kind, scopeKind) =>
-    withDatabase(async (location) =>
+  ([kind, scopeKind]) =>
+    withDatabase((location) =>
       inDatabase(
         location,
         Effect.gen(function* () {
@@ -138,10 +140,10 @@ it.each([
     ),
 );
 
-it.each(["missing", "blank"] as const)(
+it.effect.each(["missing", "blank"] as const)(
   "invitations reject a %s role and invalid expiry without leaving partial rows",
-  async (invalidRole) =>
-    withDatabase(async (location) =>
+  (invalidRole) =>
+    withDatabase((location) =>
       inDatabase(
         location,
         Effect.gen(function* () {
@@ -192,79 +194,85 @@ it.each(["missing", "blank"] as const)(
     ),
 );
 
-it("an uncaught schema conflict rolls back earlier store writes in the same transaction", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        const { workspace, role } = yield* seed(bound);
-        const record: Assignment.Record = {
-          id: Assignment.Id.make("rolled-back"),
-          workspaceId,
-          memberId: workspace.ownerMemberId,
-          status: "active",
-          source: source(
-            "Direct",
-            localScope("Workspace", otherWorkspaceId, workspace.ownerMemberId),
-          ),
-        };
-        expect(
-          yield* Effect.flip(
-            bound.store.transaction(
-              Effect.gen(function* () {
-                yield* bound.roles.rename(roleId, "Must roll back");
-                yield* bound.assignments.insert(record);
-              }),
+it.effect(
+  "an uncaught schema conflict rolls back earlier store writes in the same transaction",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          const { workspace, role } = yield* seed(bound);
+          const record: Assignment.Record = {
+            id: Assignment.Id.make("rolled-back"),
+            workspaceId,
+            memberId: workspace.ownerMemberId,
+            status: "active",
+            source: source(
+              "Direct",
+              localScope("Workspace", otherWorkspaceId, workspace.ownerMemberId),
             ),
-          ),
-        ).toMatchObject({ _tag: "AssignmentStore.Conflict" });
-        expect(yield* bound.roles.get(roleId)).toEqual(Option.some(role));
-        expect(yield* bound.assignments.get(record.id)).toEqual(Option.none());
-      }),
+          };
+          expect(
+            yield* Effect.flip(
+              bound.store.transaction(
+                Effect.gen(function* () {
+                  yield* bound.roles.rename(roleId, "Must roll back");
+                  yield* bound.assignments.insert(record);
+                }),
+              ),
+            ),
+          ).toMatchObject({ _tag: "AssignmentStore.Conflict" });
+          expect(yield* bound.roles.get(roleId)).toEqual(Option.some(role));
+          expect(yield* bound.assignments.get(record.id)).toEqual(Option.none());
+        }),
+      ),
     ),
-  ));
+);
 
-it("checkpoint validation rejects invalid progress without leaving a partial checkpoint", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        yield* initialized(bound);
-        const saved = yield* bound.store.transaction(
-          Effect.gen(function* () {
-            const native = yield* Store.Transaction;
-            const [entry] = yield* native.append({
-              logId: Entry.LogId.make("checkpoint-contract"),
-              entries: [{ payload: new Uint8Array([1]) }],
-            });
-            if (entry === undefined) return yield* Effect.die("Append returned no entry");
-            const key = { logId: entry.logId, name: "contract-projection", version: 1 };
-            const cursor = {
-              position: entry.position,
-              commitId: entry.commitId,
-              index: entry.index,
-              entryId: entry.id,
-            };
-            expect(
-              yield* Effect.flip(bound.checkpoints.set(key, { ...cursor, index: -1 })),
-            ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.set" });
-            expect(
-              yield* Effect.flip(bound.checkpoints.set({ ...key, version: Number.NaN }, cursor)),
-            ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.set" });
-            expect(yield* bound.checkpoints.get(key)).toEqual(Option.none());
-            yield* bound.checkpoints.set(key, cursor);
-            return { key, cursor };
-          }),
-        );
-        expect(yield* bound.checkpoints.get(saved.key)).toEqual(Option.some(saved.cursor));
-      }),
+it.effect(
+  "checkpoint validation rejects invalid progress without leaving a partial checkpoint",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          yield* initialized(bound);
+          const saved = yield* bound.store.transaction(
+            Effect.gen(function* () {
+              const native = yield* Store.Transaction;
+              const [entry] = yield* native.append({
+                logId: Entry.LogId.make("checkpoint-contract"),
+                entries: [{ payload: new Uint8Array([1]) }],
+              });
+              if (entry === undefined) return yield* Effect.die("Append returned no entry");
+              const key = { logId: entry.logId, name: "contract-projection", version: 1 };
+              const cursor = {
+                position: entry.position,
+                commitId: entry.commitId,
+                index: entry.index,
+                entryId: entry.id,
+              };
+              expect(
+                yield* Effect.flip(bound.checkpoints.set(key, { ...cursor, index: -1 })),
+              ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.set" });
+              expect(
+                yield* Effect.flip(bound.checkpoints.set({ ...key, version: Number.NaN }, cursor)),
+              ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.set" });
+              expect(yield* bound.checkpoints.get(key)).toEqual(Option.none());
+              yield* bound.checkpoints.set(key, cursor);
+              return { key, cursor };
+            }),
+          );
+          expect(yield* bound.checkpoints.get(saved.key)).toEqual(Option.some(saved.cursor));
+        }),
+      ),
     ),
-  ));
+);
 
-it("workspace names are required at the store boundary without partial writes", async () =>
-  withDatabase(async (location) =>
+it.effect("workspace names are required at the store boundary without partial writes", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -299,72 +307,76 @@ it("workspace names are required at the store boundary without partial writes", 
         expect(yield* bound.workspace.get).toEqual(Option.some(record));
       }),
     ),
-  ));
+  ),
+);
 
-it("ownership storage validates transitions and changes only the owner when the previous owner matches", async () =>
-  withDatabase(async (location) =>
-    inDatabase(
-      location,
-      Effect.gen(function* () {
-        const bound = yield* boundTo(workspaceId);
-        const workspace = yield* initialized(bound);
-        const next = Member.Id.make("next-owner");
-        const change = {
-          workspaceId,
-          previousOwnerMemberId: workspace.ownerMemberId,
-          ownerMemberId: next,
-        };
-        yield* bound.store.transaction(
-          Effect.gen(function* () {
-            for (const input of [
-              { ...change, workspaceId: otherWorkspaceId },
-              { ...change, previousOwnerMemberId: next },
-              { ...change, ownerMemberId: workspace.ownerMemberId },
-            ]) {
-              expect(yield* Effect.flip(bound.workspace.transferOwnership(input))).toMatchObject({
+it.effect(
+  "ownership storage validates transitions and changes only the owner when the previous owner matches",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          const workspace = yield* initialized(bound);
+          const next = Member.Id.make("next-owner");
+          const change = {
+            workspaceId,
+            previousOwnerMemberId: workspace.ownerMemberId,
+            ownerMemberId: next,
+          };
+          yield* bound.store.transaction(
+            Effect.gen(function* () {
+              for (const input of [
+                { ...change, workspaceId: otherWorkspaceId },
+                { ...change, previousOwnerMemberId: next },
+                { ...change, ownerMemberId: workspace.ownerMemberId },
+              ]) {
+                expect(yield* Effect.flip(bound.workspace.transferOwnership(input))).toMatchObject({
+                  _tag: "WorkspaceStore.Conflict",
+                });
+                expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
+              }
+              const invalid = { ...change };
+              Reflect.set(invalid, "ownerMemberId", "");
+              expect(yield* Effect.flip(bound.workspace.transferOwnership(invalid))).toMatchObject({
                 _tag: "WorkspaceStore.Conflict",
               });
-              expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
-            }
-            const invalid = { ...change };
-            Reflect.set(invalid, "ownerMemberId", "");
-            expect(yield* Effect.flip(bound.workspace.transferOwnership(invalid))).toMatchObject({
-              _tag: "WorkspaceStore.Conflict",
-            });
-            yield* bound.workspace.transferOwnership(change);
-            expect(yield* Effect.flip(bound.workspace.transferOwnership(change))).toMatchObject({
-              _tag: "WorkspaceStore.Conflict",
-            });
-          }),
-        );
-        expect(yield* bound.workspace.get).toEqual(
-          Option.some({
-            id: workspace.id,
-            name: workspace.name,
-            createdBy: workspace.createdBy,
-            ownerMemberId: next,
-          }),
-        );
-        const missing = yield* boundTo(otherWorkspaceId);
-        expect(
-          yield* Effect.flip(
-            missing.store.transaction(
-              missing.workspace.transferOwnership({ ...change, workspaceId: otherWorkspaceId }),
+              yield* bound.workspace.transferOwnership(change);
+              expect(yield* Effect.flip(bound.workspace.transferOwnership(change))).toMatchObject({
+                _tag: "WorkspaceStore.Conflict",
+              });
+            }),
+          );
+          expect(yield* bound.workspace.get).toEqual(
+            Option.some({
+              id: workspace.id,
+              name: workspace.name,
+              createdBy: workspace.createdBy,
+              ownerMemberId: next,
+            }),
+          );
+          const missing = yield* boundTo(otherWorkspaceId);
+          expect(
+            yield* Effect.flip(
+              missing.store.transaction(
+                missing.workspace.transferOwnership({ ...change, workspaceId: otherWorkspaceId }),
+              ),
             ),
-          ),
-        ).toMatchObject({ _tag: "WorkspaceStore.Conflict" });
-        const expired = yield* bound.store.transaction(Effect.context<Store.Transaction>());
-        expect(
-          yield* Effect.flip(
-            bound.workspace.transferOwnership(change).pipe(Effect.provide(expired)),
-          ),
-        ).toMatchObject({ _tag: "WorkspaceStore.Failure" });
-      }),
+          ).toMatchObject({ _tag: "WorkspaceStore.Conflict" });
+          const expired = yield* bound.store.transaction(Effect.context<Store.Transaction>());
+          expect(
+            yield* Effect.flip(
+              bound.workspace.transferOwnership(change).pipe(Effect.provide(expired)),
+            ),
+          ).toMatchObject({ _tag: "WorkspaceStore.Failure" });
+        }),
+      ),
     ),
-  ));
+);
 
-it("contact identities cannot be persisted as workspace memberships", async () =>
-  withDatabase(async (location) =>
+it.effect("contact identities cannot be persisted as workspace memberships", () =>
+  withDatabase((location) =>
     inDatabase(
       location,
       Effect.gen(function* () {
@@ -401,4 +413,5 @@ it("contact identities cannot be persisted as workspace memberships", async () =
         expect(Option.isSome(yield* bound.members.get(invalid.id))).toBe(true);
       }),
     ),
-  ));
+  ),
+);

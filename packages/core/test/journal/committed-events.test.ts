@@ -1,5 +1,5 @@
 import { Subject } from "@amends/core/journal";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect";
 import { Commit } from "../../src/journal/commit.ts";
 import { CommittedEvents } from "../../src/journal/committed-events.ts";
@@ -10,7 +10,6 @@ import { testProvenance } from "../publication.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 
 const testSubject = () => Subject.make("test", "entity");
-
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const otherWorkspaceId = WorkspaceId.Id.make("workspace-two");
 const Changed = Fact.make("example.changed", {
@@ -40,12 +39,10 @@ const batch = (id: string): CommittedEvents.Batch => ({
 const next = (
   stream: Stream.Stream<CommittedEvents.Batch, CommittedEvents.Lagged | CommittedEvents.Closed>,
 ) => stream.pipe(Stream.take(1), Stream.runCollect);
-const run = <A, E>(program: Effect.Effect<A, E, Scope.Scope>) =>
-  Effect.runPromise(Effect.scoped(program));
-
-test.each(["make", "layer"] as const)(
+const run = <A, E>(program: Effect.Effect<A, E, Scope.Scope>) => Effect.scoped(program);
+it.effect.each(["make", "layer"] as const)(
   "bus %s broadcasts canonical batches to every registered subscriber",
-  async (construction) =>
+  (construction) =>
     run(
       Effect.gen(function* () {
         const bus =
@@ -80,7 +77,7 @@ test.each(["make", "layer"] as const)(
     ),
 );
 
-test("subscriptions start live and publication owns its envelope and metadata", async () =>
+it.effect("subscriptions start live and publication owns its envelope and metadata", () =>
   run(
     Effect.gen(function* () {
       const bus = yield* CommittedEvents.make(workspaceId);
@@ -94,9 +91,10 @@ test("subscriptions start live and publication owns its envelope and metadata", 
       Reflect.set(input.events, "length", 0);
       expect(yield* next(stream)).toEqual([expected]);
     }),
-  ));
+  ),
+);
 
-test("foreign workspaces and malformed batches cannot enter a bus", async () =>
+it.effect("foreign workspaces and malformed batches cannot enter a bus", () =>
   run(
     Effect.gen(function* () {
       const bus = yield* CommittedEvents.make(workspaceId);
@@ -120,38 +118,44 @@ test("foreign workspaces and malformed batches cannot enter a bus", async () =>
       const missingAttribution = batch("missing-attribution");
       Reflect.deleteProperty(missingAttribution.events[0], "provenance");
       for (const invalid of [wrongCommit, empty, duplicate, unattributed, missingAttribution])
-        expect(yield* Effect.flip(bus.publish(invalid))).toMatchObject({ _tag: "SchemaError" });
+        expect(yield* Effect.flip(bus.publish(invalid))).toMatchObject({
+          _tag: "SchemaError",
+        });
       const good = batch("good");
       yield* bus.publish(good);
       expect(yield* next(stream)).toEqual([good]);
     }),
-  ));
+  ),
+);
 
-test("a slow subscriber fails explicitly without blocking publishers or a healthy subscriber", async () =>
-  run(
-    Effect.gen(function* () {
-      const bus = yield* CommittedEvents.make(workspaceId, { capacity: 2 });
-      const slow = yield* bus.subscribe;
-      const fast = yield* bus.subscribe;
-      for (const id of ["one", "two", "three"]) {
-        const value = batch(id);
+it.effect(
+  "a slow subscriber fails explicitly without blocking publishers or a healthy subscriber",
+  () =>
+    run(
+      Effect.gen(function* () {
+        const bus = yield* CommittedEvents.make(workspaceId, { capacity: 2 });
+        const slow = yield* bus.subscribe;
+        const fast = yield* bus.subscribe;
+        for (const id of ["one", "two", "three"]) {
+          const value = batch(id);
+          yield* bus.publish(value);
+          expect(yield* next(fast)).toEqual([value]);
+        }
+        expect(yield* Effect.flip(next(slow))).toMatchObject({
+          _tag: "CommittedEvents.Lagged",
+          workspaceId,
+        });
+        const fresh = yield* bus.subscribe;
+        const value = batch("four");
         yield* bus.publish(value);
+        expect(yield* Effect.flip(next(slow))).toMatchObject({ _tag: "CommittedEvents.Lagged" });
         expect(yield* next(fast)).toEqual([value]);
-      }
-      expect(yield* Effect.flip(next(slow))).toMatchObject({
-        _tag: "CommittedEvents.Lagged",
-        workspaceId,
-      });
-      const fresh = yield* bus.subscribe;
-      const value = batch("four");
-      yield* bus.publish(value);
-      expect(yield* Effect.flip(next(slow))).toMatchObject({ _tag: "CommittedEvents.Lagged" });
-      expect(yield* next(fast)).toEqual([value]);
-      expect(yield* next(fresh)).toEqual([value]);
-    }),
-  ));
+        expect(yield* next(fresh)).toEqual([value]);
+      }),
+    ),
+);
 
-test("concurrent publications reach subscribers in the same order with no spurious gaps", async () =>
+it.effect("concurrent publications reach subscribers in the same order with no spurious gaps", () =>
   run(
     Effect.gen(function* () {
       const bus = yield* CommittedEvents.make(workspaceId);
@@ -166,27 +170,31 @@ test("concurrent publications reach subscribers in the same order with no spurio
         new Set(values.map((value) => value.commitId)),
       );
     }),
-  ));
+  ),
+);
 
-test("closing a subscription interrupts its pending read and leaves other subscribers usable", async () =>
-  run(
-    Effect.gen(function* () {
-      const bus = yield* CommittedEvents.make(workspaceId, { capacity: 1 });
-      const readerScope = yield* Scope.fork(yield* Scope.Scope);
-      const abandoned = yield* bus.subscribe.pipe(Scope.provide(readerScope));
-      const healthy = yield* bus.subscribe;
-      const waiting = yield* next(abandoned).pipe(Effect.forkChild({ startImmediately: true }));
-      yield* Scope.close(readerScope, Exit.void);
-      expect(Exit.hasInterrupts(yield* Fiber.await(waiting))).toBe(true);
-      for (const id of ["one", "two"]) {
-        const value = batch(id);
-        yield* bus.publish(value);
-        expect(yield* next(healthy)).toEqual([value]);
-      }
-    }),
-  ));
+it.effect(
+  "closing a subscription interrupts its pending read and leaves other subscribers usable",
+  () =>
+    run(
+      Effect.gen(function* () {
+        const bus = yield* CommittedEvents.make(workspaceId, { capacity: 1 });
+        const readerScope = yield* Scope.fork(yield* Scope.Scope);
+        const abandoned = yield* bus.subscribe.pipe(Scope.provide(readerScope));
+        const healthy = yield* bus.subscribe;
+        const waiting = yield* next(abandoned).pipe(Effect.forkChild({ startImmediately: true }));
+        yield* Scope.close(readerScope, Exit.void);
+        expect(Exit.hasInterrupts(yield* Fiber.await(waiting))).toBe(true);
+        for (const id of ["one", "two"]) {
+          const value = batch(id);
+          yield* bus.publish(value);
+          expect(yield* next(healthy)).toEqual([value]);
+        }
+      }),
+    ),
+);
 
-test("closing the bus interrupts pending reads and rejects escaped handles", async () =>
+it.effect("closing the bus interrupts pending reads and rejects escaped handles", () =>
   run(
     Effect.gen(function* () {
       const owner = yield* Scope.fork(yield* Scope.Scope);
@@ -200,9 +208,10 @@ test("closing the bus interrupts pending reads and rejects escaped handles", asy
       });
       expect(yield* Effect.flip(bus.subscribe)).toMatchObject({ _tag: "CommittedEvents.Closed" });
     }),
-  ));
+  ),
+);
 
-test("bus construction rejects invalid buffer capacity", async () =>
+it.effect("bus construction rejects invalid buffer capacity", () =>
   run(
     Effect.gen(function* () {
       for (const capacity of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])
@@ -210,4 +219,5 @@ test("bus construction rejects invalid buffer capacity", async () =>
           _tag: "SchemaError",
         });
     }),
-  ));
+  ),
+);

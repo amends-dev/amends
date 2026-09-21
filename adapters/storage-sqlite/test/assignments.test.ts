@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { AssignmentApplication, BuiltinRoles, Role } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Log, Store } from "@amends/core/journal";
@@ -37,9 +37,8 @@ const setup = Effect.gen(function* () {
   );
   return { workspace, viewer, admin, bound: yield* boundTo(workspace.id) };
 });
-
-test("assignments cannot be addressed through another workspace or recipient", async () =>
-  temporary(async (filename) =>
+it.effect("assignments cannot be addressed through another workspace or recipient", () =>
+  temporary((filename) =>
     runHost(
       filename,
       Effect.gen(function* () {
@@ -70,135 +69,146 @@ test("assignments cannot be addressed through another workspace or recipient", a
         );
       }),
     ),
-  ));
+  ),
+);
 
-test("assignments are additive, duplicate assignment is idempotent, and role replacement is atomic", async () =>
-  temporary(async (filename) =>
-    runHost(
-      filename,
-      Effect.gen(function* () {
-        const { workspace, viewer, bound } = yield* setup;
-        const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
-        const duplicate = yield* Operations.assign(workspace.id, alice, {
-          memberId: viewer.id,
-          roleId: BuiltinRoles.ViewerId,
-        });
-        expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
-        const admin = yield* Operations.assign(workspace.id, alice, {
-          memberId: viewer.id,
-          roleId: BuiltinRoles.AdministratorId,
-        });
-        expect((yield* Operations.access(workspace.id, alice, viewer.id)).assignments).toHaveLength(
-          2,
-        );
-        yield* Operations.revokeAssignment(workspace.id, alice, viewer.id, duplicate.id);
-        const access = yield* Operations.access(workspace.id, bob, workspace.ownerMemberId);
-        expect(
-          access.roles.filter(({ assignable }) => assignable).map(({ role }) => role.id),
-        ).toEqual([BuiltinRoles.ViewerId]);
-        const changed = yield* Operations.change(workspace.id, alice, {
-          memberId: viewer.id,
-          roleId: BuiltinRoles.ViewerId,
-          expectedAssignmentIds: [admin.id],
-        });
-        expect(changed.id).not.toBe(admin.id);
-        expect(yield* bound.assignments.get(admin.id)).toMatchObject({
-          _tag: "Some",
-          value: { status: "revoked" },
-        });
-        expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual([changed]);
-        const batches = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
-        expect(batches.at(-1)?.entries).toHaveLength(2);
-        expect(
-          yield* Effect.flip(
-            Operations.assign(workspace.id, bob, {
-              memberId: viewer.id,
-              roleId: BuiltinRoles.AdministratorId,
-            }),
-          ),
-        ).toMatchObject({ _tag: "Authorization.Denied" });
-      }),
-    ),
-  ));
-
-test("delegation protects owners and administrators across assignment and member-removal endpoints", async () =>
-  temporary(async (filename) =>
-    runHost(
-      filename,
-      Effect.gen(function* () {
-        const { workspace, viewer, admin, bound } = yield* setup;
-        const peerId = Identity.HumanId.make("peer");
-        const peerInvite = yield* Operations.invite(
-          workspace.id,
-          alice,
-          request(workspace.id, yield* future, peerId, BuiltinRoles.AdministratorId),
-        );
-        const peer = yield* Operations.acceptInvitation(
-          workspace.id,
-          peerId,
-          peerInvite.details.id,
-        );
-        const ownerAccess = yield* Operations.access(workspace.id, alice, workspace.ownerMemberId);
-        const adminAccess = yield* Operations.access(workspace.id, alice, peer.id);
-        const viewerAccess = yield* Operations.access(workspace.id, charlie, viewer.id);
-        expect(viewerAccess.canManage).toBe(true);
-        expect((yield* Operations.access(workspace.id, charlie, admin.id)).canManage).toBe(false);
-        expect(ownerAccess.canManage).toBe(false);
-        const ownerAssignment = ownerAccess.assignments[0];
-        const adminAssignment = adminAccess.assignments[0];
-        if (!ownerAssignment || !adminAssignment) throw new Error("Missing initial assignment");
-        const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Gateway.Service>> = [
-          Operations.assign(workspace.id, charlie, {
+it.effect(
+  "assignments are additive, duplicate assignment is idempotent, and role replacement is atomic",
+  () =>
+    temporary((filename) =>
+      runHost(
+        filename,
+        Effect.gen(function* () {
+          const { workspace, viewer, bound } = yield* setup;
+          const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+          const duplicate = yield* Operations.assign(workspace.id, alice, {
+            memberId: viewer.id,
+            roleId: BuiltinRoles.ViewerId,
+          });
+          expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
+          const admin = yield* Operations.assign(workspace.id, alice, {
             memberId: viewer.id,
             roleId: BuiltinRoles.AdministratorId,
-          }),
-          Operations.assign(workspace.id, alice, {
+          });
+          expect(
+            (yield* Operations.access(workspace.id, alice, viewer.id)).assignments,
+          ).toHaveLength(2);
+          yield* Operations.revokeAssignment(workspace.id, alice, viewer.id, duplicate.id);
+          const access = yield* Operations.access(workspace.id, bob, workspace.ownerMemberId);
+          expect(
+            access.roles.filter(({ assignable }) => assignable).map(({ role }) => role.id),
+          ).toEqual([BuiltinRoles.ViewerId]);
+          const changed = yield* Operations.change(workspace.id, alice, {
             memberId: viewer.id,
-            roleId: BuiltinRoles.OwnerId,
-          }),
-          Operations.assign(workspace.id, charlie, {
-            memberId: peer.id,
             roleId: BuiltinRoles.ViewerId,
-          }),
-          Operations.revokeAssignment(workspace.id, charlie, peer.id, adminAssignment.id),
-          Operations.revokeAssignment(
+            expectedAssignmentIds: [admin.id],
+          });
+          expect(changed.id).not.toBe(admin.id);
+          expect(yield* bound.assignments.get(admin.id)).toMatchObject({
+            _tag: "Some",
+            value: { status: "revoked" },
+          });
+          expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual([changed]);
+          const batches = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+          expect(batches.at(-1)?.entries).toHaveLength(2);
+          expect(
+            yield* Effect.flip(
+              Operations.assign(workspace.id, bob, {
+                memberId: viewer.id,
+                roleId: BuiltinRoles.AdministratorId,
+              }),
+            ),
+          ).toMatchObject({ _tag: "Authorization.Denied" });
+        }),
+      ),
+    ),
+);
+
+it.effect(
+  "delegation protects owners and administrators across assignment and member-removal endpoints",
+  () =>
+    temporary((filename) =>
+      runHost(
+        filename,
+        Effect.gen(function* () {
+          const { workspace, viewer, admin, bound } = yield* setup;
+          const peerId = Identity.HumanId.make("peer");
+          const peerInvite = yield* Operations.invite(
+            workspace.id,
+            alice,
+            request(workspace.id, yield* future, peerId, BuiltinRoles.AdministratorId),
+          );
+          const peer = yield* Operations.acceptInvitation(
+            workspace.id,
+            peerId,
+            peerInvite.details.id,
+          );
+          const ownerAccess = yield* Operations.access(
             workspace.id,
             alice,
             workspace.ownerMemberId,
-            ownerAssignment.id,
-          ),
-          Operations.change(workspace.id, alice, {
-            memberId: workspace.ownerMemberId,
-            roleId: BuiltinRoles.ViewerId,
-            expectedAssignmentIds: [ownerAssignment.id],
-          }),
-          Operations.removeMember(workspace.id, charlie, peer.id),
-          Operations.removeMember(workspace.id, charlie, workspace.ownerMemberId),
-          Operations.assign(workspace.id, alice, {
-            memberId: viewer.id,
-            roleId: Role.Id.make("invented"),
-          }),
-        ];
-        const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 30 });
-        for (const attempt of attempts) {
-          yield* Effect.flip(attempt);
-          expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 30 })).toEqual(before);
-        }
-        yield* Operations.removeMember(workspace.id, charlie, viewer.id);
-        expect(
-          yield* Effect.flip(
+          );
+          const adminAccess = yield* Operations.access(workspace.id, alice, peer.id);
+          const viewerAccess = yield* Operations.access(workspace.id, charlie, viewer.id);
+          expect(viewerAccess.canManage).toBe(true);
+          expect((yield* Operations.access(workspace.id, charlie, admin.id)).canManage).toBe(false);
+          expect(ownerAccess.canManage).toBe(false);
+          const ownerAssignment = ownerAccess.assignments[0];
+          const adminAssignment = adminAccess.assignments[0];
+          if (!ownerAssignment || !adminAssignment) throw new Error("Missing initial assignment");
+          const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Gateway.Service>> = [
+            Operations.assign(workspace.id, charlie, {
+              memberId: viewer.id,
+              roleId: BuiltinRoles.AdministratorId,
+            }),
             Operations.assign(workspace.id, alice, {
               memberId: viewer.id,
+              roleId: BuiltinRoles.OwnerId,
+            }),
+            Operations.assign(workspace.id, charlie, {
+              memberId: peer.id,
               roleId: BuiltinRoles.ViewerId,
             }),
-          ),
-        ).toMatchObject({ _tag: "AssignmentApplication.InactiveMember" });
-      }),
+            Operations.revokeAssignment(workspace.id, charlie, peer.id, adminAssignment.id),
+            Operations.revokeAssignment(
+              workspace.id,
+              alice,
+              workspace.ownerMemberId,
+              ownerAssignment.id,
+            ),
+            Operations.change(workspace.id, alice, {
+              memberId: workspace.ownerMemberId,
+              roleId: BuiltinRoles.ViewerId,
+              expectedAssignmentIds: [ownerAssignment.id],
+            }),
+            Operations.removeMember(workspace.id, charlie, peer.id),
+            Operations.removeMember(workspace.id, charlie, workspace.ownerMemberId),
+            Operations.assign(workspace.id, alice, {
+              memberId: viewer.id,
+              roleId: Role.Id.make("invented"),
+            }),
+          ];
+          const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 30 });
+          for (const attempt of attempts) {
+            yield* Effect.flip(attempt);
+            expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 30 })).toEqual(before);
+          }
+          yield* Operations.removeMember(workspace.id, charlie, viewer.id);
+          expect(
+            yield* Effect.flip(
+              Operations.assign(workspace.id, alice, {
+                memberId: viewer.id,
+                roleId: BuiltinRoles.ViewerId,
+              }),
+            ),
+          ).toMatchObject({ _tag: "AssignmentApplication.InactiveMember" });
+        }),
+      ),
     ),
-  ));
+);
 
-test("competing role changes reject stale assignments rather than overwrite the winner", async () =>
-  temporary(async (filename) =>
+it.effect("competing role changes reject stale assignments rather than overwrite the winner", () =>
+  temporary((filename) =>
     runHost(
       filename,
       Effect.gen(function* () {
@@ -222,10 +232,11 @@ test("competing role changes reject stale assignments rather than overwrite the 
         expect(yield* bound.assignments.listActiveByMember(viewer.id)).toHaveLength(1);
       }),
     ),
-  ));
+  ),
+);
 
-test("a failed role-change checkpoint restores the previous assignments and journal", async () =>
-  temporary(async (filename) =>
+it.effect("a failed role-change checkpoint restores the previous assignments and journal", () =>
+  temporary((filename) =>
     runHost(
       filename,
       Effect.gen(function* () {
@@ -264,10 +275,11 @@ test("a failed role-change checkpoint restores the previous assignments and jour
         expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
       }),
     ),
-  ));
+  ),
+);
 
-test("pending invitations recheck the administrator's authority after demotion", async () =>
-  temporary(async (filename) =>
+it.effect("pending invitations recheck the administrator's authority after demotion", () =>
+  temporary((filename) =>
     runHost(
       filename,
       Effect.gen(function* () {
@@ -299,4 +311,5 @@ test("pending invitations recheck the administrator's authority after demotion",
         });
       }),
     ),
-  ));
+  ),
+);

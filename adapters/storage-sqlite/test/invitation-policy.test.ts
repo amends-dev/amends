@@ -1,13 +1,12 @@
 import { Publication } from "@amends/core/journal";
 import { testProvenance } from "./support.ts";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { AssignmentFacts, BuiltinRoles, Role } from "@amends/core/authorization";
 import { Journal, Log } from "@amends/core/journal";
 import { MemberFacts } from "@amends/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { Operations } from "./operations.ts";
-
 import {
   alice,
   bob,
@@ -20,9 +19,10 @@ import {
   boundTo,
   at,
 } from "./invitation-support.ts";
-test("recipient identity and workspace binding protect pending and accepted invitations", async () =>
-  temporary(async (filename) => {
-    await runHost(
+
+it.effect("recipient identity and workspace binding protect pending and accepted invitations", () =>
+  temporary((filename) =>
+    runHost(
       filename,
       Effect.gen(function* () {
         const a = yield* Operations.createWorkspace(alice.id);
@@ -43,12 +43,13 @@ test("recipient identity and workspace binding protect pending and accepted invi
         ).toMatchObject({ _tag: "InvitationApplication.NotRecipient" });
         expect(yield* (yield* boundTo(b.id)).members.findActive(bob)).toEqual(Option.none());
       }),
-    );
-  }));
+    ),
+  ),
+);
 
-test("expiry is checked against the operation clock, including the exact deadline", async () =>
-  temporary(async (filename) => {
-    await runHost(
+it.effect("expiry is checked against the operation clock, including the exact deadline", () =>
+  temporary((filename) =>
+    runHost(
       filename,
       Effect.gen(function* () {
         const workspace = yield* Operations.createWorkspace(alice.id);
@@ -79,12 +80,13 @@ test("expiry is checked against the operation clock, including the exact deadlin
         );
         expect(revoked.state._tag).toBe("Revoked");
       }),
-    );
-  }));
+    ),
+  ),
+);
 
-test("administrators can invite viewers but cannot invite administrators or owners", async () =>
-  temporary(async (filename) => {
-    await runHost(
+it.effect("administrators can invite viewers but cannot invite administrators or owners", () =>
+  temporary((filename) =>
+    runHost(
       filename,
       Effect.gen(function* () {
         const workspace = yield* Operations.createWorkspace(alice.id);
@@ -118,12 +120,13 @@ test("administrators can invite viewers but cannot invite administrators or owne
           ),
         ).toMatchObject({ _tag: "Delegation.OwnerProtected" });
       }),
-    );
-  }));
+    ),
+  ),
+);
 
-test("acceptance rechecks original inviter's permission, membership, and ownership", async () =>
-  temporary(async (filename) => {
-    await runHost(
+it.effect("acceptance rechecks original inviter's permission, membership, and ownership", () =>
+  temporary((filename) =>
+    runHost(
       filename,
       Effect.gen(function* () {
         for (const change of ["permission", "membership", "ownership"] as const) {
@@ -179,11 +182,12 @@ test("acceptance rechecks original inviter's permission, membership, and ownersh
           });
         }
       }),
-    );
-  }));
+    ),
+  ),
+);
 
-test("unsupported and Owner roles never publish an invitation", async () =>
-  temporary(async (filename) =>
+it.effect("unsupported and Owner roles never publish an invitation", () =>
+  temporary((filename) =>
     runHost(
       filename,
       Effect.gen(function* () {
@@ -207,4 +211,5 @@ test("unsupported and Owner roles never publish an invitation", async () =>
         ).toMatchObject({ _tag: "InvitationApplication.AlreadyMember" });
       }),
     ),
-  ));
+  ),
+);

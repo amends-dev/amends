@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "generate": "drizzle-kit generate",
-    "test": "bun test test"
+    "test": "bun run --bun vitest run --root ../.. --config vitest.config.ts adapters/storage-postgresql/test"
   },
   "dependencies": {
     "@amends/core": "workspace:*",

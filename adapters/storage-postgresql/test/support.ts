@@ -1,4 +1,4 @@
-import { afterAll, test } from "bun:test";
+import { inject } from "@effect/vitest";
 import * as Core from "@amends/core";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity, Performer } from "@amends/core/identity";
@@ -16,16 +16,15 @@ import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { layer, PostgresDatabase, PostgresStorage } from "../src/index.ts";
-import { acquire, temporary } from "./postgres.ts";
+import { temporary } from "./postgres.ts";
 
-export const setup = async () => {
-  const server = await acquire();
-  afterAll(async () => server?.stop());
+export const setup = () => {
+  const url = inject("amendsPostgresUrl");
   return {
-    it: test.skipIf(server === undefined),
-    withDatabase: (use: (url: string) => Promise<void>) => {
-      if (server === undefined) throw new Error("PostgreSQL is unavailable");
-      return temporary(server, use);
+    available: url !== null,
+    withDatabase: <A, E, R>(use: (url: string) => Effect.Effect<A, E, R>) => {
+      if (url === null) throw new Error("PostgreSQL is unavailable");
+      return temporary(url, use);
     },
   };
 };
@@ -63,7 +62,7 @@ export const core = (bound: Bound) =>
 export const inDatabase = <A, E>(
   url: string,
   program: Effect.Effect<A, E, PostgresDatabase.Service | SqlClient.SqlClient>,
-) => Effect.runPromise(program.pipe(Effect.provide(database(url))));
+) => program.pipe(Effect.provide(database(url)));
 export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
     Effect.provide(core(bound)),

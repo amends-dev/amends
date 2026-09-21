@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
 import { Assignment } from "../../src/authorization/assignment/assignment.ts";
@@ -20,7 +20,6 @@ const ManageWorkspace = Permission.make("test.workspace.manage", {
   targetKind: "Workspace",
   builtinTier: "administrator",
 });
-
 const sourcesIn = (workspaceId: Workspace.Id): ReadonlyArray<Assignment.Source> => {
   const scopedPermissions = [
     [MemberPermissions.Remove, Scope.Value.cases.Workspace.make({ workspaceId })],
@@ -46,66 +45,72 @@ const sourcesIn = (workspaceId: Workspace.Id): ReadonlyArray<Assignment.Source> 
   }
   return sources;
 };
+it.effect(
+  "assignments retain role references or direct grants within the recipient's workspace",
+  () =>
+    Effect.gen(function* () {
+      const decode = Schema.decodeUnknownEffect(Assignment.Record);
+      for (const source of sourcesIn(workspaceId)) {
+        for (const status of Assignment.Status.literals) {
+          const input = {
+            id: Assignment.Id.make(`assignment-${source._tag}-${status}`),
+            workspaceId,
+            memberId: recipientId,
+            source,
+            status,
+          };
+          expect(Assignment.Record.make(input)).toEqual(input);
+          expect(yield* decode(input)).toEqual(input);
+        }
+      }
+    }),
+);
 
-test("assignments retain role references or direct grants within the recipient's workspace", async () => {
-  const decode = Schema.decodeUnknownEffect(Assignment.Record);
-  for (const source of sourcesIn(workspaceId)) {
-    for (const status of Assignment.Status.literals) {
-      const input = {
-        id: Assignment.Id.make(`assignment-${source._tag}-${status}`),
-        workspaceId,
-        memberId: recipientId,
-        source,
-        status,
-      };
-      expect(Assignment.Record.make(input)).toEqual(input);
-      expect(await Effect.runPromise(decode(input))).toEqual(input);
+it.effect(
+  "both assignment sources reject foreign workspace and exact-target scopes, including after revocation",
+  () =>
+    Effect.gen(function* () {
+      const decode = Schema.decodeUnknownEffect(Assignment.Record);
+      for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
+        for (const status of Assignment.Status.literals) {
+          const input = {
+            id: Assignment.Id.make(`assignment-${source._tag}-${status}`),
+            workspaceId,
+            memberId: recipientId,
+            source,
+            status,
+          };
+          expect(() => Assignment.Record.make(input)).toThrow("Schema validation failed");
+          const error = yield* decode(input).pipe(Effect.flip);
+          expect(error.message).toContain("Assignment scope must belong to its workspace");
+          expect(error.message).toContain('["source"]');
+        }
+      }
+    }),
+);
+
+it.effect("assignment creation facts preserve workspace checks through the journal codec", () =>
+  Effect.gen(function* () {
+    const codec = Codec.make(AssignmentFacts.Created);
+    // Encode invalid stored data without the cross-field check to exercise replay decoding.
+    const unchecked = Codec.makeForSchema(Schema.Struct(AssignmentFacts.Created.payload.fields));
+    const identifiers = {
+      assignmentId: Assignment.Id.make("assignment-1"),
+      workspaceId,
+      memberId: recipientId,
+    };
+    for (const source of sourcesIn(workspaceId)) {
+      const payload = { ...identifiers, source };
+      const bytes = yield* codec.encode(payload);
+      expect(yield* codec.decode(bytes)).toEqual(payload);
     }
-  }
-});
-
-test("both assignment sources reject foreign workspace and exact-target scopes, including after revocation", async () => {
-  const decode = Schema.decodeUnknownEffect(Assignment.Record);
-  for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
-    for (const status of Assignment.Status.literals) {
-      const input = {
-        id: Assignment.Id.make(`assignment-${source._tag}-${status}`),
-        workspaceId,
-        memberId: recipientId,
-        source,
-        status,
-      };
-      expect(() => Assignment.Record.make(input)).toThrow("Schema validation failed");
-      const error = await Effect.runPromise(decode(input).pipe(Effect.flip));
+    for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
+      const payload = { ...identifiers, source };
+      const error = yield* codec.encode(payload).pipe(Effect.flip);
       expect(error.message).toContain("Assignment scope must belong to its workspace");
-      expect(error.message).toContain('["source"]');
+      const corrupt = yield* unchecked.encode(payload);
+      const storedError = yield* codec.decode(corrupt).pipe(Effect.flip);
+      expect(storedError.message).toContain("Assignment scope must belong to its workspace");
     }
-  }
-});
-
-test("assignment creation facts preserve workspace checks through the journal codec", async () => {
-  const codec = Codec.make(AssignmentFacts.Created);
-  // Encode invalid stored data without the cross-field check to exercise replay decoding.
-  const unchecked = Codec.makeForSchema(Schema.Struct(AssignmentFacts.Created.payload.fields));
-  const identifiers = {
-    assignmentId: Assignment.Id.make("assignment-1"),
-    workspaceId,
-    memberId: recipientId,
-  };
-
-  for (const source of sourcesIn(workspaceId)) {
-    const payload = { ...identifiers, source };
-    const bytes = await Effect.runPromise(codec.encode(payload));
-    expect(await Effect.runPromise(codec.decode(bytes))).toEqual(payload);
-  }
-
-  for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
-    const payload = { ...identifiers, source };
-    const error = await Effect.runPromise(codec.encode(payload).pipe(Effect.flip));
-    expect(error.message).toContain("Assignment scope must belong to its workspace");
-
-    const corrupt = await Effect.runPromise(unchecked.encode(payload));
-    const storedError = await Effect.runPromise(codec.decode(corrupt).pipe(Effect.flip));
-    expect(storedError.message).toContain("Assignment scope must belong to its workspace");
-  }
-});
+  }),
+);

@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, onCleanup } from "solid-js";
 import { CodeBlock, PageHeader, Tabs, WorkItemRow } from "../src/components/index.ts";

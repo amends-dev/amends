@@ -47,7 +47,9 @@ also runs each workspace's `typecheck` script. Workspace exports point to TypeSc
 which Bun and future application bundlers can consume directly.
 
 The journal and execution-log design is described in [docs/journal.md](docs/journal.md).
-Run core and persistent-host checks with `bun test packages/core/test hosts/local/test`.
+Run all tests with `bun run test`, or focus on core and the host with
+`bun run test packages/core/test hosts/local/test`. Tests use `@effect/vitest`;
+see [the testing guide](docs/testing.md) for conventions and database fixtures.
 
 For a new workspace, add a manifest, source files, and a TypeScript configuration
 extending `../../tsconfig.base.json`, plus a `typecheck` script. Then run

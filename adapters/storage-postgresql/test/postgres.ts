@@ -94,22 +94,21 @@ export const acquire = async (): Promise<Server | undefined> => {
 };
 
 /** Fresh database per test, created on the server and dropped afterwards, with its connection URL. */
-export const temporary = async (server: Server, use: (url: string) => Promise<void>) => {
+export const temporary = Effect.fnUntraced(function* <A, E, R>(
+  serverUrl: string,
+  use: (url: string) => Effect.Effect<A, E, R>,
+) {
   const name = `amends_test_${crypto.randomUUID().replaceAll("-", "")}`;
-  const maintenance = PgClient.layer({ url: Redacted.make(server.url), maxConnections: 1 });
+  const maintenance = PgClient.layer({ url: Redacted.make(serverUrl), maxConnections: 1 });
   const control = (statement: string) =>
-    Effect.runPromise(
-      Effect.flatMap(PgClient.PgClient, (sql) => sql.unsafe(statement)).pipe(
-        Effect.scoped,
-        Effect.provide(maintenance),
-      ),
+    Effect.flatMap(PgClient.PgClient, (sql) => sql.unsafe(statement)).pipe(
+      Effect.scoped,
+      Effect.provide(maintenance),
     );
-  await control(`CREATE DATABASE "${name}"`);
-  try {
-    const url = new URL(server.url);
-    url.pathname = `/${name}`;
-    await use(url.toString());
-  } finally {
-    await control(`DROP DATABASE "${name}" WITH (FORCE)`);
-  }
-};
+  yield* Effect.acquireRelease(control(`CREATE DATABASE "${name}"`), () =>
+    control(`DROP DATABASE "${name}" WITH (FORCE)`).pipe(Effect.orDie),
+  );
+  const url = new URL(serverUrl);
+  url.pathname = `/${name}`;
+  return yield* use(url.toString());
+}, Effect.scoped);

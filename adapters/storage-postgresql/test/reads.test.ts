@@ -1,4 +1,4 @@
-import { expect } from "bun:test";
+import { describe, it, expect } from "@effect/vitest";
 import { AssignmentApplication } from "@amends/core/authorization";
 import { ChangeFeedApplication } from "@amends/core/change-feed";
 import { Log, Store } from "@amends/core/journal";
@@ -13,11 +13,10 @@ import { Gateway } from "@amends/gateway";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 import { alice, boundTo, host, setup } from "./support.ts";
 
-const { it, withDatabase } = await setup();
-
-it("workspace reads and SSE open while another transaction holds the writer lock", async () =>
-  withDatabase(async (location) =>
-    Effect.runPromise(
+const { available, withDatabase } = setup();
+describe.skipIf(!available)("PostgreSQL", () => {
+  it.effect("workspace reads and SSE open while another transaction holds the writer lock", () =>
+    withDatabase((location) =>
       Effect.scoped(
         Effect.gen(function* () {
           const gateway = yield* Gateway.Service;
@@ -94,4 +93,5 @@ it("workspace reads and SSE open while another transaction holds the writer lock
         }),
       ).pipe(Effect.provide(host(location, { lockTimeout: "100 millis" }))),
     ),
-  ));
+  );
+});

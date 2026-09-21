@@ -1,10 +1,10 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends/core/identity";
 import { Schema } from "effect";
 import { WorkspaceDirectory } from "../src/directory.ts";
 import { SignIn } from "../src/sign-in.ts";
 
-test("saved sessions retain their JSON format while exposing the human ID", () => {
+it("saved sessions retain their JSON format while exposing the human ID", () => {
   const stored = { token: "session-token", identity: "human-one" };
   const json = Schema.fromJsonString(SignIn.Session);
   const session = Schema.decodeSync(json)(JSON.stringify(stored));
@@ -14,7 +14,7 @@ test("saved sessions retain their JSON format while exposing the human ID", () =
   expect(() => Schema.decodeSync(SignIn.Session)({ ...stored, identity: "" })).toThrow();
 });
 
-test.each([0, 2])("directory JSON retains people for an active member count of %i", (count) => {
+it.each([0, 2])("directory JSON retains people for an active member count of %i", (count) => {
   const wire = {
     memberships: [
       {

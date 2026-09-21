@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Effect, Schema, SchemaIssue } from "effect";
 import { Grant } from "../../src/authorization/grant.ts";
 import { Permission } from "../../src/authorization/permission.ts";
@@ -20,8 +20,7 @@ const ManageWorkspace = Permission.make("test.workspace.manage", {
   targetKind: "Workspace",
   builtinTier: "administrator",
 });
-
-test("workspace grants store permission names and scopes for either target kind", () => {
+it("workspace grants store permission names and scopes for either target kind", () => {
   for (const permission of [MemberPermissions.Read, MemberPermissions.Remove, ManageWorkspace]) {
     expect(Grant.make(permission, workspaceScope)).toEqual({
       permission: permission.name,
@@ -29,8 +28,7 @@ test("workspace grants store permission names and scopes for either target kind"
     });
   }
 });
-
-test("exact grants accept scopes matching the permission's target kind", () => {
+it("exact grants accept scopes matching the permission's target kind", () => {
   expect(Grant.make(MemberPermissions.Remove, exactMember)).toEqual({
     permission: MemberPermissions.Remove.name,
     scope: exactMember,
@@ -40,38 +38,39 @@ test("exact grants accept scopes matching the permission's target kind", () => {
     scope: exactWorkspace,
   });
 });
-
-test("grant construction rejects incompatible exact scopes", () => {
+it("grant construction rejects incompatible exact scopes", () => {
   expect(() => Grant.make(MemberPermissions.Remove, exactWorkspace)).toThrow(
     "Schema validation failed",
   );
   expect(() => Grant.make(ManageWorkspace, exactMember)).toThrow("Schema validation failed");
 });
-
-test("definition-aware schemas validate stored names and scopes when decoding or constructing", async () => {
-  for (const [permission, compatible, incompatible] of [
-    [MemberPermissions.Remove, exactMember, exactWorkspace],
-    [ManageWorkspace, exactWorkspace, exactMember],
-  ] as const) {
-    const schema = Grant.makeSchema(permission);
-    const decode = Schema.decodeUnknownEffect(schema);
-    for (const scope of [workspaceScope, compatible]) {
-      const stored = { permission: permission.name, scope };
-      expect(await Effect.runPromise(decode(stored))).toEqual(stored);
-    }
-
-    const invalid = { permission: permission.name, scope: incompatible };
-    const error = await Effect.runPromise(decode(invalid).pipe(Effect.flip));
-    const issue = await Effect.runPromise(schema.makeEffect(invalid).pipe(Effect.flip));
-    for (const message of [error.message, SchemaIssue.makeFormatterDefault()(issue)]) {
-      expect(message).toContain(`requires a ${permission.targetKind} target`);
-      expect(message).toContain('["scope"]["target"]');
-    }
-
-    const wrongName = await Effect.runPromise(
-      decode({ permission: MemberPermissions.Read.name, scope: workspaceScope }).pipe(Effect.flip),
-    );
-    expect(wrongName.message).toContain(`Expected permission ${permission.name}`);
-    expect(wrongName.message).toContain('["permission"]');
-  }
-});
+it.effect(
+  "definition-aware schemas validate stored names and scopes when decoding or constructing",
+  () =>
+    Effect.gen(function* () {
+      for (const [permission, compatible, incompatible] of [
+        [MemberPermissions.Remove, exactMember, exactWorkspace],
+        [ManageWorkspace, exactWorkspace, exactMember],
+      ] as const) {
+        const schema = Grant.makeSchema(permission);
+        const decode = Schema.decodeUnknownEffect(schema);
+        for (const scope of [workspaceScope, compatible]) {
+          const stored = { permission: permission.name, scope };
+          expect(yield* decode(stored)).toEqual(stored);
+        }
+        const invalid = { permission: permission.name, scope: incompatible };
+        const error = yield* decode(invalid).pipe(Effect.flip);
+        const issue = yield* schema.makeEffect(invalid).pipe(Effect.flip);
+        for (const message of [error.message, SchemaIssue.makeFormatterDefault()(issue)]) {
+          expect(message).toContain(`requires a ${permission.targetKind} target`);
+          expect(message).toContain('["scope"]["target"]');
+        }
+        const wrongName = yield* decode({
+          permission: MemberPermissions.Read.name,
+          scope: workspaceScope,
+        }).pipe(Effect.flip);
+        expect(wrongName.message).toContain(`Expected permission ${permission.name}`);
+        expect(wrongName.message).toContain('["permission"]');
+      }
+    }),
+);

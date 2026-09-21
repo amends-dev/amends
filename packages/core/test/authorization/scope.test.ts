@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { ThreadId } from "@amends/core/thread";
 import { Scope } from "../../src/authorization/scope.ts";
 import { Target } from "../../src/authorization/target.ts";
@@ -20,7 +20,7 @@ const memberElsewhere = Target.Reference.cases.Member.make({
   memberId,
 });
 
-test("workspace scope covers resources only within that workspace", () => {
+it("workspace scope covers resources only within that workspace", () => {
   const scope = Scope.Value.cases.Workspace.make({ workspaceId });
 
   expect(Scope.covers(scope, workspace)).toBe(true);
@@ -30,7 +30,7 @@ test("workspace scope covers resources only within that workspace", () => {
   expect(Scope.covers(scope, memberElsewhere)).toBe(false);
 });
 
-test("exact member scope requires matching workspace, resource kind, and member ID", () => {
+it("exact member scope requires matching workspace, resource kind, and member ID", () => {
   const scope = Scope.Value.cases.Target.make({ target: member });
 
   expect(Scope.covers(scope, { ...member })).toBe(true);
@@ -39,7 +39,7 @@ test("exact member scope requires matching workspace, resource kind, and member 
   expect(Scope.covers(scope, workspace)).toBe(false);
 });
 
-test("an exact workspace target covers the workspace itself without covering its members", () => {
+it("an exact workspace target covers the workspace itself without covering its members", () => {
   const scope = Scope.Value.cases.Target.make({ target: workspace });
 
   expect(Scope.covers(scope, { ...workspace })).toBe(true);
@@ -47,7 +47,7 @@ test("an exact workspace target covers the workspace itself without covering its
   expect(Scope.covers(scope, member)).toBe(false);
 });
 
-test("thread targets preserve exact scope and workspace boundaries even when IDs coincide", () => {
+it("thread targets preserve exact scope and workspace boundaries even when IDs coincide", () => {
   const thread = Target.Reference.cases.Thread.make({
     workspaceId,
     threadId: ThreadId.Id.make(memberId),

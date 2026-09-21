@@ -1,7 +1,7 @@
 import { Commit, CommittedEvents, Entry, Event, Subject } from "@amends/core/journal";
 import { Performer } from "@amends/core/identity";
 import { Workspace } from "@amends/core/workspace";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect";
 import { WorkspaceEvents } from "../src/workspace-events.ts";
 
@@ -32,12 +32,10 @@ const batch = (workspaceId: Workspace.Id, id: string): CommittedEvents.Batch => 
     },
   ],
 });
-const run = <A, E>(program: Effect.Effect<A, E, Scope.Scope>) =>
-  Effect.runPromise(Effect.scoped(program));
-
-test.each(["make", "layer"] as const)(
+const run = <A, E>(program: Effect.Effect<A, E, Scope.Scope>) => Effect.scoped(program);
+it.effect.each(["make", "layer"] as const)(
   "registry %s shares concurrent workspace acquisitions and isolates their events",
-  async (construction) =>
+  (construction) =>
     run(
       Effect.gen(function* () {
         const registry =
@@ -73,7 +71,7 @@ test.each(["make", "layer"] as const)(
     ),
 );
 
-test("the last lease releases its bus and later requests acquire a fresh live bus", async () =>
+it.effect("the last lease releases its bus and later requests acquire a fresh live bus", () =>
   run(
     Effect.gen(function* () {
       const registry = yield* WorkspaceEvents.make();
@@ -90,9 +88,10 @@ test("the last lease releases its bus and later requests acquire a fresh live bu
       yield* current.publish(batch(one, "after"));
       expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toEqual([batch(one, "after")]);
     }),
-  ));
+  ),
+);
 
-test("registry shutdown interrupts readers even while a consumer holds a lease", async () =>
+it.effect("registry shutdown interrupts readers even while a consumer holds a lease", () =>
   run(
     Effect.gen(function* () {
       const owner = yield* Scope.fork(yield* Scope.Scope);
@@ -110,9 +109,10 @@ test("registry shutdown interrupts readers even while a consumer holds a lease",
       });
       expect(Exit.hasInterrupts(yield* Effect.exit(registry.forWorkspace(one)))).toBe(true);
     }),
-  ));
+  ),
+);
 
-test("independently constructed registries never share buses or events", async () =>
+it.effect("independently constructed registries never share buses or events", () =>
   run(
     Effect.gen(function* () {
       const first = yield* WorkspaceEvents.make();
@@ -125,9 +125,10 @@ test("independently constructed registries never share buses or events", async (
       yield* b.publish(batch(one, "local"));
       expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toEqual([batch(one, "local")]);
     }),
-  ));
+  ),
+);
 
-test("registry rejects invalid configuration and workspace IDs before acquisition", async () =>
+it.effect("registry rejects invalid configuration and workspace IDs before acquisition", () =>
   run(
     Effect.gen(function* () {
       expect(yield* Effect.flip(WorkspaceEvents.make({ capacity: 0 }))).toMatchObject({
@@ -142,4 +143,5 @@ test("registry rejects invalid configuration and workspace IDs before acquisitio
       const bus = yield* registry.forWorkspace(one);
       expect(bus.workspaceId).toBe(one);
     }),
-  ));
+  ),
+);

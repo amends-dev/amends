@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import { Scope, Target } from "@amends/core/authorization";
 import { ThreadId } from "@amends/core/thread";
@@ -8,7 +8,7 @@ import { ScopeColumns } from "../src/scope.ts";
 const workspaceId = Workspace.Id.make("workspace");
 const decode = Schema.decodeUnknownOption(Scope.Value);
 
-test("scope columns preserve every target variant without broadening exact grants", () => {
+it("scope columns preserve every target variant without broadening exact grants", () => {
   const scopes = [
     Scope.Value.cases.Workspace.make({ workspaceId }),
     ...[
@@ -25,7 +25,7 @@ test("scope columns preserve every target variant without broadening exact grant
     ).toEqual(scope);
 });
 
-test("unknown, incomplete, and contradictory scope columns fail decoding", () => {
+it("unknown, incomplete, and contradictory scope columns fail decoding", () => {
   const valid = ScopeColumns.encode(
     Scope.Value.cases.Target.make({
       target: Target.Reference.cases.Thread.make({

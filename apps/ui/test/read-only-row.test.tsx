@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it } from "@effect/vitest";
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { WorkItemRow } from "../src/components/index.ts";
 afterEach(cleanup);

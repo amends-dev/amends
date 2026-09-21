@@ -1,7 +1,7 @@
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Ref, Schema, Stream } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { Codec } from "../../src/journal/codec.ts";
@@ -16,9 +16,7 @@ import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 
 const testSubject = () => Subject.make("test", "entity");
-
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-
 const logId = Log.Id.make("turn/one");
 const open = Effect.map(Log.Service, (logs) => logs.open({ id: logId, schema: Schema.String }));
 const run = <A, E>(
@@ -29,15 +27,13 @@ const run = <A, E>(
     Publication.Service | Log.Service | Transaction.Service | Counter | Checkpoint.Service
   >,
 ) =>
-  Effect.runPromise(
-    program.pipe(
-      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-      Effect.provide(Log.layer),
-      Effect.provideService(Store.Service, fixture.store),
-      Effect.provide(CommittedEvents.layer(workspaceId)),
-      Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-      Effect.provideService(Counter, fixture.counter),
-    ),
+  program.pipe(
+    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provide(Log.layer),
+    Effect.provideService(Store.Service, fixture.store),
+    Effect.provide(CommittedEvents.layer(workspaceId)),
+    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Counter, fixture.counter),
   );
 const observeWait = (fixture: Fixture, ready: Deferred.Deferred<void>): Fixture => ({
   ...fixture,
@@ -49,132 +45,136 @@ const observeWait = (fixture: Fixture, ready: Deferred.Deferred<void>): Fixture 
       ),
   }),
 });
-
-test("a tail resumes after its cursor, drains history, and waits for a future commit", async () => {
-  const fixture = await Effect.runPromise(make());
-  const ready = await Effect.runPromise(Deferred.make<void>());
-  await run(
-    observeWait(fixture, ready),
-    Effect.gen(function* () {
-      const log = yield* open;
-      const first = yield* log.append("first");
-      yield* log.append("second");
-      const tail = yield* log
-        .tail({ after: first.position, limit: 10 })
-        .pipe(Stream.take(2), Stream.runCollect, Effect.forkChild);
-      yield* Deferred.await(ready);
-      yield* log.append("third");
-      const batches = yield* Fiber.join(tail);
-      expect(batches.flatMap((batch) => batch.entries.map((entry) => entry.payload))).toEqual([
-        "second",
-        "third",
-      ]);
-      expect(batches.map((batch) => batch.position)).toEqual([
-        Log.Position.make(1),
-        Log.Position.make(2),
-      ]);
-    }),
-  );
-});
-
-test("a commit between the empty read and wait registration is not lost", async () => {
-  const fixture = await Effect.runPromise(make());
-  const payload = await Effect.runPromise(Codec.makeForSchema(Schema.String).encode("raced"));
-  let inject = true;
-  let waits = 0;
-  const raced: Fixture = {
-    ...fixture,
-    store: Store.Service.of({
-      ...fixture.store,
-      read: Effect.fn("TailTest.racedRead")(function* (id, options) {
-        const batches = yield* fixture.store.read(id, options);
-        if (inject) {
-          inject = false;
-          expect(batches).toHaveLength(0);
-          // Simulate another writer using the host, outside this Log service.
-          yield* fixture.store
-            .transaction(
-              Effect.gen(function* () {
-                yield* (yield* Store.Transaction).append({ logId: id, entries: [{ payload }] });
-              }),
-            )
-            .pipe(
-              Effect.mapError(
-                (cause) => new Store.Failure({ operation: "test external append", cause }),
-              ),
-            );
-        }
-        return batches;
+it.effect("a tail resumes after its cursor, drains history, and waits for a future commit", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const ready = yield* Deferred.make<void>();
+    yield* run(
+      observeWait(fixture, ready),
+      Effect.gen(function* () {
+        const log = yield* open;
+        const first = yield* log.append("first");
+        yield* log.append("second");
+        const tail = yield* log
+          .tail({ after: first.position, limit: 10 })
+          .pipe(Stream.take(2), Stream.runCollect, Effect.forkChild);
+        yield* Deferred.await(ready);
+        yield* log.append("third");
+        const batches = yield* Fiber.join(tail);
+        expect(batches.flatMap((batch) => batch.entries.map((entry) => entry.payload))).toEqual([
+          "second",
+          "third",
+        ]);
+        expect(batches.map((batch) => batch.position)).toEqual([
+          Log.Position.make(1),
+          Log.Position.make(2),
+        ]);
       }),
-      waitForAppend: Effect.fn("TailTest.racedWait")(function* (id, after) {
-        waits++;
-        yield* fixture.store.waitForAppend(id, after);
-      }),
-    }),
-  };
-  await run(
-    raced,
-    Effect.gen(function* () {
-      const log = yield* open;
-      const batches = yield* log.tail({ limit: 1 }).pipe(Stream.take(1), Stream.runCollect);
-      expect(batches[0]?.entries[0]?.payload).toBe("raced");
-      expect(waits).toBe(1);
-    }),
-  );
-});
+    );
+  }),
+);
 
-test("short pages and a slow consumer preserve order without reading ahead", async () => {
-  const fixture = await Effect.runPromise(make());
-  let reads = 0;
-  const short: Fixture = {
-    ...fixture,
-    store: Store.Service.of({
-      ...fixture.store,
-      read: Effect.fn("TailTest.shortRead")(function* (id, options) {
-        reads++;
-        return yield* fixture.store.read(
-          id,
-          options.after === undefined ? { limit: 1 } : { after: options.after, limit: 1 },
+it.effect("a commit between the empty read and wait registration is not lost", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const payload = yield* Codec.makeForSchema(Schema.String).encode("raced");
+    let inject = true;
+    let waits = 0;
+    const raced: Fixture = {
+      ...fixture,
+      store: Store.Service.of({
+        ...fixture.store,
+        read: Effect.fn("TailTest.racedRead")(function* (id, options) {
+          const batches = yield* fixture.store.read(id, options);
+          if (inject) {
+            inject = false;
+            expect(batches).toHaveLength(0);
+            // Simulate another writer using the host, outside this Log service.
+            yield* fixture.store
+              .transaction(
+                Effect.gen(function* () {
+                  yield* (yield* Store.Transaction).append({ logId: id, entries: [{ payload }] });
+                }),
+              )
+              .pipe(
+                Effect.mapError(
+                  (cause) => new Store.Failure({ operation: "test external append", cause }),
+                ),
+              );
+          }
+          return batches;
+        }),
+        waitForAppend: Effect.fn("TailTest.racedWait")(function* (id, after) {
+          waits++;
+          yield* fixture.store.waitForAppend(id, after);
+        }),
+      }),
+    };
+    yield* run(
+      raced,
+      Effect.gen(function* () {
+        const log = yield* open;
+        const batches = yield* log.tail({ limit: 1 }).pipe(Stream.take(1), Stream.runCollect);
+        expect(batches[0]?.entries[0]?.payload).toBe("raced");
+        expect(waits).toBe(1);
+      }),
+    );
+  }),
+);
+
+it.effect("short pages and a slow consumer preserve order without reading ahead", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    let reads = 0;
+    const short: Fixture = {
+      ...fixture,
+      store: Store.Service.of({
+        ...fixture.store,
+        read: Effect.fn("TailTest.shortRead")(function* (id, options) {
+          reads++;
+          return yield* fixture.store.read(
+            id,
+            options.after === undefined ? { limit: 1 } : { after: options.after, limit: 1 },
+          );
+        }),
+      }),
+    };
+    yield* run(
+      short,
+      Effect.gen(function* () {
+        const log = yield* open;
+        yield* log.append("one");
+        yield* log.append("two");
+        const received = yield* Ref.make<ReadonlyArray<string>>([]);
+        const ready = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const tail = yield* log.tail({ limit: 10 }).pipe(
+          Stream.take(3),
+          Stream.runForEach(
+            Effect.fnUntraced(function* (batch) {
+              yield* Ref.update(received, (values) => [
+                ...values,
+                ...batch.entries.map((entry) => entry.payload),
+              ]);
+              if (batch.position === Log.Position.make(0)) {
+                yield* Deferred.succeed(ready, undefined);
+                yield* Deferred.await(release);
+              }
+            }),
+          ),
+          Effect.forkChild,
         );
+        yield* Deferred.await(ready);
+        yield* log.append("three");
+        expect(reads).toBe(1);
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(tail);
+        expect(yield* Ref.get(received)).toEqual(["one", "two", "three"]);
+        expect(reads).toBe(3);
       }),
-    }),
-  };
-  await run(
-    short,
-    Effect.gen(function* () {
-      const log = yield* open;
-      yield* log.append("one");
-      yield* log.append("two");
-      const received = yield* Ref.make<ReadonlyArray<string>>([]);
-      const ready = yield* Deferred.make<void>();
-      const release = yield* Deferred.make<void>();
-      const tail = yield* log.tail({ limit: 10 }).pipe(
-        Stream.take(3),
-        Stream.runForEach(
-          Effect.fnUntraced(function* (batch) {
-            yield* Ref.update(received, (values) => [
-              ...values,
-              ...batch.entries.map((entry) => entry.payload),
-            ]);
-            if (batch.position === Log.Position.make(0)) {
-              yield* Deferred.succeed(ready, undefined);
-              yield* Deferred.await(release);
-            }
-          }),
-        ),
-        Effect.forkChild,
-      );
-      yield* Deferred.await(ready);
-      yield* log.append("three");
-      expect(reads).toBe(1);
-      yield* Deferred.succeed(release, undefined);
-      yield* Fiber.join(tail);
-      expect(yield* Ref.get(received)).toEqual(["one", "two", "three"]);
-      expect(reads).toBe(3);
-    }),
-  );
-});
-
+    );
+  }),
+);
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
   version: 1,
@@ -187,215 +187,226 @@ const projection = Projection.make("counter", { version: 1 }).on(
   }),
 );
 const domain = Journal.make({ logId: Log.Id.make("domain"), projections: [projection] });
-
-test("journal tails expose complete batches only after projection and cross-log writes commit", async () => {
-  const fixture = await Effect.runPromise(make());
-  const ready = await Effect.runPromise(Deferred.make<void>());
-  await run(
-    observeWait(fixture, ready),
+it.effect(
+  "journal tails expose complete batches only after projection and cross-log writes commit",
+  () =>
     Effect.gen(function* () {
-      const journal = yield* domain;
-      const turn = yield* open;
-      const staged = yield* Deferred.make<void>();
-      const release = yield* Deferred.make<void>();
-      const seen = yield* Ref.make(false);
-      const tail = yield* journal.log.tail({ limit: 1 }).pipe(
-        Stream.take(1),
-        Stream.mapEffect((batch) =>
-          Ref.set(seen, true).pipe(
-            Effect.andThen(
+      const fixture = yield* make();
+      const ready = yield* Deferred.make<void>();
+      yield* run(
+        observeWait(fixture, ready),
+        Effect.gen(function* () {
+          const journal = yield* domain;
+          const turn = yield* open;
+          const staged = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          const seen = yield* Ref.make(false);
+          const tail = yield* journal.log.tail({ limit: 1 }).pipe(
+            Stream.take(1),
+            Stream.mapEffect((batch) =>
+              Ref.set(seen, true).pipe(
+                Effect.andThen(
+                  Effect.gen(function* () {
+                    expect(yield* fixture.counter.get).toBe(3);
+                    return batch;
+                  }),
+                ),
+              ),
+            ),
+            Stream.runCollect,
+            Effect.forkChild,
+          );
+          yield* Deferred.await(ready);
+          const writer = yield* journal
+            .commit(
               Effect.gen(function* () {
-                expect(yield* fixture.counter.get).toBe(3);
-                return batch;
+                yield* journal.publish(Changed, 1);
+                yield* turn.append("execution detail");
+                yield* journal.publish(Changed, 2);
+                yield* Deferred.succeed(staged, undefined);
+                yield* Deferred.await(release);
+              }),
+            )
+            .pipe(Effect.forkChild);
+          yield* Deferred.await(staged);
+          expect(yield* Ref.get(seen)).toBe(false);
+          expect(yield* fixture.counter.get).toBe(0);
+          yield* Deferred.succeed(release, undefined);
+          yield* Fiber.join(writer);
+          const batches = yield* Fiber.join(tail);
+          expect(batches).toHaveLength(1);
+          expect(batches[0]?.entries.map((entry) => entry.index)).toEqual([0, 1]);
+          expect(batches[0]?.commit.entryCount).toBe(3);
+          expect((yield* turn.read({ limit: 1 }))[0]?.commit.id).toBe(batches[0]?.commit.id);
+        }),
+      );
+    }),
+);
+
+it.effect("tails ignore rolled-back appends and observe commits with lost acknowledgments", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const ready = yield* Deferred.make<void>();
+    yield* run(
+      observeWait(fixture, ready),
+      Effect.gen(function* () {
+        const journal = yield* domain;
+        const tail = yield* journal.log
+          .tail({ limit: 1 })
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        yield* Deferred.await(ready);
+        expect(
+          yield* Effect.flip(
+            journal.commit(
+              Effect.gen(function* () {
+                yield* journal.publish(Changed, 99);
+                return yield* Effect.fail("rollback");
               }),
             ),
           ),
-        ),
-        Stream.runCollect,
-        Effect.forkChild,
-      );
-      yield* Deferred.await(ready);
-      const writer = yield* journal
-        .commit(
-          Effect.gen(function* () {
-            yield* journal.publish(Changed, 1);
-            yield* turn.append("execution detail");
-            yield* journal.publish(Changed, 2);
-            yield* Deferred.succeed(staged, undefined);
-            yield* Deferred.await(release);
-          }),
-        )
-        .pipe(Effect.forkChild);
-      yield* Deferred.await(staged);
-      expect(yield* Ref.get(seen)).toBe(false);
-      expect(yield* fixture.counter.get).toBe(0);
-      yield* Deferred.succeed(release, undefined);
-      yield* Fiber.join(writer);
-      const batches = yield* Fiber.join(tail);
-      expect(batches).toHaveLength(1);
-      expect(batches[0]?.entries.map((entry) => entry.index)).toEqual([0, 1]);
-      expect(batches[0]?.commit.entryCount).toBe(3);
-      expect((yield* turn.read({ limit: 1 }))[0]?.commit.id).toBe(batches[0]?.commit.id);
-    }),
-  );
-});
+        ).toBe("rollback");
+        yield* fixture.loseNextAcknowledgment;
+        expect((yield* Effect.flip(journal.publish(Changed, 1)))._tag).toBe(
+          "JournalStore.CommitUncertain",
+        );
+        const batches = yield* Fiber.join(tail);
+        const entry = batches[0]?.entries[0];
+        if (entry === undefined) throw new Error("Missing committed event");
+        expect((yield* Journal.decode(Changed, entry)).payload).toBe(1);
+        expect(yield* fixture.counter.get).toBe(1);
+      }),
+    );
+  }),
+);
 
-test("tails ignore rolled-back appends and observe commits with lost acknowledgments", async () => {
-  const fixture = await Effect.runPromise(make());
-  const ready = await Effect.runPromise(Deferred.make<void>());
-  await run(
-    observeWait(fixture, ready),
-    Effect.gen(function* () {
-      const journal = yield* domain;
-      const tail = yield* journal.log
-        .tail({ limit: 1 })
-        .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
-      yield* Deferred.await(ready);
-      expect(
-        yield* Effect.flip(
-          journal.commit(
+it.effect("consumers wait independently and interruption releases the host wait", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const ready = yield* Deferred.make<void>();
+    let active = 0;
+    const watched: Fixture = {
+      ...fixture,
+      store: Store.Service.of({
+        ...fixture.store,
+        waitForAppend: (id, after) =>
+          Effect.acquireUseRelease(
+            Effect.sync(() => ++active),
+            (count) =>
+              Effect.gen(function* () {
+                if (count === 2) yield* Deferred.succeed(ready, undefined);
+                yield* fixture.store.waitForAppend(id, after);
+              }),
+            () =>
+              Effect.sync(() => {
+                active--;
+              }),
+          ),
+      }),
+    };
+    yield* run(
+      watched,
+      Effect.gen(function* () {
+        const log = yield* open;
+        const first = yield* log
+          .tail({ limit: 1 })
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        const second = yield* log
+          .tail({ limit: 1 })
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
+        yield* Deferred.await(ready);
+        yield* Fiber.interrupt(first);
+        expect(active).toBe(1);
+        const other = (yield* Log.Service).open({
+          id: Log.Id.make("unrelated"),
+          schema: Schema.String,
+        });
+        yield* other.append("ignore");
+        yield* log.append("keep");
+        const batches = yield* Fiber.join(second);
+        expect(batches[0]?.entries[0]?.payload).toBe("keep");
+        expect(active).toBe(0);
+        const resumed = yield* log.tail({ limit: 1 }).pipe(Stream.take(1), Stream.runCollect);
+        expect(resumed).toEqual(batches);
+        expect(active).toBe(0);
+      }),
+    );
+  }),
+);
+
+it.effect("spurious wakeups re-read storage and failures terminate the tail unchanged", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const failure = new Store.Failure({ operation: "waitForAppend", cause: "connection lost" });
+    let waits = 0;
+    let reads = 0;
+    const broken: Fixture = {
+      ...fixture,
+      store: Store.Service.of({
+        ...fixture.store,
+        read: (id, options) =>
+          Effect.sync(() => {
+            reads++;
+          }).pipe(Effect.andThen(fixture.store.read(id, options))),
+        waitForAppend: () =>
+          Effect.suspend(() => (++waits === 1 ? Effect.void : Effect.fail(failure))),
+      }),
+    };
+    yield* run(
+      broken,
+      Effect.gen(function* () {
+        const log = yield* open;
+        expect(yield* Effect.flip(Stream.runDrain(log.tail({ limit: 1 })))).toBe(failure);
+        expect(reads).toBe(2);
+        expect(waits).toBe(2);
+        expect((yield* Effect.flip(Stream.runDrain(log.tail({ limit: 0 }))))._tag).toBe(
+          "SchemaError",
+        );
+        expect(reads).toBe(2);
+        expect(waits).toBe(2);
+      }),
+    );
+  }),
+);
+
+it.effect("tail consumption inside a transaction is rejected before reading or waiting", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    let reads = 0;
+    const watched: Fixture = {
+      ...fixture,
+      store: Store.Service.of({
+        ...fixture.store,
+        read: (id, options) =>
+          Effect.sync(() => {
+            reads++;
+          }).pipe(Effect.andThen(fixture.store.read(id, options))),
+        waitForAppend: () => Effect.die("Must not wait inside a transaction"),
+      }),
+    };
+    yield* run(
+      watched,
+      Effect.gen(function* () {
+        const logs = yield* Log.Service;
+        const log = yield* open;
+        const tail = log.tail({ limit: 1 });
+        const failure = yield* Effect.flip(
+          logs.commit(
             Effect.gen(function* () {
-              yield* journal.publish(Changed, 99);
-              return yield* Effect.fail("rollback");
+              yield* log.append("staged");
+              yield* Stream.runDrain(tail);
             }),
           ),
-        ),
-      ).toBe("rollback");
-      yield* fixture.loseNextAcknowledgment;
-      expect((yield* Effect.flip(journal.publish(Changed, 1)))._tag).toBe(
-        "JournalStore.CommitUncertain",
-      );
-      const batches = yield* Fiber.join(tail);
-      const entry = batches[0]?.entries[0];
-      if (entry === undefined) throw new Error("Missing committed event");
-      expect((yield* Journal.decode(Changed, entry)).payload).toBe(1);
-      expect(yield* fixture.counter.get).toBe(1);
-    }),
-  );
-});
-
-test("consumers wait independently and interruption releases the host wait", async () => {
-  const fixture = await Effect.runPromise(make());
-  const ready = await Effect.runPromise(Deferred.make<void>());
-  let active = 0;
-  const watched: Fixture = {
-    ...fixture,
-    store: Store.Service.of({
-      ...fixture.store,
-      waitForAppend: (id, after) =>
-        Effect.acquireUseRelease(
-          Effect.sync(() => ++active),
-          (count) =>
-            Effect.gen(function* () {
-              if (count === 2) yield* Deferred.succeed(ready, undefined);
-              yield* fixture.store.waitForAppend(id, after);
-            }),
-          () =>
-            Effect.sync(() => {
-              active--;
-            }),
-        ),
-    }),
-  };
-  await run(
-    watched,
-    Effect.gen(function* () {
-      const log = yield* open;
-      const first = yield* log
-        .tail({ limit: 1 })
-        .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
-      const second = yield* log
-        .tail({ limit: 1 })
-        .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
-      yield* Deferred.await(ready);
-      yield* Fiber.interrupt(first);
-      expect(active).toBe(1);
-      const other = (yield* Log.Service).open({
-        id: Log.Id.make("unrelated"),
-        schema: Schema.String,
-      });
-      yield* other.append("ignore");
-      yield* log.append("keep");
-      const batches = yield* Fiber.join(second);
-      expect(batches[0]?.entries[0]?.payload).toBe("keep");
-      expect(active).toBe(0);
-      const resumed = yield* log.tail({ limit: 1 }).pipe(Stream.take(1), Stream.runCollect);
-      expect(resumed).toEqual(batches);
-      expect(active).toBe(0);
-    }),
-  );
-});
-
-test("spurious wakeups re-read storage and failures terminate the tail unchanged", async () => {
-  const fixture = await Effect.runPromise(make());
-  const failure = new Store.Failure({ operation: "waitForAppend", cause: "connection lost" });
-  let waits = 0;
-  let reads = 0;
-  const broken: Fixture = {
-    ...fixture,
-    store: Store.Service.of({
-      ...fixture.store,
-      read: (id, options) =>
-        Effect.sync(() => {
-          reads++;
-        }).pipe(Effect.andThen(fixture.store.read(id, options))),
-      waitForAppend: () =>
-        Effect.suspend(() => (++waits === 1 ? Effect.void : Effect.fail(failure))),
-    }),
-  };
-  await run(
-    broken,
-    Effect.gen(function* () {
-      const log = yield* open;
-      expect(yield* Effect.flip(Stream.runDrain(log.tail({ limit: 1 })))).toBe(failure);
-      expect(reads).toBe(2);
-      expect(waits).toBe(2);
-      expect((yield* Effect.flip(Stream.runDrain(log.tail({ limit: 0 }))))._tag).toBe(
-        "SchemaError",
-      );
-      expect(reads).toBe(2);
-      expect(waits).toBe(2);
-    }),
-  );
-});
-
-test("tail consumption inside a transaction is rejected before reading or waiting", async () => {
-  const fixture = await Effect.runPromise(make());
-  let reads = 0;
-  const watched: Fixture = {
-    ...fixture,
-    store: Store.Service.of({
-      ...fixture.store,
-      read: (id, options) =>
-        Effect.sync(() => {
-          reads++;
-        }).pipe(Effect.andThen(fixture.store.read(id, options))),
-      waitForAppend: () => Effect.die("Must not wait inside a transaction"),
-    }),
-  };
-  await run(
-    watched,
-    Effect.gen(function* () {
-      const logs = yield* Log.Service;
-      const log = yield* open;
-      const tail = log.tail({ limit: 1 });
-      const failure = yield* Effect.flip(
-        logs.commit(
-          Effect.gen(function* () {
-            yield* log.append("staged");
-            yield* Stream.runDrain(tail);
-          }),
-        ),
-      );
-      expect(failure._tag).toBe("Log.TailInTransaction");
-      expect(reads).toBe(0);
-      expect((yield* fixture.snapshot).logs.size).toBe(0);
-      // Creating a tail is lazy; only the context in which it is consumed matters.
-      const created = yield* logs.commit(Effect.succeed(log.tail({ limit: 1 })));
-      yield* log.append("committed");
-      const batches = yield* created.pipe(Stream.take(1), Stream.runCollect);
-      expect(batches[0]?.entries[0]?.payload).toBe("committed");
-      expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
-    }),
-  );
-});
+        );
+        expect(failure._tag).toBe("Log.TailInTransaction");
+        expect(reads).toBe(0);
+        expect((yield* fixture.snapshot).logs.size).toBe(0);
+        // Creating a tail is lazy; only the context in which it is consumed matters.
+        const created = yield* logs.commit(Effect.succeed(log.tail({ limit: 1 })));
+        yield* log.append("committed");
+        const batches = yield* created.pipe(Stream.take(1), Stream.runCollect);
+        expect(batches[0]?.entries[0]?.payload).toBe("committed");
+        expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
+      }),
+    );
+  }),
+);

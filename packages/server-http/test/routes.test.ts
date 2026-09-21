@@ -1,5 +1,5 @@
 import { BuiltinRoles } from "@amends/core/authorization";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Api, Authentication } from "@amends/api-http";
 import type * as Core from "@amends/core";
 import { Authorization, Requirement, Target } from "@amends/core/authorization";
@@ -184,10 +184,8 @@ const run = <A, E>(
   token: string,
   program: (client: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>,
 ) =>
-  Effect.runPromise(
-    Effect.scoped(Effect.flatMap(makeClient, program)).pipe(
-      Effect.provide(Layer.mergeAll(services, asToken(token))),
-    ),
+  Effect.scoped(Effect.flatMap(makeClient, program)).pipe(
+    Effect.provide(Layer.mergeAll(services, asToken(token))),
   );
 const makeClient = HttpApiTest.groups(Api, [
   "session",
@@ -197,208 +195,227 @@ const makeClient = HttpApiTest.groups(Api, [
   "invitations",
   "notifications",
 ]);
-
-test("notification queries decode cursors and select the requested application read", async () => {
-  calls.length = 0;
-  const after = { recordedAt: notification.recordedAt, id: Notification.Id.make("a + & é") };
-  const pages = await run("alice", (client) =>
-    Effect.gen(function* () {
-      const first = yield* client.notifications.list({
-        params: { workspaceId },
-        query: { limit: 1 },
-      });
-      const next = yield* client.notifications.list({
-        params: { workspaceId },
-        query: { limit: 2, after, pendingOnly: true },
-      });
-      yield* client.notifications.list({
-        params: { workspaceId },
-        query: { limit: 3, pendingOnly: false },
-      });
-      return [first, next];
-    }),
-  );
-  expect(pages).toEqual([[notification], [notification]]);
-  expect(calls).toEqual([
-    { operation: "asMember", arguments: [workspaceId, alice] },
-    { operation: "notification.list", arguments: [{ limit: 1 }] },
-    { operation: "asMember", arguments: [workspaceId, alice] },
-    { operation: "notification.listPending", arguments: [{ limit: 2, after }] },
-    { operation: "asMember", arguments: [workspaceId, alice] },
-    { operation: "notification.list", arguments: [{ limit: 3 }] },
-  ]);
-});
-
-test("individual notification reads encode records and expose a typed 404", async () => {
-  const found = await run("alice", (client) =>
-    client.notifications.get({
-      params: { workspaceId, notificationId: notification.id },
-    }),
-  );
-  expect(found).toEqual(notification);
-  const missing = await run("alice", (client) =>
-    client.notifications
-      .get({
-        params: { workspaceId, notificationId: Notification.Id.make("missing") },
-      })
-      .pipe(Effect.flip),
-  );
-  expect(missing).toMatchObject({
-    _tag: "NotificationApplication.NotFound",
-    workspaceId,
-    notificationId: "missing",
-  });
-});
-
-test("member reads pass the bearer principal and path parameters to the gateway", async () => {
-  calls.length = 0;
-  const fetched = await run("alice", (client) =>
-    client.members.get({ params: { workspaceId, memberId } }),
-  );
-  expect(fetched).toEqual(member);
-  expect(calls).toEqual([
-    { operation: "asMember", arguments: [workspaceId, alice] },
-    { operation: "get", arguments: [memberId] },
-  ]);
-});
-
-test("domain outcomes keep their tags and statuses", async () => {
-  const missing = await run("alice", (client) =>
-    client.members
-      .get({ params: { workspaceId, memberId: Member.Id.make("missing") } })
-      .pipe(Effect.flip),
-  );
-  expect(missing).toMatchObject({ _tag: "MemberApplication.NotFound", memberId: "missing" });
-  const notMember = await run("bob", (client) =>
-    client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
-  );
-  expect(notMember).toMatchObject({ _tag: "Gateway.NotMember", workspaceId });
-  const forbidden = await run("alice", (client) =>
-    client.members
-      .remove({ params: { workspaceId, memberId }, responseMode: "decoded-and-response" })
-      .pipe(Effect.flip),
-  );
-  expect(forbidden).toMatchObject({
-    _tag: "Authorization.Denied",
-    requirement: { permission: { name: "member.read" } },
-  });
-  const statuses = await run("alice", (client) =>
-    Effect.all([
-      client.members.get({ params: { workspaceId, memberId }, responseMode: "response-only" }),
-      client.members.get({
-        params: { workspaceId, memberId: Member.Id.make("missing") },
-        responseMode: "response-only",
+it.effect("notification queries decode cursors and select the requested application read", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const after = { recordedAt: notification.recordedAt, id: Notification.Id.make("a + & é") };
+    const pages = yield* run("alice", (client) =>
+      Effect.gen(function* () {
+        const first = yield* client.notifications.list({
+          params: { workspaceId },
+          query: { limit: 1 },
+        });
+        const next = yield* client.notifications.list({
+          params: { workspaceId },
+          query: { limit: 2, after, pendingOnly: true },
+        });
+        yield* client.notifications.list({
+          params: { workspaceId },
+          query: { limit: 3, pendingOnly: false },
+        });
+        return [first, next];
       }),
-      client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
-      client.workspaces.create({
-        payload: { name: "Test workspace" },
-        responseMode: "response-only",
+    );
+    expect(pages).toEqual([[notification], [notification]]);
+    expect(calls).toEqual([
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "notification.list", arguments: [{ limit: 1 }] },
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "notification.listPending", arguments: [{ limit: 2, after }] },
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "notification.list", arguments: [{ limit: 3 }] },
+    ]);
+  }),
+);
+
+it.effect("individual notification reads encode records and expose a typed 404", () =>
+  Effect.gen(function* () {
+    const found = yield* run("alice", (client) =>
+      client.notifications.get({
+        params: { workspaceId, notificationId: notification.id },
       }),
-    ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
-  );
-  expect(statuses).toEqual([200, 404, 403, 201]);
-});
+    );
+    expect(found).toEqual(notification);
+    const missing = yield* run("alice", (client) =>
+      client.notifications
+        .get({
+          params: { workspaceId, notificationId: Notification.Id.make("missing") },
+        })
+        .pipe(Effect.flip),
+    );
+    expect(missing).toMatchObject({
+      _tag: "NotificationApplication.NotFound",
+      workspaceId,
+      notificationId: "missing",
+    });
+  }),
+);
 
-test("missing or rejected credentials are unauthorized before any gateway call", async () => {
-  calls.length = 0;
-  const rejected = await run("invalid", (client) =>
-    client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
-  );
-  expect(rejected).toMatchObject({ _tag: "Api.Unauthorized" });
-  expect(calls).toEqual([]);
-});
+it.effect("member reads pass the bearer principal and path parameters to the gateway", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const fetched = yield* run("alice", (client) =>
+      client.members.get({ params: { workspaceId, memberId } }),
+    );
+    expect(fetched).toEqual(member);
+    expect(calls).toEqual([
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "get", arguments: [memberId] },
+    ]);
+  }),
+);
 
-test("workspace creation and acceptance require a human principal", async () => {
-  calls.length = 0;
-  const created = await run("alice", (client) =>
-    client.workspaces.create({ payload: { name: "Test workspace" } }),
-  );
-  expect(created).toEqual(workspace);
-  const refused = await run("agent", (client) =>
-    client.workspaces.create({ payload: { name: "Test workspace" } }).pipe(Effect.flip),
-  );
-  expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
-  const accepted = await run("alice", (client) =>
-    client.invitations.accept({
-      params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
-    }),
-  );
-  expect(accepted).toEqual(member);
-  expect(calls).toEqual([
-    { operation: "createWorkspace", arguments: [alice.id, { name: "Test workspace" }] },
-    { operation: "inWorkspace", arguments: [workspaceId] },
-    { operation: "accept", arguments: ["invitation-one", alice.id] },
-  ]);
-});
+it.effect("domain outcomes keep their tags and statuses", () =>
+  Effect.gen(function* () {
+    const missing = yield* run("alice", (client) =>
+      client.members
+        .get({ params: { workspaceId, memberId: Member.Id.make("missing") } })
+        .pipe(Effect.flip),
+    );
+    expect(missing).toMatchObject({ _tag: "MemberApplication.NotFound", memberId: "missing" });
+    const notMember = yield* run("bob", (client) =>
+      client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
+    );
+    expect(notMember).toMatchObject({ _tag: "Gateway.NotMember", workspaceId });
+    const forbidden = yield* run("alice", (client) =>
+      client.members
+        .remove({ params: { workspaceId, memberId }, responseMode: "decoded-and-response" })
+        .pipe(Effect.flip),
+    );
+    expect(forbidden).toMatchObject({
+      _tag: "Authorization.Denied",
+      requirement: { permission: { name: "member.read" } },
+    });
+    const statuses = yield* run("alice", (client) =>
+      Effect.all([
+        client.members.get({ params: { workspaceId, memberId }, responseMode: "response-only" }),
+        client.members.get({
+          params: { workspaceId, memberId: Member.Id.make("missing") },
+          responseMode: "response-only",
+        }),
+        client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
+        client.workspaces.create({
+          payload: { name: "Test workspace" },
+          responseMode: "response-only",
+        }),
+      ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
+    );
+    expect(statuses).toEqual([200, 404, 403, 201]);
+  }),
+);
 
-test("invitation payloads round-trip dates and roles through JSON", async () => {
-  calls.length = 0;
-  const expiresAt = DateTime.makeUnsafe("2026-02-01T00:00:00Z");
-  const issued = await run("alice", (client) =>
-    client.invitations.issue({
-      params: { workspaceId },
-      payload: {
-        recipientId: Identity.HumanId.make("bob"),
-        expiresAt,
-        roleId: BuiltinRoles.ViewerId,
-      },
-    }),
-  );
-  expect(issued.details.recipientId).toBe(Identity.HumanId.make("bob"));
-  expect(DateTime.toEpochMillis(issued.details.expiresAt)).toBe(DateTime.toEpochMillis(expiresAt));
-  expect(issued.state).toEqual({ _tag: "Pending" });
-  expect(calls[1]).toMatchObject({
-    operation: "issue",
-    arguments: [
-      {
-        recipientId: "bob",
-        roleId: BuiltinRoles.ViewerId,
-      },
-    ],
-  });
-});
+it.effect("missing or rejected credentials are unauthorized before any gateway call", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const rejected = yield* run("invalid", (client) =>
+      client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
+    );
+    expect(rejected).toMatchObject({ _tag: "Api.Unauthorized" });
+    expect(calls).toEqual([]);
+  }),
+);
 
-test("sign-in needs no credential, and the directory answers for the principal", async () => {
-  calls.length = 0;
-  const email = "jo@mercier.co";
-  const outcome = await run("", (client) =>
-    Effect.gen(function* () {
-      yield* client.session.start({ payload: { email } });
-      const rejected = yield* Effect.flip(
-        client.session.complete({ payload: { email, code: "000000" } }),
-      );
-      const session = yield* client.session.complete({ payload: { email, code: "419270" } });
-      const malformed = yield* Effect.flip(
-        client.session.start({ payload: { email: "not-an-address" } }),
-      );
-      return { rejected, session, malformed };
-    }),
-  );
-  expect(outcome.rejected).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
-  expect(outcome.session).toEqual({ token: email, humanId: Identity.HumanId.make(email) });
-  // The client rejects a malformed address before any request is sent.
-  expect(outcome.malformed._tag).toBe("SchemaError");
-  expect(calls.map((call) => call.operation)).toEqual(["start", "complete", "complete"]);
-  calls.length = 0;
-  const listing = await run("alice", (client) => client.me.workspaces());
-  expect(listing.memberships).toHaveLength(1);
-  expect(calls).toEqual([{ operation: "list", arguments: [alice] }]);
-});
+it.effect("workspace creation and acceptance require a human principal", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const created = yield* run("alice", (client) =>
+      client.workspaces.create({ payload: { name: "Test workspace" } }),
+    );
+    expect(created).toEqual(workspace);
+    const refused = yield* run("agent", (client) =>
+      client.workspaces.create({ payload: { name: "Test workspace" } }).pipe(Effect.flip),
+    );
+    expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
+    const accepted = yield* run("alice", (client) =>
+      client.invitations.accept({
+        params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
+      }),
+    );
+    expect(accepted).toEqual(member);
+    expect(calls).toEqual([
+      { operation: "createWorkspace", arguments: [alice.id, { name: "Test workspace" }] },
+      { operation: "inWorkspace", arguments: [workspaceId] },
+      { operation: "accept", arguments: ["invitation-one", alice.id] },
+    ]);
+  }),
+);
 
-test("session and directory responses retain their existing JSON field names", async () => {
-  const session = await run("", (client) =>
-    client.session
-      .complete({
-        payload: { email: "jo@mercier.co", code: "419270" },
-        responseMode: "response-only",
-      })
-      .pipe(Effect.flatMap((response) => response.json)),
-  );
-  expect(session).toEqual({ token: "jo@mercier.co", identity: "jo@mercier.co" });
-  const directory = await run("alice", (client) =>
-    client.me
-      .workspaces({ responseMode: "response-only" })
-      .pipe(Effect.flatMap((response) => response.json)),
-  );
-  expect(directory).toEqual({ memberships: [{ workspace, member, people: 1 }], invitations: [] });
-});
+it.effect("invitation payloads round-trip dates and roles through JSON", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const expiresAt = DateTime.makeUnsafe("2026-02-01T00:00:00Z");
+    const issued = yield* run("alice", (client) =>
+      client.invitations.issue({
+        params: { workspaceId },
+        payload: {
+          recipientId: Identity.HumanId.make("bob"),
+          expiresAt,
+          roleId: BuiltinRoles.ViewerId,
+        },
+      }),
+    );
+    expect(issued.details.recipientId).toBe(Identity.HumanId.make("bob"));
+    expect(DateTime.toEpochMillis(issued.details.expiresAt)).toBe(
+      DateTime.toEpochMillis(expiresAt),
+    );
+    expect(issued.state).toEqual({ _tag: "Pending" });
+    expect(calls[1]).toMatchObject({
+      operation: "issue",
+      arguments: [
+        {
+          recipientId: "bob",
+          roleId: BuiltinRoles.ViewerId,
+        },
+      ],
+    });
+  }),
+);
+
+it.effect("sign-in needs no credential, and the directory answers for the principal", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const email = "jo@mercier.co";
+    const outcome = yield* run("", (client) =>
+      Effect.gen(function* () {
+        yield* client.session.start({ payload: { email } });
+        const rejected = yield* Effect.flip(
+          client.session.complete({ payload: { email, code: "000000" } }),
+        );
+        const session = yield* client.session.complete({ payload: { email, code: "419270" } });
+        const malformed = yield* Effect.flip(
+          client.session.start({ payload: { email: "not-an-address" } }),
+        );
+        return { rejected, session, malformed };
+      }),
+    );
+    expect(outcome.rejected).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
+    expect(outcome.session).toEqual({ token: email, humanId: Identity.HumanId.make(email) });
+    // The client rejects a malformed address before any request is sent.
+    expect(outcome.malformed._tag).toBe("SchemaError");
+    expect(calls.map((call) => call.operation)).toEqual(["start", "complete", "complete"]);
+    calls.length = 0;
+    const listing = yield* run("alice", (client) => client.me.workspaces());
+    expect(listing.memberships).toHaveLength(1);
+    expect(calls).toEqual([{ operation: "list", arguments: [alice] }]);
+  }),
+);
+
+it.effect("session and directory responses retain their existing JSON field names", () =>
+  Effect.gen(function* () {
+    const session = yield* run("", (client) =>
+      client.session
+        .complete({
+          payload: { email: "jo@mercier.co", code: "419270" },
+          responseMode: "response-only",
+        })
+        .pipe(Effect.flatMap((response) => response.json)),
+    );
+    expect(session).toEqual({ token: "jo@mercier.co", identity: "jo@mercier.co" });
+    const directory = yield* run("alice", (client) =>
+      client.me
+        .workspaces({ responseMode: "response-only" })
+        .pipe(Effect.flatMap((response) => response.json)),
+    );
+    expect(directory).toEqual({ memberships: [{ workspace, member, people: 1 }], invitations: [] });
+  }),
+);

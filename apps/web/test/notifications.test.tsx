@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-li
 import { DateTime, Effect, Schema } from "effect";
 import { AtomRegistry, Reactivity } from "effect/unstable/reactivity";
 import { Show } from "solid-js";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "@effect/vitest";
 import { ApiClient } from "../src/api/client.ts";
 import { useQuery } from "../src/api/hooks.ts";
 import { keys } from "../src/api/keys.ts";
@@ -58,115 +58,126 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("shares equivalent page requests and separates workspace, cursor, filter and page size", async () => {
-  const delayed = Promise.withResolvers<Response>();
-  transport.mockImplementation((input, init) => {
-    const request = requestOf(input, init);
-    const url = new URL(request.url);
-    expect(request.headers.get("authorization")).toBe("Bearer credential-a");
-    return url.pathname.includes("workspace-a") &&
-      url.searchParams.get("limit") === "2" &&
-      url.searchParams.get("pendingOnly") === "false" &&
-      !url.searchParams.has("after")
-      ? delayed.promise
-      : Promise.resolve(response([encode(saved)]));
-  });
-  const store = registry();
-  const first = Notifications.list(workspaceId, { limit: 2 });
-  const equivalent = Notifications.list(workspaceId, { limit: 2, pendingOnly: false });
-  const next = Notifications.list(workspaceId, { limit: 2, after: saved });
-  expect(
-    Notifications.list(workspaceId, {
-      limit: 2,
-      after: { id: saved.id, recordedAt: DateTime.makeUnsafe("2026-09-19T12:00:00.123Z") },
+it.effect(
+  "shares equivalent page requests and separates workspace, cursor, filter and page size",
+  () =>
+    Effect.gen(function* () {
+      const delayed = Promise.withResolvers<Response>();
+      transport.mockImplementation((input, init) => {
+        const request = requestOf(input, init);
+        const url = new URL(request.url);
+        expect(request.headers.get("authorization")).toBe("Bearer credential-a");
+        return url.pathname.includes("workspace-a") &&
+          url.searchParams.get("limit") === "2" &&
+          url.searchParams.get("pendingOnly") === "false" &&
+          !url.searchParams.has("after")
+          ? delayed.promise
+          : Promise.resolve(response([encode(saved)]));
+      });
+      const store = registry();
+      const first = Notifications.list(workspaceId, { limit: 2 });
+      const equivalent = Notifications.list(workspaceId, { limit: 2, pendingOnly: false });
+      const next = Notifications.list(workspaceId, { limit: 2, after: saved });
+      expect(
+        Notifications.list(workspaceId, {
+          limit: 2,
+          after: { id: saved.id, recordedAt: DateTime.makeUnsafe("2026-09-19T12:00:00.123Z") },
+        }),
+      ).toBe(next);
+      expect(equivalent).toBe(first);
+      const queries = [
+        first,
+        equivalent,
+        next,
+        Notifications.list(workspaceId, { limit: 2, pendingOnly: true }),
+        Notifications.list(workspaceId, { limit: 1 }),
+        Notifications.list(otherWorkspaceId, { limit: 2 }),
+      ];
+      queries.forEach((query) => store.mount(query));
+      yield* Effect.promise(() => waitFor(() => expect(transport).toHaveBeenCalledTimes(5)));
+      const cursorRequest = transport.mock.calls
+        .map(([input, init]) => new URL(requestOf(input, init).url))
+        .find((url) => url.searchParams.has("after"));
+      expect(JSON.parse(cursorRequest?.searchParams.get("after") ?? "null")).toEqual({
+        recordedAt: "2026-09-19T12:00:00.123Z",
+        id: saved.id,
+      });
+      delayed.resolve(response([encode(saved)]));
+      expect(yield* AtomRegistry.getResult(store, first)).toEqual([saved]);
     }),
-  ).toBe(next);
-  expect(equivalent).toBe(first);
-  const queries = [
-    first,
-    equivalent,
-    next,
-    Notifications.list(workspaceId, { limit: 2, pendingOnly: true }),
-    Notifications.list(workspaceId, { limit: 1 }),
-    Notifications.list(otherWorkspaceId, { limit: 2 }),
-  ];
-  queries.forEach((query) => store.mount(query));
-  await waitFor(() => expect(transport).toHaveBeenCalledTimes(5));
-  const cursorRequest = transport.mock.calls
-    .map(([input, init]) => new URL(requestOf(input, init).url))
-    .find((url) => url.searchParams.has("after"));
-  expect(JSON.parse(cursorRequest?.searchParams.get("after") ?? "null")).toEqual({
-    recordedAt: "2026-09-19T12:00:00.123Z",
-    id: saved.id,
-  });
-  delayed.resolve(response([encode(saved)]));
-  expect(await Effect.runPromise(AtomRegistry.getResult(store, first))).toEqual([saved]);
-});
+);
 
-it("invalidates inbox pages and individual records only in the selected workspace and session", async () => {
-  const reads = new Map<string, number>();
-  const requestKey = (request: Request) => `${request.headers.get("authorization")} ${request.url}`;
-  transport.mockImplementation(async (input, init) => {
-    const request = requestOf(input, init);
-    const key = requestKey(request);
-    reads.set(key, (reads.get(key) ?? 0) + 1);
-    return response(
-      new URL(request.url).pathname.endsWith("/notification") ? encode(saved) : [encode(saved)],
-    );
-  });
-  const store = registry();
-  const otherSession = registry(nextSession);
-  const pages = [
-    Notifications.list(workspaceId, { limit: 10 }),
-    Notifications.list(workspaceId, { limit: 10, pendingOnly: true }),
-    Notifications.list(workspaceId, { limit: 10, after: saved }),
-  ] as const;
-  const detail = Notifications.get(workspaceId, saved.id);
-  const otherWorkspace = Notifications.list(otherWorkspaceId, { limit: 10 });
-  pages.forEach((query) => store.mount(query));
-  store.mount(detail);
-  store.mount(otherWorkspace);
-  otherSession.mount(pages[0]);
-  await waitFor(() => expect(reads.size).toBe(6));
-  const invalidate = ApiClient.runtime.fn((changed: ReadonlyArray<string>) =>
-    Reactivity.invalidate(changed),
-  );
-  store.mount(invalidate);
-  const refresh = async (key: string) => {
-    store.set(invalidate, [key]);
-    await Effect.runPromise(AtomRegistry.getResult(store, invalidate, { suspendOnWaiting: true }));
-  };
-  await refresh(keys.notifications.list(workspaceId));
-  await waitFor(() => expect(transport).toHaveBeenCalledTimes(9));
-  for (const [key, count] of reads) {
-    expect(count).toBe(
-      key.startsWith("Bearer credential-a") && key.includes("workspace-a/") && key.includes("?")
-        ? 2
-        : 1,
-    );
-  }
-  await refresh(keys.notifications.get(workspaceId, saved.id));
-  await waitFor(() => expect(transport).toHaveBeenCalledTimes(10));
-  await refresh(keys.notifications.all(workspaceId));
-  await waitFor(() => expect(transport).toHaveBeenCalledTimes(14));
-  for (const [key, count] of reads) {
-    expect(count).toBe(
-      key.startsWith("Bearer credential-a") && key.includes("workspace-a/") ? 3 : 1,
-    );
-  }
-});
+it.effect(
+  "invalidates inbox pages and individual records only in the selected workspace and session",
+  () =>
+    Effect.gen(function* () {
+      const reads = new Map<string, number>();
+      const requestKey = (request: Request) =>
+        `${request.headers.get("authorization")} ${request.url}`;
+      transport.mockImplementation(async (input, init) => {
+        const request = requestOf(input, init);
+        const key = requestKey(request);
+        reads.set(key, (reads.get(key) ?? 0) + 1);
+        return response(
+          new URL(request.url).pathname.endsWith("/notification") ? encode(saved) : [encode(saved)],
+        );
+      });
+      const store = registry();
+      const otherSession = registry(nextSession);
+      const pages = [
+        Notifications.list(workspaceId, { limit: 10 }),
+        Notifications.list(workspaceId, { limit: 10, pendingOnly: true }),
+        Notifications.list(workspaceId, { limit: 10, after: saved }),
+      ] as const;
+      const detail = Notifications.get(workspaceId, saved.id);
+      const otherWorkspace = Notifications.list(otherWorkspaceId, { limit: 10 });
+      pages.forEach((query) => store.mount(query));
+      store.mount(detail);
+      store.mount(otherWorkspace);
+      otherSession.mount(pages[0]);
+      yield* Effect.promise(() => waitFor(() => expect(reads.size).toBe(6)));
+      const invalidate = ApiClient.runtime.fn((changed: ReadonlyArray<string>) =>
+        Reactivity.invalidate(changed),
+      );
+      store.mount(invalidate);
+      const refresh = Effect.fnUntraced(function* (key: string) {
+        store.set(invalidate, [key]);
+        yield* AtomRegistry.getResult(store, invalidate, { suspendOnWaiting: true });
+      });
+      yield* refresh(keys.notifications.list(workspaceId));
+      yield* Effect.promise(() => waitFor(() => expect(transport).toHaveBeenCalledTimes(9)));
+      for (const [key, count] of reads) {
+        expect(count).toBe(
+          key.startsWith("Bearer credential-a") && key.includes("workspace-a/") && key.includes("?")
+            ? 2
+            : 1,
+        );
+      }
+      yield* refresh(keys.notifications.get(workspaceId, saved.id));
+      yield* Effect.promise(() => waitFor(() => expect(transport).toHaveBeenCalledTimes(10)));
+      yield* refresh(keys.notifications.all(workspaceId));
+      yield* Effect.promise(() => waitFor(() => expect(transport).toHaveBeenCalledTimes(14)));
+      for (const [key, count] of reads) {
+        expect(count).toBe(
+          key.startsWith("Bearer credential-a") && key.includes("workspace-a/") ? 3 : 1,
+        );
+      }
+    }),
+);
 
-it("does not poll mounted notification queries as time passes", async () => {
-  vi.useFakeTimers();
-  transport.mockResolvedValue(response([]));
-  const store = registry();
-  const query = Notifications.list(workspaceId, { limit: 10 });
-  store.mount(query);
-  await vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
-  await Effect.runPromise(AtomRegistry.getResult(store, query));
-  await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-  expect(transport).toHaveBeenCalledTimes(1);
-});
+it.effect("does not poll mounted notification queries as time passes", () =>
+  Effect.gen(function* () {
+    vi.useFakeTimers();
+    transport.mockResolvedValue(response([]));
+    const store = registry();
+    const query = Notifications.list(workspaceId, { limit: 10 });
+    store.mount(query);
+    yield* Effect.promise(() => vi.waitFor(() => expect(transport).toHaveBeenCalledTimes(1)));
+    yield* AtomRegistry.getResult(store, query);
+    yield* Effect.promise(() => vi.advanceTimersByTimeAsync(5 * 60 * 1000));
+    expect(transport).toHaveBeenCalledTimes(1);
+  }),
+);
 
 function Detail() {
   const query = useQuery(() => Notifications.get(workspaceId, saved.id));

@@ -47,7 +47,7 @@ export const core = (bound: Bound) =>
 export const inDatabase = <A, E>(
   filename: string,
   program: Effect.Effect<A, E, SqliteDatabase.Service | SqlClient.SqlClient>,
-) => Effect.runPromise(program.pipe(Effect.provide(SqliteDatabase.layer(filename))));
+) => program.pipe(Effect.provide(SqliteDatabase.layer(filename)));
 export const host = (filename: string) =>
   Gateway.layer.pipe(
     Layer.provideMerge(WorkspaceEvents.layer()),
@@ -58,14 +58,15 @@ export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
     Effect.provide(core(bound)),
   );
-export const temporary = async (run: (filename: string) => Promise<void>) => {
-  const directory = await mkdtemp(join(tmpdir(), "amends-sqlite-"));
-  try {
-    await run(join(directory, "test.sqlite"));
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-};
+export const temporary = Effect.fnUntraced(function* <A, E, R>(
+  use: (filename: string) => Effect.Effect<A, E, R>,
+) {
+  const directory = yield* Effect.acquireRelease(
+    Effect.promise(() => mkdtemp(join(tmpdir(), "amends-sqlite-"))),
+    (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+  );
+  return yield* use(join(directory, "test.sqlite"));
+}, Effect.scoped);
 
 export const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   return yield* (yield* views).forWorkspace(workspaceId);

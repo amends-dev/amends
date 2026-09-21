@@ -516,7 +516,7 @@ reset stores, migrate schemas, or switch readers between projection versions.
 
 ## Verification
 
-`bun test packages/core/test` exercises the portable implementation with a test-only
+`bun run test packages/core/test` exercises the portable implementation with a test-only
 memory adapter, including cross-log atomicity, rollback, nested and concurrent
 publication, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version

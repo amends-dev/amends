@@ -1,7 +1,7 @@
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { Array, DateTime, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect";
 import { Authorization } from "../../src/authorization/authorization.ts";
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
@@ -28,7 +28,6 @@ import { Role } from "../../src/authorization/role/role.ts";
 import { make, type Fixture } from "../memory-store.ts";
 
 const testSubject = () => Subject.make("test", "entity");
-
 const workspaceId = Workspace.Id.make("workspace");
 const actor = Actor.Value.make({
   workspaceId,
@@ -54,101 +53,101 @@ type Services =
   | Actor.Service
   | Scope.Scope;
 const run = <A, E>(use: (fixture: Fixture) => Effect.Effect<A, E, Services>, capacity = 256) =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const fixture = yield* make();
-      yield* fixture.store.transaction(
-        fixture.members(workspaceId).insert({
-          id: actor.memberId,
-          workspaceId,
-          identity: actor.identity,
-          status: "active",
-        }),
-      );
-      const host = Layer.mergeAll(
-        Layer.succeed(Store.Service, fixture.store),
-        Layer.succeed(Checkpoint.Service, fixture.checkpoints),
-        Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
-        Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
-        Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
-        PermissionCatalog.layer([]),
-        CommittedEvents.layer(workspaceId, { capacity }),
-      );
-      const services = Layer.mergeAll(
-        Journal.layer({ logId: Log.Id.make("journal"), projections: [] }).pipe(
-          Layer.provide(Log.layer),
-        ),
-        Authorization.layer.pipe(Layer.provide(GrantResolver.layer)),
-      ).pipe(Layer.provideMerge(host));
-      const configured = ChangeFeedApplication.layer.pipe(Layer.provideMerge(services));
-      return yield* use(fixture).pipe(
-        Effect.provide(configured),
-        Effect.provideService(Actor.Service, actor),
-      );
-    }).pipe(Effect.scoped),
-  );
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* fixture.store.transaction(
+      fixture.members(workspaceId).insert({
+        id: actor.memberId,
+        workspaceId,
+        identity: actor.identity,
+        status: "active",
+      }),
+    );
+    const host = Layer.mergeAll(
+      Layer.succeed(Store.Service, fixture.store),
+      Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+      Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
+      Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
+      Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
+      PermissionCatalog.layer([]),
+      CommittedEvents.layer(workspaceId, { capacity }),
+    );
+    const services = Layer.mergeAll(
+      Journal.layer({ logId: Log.Id.make("journal"), projections: [] }).pipe(
+        Layer.provide(Log.layer),
+      ),
+      Authorization.layer.pipe(Layer.provide(GrantResolver.layer)),
+    ).pipe(Layer.provideMerge(host));
+    const configured = ChangeFeedApplication.layer.pipe(Layer.provideMerge(services));
+    return yield* use(fixture).pipe(
+      Effect.provide(configured),
+      Effect.provideService(Actor.Service, actor),
+    );
+  }).pipe(Effect.scoped);
+it.effect(
+  "registers before Ready, skips history and preserves committed batches with encoded payloads",
+  () =>
+    run(() =>
+      Effect.gen(function* () {
+        const journal = yield* Journal.Service;
+        const changes = yield* ChangeFeedApplication.Service;
+        yield* journal
+          .publish(MemberFacts.Added, {
+            workspaceId,
+            memberId: Member.Id.make("historical-member"),
+            identity: actor.identity,
+          })
+          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+        const stream = yield* changes.watch;
+        // Publish before even pulling Ready: a successful subscription must retain this commit.
+        const events = yield* journal.commit(
+          Effect.gen(function* () {
+            const first = yield* journal
+              .publish(MemberFacts.Added, {
+                workspaceId,
+                memberId: actor.memberId,
+                identity: actor.identity,
+              })
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+            const second = yield* journal
+              .publish(InvitationFacts.Issued, invitation)
+              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+            return [first, second] as const;
+          }),
+        );
+        const messages = yield* stream.pipe(Stream.take(2), Stream.runCollect);
+        expect(messages).toEqual([
+          { _tag: "Ready", workspaceId },
+          {
+            _tag: "Committed",
+            workspaceId,
+            commitId: events[0].commitId,
+            events: Array.map(events, (event) => ({
+              id: event.id,
+              name: event.name,
+              version: event.version,
+              recordedAt: event.recordedAt,
+              provenance: event.provenance,
+              payload:
+                event.name === MemberFacts.Added.name
+                  ? event.payload
+                  : Schema.encodeSync(Invitation.Issuance)(invitation),
+            })),
+          },
+        ]);
+        expect(DateTime.isDateTime(events[1].payload.expiresAt)).toBe(true);
+        const committed = messages[1];
+        if (committed === undefined) return yield* Effect.die("Missing committed message");
+        const encoded = yield* Schema.encodeEffect(ChangeFeed.Message)(committed);
+        expect(yield* Schema.decodeEffect(ChangeFeed.Message)(encoded)).toEqual(committed);
+        expect(
+          (yield* journal.log.read({ limit: 10 })).flatMap((batch) => batch.entries),
+        ).toHaveLength(3);
+      }),
+    ),
+);
 
-test("registers before Ready, skips history and preserves committed batches with encoded payloads", async () =>
-  run(() =>
-    Effect.gen(function* () {
-      const journal = yield* Journal.Service;
-      const changes = yield* ChangeFeedApplication.Service;
-      yield* journal
-        .publish(MemberFacts.Added, {
-          workspaceId,
-          memberId: Member.Id.make("historical-member"),
-          identity: actor.identity,
-        })
-        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-      const stream = yield* changes.watch;
-      // Publish before even pulling Ready: a successful subscription must retain this commit.
-      const events = yield* journal.commit(
-        Effect.gen(function* () {
-          const first = yield* journal
-            .publish(MemberFacts.Added, {
-              workspaceId,
-              memberId: actor.memberId,
-              identity: actor.identity,
-            })
-            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-          const second = yield* journal
-            .publish(InvitationFacts.Issued, invitation)
-            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-          return [first, second] as const;
-        }),
-      );
-      const messages = yield* stream.pipe(Stream.take(2), Stream.runCollect);
-      expect(messages).toEqual([
-        { _tag: "Ready", workspaceId },
-        {
-          _tag: "Committed",
-          workspaceId,
-          commitId: events[0].commitId,
-          events: Array.map(events, (event) => ({
-            id: event.id,
-            name: event.name,
-            version: event.version,
-            recordedAt: event.recordedAt,
-            provenance: event.provenance,
-            payload:
-              event.name === MemberFacts.Added.name
-                ? event.payload
-                : Schema.encodeSync(Invitation.Issuance)(invitation),
-          })),
-        },
-      ]);
-      expect(DateTime.isDateTime(events[1].payload.expiresAt)).toBe(true);
-      const committed = messages[1];
-      if (committed === undefined) return yield* Effect.die("Missing committed message");
-      const encoded = yield* Schema.encodeEffect(ChangeFeed.Message)(committed);
-      expect(yield* Schema.decodeEffect(ChangeFeed.Message)(encoded)).toEqual(committed);
-      expect(
-        (yield* journal.log.read({ limit: 10 })).flatMap((batch) => batch.entries),
-      ).toHaveLength(3);
-    }),
-  ));
-
-test("checks current membership and opens a stream without a transaction", async () =>
+it.effect("checks current membership and opens a stream without a transaction", () =>
   run((fixture) =>
     Effect.gen(function* () {
       const changes = yield* ChangeFeedApplication.Service;
@@ -163,9 +162,10 @@ test("checks current membership and opens a stream without a transaction", async
         _tag: "Authorization.InvalidActor",
       });
     }),
-  ));
+  ),
+);
 
-test("lag fails the stream so a reconnect must establish a fresh Ready boundary", async () =>
+it.effect("lag fails the stream so a reconnect must establish a fresh Ready boundary", () =>
   run(
     () =>
       Effect.gen(function* () {
@@ -192,9 +192,10 @@ test("lag fails the stream so a reconnect must establish a fresh Ready boundary"
         ).toEqual(["Ready", "Committed"]);
       }),
     1,
-  ));
+  ),
+);
 
-test("unknown fact versions fail normalization instead of emitting an incomplete batch", async () =>
+it.effect("unknown fact versions fail normalization instead of emitting an incomplete batch", () =>
   run(() =>
     Effect.gen(function* () {
       const stream = yield* (yield* ChangeFeedApplication.Service).watch;
@@ -210,24 +211,28 @@ test("unknown fact versions fail normalization instead of emitting an incomplete
         new ChangeFeed.Unavailable({}),
       );
     }),
-  ));
+  ),
+);
 
-test("closing the caller scope interrupts pending reads without closing another subscription", async () =>
-  run(() =>
-    Effect.gen(function* () {
-      const changes = yield* ChangeFeedApplication.Service;
-      const scope = yield* Scope.fork(yield* Scope.Scope);
-      const stream = yield* changes.watch.pipe(Scope.provide(scope));
-      const other = yield* changes.watch;
-      const pending = yield* stream.pipe(
-        Stream.runDrain,
-        Effect.forkChild({ startImmediately: true }),
-      );
-      yield* Scope.close(scope, Exit.void);
-      expect(Exit.hasInterrupts(yield* Fiber.await(pending))).toBe(true);
-      yield* (yield* Journal.Service)
-        .publish(InvitationFacts.Issued, invitation)
-        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-      expect(yield* other.pipe(Stream.take(2), Stream.runCollect)).toHaveLength(2);
-    }),
-  ));
+it.effect(
+  "closing the caller scope interrupts pending reads without closing another subscription",
+  () =>
+    run(() =>
+      Effect.gen(function* () {
+        const changes = yield* ChangeFeedApplication.Service;
+        const scope = yield* Scope.fork(yield* Scope.Scope);
+        const stream = yield* changes.watch.pipe(Scope.provide(scope));
+        const other = yield* changes.watch;
+        const pending = yield* stream.pipe(
+          Stream.runDrain,
+          Effect.forkChild({ startImmediately: true }),
+        );
+        yield* Scope.close(scope, Exit.void);
+        expect(Exit.hasInterrupts(yield* Fiber.await(pending))).toBe(true);
+        yield* (yield* Journal.Service)
+          .publish(InvitationFacts.Issued, invitation)
+          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+        expect(yield* other.pipe(Stream.take(2), Stream.runCollect)).toHaveLength(2);
+      }),
+    ),
+);

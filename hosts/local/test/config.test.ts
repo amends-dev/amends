@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, it } from "@effect/vitest";
 import { ConfigProvider, Effect, Redacted } from "effect";
 import { LocalConfig } from "../src/config.ts";
 
@@ -9,57 +9,60 @@ const load = (values: Record<string, unknown>) =>
       ConfigProvider.fromUnknown(values, { preserveEmptyStrings: true }),
     ),
   );
+it.effect("configuration defaults to SQLite on port 8787", () =>
+  Effect.gen(function* () {
+    expect(yield* load({})).toEqual({
+      port: 8787,
+      storage: { _tag: "Sqlite", filename: "./data/amends.sqlite" },
+    });
+  }),
+);
 
-test("configuration defaults to SQLite on port 8787", async () => {
-  expect(await Effect.runPromise(load({}))).toEqual({
-    port: 8787,
-    storage: { _tag: "Sqlite", filename: "./data/amends.sqlite" },
-  });
-});
-
-test.each([0, 8787, 65535])(
+it.effect.each([0, 8787, 65535])(
   "configuration accepts port %i and an explicit SQLite filename",
-  async (port) => {
-    expect(
-      await Effect.runPromise(
-        load({ AMENDS_PORT: String(port), AMENDS_DATABASE: "/tmp/host.sqlite" }),
-      ),
-    ).toEqual({ port, storage: { _tag: "Sqlite", filename: "/tmp/host.sqlite" } });
-  },
+  (port) =>
+    Effect.gen(function* () {
+      expect(
+        yield* load({ AMENDS_PORT: String(port), AMENDS_DATABASE: "/tmp/host.sqlite" }),
+      ).toEqual({ port, storage: { _tag: "Sqlite", filename: "/tmp/host.sqlite" } });
+    }),
 );
 
-test.each(["", " ", "-1", "65536", "1.5", "not-a-port"])(
+it.effect.each(["", " ", "-1", "65536", "1.5", "not-a-port"])(
   "configuration rejects an invalid port %j",
-  async (port) => {
-    const error = await Effect.runPromise(load({ AMENDS_PORT: port }).pipe(Effect.flip));
-    expect(error._tag).toBe("ConfigError");
-    expect(error.message).toContain("AMENDS_PORT");
-  },
+  (port) =>
+    Effect.gen(function* () {
+      const error = yield* load({ AMENDS_PORT: port }).pipe(Effect.flip);
+      expect(error._tag).toBe("ConfigError");
+      expect(error.message).toContain("AMENDS_PORT");
+    }),
 );
 
-test.each(["", "   "])("configuration rejects a blank SQLite filename %j", async (filename) => {
-  const error = await Effect.runPromise(load({ AMENDS_DATABASE: filename }).pipe(Effect.flip));
-  expect(error.message).toContain("AMENDS_DATABASE");
-});
+it.effect.each(["", "   "])("configuration rejects a blank SQLite filename %j", (filename) =>
+  Effect.gen(function* () {
+    const error = yield* load({ AMENDS_DATABASE: filename }).pipe(Effect.flip);
+    expect(error.message).toContain("AMENDS_DATABASE");
+  }),
+);
 
-test.each(["postgres", "postgresql"])(
+it.effect.each(["postgres", "postgresql"])(
   "%s URL takes precedence without reading the SQLite filename",
-  async (protocol) => {
-    const url = `${protocol}://user:secret@localhost/database`;
-    const options = await Effect.runPromise(
-      load({ AMENDS_DATABASE_URL: url, AMENDS_DATABASE: "" }),
-    );
-    if (options.storage._tag !== "Postgres") throw new Error("Expected PostgreSQL");
-    expect(Redacted.value(options.storage.url)).toBe(url);
-    expect(JSON.stringify(options)).not.toContain("secret");
-  },
+  (protocol) =>
+    Effect.gen(function* () {
+      const url = `${protocol}://user:secret@localhost/database`;
+      const options = yield* load({ AMENDS_DATABASE_URL: url, AMENDS_DATABASE: "" });
+      if (options.storage._tag !== "Postgres") throw new Error("Expected PostgreSQL");
+      expect(Redacted.value(options.storage.url)).toBe(url);
+      expect(JSON.stringify(options)).not.toContain("secret");
+    }),
 );
 
-test.each(["", " ", "not-a-url", "https://user:secret@localhost/database"])(
+it.effect.each(["", " ", "not-a-url", "https://user:secret@localhost/database"])(
   "invalid database URL %j fails without falling back to SQLite",
-  async (url) => {
-    const error = await Effect.runPromise(load({ AMENDS_DATABASE_URL: url }).pipe(Effect.flip));
-    expect(error.message).toContain("AMENDS_DATABASE_URL");
-    expect(error.message).not.toContain("secret");
-  },
+  (url) =>
+    Effect.gen(function* () {
+      const error = yield* load({ AMENDS_DATABASE_URL: url }).pipe(Effect.flip);
+      expect(error.message).toContain("AMENDS_DATABASE_URL");
+      expect(error.message).not.toContain("secret");
+    }),
 );
