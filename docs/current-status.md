@@ -11,30 +11,31 @@ Core and both adapters implement [private group creation and membership lifecycl
 including permission-based addition/removal, self-leave, ordinary group reads, and management
 inspection of known groups. DMs, public groups,
 and group HTTP/UI workflows remain unimplemented.
-Thread access and activity, turns, agent execution, triage, and channel delivery remain
-design work; the thread package currently supplies only an ID.
+[Starting a private-group thread](thread-workflows.md) with a human text message, initial
+participation, timeline activity, and notifications is implemented in core and both adapters.
+Thread reads, replies, general participation management, turns, agent execution, triage,
+and channel delivery remain future work.
 The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
 are agreed design intent. Inherited thread access, standalone admission, and participation
-cleanup are not implemented. Workspace-member removal does settle active group admissions.
-The shared group-audience check is implemented; thread operations do not yet consume it.
+management remain incomplete. Group departure ends its associated thread participations and
+discards their pending agent input; workspace-member removal uses the same cleanup.
+Thread starts use the shared group-audience check.
 Group lists and current rosters are unpaginated, and separate reads do not share a snapshot.
 
 ## Notification recipients and generation
 
 The [notification schema](../packages/core/src/notification/notification.ts) supports
-Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending`
-as its only state. Both adapters store these variants and enforce source/recipient
+Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending` and
+`Discarded { reason: "participation-ended" }` states. Both adapters store these variants and enforce source/recipient
 uniqueness. The [application](../packages/core/src/notification/application.ts) exposes
 only the acting human or agent's inbox, with active membership required. Contact
 and Triage reads are available only through internal stores.
 
-The [projection](../packages/core/src/notification/projection.ts) has no generation
-handlers. Source existence, historical participant selection, acknowledgment,
-recipient processing, and delivery are not implemented. The recipient rules in
-the [core model](core-model.md#activity-selects-recipients-from-thread-participants)
-are design intent. Normal operations create no notifications; tests seed records.
-Adding handlers requires fresh development data or explicit projection preparation
-because the empty projection already advances its checkpoint.
+The [projection](../packages/core/src/notification/projection.ts) generates notifications from
+the opening message's recorded activity and historical recipient selection. It settles pending
+agent notifications when their linked group admission ends. General acknowledgment, recipient
+processing, silent completion, and delivery remain unimplemented. Existing tests also seed
+notifications for storage and inbox contracts. Other activity kinds remain design intent.
 
 ## Live delivery and authorization
 
@@ -47,7 +48,7 @@ or another process's commit can leave a connected client's view stale.
 
 [ChangeFeedApplication.watch](../packages/core/src/change-feed/application.ts) checks
 membership at subscription time and forwards supported workspace-management events.
-Private group creation, admission, and departure facts are withheld, including their provenance;
+Private group and thread facts are withheld, including message text, recipients, and provenance;
 group-only commits produce no public change until audience-aware group delivery exists.
 It does not filter fields or events by permission, or continuously recheck membership.
 Removal therefore does not itself close an existing subscription. Reconnecting

@@ -5,7 +5,8 @@ SQLite and PostgreSQL. These operations are available through `GroupApplication.
 and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
-broader design; DMs, public groups, and thread access remain future work.
+broader design; DMs, public groups, and thread reads remain future work.
+[Thread workflows](thread-workflows.md) now cover starting conversations in private groups.
 
 ## Permission and input
 
@@ -186,18 +187,19 @@ store contracts. Core requires `GroupStore` and `GroupMembershipStore`; both ada
 them over the same workspace transaction. Authorization targets now include `Group`, and
 both adapters preserve exact group scopes in grants. Target support alone does not implement
 thread-audience authorization. The read operations and shared group audience policy above
-are implemented; there are no thread operations yet.
+are implemented; thread starts now use that policy.
 
 Private group, admission, and departure facts remain on the internal committed-event bus but are
 withheld from the workspace-wide change feed. A commit containing only those facts emits
 no public change; a mixed commit retains its other supported events in order. Group discovery
-and live delivery will need their own audience-aware HTTP/UI contract. Creation generates no
-notifications because notifications originate from thread activity, which is not implemented.
+and live delivery will need their own audience-aware HTTP/UI contract. Group creation generates no notifications. Opening-message activity generates notifications
+through the [thread workflow](thread-workflows.md).
 
-DMs, public-group joining/discovery, thread creation, and group HTTP/UI workflows
+DMs, public-group joining/discovery, further thread workflows, and group/thread HTTP/UI workflows
 remain separate implementation steps. See [known limitations](current-status.md).
-Thread participation, notifications, and agent-turn cancellation are not implemented; this
-membership lifecycle supplies the departure boundary those future workflows must honor.
+Opening messages establish thread participation and notifications. Group departures end those
+participations and discard pending agent input. General participation management and agent-turn
+cancellation remain future work.
 
 Group creation introduced new storage baselines. Adding members reuses those tables and facts;
 it adds `group.membership.manage` to newly initialized permission bundles. Existing stored

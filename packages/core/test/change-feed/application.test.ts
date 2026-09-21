@@ -1,3 +1,13 @@
+import {
+  Thread,
+  ThreadFacts,
+  ThreadMessage,
+  ThreadMessageFacts,
+  ThreadParticipation,
+  ThreadParticipationFacts,
+  ThreadActivity,
+  ThreadActivityFacts,
+} from "@amends/core/thread";
 import { Subject } from "@amends/core/journal";
 import { Group, GroupFacts, GroupMembership, GroupMembershipFacts } from "@amends/core/group";
 import { Publication } from "../../src/journal/publication.ts";
@@ -240,6 +250,50 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             status: "active",
             admittedAt: group.createdAt,
           });
+          const threadId = Thread.Id.make("private-thread");
+          const messageId = ThreadMessage.Id.make("private-message");
+          const participationId = ThreadParticipation.Id.make("private-participation");
+          yield* journal.publish(ThreadFacts.Created, {
+            id: threadId,
+            workspaceId,
+            groupId: group.id,
+            createdBy: actor.memberId,
+            createdAt: group.createdAt,
+          });
+          yield* journal.publish(ThreadParticipationFacts.Added, {
+            id: participationId,
+            workspaceId,
+            threadId,
+            memberId: actor.memberId,
+            groupMembershipId: GroupMembership.Id.make("private-membership"),
+            identity: actor.identity,
+            joinedAt: group.createdAt,
+            joinedAtSequence: 1,
+            status: "active",
+            endedAt: null,
+          });
+          yield* journal.publish(ThreadMessageFacts.Published, {
+            id: messageId,
+            workspaceId,
+            threadId,
+            authorMemberId: actor.memberId,
+            kind: "User",
+            text: "Private proposal",
+            mentions: [],
+            publishedAt: group.createdAt,
+          });
+          yield* journal.publish(ThreadActivityFacts.Recorded, {
+            activity: {
+              id: ThreadActivity.Id.make("private-activity"),
+              workspaceId,
+              threadId,
+              sequence: 1,
+              kind: "MessagePublished",
+              messageId,
+              occurredAt: group.createdAt,
+            },
+            recipients: [{ participationId, identity: actor.identity }],
+          });
           yield* journal.publish(GroupMembershipFacts.Removed, {
             workspaceId,
             groupId: group.id,
@@ -273,6 +327,8 @@ it.effect("private group commits are withheld and mixed commits retain only publ
       expect(committed.events.map(({ name }) => name)).toEqual([InvitationFacts.Issued.name]);
       expect(JSON.stringify(messages)).not.toContain("private-group");
       expect(JSON.stringify(messages)).not.toContain("Private name");
+      expect(JSON.stringify(messages)).not.toContain("private-thread");
+      expect(JSON.stringify(messages)).not.toContain("Private proposal");
     }),
   ),
 );

@@ -1,3 +1,5 @@
+import { ThreadPermissions } from "@amends/core/thread";
+import { AgentPermissions } from "@amends/core/agent";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { Log } from "@amends/core/journal";
@@ -83,6 +85,8 @@ it.effect(
                     MemberPermissions.Read.name,
                     AssignmentPermissions.Read.name,
                     GroupPermissions.Read.name,
+                    ThreadPermissions.Start.name,
+                    AgentPermissions.Use.name,
                   ],
                 }),
               );
@@ -105,6 +109,8 @@ it.effect(
                       GroupPermissions.Create.name,
                       GroupPermissions.Read.name,
                       GroupMembershipPermissions.Manage.name,
+                      ThreadPermissions.Start.name,
+                      AgentPermissions.Use.name,
                     ],
                   }),
                 );

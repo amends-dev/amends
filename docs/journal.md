@@ -432,9 +432,9 @@ before claiming that an Effect upgrade preserves the persisted format.
 
 In the planned turn domain, turn logs provide durable history for continuation and final-response
 derivation. Rebuilding domain projections from the journal does not recreate those
-separate logs. Notification generation is not implemented. Its design follows
-committed thread activity as defined in the core model; arbitrary log entries do
-not create notifications.
+separate logs. Notification generation now handles opening-message thread activity using
+recorded recipient selection and source-derived IDs. Arbitrary log entries do not create
+notifications. See [thread workflows](thread-workflows.md) for the implemented boundary.
 
 ## Live tailing
 

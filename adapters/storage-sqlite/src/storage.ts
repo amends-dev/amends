@@ -1,3 +1,7 @@
+import { Threads } from "./threads.ts";
+import { ThreadParticipations } from "./thread-participations.ts";
+import { ThreadMessages } from "./thread-messages.ts";
+import { ThreadActivities } from "./thread-activities.ts";
 import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer } from "effect";
@@ -31,6 +35,10 @@ const layerStores = Layer.mergeAll(
   Notifications.layer,
   Groups.layer,
   GroupMemberships.layer,
+  Threads.layer,
+  ThreadParticipations.layer,
+  ThreadMessages.layer,
+  ThreadActivities.layer,
 );
 
 /**

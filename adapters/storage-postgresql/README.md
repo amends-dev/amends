@@ -39,7 +39,8 @@ backfills, or legacy envelope formats. See the
 One module per store, each exporting `make` and a `layer` for the core service
 it implements: `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`,
 `roles.ts`, `assignments.ts`, `invitations.ts`, `notifications.ts`, `groups.ts`, and
-`group-memberships.ts`. They share `binding.ts`,
+`group-memberships.ts`, `threads.ts`, `thread-participations.ts`, `thread-messages.ts`, and
+`thread-activities.ts`. They share `binding.ts`,
 which is one workspace's view of the database: its identity, the transaction
 boundary, and the guard each statement runs under. `storage.ts` exports
 `layerWorkspace(workspaceId, options)` to compose the store layers over a binding
@@ -63,8 +64,8 @@ Notification reads match both recipient kind and ID, with bounded pages ordered
 by recorded time and ID using `COLLATE "C"` to match SQLite's binary ordering.
 Notification IDs and source/recipient associations are unique within the workspace.
 Inserts join the journal transaction; source existence and recipient selection
-remain generation responsibilities. The notification projection currently has no
-generation handlers.
+remain generation responsibilities. The notification projection generates opening-message notifications from recorded thread activity
+and discards pending agent input when its participation ends.
 
 ## Transactions
 
@@ -87,6 +88,13 @@ and `group.read`; explicit management reads inspect a known group under its mana
 The read suite verifies permission and audience separation, current rosters, staged changes,
 revocation, and reads without opening transactions. New role bundles include `group.read`;
 existing stored roles are unchanged.
+
+Thread opening persists the thread, its initial participants, a text message, ordered activity,
+and notifications in one workspace commit. Broadcast enrolls current group members; mentions
+narrow the initial set. Participation references the exact group admission; departure ends it
+and discards pending agent input. Activity facts preserve recipient selection for replay.
+These tables and notification fields are part of the updated development baseline: recreate
+disposable databases rather than applying an upgrade chain. See [thread workflows](../../docs/thread-workflows.md).
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

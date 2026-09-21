@@ -35,7 +35,7 @@ export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
 export const targetKinds = ["Workspace", "Member", "Thread", "Group"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
-export const notificationStates = ["Pending"] as const;
+export const notificationStates = ["Pending", "Discarded"] as const;
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -242,6 +242,8 @@ export const notifications = pgTable(
     id: text("id").notNull(),
     sourceLogId: text("source_log_id").notNull(),
     sourceEntryId: text("source_entry_id").notNull(),
+    participationId: text("participation_id"),
+    discardReason: text("discard_reason", { enum: ["participation-ended"] }),
     recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
     recipientId: text("recipient_id"),
     recordedAt: instant("recorded_at").notNull(),
@@ -254,6 +256,10 @@ export const notifications = pgTable(
       foreignColumns: [workspaces.workspaceId],
       name: "notifications_workspace",
     }).onDelete("cascade"),
+    check(
+      "notification_state",
+      sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
+    ),
     // Source existence and recipient selection belong to notification generation.
     uniqueIndex("notifications_by_source_recipient").on(
       table.workspaceId,
@@ -282,7 +288,6 @@ export const notifications = pgTable(
       "notifications_recipient_kind",
       sql`(${table.recipientKind} = 'Triage' AND ${table.recipientId} IS NULL) OR (${table.recipientKind} IN ('Human', 'Agent', 'Contact') AND ${table.recipientId} IS NOT NULL AND ${table.recipientId} <> '')`,
     ),
-    check("notifications_state", sql`${table.state} = 'Pending'`),
   ],
 );
 
@@ -418,4 +423,117 @@ export const checkpoints = pgTable(
     entryId: text("entry_id").notNull(),
   },
   (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name, table.version] })],
+);
+
+export const threads = pgTable(
+  "threads",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    groupId: text("group_id").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    foreignKey({
+      columns: [t.workspaceId, t.groupId],
+      foreignColumns: [groups.workspaceId, groups.id],
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.createdBy],
+      foreignColumns: [members.workspaceId, members.id],
+    }),
+    index("threads_by_group").on(t.workspaceId, t.groupId, t.id),
+  ],
+);
+export const threadParticipations = pgTable(
+  "thread_participations",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    threadId: text("thread_id").notNull(),
+    memberId: text("member_id").notNull(),
+    groupMembershipId: text("group_membership_id").notNull(),
+    identityKind: text("identity_kind", { enum: memberIdentityKinds }).notNull(),
+    identityId: text("identity_id").notNull(),
+    joinedAt: instant("joined_at").notNull(),
+    joinedAtSequence: integer("joined_at_sequence").notNull(),
+    status: text("status", { enum: ["active", "ended"] }).notNull(),
+    endedAt: instant("ended_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    foreignKey({
+      columns: [t.workspaceId, t.threadId],
+      foreignColumns: [threads.workspaceId, threads.id],
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.memberId],
+      foreignColumns: [members.workspaceId, members.id],
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.groupMembershipId],
+      foreignColumns: [groupMemberships.workspaceId, groupMemberships.id],
+    }),
+    uniqueIndex("active_thread_participation")
+      .on(t.workspaceId, t.threadId, t.memberId)
+      .where(sql`${t.status} = 'active'`),
+    index("participations_by_admission").on(t.workspaceId, t.groupMembershipId),
+    check(
+      "participation_state",
+      sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`,
+    ),
+    check("participation_sequence", sql`${t.joinedAtSequence} > 0`),
+  ],
+);
+export const threadMessages = pgTable(
+  "thread_messages",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    threadId: text("thread_id").notNull(),
+    authorMemberId: text("author_member_id").notNull(),
+    kind: text("kind", { enum: ["User"] }).notNull(),
+    text: text("text").notNull(),
+    mentions: text("mentions").array().notNull(),
+    publishedAt: instant("published_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    foreignKey({
+      columns: [t.workspaceId, t.threadId],
+      foreignColumns: [threads.workspaceId, threads.id],
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.authorMemberId],
+      foreignColumns: [members.workspaceId, members.id],
+    }),
+  ],
+);
+export const threadActivities = pgTable(
+  "thread_activities",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    threadId: text("thread_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    kind: text("kind", { enum: ["MessagePublished"] }).notNull(),
+    messageId: text("message_id").notNull(),
+    occurredAt: instant("occurred_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    foreignKey({
+      columns: [t.workspaceId, t.threadId],
+      foreignColumns: [threads.workspaceId, threads.id],
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.messageId],
+      foreignColumns: [threadMessages.workspaceId, threadMessages.id],
+    }),
+    uniqueIndex("thread_activity_sequence").on(t.workspaceId, t.threadId, t.sequence),
+    uniqueIndex("thread_message_activity").on(t.workspaceId, t.messageId),
+    check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
+  ],
 );

@@ -1,3 +1,5 @@
+import { NotificationStore } from "@amends/core/notification";
+import { ThreadParticipationStore } from "@amends/core/thread";
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
@@ -32,10 +34,31 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Publication.Service | Log.Service | Transaction.Service | Checkpoint.Service
+    | Publication.Service
+    | Log.Service
+    | Transaction.Service
+    | Checkpoint.Service
+    | NotificationStore.Service
+    | ThreadParticipationStore.Service
   >,
 ) =>
   program.pipe(
+    Effect.provideService(NotificationStore.Service, {
+      workspaceId,
+      get: () => Effect.die("Unexpected notification read"),
+      listByRecipient: () => Effect.die("Unexpected notification read"),
+      listPendingByRecipient: () => Effect.die("Unexpected notification read"),
+      insert: () => Effect.die("Unexpected notification write"),
+      discardPendingForParticipation: () => Effect.die("Unexpected notification write"),
+    }),
+    Effect.provideService(ThreadParticipationStore.Service, {
+      workspaceId,
+      get: () => Effect.die("Unexpected participation read"),
+      listByThread: () => Effect.die("Unexpected participation read"),
+      listByAdmission: () => Effect.die("Unexpected participation read"),
+      insert: () => Effect.die("Unexpected participation write"),
+      endByAdmission: () => Effect.die("Unexpected participation write"),
+    }),
     Effect.provideService(Publication.Service, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
@@ -43,7 +66,7 @@ const run = <A, E>(
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
   );
 it.effect(
-  "the empty notification projection catches up and checkpoints live batches without a notification store",
+  "unrelated facts advance the notification checkpoint without reading or writing domain stores",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();

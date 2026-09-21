@@ -1,3 +1,4 @@
+import { ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { and, asc, eq, gt, or, sql } from "drizzle-orm";
@@ -27,7 +28,13 @@ const toEncodedRecord = (row: NotificationRow) => ({
         : undefined
       : { _tag: row.recipientKind, id: row.recipientId },
   recordedAt: row.recordedAt,
-  state: { _tag: row.state },
+  ...(row.participationId === null ? {} : { participationId: row.participationId }),
+  state:
+    row.state === "Pending"
+      ? row.discardReason === null
+        ? { _tag: "Pending" }
+        : undefined
+      : { _tag: row.state, reason: row.discardReason },
 });
 
 /**
@@ -102,6 +109,28 @@ export const make = Effect.fn("Notifications.make")(function* () {
       (recipient, options) => list(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
     ),
+    discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
+      function* (input) {
+        yield* Store.Transaction;
+        const id = yield* Schema.decodeEffect(ThreadParticipation.Id)(input).pipe(
+          Effect.mapError(storeConflict(NotificationStore, "discardPendingForParticipation")),
+        );
+        yield* guard(
+          db
+            .update(notifications)
+            .set({ state: "Discarded", discardReason: "participation-ended" })
+            .where(
+              and(
+                inWorkspace,
+                eq(notifications.participationId, id),
+                eq(notifications.recipientKind, "Agent"),
+                eq(notifications.state, "Pending"),
+              ),
+            ),
+          true,
+        ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForParticipation")));
+      },
+    ),
     insert: Effect.fn("Notifications.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validateRecord(input).pipe(
@@ -118,6 +147,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
           id: record.id,
           sourceLogId: record.source.logId,
           sourceEntryId: record.source.entryId,
+          participationId: record.participationId ?? null,
+          discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
           recipientKind: record.recipient._tag,
           recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
           recordedAt: DateTime.toDate(record.recordedAt),

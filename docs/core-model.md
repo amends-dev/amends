@@ -14,9 +14,10 @@ and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
 and process-local live changes are implemented. Core and both adapters also implement
 private team-group creation, membership admission/departure, workspace-removal cleanup,
-authorized group reads, and a shared group-audience check. DMs, public groups, group HTTP/UI,
-thread access and participation/activity,
-turns, execution, notification generation/acknowledgment, triage, and channel
+authorized group reads, and a shared group-audience check. Human opening messages in private
+groups now create threads, initial participation, ordered message activity, and pending notifications
+atomically; see [thread workflows](thread-workflows.md). Thread reads, replies, general participation
+management, DMs, public groups, group/thread HTTP/UI, turns, execution, general acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
 
@@ -185,7 +186,8 @@ requesting activities from the agent and turn that performed the resulting opera
 
 A group holds multiple threads. A DM is a group for two members, with both participating
 initially in each new thread. A team group's threads inherit the group's access audience,
-while their initial participants are the author and explicitly mentioned eligible members.
+while an unmentioned opening message includes all current group members as participants.
+Explicit mentions narrow initial participation to the author and mentioned eligible members.
 A standalone thread establishes its own access audience through authorized participation.
 
 Members with group-creation permission can create team groups; membership changes require
@@ -210,7 +212,8 @@ See [groups and thread audiences](#agreed-groups-provide-a-shared-home-for-threa
 ### Thread participants, addressing, and history
 
 - A new thread in a DM group starts with both group members as participants. A new thread
-  in a team group starts with its author and explicitly mentioned eligible members.
+  in a team group starts with all current group members when there are no explicit mentions,
+  or with its author and explicitly mentioned eligible members when mentions narrow the message.
   A standalone thread starts with its author and explicitly admitted participants.
   Later mentions can add participants under the thread's audience and admission rules.
 - External people participate as separate contacts, preserving the actual author of each
@@ -2011,9 +2014,11 @@ The thread is aware of turns as activity within its conversation. That awareness
 make it responsible for spawning environments or implementing turn execution. The turn
 continues to own its execution lifecycle, transcript, configuration, and snapshots.
 
-Thread activity is the timeline item already established in this design. It is a defined
+Thread activity is the timeline item already established in this design. The implemented
+opening-message workflow records `MessagePublished` activity referencing a separate message,
+starting at sequence 1. Further publication and lifecycle variants remain future work. It is a defined
 set of activity types, including message publication, turn lifecycle activity such as
-turn started, and task updates. It is not another log beside the timeline. The exact
+turn started, and task updates. It is not another log beside the timeline. The remaining
 discriminators and payload schemas remain to be specified.
 
 The owning domain performs an operation, and its committed activity is recorded on the
@@ -2373,11 +2378,11 @@ requires an explicit future design.
 
 ### Grouped threads inherit access; standalone threads establish their own audience
 
-| Thread location | Access audience for workspace members                          | Initial participants                              |
-| --------------- | -------------------------------------------------------------- | ------------------------------------------------- |
-| DM group        | The group's two members.                                       | Both members.                                     |
-| Team group      | Current group members.                                         | Author and explicitly mentioned eligible members. |
-| Standalone      | Current participants admitted through an authorized operation. | Author and explicitly admitted participants.      |
+| Thread location | Access audience for workspace members                          | Initial participants                                                                   |
+| --------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| DM group        | The group's two members.                                       | Both members.                                                                          |
+| Team group      | Current group members.                                         | All current members without mentions; otherwise author and mentioned eligible members. |
+| Standalone      | Current participants admitted through an authorized operation. | Author and explicitly admitted participants.                                           |
 
 All threads in a group inherit its audience. A member with read permission can browse and
 read its threads without participating, including their earlier history. Private subsets
@@ -2435,7 +2440,9 @@ agreed. Any active workspace member can start a DM. Private team-group creation 
 through `group.create`, and member addition/removal through `group.membership.manage`.
 Self-leave and group cleanup during workspace-member removal are also implemented.
 Private-group reads use `group.read` plus audience membership, with separate management
-inspection and a reusable audience check. Group HTTP/UI and thread enforcement remain future work.
+inspection and a reusable audience check. Starting a private-group thread with a human text
+message, initial participation, and notifications is implemented; group/thread HTTP/UI,
+thread reads, further publication, and full thread enforcement remain future work.
 Default role placement does not limit future grants or roles.
 Other group operations, their permission declarations, broader group schemas, and admission
 UI remain contract work.
@@ -2452,11 +2459,15 @@ individual contacts. Task workflows can also involve a participant that handles 
 its exact representation remains open. A new thread in a DM group starts with both group
 members participating. A human-to-human DM group does not invoke an agent.
 
-A thread in a team group begins with its author and the eligible members explicitly mentioned
-in the initial message. An initial message with no mentions does not invoke agents merely
-because they belong to the group. A standalone thread begins with its author and explicitly
-admitted participants. Later mentions can add participants under the
+A thread in a team group begins with all current active group members when its opening message
+has no explicit mentions. With explicit mentions, it begins with the author and those eligible
+mentioned members. An unmentioned message is addressed to the group, including its agents.
+A standalone thread begins with its author and explicitly admitted participants. Later mentions can add participants under the
 [audience and admission rules](#grouped-threads-inherit-access-standalone-threads-establish-their-own-audience).
+
+Group membership seeds participation only when the thread starts. Later unmentioned messages
+address the thread's current participants; they do not re-enroll the group or restore someone
+who left. Later group additions grant eligible access without joining every existing thread.
 
 These are thread participation rules. The initiating application operation must authorize
 the requested conversation and participant changes. Adding a thread participant does not create
@@ -2623,6 +2634,13 @@ triage triggers evaluation even when triage already participates in the thread.
 
 Receiving a notification is not itself an instruction to invoke a harness. The handler
 uses the activity type and its recorded meaning to decide what to do.
+
+For a human-authored broadcast, agents selected as participants may take a turn to evaluate
+relevance, ask a question, do work, respond, or finish silently. Responsibility for relevance
+sits with the recipient. Explicit mentions make a request direct and increase the expectation
+of handling it, but do not require a meaningless visible reply. A completed relevance evaluation
+with no response is a handled outcome, not unfinished input to retry. This recipient-processing
+behavior is design intent; the current implementation only generates pending notifications.
 
 | Recipient          | Activity                                                        | Handling                                                                                          |
 | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |

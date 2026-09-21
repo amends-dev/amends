@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { Entry } from "../journal/entry.ts";
 import { WorkspaceId } from "../workspace/id.ts";
+import { ThreadParticipationId } from "../thread/participation/id.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
 export type Id = typeof Id.Type;
@@ -23,18 +24,23 @@ export const Recipient = Schema.TaggedUnion({
 export type Recipient = typeof Recipient.Type;
 
 /** Acknowledgment outcomes will extend this state when their operations are implemented. */
-export const State = Schema.TaggedUnion({ Pending: {} });
+export const State = Schema.TaggedUnion({
+  Pending: {},
+  Discarded: { reason: Schema.Literal("participation-ended") },
+});
 export type State = typeof State.Type;
 
 /**
- * One recipient's pending notification of a recorded source. Generation will
- * choose a stable ID and recorded time from historical input, including on replay.
+ * One recipient's notification of a recorded source. Generation chooses
+ * a stable ID and recorded time from historical input, including on replay.
  * Source existence and recipient selection are responsibilities of that workflow.
  */
 export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   source: Source,
+  /** Present for thread-generated member notifications; ties pending work to one participation. */
+  participationId: Schema.optionalKey(ThreadParticipationId.Id),
   recipient: Recipient,
   recordedAt: Schema.DateTimeUtcFromString,
   state: State,

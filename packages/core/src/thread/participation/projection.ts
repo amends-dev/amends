@@ -1,0 +1,31 @@
+import { Effect } from "effect";
+import { Projection } from "../../journal/projection.ts";
+import { ThreadParticipationFacts } from "./facts.ts";
+import { ThreadParticipationStore } from "./store.ts";
+import { GroupMembershipFacts } from "../../group/membership/facts.ts";
+export const definition = Projection.make("thread.participation", { version: 1 })
+  .on(
+    ThreadParticipationFacts.Added,
+    Effect.fn("ThreadParticipationProjection.added")(function* ({ payload }) {
+      const store = yield* ThreadParticipationStore.Service;
+      if (store.workspaceId !== payload.workspaceId)
+        return yield* new ThreadParticipationStore.Conflict({
+          operation: "project",
+          message: "Fact belongs to another workspace",
+        });
+      yield* store.insert(payload);
+    }),
+  )
+  .on(
+    GroupMembershipFacts.Removed,
+    Effect.fn("ThreadParticipationProjection.departed")(function* ({ payload, provenance }) {
+      const store = yield* ThreadParticipationStore.Service;
+      if (store.workspaceId !== payload.workspaceId)
+        return yield* new ThreadParticipationStore.Conflict({
+          operation: "project",
+          message: "Fact belongs to another workspace",
+        });
+      yield* store.endByAdmission(payload.membershipId, provenance.occurredAt);
+    }),
+  );
+export * as ThreadParticipationProjection from "./projection.ts";

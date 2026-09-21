@@ -1,3 +1,11 @@
+import { AgentPermissions } from "./agent/permissions.ts";
+import { ThreadApplication } from "./thread/application.ts";
+import { ThreadCreation } from "./thread/creation.ts";
+import { ThreadPermissions } from "./thread/permissions.ts";
+import { ThreadProjection } from "./thread/projection.ts";
+import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
+import { ThreadMessageProjection } from "./thread/message/projection.ts";
+import { ThreadActivityProjection } from "./thread/activity/projection.ts";
 /**
  * Compose one workspace's core from its domains. Hosts bind storage to a
  * workspace and supply cryptography; a gateway resolves the acting member and
@@ -43,6 +51,10 @@ const projections = [
   InvitationProjection.definition,
   GroupProjection.definition,
   GroupMembershipProjection.definition,
+  ThreadProjection.definition,
+  ThreadParticipationProjection.definition,
+  ThreadMessageProjection.definition,
+  ThreadActivityProjection.definition,
   NotificationProjection.definition,
 ] as const;
 
@@ -57,6 +69,8 @@ const permissions = [
   GroupPermissions.Create,
   GroupPermissions.Read,
   GroupMembershipPermissions.Manage,
+  ThreadPermissions.Start,
+  AgentPermissions.Use,
 ];
 
 /** The domain journal and its log, over host storage. */
@@ -80,7 +94,8 @@ const operations = Layer.mergeAll(
   ChangeFeedApplication.layer,
   GroupApplication.layer,
   GroupMembershipApplication.layer,
-).pipe(Layer.provide(Layer.mergeAll(Delegation.layer, GroupAudience.layer)));
+  ThreadApplication.layer,
+).pipe(Layer.provide(Layer.mergeAll(Delegation.layer, GroupAudience.layer, ThreadCreation.layer)));
 
 /**
  * Complete core for one workspace: application operations over the journal,

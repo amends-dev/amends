@@ -1,3 +1,7 @@
+import { ThreadFacts } from "../thread/facts.ts";
+import { ThreadMessageFacts } from "../thread/message/facts.ts";
+import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
+import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import { Array, Context, Effect, Layer, Result, Stream } from "effect";
 import type { Scope } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
@@ -51,6 +55,12 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
           const visible = batch.events.filter(
             (event) =>
               !(
+                [
+                  ThreadFacts.Created,
+                  ThreadMessageFacts.Published,
+                  ThreadParticipationFacts.Added,
+                  ThreadActivityFacts.Recorded,
+                ].some((fact) => fact.name === event.name && fact.version === event.version) ||
                 (event.name === GroupFacts.Created.name &&
                   event.version === GroupFacts.Created.version) ||
                 (event.name === GroupMembershipFacts.Added.name &&

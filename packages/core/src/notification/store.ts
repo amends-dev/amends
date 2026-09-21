@@ -3,6 +3,7 @@ import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
+import type { ThreadParticipationId } from "../thread/participation/id.ts";
 
 /** Exclusive keyset boundary for listing; not a journal position or live delivery cursor. */
 export const Cursor = Schema.Struct({
@@ -56,7 +57,7 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
 
   /**
-   * Future projection write, enlisted with the source fact and checkpoint.
+   * Projection write, enlisted with the source activity and checkpoint.
    * Validate before writing. Invalid records, foreign workspaces, reused IDs,
    * and duplicate (source log, source entry, recipient kind, recipient ID)
    * associations conflict atomically. Never upsert or retry internally; reject
@@ -64,6 +65,10 @@ export interface Interface {
    */
   readonly insert: (
     record: Notification.Record,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /** Settle pending agent input for this ended participation, preserving source and recipient history. */
+  readonly discardPendingForParticipation: (
+    id: ThreadParticipationId.Id,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 

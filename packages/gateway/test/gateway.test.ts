@@ -1,3 +1,9 @@
+import {
+  ThreadStore,
+  ThreadParticipationStore,
+  ThreadMessageStore,
+  ThreadActivityStore,
+} from "@amends/core/thread";
 import { expect, it } from "@effect/vitest";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
@@ -115,6 +121,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       NotificationStore.Service,
       NotificationStore.Service.of({
+        discardPendingForParticipation: unexpected,
         workspaceId: boundWorkspaceId,
         get: unexpected,
         listByRecipient: unexpected,
@@ -122,6 +129,31 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         insert: unexpected,
       }),
     ),
+    Context.add(ThreadStore.Service, {
+      workspaceId: boundWorkspaceId,
+      get: unexpected,
+      listByGroup: unexpected,
+      insert: unexpected,
+    }),
+    Context.add(ThreadParticipationStore.Service, {
+      workspaceId: boundWorkspaceId,
+      get: unexpected,
+      listByThread: unexpected,
+      listByAdmission: unexpected,
+      insert: unexpected,
+      endByAdmission: unexpected,
+    }),
+    Context.add(ThreadMessageStore.Service, {
+      workspaceId: boundWorkspaceId,
+      get: unexpected,
+      insert: unexpected,
+    }),
+    Context.add(ThreadActivityStore.Service, {
+      workspaceId: boundWorkspaceId,
+      get: unexpected,
+      listByThread: unexpected,
+      insert: unexpected,
+    }),
     Context.add(
       GroupStore.Service,
       GroupStore.Service.of({ workspaceId: boundWorkspaceId, get: unexpected, insert: unexpected }),
@@ -411,11 +443,11 @@ it.effect("concurrent requests share boot and later requests do not replay or re
           yield* Deferred.succeed(resume, undefined);
           yield* Fiber.join(requests);
           expect(executed).toBe(20);
-          expect(reads).toBe(8);
+          expect(reads).toBe(12); // One replay read per registered projection.
           yield* gateway.asMember(workspaceId, alice, operation);
           yield* gateway.inWorkspace(workspaceId, operation);
           expect(bound).toBe(1);
-          expect(reads).toBe(8);
+          expect(reads).toBe(12); // One replay read per registered projection.
           expect(executed).toBe(22);
         }).pipe(Effect.provide(host(storage)));
       }),

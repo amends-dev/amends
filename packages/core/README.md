@@ -20,7 +20,9 @@ The current domains contain these features:
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
-| `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
+| `notification`  | Notification records, inbox reads, opening-activity generation, and departure settlement.        |
+| `thread`        | Private-group starts, participation, user messages, timeline activity, and projection storage.   |
+| `agent`         | Permission to direct input to an agent workspace member.                                         |
 | `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.     |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
 
@@ -31,7 +33,7 @@ management.
 
 The notification foundation is exported as `@amends/core/notification`. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient and
-currently supports only `Pending` state. Triage is one recipient per workspace,
+supports `Pending` and departure-related `Discarded` states. Triage is one recipient per workspace,
 represented by `{ _tag: "Triage" }` without a person ID. Both storage adapters implement its bounded recipient reads
 and transactional insert. `NotificationApplication.get`, `list`, and `listPending`
 require current active membership and derive the recipient from the acting identity.
@@ -42,10 +44,10 @@ notification or grants access to its source. Core now requires `NotificationStor
 
 The HTTP API exposes these reads, and the web client provides session-scoped query
 atoms. Contact and Triage recipients are available to internal storage consumers; the
-member inbox API remains limited to the acting human or agent. Generation,
-acknowledgment, and delivery remain deferred. The empty projection
-still advances its checkpoint; introducing historical generation requires fresh
-development data or explicit projection preparation.
+member inbox API remains limited to the acting human or agent. The projection now generates
+notifications from recorded opening-message activity and settles pending agent input on group
+departure. It preserves historical recipient selection and references the originating participation.
+General acknowledgment, recipient processing, and delivery remain deferred.
 
 Membership demonstrates the feature layout:
 
@@ -166,7 +168,25 @@ that workspace. Adding a Thread target supplies scoped grant storage. The
 also requires group access or standalone participation alongside action permissions.
 Group creation, reads, admission/departure, and the shared group-audience policy are implemented.
 Thread reads and their complete audience/action policy are not.
-The thread module currently contains only its ID.
+The thread module supplies the opening-message workflow described below.
+
+## Starting a thread in a private group
+
+`ThreadApplication.startInGroup({ groupId, text, mentions })` requires a human actor, current
+group membership, `thread.start` on the group, and `agent.use` on each selected agent member.
+An empty mention array enrolls all current active group members; explicit mentions select the
+author and mentioned members. The thread, admissions, verbatim user text, sequence-1
+`MessagePublished` activity, notifications, and checkpoints commit together.
+
+`ThreadCreation` is the internal reusable creation service, excluded from `Core.Operations`.
+The authorized workflow calls it within its transaction; it does not repeat a separate action
+permission check. Four store contracts persist threads, participations, messages, and timeline
+activity. Participations reference the exact group admission; group departure ends them and
+discards pending agent input. Replay uses recorded recipients and stable notification IDs.
+
+These operations reuse the existing workspace journal; the timeline is a read model of ordered
+activity, not an independent second event stream. No thread read, reply, HTTP/UI, or agent-turn
+execution workflow is supplied yet. See [thread workflows](../../docs/thread-workflows.md).
 
 ## Permission declarations and built-in roles
 
@@ -297,7 +317,7 @@ batch. Events committed after subscription are retained even before Ready is rea
 The feature has no store, projection, facts, cursor, or history API. It consumes
 confirmed local publications and does not create application notifications.
 Membership is checked when opening the subscription; per-event authorization and
-field filtering are deferred. Private group creation, admission, and departure facts are withheld,
+field filtering are deferred. Private group and thread facts are withheld,
 including their provenance, until audience-aware group delivery exists. Commits containing
 only those facts emit no public change; mixed commits retain their other supported events.
 Lag or an unsupported payload/version fails the stream with `ChangeFeed.Unavailable`;

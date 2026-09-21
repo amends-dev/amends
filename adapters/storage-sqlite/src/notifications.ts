@@ -1,3 +1,4 @@
+import { ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -75,6 +76,18 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       (recipient, options) => list(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
+    ),
+    discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
+      function* (input) {
+        yield* Store.Transaction;
+        const id = yield* Schema.decodeEffect(ThreadParticipation.Id)(input).pipe(
+          Effect.mapError(storeConflict(NotificationStore, "discardPendingForParticipation")),
+        );
+        yield* guard(
+          sql`UPDATE notifications SET record = json_set(record, '$.state._tag', 'Discarded', '$.state.reason', 'participation-ended') WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.participationId') = ${id} AND json_extract(record, '$.recipient._tag') = 'Agent' AND json_extract(record, '$.state._tag') = 'Pending'`,
+          true,
+        ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForParticipation")));
+      },
     ),
     insert: Effect.fn("Notifications.insert")(function* (input) {
       yield* Store.Transaction;

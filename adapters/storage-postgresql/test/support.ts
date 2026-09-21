@@ -1,3 +1,9 @@
+import {
+  ThreadStore,
+  ThreadParticipationStore,
+  ThreadMessageStore,
+  ThreadActivityStore,
+} from "@amends/core/thread";
 import { inject } from "@effect/vitest";
 import * as Core from "@amends/core";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
@@ -38,6 +44,10 @@ export const journalLog = Log.Id.make("journal");
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
   context,
+  threads: Context.get(context, ThreadStore.Service),
+  participations: Context.get(context, ThreadParticipationStore.Service),
+  messages: Context.get(context, ThreadMessageStore.Service),
+  activities: Context.get(context, ThreadActivityStore.Service),
   store: Context.get(context, Store.Service),
   checkpoints: Context.get(context, Checkpoint.Service),
   workspace: Context.get(context, WorkspaceStore.Service),

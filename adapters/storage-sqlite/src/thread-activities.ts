@@ -1,0 +1,102 @@
+import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread";
+
+import { Store } from "@amends/core/journal";
+import { Array, Effect, Layer, Schema } from "effect";
+
+import { Binding } from "./binding.ts";
+import { storeConflict, storeError, storeFailure } from "./errors.ts";
+const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
+const codec = Schema.fromJsonString(ThreadActivity.Record);
+const encode = Schema.encodeEffect(codec);
+const decode = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({
+      workspaceId: ThreadActivity.Record.fields.workspaceId,
+      id: ThreadActivity.Id,
+      threadId: ThreadActivity.Record.fields.threadId,
+      messageId: ThreadActivity.Record.fields.messageId,
+      sequence: ThreadActivity.Record.fields.sequence,
+      record: codec,
+    }).check(
+      Schema.makeFilter(
+        (row) =>
+          (row.workspaceId === row.record.workspaceId &&
+            row.id === row.record.id &&
+            row.threadId === row.record.threadId &&
+            row.messageId === row.record.messageId &&
+            row.sequence === row.record.sequence) ||
+          "Columns must match the stored record",
+      ),
+    ),
+  ),
+);
+const records = (rows: ReadonlyArray<{ readonly record: ThreadActivity.Record }>) =>
+  rows.map((row) => row.record);
+/** Workspace-bound thread-activities projection storage. @category constructors */
+export const make = Effect.fn("ThreadActivities.make")(function* () {
+  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { sql } = database;
+  const columns = sql`workspace_id AS workspaceId, id, thread_id AS threadId, message_id AS messageId, sequence, record`;
+  return ThreadActivityStore.Service.of({
+    workspaceId,
+    get: Effect.fn("ThreadActivities.get")(
+      function* (input) {
+        const id = yield* Schema.decodeEffect(ThreadActivity.Id)(input);
+        return yield* guard(
+          sql`SELECT ${columns} FROM thread_activities WHERE workspace_id = ${workspaceId} AND id = ${id}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records), Effect.map(Array.head));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "get")),
+    ),
+    listByThread: Effect.fn("ThreadActivities.listByThread")(
+      function* (input) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+        return yield* guard(
+          sql`SELECT ${columns} FROM thread_activities WHERE workspace_id = ${workspaceId} AND thread_id = ${id} ORDER BY sequence`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
+    ),
+    insert: Effect.fn("ThreadActivities.insert")(function* (input) {
+      yield* Store.Transaction;
+      const record = yield* validate(input).pipe(
+        Effect.mapError(storeConflict(ThreadActivityStore, "insert")),
+      );
+      if (record.workspaceId !== workspaceId)
+        return yield* new ThreadActivityStore.Conflict({
+          operation: "insert",
+          message: "Invalid initial record or workspace",
+        });
+      const related = yield* guard(
+        sql`SELECT id FROM thread_messages WHERE workspace_id = ${workspaceId} AND id = ${record.messageId} AND thread_id = ${record.threadId}`,
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
+      if (related.length === 0)
+        return yield* new ThreadActivityStore.Conflict({
+          operation: "insert",
+          message: "Missing or inconsistent references",
+        });
+      const sequenceRows = yield* guard(
+        sql<{
+          next: number;
+        }>`SELECT coalesce(max(sequence),0)+1 AS next FROM thread_activities WHERE workspace_id = ${workspaceId} AND thread_id = ${record.threadId}`,
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
+      if (sequenceRows[0]?.next !== record.sequence)
+        return yield* new ThreadActivityStore.Conflict({
+          operation: "insert",
+          message: "Activity must follow the current thread sequence",
+        });
+      const data = yield* encode(record).pipe(
+        Effect.mapError(storeFailure(ThreadActivityStore, "insert")),
+      );
+      yield* guard(
+        sql`INSERT INTO thread_activities (workspace_id,id,thread_id,message_id,sequence,record) VALUES (${workspaceId},${record.id},${record.threadId},${record.messageId},${record.sequence},${data})`,
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
+    }),
+  });
+});
+/** @category layers */
+export const layer = Layer.effect(ThreadActivityStore.Service, make());
+export * as ThreadActivities from "./thread-activities.ts";

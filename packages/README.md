@@ -87,15 +87,16 @@ cryptography, and workspace event bus a host must supply, derived from that laye
 `Operations` is the set of application services a gateway may run. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/group`, `@amends/core/thread`, and
-`@amends/core/workspace`, each exposing the records, facts, stores, projections,
-and operations it implements. The thread subpath currently exposes only its ID.
+`@amends/core/agent`, and `@amends/core/workspace`, each exposing the records, facts, stores, projections,
+and operations it implements. The thread surface implements private-group starts with initial
+participation, a text message, ordered activity, and notification generation. Agent-use permission
+is declared in the agent domain; execution remains future work.
 The group surface supplies private team creation, authorized reads, an internal audience check,
 and membership admission/departure, with
 separate creation and Group-scoped membership-management permissions. Self-leave needs no
 management grant; workspace removal also settles group admissions. Ordinary group reads require
 membership and `group.read`; separate management reads expose known-group metadata and current
-admissions under `group.membership.manage`. The notification surface includes its record, store contract, authorized inbox reads, and empty
-projection. Notification reads derive the recipient from the current actor and
+admissions under `group.membership.manage`. The notification surface includes its record, store contract, authorized inbox reads, opening-activity generation, and pending-agent-input settlement. Notification reads derive the recipient from the current actor and
 require active membership. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 
