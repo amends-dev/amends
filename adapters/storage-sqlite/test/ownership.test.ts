@@ -393,6 +393,9 @@ test("ownership transfer survives restart and journal replay without reauthorizi
             yield* sql`DELETE FROM checkpoints`;
           }),
         );
+        yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          Effect.provide(core(yield* boundTo(saved.workspace.id))),
+        );
         const replayed = yield* Operations.ownership(saved.workspace.id, bob);
         expect(replayed).toEqual(view);
         expect((yield* Operations.ownership(saved.workspace.id, alice)).canTransfer).toBe(false);

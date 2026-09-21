@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Commit, Store } from "@amends/core/journal";
+import { Checkpoint, Commit, CommittedEvents, Store } from "@amends/core/journal";
 import {
   Notification,
   NotificationApplication,
@@ -15,11 +15,26 @@ import {
   Workspace,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Cause, Context, Crypto, Effect, Exit, Layer, Option, Result, Schema } from "effect";
+import {
+  Cause,
+  Context,
+  Crypto,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Result,
+  Schema,
+  Scope,
+  Stream,
+} from "effect";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
 import { WorkspaceEvents } from "../src/workspace-events.ts";
+import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -28,14 +43,16 @@ const memberId = Member.Id.make("member");
 const unexpected = () => Effect.die(new Error("Unexpected storage operation in gateway test"));
 
 interface BindingOptions {
+  readonly workspaceId?: Workspace.Id;
   readonly findActive?: MemberStore.Interface["findActive"];
   readonly read?: Store.Interface["read"];
   readonly memberWorkspaceId?: Workspace.Id;
 }
 
 /** Empty journal and explicit host contracts; unexpected writes fail instead of simulating storage. */
-const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorage.Bindings> =>
-  Context.make(
+const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorage.Bindings> => {
+  const boundWorkspaceId = options.workspaceId ?? workspaceId;
+  return Context.make(
     Store.Service,
     Store.Service.of({
       readFacts: () => Effect.succeed([]),
@@ -59,7 +76,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       WorkspaceStore.Service,
       WorkspaceStore.Service.of({
-        workspaceId,
+        workspaceId: boundWorkspaceId,
         get: unexpected(),
         insert: unexpected,
         transferOwnership: unexpected,
@@ -68,12 +85,17 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       MemberStore.Service,
       MemberStore.Service.of({
-        workspaceId: options.memberWorkspaceId ?? workspaceId,
+        workspaceId: options.memberWorkspaceId ?? boundWorkspaceId,
         get: unexpected,
         findActive:
           options.findActive ??
           ((identity) =>
-            Effect.succeedSome({ id: memberId, workspaceId, identity, status: "active" })),
+            Effect.succeedSome({
+              id: memberId,
+              workspaceId: boundWorkspaceId,
+              identity,
+              status: "active",
+            })),
         list: unexpected(),
         insert: unexpected,
         markRemoved: unexpected,
@@ -82,7 +104,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       InvitationStore.Service,
       InvitationStore.Service.of({
-        workspaceId,
+        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         listPendingByRecipient: unexpected,
@@ -93,7 +115,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       NotificationStore.Service,
       NotificationStore.Service.of({
-        workspaceId,
+        workspaceId: boundWorkspaceId,
         get: unexpected,
         listByRecipient: unexpected,
         listPendingByRecipient: unexpected,
@@ -103,7 +125,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       RoleStore.Service,
       RoleStore.Service.of({
-        workspaceId,
+        workspaceId: boundWorkspaceId,
         get: unexpected,
         insert: unexpected,
         rename: unexpected,
@@ -113,7 +135,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       AssignmentStore.Service,
       AssignmentStore.Service.of({
-        workspaceId,
+        workspaceId: boundWorkspaceId,
         get: unexpected,
         listActiveByMember: unexpected,
         listActiveByRole: unexpected,
@@ -122,6 +144,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
     ),
   );
+};
 
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
@@ -139,6 +162,7 @@ const run = <A, E>(
 ) =>
   Effect.runPromise(
     Effect.flatMap(Gateway.make(), program).pipe(
+      Effect.scoped,
       Effect.provide(
         host({
           forWorkspace: () => Effect.succeed(bindings(options)),
@@ -295,7 +319,7 @@ test.each(["make", "layer"] as const)(
       construction === "make"
         ? Effect.flatMap(Gateway.make(), program)
         : Effect.flatMap(Gateway.Service, program).pipe(Effect.provide(Gateway.layer));
-    await Effect.runPromise(configured.pipe(Effect.provide(host(storage))));
+    await Effect.runPromise(configured.pipe(Effect.scoped, Effect.provide(host(storage))));
   },
 );
 
@@ -333,5 +357,235 @@ test("one gateway resolves each caller's current membership and stops after revo
             : Option.none();
         }),
     },
+  );
+});
+
+test("concurrent requests share boot and later requests do not replay or rebind", async () => {
+  let bound = 0;
+  let reads = 0;
+  let executed = 0;
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const resume = yield* Deferred.make<void>();
+        const storage = WorkspaceStorage.Service.of({
+          forWorkspace: () =>
+            Effect.sync(() => {
+              bound += 1;
+              return bindings({
+                read: () =>
+                  Effect.gen(function* () {
+                    reads += 1;
+                    yield* Deferred.succeed(entered, undefined);
+                    yield* Deferred.await(resume);
+                    return [];
+                  }),
+              });
+            }),
+        });
+        yield* Effect.gen(function* () {
+          const gateway = yield* Gateway.make();
+          const operation = Effect.sync(() => {
+            executed += 1;
+          });
+          const requests = yield* Effect.forEach(
+            Array.from({ length: 20 }),
+            () => gateway.inWorkspace(workspaceId, operation),
+            { concurrency: "unbounded" },
+          ).pipe(Effect.forkChild({ startImmediately: true }));
+          yield* Deferred.await(entered);
+          expect(bound).toBe(1);
+          expect(executed).toBe(0);
+          yield* Deferred.succeed(resume, undefined);
+          yield* Fiber.join(requests);
+          expect(executed).toBe(20);
+          expect(reads).toBe(6);
+          yield* gateway.asMember(workspaceId, alice, operation);
+          yield* gateway.inWorkspace(workspaceId, operation);
+          expect(bound).toBe(1);
+          expect(reads).toBe(6);
+          expect(executed).toBe(22);
+        }).pipe(Effect.provide(host(storage)));
+      }),
+    ),
+  );
+});
+
+test("failed boot releases its bus and a later acquisition retries once", async () => {
+  const failure = new Store.Failure({ operation: "read", cause: "boot failed" });
+  let bound = 0;
+  let executed = 0;
+  const buses: Array<CommittedEvents.Interface> = [];
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const events = yield* WorkspaceEvents.Service;
+        const gateway = yield* Gateway.make().pipe(
+          Effect.provideService(WorkspaceEvents.Service, {
+            forWorkspace: (id) =>
+              events.forWorkspace(id).pipe(
+                Effect.tap((bus) =>
+                  Effect.sync(() => {
+                    buses.push(bus);
+                  }),
+                ),
+              ),
+          }),
+        );
+        const operation = Effect.sync(() => {
+          executed += 1;
+        });
+        expect(defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, operation)))).toBe(
+          failure,
+        );
+        expect(executed).toBe(0);
+        const failedBus = buses[0];
+        if (failedBus === undefined) throw new Error("Expected the failed boot's bus");
+        expect(yield* Effect.flip(failedBus.subscribe)).toMatchObject({
+          _tag: "CommittedEvents.Closed",
+        });
+        yield* gateway.inWorkspace(workspaceId, operation);
+        yield* gateway.inWorkspace(workspaceId, operation);
+        expect(executed).toBe(2);
+        expect(bound).toBe(2);
+        expect(buses).toHaveLength(2);
+        expect(buses[1]).not.toBe(failedBus);
+      }),
+    ).pipe(
+      Effect.provide(
+        host({
+          forWorkspace: () =>
+            Effect.sync(() => {
+              bound += 1;
+              return bindings(bound === 1 ? { read: () => Effect.fail(failure) } : {});
+            }),
+        }),
+      ),
+    ),
+  );
+});
+
+test("interrupting a caller leaves shared boot available to the next request", async () => {
+  let bound = 0;
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const resume = yield* Deferred.make<void>();
+        yield* Effect.gen(function* () {
+          const gateway = yield* Gateway.make();
+          const first = yield* gateway
+            .inWorkspace(workspaceId, Effect.void)
+            .pipe(Effect.forkChild({ startImmediately: true }));
+          yield* Deferred.await(entered);
+          yield* Fiber.interrupt(first);
+          expect(Exit.hasInterrupts(yield* Fiber.await(first))).toBe(true);
+          const second = yield* gateway
+            .asMember(workspaceId, alice, Actor.Service)
+            .pipe(Effect.forkChild({ startImmediately: true }));
+          yield* Deferred.succeed(resume, undefined);
+          expect((yield* Fiber.join(second)).identity).toEqual(alice);
+          expect(bound).toBe(1);
+        }).pipe(
+          Effect.provide(
+            host({
+              forWorkspace: () =>
+                Effect.gen(function* () {
+                  bound += 1;
+                  yield* Deferred.succeed(entered, undefined);
+                  yield* Deferred.await(resume);
+                  return bindings();
+                }),
+            }),
+          ),
+        );
+      }),
+    ),
+  );
+});
+
+test("workspace runtimes are isolated and a new host boots from storage again", async () => {
+  const requested: Array<Workspace.Id> = [];
+  const storage = {
+    forWorkspace: (id: Workspace.Id) =>
+      Effect.sync(() => {
+        requested.push(id);
+        return bindings({ workspaceId: id });
+      }),
+  };
+  const other = Workspace.Id.make("other");
+  for (let restart = 0; restart < 2; restart += 1) {
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const gateway = yield* Gateway.make();
+          expect((yield* gateway.asMember(workspaceId, alice, Actor.Service)).workspaceId).toBe(
+            workspaceId,
+          );
+          expect((yield* gateway.asMember(other, agent, Actor.Service)).workspaceId).toBe(other);
+          yield* gateway.inWorkspace(workspaceId, Effect.void);
+        }),
+      ).pipe(Effect.provide(host(storage))),
+    );
+  }
+  expect(requested).toEqual([workspaceId, other, workspaceId, other]);
+});
+
+test("boot uses the host context and does not capture the first request's actor or transaction", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const gateway = yield* Gateway.make();
+        yield* gateway.inWorkspace(workspaceId, Effect.void).pipe(
+          Effect.provideService(Actor.Service, { workspaceId, memberId, identity: alice }),
+          Effect.provideService(Store.Transaction, {
+            id: Commit.Id.make("request"),
+            append: unexpected,
+          }),
+        );
+        yield* gateway.inWorkspace(
+          workspaceId,
+          Effect.gen(function* () {
+            expect(Option.isNone(yield* Effect.serviceOption(Actor.Service))).toBe(true);
+            expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
+          }),
+        );
+      }),
+    ).pipe(
+      Effect.provide(
+        host({
+          forWorkspace: () =>
+            Effect.gen(function* () {
+              expect(Option.isNone(yield* Effect.serviceOption(Actor.Service))).toBe(true);
+              expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
+              return bindings();
+            }),
+        }),
+      ),
+    ),
+  );
+});
+
+test("host shutdown closes runtime buses and readers even with an outstanding request lease", async () => {
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const owner = yield* Scope.fork(yield* Scope.Scope);
+        const runtimes = yield* WorkspaceRuntime.make().pipe(Scope.provide(owner));
+        const context = yield* runtimes.forWorkspace(workspaceId);
+        const bus = Context.get(context, CommittedEvents.Service);
+        const stream = yield* bus.subscribe;
+        const reader = yield* Stream.runDrain(stream).pipe(
+          Effect.forkChild({ startImmediately: true }),
+        );
+        yield* Scope.close(owner, Exit.void);
+        expect(Exit.hasInterrupts(yield* Fiber.await(reader))).toBe(true);
+        expect(yield* Effect.flip(bus.subscribe)).toMatchObject({ _tag: "CommittedEvents.Closed" });
+        expect(Exit.hasInterrupts(yield* Effect.exit(runtimes.forWorkspace(workspaceId)))).toBe(
+          true,
+        );
+      }),
+    ).pipe(Effect.provide(host({ forWorkspace: () => Effect.succeed(bindings()) }))),
   );
 });

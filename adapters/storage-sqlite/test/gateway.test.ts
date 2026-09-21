@@ -4,13 +4,15 @@ import { Log } from "@amends/core/journal";
 import {
   InvitationPermissions,
   MemberPermissions,
+  MemberProjection,
   OwnershipPermissions,
 } from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Option } from "effect";
+import { SqlClient } from "effect/unstable/sql";
 import { Operations } from "./operations.ts";
 
-import { alice, bob, views, inDatabase, host, temporary } from "./support.ts";
+import { alice, bob, views, inDatabase, host, temporary, boundTo } from "./support.ts";
 test("one host creates two isolated workspaces and uses each operation's authenticated identity", async () =>
   temporary(async (filename) => {
     expectTypeOf<
@@ -124,3 +126,39 @@ test("workspace creation rejects blank names before persisting a workspace", asy
       }).pipe(Effect.provide(host(location))),
     ),
   ));
+
+test("cold workspace boot replays pending membership history before resolving the caller", async () =>
+  temporary(async (filename) => {
+    const workspace = await Effect.runPromise(
+      Operations.createWorkspace(alice.id).pipe(Effect.provide(host(filename))),
+    );
+    // Prepare a fresh projection target while the host is offline.
+    const before = await inDatabase(
+      filename,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const bound = yield* boundTo(workspace.id);
+        yield* sql.withTransaction(
+          Effect.gen(function* () {
+            yield* sql`DELETE FROM members WHERE workspace_id = ${workspace.id}`;
+            yield* sql`DELETE FROM checkpoints WHERE workspace_id = ${workspace.id} AND name = ${MemberProjection.definition.name}`;
+          }),
+        );
+        expect(yield* bound.members.findActive(alice)).toEqual(Option.none());
+        return yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+      }),
+    );
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const member = yield* Operations.getMember(workspace.id, alice, workspace.ownerMemberId);
+        expect(member).toMatchObject({
+          id: workspace.ownerMemberId,
+          identity: alice,
+          status: "active",
+        });
+        const bound = yield* boundTo(workspace.id);
+        expect(yield* bound.members.findActive(alice)).toEqual(Option.some(member));
+        expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
+      }).pipe(Effect.provide(host(filename))),
+    );
+  }));

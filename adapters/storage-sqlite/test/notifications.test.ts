@@ -432,7 +432,7 @@ it("gateway notification reads enforce recipient and workspace isolation with re
           _tag: "Gateway.NotMember",
         });
         expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
-      }).pipe(Effect.provide(WorkspaceEvents.layer())),
+      }).pipe(Effect.scoped, Effect.provide(WorkspaceEvents.layer())),
     ),
   ));
 

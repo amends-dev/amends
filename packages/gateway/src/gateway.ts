@@ -1,16 +1,17 @@
-import * as Core from "@amends/core";
+import type * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
-import { CommittedEvents, Journal, Store } from "@amends/core/journal";
+import { Store } from "@amends/core/journal";
 import { MemberStore, Workspace, WorkspaceInitialization } from "@amends/core/workspace";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceEvents } from "./workspace-events.ts";
+import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
 export interface Interface {
-  /** Keep workspace services and the bus lease in the caller's scope, including a response stream's lifetime. */
+  /** Keep the workspace lease and operation resources in the caller's scope, including response streams. */
   readonly asMemberScoped: <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
     workspaceId: Workspace.Id,
     identity: Identity.Reference,
@@ -87,11 +88,8 @@ const expose = <A, E, R>(
     return Effect.die(error);
   });
 
-/** Everything a bound core context provides; runners narrow what programs may require. */
-type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
-
 /**
- * Construct the gateway from workspace storage, the shared event registry, and cryptography. Identities come
+ * Construct one gateway and its workspace runtimes in the host scope. Identities come
  * from a trusted ingress; the gateway never accepts client-asserted actors or member IDs.
  *
  * @category constructors
@@ -99,42 +97,17 @@ type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
 export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
   Interface,
   never,
-  WorkspaceStorage.Service | WorkspaceEvents.Service | Crypto.Crypto
+  WorkspaceStorage.Service | WorkspaceEvents.Service | Crypto.Crypto | Scope.Scope
 > {
-  const storage = yield* WorkspaceStorage.Service;
-  const events = yield* WorkspaceEvents.Service;
+  const runtimes = yield* WorkspaceRuntime.make();
   const cryptography = yield* Crypto.Crypto;
 
-  // Failures while binding storage, building core, or catching up projections
-  // are host defects, not outcomes of the operation being run.
   const bind = Effect.fn("Gateway.bind")(function* <A, E>(
     workspaceId: Workspace.Id,
-    program: Effect.Effect<A, E, Provided | Scope.Scope>,
+    program: Effect.Effect<A, E, WorkspaceRuntime.Provided | Scope.Scope>,
   ) {
-    const bindings = yield* storage.forWorkspace(workspaceId);
-    const bus = yield* Effect.orDie(events.forWorkspace(workspaceId));
-    if (bus.workspaceId !== workspaceId)
-      return yield* Effect.die(
-        new CommittedEvents.WorkspaceMismatch({
-          expectedWorkspaceId: workspaceId,
-          actualWorkspaceId: bus.workspaceId,
-        }),
-      );
-    const services = Core.layer.pipe(
-      Layer.provideMerge(
-        Layer.mergeAll(
-          Layer.succeedContext(bindings),
-          Layer.succeed(Crypto.Crypto, cryptography),
-          Layer.succeed(CommittedEvents.Service, bus),
-        ),
-      ),
-      Layer.orDie,
-    );
-    const context = yield* Layer.build(services);
-    return yield* Effect.gen(function* () {
-      yield* Effect.orDie((yield* Journal.Service).replay);
-      return yield* program;
-    }).pipe(Effect.provide(context));
+    const context = yield* runtimes.forWorkspace(workspaceId);
+    return yield* program.pipe(Effect.provide(context));
   });
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
@@ -184,7 +157,7 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
 });
 
 /**
- * Provide the gateway over the caller's workspace storage and cryptography.
+ * Provide one gateway and its workspace runtimes for the host layer's lifetime.
  *
  * @category layers
  */

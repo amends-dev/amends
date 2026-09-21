@@ -1,7 +1,7 @@
 import { expect } from "bun:test";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Actor } from "@amends/core/identity";
-import { Checkpoint, Store } from "@amends/core/journal";
+import { Checkpoint, Journal, Store } from "@amends/core/journal";
 import {
   InvitationApplication,
   OwnershipApplication,
@@ -117,8 +117,11 @@ it("ownership transfer rolls back fully, serializes competing requests, and repl
             yield* sql`DELETE FROM checkpoints`;
           }),
         );
-        expect(yield* read).toEqual(before);
         const bound = yield* boundTo(saved.workspace.id);
+        yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          Effect.provide(core(bound)),
+        );
+        expect(yield* read).toEqual(before);
         expect(
           (yield* bound.assignments.listActiveByMember(saved.workspace.ownerMemberId)).map(
             ({ source }) => source,

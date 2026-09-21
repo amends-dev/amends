@@ -201,6 +201,9 @@ test("removal and pending invitation revocation roll back together, commit once,
             yield* sql`DELETE FROM checkpoints WHERE workspace_id = ${workspace.id} AND name IN (${MemberProjection.definition.name}, ${InvitationProjection.definition.name})`;
           }),
         );
+        yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          Effect.provide(core(bound)),
+        );
         expect(yield* Operations.getMember(workspace.id, alice, member.id)).toMatchObject({
           id: member.id,
           status: "removed",

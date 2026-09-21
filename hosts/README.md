@@ -45,8 +45,10 @@ and code validation happen during operations. Construction issues no token or co
 `LocalHost` and `LocalServer` are composition modules, so they expose layers without
 additional `make` wrappers. `LocalHost.layerSqlite` and `layerPostgres` compose the
 gateway, directory, database adapter, cryptography, and a shared `WorkspaceEvents`
-registry. The registry is host-owned; each gateway operation leases its workspace's
-bus until the operation and its commit observer finish. `LocalServer.layerRoutes`
+registry. The gateway owns prepared workspace runtimes in its host scope. Each
+runtime boots lazily, replays once, and holds its bus lease until host shutdown;
+requests resolve identity and open operation scopes over the prepared services.
+`LocalServer.layerRoutes`
 registers the API and documentation; `LocalServer.layer` adds sign-in, credentials,
 and the Bun HTTP server. `LocalHost.HostLayer` names the layer supplied to the
 server. Database and server resources belong to the layer scope.

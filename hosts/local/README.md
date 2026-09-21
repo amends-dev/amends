@@ -59,8 +59,10 @@ to their layer scopes. Each host also provides one `WorkspaceEvents` registry sh
 by gateway requests and internal consumers. Acquiring a workspace bus and its
 subscription requires holding their scope open; commits publish canonical event
 batches only after storage confirms success. `GET /workspaces/:workspaceId/changes`
-exposes the core change feed through authenticated SSE. A stream holds its workspace
-bus lease until disconnect; ordinary requests hold a lease only for their operation.
+exposes the core change feed through authenticated SSE. The gateway lazily boots
+each workspace once, replaying before it serves operations and retaining the prepared
+services and bus lease until host shutdown. Request scopes own operation resources;
+a stream keeps its subscription open until disconnect.
 Delivery is process-local, with no cross-process recovery in this version.
 Storage behavior is documented by the
 [SQLite](../../adapters/storage-sqlite/README.md) and
