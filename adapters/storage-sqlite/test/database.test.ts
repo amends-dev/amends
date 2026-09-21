@@ -58,3 +58,26 @@ test("database construction fails and rolls back incomplete schema initializatio
     }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:", busyTimeout: 0 }))),
   );
 });
+
+test("commit entry lookups seek within one batch and return index order without sorting", async () =>
+  temporary(async (filename) =>
+    inDatabase(
+      filename,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        // Complete checkpoint batches and keyed append slices use the same access path.
+        for (const range of [sql``, sql`AND entry_index >= ${1} AND entry_index < ${3}`]) {
+          const plan = yield* sql<{
+            detail: string;
+          }>`EXPLAIN QUERY PLAN SELECT id, log_id, position, commit_id, entry_index, recorded_at, payload, subject, fact_name, fact_version, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${"journal"} AND commit_id = ${"commit"} ${range} ORDER BY entry_index`;
+          const details = plan.map((row) => row.detail);
+          expect(
+            details.some((detail) =>
+              detail.includes("workspace_id=? AND log_id=? AND commit_id=?"),
+            ),
+          ).toBe(true);
+          expect(details.some((detail) => detail.includes("TEMP B-TREE"))).toBe(false);
+        }
+      }),
+    ),
+  ));

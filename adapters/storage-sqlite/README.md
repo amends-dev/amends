@@ -19,6 +19,10 @@ Generic execution entries leave fact metadata null. `log_entries_by_fact` suppor
 workspace/log/name reads ordered by position and entry index. These filtered
 entry pages are separate from complete-batch reads used for replay.
 
+`log_entries_by_commit` supports complete-batch checkpoint validation and keyed
+append receipts by workspace, log, commit, and entry index. These lookups seek to
+one commit and read entries in order without scanning the log or sorting a batch.
+
 `log_entries_by_subject` supports entity history across fact names using the
 workspace, log, subject, position, and entry index. Fact subjects are required;
 generic execution entries leave the entire fact header null.
