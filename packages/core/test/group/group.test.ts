@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import { Group } from "../../src/group/group.ts";
+import { GroupMembership } from "../../src/group/membership/membership.ts";
 import { Scope } from "../../src/authorization/scope.ts";
 import { Target } from "../../src/authorization/target.ts";
 import { ThreadId } from "../../src/thread/id.ts";
@@ -35,6 +36,19 @@ it("persisted group records reject kinds and visibility whose workflows are not 
     { ...record, visibility: "Public" },
   ])
     expect(decode(invalid)._tag).toBe("None");
+});
+
+it("adding a member requires both nonempty membership and group IDs", () => {
+  const decode = Schema.decodeUnknownOption(GroupMembership.AddInput);
+  expect(decode({ groupId: "group", memberId: "member" })._tag).toBe("Some");
+  for (const input of [
+    {},
+    { groupId: "group" },
+    { memberId: "member" },
+    { groupId: "", memberId: "member" },
+    { groupId: "group", memberId: "" },
+  ])
+    expect(decode(input)._tag).toBe("None");
 });
 
 it("exact group grants stay separate from other groups, workspaces, and same-ID threads", () => {

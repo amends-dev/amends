@@ -8,7 +8,7 @@ export type Id = GroupId.Id;
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
 export type Name = typeof Name.Type;
 
-/** This first operation creates private team groups; other kinds arrive with their workflows. */
+/** This slice supports private team groups; other kinds arrive with their workflows. */
 export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,

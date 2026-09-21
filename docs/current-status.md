@@ -7,9 +7,9 @@ Workspace creation, membership, required-role invitations, assignment management
 and ownership transfer are implemented through core, the gateway, HTTP, and the
 Solid web app. SQLite and PostgreSQL persist their journal and projections. See
 [workspace workflows](workspace-workflows.md) for the available operations.
-Core and both adapters implement [private team-group creation](group-workflows.md) with
-explicit initial memberships and permission-based authorization. Group reads, later membership
-changes, DMs, public groups, and group HTTP/UI workflows remain unimplemented.
+Core and both adapters implement [group creation and member addition](group-workflows.md) with
+permission-based authorization. Group reads, member removal and self-leave, DMs, public groups,
+and group HTTP/UI workflows remain unimplemented.
 Thread access and activity, turns, agent execution, triage, and channel delivery remain
 design work; the thread package currently supplies only an ID.
 The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)

@@ -14,15 +14,15 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                          |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features.   |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                      |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                    |
-| `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.    |
-| `group`         | Permission-based private team creation, initial group admissions, facts, projections, and storage. |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                              |
+| Domain          | Ownership                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features. |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.              |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
+| `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
+| `group`         | Permission-based private team creation and member addition, facts, projections, and storage.     |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -112,9 +112,18 @@ it; their names play no part in authorization.
 
 Initial members are explicit and may be empty. The creator is admitted only if included.
 `GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
-own ID and workspace-membership reference. Public group reads, membership changes, DMs,
+own ID and workspace-membership reference. Public group reads, removal and self-leave, DMs,
 public groups, threads, and HTTP/UI workflows remain separate work. See
 [group creation](../../docs/group-workflows.md) for the current contract and verification.
+
+`GroupMembershipApplication.add({ groupId, memberId })` requires
+`GroupMembershipPermissions.Manage` (`group.membership.manage`) on that Group target.
+It validates the group and the member's current workspace membership, rejects an active
+duplicate, and publishes a fresh admission using the existing fact and projection. All
+checks and writes share one commit. The caller need not belong to the group when their
+grants authorize management. Creation permission and group membership confer no management
+authority by themselves. Both operations check current permissions, including staged changes
+in a caller's transaction. See [adding a member](../../docs/group-workflows.md#adding-a-member).
 
 ## Identity and target boundaries
 
@@ -131,7 +140,7 @@ scopes compare the workspace, kind, and ID; a workspace scope covers targets in
 that workspace. Adding a Thread target supplies scoped grant storage. The
 [planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
 also requires group access or standalone participation alongside action permissions.
-Group creation is implemented; group/thread reads and that audience policy are not.
+Group creation and member addition are implemented; group/thread reads and that audience policy are not.
 The thread module currently contains only its ID.
 
 ## Permission declarations and built-in roles
@@ -443,6 +452,7 @@ meaning rather than using it as a synonym for a constructor.
 | Member operations     | `MemberApplication.make()`                    | `MemberApplication.Service`             |
 | Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
 | Private team creation | `GroupApplication.make()`                     | `GroupApplication.Service`              |
+| Group member addition | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
 | Assignment operations | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
 | Delegation policy     | `Delegation.make()`                           | `Delegation.Service`                    |
 | Invitation operations | `InvitationApplication.make()`                | `InvitationApplication.Service`         |

@@ -8,6 +8,8 @@ import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { GroupApplication } from "./group/application.ts";
 import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
+import { GroupMembershipApplication } from "./group/membership/application.ts";
+import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
 import { AssignmentProjection } from "./authorization/assignment/projection.ts";
 import { AssignmentApplication } from "./authorization/assignment/application.ts";
@@ -52,6 +54,7 @@ const permissions = [
   AssignmentPermissions.Manage,
   OwnershipPermissions.Transfer,
   GroupPermissions.Create,
+  GroupMembershipPermissions.Manage,
 ];
 
 /** The domain journal and its log, over host storage. */
@@ -74,6 +77,7 @@ const operations = Layer.mergeAll(
   NotificationApplication.layer,
   ChangeFeedApplication.layer,
   GroupApplication.layer,
+  GroupMembershipApplication.layer,
 ).pipe(Layer.provide(Delegation.layer));
 
 /**

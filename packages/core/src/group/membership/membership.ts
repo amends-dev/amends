@@ -19,4 +19,11 @@ export const Record = Schema.Struct({
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
+/** Add an active workspace member to an existing group in the bound workspace. */
+export const AddInput = Schema.Struct({
+  groupId: GroupId.Id,
+  memberId: MemberId.Id,
+});
+export interface AddInput extends Schema.Schema.Type<typeof AddInput> {}
+
 export * as GroupMembership from "./membership.ts";

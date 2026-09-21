@@ -13,7 +13,7 @@ For current behavior, read [workspace workflows](workspace-workflows.md), the
 and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
 and process-local live changes are implemented. Core and both adapters also implement
-permission-authorized private team-group creation with initial memberships. Other group
+permission-authorized private team-group creation and subsequent member addition. Other group
 workflows, thread access and participation/activity,
 turns, execution, notification generation/acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
@@ -2280,13 +2280,16 @@ Its initial `administrator` built-in tier places it in the Administrator and Own
 that placement is a default bundle choice, not a restriction on who may hold the permission.
 Another role, including a future role between Viewer and Administrator, or a direct grant
 can authorize the same operation. Holding an Administrator role without the permission does
-not authorize it. Group-membership management will follow the same rule; its exact permission
-names remain contract work.
+not authorize it. Adding a member to an existing group requires `group.membership.manage`
+on that Group target. Its default tier is also `administrator`, and any role or direct
+grant can provide it. That permission is independent of `group.create` and group membership.
 
-The implemented first operation creates a private team group and an explicit list of initial
-memberships atomically. Its creation permission covers that requested audience without a
-second membership-management check. The creator joins only if included in the list. See
-[group creation](group-workflows.md) for its implemented contract and remaining workflows.
+Group creation records a private team group and an explicit list of initial memberships
+atomically. Its creation permission covers that requested audience without a second
+membership-management check. The creator joins only if included in the list. A later
+addition checks management permission, the group's existence, the workspace member's
+eligibility, and absence of an active admission in the same commit as its publication.
+See [group workflows](group-workflows.md) for the implemented contracts and remaining work.
 
 Starting a DM is a member operation. The initiating member is one of its two members and
 selects one other active human or agent member in the same workspace. Selecting an agent
@@ -2398,7 +2401,8 @@ sharing rules remain open; group membership is not inferred from contact partici
 The group/thread relationship, inherited audience, standalone admission, separation from
 notification selection, permission-based group management, and self-service departure are
 agreed. Any active workspace member can start a DM. Private team-group creation is implemented
-through `group.create`; its default role placement does not limit future grants or roles.
+through `group.create`, and member addition through `group.membership.manage`. Their default
+role placement does not limit future grants or roles.
 Other group operations, their permission declarations, broader group schemas, and admission
 UI remain contract work.
 Whether a pair has one reusable DM group and its readmission behavior, public-group discovery,

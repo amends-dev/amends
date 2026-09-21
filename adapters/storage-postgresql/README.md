@@ -75,6 +75,9 @@ Stores validate records and workspace references before writes. Replay accepts h
 references to removed workspace members; current eligibility belongs to application operations.
 The group suite covers permission grants, rollback, reopening, replay, and direct-store
 constraints. See [group creation](../../docs/group-workflows.md) for the implemented scope.
+Later member additions reuse the same store and admission facts. The membership suite
+also verifies exact group grants, concurrent additions over independent connections,
+duplicate rejection, current eligibility, rollback, and replay.
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

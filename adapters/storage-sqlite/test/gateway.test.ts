@@ -10,7 +10,7 @@ import {
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
-import { GroupPermissions } from "@amends/core/group";
+import { GroupPermissions, GroupMembershipPermissions } from "@amends/core/group";
 import { Operations } from "./operations.ts";
 import { alice, bob, views, inDatabase, host, temporary, boundTo } from "./support.ts";
 
@@ -99,6 +99,7 @@ it.effect(
                       AssignmentPermissions.Manage.name,
                       ...(id === BuiltinRoles.OwnerId ? [OwnershipPermissions.Transfer.name] : []),
                       GroupPermissions.Create.name,
+                      GroupMembershipPermissions.Manage.name,
                     ],
                   }),
                 );

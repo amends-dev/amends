@@ -1,8 +1,9 @@
-# Group creation
+# Group workflows
 
-Core implements private team-group creation and its initial memberships over SQLite and
-PostgreSQL. The operation is available through `GroupApplication.Service` in a workspace
-context, including `Gateway.asMember`. There is no group HTTP endpoint or web interface yet.
+Core implements private team-group creation and adding members to existing groups over
+SQLite and PostgreSQL. These operations are available through `GroupApplication.Service`
+and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
+There is no group HTTP endpoint or web interface yet.
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
 broader design; DMs, public groups, and thread access remain future work.
 
@@ -22,8 +23,39 @@ does not invoke it or grant permission to use it for work.
 
 The creator is included only when their membership ID appears in `memberIds`. An empty list
 is valid; creator attribution does not establish a membership or special group ownership.
-The creation permission covers the initial audience as part of this operation. Later
-membership management will have its own operations and permissions.
+The creation permission covers the initial audience as part of this operation. Adding
+members after creation uses a separate operation and permission.
+
+## Adding a member
+
+`GroupMembershipApplication.add({ groupId, memberId })` requires
+`group.membership.manage` on the selected group. `GroupMembershipPermissions.Manage`
+declares this permission, with an initial `administrator` tier for new built-in role
+bundles. Any role or direct grant can supply it. An exact Group scope authorizes that
+group only; a workspace scope covers groups in that workspace.
+
+The caller needs active workspace membership and the management permission. They need
+neither group membership nor a separate member-read permission. Group creation authority,
+creator attribution, and belonging to the group do not grant management authority.
+The group's creation workflow continues to require only `group.create` for its initial audience.
+
+After authorization, the operation checks the group exists in the bound workspace and
+`memberId` names an active human or agent workspace membership there. Missing and foreign
+references produce the same not-found outcomes. It rejects an existing active admission
+with `GroupMembershipApplication.AlreadyMember`, without publishing another fact.
+The other public outcomes are `GroupNotFound`, `MemberNotFound`, and `InactiveMember`
+in that namespace; the gateway preserves them.
+
+A successful addition returns a fresh `GroupMembership.Record` and publishes the existing
+`group.membership.added` fact with its own admission time and the current operation's
+provenance. It preserves the group record and previous admissions. It neither invokes
+an agent nor enrolls anyone in a thread. Repeating the request while the admission remains
+active returns `AlreadyMember`; it does not create another admission or act as a request receipt.
+
+Authorization, eligibility, the duplicate check, and publication share one commit and
+honor staged changes in an outer transaction. Concurrent additions cannot create competing
+active admissions: a later serialized request sees `AlreadyMember`, while storage contention
+can return a conflict. The operation does not automatically retry the transaction.
 
 ## Atomic creation and recorded history
 
@@ -34,8 +66,9 @@ journal entry, or checkpoint.
 
 `group.created` records the group's ID, workspace, `Team` kind, `Private` visibility, name,
 creator membership, and creation time. Each `group.membership.added` records a fresh admission
-ID, group, workspace membership, admission time, and active status. Its provenance refers to
-the creation event as its cause. All initial admissions use the group's creation time.
+ID, group, workspace membership, admission time, and active status. Initial admissions refer
+to the creation event as their cause and use the group's creation time. Later additions use
+their own operation's provenance and admission time.
 
 Group membership is distinct from workspace membership and thread participation. References
 to workspace membership IDs prevent a later workspace readmission from silently inheriting
@@ -56,7 +89,7 @@ idempotency contract yet. An uncertain commit must be reconciled before another 
 
 ## Integration and current limits
 
-`@amends/core/group` exports the models, application, facts, projections, permission, and
+`@amends/core/group` exports the models, applications, facts, projections, permissions, and
 store contracts. Core requires `GroupStore` and `GroupMembershipStore`; both adapters compose
 them over the same workspace transaction. Authorization targets now include `Group`, and
 both adapters preserve exact group scopes in grants. Target support alone does not implement
@@ -68,16 +101,21 @@ no public change; a mixed commit retains its other supported events in order. Gr
 and live delivery will need their own audience-aware contract. Creation generates no
 notifications because notifications originate from thread activity, which is not implemented.
 
-DMs, public-group joining/discovery, membership changes, thread creation, and HTTP/UI workflows
+DMs, public-group joining/discovery, removal and self-leave, thread creation, and HTTP/UI workflows
 remain separate implementation steps. See [known limitations](current-status.md).
 
-The storage baselines and default permission bundles changed. Existing disposable development
-databases need to be recreated; no upgrade migration or data reset is performed automatically.
+Group creation introduced new storage baselines. Adding members reuses those tables and facts;
+it adds `group.membership.manage` to newly initialized permission bundles. Existing stored
+roles are not updated automatically. Development uses recreated databases after permission
+changes; no migration or data reset is performed by this operation.
 
 ## Verification
 
 The group suites in both adapters cover custom-role and direct permission grants, permission
 revocation, explicit human/agent audiences, invalid and foreign memberships, rollback after a
 partial projection, outer transaction rollback, reopening, replay, and store constraints.
+The membership suites also cover management scoped to one group, independence from creation
+permission and group membership, duplicate requests, concurrent connections, current eligibility,
+outer transaction changes, projection rollback, gateway error exposure, and later-admission replay.
 Core tests cover schema boundaries, exact group scopes, and withholding private group facts
 from the public change feed. Run `bun run check` and `bun run test` from the repository root.
