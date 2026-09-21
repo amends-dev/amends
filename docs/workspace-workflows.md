@@ -130,7 +130,8 @@ protected from these mutations, including attempts by the owner. Ownership trans
 has its own operation. Custom-role management remains unimplemented.
 
 The web member details show actual assignments with revoke and change-role controls
-when permitted. Refresh access after a stale-change error before submitting again.
+when permitted. The workspace change stream invalidates access queries automatically.
+After a stale-change error, review the updated access before submitting again.
 Invitation forms offer role choices from the same backend policy.
 
 ## Ownership transfer

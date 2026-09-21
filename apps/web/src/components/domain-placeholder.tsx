@@ -1,6 +1,10 @@
 import { DocumentTitle } from "./document-title.tsx";
 import { EmptyState, EmptyStateIllustration, PageHeader, Shell } from "@amends/ui/components";
-export function DomainPlaceholder(props: { title: string }) {
+import type { ComponentProps } from "solid-js";
+export function DomainPlaceholder(props: {
+  title: string;
+  illustration: ComponentProps<typeof EmptyStateIllustration>["kind"];
+}) {
   return (
     <>
       <DocumentTitle title={props.title} />
@@ -11,7 +15,7 @@ export function DomainPlaceholder(props: { title: string }) {
         <EmptyState
           title="Nothing here yet"
           description={props.title + " will appear here once that part of the workspace exists."}
-          illustration={<EmptyStateIllustration kind="unstitched-cloth" />}
+          illustration={<EmptyStateIllustration kind={props.illustration} />}
         />
       </Shell.Main>
     </>

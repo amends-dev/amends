@@ -67,7 +67,7 @@ export const explain = (cause: Cause.Cause<unknown>): string => {
     case "Delegation.RoleNotFound":
       return "This role is unavailable in the workspace.";
     case "AssignmentApplication.Changed":
-      return "Their roles changed since you loaded them. Refresh access before trying again.";
+      return "Their roles changed since you loaded them. Review the latest access before trying again.";
     case "AssignmentApplication.InactiveMember":
       return "Removed members cannot receive access. Invite them again to rejoin.";
     case "AssignmentApplication.MemberNotFound":

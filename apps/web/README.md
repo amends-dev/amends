@@ -228,7 +228,9 @@ There is no page-header registration or separate shell for sign-in and workspace
   and `person` selection links remain readable.
 
 Home, Triage, Tasks, Agents, Channels, Environments, and Connections remain explicit
-placeholder pages until those backend domains exist. Workspaces have required display
+placeholder pages until those backend domains exist. Each page selects its own
+`EmptyStateIllustration` variant through `DomainPlaceholder`, matching the corresponding
+design-system screen. Workspaces have required display
 names and stable IDs for routing. Declining an invitation is not an available backend operation.
 
 The [accepted architecture proposal](../../docs/web-architecture-proposal.md) explains

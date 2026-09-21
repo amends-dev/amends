@@ -112,9 +112,6 @@ export function MemberAccess(props: { memberId: Member.Id }) {
       </QueryView>
       <CommandError result={change.result()} />
       <CommandError result={revoke.result()} />
-      <Button variant="secondary" disabled={pending()} onClick={query.refresh}>
-        Refresh access
-      </Button>
     </Section>
   );
 }

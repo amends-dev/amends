@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { BuiltinRoles } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
 import { Member, Workspace } from "@amends/core/workspace";
 import { SignIn } from "@amends/gateway/sign-in";
@@ -9,6 +9,8 @@ import { saveSession } from "../src/session/session.ts";
 import { WorkspaceContext } from "../src/workspace/context.tsx";
 import { IssueInvitationForm } from "../src/features/invitations/issue-invitation-form.tsx";
 import { MemberAccess } from "../src/features/members/member-access.tsx";
+import { Changes } from "../src/api/changes.ts";
+import { useQuery } from "../src/api/hooks.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const ownerId = Member.Id.make("owner");
@@ -88,12 +90,19 @@ it("invitations submit one selected role without raw permission grants", async (
   await screen.findByText(/Issued an invitation for bob@example.com/);
 });
 
-it("role changes carry the displayed assignment IDs and can refresh after a stale-change rejection", async () => {
+it("role changes use the assignment IDs refreshed by SSE after a stale-change rejection", async () => {
   const submitted: unknown[] = [];
   let assignmentId = "first";
+  let reads = 0;
+  const feed = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
   transport.mockImplementation(async (input, init) => {
     const request = requestOf(input, init);
-    if (request.method === "GET")
+    if (new URL(request.url).pathname.endsWith("/changes"))
+      return new Response(new ReadableStream<Uint8Array>({ start: feed.resolve }), {
+        headers: { "content-type": "text/event-stream" },
+      });
+    if (request.method === "GET") {
+      reads++;
       return response({
         assignments: [
           {
@@ -111,17 +120,32 @@ it("role changes carry the displayed assignment IDs and can refresh after a stal
         roles,
         canManage: true,
       });
+    }
     submitted.push(await request.json());
     assignmentId = "newer";
     return response({ _tag: "AssignmentApplication.Changed", memberId }, 409);
   });
+  function LiveAccess() {
+    useQuery(() => Changes.watch(workspaceId));
+    return <MemberAccess memberId={memberId} />;
+  }
   render(() => (
     <SessionBoundary>
       <WorkspaceContext.Provider value={() => membership}>
-        <MemberAccess memberId={memberId} />
+        <LiveAccess />
       </WorkspaceContext.Provider>
     </SessionBoundary>
   ));
+  const events = await feed.promise;
+  await screen.findByRole("radio", { name: "Administrator" });
+  const initialReads = reads;
+  events.enqueue(
+    new TextEncoder().encode(
+      `event: message\ndata: ${JSON.stringify({ _tag: "Ready", workspaceId })}\n\n`,
+    ),
+  );
+  await waitFor(() => expect(reads).toBeGreaterThan(initialReads));
+  await waitFor(() => expect(screen.queryByText("Refreshing…")).toBeNull());
   fireEvent.click(await screen.findByRole("radio", { name: "Administrator" }));
   fireEvent.click(screen.getByRole("button", { name: "Change role" }));
   await screen.findByText(/Their roles changed since you loaded them/);
@@ -130,12 +154,34 @@ it("role changes carry the displayed assignment IDs and can refresh after a stal
     roleId: BuiltinRoles.AdministratorId,
     expectedAssignmentIds: ["first"],
   });
-  fireEvent.click(screen.getByRole("button", { name: "Refresh access" }));
-  await waitFor(() =>
-    expect(
-      transport.mock.calls.filter(([input, init]) => requestOf(input, init).method === "GET"),
-    ).toHaveLength(2),
+  const readsBeforeCommit = reads;
+  const recordedAt = "2026-09-20T12:00:00.000Z";
+  events.enqueue(
+    new TextEncoder().encode(
+      `event: message\ndata: ${JSON.stringify({
+        _tag: "Committed",
+        workspaceId,
+        commitId: "access-changed",
+        events: [
+          {
+            id: "assignment-revoked",
+            name: AssignmentFacts.Revoked.name,
+            version: AssignmentFacts.Revoked.version,
+            recordedAt,
+            provenance: {
+              workspaceId,
+              performedBy: { _tag: "Identity", identity: membership.member.identity },
+              causedBy: null,
+              correlationId: "access-change",
+              occurredAt: recordedAt,
+            },
+            payload: { workspaceId, assignmentId: "first" },
+          },
+        ],
+      })}\n\n`,
+    ),
   );
+  await waitFor(() => expect(reads).toBeGreaterThan(readsBeforeCommit));
   await waitFor(() => expect(screen.queryByText("Refreshing…")).toBeNull());
   fireEvent.click(screen.getByRole("button", { name: "Change role" }));
   await waitFor(() => expect(submitted).toHaveLength(2));
