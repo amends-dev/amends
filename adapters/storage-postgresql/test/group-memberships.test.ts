@@ -688,9 +688,7 @@ describe.skipIf(!available)("PostgreSQL group membership", () => {
           expect(
             yield* Effect.flip(run(foreignStore, owner, add(group.id, humanId))),
           ).toMatchObject({
-            _tag: expect.stringMatching(
-              /^(GroupMembershipApplication.InvalidResponse|MemberApplication.WorkspaceMismatch)$/,
-            ),
+            _tag: "GroupAudience.InvalidResponse",
           });
           expect(yield* history(bound)).toEqual(before);
           expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([]);

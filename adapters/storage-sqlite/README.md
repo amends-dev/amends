@@ -74,6 +74,11 @@ specific admission through a conditional status update; readmission uses a fresh
 removal lists and settles active group admissions within the same transaction. Departure tests
 cover attribution, stale requests, partial-cleanup rollback, replay, and concurrent departure
 and admission/removal races. Departure reuses the existing schema baseline.
+Authorized group reads also reuse these stores: ordinary reads require audience membership
+and `group.read`; explicit management reads inspect a known group under its management grant.
+The read suite verifies permission and audience separation, current rosters, staged changes,
+revocation, and reads without opening transactions. New role bundles include `group.read`;
+existing stored roles are unchanged.
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

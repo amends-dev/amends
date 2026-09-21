@@ -8,13 +8,16 @@ and ownership transfer are implemented through core, the gateway, HTTP, and the
 Solid web app. SQLite and PostgreSQL persist their journal and projections. See
 [workspace workflows](workspace-workflows.md) for the available operations.
 Core and both adapters implement [private group creation and membership lifecycle](group-workflows.md),
-including permission-based addition/removal and self-leave. Group reads, DMs, public groups,
+including permission-based addition/removal, self-leave, ordinary group reads, and management
+inspection of known groups. DMs, public groups,
 and group HTTP/UI workflows remain unimplemented.
 Thread access and activity, turns, agent execution, triage, and channel delivery remain
 design work; the thread package currently supplies only an ID.
 The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
 are agreed design intent. Inherited thread access, standalone admission, and participation
 cleanup are not implemented. Workspace-member removal does settle active group admissions.
+The shared group-audience check is implemented; thread operations do not yet consume it.
+Group lists and current rosters are unpaginated, and separate reads do not share a snapshot.
 
 ## Notification recipients and generation
 

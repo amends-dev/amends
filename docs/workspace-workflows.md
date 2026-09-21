@@ -190,14 +190,19 @@ Each registered permission declares a required `builtinTier`. Viewer includes
 `viewer` permissions, Administrator also includes `administrator` permissions,
 and Owner includes all three tiers, including `owner`. The current bundles are:
 
-| Role          | Stored permissions                                                                                                                                                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Viewer        | `member.read`, `assignment.read`                                                                                                                                       |
-| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `group.create`, `group.membership.manage`                                 |
-| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership`, `group.create`, `group.membership.manage` |
+| Role          | Stored permissions                                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Viewer        | `member.read`, `assignment.read`, `group.read`                                                                                                                                       |
+| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `group.create`, `group.read`, `group.membership.manage`                                 |
+| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership`, `group.create`, `group.read`, `group.membership.manage` |
 
 Ownership transfer is the first owner-tier permission. Delegation separately reserves
 administrator management for the current owner.
+
+`group.read` authorizes [ordinary group reads](group-workflows.md#reading-groups-and-their-current-members)
+only when the caller also has current group membership. Management authority does not bypass
+that audience check. It separately permits inspecting metadata and current admissions for
+a known group through the management read methods.
 
 `group.create` authorizes [private team-group creation](group-workflows.md).
 `group.membership.manage` separately authorizes [adding](group-workflows.md#adding-a-member) and

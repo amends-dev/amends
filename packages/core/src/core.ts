@@ -6,6 +6,7 @@
 import { Layer } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { GroupApplication } from "./group/application.ts";
+import { GroupAudience } from "./group/audience.ts";
 import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
 import { GroupMembershipApplication } from "./group/membership/application.ts";
@@ -54,6 +55,7 @@ const permissions = [
   AssignmentPermissions.Manage,
   OwnershipPermissions.Transfer,
   GroupPermissions.Create,
+  GroupPermissions.Read,
   GroupMembershipPermissions.Manage,
 ];
 
@@ -78,7 +80,7 @@ const operations = Layer.mergeAll(
   ChangeFeedApplication.layer,
   GroupApplication.layer,
   GroupMembershipApplication.layer,
-).pipe(Layer.provide(Delegation.layer));
+).pipe(Layer.provide(Layer.mergeAll(Delegation.layer, GroupAudience.layer)));
 
 /**
  * Complete core for one workspace: application operations over the journal,

@@ -79,7 +79,11 @@ it.effect(
                   id: BuiltinRoles.ViewerId,
                   workspaceId: workspace.id,
                   name: "Viewer",
-                  permissions: [MemberPermissions.Read.name, AssignmentPermissions.Read.name],
+                  permissions: [
+                    MemberPermissions.Read.name,
+                    AssignmentPermissions.Read.name,
+                    GroupPermissions.Read.name,
+                  ],
                 }),
               );
               for (const [id, name] of [
@@ -99,6 +103,7 @@ it.effect(
                       AssignmentPermissions.Manage.name,
                       ...(id === BuiltinRoles.OwnerId ? [OwnershipPermissions.Transfer.name] : []),
                       GroupPermissions.Create.name,
+                      GroupPermissions.Read.name,
                       GroupMembershipPermissions.Manage.name,
                     ],
                   }),

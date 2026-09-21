@@ -12,6 +12,8 @@ import { WorkspaceId } from "../../workspace/id.ts";
 import { Member } from "../../workspace/member/member.ts";
 import { MemberStore } from "../../workspace/member/store.ts";
 import { Group } from "../group.ts";
+import { GroupAudience } from "../audience.ts";
+import { GroupPermissions } from "../permissions.ts";
 import { GroupStore } from "../store.ts";
 import { GroupMembership } from "./membership.ts";
 import { GroupMembershipFacts } from "./facts.ts";
@@ -64,6 +66,16 @@ export type Error =
   | AlreadyRemoved
   | InvalidResponse;
 
+export type ReadError =
+  | Authorization.Error
+  | GroupStore.Failure
+  | GroupMembershipStore.Failure
+  | MemberStore.Failure
+  | Schema.SchemaError
+  | GroupAudience.InvalidResponse
+  | GroupNotFound
+  | InvalidResponse;
+
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   /**
@@ -82,6 +94,14 @@ export interface Interface {
   readonly leave: (
     input: GroupMembership.LeaveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
+  /** Current admissions of active workspace members; require group.read and audience membership. */
+  readonly listCurrent: (
+    groupId: Group.Id,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
+  /** Inspect a known group's current roster under group.membership.manage, without joining it. */
+  readonly listCurrentForManagement: (
+    groupId: Group.Id,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -104,6 +124,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   | GroupStore.Service
   | MemberStore.Service
   | GroupMembershipStore.Service
+  | GroupAudience.Service
   | Journal.Service
   | Crypto.Crypto
 > {
@@ -111,11 +132,12 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   const groups = yield* GroupStore.Service;
   const members = yield* MemberStore.Service;
   const memberships = yield* GroupMembershipStore.Service;
+  const audience = yield* GroupAudience.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   if (
-    [groups.workspaceId, members.workspaceId, memberships.workspaceId].some(
+    [groups.workspaceId, members.workspaceId, memberships.workspaceId, audience.workspaceId].some(
       (id) => id !== workspaceId,
     )
   )
@@ -258,7 +280,67 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     journal.commit,
   );
 
-  return Service.of({ workspaceId, add, remove, leave });
+  const current = Effect.fnUntraced(function* (groupId: Group.Id) {
+    yield* loadGroup(groupId);
+    const seenIds = new Set<GroupMembership.Id>();
+    const seenMembers = new Set<Member.Id>();
+    const active: Array<GroupMembership.Record> = [];
+    for (const found of yield* memberships.listByGroup(groupId)) {
+      const membership = yield* decodeMembership(found).pipe(Effect.mapError(invalidRecord));
+      if (
+        membership.workspaceId !== workspaceId ||
+        membership.groupId !== groupId ||
+        seenIds.has(membership.id)
+      )
+        return yield* new InvalidResponse({
+          message: "Membership store returned an inconsistent group listing",
+        });
+      seenIds.add(membership.id);
+      if (membership.status !== "active") continue;
+      if (seenMembers.has(membership.memberId))
+        return yield* new InvalidResponse({
+          message: "Membership store returned duplicate active admissions",
+        });
+      seenMembers.add(membership.memberId);
+      const foundMember = yield* members.get(membership.memberId);
+      if (Option.isNone(foundMember))
+        return yield* new InvalidResponse({
+          message: "Group admission references a missing workspace member",
+        });
+      const member = yield* decodeMember(foundMember.value).pipe(Effect.mapError(invalidRecord));
+      if (member.workspaceId !== workspaceId || member.id !== membership.memberId)
+        return yield* new InvalidResponse({
+          message: "Member store returned another member or workspace",
+        });
+      if (member.status === "active") active.push(membership);
+    }
+    return active;
+  });
+  const listCurrent = Effect.fn("GroupMembershipApplication.listCurrent")(function* (
+    groupId: Group.Id,
+  ) {
+    const id = yield* Schema.decodeEffect(Group.Id)(groupId);
+    yield* audience
+      .require(id)
+      .pipe(
+        Effect.catchTag("GroupAudience.NotMember", () =>
+          Effect.fail(new GroupNotFound({ groupId: id })),
+        ),
+      );
+    yield* authorization.require([
+      Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
+    ]);
+    return yield* current(id);
+  });
+  const listCurrentForManagement = Effect.fn("GroupMembershipApplication.listCurrentForManagement")(
+    function* (groupId: Group.Id) {
+      const id = yield* Schema.decodeEffect(Group.Id)(groupId);
+      yield* requireManagement(id);
+      return yield* current(id);
+    },
+  );
+
+  return Service.of({ workspaceId, add, remove, leave, listCurrent, listCurrentForManagement });
 });
 
 /** Provide membership operations over the workspace's existing stores and journal. @category layers */

@@ -9,12 +9,13 @@ implementation. The discussion is grounded in the work users want to do and the 
 of external systems. Existing implementation choices do not constrain the design.
 
 For current behavior, read [workspace workflows](workspace-workflows.md), the
-[group creation](group-workflows.md), the [core package guide](../packages/core/README.md),
+[group workflows](group-workflows.md), the [core package guide](../packages/core/README.md),
 and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
 and process-local live changes are implemented. Core and both adapters also implement
-permission-authorized private team-group creation and subsequent member addition. Other group
-workflows, thread access and participation/activity,
+private team-group creation, membership admission/departure, workspace-removal cleanup,
+authorized group reads, and a shared group-audience check. DMs, public groups, group HTTP/UI,
+thread access and participation/activity,
 turns, execution, notification generation/acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
@@ -2327,6 +2328,22 @@ A member with the required management permission can explicitly add themselves w
 that recorded membership change supplies access. A DM's two-person audience still constrains
 membership management; management authority does not expand it to a third person.
 
+For implemented private team groups, ordinary metadata and current-roster reads require
+`group.read` on the group as well as current workspace and group membership. The permission
+is included in new Viewer and higher-tier bundles; role names themselves confer no authority.
+`GroupApplication.listMine` includes only current readable memberships. `get` and
+`GroupMembershipApplication.listCurrent` return metadata and active admission records,
+without exposing historical admissions or member profiles. Missing and outside-audience
+groups share the same not-found outcome.
+
+Separate `getForManagement` and `listCurrentForManagement` methods inspect a known group's
+metadata and current roster under `group.membership.manage`, even without audience membership
+or `group.read`. These methods do not supply group discovery or conversation access.
+The shared `GroupAudience.require` policy verifies active workspace and group membership
+without a management bypass; callers check their action permission separately. It opens no
+transaction, honors a caller's staged changes, and must run inside the commit for future
+thread writes. Current read operations do not promise a shared snapshot.
+
 Adding someone requires active membership in the same workspace and grants the group's
 inherited thread access, subject to action permissions. It does not change workspace roles,
 enroll the member in existing threads, or request agent work. Removing another member and
@@ -2417,6 +2434,8 @@ notification selection, permission-based group management, and self-service depa
 agreed. Any active workspace member can start a DM. Private team-group creation is implemented
 through `group.create`, and member addition/removal through `group.membership.manage`.
 Self-leave and group cleanup during workspace-member removal are also implemented.
+Private-group reads use `group.read` plus audience membership, with separate management
+inspection and a reusable audience check. Group HTTP/UI and thread enforcement remain future work.
 Default role placement does not limit future grants or roles.
 Other group operations, their permission declarations, broader group schemas, and admission
 UI remain contract work.

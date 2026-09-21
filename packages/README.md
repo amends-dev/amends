@@ -89,9 +89,12 @@ cryptography, and workspace event bus a host must supply, derived from that laye
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/group`, `@amends/core/thread`, and
 `@amends/core/workspace`, each exposing the records, facts, stores, projections,
 and operations it implements. The thread subpath currently exposes only its ID.
-The group surface supplies private team creation and membership admission/departure, with
+The group surface supplies private team creation, authorized reads, an internal audience check,
+and membership admission/departure, with
 separate creation and Group-scoped membership-management permissions. Self-leave needs no
-management grant; workspace removal also settles group admissions. The notification surface includes its record, store contract, authorized inbox reads, and empty
+management grant; workspace removal also settles group admissions. Ordinary group reads require
+membership and `group.read`; separate management reads expose known-group metadata and current
+admissions under `group.membership.manage`. The notification surface includes its record, store contract, authorized inbox reads, and empty
 projection. Notification reads derive the recipient from the current actor and
 require active membership. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.

@@ -21,7 +21,7 @@ The current domains contain these features:
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                  |
 | `notification`  | Notification records, authorized inbox reads, and storage, with an empty registered projection.  |
-| `group`         | Private team creation, membership admission/departure, facts, projections, and storage.          |
+| `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.     |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
@@ -102,7 +102,7 @@ build a read screen do not authorize a later write. Stores still require a valid
 workspace transaction for every mutation. A read invoked inside an existing commit
 uses that transaction and sees its staged changes without opening another one.
 
-## Private team-group creation
+## Private team groups
 
 `@amends/core/group` exposes `GroupApplication.createPrivateTeam({ name, memberIds })`.
 It requires `group.create` on the workspace, validates the name and distinct active workspace
@@ -112,7 +112,7 @@ it; their names play no part in authorization.
 
 Initial members are explicit and may be empty. The creator is admitted only if included.
 `GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
-own ID and workspace-membership reference. Authorized group reads, DMs,
+own ID and workspace-membership reference. DMs,
 public groups, threads, and HTTP/UI workflows remain separate work. See
 [group creation](../../docs/group-workflows.md) for the current contract and verification.
 
@@ -134,6 +134,21 @@ admissions in its existing commit, with no extra group-management grant. The dep
 records its reason and uses journal provenance for actor and time. See
 [departures](../../docs/group-workflows.md#removing-a-member-or-leaving).
 
+`GroupApplication.get` and `listMine`, and `GroupMembershipApplication.listCurrent`, require
+current group membership and `group.read`. The permission is included in new Viewer and
+higher-tier bundles; existing stored roles are unchanged. `getForManagement` and
+`listCurrentForManagement` are explicit metadata/roster reads for a known group under
+`group.membership.manage`. They require no membership or read grant, and establish no
+conversation access. Current rosters expose admission records, not member profiles or
+historical admissions. Reads open no transaction, honor staged changes in a caller's commit,
+and do not promise a shared snapshot. See [group reads](../../docs/group-workflows.md#reading-groups-and-their-current-members).
+
+`GroupAudience.require` checks active workspace and group membership without checking any
+action permission or allowing a management bypass. It returns the current admission and
+requires only the actor at operation time. Core provides this policy internally to application
+services; it is excluded from `Core.Operations`. Future thread writes must call it inside
+their commit and separately require the relevant action grant.
+
 ## Identity and target boundaries
 
 `Identity.Reference` identifies a Human, Agent, or Contact. `Identity.MemberReference`
@@ -149,7 +164,8 @@ scopes compare the workspace, kind, and ID; a workspace scope covers targets in
 that workspace. Adding a Thread target supplies scoped grant storage. The
 [planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
 also requires group access or standalone participation alongside action permissions.
-Group creation and membership admission/departure are implemented; group/thread reads and that audience policy are not.
+Group creation, reads, admission/departure, and the shared group-audience policy are implemented.
+Thread reads and their complete audience/action policy are not.
 The thread module currently contains only its ID.
 
 ## Permission declarations and built-in roles
@@ -462,6 +478,7 @@ meaning rather than using it as a synonym for a constructor.
 | Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
 | Private team creation | `GroupApplication.make()`                     | `GroupApplication.Service`              |
 | Group membership      | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
+| Group audience policy | `GroupAudience.make()`                        | `GroupAudience.Service`                 |
 | Assignment operations | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
 | Delegation policy     | `Delegation.make()`                           | `Delegation.Service`                    |
 | Invitation operations | `InvitationApplication.make()`                | `InvitationApplication.Service`         |

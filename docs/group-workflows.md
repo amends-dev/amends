@@ -1,6 +1,6 @@
 # Group workflows
 
-Core implements private team-group creation, member addition, removal, and self-leave over
+Core implements private team-group creation, authorized reads, member addition, removal, and self-leave over
 SQLite and PostgreSQL. These operations are available through `GroupApplication.Service`
 and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
@@ -25,6 +25,55 @@ The creator is included only when their membership ID appears in `memberIds`. An
 is valid; creator attribution does not establish a membership or special group ownership.
 The creation permission covers the initial audience as part of this operation. Adding
 members after creation uses a separate operation and permission.
+
+## Reading groups and their current members
+
+Ordinary reads require active workspace membership, an active admission to the group,
+and `group.read` on that Group target. `GroupPermissions.Read` is included in newly
+initialized Viewer, Administrator, and Owner bundles. Any custom role or direct grant can
+supply it. Membership alone grants no read permission; a broad read or management grant,
+creator attribution, or workspace ownership does not make the caller part of the audience.
+
+| Operation                                                      | Result and authority                                                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GroupApplication.listMine`                                    | The caller's current readable groups, ordered by group ID. Unreadable and unjoined groups are omitted. |
+| `GroupApplication.get(groupId)`                                | Group metadata, requiring audience membership and `group.read`.                                        |
+| `GroupMembershipApplication.listCurrent(groupId)`              | Current admissions under the same read policy, ordered by admission ID.                                |
+| `GroupApplication.getForManagement(groupId)`                   | Metadata for a known group, requiring `group.membership.manage` on it.                                 |
+| `GroupMembershipApplication.listCurrentForManagement(groupId)` | The current roster for a known group under that management permission.                                 |
+
+Management reads require neither group membership nor `group.read`. They expose only the
+group record and current admission records needed to manage that group. They do not join
+the caller, grant conversation access, or provide a workspace-wide private-group catalog.
+Creation permission alone grants no management inspection authority.
+
+A roster returns `GroupMembership.Record` values: admission IDs, workspace-member references,
+and admission times. It includes only active group admissions whose workspace member is
+still active. Ended admissions and membership history are not returned. Reading the roster
+needs no additional `member.read` grant and does not return member profiles or identities.
+
+Missing, foreign, and outside-audience groups have the same ordinary get outcome,
+`GroupApplication.NotFound`; ordinary roster reads use `GroupMembershipApplication.GroupNotFound`.
+A current group member without the action grant receives `Authorization.Denied`.
+Management reads check their grant before reporting whether a known group exists.
+The gateway preserves these outcomes. Storage and consistency failures are not hidden as
+empty lists or missing groups.
+
+Reads query current state without opening a transaction, publishing facts, or advancing
+checkpoints. They honor an existing caller transaction, including staged admission, departure,
+and grant changes. Separate reads do not promise a shared snapshot: revocation affects later
+checks but does not cancel an already-authorized read. Lists are currently unpaginated.
+
+### Shared audience policy
+
+`GroupAudience.require(groupId)` is an internal policy service, exported for domain composition
+but not exposed as a gateway operation. It verifies the acting member's current workspace
+membership and active group admission, returning that admission. It has no role, ownership,
+or management bypass and grants no action permission. Applications check the action grant
+separately and map `GroupAudience.NotMember` to their own unavailable-resource outcome.
+The helper queries admissions without loading group metadata; application reads validate
+the group record as well. Future thread writes must call this policy inside their journal
+commit, and must never reuse an earlier read result as authorization.
 
 ## Adding a member
 
@@ -123,7 +172,7 @@ Both projections preserve recorded IDs, timestamps, and attribution. Replay does
 the original actor's current permissions or whether an originally admitted workspace member
 is still active. Both adapters validate records before storage conversion and enforce one
 active admission per group/workspace-member pair. Store reads are internal and honor the
-current transaction; they are not authorized product read operations.
+current transaction; callers use the authorized application reads above instead of stores.
 
 Creation, admission, and departure facts use their stable IDs as occurrence identities. Repeating those
 facts with matching content reuses the original events. Calling `createPrivateTeam` again
@@ -136,12 +185,13 @@ idempotency contract yet. An uncertain commit must be reconciled before another 
 store contracts. Core requires `GroupStore` and `GroupMembershipStore`; both adapters compose
 them over the same workspace transaction. Authorization targets now include `Group`, and
 both adapters preserve exact group scopes in grants. Target support alone does not implement
-group reads or thread-audience authorization.
+thread-audience authorization. The read operations and shared group audience policy above
+are implemented; there are no thread operations yet.
 
 Private group, admission, and departure facts remain on the internal committed-event bus but are
 withheld from the workspace-wide change feed. A commit containing only those facts emits
 no public change; a mixed commit retains its other supported events in order. Group discovery
-and live delivery will need their own audience-aware contract. Creation generates no
+and live delivery will need their own audience-aware HTTP/UI contract. Creation generates no
 notifications because notifications originate from thread activity, which is not implemented.
 
 DMs, public-group joining/discovery, thread creation, and group HTTP/UI workflows
@@ -154,6 +204,9 @@ it adds `group.membership.manage` to newly initialized permission bundles. Exist
 roles are not updated automatically. Development uses recreated databases after permission
 changes; no migration or data reset is performed by this operation.
 Departure reuses the existing admission status and tables and introduces no new permission.
+Reads also reuse the existing storage. They introduce `group.read` in new role bundles; existing
+role records are unchanged, so existing workspaces need an explicit grant or role update.
+No read, application construction, or replay updates stored permission bundles.
 
 ## Verification
 
@@ -166,5 +219,8 @@ outer transaction changes, projection rollback, gateway error exposure, and late
 Departure coverage includes grant-free self-leave, fresh readmission and stale requests,
 workspace cleanup, causal attribution, rollback after partial cleanup, historical replay,
 concurrent departure and admission/removal races, and conditional storage transitions.
+Read suites cover ordinary versus management access, exact and custom-role grants, stale actors,
+departure and readmission, private-ID outcomes, current roster filtering, corrupt storage,
+and reads both outside and inside an existing transaction.
 Core tests cover schema boundaries, exact group scopes, and withholding private group facts
 from the public change feed. Run `bun run check` and `bun run test` from the repository root.
