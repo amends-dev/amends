@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "f9edf1bb-4b9b-4098-8af1-b1f131cfc6e4",
+  "id": "7ee10211-1d1a-480b-b95e-e3371665c352",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1463,12 +1463,38 @@
     {
       "type": "text",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
       "name": "message_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "participation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "reason",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_activities"
@@ -2477,6 +2503,41 @@
           "opclass": null
         },
         {
+          "value": "participation_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "thread_participation_activity",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "thread_id",
           "isExpression": false,
           "asc": true,
@@ -2858,6 +2919,25 @@
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "thread_activities_xyjglJJtxVz2_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "workspace_id",
+        "participation_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "thread_participations",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "thread_activities_87rvenxiiDk0_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "thread_activities"
@@ -3282,6 +3362,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "notifications"
+    },
+    {
+      "value": "(\"kind\" = 'MessagePublished' AND \"message_id\" IS NOT NULL AND \"participation_id\" IS NULL AND \"reason\" IS NULL) OR (\"kind\" = 'ParticipationFollowed' AND \"message_id\" IS NULL AND \"participation_id\" IS NOT NULL AND \"reason\" IS NULL) OR (\"kind\" = 'ParticipationEnded' AND \"message_id\" IS NULL AND \"participation_id\" IS NOT NULL AND \"reason\" IS NOT NULL AND \"reason\" IN ('unfollowed','group-left','group-removed','workspace-removed'))",
+      "name": "thread_activity_subject",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "thread_activities"
     },
     {
       "value": "\"sequence\" > 0",

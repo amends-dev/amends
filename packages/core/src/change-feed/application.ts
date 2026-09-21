@@ -59,6 +59,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
                   ThreadFacts.Created,
                   ThreadMessageFacts.Published,
                   ThreadParticipationFacts.Added,
+                  ThreadParticipationFacts.Ended,
                   ThreadActivityFacts.Recorded,
                 ].some((fact) => fact.name === event.name && fact.version === event.version) ||
                 (event.name === GroupFacts.Created.name &&

@@ -18,7 +18,9 @@ authorized group reads, and a shared group-audience check. Human opening message
 groups now create threads, initial participation, ordered message activity, and pending notifications
 atomically; see [thread workflows](thread-workflows.md). Authorized group-thread discovery,
 metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
-`ThreadMessageApplication`, admitting the author and eligible mentions in the same commit. General participation
+`ThreadMessageApplication`, admitting the author and eligible mentions in the same commit.
+`ThreadParticipationApplication` implements self-follow/unfollow, quiet follow activity, and pending
+agent-input settlement. Other participation
 management, DMs, public groups, group/thread HTTP/UI, turns, execution, general acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
@@ -2018,7 +2020,12 @@ continues to own its execution lifecycle, transcript, configuration, and snapsho
 
 Thread activity is the timeline item already established in this design. The implemented
 opening-message and human-reply workflows record `MessagePublished` activity referencing a separate message,
-starting at sequence 1 and appending replies at the next sequence. Assistant publication and lifecycle variants remain future work. It is a defined
+starting at sequence 1 and appending replies at the next sequence. Explicit following records
+`ParticipationFollowed` activity referencing its participation. Every departure path records
+`ParticipationEnded` with its historical reason. Both kinds currently select no notification recipients.
+All kinds use one activity-recorded fact and internal recorder; notification generation consumes
+that fact uniformly.
+Assistant publication and turn/task lifecycle variants remain future work. It is a defined
 set of activity types, including message publication, turn lifecycle activity such as
 turn started, and task updates. It is not another log beside the timeline. The remaining
 discriminators and payload schemas remain to be specified.
@@ -2381,7 +2388,7 @@ requires an explicit future design.
 For implemented group threads, `ThreadApplication.get`, `listInGroup`, `readTimeline`, and
 `listParticipants` enforce current group access and `thread.read` on the Thread target.
 Discovery filters unreadable threads. Timeline pages follow an exclusive sequence cursor and
-resolve message content under the same check. Participant summaries expose member references
+resolve message content or a historical follow summary under the same check. Participant summaries expose member references
 and joining details, while routing identities and ended participation remain internal.
 Reading requires no participation, creates none, and neither acknowledges input nor requests work.
 Subscriptions, notification-source resolution, and standalone audiences retain their
@@ -2535,6 +2542,14 @@ consistently with the access change. Historical contributions and previously sel
 recipients remain recorded. Agent cancellation still distinguishes a request to stop from
 confirmation that execution stopped; loss of access does not erase completed effects.
 Detailed coordination across affected threads remains implementation work.
+
+Self-follow/unfollow is implemented for current group members. Follow requires `thread.follow`
+on the Thread target and records a quiet joining activity; repeated follow retains the current
+participation. Unfollow needs no action grant and addresses the actor’s exact participation ID.
+It preserves group access, records a quiet participation-ended activity, ends future recipient
+selection, and atomically discards that participation’s pending agent input. Group and workspace
+departures use the same per-participation lifecycle and record the corresponding ending activities. A later rejoin has a fresh ID and boundary. See
+[following and unfollowing](thread-workflows.md#following-and-unfollowing).
 
 Muting does not acknowledge notifications, advance input progress, or cancel agent work.
 It is a human presentation preference. Its exact UI and alert settings remain open.

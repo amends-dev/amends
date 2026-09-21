@@ -93,8 +93,15 @@ activity, current grants and admission state, and rejection of inconsistent refe
 Human replies use the same tables and transaction boundary. The latest-activity lookup uses
 the workspace/thread/sequence index; insertion still rejects duplicate positions and gaps.
 Reply tests cover scoped publishing grants, new and returning participants, addressing, concurrent
-replies/departures, rollback, reopening, and replay. This slice adds no schema migration.
-These tables and notification fields are part of the updated development baseline: recreate
+replies/departures, rollback, reopening, and replay.
+Self-follow records a quiet activity referencing its participation, with no message or notifications.
+Activity rows enforce exactly one message or participation reference, with at most one activity
+per participation and lifecycle kind. Ending activity validates the participation’s terminal state
+and departure time and preserves its reason. Unfollow, group departure, and workspace removal
+record the same per-participation ending facts and activity; pending agent input is discarded
+in the same commit. Every kind uses the common activity-recorded fact and notification generator. The participation suite covers scoped grants, quiet follows,
+rejoining, stale requests, concurrent publication, rollback, historical reads, and replay.
+Participation lifecycle activity updates the development baseline: recreate
 disposable databases rather than applying an upgrade chain. See [thread workflows](../../docs/thread-workflows.md).
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and

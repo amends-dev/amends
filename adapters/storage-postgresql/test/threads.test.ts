@@ -550,6 +550,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
               );
               return {
                 started,
+                activities: yield* bound.activities.listByThread(started.thread.id),
                 participants: yield* bound.participations.listByThread(started.thread.id),
                 notifications: yield* notifications(bound, agentIdentity),
                 history: yield* history(bound),
@@ -588,9 +589,9 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
               expect(yield* bound.messages.get(saved.started.message.id)).toEqual(
                 Option.some(saved.started.message),
               );
-              expect(yield* bound.activities.listByThread(saved.started.thread.id)).toEqual([
-                saved.started.activity,
-              ]);
+              expect(yield* bound.activities.listByThread(saved.started.thread.id)).toEqual(
+                saved.activities,
+              );
               expect(yield* notifications(bound, agentIdentity)).toEqual(saved.notifications);
               expect(
                 yield* notifications(bound, { _tag: "Human", id: Identity.HumanId.make("other") }),

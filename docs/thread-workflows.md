@@ -1,7 +1,7 @@
 # Thread workflows
 
-Core and both storage adapters implement human opening messages, replies, and authorized reads in
-private team groups. Call `ThreadApplication` and `ThreadMessageApplication` through
+Core and both storage adapters implement human opening messages, replies, following/unfollowing,
+and authorized reads in private team groups. Call the thread application services through
 `Gateway.asMember` or a trusted workspace context. HTTP/UI, DMs,
 standalone threads, attachments, and agent execution remain separate implementation steps.
 
@@ -63,7 +63,7 @@ the thread when they hold `thread.read`. Reading does not enroll them.
 
 A later group addition does not enroll that member in existing threads or create retroactive
 notifications. Unmentioned replies address that thread's current participants plus their author,
-without enrolling the whole group again. Explicit following remains a future workflow.
+without enrolling the whole group again. Members can also follow explicitly without posting.
 
 Broadcast agent notifications represent input for recipient evaluation. The agreed design allows
 an agent to ask a question, perform work, reply, or finish silently after evaluating relevance.
@@ -127,6 +127,45 @@ boundary; storage still rejects timeline gaps and duplicate positions. Contentio
 attempt and does not trigger an automatic retry. Notification records remain pending input;
 publication starts no agent execution.
 
+## Following and unfollowing
+
+`ThreadParticipationApplication.follow(threadId)` joins the acting human or agent and returns
+a public `ThreadParticipation.Summary`. It requires active workspace and group membership and
+`thread.follow` on that Thread target. `ThreadParticipationPermissions.Follow` has a Viewer
+default tier; any covering role or direct grant can supply it. No read, publish, management,
+or `agent.use` grant is required. Following oneself does not request work from an agent.
+
+A new follow records an admission and a quiet `ParticipationFollowed` timeline activity at the
+next sequence, atomically. Its sequence is the participation's `joinedAtSequence`; earlier
+activity is history. The operation publishes no message, generates no notifications, and starts
+no work. Following while already participating returns the existing summary without changing
+its joining boundary, appending activity, or writing another commit. Every call still checks
+current access and the follow grant.
+
+`unfollow({ threadId, participationId })` returns no value and ends only the actor's addressed
+participation. It requires current workspace/group membership but no action grant. A member can
+unfollow after losing their follow permission. Group membership and permission-governed read
+access remain intact. Other members' IDs, another thread's IDs, and missing participations share
+`ThreadParticipationApplication.NotFound`; one's own ended participation returns `AlreadyEnded`.
+An inaccessible or missing thread returns `ThreadParticipationApplication.ThreadNotFound`.
+Malformed input becomes `Gateway.InvalidInput` at the gateway.
+
+Unfollow records `thread.participation.ended` and a `ParticipationEnded` timeline activity,
+preserving the record and its original joining boundary. The activity records the departure reason.
+Pending agent notifications for that exact participation become discarded in the same commit;
+human notification history remains. The departure activity selects no notification recipients.
+Reading earlier participation activity still returns its historical public joining summary.
+
+A later follow, own reply, or authorized mention can establish a fresh participation, even under
+the same group admission. Unmentioned messages do not re-enroll an unfollowed member. Old work
+stays settled, and an old unfollow request cannot end a newer participation. Following and
+unfollowing are distinct from muting; mute preferences remain unimplemented.
+
+All checks, facts, projections, and checkpoints share the existing workspace transaction.
+Concurrent publication and departure have a consistent order; an enclosing commit sees staged
+participation, permission, and membership changes. Failures roll back admission or departure
+along with their timeline and notification effects. No automatic retry is performed.
+
 ## Reading conversations
 
 Every thread read requires active workspace membership, current membership in its group,
@@ -140,7 +179,7 @@ for an exact thread. Membership, authorship, ownership, group management, `group
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `get(threadId)`                                     | The thread's metadata.                                                                                                |
 | `listInGroup(groupId)`                              | Current readable threads in that group, in stable thread-ID order. Threads without a covering read grant are omitted. |
-| `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values, each containing the activity and its resolved message.    |
+| `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject.                     |
 | `listParticipants(threadId)`                        | Current `ThreadParticipation.Summary` values in participation-ID order.                                               |
 
 A nonparticipant can read the complete earlier conversation when they have group access and
@@ -157,8 +196,14 @@ returned item's `activity.sequence` as the next cursor. An empty page means no l
 is currently available. Later appended activity can be read using that same boundary.
 The cursor belongs to the selected thread; it is not a journal position or notification cursor.
 
-The application validates page bounds and order, then verifies that every referenced message
-belongs to that thread and workspace. Missing or inconsistent messages, duplicate or unordered
+Message items contain `{ activity, message }`. Participation items contain `{ activity, participant }`,
+where `participant` is a public joining summary, including for a participation that later ended.
+`ParticipationEnded` includes the immutable departure reason and occurrence time. Use
+`activity.kind` to identify the activity; the item schema is a union of those two shapes.
+
+The application validates page bounds and order, then verifies each referenced message or
+participation belongs to that thread and workspace. A follow's joining sequence must match its
+activity. An ending must match the ended participation and its departure time. Missing or inconsistent subjects, duplicate or unordered
 activity, and storage failures fail the read instead of producing partial content or empty pages.
 Paging tests also seed canonical activity with nonmonotonic timestamps to isolate ordering;
 reply tests verify pages containing messages published through the application.
@@ -186,6 +231,23 @@ revocation affects subsequent authorization checks but does not cancel an alread
 Thread discovery and participant lists are currently unpaginated.
 
 ## Recorded changes and replay
+
+Every timeline item uses `ThreadActivityFacts.Recorded` with the same `{ activity, recipients }`
+envelope. `activity` is a typed `MessagePublished`, `ParticipationFollowed`, or `ParticipationEnded`
+record. `ThreadActivityRecording` owns next-position lookup, validates the position again before
+recording, assigns the activity ID, and publishes the common fact within the caller's transaction.
+Domain facts remain separate: message publication and participation changes own their state;
+activity owns their position in the conversation. Each activity references its causing domain fact.
+
+The notification projection consumes this one activity fact for all kinds. It generates durable
+notifications from the recorded recipient selection without switching on activity kind or
+recomputing current membership. The workflow selects recipients: messages follow addressing
+rules, while explicit follow and all participation endings currently select an empty list.
+Quiet activity still passes through the same recording and notification pipeline. Recorded activity
+is the notification projection’s sole input: for `ParticipationEnded`, it first discards existing
+pending input for that agent participation, then runs the common recipient-generation step.
+An empty recipient list suppresses new notifications without suppressing cleanup. Participation
+domain facts update participation state; they do not directly change notifications.
 
 The workflow records, in order, a thread, its initial participations, a user message, and one
 `MessagePublished` activity at sequence 1. The timeline has an increasing sequence per thread;
@@ -227,11 +289,15 @@ request-level idempotency receipt yet; reconcile an uncertain commit before invo
 
 ## Departure and pending input
 
-Each participation references the exact group admission that established it. A recorded group
-departure ends participations tied to that admission, preserving their original identity and
-joining position. Workspace-member removal already records departures of all active group
-admissions, so the same cleanup applies. Rejoining uses a fresh admission and does not reactivate
-old participation or old work.
+Each participation references the exact group admission that established it. Internal
+`GroupMembershipDeparture` records group departure and calls `ThreadParticipationDeparture`
+for each active participation under that admission. Explicit unfollow calls the same participation
+departure service. Workspace-member removal uses the group departure service for each admission.
+Each affected thread receives an explicit participation-ended fact and activity, with reason
+`unfollowed`, `group-left`, `group-removed`, or `workspace-removed`. Already-ended participations
+are skipped by cascades; their history stays intact. Participation and notification projections
+do not derive hidden bulk changes from group-removal facts. Replay applies the recorded per-thread
+changes, without rerunning the departure workflows. Rejoining never revives old work.
 
 Pending agent notifications from the ended participation become
 `Discarded { reason: "participation-ended" }`. Their source, recipient, participation ID, and
@@ -247,16 +313,16 @@ other supported public events. A thread-only commit therefore provides no inbox 
 through that feed. Audience-aware thread subscriptions and live notification delivery remain work.
 Notifications expose source references, not continuing authority to read the source conversation.
 
-The public surface provides starts, human replies, and the authorized reads above. Internal store reads are not
-authorized thread APIs. Notification-source resolution, explicit follow/unfollow, other participation management, general
+The public surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
+authorized thread APIs. Notification-source resolution, managing other participants, general
 acknowledgment, silent agent completion, turn execution, task activity, DMs, and standalone threads
 remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
-The opening-message implementation updated both development schema baselines. Recreate disposable
+Opening messages and participation activity updated both development schema baselines. Recreate disposable
 development databases when adopting that baseline; no upgrade chain or automatic data reset is provided. New permission bundles also
 apply only to fresh workspace initialization unless stored roles are explicitly updated.
-The read and reply slices add no tables or schema migration. Existing stored roles do not automatically gain
-`thread.read` or `thread.publish`; assign explicit grants or update those roles before using the new operations.
+Activity rows reference either a message or a participation lifecycle occurrence. Existing stored roles do not automatically gain
+`thread.read`, `thread.publish`, or `thread.follow`; assign explicit grants or update those roles before using the new operations.
 
 ## Verification
 
@@ -269,4 +335,10 @@ and rejection of corrupt cross-thread references. Core tests verify withholding 
 Reply suites cover scoped action grants, live access changes, initial and returning admissions,
 mention and broadcast selection, concurrent sequencing and removal, projection/checkpoint failures,
 outer commits, reopening, and replay after grants or membership change.
+Participation suites verify quiet following, repeat calls, self-only unfollow, stale requests,
+notification retention/settlement, rejoining through follows and messages, concurrent publication,
+projection/checkpoint rollback, outer commits, replay, and historical follow reads.
+They also exercise the common notification generator with nonempty recipient selections on
+non-message activity, ending activity for all departure paths, and rollback after a partial
+multi-thread departure cascade.
 Run `bun run check` and `bun run test` from the repository root.

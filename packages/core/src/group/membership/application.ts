@@ -17,6 +17,7 @@ import { GroupPermissions } from "../permissions.ts";
 import { GroupStore } from "../store.ts";
 import { GroupMembership } from "./membership.ts";
 import { GroupMembershipFacts } from "./facts.ts";
+import { GroupMembershipDeparture } from "./departure.ts";
 import { GroupMembershipPermissions } from "./permissions.ts";
 import { GroupMembershipStore } from "./store.ts";
 
@@ -50,6 +51,7 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 ) {}
 
 export type Error =
+  | GroupMembershipDeparture.Error
   | Authorization.Error
   | GroupStore.Failure
   | MemberStore.Failure
@@ -124,6 +126,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   | GroupStore.Service
   | MemberStore.Service
   | GroupMembershipStore.Service
+  | GroupMembershipDeparture.Service
   | GroupAudience.Service
   | Journal.Service
   | Crypto.Crypto
@@ -132,14 +135,19 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   const groups = yield* GroupStore.Service;
   const members = yield* MemberStore.Service;
   const memberships = yield* GroupMembershipStore.Service;
+  const departure = yield* GroupMembershipDeparture.Service;
   const audience = yield* GroupAudience.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   if (
-    [groups.workspaceId, members.workspaceId, memberships.workspaceId, audience.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
+    [
+      groups.workspaceId,
+      members.workspaceId,
+      memberships.workspaceId,
+      audience.workspaceId,
+      departure.workspaceId,
+    ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
       message: "Group membership services belong to different workspaces",
@@ -235,15 +243,16 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
         membershipId: membership.id,
       });
     const occurredAt = yield* DateTime.now;
-    yield* journal
-      .publish(GroupMembershipFacts.Removed, {
+    yield* departure.remove(
+      {
         workspaceId,
         groupId: membership.groupId,
         membershipId: membership.id,
         memberId: membership.memberId,
         reason,
-      })
-      .pipe(Publication.withOccurredAt(occurredAt));
+      },
+      occurredAt,
+    );
     return {
       id: membership.id,
       workspaceId,

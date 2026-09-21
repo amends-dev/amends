@@ -45,8 +45,11 @@ notification or grants access to its source. Core now requires `NotificationStor
 The HTTP API exposes these reads, and the web client provides session-scoped query
 atoms. Contact and Triage recipients are available to internal storage consumers; the
 member inbox API remains limited to the acting human or agent. The projection now generates
-notifications from recorded opening and reply message activity and settles pending agent input on group
-departure. It preserves historical recipient selection and references the originating participation.
+notifications from the common activity-recorded fact for every activity kind. Quiet participation
+activity selects no recipients. The same activity handler settles pending agent input when it
+sees `ParticipationEnded`, then generates notifications for the recorded recipients. Group and
+workspace departures record that activity through the internal lifecycle service. Participation
+domain facts change participation state only; notifications subscribe solely to recorded activity. It preserves historical recipient selection and references the originating participation.
 General acknowledgment, recipient processing, and delivery remain deferred.
 
 Membership demonstrates the feature layout:
@@ -194,7 +197,8 @@ Thread reads use `ThreadApplication.get`, `listInGroup`, `readTimeline`, and `li
 All require current workspace/group membership and `thread.read` on the Thread target; lists
 omit threads outside the caller's grants. Participation is not required or created by reading.
 Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional nonnegative
-`afterSequence`) and return activity/message pairs in sequence order. Current participants use
+`afterSequence`) and return typed timeline items in sequence order: message items contain
+`activity` and `message`, while participation items contain `activity` and a public `participant` joining summary. Current participants use
 `ThreadParticipation.Summary`, excluding internal identity snapshots and ended admissions.
 Reads honor caller transactions but open none, and make no notification or checkpoint changes.
 New Viewer bundles include the permission; stored role records are unchanged. See
@@ -215,6 +219,31 @@ publication context. They perform no independent action authorization and are ex
 `Core.Operations`. `ThreadAccess` shares audience validation between reads and replies; each
 application checks its own action. Starting includes its initial publication under `thread.start`
 without requiring `thread.publish`; replies require neither `thread.read` nor `thread.start`.
+
+## Following and unfollowing
+
+`ThreadParticipationApplication.follow(threadId)` requires current group access and
+`ThreadParticipationPermissions.Follow` (`thread.follow`) on the Thread target. It uses the
+internal admission service and records a quiet `ParticipationFollowed` activity at the joining
+sequence, without messages or notifications. It returns `ThreadParticipation.Summary`; repeated
+follow returns the existing participation without changing its boundary. New Viewer bundles
+include the permission, while existing stored roles retain their grants.
+
+`unfollow({ threadId, participationId })` requires current group access and the actor’s own
+participation, with no action grant. It uses internal `ThreadParticipationDeparture` to record `ThreadParticipationFacts.Ended` and
+`ParticipationEnded` activity, ending that record and discarding pending agent input atomically. Human notification history is retained.
+It returns no value. A fresh participation after rejoining cannot be ended by an old request.
+Both workflows honor caller transactions. See [following and unfollowing](../../docs/thread-workflows.md#following-and-unfollowing).
+
+All activity kinds use `ThreadActivityRecording` and `ThreadActivityFacts.Recorded`, carrying a
+typed activity and its selected recipients. The notification generator consumes that common
+envelope; it needs no kind-specific registration. Domain facts own state and activity owns timeline
+position. Quiet follow and departure activity use empty recipient lists.
+
+`GroupMembershipDeparture` records a group departure and invokes the participation departure
+service for each active participation; member removal uses that same group service. These internal
+services are excluded from `Core.Operations` and require the caller’s transaction and publication
+context. Projections replay explicit facts rather than deriving unrecorded bulk departures.
 
 ## Permission declarations and built-in roles
 
@@ -513,27 +542,28 @@ meaning rather than using it as a synonym for a constructor.
 
 ## Service boundaries
 
-| Implementation            | Constructor                                   | Layer provides                          |
-| ------------------------- | --------------------------------------------- | --------------------------------------- |
-| Transaction               | `Transaction.make()`                          | `Transaction.Service`                   |
-| Log                       | `Log.make()`                                  | `Log.Service` and `Transaction.Service` |
-| Journal                   | `Journal.make(options)`                       | `Journal.Service`                       |
-| Committed-event bus       | `CommittedEvents.make(workspaceId, options?)` | `CommittedEvents.Service`               |
-| Permission catalog        | `PermissionCatalog.make(definitions)`         | `PermissionCatalog.Service`             |
-| Grant resolver            | `GrantResolver.make()`                        | `GrantResolver.Service`                 |
-| Authorization             | `Authorization.make()`                        | `Authorization.Service`                 |
-| Member operations         | `MemberApplication.make()`                    | `MemberApplication.Service`             |
-| Thread operations         | `ThreadApplication.make()`                    | `ThreadApplication.Service`             |
-| Human message publication | `ThreadMessageApplication.make()`             | `ThreadMessageApplication.Service`      |
-| Notification reads        | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
-| Private team creation     | `GroupApplication.make()`                     | `GroupApplication.Service`              |
-| Group membership          | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`    |
-| Group audience policy     | `GroupAudience.make()`                        | `GroupAudience.Service`                 |
-| Assignment operations     | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
-| Delegation policy         | `Delegation.make()`                           | `Delegation.Service`                    |
-| Invitation operations     | `InvitationApplication.make()`                | `InvitationApplication.Service`         |
-| Ownership operations      | `OwnershipApplication.make()`                 | `OwnershipApplication.Service`          |
-| Change feed               | `ChangeFeedApplication.make()`                | `ChangeFeedApplication.Service`         |
+| Implementation            | Constructor                                   | Layer provides                           |
+| ------------------------- | --------------------------------------------- | ---------------------------------------- |
+| Transaction               | `Transaction.make()`                          | `Transaction.Service`                    |
+| Log                       | `Log.make()`                                  | `Log.Service` and `Transaction.Service`  |
+| Journal                   | `Journal.make(options)`                       | `Journal.Service`                        |
+| Committed-event bus       | `CommittedEvents.make(workspaceId, options?)` | `CommittedEvents.Service`                |
+| Permission catalog        | `PermissionCatalog.make(definitions)`         | `PermissionCatalog.Service`              |
+| Grant resolver            | `GrantResolver.make()`                        | `GrantResolver.Service`                  |
+| Authorization             | `Authorization.make()`                        | `Authorization.Service`                  |
+| Member operations         | `MemberApplication.make()`                    | `MemberApplication.Service`              |
+| Thread operations         | `ThreadApplication.make()`                    | `ThreadApplication.Service`              |
+| Thread participation      | `ThreadParticipationApplication.make()`       | `ThreadParticipationApplication.Service` |
+| Human message publication | `ThreadMessageApplication.make()`             | `ThreadMessageApplication.Service`       |
+| Notification reads        | `NotificationApplication.make()`              | `NotificationApplication.Service`        |
+| Private team creation     | `GroupApplication.make()`                     | `GroupApplication.Service`               |
+| Group membership          | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`     |
+| Group audience policy     | `GroupAudience.make()`                        | `GroupAudience.Service`                  |
+| Assignment operations     | `AssignmentApplication.make()`                | `AssignmentApplication.Service`          |
+| Delegation policy         | `Delegation.make()`                           | `Delegation.Service`                     |
+| Invitation operations     | `InvitationApplication.make()`                | `InvitationApplication.Service`          |
+| Ownership operations      | `OwnershipApplication.make()`                 | `OwnershipApplication.Service`           |
+| Change feed               | `ChangeFeedApplication.make()`                | `ChangeFeedApplication.Service`          |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
 `Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation

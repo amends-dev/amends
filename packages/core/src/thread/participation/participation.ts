@@ -41,4 +41,28 @@ export const Summary = Schema.Struct({
   joinedAtSequence: Record.fields.joinedAtSequence,
 });
 export interface Summary extends Schema.Schema.Type<typeof Summary> {}
+export const toSummary = (record: Record): Summary => ({
+  id: record.id,
+  workspaceId: record.workspaceId,
+  threadId: record.threadId,
+  memberId: record.memberId,
+  joinedAt: record.joinedAt,
+  joinedAtSequence: record.joinedAtSequence,
+});
+export const UnfollowInput = Schema.Struct({ threadId: ThreadId.Id, participationId: Id });
+export interface UnfollowInput extends Schema.Schema.Type<typeof UnfollowInput> {}
+/** Ends one specific admission, retaining its original joining boundary. */
+export const Departure = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  ...UnfollowInput.fields,
+  memberId: MemberId.Id,
+});
+export interface Departure extends Schema.Schema.Type<typeof Departure> {}
+export const EndReason = Schema.Literals([
+  "unfollowed",
+  "group-left",
+  "group-removed",
+  "workspace-removed",
+]);
+export type EndReason = typeof EndReason.Type;
 export * as ThreadParticipation from "./participation.ts";

@@ -85,7 +85,7 @@ export interface Interface {
   readonly listInGroup: (
     groupId: Group.Id,
   ) => Effect.Effect<ReadonlyArray<Thread.Record>, ReadError, Actor.Service>;
-  /** Bounded activity page with resolved messages, ordered by sequence. The cursor is exclusive. */
+  /** Bounded activity page with resolved subjects, ordered by sequence. The cursor is exclusive. */
   readonly readTimeline: (
     threadId: Thread.Id,
     options: ThreadActivityStore.ReadOptions,
@@ -112,6 +112,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const threads = yield* ThreadStore.Service;
   const messages = yield* ThreadMessageStore.Service;
   const activities = yield* ThreadActivityStore.Service;
+  const participations = yield* ThreadParticipationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -125,6 +126,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       threads.workspaceId,
       messages.workspaceId,
       activities.workspaceId,
+      participations.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -273,6 +275,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     let afterSequence = request.afterSequence ?? 0;
     const seen = new Set<ThreadActivity.Id>();
     const seenMessages = new Set<ThreadMessage.Id>();
+    const seenParticipationActivity = new Set<string>();
     const items: Array<Thread.TimelineItem> = [];
     for (const row of found) {
       const activity = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(row).pipe(
@@ -282,14 +285,45 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         activity.workspaceId !== workspaceId ||
         activity.threadId !== thread.id ||
         activity.sequence <= afterSequence ||
-        seen.has(activity.id) ||
-        seenMessages.has(activity.messageId)
+        seen.has(activity.id)
       )
         return yield* new InvalidResponse({
           message: "Timeline store returned inconsistent references or order",
         });
       afterSequence = activity.sequence;
       seen.add(activity.id);
+      if (activity.kind !== "MessagePublished") {
+        const occurrence = `${activity.kind}:${activity.participationId}`;
+        if (seenParticipationActivity.has(occurrence))
+          return yield* new InvalidResponse({ message: "Duplicate participation activity" });
+        seenParticipationActivity.add(occurrence);
+        const found = yield* participations.get(activity.participationId);
+        if (Option.isNone(found))
+          return yield* new InvalidResponse({
+            message: "Participation activity references missing participation",
+          });
+        const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
+          found.value,
+        ).pipe(Effect.mapError(invalidReadRecord));
+        if (
+          participant.workspaceId !== workspaceId ||
+          participant.threadId !== thread.id ||
+          participant.id !== activity.participationId ||
+          (activity.kind === "ParticipationFollowed"
+            ? participant.joinedAtSequence !== activity.sequence
+            : participant.joinedAtSequence >= activity.sequence ||
+              participant.status !== "ended" ||
+              participant.endedAt === null ||
+              DateTime.formatIso(participant.endedAt) !== DateTime.formatIso(activity.occurredAt))
+        )
+          return yield* new InvalidResponse({
+            message: "Participation activity references inconsistent participation",
+          });
+        items.push({ activity, participant: ThreadParticipation.toSummary(participant) });
+        continue;
+      }
+      if (seenMessages.has(activity.messageId))
+        return yield* new InvalidResponse({ message: "Duplicate message activity" });
       seenMessages.add(activity.messageId);
       const foundMessage = yield* messages.get(activity.messageId);
       if (Option.isNone(foundMessage))

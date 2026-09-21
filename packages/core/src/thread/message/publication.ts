@@ -10,9 +10,7 @@ import { ThreadId } from "../id.ts";
 import { Thread } from "../thread.ts";
 import { ThreadStore } from "../store.ts";
 import { ThreadParticipationAdmission } from "../participation/admission.ts";
-import { ThreadActivity } from "../activity/activity.ts";
-import { ThreadActivityFacts } from "../activity/facts.ts";
-import { ThreadActivityStore } from "../activity/store.ts";
+import { ThreadActivityRecording } from "../activity/recording.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessageFacts } from "./facts.ts";
 
@@ -33,7 +31,7 @@ export const Input = Schema.Struct({
 export interface Input extends Schema.Schema.Type<typeof Input> {}
 export type Error =
   | ThreadStore.Failure
-  | ThreadActivityStore.Failure
+  | ThreadActivityRecording.Error
   | ThreadParticipationAdmission.Error
   | InvalidReference
   | Schema.SchemaError
@@ -52,12 +50,12 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
   const threads = yield* ThreadStore.Service;
-  const activities = yield* ThreadActivityStore.Service;
+  const recording = yield* ThreadActivityRecording.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = threads.workspaceId;
-  if (activities.workspaceId !== workspaceId || admissions.workspaceId !== workspaceId)
+  if (recording.workspaceId !== workspaceId || admissions.workspaceId !== workspaceId)
     return yield* new InvalidReference({
       message: "Message publication services belong to different workspaces",
     });
@@ -83,29 +81,11 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       return yield* new InvalidReference({
         message: "Publication references another thread or workspace",
       });
-    const latest = yield* activities.latest(thread.id);
-    let sequence = 1;
-    if (Option.isSome(latest)) {
-      const previous = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(
-        latest.value,
-      ).pipe(
-        Effect.mapError(
-          (cause) => new InvalidReference({ message: `Invalid latest activity: ${cause.message}` }),
-        ),
-      );
-      if (
-        previous.workspaceId !== workspaceId ||
-        previous.threadId !== thread.id ||
-        !Number.isSafeInteger(previous.sequence + 1)
-      )
-        return yield* new InvalidReference({
-          message: "Latest activity is inconsistent or its sequence is exhausted",
-        });
-      sequence = previous.sequence + 1;
-    }
-    const participants = yield* admissions
+    const sequence = yield* recording.nextSequence(thread.id);
+    const admitted = yield* admissions
       .ensure(thread, request.participantIds, sequence, request.occurredAt)
       .pipe(Publication.withOccurredAt(request.occurredAt));
+    const participants = admitted.participants;
     if (participants.find((p) => p.memberId === request.authorMemberId)?.identity._tag !== "Human")
       return yield* new InvalidReference({
         message: "Human message publication requires a human author",
@@ -123,21 +103,21 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
     const published = yield* journal
       .publish(ThreadMessageFacts.Published, message)
       .pipe(Publication.withOccurredAt(request.occurredAt));
-    const activity: ThreadActivity.Record = {
-      id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      threadId: thread.id,
-      sequence,
-      kind: "MessagePublished",
-      messageId: message.id,
-      occurredAt: request.occurredAt,
-    };
     const recipients = participants
       .filter((p) => request.mentions.length === 0 || request.mentions.includes(p.memberId))
       .map((p) => ({ participationId: p.id, identity: p.identity }));
-    yield* journal
-      .publish(ThreadActivityFacts.Recorded, { activity, recipients })
+    const recorded = yield* recording
+      .record({
+        threadId: thread.id,
+        sequence,
+        occurredAt: request.occurredAt,
+        subject: { kind: "MessagePublished", messageId: message.id },
+        recipients,
+      })
       .pipe(Publication.withCause(published, request.occurredAt));
+    const activity = recorded.payload.activity;
+    if (activity.kind !== "MessagePublished")
+      return yield* new InvalidReference({ message: "Recorder returned another activity kind" });
     return { message, activity };
   });
   return Service.of({ workspaceId, publish });

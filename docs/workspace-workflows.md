@@ -190,11 +190,11 @@ Each registered permission declares a required `builtinTier`. Viewer includes
 `viewer` permissions, Administrator also includes `administrator` permissions,
 and Owner includes all three tiers, including `owner`. The current bundles are:
 
-| Role          | Stored permissions                                                                                                                                                                                                                                 |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Viewer        | `member.read`, `assignment.read`, `group.read`, `thread.start`, `thread.read`, `thread.publish`, `agent.use`                                                                                                                                       |
-| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `group.create`, `group.read`, `group.membership.manage`, `thread.start`, `thread.read`, `thread.publish`, `agent.use`                                 |
-| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership`, `group.create`, `group.read`, `group.membership.manage`, `thread.start`, `thread.read`, `thread.publish`, `agent.use` |
+| Role          | Stored permissions                                                                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Viewer        | `member.read`, `assignment.read`, `group.read`, `thread.start`, `thread.read`, `thread.publish`, `thread.follow`, `agent.use`                                                                                                                                       |
+| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `group.create`, `group.read`, `group.membership.manage`, `thread.start`, `thread.read`, `thread.publish`, `thread.follow`, `agent.use`                                 |
+| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership`, `group.create`, `group.read`, `group.membership.manage`, `thread.start`, `thread.read`, `thread.publish`, `thread.follow`, `agent.use` |
 
 Ownership transfer is the first owner-tier permission. Delegation separately reserves
 administrator management for the current owner.
@@ -216,6 +216,10 @@ in newly initialized Viewer and higher-tier bundles. See [thread workflows](thre
 `agent.use` for selected agent recipients. `ThreadMessagePermissions.Publish` declares it with
 a Viewer default tier. Publication needs no separate read or start grant; existing stored roles
 need an explicit grant or role update. Starting includes its opening publication under `thread.start`.
+
+`thread.follow` authorizes explicit self-follow on a Thread target, with current group access.
+It has a Viewer default tier; existing stored roles need an explicit update or grant. Self-unfollow
+requires no action grant and can end only the actor’s addressed participation.
 
 `group.create` authorizes [private team-group creation](group-workflows.md).
 `group.membership.manage` separately authorizes [adding](group-workflows.md#adding-a-member) and

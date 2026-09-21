@@ -272,6 +272,25 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             status: "active",
             endedAt: null,
           });
+          yield* journal.publish(ThreadParticipationFacts.Ended, {
+            reason: "unfollowed",
+            workspaceId,
+            threadId,
+            participationId,
+            memberId: actor.memberId,
+          });
+          yield* journal.publish(ThreadActivityFacts.Recorded, {
+            recipients: [],
+            activity: {
+              id: ThreadActivity.Id.make("private-follow"),
+              workspaceId,
+              threadId,
+              participationId,
+              sequence: 2,
+              kind: "ParticipationFollowed",
+              occurredAt: group.createdAt,
+            },
+          });
           yield* journal.publish(ThreadMessageFacts.Published, {
             id: messageId,
             workspaceId,

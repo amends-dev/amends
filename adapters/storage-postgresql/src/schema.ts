@@ -518,8 +518,14 @@ export const threadActivities = pgTable(
     id: text("id").notNull(),
     threadId: text("thread_id").notNull(),
     sequence: integer("sequence").notNull(),
-    kind: text("kind", { enum: ["MessagePublished"] }).notNull(),
-    messageId: text("message_id").notNull(),
+    kind: text("kind", {
+      enum: ["MessagePublished", "ParticipationFollowed", "ParticipationEnded"],
+    }).notNull(),
+    messageId: text("message_id"),
+    participationId: text("participation_id"),
+    reason: text("reason", {
+      enum: ["unfollowed", "group-left", "group-removed", "workspace-removed"],
+    }),
     occurredAt: instant("occurred_at").notNull(),
   },
   (t) => [
@@ -534,6 +540,15 @@ export const threadActivities = pgTable(
     }),
     uniqueIndex("thread_activity_sequence").on(t.workspaceId, t.threadId, t.sequence),
     uniqueIndex("thread_message_activity").on(t.workspaceId, t.messageId),
+    foreignKey({
+      columns: [t.workspaceId, t.participationId],
+      foreignColumns: [threadParticipations.workspaceId, threadParticipations.id],
+    }),
+    uniqueIndex("thread_participation_activity").on(t.workspaceId, t.participationId, t.kind),
+    check(
+      "thread_activity_subject",
+      sql`(${t.kind} = 'MessagePublished' AND ${t.messageId} IS NOT NULL AND ${t.participationId} IS NULL AND ${t.reason} IS NULL) OR (${t.kind} = 'ParticipationFollowed' AND ${t.messageId} IS NULL AND ${t.participationId} IS NOT NULL AND ${t.reason} IS NULL) OR (${t.kind} = 'ParticipationEnded' AND ${t.messageId} IS NULL AND ${t.participationId} IS NOT NULL AND ${t.reason} IS NOT NULL AND ${t.reason} IN ('unfollowed','group-left','group-removed','workspace-removed'))`,
+    ),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
   ],
 );

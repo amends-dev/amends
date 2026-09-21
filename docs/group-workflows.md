@@ -198,8 +198,9 @@ through the [thread workflow](thread-workflows.md).
 DMs, public-group joining/discovery, further thread workflows, and group/thread HTTP/UI workflows
 remain separate implementation steps. See [known limitations](current-status.md).
 Opening messages establish thread participation and notifications. Group departures end those
-participations and discard pending agent input. General participation management and agent-turn
-cancellation remain future work.
+participations and discard pending agent input. Every affected thread records a participation-ended
+fact and timeline activity through the same lifecycle service as explicit unfollow. Self-follow/unfollow is implemented without changing group membership. Managing other
+participants and agent-turn cancellation remain future work.
 
 Group creation introduced new storage baselines. Adding members reuses those tables and facts;
 it adds `group.membership.manage` to newly initialized permission bundles. Existing stored

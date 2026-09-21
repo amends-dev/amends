@@ -14,6 +14,7 @@ import {
   Group,
   GroupApplication,
   GroupMembershipApplication,
+  GroupMembershipDeparture,
   GroupMembershipFacts,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
@@ -25,6 +26,8 @@ import {
   ThreadApplication,
   ThreadAccess,
   ThreadActivityFacts,
+  ThreadActivityRecording,
+  ThreadParticipationDeparture,
   ThreadActivityStore,
   ThreadMessage,
   ThreadMessageApplication,
@@ -183,6 +186,9 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
                 | ThreadAccess.Service
                 | ThreadParticipationAdmission.Service
                 | ThreadMessagePublication.Service
+                | ThreadActivityRecording.Service
+                | ThreadParticipationDeparture.Service
+                | GroupMembershipDeparture.Service
               >
             >().toEqualTypeOf<never>();
             const { bound, owner, group, first, human } = yield* prepare();
@@ -527,12 +533,12 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             });
             yield* TestClock.adjust("2 seconds");
             const addressed = yield* run(bound, owner, reply(first.thread.id, [agentId]));
-            expect(addressed.activity.sequence).toBe(4);
+            expect(addressed.activity.sequence).toBe(5);
             const current = (yield* bound.participations.listByThread(first.thread.id)).find(
               (p) => p.memberId === agentId && p.status === "active",
             );
             expect(current).toMatchObject({
-              joinedAtSequence: 4,
+              joinedAtSequence: 5,
               joinedAt: addressed.message.publishedAt,
             });
             expect(current?.id).not.toBe(old.id);

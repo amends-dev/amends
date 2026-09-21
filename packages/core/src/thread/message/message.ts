@@ -30,6 +30,9 @@ export const PublishInput = Schema.Struct({
 });
 export interface PublishInput extends Schema.Schema.Type<typeof PublishInput> {}
 /** Publication result excludes internal admission and recipient identity snapshots. */
-export const Published = Schema.Struct({ message: Record, activity: ThreadActivity.Record });
+export const Published = Schema.Struct({
+  message: Record,
+  activity: ThreadActivity.MessagePublished,
+});
 export interface Published extends Schema.Schema.Type<typeof Published> {}
 export * as ThreadMessage from "./message.ts";

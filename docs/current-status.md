@@ -15,14 +15,15 @@ and group HTTP/UI workflows remain unimplemented.
 participation, timeline activity, and notifications is implemented in core and both adapters.
 Authorized thread discovery, metadata, sequence-paginated timelines, and current-participant
 summaries and human replies are also implemented. Replies admit their author and eligible mentions,
-record the next timeline activity, and generate notifications atomically. Explicit follow/unfollow,
-other participation management, turns, agent execution, triage,
+record the next timeline activity, and generate notifications atomically. Explicit self-follow/unfollow
+is implemented, including quiet follow/ending activity and pending agent-input cleanup. Managing other
+participants, muting, turns, agent execution, triage,
 and channel delivery remain future work.
 The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
 include implemented group-inherited read access. Standalone admission and general participation
 management remain incomplete. Group departure ends its associated thread participations and
 discards their pending agent input; workspace-member removal uses the same cleanup.
-Thread starts, reads, and replies use the shared group-audience check.
+Thread starts, reads, replies, and follow/unfollow use the shared group-audience check.
 Group and thread discovery and current-participant lists are unpaginated; timelines have
 sequence-based pages. Separate reads and pages do not share a snapshot.
 
@@ -36,10 +37,14 @@ only the acting human or agent's inbox, with active membership required. Contact
 and Triage reads are available only through internal stores.
 
 The [projection](../packages/core/src/notification/projection.ts) generates notifications from
-opening and reply messages’ recorded activity and historical recipient selection. It settles pending
-agent notifications when their linked group admission ends. General acknowledgment, recipient
+the shared activity-recorded fact and its historical recipient selection, for every activity kind.
+Follow and participation endings currently select no recipients. Ending activity settles pending
+agent input before the same handler generates notifications for selected recipients. Participation
+domain facts do not directly change notifications. Group and workspace departures record ending
+activity for each affected thread through the same internal lifecycle service. General acknowledgment, recipient
 processing, silent completion, and delivery remain unimplemented. Existing tests also seed
-notifications for storage and inbox contracts. Other activity kinds remain design intent.
+notifications for storage and inbox contracts. Quiet participation activity creates no notifications.
+Turn/task activity kinds remain design intent.
 
 ## Live delivery and authorization
 

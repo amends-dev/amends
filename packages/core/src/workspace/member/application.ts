@@ -6,7 +6,7 @@ import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
 import { GroupMembership } from "../../group/membership/membership.ts";
-import { GroupMembershipFacts } from "../../group/membership/facts.ts";
+import { GroupMembershipDeparture } from "../../group/membership/departure.ts";
 import { GroupMembershipStore } from "../../group/membership/store.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
@@ -56,6 +56,7 @@ export type Error =
   | InvalidResponse;
 
 export type RemoveError =
+  | GroupMembershipDeparture.Error
   | Error
   | PlatformError.PlatformError
   | Delegation.Error
@@ -120,6 +121,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | WorkspaceStore.Service
   | InvitationStore.Service
   | GroupMembershipStore.Service
+  | GroupMembershipDeparture.Service
   | Authorization.Service
   | Delegation.Service
   | Journal.Service
@@ -129,6 +131,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const workspace = yield* WorkspaceStore.Service;
   const invitations = yield* InvitationStore.Service;
   const groupMemberships = yield* GroupMembershipStore.Service;
+  const groupDeparture = yield* GroupMembershipDeparture.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -138,6 +141,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   yield* requireWorkspace(workspaceId, workspace.workspaceId);
   yield* requireWorkspace(workspaceId, invitations.workspaceId);
   yield* requireWorkspace(workspaceId, groupMemberships.workspaceId);
+  yield* requireWorkspace(workspaceId, groupDeparture.workspaceId);
   yield* requireWorkspace(workspaceId, delegation.workspaceId);
 
   const load = Effect.fnUntraced(function* (id: Member.Id) {
@@ -218,13 +222,16 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
             return yield* new InvalidResponse({
               message: "Group membership store returned another member, workspace, or state",
             });
-          yield* journal.publish(GroupMembershipFacts.Removed, {
-            workspaceId,
-            groupId: membership.groupId,
-            membershipId: membership.id,
-            memberId: id,
-            reason: "workspace-removed",
-          });
+          yield* groupDeparture.remove(
+            {
+              workspaceId,
+              groupId: membership.groupId,
+              membershipId: membership.id,
+              memberId: id,
+              reason: "workspace-removed",
+            },
+            removed.provenance.occurredAt,
+          );
         }
       }).pipe(Publication.withCause(removed, removed.provenance.occurredAt));
       if (member.identity._tag === "Human") {

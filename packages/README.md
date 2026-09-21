@@ -91,7 +91,9 @@ cryptography, and workspace event bus a host must supply, derived from that laye
 and operations it implements. The thread surface implements private-group starts with initial
 participation, a text message, ordered activity, and notification generation.
 `ThreadMessageApplication.publish` adds human replies under `thread.publish`; starts and replies
-reuse internal admission and publication services without requiring each other’s action grants. Its authorized
+reuse internal admission and publication services without requiring each other’s action grants.
+`ThreadParticipationApplication` implements self-follow/unfollow. Following adds quiet timeline
+activity; unfollow ends one participation while retaining group access. Its authorized
 reads provide group discovery, metadata, timeline pages, and current participant summaries,
 with group audience and `thread.read` checked independently of participation. Agent-use permission
 is declared in the agent domain; execution remains future work.

@@ -2,14 +2,32 @@ import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread
 
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
-import { threadActivities, threadMessages } from "./schema.ts";
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+import { threadActivities, threadMessages, threadParticipations } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...ThreadActivity.Record.fields, occurredAt: Schema.DateTimeUtcFromDate }),
+    Schema.Union([
+      Schema.Struct({
+        ...ThreadActivity.MessagePublished.fields,
+        occurredAt: Schema.DateTimeUtcFromDate,
+        participationId: Schema.Null,
+        reason: Schema.Null,
+      }),
+      Schema.Struct({
+        ...ThreadActivity.ParticipationFollowed.fields,
+        reason: Schema.Null,
+        occurredAt: Schema.DateTimeUtcFromDate,
+        messageId: Schema.Null,
+      }),
+      Schema.Struct({
+        ...ThreadActivity.ParticipationEnded.fields,
+        occurredAt: Schema.DateTimeUtcFromDate,
+        messageId: Schema.Null,
+      }),
+    ]),
   ),
 );
 const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =>
@@ -94,16 +112,34 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
           message: "Invalid initial record or workspace",
         });
       const related = yield* guard(
-        db
-          .select({ id: threadMessages.id })
-          .from(threadMessages)
-          .where(
-            and(
-              eq(threadMessages.workspaceId, workspaceId),
-              eq(threadMessages.id, record.messageId),
-              eq(threadMessages.threadId, record.threadId),
-            ),
-          ),
+        record.kind === "MessagePublished"
+          ? db
+              .select({ id: threadMessages.id })
+              .from(threadMessages)
+              .where(
+                and(
+                  eq(threadMessages.workspaceId, workspaceId),
+                  eq(threadMessages.id, record.messageId),
+                  eq(threadMessages.threadId, record.threadId),
+                ),
+              )
+          : db
+              .select({ id: threadParticipations.id })
+              .from(threadParticipations)
+              .where(
+                and(
+                  eq(threadParticipations.workspaceId, workspaceId),
+                  eq(threadParticipations.id, record.participationId),
+                  eq(threadParticipations.threadId, record.threadId),
+                  record.kind === "ParticipationFollowed"
+                    ? eq(threadParticipations.joinedAtSequence, record.sequence)
+                    : and(
+                        lt(threadParticipations.joinedAtSequence, record.sequence),
+                        eq(threadParticipations.status, "ended"),
+                        eq(threadParticipations.endedAt, DateTime.toDate(record.occurredAt)),
+                      ),
+                ),
+              ),
         true,
       ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
       if (related.length === 0)

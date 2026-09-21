@@ -10,6 +10,7 @@ import { Journal } from "../../journal/journal.ts";
 import { Store } from "../../journal/store.ts";
 import type { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
+import type { Event } from "../../journal/event.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Thread } from "../thread.ts";
 import { ThreadParticipation } from "./participation.ts";
@@ -44,6 +45,10 @@ export type Error =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error;
+export interface Ensured {
+  readonly participants: ReadonlyArray<ThreadParticipation.Record>;
+  readonly added: ReadonlyArray<Event.Type<typeof ThreadParticipationFacts.Added>>;
+}
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
   readonly eligible: (
@@ -58,11 +63,7 @@ export interface Interface {
     memberIds: ReadonlyArray<Member.Id>,
     sequence: number,
     occurredAt: DateTime.Utc,
-  ) => Effect.Effect<
-    ReadonlyArray<ThreadParticipation.Record>,
-    Error,
-    Store.Transaction | Publication.Service
-  >;
+  ) => Effect.Effect<Ensured, Error, Store.Transaction | Publication.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/participation/admission/Service",
@@ -184,6 +185,7 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     const candidates = yield* eligible(thread.groupId);
     const existing = new Map((yield* current(thread)).map((p) => [p.memberId, p]));
     const result: Array<ThreadParticipation.Record> = [];
+    const added: Array<Event.Type<typeof ThreadParticipationFacts.Added>> = [];
     for (const memberId of ids) {
       const candidate = candidates.get(memberId);
       if (candidate === undefined) return yield* new Unavailable({ memberId });
@@ -211,10 +213,10 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
         status: "active",
         endedAt: null,
       });
-      yield* journal.publish(ThreadParticipationFacts.Added, participant);
+      added.push(yield* journal.publish(ThreadParticipationFacts.Added, participant));
       result.push(participant);
     }
-    return result;
+    return { participants: result, added };
   });
   return Service.of({ workspaceId, eligible, current, ensure });
 });

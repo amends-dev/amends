@@ -6,6 +6,11 @@ import { ThreadMessageApplication } from "./thread/message/application.ts";
 import { ThreadMessagePublication } from "./thread/message/publication.ts";
 import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
 import { ThreadParticipationAdmission } from "./thread/participation/admission.ts";
+import { ThreadParticipationApplication } from "./thread/participation/application.ts";
+import { ThreadParticipationPermissions } from "./thread/participation/permissions.ts";
+import { ThreadParticipationDeparture } from "./thread/participation/departure.ts";
+import { ThreadActivityRecording } from "./thread/activity/recording.ts";
+import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
 import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
@@ -77,6 +82,7 @@ const permissions = [
   ThreadPermissions.Start,
   ThreadPermissions.Read,
   ThreadMessagePermissions.Publish,
+  ThreadParticipationPermissions.Follow,
   AgentPermissions.Use,
 ];
 
@@ -89,7 +95,12 @@ const journal = Journal.layer({ logId: Log.Id.make("journal"), projections }).pi
 const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
 
 const admissions = ThreadParticipationAdmission.layer;
-const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(admissions));
+const recording = ThreadActivityRecording.layer;
+const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(recording));
+const groupDeparture = GroupMembershipDeparture.layer.pipe(Layer.provide(departures));
+const messagePublication = ThreadMessagePublication.layer.pipe(
+  Layer.provide(Layer.mergeAll(admissions, recording)),
+);
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
 
 /**
@@ -107,6 +118,7 @@ const operations = Layer.mergeAll(
   GroupMembershipApplication.layer,
   ThreadApplication.layer,
   ThreadMessageApplication.layer,
+  ThreadParticipationApplication.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
@@ -115,6 +127,9 @@ const operations = Layer.mergeAll(
       ThreadCreation.layer,
       threadAccess,
       admissions,
+      recording,
+      departures,
+      groupDeparture,
       messagePublication,
     ),
   ),

@@ -26,8 +26,9 @@ export interface Interface {
   readonly listByAdmission: (
     id: GroupMembership.Id,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
-  readonly endByAdmission: (
-    id: GroupMembership.Id,
+  /** End exactly the addressed active participation; mismatched or terminal records conflict. */
+  readonly end: (
+    departure: ThreadParticipation.Departure,
     endedAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** Validate schema and workspace references before insertion. Preserve historical values on replay. */

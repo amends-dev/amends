@@ -165,9 +165,12 @@ CREATE TABLE "thread_activities" (
 	"thread_id" text NOT NULL,
 	"sequence" integer NOT NULL,
 	"kind" text NOT NULL,
-	"message_id" text NOT NULL,
+	"message_id" text,
+	"participation_id" text,
+	"reason" text,
 	"occurred_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "thread_activities_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "thread_activity_subject" CHECK (("kind" = 'MessagePublished' AND "message_id" IS NOT NULL AND "participation_id" IS NULL AND "reason" IS NULL) OR ("kind" = 'ParticipationFollowed' AND "message_id" IS NULL AND "participation_id" IS NOT NULL AND "reason" IS NULL) OR ("kind" = 'ParticipationEnded' AND "message_id" IS NULL AND "participation_id" IS NOT NULL AND "reason" IS NOT NULL AND "reason" IN ('unfollowed','group-left','group-removed','workspace-removed'))),
 	CONSTRAINT "thread_activity_positive_sequence" CHECK ("sequence" > 0)
 );
 --> statement-breakpoint
@@ -232,6 +235,7 @@ CREATE INDEX "notifications_by_recipient" ON "notifications" ("workspace_id","re
 CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"recorded_at","id" COLLATE "C") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_message_activity" ON "thread_activities" ("workspace_id","message_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "thread_participation_activity" ON "thread_activities" ("workspace_id","participation_id","kind");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id");--> statement-breakpoint
 CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id");--> statement-breakpoint
@@ -251,6 +255,7 @@ ALTER TABLE "notifications" ADD CONSTRAINT "notifications_workspace" FOREIGN KEY
 ALTER TABLE "roles" ADD CONSTRAINT "roles_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "thread_activities" ADD CONSTRAINT "thread_activities_4Sa14SmdIuuD_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_activities" ADD CONSTRAINT "thread_activities_xyjglJJtxVz2_fkey" FOREIGN KEY ("workspace_id","message_id") REFERENCES "thread_messages"("workspace_id","id");--> statement-breakpoint
+ALTER TABLE "thread_activities" ADD CONSTRAINT "thread_activities_87rvenxiiDk0_fkey" FOREIGN KEY ("workspace_id","participation_id") REFERENCES "thread_participations"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_messages" ADD CONSTRAINT "thread_messages_yFALzBzMcA1U_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_messages" ADD CONSTRAINT "thread_messages_VQN5uhaRX29u_fkey" FOREIGN KEY ("workspace_id","author_member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_WEmntEwuURKU_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint

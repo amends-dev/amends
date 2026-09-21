@@ -1,7 +1,7 @@
 import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread";
 
 import { Store } from "@amends/core/journal";
-import { Array, Effect, Layer, Schema } from "effect";
+import { Array, DateTime, Effect, Layer, Schema } from "effect";
 
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -11,11 +11,12 @@ const encode = Schema.encodeEffect(codec);
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      workspaceId: ThreadActivity.Record.fields.workspaceId,
+      workspaceId: ThreadActivity.Common.fields.workspaceId,
       id: ThreadActivity.Id,
-      threadId: ThreadActivity.Record.fields.threadId,
-      messageId: ThreadActivity.Record.fields.messageId,
-      sequence: ThreadActivity.Record.fields.sequence,
+      threadId: ThreadActivity.Common.fields.threadId,
+      messageId: Schema.NullOr(ThreadActivity.MessagePublished.fields.messageId),
+      participationId: Schema.NullOr(ThreadActivity.ParticipationFollowed.fields.participationId),
+      sequence: ThreadActivity.Common.fields.sequence,
       record: codec,
     }).check(
       Schema.makeFilter(
@@ -23,7 +24,9 @@ const decode = Schema.decodeUnknownEffect(
           (row.workspaceId === row.record.workspaceId &&
             row.id === row.record.id &&
             row.threadId === row.record.threadId &&
-            row.messageId === row.record.messageId &&
+            (row.record.kind === "MessagePublished"
+              ? row.messageId === row.record.messageId && row.participationId === null
+              : row.messageId === null && row.participationId === row.record.participationId) &&
             row.sequence === row.record.sequence) ||
           "Columns must match the stored record",
       ),
@@ -36,7 +39,7 @@ const records = (rows: ReadonlyArray<{ readonly record: ThreadActivity.Record }>
 export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
-  const columns = sql`workspace_id AS workspaceId, id, thread_id AS threadId, message_id AS messageId, sequence, record`;
+  const columns = sql`workspace_id AS workspaceId, id, thread_id AS threadId, message_id AS messageId, participation_id AS participationId, sequence, record`;
   return ThreadActivityStore.Service.of({
     workspaceId,
     get: Effect.fn("ThreadActivities.get")(
@@ -87,7 +90,11 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
           message: "Invalid initial record or workspace",
         });
       const related = yield* guard(
-        sql`SELECT id FROM thread_messages WHERE workspace_id = ${workspaceId} AND id = ${record.messageId} AND thread_id = ${record.threadId}`,
+        record.kind === "MessagePublished"
+          ? sql`SELECT id FROM thread_messages WHERE workspace_id = ${workspaceId} AND id = ${record.messageId} AND thread_id = ${record.threadId}`
+          : record.kind === "ParticipationFollowed"
+            ? sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND id = ${record.participationId} AND thread_id = ${record.threadId} AND json_extract(record, '$.joinedAtSequence') = ${record.sequence}`
+            : sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND id = ${record.participationId} AND thread_id = ${record.threadId} AND json_extract(record, '$.joinedAtSequence') < ${record.sequence} AND json_extract(record, '$.status') = 'ended' AND json_extract(record, '$.endedAt') = ${DateTime.formatIso(record.occurredAt)}`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
       if (related.length === 0)
@@ -110,7 +117,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         Effect.mapError(storeFailure(ThreadActivityStore, "insert")),
       );
       yield* guard(
-        sql`INSERT INTO thread_activities (workspace_id,id,thread_id,message_id,sequence,record) VALUES (${workspaceId},${record.id},${record.threadId},${record.messageId},${record.sequence},${data})`,
+        sql`INSERT INTO thread_activities (workspace_id,id,thread_id,message_id,participation_id,sequence,record) VALUES (${workspaceId},${record.id},${record.threadId},${record.kind === "MessagePublished" ? record.messageId : null},${record.kind !== "MessagePublished" ? record.participationId : null},${record.sequence},${data})`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
     }),

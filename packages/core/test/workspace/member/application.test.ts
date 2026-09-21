@@ -1,3 +1,4 @@
+import { GroupMembershipDeparture } from "@amends/core/group";
 import { Publication } from "../../../src/journal/publication.ts";
 import { GroupMembershipStore } from "../../../src/group/membership/store.ts";
 import { testCrypto, testProvenance } from "../../publication.ts";
@@ -128,7 +129,17 @@ const configured = (
   // Keep the journal available to exercise reads inside an outer application commit.
   return MemberApplication.layer.pipe(
     Layer.provideMerge(
-      Layer.mergeAll(services, workspace, invitations, groupMemberships, delegation),
+      Layer.mergeAll(
+        services,
+        workspace,
+        invitations,
+        groupMemberships,
+        delegation,
+        Layer.succeed(GroupMembershipDeparture.Service, {
+          workspaceId,
+          remove: () => Effect.die("These member tests have no group admissions"),
+        }),
+      ),
     ),
     Layer.provide(members),
   );
@@ -151,6 +162,7 @@ const run = <A, E>(
     | WorkspaceStore.Service
     | InvitationStore.Service
     | GroupMembershipStore.Service
+    | GroupMembershipDeparture.Service
     | Actor.Service
     | Crypto.Crypto
   >,
@@ -186,6 +198,7 @@ it.effect("member reads require only the current actor and leave the journal unc
       | WorkspaceStore.Service
       | InvitationStore.Service
       | GroupMembershipStore.Service
+      | GroupMembershipDeparture.Service
       | Authorization.Service
       | Delegation.Service
       | Journal.Service

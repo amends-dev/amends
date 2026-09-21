@@ -5,6 +5,7 @@ import { MemberId } from "../workspace/member/id.ts";
 import { ThreadId } from "./id.ts";
 import { ThreadMessage } from "./message/message.ts";
 import { ThreadActivity } from "./activity/activity.ts";
+import { ThreadParticipation } from "./participation/participation.ts";
 export const Id = ThreadId.Id;
 export type Id = ThreadId.Id;
 export const Record = Schema.Struct({
@@ -24,13 +25,22 @@ export interface StartInGroupInput extends Schema.Schema.Type<typeof StartInGrou
 export const Started = Schema.Struct({
   thread: Record,
   message: ThreadMessage.Record,
-  activity: ThreadActivity.Record,
+  activity: ThreadActivity.MessagePublished,
 });
 export interface Started extends Schema.Schema.Type<typeof Started> {}
-/** One ordered activity with its message resolved after authorizing the thread. */
-export const TimelineItem = Schema.Struct({
-  activity: ThreadActivity.Record,
-  message: ThreadMessage.Record,
-});
-export interface TimelineItem extends Schema.Schema.Type<typeof TimelineItem> {}
+/** Resolve each activity's subject only after authorizing the thread. */
+export const TimelineItem = Schema.Union([
+  Schema.Struct({
+    activity: ThreadActivity.MessagePublished,
+    message: ThreadMessage.Record,
+  }),
+  Schema.Struct({
+    activity: Schema.Union([
+      ThreadActivity.ParticipationFollowed,
+      ThreadActivity.ParticipationEnded,
+    ]),
+    participant: ThreadParticipation.Summary,
+  }),
+]);
+export type TimelineItem = typeof TimelineItem.Type;
 export * as Thread from "./thread.ts";

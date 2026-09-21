@@ -68,27 +68,40 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "listByAdmission")),
     ),
-    endByAdmission: Effect.fn("ThreadParticipations.endByAdmission")(function* (input, time) {
+    end: Effect.fn("ThreadParticipations.end")(function* (input, time) {
       yield* Store.Transaction;
-      const id = yield* Schema.decodeEffect(GroupMembership.Id)(input).pipe(
-        Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")),
+      const departure = yield* Schema.decodeEffect(ThreadParticipation.Departure)(input).pipe(
+        Effect.mapError(storeConflict(ThreadParticipationStore, "end")),
       );
       const endedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
         time,
-      ).pipe(Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")));
-      yield* guard(
+      ).pipe(Effect.mapError(storeConflict(ThreadParticipationStore, "end")));
+      if (departure.workspaceId !== workspaceId)
+        return yield* new ThreadParticipationStore.Conflict({
+          operation: "end",
+          message: "Departure belongs to another workspace",
+        });
+      const rows = yield* guard(
         db
           .update(threadParticipations)
           .set({ status: "ended", endedAt: DateTime.toDate(endedAt) })
           .where(
             and(
               inWorkspace,
-              eq(threadParticipations.groupMembershipId, id),
+              eq(threadParticipations.id, departure.participationId),
+              eq(threadParticipations.threadId, departure.threadId),
+              eq(threadParticipations.memberId, departure.memberId),
               eq(threadParticipations.status, "active"),
             ),
-          ),
+          )
+          .returning({ id: threadParticipations.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "endByAdmission")));
+      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "end")));
+      if (rows.length !== 1)
+        return yield* new ThreadParticipationStore.Conflict({
+          operation: "end",
+          message: "Participation is missing, mismatched, or already ended",
+        });
     }),
     insert: Effect.fn("ThreadParticipations.insert")(function* (input) {
       yield* Store.Transaction;

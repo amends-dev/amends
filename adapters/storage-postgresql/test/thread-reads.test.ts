@@ -614,8 +614,8 @@ describe.skipIf(!available)("PostgreSQL thread reads", () => {
                     recipients: [],
                   });
                   expect(
-                    (yield* asActor(timeline(first.thread.id), reader)).map(
-                      (item) => item.message.text,
+                    (yield* asActor(timeline(first.thread.id), reader)).map((item) =>
+                      "message" in item ? item.message.text : null,
                     ),
                   ).toEqual([first.message.text, "Staged text"]);
                   yield* journal.publish(AssignmentFacts.Revoked, {

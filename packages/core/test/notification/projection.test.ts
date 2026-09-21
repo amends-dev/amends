@@ -1,5 +1,11 @@
 import { NotificationStore } from "@amends/core/notification";
-import { ThreadParticipationStore } from "@amends/core/thread";
+import {
+  Thread,
+  ThreadParticipation,
+  ThreadParticipationFacts,
+  ThreadParticipationStore,
+} from "@amends/core/thread";
+import { Member } from "@amends/core/workspace";
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
@@ -57,7 +63,7 @@ const run = <A, E>(
       listByThread: () => Effect.die("Unexpected participation read"),
       listByAdmission: () => Effect.die("Unexpected participation read"),
       insert: () => Effect.die("Unexpected participation write"),
-      endByAdmission: () => Effect.die("Unexpected participation write"),
+      end: () => Effect.die("Unexpected participation write"),
     }),
     Effect.provideService(Publication.Service, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
@@ -108,4 +114,36 @@ it.effect(
         }),
       );
     }),
+);
+
+it.effect("participation domain facts advance the checkpoint without touching notifications", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const journal = yield* Journal.make({
+          logId,
+          projections: [NotificationProjection.definition],
+        });
+        const ended = yield* journal.publish(ThreadParticipationFacts.Ended, {
+          workspaceId,
+          threadId: Thread.Id.make("thread"),
+          participationId: ThreadParticipation.Id.make("participation"),
+          memberId: Member.Id.make("member"),
+          reason: "unfollowed",
+        });
+        expect(yield* fixture.checkpoints.get(key)).toEqual(
+          Option.some({
+            position: ended.position,
+            commitId: ended.commitId,
+            index: ended.index,
+            entryId: ended.id,
+          }),
+        );
+        // The fixture defects on every participation or notification read/write.
+        yield* journal.replay;
+      }),
+    );
+  }),
 );
