@@ -85,3 +85,16 @@ Global teardown stops only the cluster started by the tests. A supplied URL must
 allow database creation and deletion. Without that URL or a local PostgreSQL
 installation, database suites are reported as skipped; pure PostgreSQL adapter
 tests still run. Startup and connection failures fail the run.
+
+## Limits of current coverage
+
+The suite checks journal round trips, transactional behavior, inbox isolation, and
+ordinary SSE reconnects. It does not yet include fixed golden bytes for SchemaBinary
+payloads, PostgreSQL isolation-default variations or deadlock classification,
+repeated Ready/disconnect backoff behavior, or an application request-body limit.
+These [known limitations](current-status.md) remain open even when the existing
+suite passes. Notification tests seed records because generation is not implemented.
+
+Subprocess fixtures create an existing temporary database parent, so passing host
+tests do not prove that the default SQLite path works on a fresh clone. Follow the
+[setup guide](../hosts/local/README.md#run) to create that directory first.

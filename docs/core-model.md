@@ -8,6 +8,14 @@ This document describes design intent. It does not describe or validate the curr
 implementation. The discussion is grounded in the work users want to do and the contracts
 of external systems. Existing implementation choices do not constrain the design.
 
+For current behavior, read [workspace workflows](workspace-workflows.md), the
+[core package guide](../packages/core/README.md), and [known limitations](current-status.md).
+Workspace management, the generic journal, notification storage and inbox reads,
+and process-local live changes are implemented. Thread participation/activity,
+turns, execution, notification generation/acknowledgment, triage, and channel
+delivery below remain design intent. “Agreed” records a design decision, not its
+implementation status.
+
 ## Architecture summary
 
 The thread holds the conversation and its ordered activity. That timeline is the sole
@@ -418,8 +426,9 @@ retried without duplication.
 
 These ownership and behavioral rules are agreed. Exact storage mechanisms, lifecycle and
 protocol schemas, harness continuation capabilities, task-thread context inheritance,
-and resource revision contracts remain open. See
-[Open questions for the next parts](#open-questions-for-the-next-parts).
+and resource revision contracts remain open. Unresolved details are recorded in
+their owning sections below; see [Working method and scope](#working-method-and-scope)
+for the meaning of each decision status.
 
 ## Working method and scope
 

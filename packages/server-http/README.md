@@ -13,8 +13,9 @@ domain rules belong to core.
 Notification handlers enter through `Gateway.asMember` and call
 `NotificationApplication.get`, `list`, or `listPending`. The contract decodes the
 page size, cursor, and optional pending-only filter; core derives the recipient
-from the actor and checks active membership and recipient ownership in the read
-transaction. The HTTP layer adds no notification generation or delivery.
+from the actor and checks active membership and recipient ownership without opening
+a transaction. An existing caller transaction is honored. The HTTP layer adds no
+notification generation or delivery.
 
 `ChangesHandlers.watch` enters through `Gateway.asMemberScoped` and calls
 `ChangeFeedApplication.watch`. Effect's HTTP server transfers the request scope

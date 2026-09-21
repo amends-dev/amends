@@ -37,34 +37,31 @@ considered complete.
 
 ## Review basis and versions
 
-The local dependency catalog and vendored package both identify **4.0.0-rc.112**. The API
-list supplied in the discussion identifies **4.0.0-rc.115**. I reviewed the local public
-module inventory, `LLMS.md`, examples, and the implementations and tests most relevant to
-our guarantees. The catalog at the end accounts for every namespace export in the local
-core and unstable entry points, plus the additions in the supplied list.
+The original review used **4.0.0-rc.112** source and a supplied **4.0.0-rc.115** API
+list. The repository has since aligned its dependency catalog and vendored source
+to **4.0.0-rc.115**. The module inventory below has been refreshed against those
+local export indexes; the deeper workflow, AI, MCP, and driver assessments remain
+the earlier design review and require verification before implementation.
 
-The review goes deepest on workflows, queues, SQL transactions, cluster execution, AI
+The original review went deepest on workflows, queues, SQL transactions, cluster execution, AI
 history, MCP, scoped resources, and event logs. Ordinary collection and type utilities
 are grouped by use; this is not a claim to have audited every implementation line or run
-the upstream conformance suites. Application implementation files were not used as design
-evidence. Package metadata was checked only to establish the pinned version.
+the upstream conformance suites. That review did not use application implementation
+files as design evidence; the implementation-status notes above were added later.
 
-The newer release surface requires a deliberate version alignment before implementation:
+Keep dependencies and source aligned on future upgrades. `ByteSize`, `Arbitrary`,
+`Mime`, and the network-address modules are now present; `Msgpack` is absent.
+Use the matching local source for exact APIs rather than treating this proposal as
+proof of current behavior.
 
-- `rc.113` introduces `ByteSize`, native schema-based `Arbitrary`, network-address modules,
-  and MIME lookup; removes MessagePack APIs; and changes persisted-queue retry and
-  dead-letter handling. It also contains workflow, cache, AI-tool, and MCP fixes. These
-  differences make a source review of `rc.112` insufficient proof of exact `rc.115`
-  behavior. [Official rc.113 release](https://github.com/Effect-TS/effect/releases/tag/effect%404.0.0-rc.113)
-- `rc.114` includes schema import/code-generation and published-type fixes.
-  [Official rc.114 release](https://github.com/Effect-TS/effect/releases/tag/effect%404.0.0-rc.114)
-- `rc.115` includes fixes to SQL persistence lookups and HTTP response handling.
-  [Official rc.115 release](https://github.com/Effect-TS/effect/releases/tag/effect%404.0.0-rc.115)
-
-I recommend aligning the package versions and vendored source to the selected target
-release together before implementing this plan. This review does not update dependencies
-or the subtree. The recommendations below distinguish architectural fit from exact
-version-specific behavior.
+The application now uses services, schemas, SQL adapters, scoped workspace runtimes,
+a process-local committed-event bus, HttpApi, Solid atoms, and `@effect/vitest`.
+Workflow/cluster execution, AI harnesses, and MCP integrations remain proposed.
+The adapters own their native commit boundary rather than using the generic
+`SqlClient.withTransaction` wrapper, so they can expose commit outcomes and confirmed
+publication hooks. Public workspace SSE currently has no resume cursor or history
+replay. See the [documentation index](README.md) and [known limitations](current-status.md)
+for implementation status.
 
 ## Capability decisions
 
@@ -538,8 +535,9 @@ Sampled or transient traces cannot establish durable permission or delivery hist
 Use `@effect/vitest`, `TestClock`, `Deferred`, `Latch`, and test layers for deterministic
 execution tests. Use `HttpApiTest` and `RpcTest` for transport/schema behavior without
 opening a real network listener. Use schema round-trip and property tests for the
-sequence-boundary invariants and encoded transcript data. The local pin provides
-`FastCheck`/`TestSchema`; evaluate the newer native `Arbitrary` API after version alignment.
+sequence-boundary invariants and encoded transcript data. The current pin provides
+`FastCheck`/`TestSchema` and native `Arbitrary`; verify their matching-source APIs
+when adding property tests.
 
 Before committing to the high-level execution implementation, prove these cases:
 
@@ -607,8 +605,11 @@ new package layout.
 
 ## 11. Adoption order
 
-1. Align the selected Effect version and vendored source; retain this review's version
-   distinctions when updating API usage.
+This was the proposed implementation sequence. Version alignment and the initial
+workspace/HTTP/UI foundation are complete; the turn and delivery steps remain proposed.
+
+1. Keep the selected Effect version and vendored source aligned; retain this review's
+   version distinctions when updating API usage.
 2. Establish schemas, domain services, trusted identity, authorization, and SQL transaction
    contracts. Prove notification acceptance and conditional publication atomically.
 3. Validate `Workflow` with `ClusterWorkflowEngine` and `SingleRunner` against real persistent
@@ -622,9 +623,10 @@ new package layout.
 7. Add multi-runner clustering, replicated EventLog, embeddings, worker pools, or advanced
    schema tooling when a concrete requirement calls for them.
 
-The major deployment choice still needed is the control-plane host and durable database.
-It determines which engine/storage layers can be used directly. It does not change the
-application meanings of turns, environments, notifications, or permissions.
+The local control-plane host now uses Bun with SQLite or PostgreSQL. A production
+host and durable execution engine remain deployment choices for the planned turn
+and delivery domains. Those choices determine available engine/storage layers,
+without changing the meanings of turns, environments, notifications, or permissions.
 
 ## 12. Complete public module inventory
 
@@ -692,7 +694,7 @@ Use structured operational telemetry; persist audit data separately.
 
 #### Platform contracts
 
-`FileSystem`, `Path`, `Stdio`, `Terminal`, `PlatformError`, `Runtime`.
+`FileSystem`, `Path`, `Stdio`, `Terminal`, `PlatformError`, `Runtime`, `ByteSize`.
 
 Use through host/provider layers; these interfaces alone do not create sandboxes.
 
@@ -708,6 +710,14 @@ protocols are mostly supporting infrastructure, not new application subsystems.
 Source: [core export index](../repos/effect/packages/effect/src/index.ts).
 
 ### Unstable namespace exports
+
+#### `effect/unstable/arbitrary`
+
+`Arbitrary`.
+
+Schema-derived property-test inputs; inspect the selected schema's constraints before use.
+
+Source: [arbitrary export index](../repos/effect/packages/effect/src/unstable/arbitrary/index.ts).
 
 #### `effect/unstable/ai`
 
@@ -743,9 +753,11 @@ Source: [devtools export index](../repos/effect/packages/effect/src/unstable/dev
 
 #### `effect/unstable/encoding`
 
-`Ini`, `Msgpack`, `Ndjson`, `SchemaBinary`, `Sse`, `Toml`, `Yaml`.
+`Ini`, `Ndjson`, `SchemaBinary`, `Sse`, `Toml`, `Yaml`.
 
-Use SSE/NDJSON for appropriate streams and consider SchemaBinary for binary contracts. Msgpack exists in the local pin but is removed before the supplied rc.115 surface; do not select it for new target-version work.
+Use SSE/NDJSON for appropriate streams. The journal already uses SchemaBinary for
+payload storage, with [golden-byte compatibility coverage](current-status.md#payload-format-compatibility)
+still outstanding. Msgpack is not exported by the pinned release.
 
 Source: [encoding export index](../repos/effect/packages/effect/src/unstable/encoding/index.ts).
 
@@ -759,7 +771,7 @@ Source: [eventlog export index](../repos/effect/packages/effect/src/unstable/eve
 
 #### `effect/unstable/http`
 
-`Cookies`, `Etag`, `FetchHttpClient`, `FindMyWay`, `Headers`, `HttpBody`, `HttpClient`, `HttpClientError`, `HttpClientRequest`, `HttpClientResponse`, `HttpEffect`, `HttpIncomingMessage`, `HttpMethod`, `HttpMiddleware`, `HttpPlatform`, `HttpRouter`, `HttpServer`, `HttpServerError`, `HttpServerRequest`, `HttpServerRespondable`, `HttpServerResponse`, `HttpStaticServer`, `HttpStatus`, `HttpTraceContext`, `Multipart`, `MultipartParser`, `Template`, `Url`, `UrlParams`.
+`Cookies`, `Etag`, `FetchHttpClient`, `FindMyWay`, `Headers`, `HttpBody`, `HttpClient`, `HttpClientError`, `HttpClientRequest`, `HttpClientResponse`, `HttpEffect`, `HttpIncomingMessage`, `HttpMethod`, `HttpMiddleware`, `HttpPlatform`, `HttpRouter`, `HttpServer`, `HttpServerError`, `HttpServerRequest`, `HttpServerRespondable`, `HttpServerResponse`, `HttpStaticServer`, `HttpStatus`, `HttpTraceContext`, `Mime`, `Multipart`, `MultipartParser`, `Template`, `Url`, `UrlParams`.
 
 Adopt clients, routers, requests/responses, and selected body/stream helpers in transport adapters. Low-level routing and multipart machinery should generally remain behind higher-level APIs.
 
@@ -772,6 +784,14 @@ Source: [http export index](../repos/effect/packages/effect/src/unstable/http/in
 Adopt schema-based public contracts, generated clients, middleware, documentation, and in-memory API tests. Select one documentation renderer if a browser documentation page is needed.
 
 Source: [httpapi export index](../repos/effect/packages/effect/src/unstable/httpapi/index.ts).
+
+#### `effect/unstable/net`
+
+`IpInterface`, `IpNetwork`, `NetAddress`.
+
+Network-address parsing and validation for adapters that need those values.
+
+Source: [net export index](../repos/effect/packages/effect/src/unstable/net/index.ts).
 
 #### `effect/unstable/observability`
 
@@ -872,11 +892,8 @@ Source: [workflow export index](../repos/effect/packages/effect/src/unstable/wor
   and `MultipartParser/Search` support parsing internals; prefer the public Multipart API
   unless building a transport adapter that specifically needs those helpers.
 
-The additional names in the supplied `rc.115` list are `ByteSize`,
-`unstable/arbitrary/Arbitrary`, `unstable/http/Mime`, and `unstable/net`
-(`IpInterface`, `IpNetwork`, `NetAddress`). Candidate uses are typed byte limits, generated
-property-test inputs, attachment MIME lookup, and network-address validation respectively.
-They are not present in the local pin and were checked at the release-documentation level,
-not through local implementation tests. Validate their exact APIs after source alignment.
-See the [official rc.113 additions](https://github.com/Effect-TS/effect/releases/tag/effect%404.0.0-rc.113)
-and [rc.115 package exports](https://raw.githubusercontent.com/Effect-TS/effect/effect%404.0.0-rc.115/packages/effect/package.json).
+`ByteSize`, `Arbitrary`, `Mime`, and the network-address modules are included in
+the current inventory above. Export presence was checked against local source;
+it does not establish adoption or conformance testing by this application.
+The [vendored manifest](../repos/effect/packages/effect/package.json) identifies
+the release and available package subpaths.

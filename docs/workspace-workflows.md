@@ -5,8 +5,8 @@ workflows. For server setup and development authentication, see the
 [local host guide](../hosts/local/README.md). The
 [HTTP contract](../packages/api-http/README.md) defines the available endpoints;
 [core design](./core-model.md) records the broader model and planned work.
-The [role and authorization review](./authorization-review.md) records the
-remaining UI consistency gaps in these workflows.
+See [known limitations](./current-status.md) for storage outcomes and live-update
+constraints that affect these workflows.
 
 The examples assume the local host is running on port 8787 and use its
 development bearer identities.

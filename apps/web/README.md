@@ -11,6 +11,7 @@ From the repository root:
 
 ```sh
 bun install --frozen-lockfile
+mkdir -p hosts/local/data
 bun run start
 ```
 
@@ -22,6 +23,7 @@ bun run --filter @amends/web dev
 
 Open `http://127.0.0.1:4321/`. The development server proxies `/api` to the local
 host on port 8787. Local sign-in logs its one-time code in the host terminal.
+See the [local host guide](../../hosts/local/README.md#run) for alternative storage.
 
 ```sh
 bun run check
@@ -33,6 +35,8 @@ bun run --filter @amends/web preview
 Vite deduplicates Solid so the app, shared UI source, and Solid primitives use one
 reactive owner tree. The test runner uses Solid and Happy DOM. Browser checks are
 also needed for viewport sizing, scroll containment, and responsive focus behavior.
+`preview` serves the built client; it does not start the API. Its `/api` requests
+still need the local host. The local Bun host does not serve the web build.
 
 ## Ownership and names
 
@@ -156,7 +160,12 @@ mapping as features add facts or derived views. A commit's keys are deduplicated
 The server publishes events and never knows query keys.
 
 EOF and transient failures reconnect with exponential backoff and jitter, capped
-at 30 seconds. Rejected credentials or lost membership stop retries and use the
+at 30 seconds while failures occur before another message arrives. Effect's
+`Stream.retry` resets its schedule after a message, including Ready. A repeated
+Ready/disconnect cycle can therefore keep retrying near the initial 500ms delay
+and refreshing all mounted workspace queries; there is no stable-connection reset
+threshold or retry budget yet. See [edge limits](../../docs/current-status.md#edge-resource-controls).
+Rejected credentials or lost membership stop retries and use the
 existing session/access handling. No cursor is retained and queries do not poll.
 Workspace switches, session replacement and sign-out dispose the subscription;
 messages for a different workspace are rejected before invalidation. This feed
@@ -219,8 +228,8 @@ There is no page-header registration or separate shell for sign-in and workspace
   and `person` selection links remain readable.
 
 Home, Triage, Tasks, Agents, Channels, Environments, and Connections remain explicit
-placeholder pages until those backend domains exist. Workspaces still have IDs rather
-than names. Declining an invitation is not an available backend operation.
+placeholder pages until those backend domains exist. Workspaces have required display
+names and stable IDs for routing. Declining an invitation is not an available backend operation.
 
 The [accepted architecture proposal](../../docs/web-architecture-proposal.md) explains
 the design and the future `TurnLog` contract. Turn history and streaming require backend

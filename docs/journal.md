@@ -3,7 +3,10 @@
 The journal uses the same append-only log mechanism as execution history.
 `Journal.publish` appends a fact event to its configured log and applies matching
 projections inside the same commit. A turn's log stores its own schema-defined
-execution entries through `Log`, without running domain projections.
+execution entries through `Log`, without running domain projections. The generic
+log mechanism is implemented; turn execution and its domain-specific log schema
+remain planned. Turn and agent examples below illustrate consumers rather than
+available application operations.
 
 ## Ownership
 
@@ -29,7 +32,8 @@ execution entries through `Log`, without running domain projections.
 The core imports Effect only. Hosts choose storage and provide `Store.Service`,
 `Checkpoint.Service`, and the domain store services used by projection handlers.
 `Log.layer` builds the common log service and transaction coordinator from that
-store. `Journal.layer({ logId, projections })` builds `Journal.Service`, whose
+store and the workspace-bound `CommittedEvents.Service` supplied by the host.
+`Journal.layer({ logId, projections })` builds `Journal.Service`, whose
 interface stays the same as projections are added. `Journal.make` remains available
 as its constructor and returns that same interface.
 
@@ -40,15 +44,16 @@ context, preserving the active host transaction and giving each operation its ow
 scope. Projection dependencies do not appear on journal calls. A published fact's
 own schema requirements remain on that particular `publish` call.
 
-For example, `HostStores` below is a host layer supplying the storage services and
-all dependencies used by the domain-owned `AgentsProjection`. The shared log and
+For example, `HostServices` below is a host layer supplying storage, the shared
+workspace event bus, and dependencies used by an illustrative domain-owned
+`AgentsProjection`. The shared log and
 transaction services stay exposed so execution-log writes can join journal commits:
 
 ```ts
 const JournalLive = Journal.layer({
   logId: Log.Id.make("domain"),
   projections: [AgentsProjection],
-}).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostStores));
+}).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostServices));
 ```
 
 Domains obtain the configured implementation with `yield* Journal.Service`.
@@ -123,7 +128,9 @@ export const Removed = Fact.make("workspace.member.removed", {
   occurrence: (payload) => [payload.memberId],
 });
 
-const event = yield * journal.publish(MemberFacts.Removed, { workspaceId, memberId });
+const remove = Effect.gen(function* () {
+  return yield* journal.publish(Removed, { workspaceId, memberId });
+});
 ```
 
 `occurrence` is a pure, deterministic function of the validated decoded payload.
@@ -155,7 +162,9 @@ Use an explicit key for request-level retries of a repeatable fact:
 
 ```ts
 const options = { idempotencyKey: Log.IdempotencyKey.make(operationId) };
-const event = yield * journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options);
+const rename = Effect.gen(function* () {
+  return yield* journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options);
+});
 ```
 
 `Log.append` and `Log.appendAll` continue to accept explicit keys because execution
@@ -376,6 +385,9 @@ Adapters report unconfirmed commit outcomes with `Store.CommitUncertain`, includ
 the commit ID for lookup and reconciliation. The core does not automatically retry
 the program. Optional expected-position checks support conditional appends;
 idempotency keys separately support retrying the same append or publication.
+Both adapters currently classify every failed COMMIT effect as uncertain, including
+some errors with a definite rollback outcome. PostgreSQL deadlock classification
+also remains incomplete. See [known limitations](current-status.md#commit-outcomes-and-postgresql-contention).
 
 ## Reading and replay
 
@@ -413,11 +425,16 @@ own writes; consumers requiring committed history read outside write transaction
 The shared binary codec preserves schema transformations and service requirements.
 Its output buffers have independent ownership. Fact schema versions and the binary
 format are persistence contracts that must remain readable when dependencies change.
+The implementation uses `SchemaBinary.toCodec`. Current tests exercise round trips
+and storage behavior but do not pin literal golden bytes; encoding and decoding with
+the same upgraded codec cannot prove old payload compatibility. Add fixed fixtures
+before claiming that an Effect upgrade preserves the persisted format.
 
-Turn logs are durable execution history used for continuation and final-response
+In the planned turn domain, turn logs provide durable history for continuation and final-response
 derivation. Rebuilding domain projections from the journal does not recreate those
-separate logs. Notification generation still follows committed thread activity as
-defined in the core model; arbitrary log entries do not create notifications.
+separate logs. Notification generation is not implemented. Its design follows
+committed thread activity as defined in the core model; arbitrary log entries do
+not create notifications.
 
 ## Live tailing
 
@@ -502,8 +519,10 @@ updates from event data and the projection's own state, without depending on
 another projection's progress. Handlers and decoders must avoid external actions;
 the runner rejects new log appends during projection execution.
 
-Checkpoint reads and writes must participate in the same serializable host
-transaction as domain updates, including when no checkpoint exists yet. Competing
+Checkpoint reads and writes must participate in the same host transaction as
+domain updates, including when no checkpoint exists yet, with competing writes
+serialized. This is the storage contract; PostgreSQL currently relies on a
+workspace advisory lock and does not explicitly select an isolation level. Competing
 runners must serialize or receive `Store.Conflict`; the core does not retry them.
 After `Store.CommitUncertain`, reconcile using persisted progress and domain state.
 A later replay reads its checkpoint again before applying anything.
@@ -526,6 +545,9 @@ active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit
 visibility, rollback, independent consumers, cancellation, and wait failures.
 Storage adapters must satisfy the same transaction and log contracts. The
-[local host](../hosts/local/README.md) now supplies a SQLite adapter and tests those
-contracts against persistent storage and independent connections. The core's
+[SQLite](../adapters/storage-sqlite/README.md) and
+[PostgreSQL](../adapters/storage-postgresql/README.md) adapters test these contracts
+against persistent storage and independent connections; PostgreSQL suites require
+an available server as described in the [testing guide](testing.md).
+The [local host](../hosts/local/README.md) composes either adapter. The core's
 memory adapter remains test-only.

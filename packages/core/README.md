@@ -1,8 +1,9 @@
 # Core
 
 `@amends/core` implements one workspace's journal, authorization, and application
-operations. Hosts supply storage and cryptography; the gateway supplies the actor
-for each protected operation. The root `layer` composes the workspace services.
+operations. Hosts supply storage, cryptography, and a shared workspace event bus;
+the gateway supplies the actor for each protected operation. The root `layer`
+composes the workspace services.
 
 ## Features and ownership
 
@@ -219,7 +220,7 @@ committed result or retry the write. This is process-local live delivery; recove
 from missed publication and other writers remains separate work.
 
 `subscribe` registers eagerly and returns a single-consumer stream in the caller's
-scope. Registration therefore completes before a future transport sends its ready
+scope. Registration therefore completes before the HTTP transport sends its ready
 message. It delivers only subsequent publications, with no replay or deduplication.
 The buffer slides instead of making publishers wait for slow consumers. A private
 sequence detects lost batches and fails that subscription with `CommittedEvents.Lagged`;
@@ -309,7 +310,7 @@ consistent across modules. Typed errors retain tagged error schemas.
 
 Supporting types name their actual role. `Invitation.Issuance` is the immutable
 issuance record retained through acceptance or revocation. `Event.Envelope`
-contains a fact's name, version, encoded payload, and provenance; `Fact.Payload<F>` is the
+contains a fact's subject, name, version, encoded payload, and provenance; `Fact.Payload<F>` is the
 decoded domain payload. `Log.Entry<A>` carries a decoded payload and entry
 metadata. `Codec.PayloadCodec<S>` handles a payload schema, while
 `Codec.FactCodec<F>` pairs that codec with its fact definition. `Codec.EntryCodec<S>`
@@ -402,26 +403,30 @@ const makeLogs = Effect.gen(function* () {
 });
 ```
 
-This still requires host storage. `Log.layer` supplies the coordinator and exposes
-both services so the journal and log operations share the same commit ownership.
+This still requires host storage and a workspace-bound `CommittedEvents.Service`.
+`Log.layer` supplies the coordinator and exposes both services so the journal and
+log operations share the same commit ownership.
 `Layer.build` materializes a layer into a scoped context; reserve `build` for that
 meaning rather than using it as a synonym for a constructor.
 
 ## Service boundaries
 
-| Implementation        | Constructor                           | Layer provides                          |
-| --------------------- | ------------------------------------- | --------------------------------------- |
-| Transaction           | `Transaction.make()`                  | `Transaction.Service`                   |
-| Log                   | `Log.make()`                          | `Log.Service` and `Transaction.Service` |
-| Journal               | `Journal.make(options)`               | `Journal.Service`                       |
-| Permission catalog    | `PermissionCatalog.make(definitions)` | `PermissionCatalog.Service`             |
-| Grant resolver        | `GrantResolver.make()`                | `GrantResolver.Service`                 |
-| Authorization         | `Authorization.make()`                | `Authorization.Service`                 |
-| Member operations     | `MemberApplication.make()`            | `MemberApplication.Service`             |
-| Notification reads    | `NotificationApplication.make()`      | `NotificationApplication.Service`       |
-| Assignment operations | `AssignmentApplication.make()`        | `AssignmentApplication.Service`         |
-| Delegation policy     | `Delegation.make()`                   | `Delegation.Service`                    |
-| Invitation operations | `InvitationApplication.make()`        | `InvitationApplication.Service`         |
+| Implementation        | Constructor                                   | Layer provides                          |
+| --------------------- | --------------------------------------------- | --------------------------------------- |
+| Transaction           | `Transaction.make()`                          | `Transaction.Service`                   |
+| Log                   | `Log.make()`                                  | `Log.Service` and `Transaction.Service` |
+| Journal               | `Journal.make(options)`                       | `Journal.Service`                       |
+| Committed-event bus   | `CommittedEvents.make(workspaceId, options?)` | `CommittedEvents.Service`               |
+| Permission catalog    | `PermissionCatalog.make(definitions)`         | `PermissionCatalog.Service`             |
+| Grant resolver        | `GrantResolver.make()`                        | `GrantResolver.Service`                 |
+| Authorization         | `Authorization.make()`                        | `Authorization.Service`                 |
+| Member operations     | `MemberApplication.make()`                    | `MemberApplication.Service`             |
+| Notification reads    | `NotificationApplication.make()`              | `NotificationApplication.Service`       |
+| Assignment operations | `AssignmentApplication.make()`                | `AssignmentApplication.Service`         |
+| Delegation policy     | `Delegation.make()`                           | `Delegation.Service`                    |
+| Invitation operations | `InvitationApplication.make()`                | `InvitationApplication.Service`         |
+| Ownership operations  | `OwnershipApplication.make()`                 | `OwnershipApplication.Service`          |
+| Change feed           | `ChangeFeedApplication.make()`                | `ChangeFeedApplication.Service`         |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
 `Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation

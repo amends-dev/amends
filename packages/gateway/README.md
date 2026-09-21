@@ -139,6 +139,12 @@ cause for host logging. `GatewayErrors.PublicError` is the schema of these
 outcomes, and `GatewayErrors.ExposedError<E>` computes a program's public error
 type from core's.
 
+The adapters currently map every failed COMMIT effect to `Uncertain`, including
+some definite failures, and PostgreSQL deadlocks are not mapped to contention.
+See [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
+The commit ID is an internal reconciliation reference; the HTTP contract does not
+expose a commit-status lookup endpoint.
+
 `GatewayErrors` is the canonical error namespace. Import it from
 `@amends/gateway/errors` in contracts to avoid loading the gateway implementation;
 the package root relays the same namespace. `Gateway` exposes operations and

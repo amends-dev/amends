@@ -10,8 +10,9 @@ dependencies, devDependencies, peerDependencies, and optionalDependencies.
 `bun run check:packages` checks these manifests and runs before commits.
 
 Packages extend `../../tsconfig.base.json` and do not receive Bun, Node, or browser
-globals. Use Effect services to describe runtime requirements and implement
-platform adapters in `hosts/` or `apps/`.
+globals. Use Effect services to describe runtime requirements. External-system
+implementations belong in `adapters/`; runtime composition and host-owned ingress
+belong in `hosts/`, and browser integration belongs in `apps/`.
 
 Use `effect: "catalog:"` to share the root Effect version. Export source through
 `package.json` and import other packages by their declared workspace names;
@@ -81,13 +82,14 @@ service inventory and examples; each protocol package documents its own surface.
 
 `@amends/core` composes one workspace's core. Its root export holds the
 composition: `layer` builds the application operations over the journal,
-authorization, and permission catalog; `HostServices` is the storage and
-cryptography and shared workspace event bus a host must supply, derived from that layer; and `Operations` is
-the set of application services a gateway may run. Domains are subpath exports:
+authorization, and permission catalog. `HostServices` describes the storage,
+cryptography, and workspace event bus a host must supply, derived from that layer.
+`Operations` is the set of application services a gateway may run. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
-`@amends/core/notification`, and `@amends/core/workspace`, each exposing the
-records, facts, stores, projections, and operations it implements. The notification
-surface includes its record, store contract, authorized inbox reads, and empty
+`@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/thread`, and
+`@amends/core/workspace`, each exposing the records, facts, stores, projections,
+and operations it implements. The thread subpath currently exposes only its ID.
+The notification surface includes its record, store contract, authorized inbox reads, and empty
 projection. Notification reads derive the recipient from the current actor and
 require active membership. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.

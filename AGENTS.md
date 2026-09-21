@@ -9,10 +9,13 @@ for synchronous assertions and Promise-based UI or subprocess tests. Test helper
 return Effects; do not run them with `Effect.runPromise` or `Effect.runSync`.
 Use `TestClock` and explicit concurrency signals, and scope acquired resources.
 See [docs/testing.md](docs/testing.md) for commands, fixtures, and examples.
-`bun run start` serves the local host on port 8787 and keeps running; after
-changing runtime setup, start it in the background with `AMENDS_PORT=0`, confirm
-the "Listening on" line, and stop it. The host tests also spawn the server entry
-point. Use `bun run format` and `bun run lint:fix` to apply formatting and safe
+`bun run start` serves the local host on port 8787 and keeps running. On a fresh
+clone, create `hosts/local/data` first or select an absolute `AMENDS_DATABASE`
+filename whose parent exists. After changing runtime setup, start it in the
+background with `AMENDS_PORT=0`, a temporary absolute `AMENDS_DATABASE` filename,
+and `AMENDS_DATABASE_URL` unset; confirm the "Listening on" line and stop it.
+The host tests also spawn the server entry point. Use `bun run format` and
+`bun run lint:fix` to apply formatting and safe
 lint fixes.
 
 `bun install` runs `effect-tsgo patch` and `lefthook install` through the `prepare`
@@ -59,13 +62,27 @@ currently run through TypeScript. Check compatibility before changing this setup
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no
 runtime-specific global types; hosts and apps opt into their own environments.
-Root `tsconfig.json` checks repository scripts; `bun run typecheck` checks both
-those scripts and every workspace. Use declared package names for cross-workspace
-imports, not relative paths into another workspace.
+Root `tsconfig.json` checks repository scripts, shared-package tests, and the Vitest
+configuration; `bun run typecheck` checks these and every workspace. Use declared
+package names for cross-workspace imports, not relative paths into another workspace.
 
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.
 `bun run check:packages` checks shared-package dependency declarations.
+
+## Documentation
+
+[docs/README.md](docs/README.md) indexes current guides, design intent, and historical
+references. Update affected READMEs and guides when changing commands, configuration,
+contracts, behavior, or test setup. Check claims against implementation and tests;
+an agreed design or a passing round-trip test does not establish an implemented
+feature or compatibility across dependency upgrades.
+
+Keep [known limitations](docs/current-status.md) aligned with the owning source and
+guides. Remove a limitation when its implementation and relevant verification are
+complete. Preserve the status of proposals and historical notes instead of presenting
+them as current behavior. Check relative links and heading anchors after moving or
+renaming documentation. `CLAUDE.md` is a symlink to this file; keep one guidance source.
 
 ## Effect
 

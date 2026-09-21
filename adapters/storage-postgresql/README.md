@@ -74,8 +74,10 @@ entries, and projection writes commit or roll back together. See the [journal co
 
 Writers to one workspace take turns: each commit takes a transaction-scoped
 advisory lock keyed by the workspace before it runs, bounded by `lockTimeout`
-(five seconds by default), and reports contention as a store conflict without
-retrying. Reads outside a transaction see committed state. A statement PostgreSQL
+(five seconds by default), and maps lock timeouts and serialization errors at the
+transaction boundary to store conflicts without retrying. `DeadlockError` is not
+included in that classification and currently becomes a failure. Reads outside a
+transaction see committed state. A statement PostgreSQL
 refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
 Waiting readers poll the log every `pollInterval` (100 milliseconds by default).
@@ -84,6 +86,13 @@ Ordinary application reads and SSE authorization do not open a transaction or ta
 the workspace advisory lock. They use available pool connections to query committed
 state while writers hold that lock. Separate queries may observe concurrent changes;
 reads inside an existing transaction use its staged state.
+
+The binding opens transactions with plain `BEGIN`; it does not pin isolation.
+The database/session default therefore still controls snapshot behavior despite
+the workspace advisory lock. Tests do not cover arbitrary changed isolation
+defaults. Every failed COMMIT effect currently returns `Store.CommitUncertain`,
+including errors that could be classified as definite rollback. See the
+[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
 
 The optional `Store.transaction` observer runs after PostgreSQL confirms COMMIT,
 inside its uninterruptible completion boundary. It is skipped on rollback and
@@ -123,7 +132,8 @@ stores and reopening without data loss.
 
 The suites separate database construction, transactions, journal behavior,
 authorization, gateway workflows, and invitations. Each file creates its fixture
-through `support.ts` and owns its test-cluster cleanup. `contracts.test.ts` runs
+through `support.ts`. The PostgreSQL Vitest project's global setup owns the shared
+test cluster; individual tests own their temporary databases. `contracts.test.ts` runs
 the same direct-store rejection and round-trip scenarios as SQLite, including
 role validation, every foreign scope shape, missing or blank invitation roles, invalid invitation expiry, checkpoint
 validation, and rollback. Engine-specific locking and aborted-transaction tests

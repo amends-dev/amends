@@ -1,50 +1,75 @@
 # amends-v2
 
-A Bun and TypeScript monorepo using Effect **4.0.0-rc.115**, the latest `rc`
-published when this setup was created on September 16, 2026. The root workspace
-catalog pins Effect versions, and `bun.lock` records all resolved dependencies.
+A Bun and TypeScript monorepo with a Solid web app, an HTTP API, and workspace
+services backed by SQLite or PostgreSQL. The root workspace catalog pins Effect
+**4.0.0-rc.115**, and `bun.lock` records resolved dependencies.
+
+From the repository root:
 
 ```bash
 bun install --frozen-lockfile
+mkdir -p hosts/local/data
 bun run start
-bun run check
 ```
 
-`bun run start` runs the local Bun host's persistent two-workspace demonstration,
-and `bun run dev` reruns it when files change. Each demonstration creates two new
-workspaces and exercises invitation, acceptance, limited access, invitation revocation,
-and member removal with access denial after reopening storage.
-See the [local host guide](hosts/local/README.md) for individual commands, storage
-configuration, and the trusted local identity boundary.
+`bun run start` keeps the local API running at `http://127.0.0.1:8787`;
+`bun run dev` restarts it when files change. Its default SQLite file is
+`hosts/local/data/amends.sqlite`. Startup does not create that parent directory,
+so the `mkdir` step is required on a fresh clone. The server creates workspaces
+only when requested through the API or web app.
+
+In another terminal, run `bun run --filter @amends/web dev` and open
+`http://127.0.0.1:4321/`. The web server proxies `/api` to the local host. Development
+sign-in prints the one-time code in the host terminal. The API exposes OpenAPI at
+`/openapi.json` and interactive documentation at `/docs`.
+
+See the [local host guide](hosts/local/README.md) for storage configuration and
+development authentication, and the [web guide](apps/web/README.md) for app commands.
+Workspace creation, invitations, membership, roles, and ownership transfer are
+implemented. Notification reads and live workspace changes have
+[known limitations](docs/current-status.md); task, thread, and agent execution
+remain design work. The [documentation index](docs/README.md) separates current
+guides from proposals and historical references.
 
 ## Workspace layout
 
 ```text
 packages/
-  core/             @amends/core: portable journal and workspace domain services
+  core/               @amends/core: portable journal and workspace domain services
+  gateway/            @amends/gateway: workspace entry and host contracts
+  api-http/           @amends/api-http: shared HTTP contract
+  server-http/        @amends/server-http: HTTP handlers and authentication
+adapters/
+  storage-sqlite/      @amends/storage-sqlite: SQLite storage and directory
+  storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
 hosts/
-  local/            @amends/host-local: Bun runtime entry point
-apps/               future user-facing clients, such as web and desktop
-scripts/            repository tooling
-repos/effect/       upstream Effect reference source
+  local/              @amends/host-local: Bun runtime entry point
+apps/
+  ui/                 @amends/ui: Solid components, tokens, and styles
+  web/                @amends/web: Solid application over the HTTP contract
+docs/                 implementation guides, design intent, and known limitations
+design-system/        design references and historical token handoff
+scripts/              repository tooling
+repos/effect/         upstream Effect reference source
 ```
 
 [Bun workspaces](https://bun.com/docs/pm/workspaces) discover packages under
-`packages/*`, `hosts/*`, and `apps/*`. Each workspace has its own manifest,
+`packages/*`, `adapters/*`, `hosts/*`, and `apps/*`. Each workspace has its own manifest,
 TypeScript configuration, and scripts. One install and lockfile serve the repository.
 
 Shared packages may depend only on `effect` and other packages under `packages/`.
 Internal dependencies use `workspace:*`; Effect dependencies use `catalog:`.
 The restriction covers dependencies, devDependencies, peerDependencies, and
 optionalDependencies. `bun run check:packages` validates these declarations.
-Keep development tooling in the root package and platform dependencies in hosts
-or apps. Shared packages cannot depend on hosts or apps.
+Keep shared-package development tooling at the root and external-system dependencies
+in adapters, hosts, or apps. Shared packages cannot depend on adapters, hosts, or apps.
 
 `tsconfig.base.json` supplies strict TypeScript and Effect tooling settings with
 no runtime globals. Hosts and apps enable their own runtime types. The root
-`tsconfig.json` checks repository scripts and core tests, and `bun run typecheck`
-also runs each workspace's `typecheck` script. Workspace exports point to TypeScript source,
-which Bun and future application bundlers can consume directly.
+`tsconfig.json` checks repository scripts, shared-package tests, and the Vitest
+configuration. `bun run typecheck` also runs each workspace's `typecheck` script.
+Workspace exports point to TypeScript source,
+which Bun and the web app's Vite build consume directly.
 
 The journal and execution-log design is described in [docs/journal.md](docs/journal.md).
 Run all tests with `bun run test`, or focus on core and the host with
@@ -53,14 +78,14 @@ see [the testing guide](docs/testing.md) for conventions and database fixtures.
 
 For a new workspace, add a manifest, source files, and a TypeScript configuration
 extending `../../tsconfig.base.json`, plus a `typecheck` script. Then run
-`bun install` from the root. See [packages](packages/README.md),
+`bun install` from the root. See [packages](packages/README.md), [adapters](adapters/README.md),
 [hosts](hosts/README.md), and [apps](apps/README.md) for their responsibilities.
 
 ## Development tools
 
 The project pins TypeScript **7.0.2**, Oxlint **1.83.0**, Oxfmt **0.68.0**,
-`oxlint-tsgolint` **7.0.2001**, and `@effect/tsgo` **0.45.0**. These were the
-latest stable tooling releases available when configured.
+`oxlint-tsgolint` **7.0.2001**, and `@effect/tsgo` **0.45.0**. The root
+`package.json` is the source of truth for these pins.
 
 | Command                  | Purpose                                               |
 | ------------------------ | ----------------------------------------------------- |
@@ -71,6 +96,7 @@ latest stable tooling releases available when configured.
 | `bun run format:check`   | Check formatting without writing files                |
 | `bun run check`          | Validate dependencies, types, lint, and formatting    |
 | `bun run check:packages` | Validate shared-package dependency boundaries         |
+| `bun run test`           | Run backend, PostgreSQL, UI, and web tests            |
 
 Following the [Effect devtools guide](https://effect.website/docs/v4/getting-started/devtools),
 `bun install` runs `effect-tsgo patch` via `prepare`. This patches the local
@@ -78,7 +104,7 @@ TypeScript compiler and language server to provide Effect diagnostics, quick
 info, completions, and refactors. Floating Effects are reported as errors.
 
 `@effect/tsgo@0.45.0` supports TypeScript 7.0.2, but its Oxlint integration only
-supports Oxlint 1.81.0 and 1.82.0. To use the latest Oxlint, this project keeps
+supports Oxlint 1.81.0 and 1.82.0. With the pinned Oxlint version, this project keeps
 Effect diagnostics enabled in TypeScript and uses stock Oxlint for general
 type-aware linting. Do not add `--oxlint` to the patch command or disable the
 TypeScript Effect diagnostics until the pinned versions support that integration.
@@ -141,9 +167,13 @@ replacing `<version>` with the catalog's exact Effect version:
 ```bash
 git subtree pull --prefix=repos/effect \
   https://github.com/Effect-TS/effect.git 'effect@<version>' --squash
-bun run typecheck
-bun run start
+bun run check
+bun run test
 ```
 
 Update the version and commit recorded above after upgrading. Keep package and
-subtree updates together when sharing changes.
+subtree updates together when sharing changes. Recheck the affected APIs against
+the matching source and perform the [temporary-port startup check](hosts/local/README.md#verify).
+Journal payloads use SchemaBinary; the missing
+[golden-byte compatibility test](docs/current-status.md#payload-format-compatibility)
+means round-trip tests alone do not establish compatibility across Effect upgrades.

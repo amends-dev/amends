@@ -7,6 +7,12 @@ records the pre-refactor findings; migration examples retain their design ration
 Turn and thread APIs remain proposed because those domains do not yet exist in the HTTP
 contract.
 
+Later workspace-name, role, ownership, notification-read, and live-change work is
+documented in the [workspace workflows](workspace-workflows.md) and current READMEs.
+The workspace change feed is implemented, but it does not supply the proposed
+turn-history protocol. See [known limitations](current-status.md) for its delivery,
+authorization, and reconnect constraints.
+
 ## Intended result
 
 A feature should be usable by supplying its domain identity:
@@ -49,7 +55,7 @@ Refactored source locations: [client](../apps/web/src/api/client.ts),
 [HTTP contract](../packages/api-http/README.md), and
 [web tests](../apps/web/test/sign-in.test.tsx).
 
-The refactor addresses these concrete correctness issues:
+The refactor addressed these concrete correctness issues in the former implementation:
 
 - The workspace resolver sends every failed directory lookup to `ClosedWorkspace`.
   An expired credential, a network failure, and an ended membership need different outcomes.
@@ -670,8 +676,9 @@ keys. See the core model's [event ownership](core-model.md#agreed-harness-event-
 
 ## Migration and acceptance criteria
 
-Start with the domains that exist. Settings is the first complete example; implementing
-turn execution is not a prerequisite for fixing web structure.
+The following sequence records the accepted migration plan. Steps 1–4 are implemented
+for the existing domains; step 5 awaits the turn backend. Settings remains the working
+example. The criteria continue to guide regression coverage as features are added.
 
 1. **Establish data policy with members and invitations.** Extract API modules and scoped
    keys; introduce independently owned command factories; fix removal invalidation and

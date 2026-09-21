@@ -13,6 +13,10 @@ bun run --filter @amends/ui test
 This is a source package, with no standalone application or specimen server. The
 design references are in [`design-system`](../../design-system/). A consuming app
 owns routing, appearance preferences, and component composition.
+The [token-sync handoff](../../design-system/sync/README.md) is historical; current
+tokens and styles live under `src/tokens/` and `src/styles/`. Task, conversation,
+and turn examples below describe composition patterns for presentation components;
+they do not imply those backend workflows are implemented.
 
 ## Use in an application
 
@@ -227,7 +231,7 @@ continue to use their list presentation.
 | `selection`                   | Selected text and its background.                                                               |
 | `shadow`                      | Overlay and modal surfaces. Page content stays flat.                                            |
 
-Semantic status colours do not define task or session state. Those mappings belong to
+Semantic status colours do not define task or turn state. Those mappings belong to
 the application. Pending means attention, not failure; held and review can share it.
 Disabled text is intentionally subdued and excluded from the readable-text contrast
 guarantee. Soft status backgrounds belong to notices, not every badge or row.

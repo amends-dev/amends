@@ -77,6 +77,11 @@ connection holds the writer lock. They still wait for the shared connection when
 that same client has an active transaction; this adapter does not have a separate
 reader pool. Reads inside an existing transaction use its staged state.
 
+Every failed COMMIT effect currently returns `Store.CommitUncertain`, even when
+the database error could establish a definite failure. A successful cleanup
+rollback does not narrow that result. See the
+[commit classification limitation](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
+
 The optional `Store.transaction` observer runs after a confirmed native COMMIT,
 inside its uninterruptible completion boundary. It is skipped on rollback and
 uncertain outcomes. `Store.notifyCommit` logs observer failures without changing
@@ -97,6 +102,7 @@ Gateway.layer.pipe(
 The root `layer` provides both gateway contracts; `SqliteDatabase.layer` opens the
 file and migrates it. The local host also supplies cryptography and uses SQLite
 unless `AMENDS_DATABASE_URL` selects PostgreSQL.
+The caller must create the file's parent directory; the layer does not create it.
 
 `SqliteDatabase.make()` instead accepts `SqlClient.SqlClient` through Effect's
 context and initializes it using the same baseline. Keep that client's scope open

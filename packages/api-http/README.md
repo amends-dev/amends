@@ -80,7 +80,9 @@ The first SSE `message` has JSON data such as
 `{ "_tag": "Ready", "workspaceId": "workspace-one" }`. Ready is sent after
 subscription registration. Later messages contain `_tag: "Committed"`, `workspaceId`,
 `commitId`, and an ordered nonempty `events` array. Each event contains `id`, `name`,
-`version`, `recordedAt` (UTC ISO string), and its fact-schema-encoded `payload`.
+`version`, `recordedAt` (UTC ISO string), `provenance`, and its fact-schema-encoded `payload`.
+Provenance includes the workspace, performer, immediate cause, correlation ID, and
+occurrence time; public request bodies cannot choose that attribution.
 The server sends no query keys. Clients refresh on every Ready and choose which
 queries to invalidate for each commit.
 
@@ -92,6 +94,9 @@ and disable proxy buffering where supported. Missing/rejected credentials return
 `ChangeFeed.Unavailable`; reconnect and refresh to recover the current view.
 Delivery covers confirmed commits in the serving process. Other processes and
 missed publications need a future recovery mechanism.
+Membership is not rechecked after entry, so removal does not itself terminate an
+existing subscription. There is no per-event permission check or field redaction.
+See [known limitations](../../docs/current-status.md) for delivery and edge controls.
 
 Notification lists require an integer `limit` from 1 to 100. The optional
 `pendingOnly=true` filter selects pending records; omission or `false` lists all

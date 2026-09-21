@@ -14,6 +14,7 @@ From the repository root:
 
 ```bash
 bun install --frozen-lockfile
+mkdir -p hosts/local/data
 bun run start
 ```
 
@@ -34,7 +35,9 @@ validation. Database URLs stay redacted in configuration errors.
 
 Relative SQLite paths resolve from the process working directory. `bun run start`
 at the repository root runs the host in `hosts/local`, so its default database is
-`hosts/local/data/amends.sqlite`. Use an absolute filename to choose another location.
+`hosts/local/data/amends.sqlite`. The host does not create parent directories;
+without the setup step, the default path fails on a fresh clone. Use an absolute
+filename with an existing parent to choose another location.
 
 ## Modules and construction
 
@@ -64,6 +67,10 @@ each workspace once, replaying before it serves operations and retaining the pre
 services and bus lease until host shutdown. Request scopes own operation resources;
 a stream keeps its subscription open until disconnect.
 Delivery is process-local, with no cross-process recovery in this version.
+The host sets no application request-body limit or SSE connection/admission limit.
+It relies on runtime defaults; these are not an explicit edge resource policy.
+See [known limitations](../../docs/current-status.md) for commit classification,
+PostgreSQL isolation, stream authorization, and reconnect behavior.
 Storage behavior is documented by the
 [SQLite](../../adapters/storage-sqlite/README.md) and
 [PostgreSQL](../../adapters/storage-postgresql/README.md) adapters.
@@ -119,3 +126,5 @@ without execution.
 After changing runtime composition, also run `AMENDS_PORT=0 bun run start` with a
 temporary absolute `AMENDS_DATABASE` filename and `AMENDS_DATABASE_URL` unset.
 Confirm the `Listening on` line, stop the process, and remove the temporary database.
+The subprocess fixture in `test/server.ts` automates this startup and cleanup
+boundary without loading environment files.
