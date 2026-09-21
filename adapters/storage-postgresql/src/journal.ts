@@ -287,6 +287,25 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   return Store.Service.of({
+    getEntry: Effect.fn("Journal.getEntry")(
+      function* (logId, entryId) {
+        yield* Schema.decodeEffect(Entry.LogId)(logId);
+        yield* Schema.decodeEffect(Entry.Id)(entryId);
+        return yield* guard(
+          db
+            .select(entryColumns)
+            .from(logEntries)
+            .where(
+              and(
+                eq(logEntries.workspaceId, workspaceId),
+                eq(logEntries.logId, logId),
+                eq(logEntries.id, entryId),
+              ),
+            ),
+        ).pipe(Effect.flatMap(decodeEntries), Effect.map(Array.head));
+      },
+      Effect.mapError(storeFailure(Store, "getEntry")),
+    ),
     readFacts: Effect.fn("Journal.readFacts")(function* (logId, input) {
       return yield* guard(
         Effect.gen(function* () {

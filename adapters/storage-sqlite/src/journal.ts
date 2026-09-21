@@ -195,6 +195,16 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   return Store.Service.of({
+    getEntry: Effect.fn("Journal.getEntry")(
+      function* (logId, entryId) {
+        yield* Schema.decodeEffect(Entry.LogId)(logId);
+        yield* Schema.decodeEffect(Entry.Id)(entryId);
+        return yield* guard(
+          sql`SELECT id, log_id AS logId, position, commit_id AS commitId, entry_index AS "index", recorded_at AS recordedAt, payload, subject, fact_name AS factName, fact_version AS factVersion, provenance FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${logId} AND id = ${entryId}`,
+        ).pipe(Effect.flatMap(decodeEntries), Effect.map(Array.head));
+      },
+      Effect.mapError(storeFailure(Store, "getEntry")),
+    ),
     readFacts: Effect.fn("Journal.readFacts")(function* (logId, input) {
       return yield* guard(
         Effect.gen(function* () {

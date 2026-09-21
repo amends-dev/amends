@@ -391,6 +391,15 @@ also remains incomplete. See [known limitations](current-status.md#commit-outcom
 
 ## Reading and replay
 
+`journal.log.getEntry(entryId)` resolves one entry directly by ID within the bound workspace and
+log, returning `Option<Log.Entry<Event.Envelope>>`. Generic `Log.Handle.getEntry` returns the
+same optional entry shape decoded with that log's codec. Both validate entry identity and log
+ownership. Missing or foreign-log IDs return `None`; malformed stored entries fail the read.
+The adapters use the existing workspace/entry primary key and also filter by log ID. Lookup
+opens no transaction, sees staged entries inside a caller's transaction, and changes no journal,
+projection, or checkpoint state. Application authorization remains separate: notification source
+resolution checks ownership and current thread access before returning conversation content.
+
 `journal.read({ name, version?, after?, limit })` queries matching fact entries
 directly in storage. Omitting `version` includes every stored version of that name;
 supplying it selects an exact version. Results are `Log.Entry<Event.Envelope>`
@@ -432,7 +441,7 @@ before claiming that an Effect upgrade preserves the persisted format.
 
 In the planned turn domain, turn logs provide durable history for continuation and final-response
 derivation. Rebuilding domain projections from the journal does not recreate those
-separate logs. Notification generation now handles opening-message thread activity using
+separate logs. Notification generation handles recorded thread activity using
 recorded recipient selection and source-derived IDs. Arbitrary log entries do not create
 notifications. See [thread workflows](thread-workflows.md) for the implemented boundary.
 
@@ -544,6 +553,8 @@ dependency inference across different projections, the stable consumer interface
 active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit
 visibility, rollback, independent consumers, cancellation, and wait failures.
+Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
+staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The
 [SQLite](../adapters/storage-sqlite/README.md) and
 [PostgreSQL](../adapters/storage-postgresql/README.md) adapters test these contracts

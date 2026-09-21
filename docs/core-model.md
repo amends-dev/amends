@@ -20,7 +20,8 @@ atomically; see [thread workflows](thread-workflows.md). Authorized group-thread
 metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
 `ThreadMessageApplication`, admitting the author and eligible mentions in the same commit.
 `ThreadParticipationApplication` implements self-follow/unfollow, quiet follow activity, and pending
-agent-input settlement. Other participation
+agent-input settlement. `NotificationApplication.resolveSource` resolves owned notifications under
+current thread access, without acknowledgment or participation changes. Other participation
 management, DMs, public groups, group/thread HTTP/UI, turns, execution, general acknowledgment, triage, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
@@ -2391,8 +2392,14 @@ Discovery filters unreadable threads. Timeline pages follow an exclusive sequenc
 resolve message content or a historical follow summary under the same check. Participant summaries expose member references
 and joining details, while routing identities and ended participation remain internal.
 Reading requires no participation, creates none, and neither acknowledges input nor requests work.
-Subscriptions, notification-source resolution, and standalone audiences retain their
-separate authorization contracts. See [thread reads](thread-workflows.md#reading-conversations).
+`NotificationApplication.resolveSource` applies the same current group access and `thread.read`
+after checking notification ownership and historical source references. It returns the same typed
+timeline item without acknowledging input or changing participation. Historical notifications,
+including discarded agent input, remain readable after unfollowing while access permits; group
+departure or a revoked read grant blocks source resolution. This is implemented through core and
+the gateway; HTTP/UI integration remains future work. Subscriptions and standalone audiences retain
+their separate authorization contracts. See [thread reads](thread-workflows.md#reading-conversations)
+and [source resolution](thread-workflows.md#resolving-a-notification-source).
 
 ### Grouped threads inherit access; standalone threads establish their own audience
 

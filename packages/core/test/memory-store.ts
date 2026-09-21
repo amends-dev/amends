@@ -298,6 +298,13 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   });
 
   const store = Store.Service.of({
+    getEntry: Effect.fn("JournalTest.getEntry")(function* (logId, entryId) {
+      return Option.fromUndefinedOr(
+        ((yield* view).logs.get(logId) ?? [])
+          .flatMap((batch) => cloneBatch(batch).entries)
+          .find((entry) => entry.id === entryId),
+      );
+    }),
     getAppend: Effect.fn("JournalTest.getAppend")(function* (logId, key) {
       const saved = (yield* view).appends.get(logId)?.get(key);
       return saved === undefined ? Option.none() : Option.some(cloneReceipt(saved));

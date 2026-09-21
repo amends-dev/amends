@@ -10,6 +10,8 @@ import { ThreadParticipationApplication } from "./thread/participation/applicati
 import { ThreadParticipationPermissions } from "./thread/participation/permissions.ts";
 import { ThreadParticipationDeparture } from "./thread/participation/departure.ts";
 import { ThreadActivityRecording } from "./thread/activity/recording.ts";
+import { ThreadActivityReading } from "./thread/activity/reading.ts";
+import { NotificationSource } from "./notification/source.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
@@ -102,6 +104,8 @@ const messagePublication = ThreadMessagePublication.layer.pipe(
   Layer.provide(Layer.mergeAll(admissions, recording)),
 );
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
+const activityReading = ThreadActivityReading.layer.pipe(Layer.provide(threadAccess));
+const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
 
 /**
  * Application operations, sharing one journal and one authorization check. These
@@ -126,6 +130,8 @@ const operations = Layer.mergeAll(
       GroupAudience.layer,
       ThreadCreation.layer,
       threadAccess,
+      activityReading,
+      notificationSource,
       admissions,
       recording,
       departures,

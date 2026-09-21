@@ -203,6 +203,7 @@ export const make = Effect.fn("Journal.make")(function* <
     id: log.id,
     schema: log.schema,
     get: log.get,
+    getEntry: log.getEntry,
     getAppend: log.getAppend,
     read: log.read,
     stream: log.stream,

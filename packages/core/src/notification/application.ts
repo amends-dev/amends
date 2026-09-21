@@ -4,6 +4,8 @@ import { Actor } from "../identity/actor.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
+import { NotificationSource } from "./source.ts";
+import type { Thread } from "../thread/thread.ts";
 
 /** Missing and other recipients' notifications deliberately share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("NotificationApplication.NotFound", {
@@ -20,6 +22,11 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "NotificationApplication.InvalidResponse",
   { message: Schema.String },
 ) {}
+/** The caller owns the notification, but its supported source cannot currently be read. */
+export class SourceUnavailable extends Schema.TaggedError<SourceUnavailable>()(
+  "NotificationApplication.SourceUnavailable",
+  { notificationId: Notification.Id },
+) {}
 
 export type Error =
   | Authorization.Error
@@ -28,6 +35,13 @@ export type Error =
   | NotFound
   | WorkspaceMismatch
   | InvalidResponse;
+export type ResolveError =
+  | Error
+  | Exclude<
+      NotificationSource.Error,
+      NotificationSource.Unavailable | NotificationSource.InvalidReference
+    >
+  | SourceUnavailable;
 
 /**
  * Read the acting identity's inbox within one workspace. Active membership is
@@ -47,6 +61,9 @@ export interface Interface {
   readonly listPending: (
     options: NotificationStore.ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Error, Actor.Service>;
+  readonly resolveSource: (
+    notificationId: Notification.Id,
+  ) => Effect.Effect<Thread.TimelineItem, ResolveError, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -75,12 +92,14 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
-  NotificationStore.Service | Authorization.Service
+  NotificationStore.Service | Authorization.Service | NotificationSource.Service
 > {
   const notifications = yield* NotificationStore.Service;
   const authorization = yield* Authorization.Service;
+  const source = yield* NotificationSource.Service;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, notifications.workspaceId);
+  yield* requireWorkspace(workspaceId, source.workspaceId);
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
@@ -140,7 +159,20 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     (options: NotificationStore.ReadOptions) => read(options, true),
   );
 
-  return Service.of({ workspaceId, get, list, listPending });
+  const resolveSource = Effect.fn("NotificationApplication.resolveSource")(function* (
+    notificationId: Notification.Id,
+  ) {
+    const notification = yield* get(notificationId);
+    return yield* source.resolve(notification).pipe(
+      Effect.catchTags({
+        "NotificationSource.Unavailable": () =>
+          Effect.fail(new SourceUnavailable({ notificationId: notification.id })),
+        "NotificationSource.InvalidReference": (error) =>
+          Effect.fail(new InvalidResponse({ message: error.message })),
+      }),
+    );
+  });
+  return Service.of({ workspaceId, get, list, listPending, resolveSource });
 });
 
 /**

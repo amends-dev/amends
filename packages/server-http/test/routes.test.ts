@@ -60,6 +60,7 @@ const operations = Layer.mergeAll(
     NotificationApplication.Service,
     NotificationApplication.Service.of({
       workspaceId,
+      resolveSource: () => Effect.die("Source resolution is not exposed over HTTP yet"),
       get: record("notification.get", (notificationId) =>
         notificationId === notification.id
           ? Effect.succeed(notification)

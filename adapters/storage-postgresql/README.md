@@ -30,6 +30,11 @@ filtered entry pages remain separate from complete-batch replay reads.
 workspace, log, subject, position, and entry index. Fact subjects are required;
 generic execution entries leave the entire fact header null.
 
+`Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
+log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
+transaction, and opens none. This supports notification-source reads without scanning the log
+or changing the schema.
+
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
 [storage envelope](../../docs/journal.md#storage-envelope).
@@ -182,3 +187,6 @@ the same direct-store rejection and round-trip scenarios as SQLite, including
 role validation, every foreign scope shape, missing or blank invitation roles, invalid invitation expiry, checkpoint
 validation, and rollback. Engine-specific locking and aborted-transaction tests
 remain separate from these shared contract expectations.
+`notification-sources.test.ts` mirrors SQLite coverage for current source authorization,
+historical recipient integrity, direct entry lookup, no-write resolution, staged visibility,
+rollback, reopening, and gateway outcomes.

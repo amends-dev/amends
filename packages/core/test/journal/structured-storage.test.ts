@@ -1,6 +1,6 @@
 import { Subject } from "@amends/core/journal";
 import { expect, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { Codec } from "../../src/journal/codec.ts";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { CommittedEvents } from "../../src/journal/committed-events.ts";
@@ -224,4 +224,38 @@ it.effect("publication retries and replay decoding reject changed subject intent
       }),
     );
   }),
+);
+
+it.effect(
+  "entry lookup decodes one ID within its log and observes staged entries without opening a transaction",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* make();
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          const logs = yield* Log.Service;
+          const plain = logs.open({ id: Log.Id.make("plain"), schema: Schema.String });
+          const other = logs.open({ id: Log.Id.make("other"), schema: Schema.String });
+          const written = yield* plain.append("value");
+          const before = yield* fixture.snapshot;
+          const attempts = yield* fixture.attempts;
+          expect(yield* plain.getEntry(written.id)).toEqual(Option.some(written));
+          expect((yield* other.getEntry(written.id))._tag).toBe("None");
+          expect(yield* fixture.snapshot).toEqual(before);
+          expect(yield* fixture.attempts).toBe(attempts);
+          const outcome = yield* Effect.flip(
+            logs.commit(
+              Effect.gen(function* () {
+                const staged = yield* plain.append("staged");
+                expect(yield* plain.getEntry(staged.id)).toEqual(Option.some(staged));
+                return yield* Effect.fail("rollback");
+              }),
+            ),
+          );
+          expect(outcome).toBe("rollback");
+          expect(yield* fixture.snapshot).toEqual(before);
+        }),
+      );
+    }),
 );

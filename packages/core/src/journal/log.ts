@@ -66,6 +66,10 @@ export interface Handle<S extends Schema.Constraint> {
   readonly get: (
     commitId: Commit.Id,
   ) => Effect.Effect<Option.Option<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
+  /** Resolve one entry by ID within this log, honoring an enclosing transaction. */
+  readonly getEntry: (
+    entryId: StoredEntry.Id,
+  ) => Effect.Effect<Option.Option<Entry<S["Type"]>>, ReadError, S["DecodingServices"]>;
   readonly read: (
     options: Store.ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
@@ -90,7 +94,7 @@ export interface Handle<S extends Schema.Constraint> {
 /** Domain journals expose their underlying log through this read-only view. */
 export type Reader<S extends Schema.Constraint> = Pick<
   Handle<S>,
-  "id" | "schema" | "get" | "getAppend" | "read" | "stream" | "tail"
+  "id" | "schema" | "get" | "getEntry" | "getAppend" | "read" | "stream" | "tail"
 >;
 
 export interface Interface {
@@ -269,6 +273,22 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       return yield* new InvalidResponse({ message: "Append returned no entry" });
     });
 
+    const getEntry = Effect.fn("Log.getEntry")(function* (entryId: StoredEntry.Id) {
+      const requestedId = yield* Schema.decodeEffect(StoredEntry.Id)(entryId);
+      const found = yield* Schema.decodeEffect(
+        Schema.Option(
+          Schema.toType(Store.Entry).check(
+            Schema.makeFilter(
+              (entry) =>
+                (entry.logId === id && entry.id === requestedId) ||
+                "Entry belongs to another log or ID",
+            ),
+          ),
+        ),
+      )(yield* store.getEntry(id, requestedId));
+      if (Option.isNone(found)) return Option.none<Entry<S["Type"]>>();
+      return Option.some(yield* decodeEntry(found.value));
+    });
     const get = Effect.fn("Log.get")(function* (commitId: Commit.Id) {
       const requestedId = yield* validateCommitId(commitId);
       const resultSchema = Schema.Option(
@@ -377,7 +397,19 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       )(yield* store.readFacts(id, request));
       return yield* Effect.forEach(entries, decodeEntry);
     });
-    return { id, schema, append, appendAll, get, getAppend, read, readFacts, stream, tail };
+    return {
+      id,
+      schema,
+      append,
+      appendAll,
+      get,
+      getEntry,
+      getAppend,
+      read,
+      readFacts,
+      stream,
+      tail,
+    };
   };
 
   return Service.of({ open, commit: transaction.run });

@@ -222,13 +222,43 @@ A member in the audience without the action grant receives `Authorization.Denied
 thread read; discovery omits unreadable threads. Removed or identity-mismatched actors fail the
 current workspace-membership check. The gateway preserves these outcomes and maps invalid page
 options to `Gateway.InvalidInput`. Existing notifications never bypass source access checks;
-notification-source resolution remains a separate workflow.
+the source-resolution operation below applies the same current audience and read permission.
 
 Reads open no transaction and perform no journal, checkpoint, participation, or notification
 writes. An enclosing caller transaction is honored, including staged activity, admissions,
 departures, and grant changes. Separate reads and pages do not promise a shared snapshot;
 revocation affects subsequent authorization checks but does not cancel an already-authorized read.
 Thread discovery and participant lists are currently unpaginated.
+
+## Resolving a notification source
+
+`NotificationApplication.resolveSource(notificationId)` returns the source's `Thread.TimelineItem`
+for the acting human or agent. It first checks active workspace membership and notification
+ownership. Missing IDs and other recipients' notifications both return
+`NotificationApplication.NotFound`, before any source lookup.
+
+The internal `NotificationSource` reader looks up the referenced journal entry directly by ID.
+It supports the current `ThreadActivityFacts.Recorded` version in the workspace journal and
+validates the notification's recorded time, selected recipient, historical participation, and
+activity references. `ThreadActivityReading` then checks current group audience and `thread.read`
+on the Thread target before resolving the subject. Timeline pages use the same internal reader.
+The result contains the activity and its message or public participation summary; it does not
+expose the journal envelope, recipient selection, or internal identity/admission snapshots.
+
+Owning a notification does not grant access to its source. Missing entries, unsupported logs or
+fact versions, and sources outside current access return `NotificationApplication.SourceUnavailable`.
+Inconsistent stored references and storage failures fail the operation and remain internal errors
+at the gateway. Invalid notification IDs become `Gateway.InvalidInput`.
+
+Unfollowing does not remove group access, so earlier sources remain readable with `thread.read`.
+Leaving the group or losing that grant blocks subsequent resolution. Readmission can restore
+access to history without reviving the old participation. Both pending notifications and discarded
+agent notifications can resolve; reading never acknowledges input, changes notification state,
+joins a thread, or requests work. These reads open no transaction, honor an enclosing commit,
+and have the same snapshot and revocation limits as timeline reads.
+
+Source resolution is implemented in core, the gateway, and both adapters. Its HTTP route and
+client integration remain future work.
 
 ## Recorded changes and replay
 
@@ -313,8 +343,8 @@ other supported public events. A thread-only commit therefore provides no inbox 
 through that feed. Audience-aware thread subscriptions and live notification delivery remain work.
 Notifications expose source references, not continuing authority to read the source conversation.
 
-The public surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
-authorized thread APIs. Notification-source resolution, managing other participants, general
+The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
+authorized thread APIs. Managing other participants, general
 acknowledgment, silent agent completion, turn execution, task activity, DMs, and standalone threads
 remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
@@ -338,6 +368,10 @@ outer commits, reopening, and replay after grants or membership change.
 Participation suites verify quiet following, repeat calls, self-only unfollow, stale requests,
 notification retention/settlement, rejoining through follows and messages, concurrent publication,
 projection/checkpoint rollback, outer commits, replay, and historical follow reads.
+Source-resolution suites cover human/agent ownership, current grant and audience revocation,
+historical reads after unfollow or readmission, discarded agent input, malformed references,
+message and participation subjects, direct entry lookup, read-only behavior, outer commits,
+reopening, and gateway outcomes on both adapters.
 They also exercise the common notification generator with nonempty recipient selections on
 non-message activity, ending activity for all departure paths, and rollback after a partial
 multi-thread departure cascade.

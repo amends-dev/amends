@@ -36,6 +36,13 @@ uniqueness. The [application](../packages/core/src/notification/application.ts) 
 only the acting human or agent's inbox, with active membership required. Contact
 and Triage reads are available only through internal stores.
 
+`NotificationApplication.resolveSource` resolves an owned notification to its typed thread
+timeline item through core and the gateway. It requires current group access and `thread.read`,
+even for historical notifications. Unfollowing alone preserves source access; reading discarded
+agent input does not revive it. Unsupported or inaccessible sources return `SourceUnavailable`.
+Both adapters implement direct journal-entry lookup. Source resolution has no HTTP route or
+client integration yet. See [source resolution](thread-workflows.md#resolving-a-notification-source).
+
 The [projection](../packages/core/src/notification/projection.ts) generates notifications from
 the shared activity-recorded fact and its historical recipient selection, for every activity kind.
 Follow and participation endings currently select no recipients. Ending activity settles pending

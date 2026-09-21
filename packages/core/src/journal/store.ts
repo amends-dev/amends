@@ -212,6 +212,10 @@ export interface Interface {
   ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
 
   /** Reads use the current transaction when present, otherwise committed state. */
+  readonly getEntry: (
+    logId: LogEntry.LogId,
+    entryId: LogEntry.Id,
+  ) => Effect.Effect<Option.Option<Entry>, Failure>;
   readonly get: (
     logId: LogEntry.LogId,
     commitId: Commit.Id,

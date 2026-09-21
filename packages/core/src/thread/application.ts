@@ -20,11 +20,10 @@ import { ThreadAccess } from "./access.ts";
 import { ThreadParticipationAdmission } from "./participation/admission.ts";
 import { ThreadMessagePublication } from "./message/publication.ts";
 import { ThreadPermissions } from "./permissions.ts";
-import { ThreadMessage } from "./message/message.ts";
 import { ThreadMessageStore } from "./message/store.ts";
 import { ThreadParticipation } from "./participation/participation.ts";
 import { ThreadParticipationStore } from "./participation/store.ts";
-import { ThreadActivity } from "./activity/activity.ts";
+import { ThreadActivityReading } from "./activity/reading.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
 /** Missing, foreign, and outside-audience threads share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadApplication.NotFound", {
@@ -110,9 +109,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const admissions = yield* ThreadParticipationAdmission.Service;
   const publication = yield* ThreadMessagePublication.Service;
   const threads = yield* ThreadStore.Service;
-  const messages = yield* ThreadMessageStore.Service;
-  const activities = yield* ThreadActivityStore.Service;
-  const participations = yield* ThreadParticipationStore.Service;
+  const reading = yield* ThreadActivityReading.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -124,9 +121,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       admissions.workspaceId,
       publication.workspaceId,
       threads.workspaceId,
-      messages.workspaceId,
-      activities.workspaceId,
-      participations.workspaceId,
+      reading.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -263,88 +258,21 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     }
     return readable;
   });
-  const readTimeline = Effect.fn("ThreadApplication.readTimeline")(function* (
-    threadId: Thread.Id,
-    options: ThreadActivityStore.ReadOptions,
-  ) {
-    const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
-    const thread = yield* get(threadId);
-    const found = yield* activities.readPage(thread.id, request);
-    if (found.length > request.limit)
-      return yield* new InvalidResponse({ message: "Timeline exceeds the requested page size" });
-    let afterSequence = request.afterSequence ?? 0;
-    const seen = new Set<ThreadActivity.Id>();
-    const seenMessages = new Set<ThreadMessage.Id>();
-    const seenParticipationActivity = new Set<string>();
-    const items: Array<Thread.TimelineItem> = [];
-    for (const row of found) {
-      const activity = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(row).pipe(
-        Effect.mapError(invalidReadRecord),
-      );
-      if (
-        activity.workspaceId !== workspaceId ||
-        activity.threadId !== thread.id ||
-        activity.sequence <= afterSequence ||
-        seen.has(activity.id)
-      )
-        return yield* new InvalidResponse({
-          message: "Timeline store returned inconsistent references or order",
-        });
-      afterSequence = activity.sequence;
-      seen.add(activity.id);
-      if (activity.kind !== "MessagePublished") {
-        const occurrence = `${activity.kind}:${activity.participationId}`;
-        if (seenParticipationActivity.has(occurrence))
-          return yield* new InvalidResponse({ message: "Duplicate participation activity" });
-        seenParticipationActivity.add(occurrence);
-        const found = yield* participations.get(activity.participationId);
-        if (Option.isNone(found))
-          return yield* new InvalidResponse({
-            message: "Participation activity references missing participation",
-          });
-        const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-          found.value,
-        ).pipe(Effect.mapError(invalidReadRecord));
-        if (
-          participant.workspaceId !== workspaceId ||
-          participant.threadId !== thread.id ||
-          participant.id !== activity.participationId ||
-          (activity.kind === "ParticipationFollowed"
-            ? participant.joinedAtSequence !== activity.sequence
-            : participant.joinedAtSequence >= activity.sequence ||
-              participant.status !== "ended" ||
-              participant.endedAt === null ||
-              DateTime.formatIso(participant.endedAt) !== DateTime.formatIso(activity.occurredAt))
-        )
-          return yield* new InvalidResponse({
-            message: "Participation activity references inconsistent participation",
-          });
-        items.push({ activity, participant: ThreadParticipation.toSummary(participant) });
-        continue;
-      }
-      if (seenMessages.has(activity.messageId))
-        return yield* new InvalidResponse({ message: "Duplicate message activity" });
-      seenMessages.add(activity.messageId);
-      const foundMessage = yield* messages.get(activity.messageId);
-      if (Option.isNone(foundMessage))
-        return yield* new InvalidResponse({
-          message: "Timeline activity references a missing message",
-        });
-      const message = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Record))(
-        foundMessage.value,
-      ).pipe(Effect.mapError(invalidReadRecord));
-      if (
-        message.workspaceId !== workspaceId ||
-        message.threadId !== thread.id ||
-        message.id !== activity.messageId
-      )
-        return yield* new InvalidResponse({
-          message: "Message store returned another message, thread, or workspace",
-        });
-      items.push({ activity, message });
-    }
-    return items;
-  });
+  const readTimeline = Effect.fn("ThreadApplication.readTimeline")(
+    (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>
+      reading.page(threadId, options).pipe(
+        Effect.catchTags({
+          "ThreadAccess.NotFound": (error) =>
+            Effect.fail(new NotFound({ threadId: error.threadId })),
+          "ThreadAccess.InvalidResponse": (error) =>
+            Effect.fail(new InvalidResponse({ message: error.message })),
+          "ThreadActivityReading.InvalidResponse": (error) =>
+            Effect.fail(new InvalidResponse({ message: error.message })),
+          "ThreadActivityReading.NotFound": () =>
+            Effect.fail(new InvalidResponse({ message: "Timeline activity is missing" })),
+        }),
+      ),
+  );
   const listParticipants = Effect.fn("ThreadApplication.listParticipants")(function* (
     threadId: Thread.Id,
   ) {

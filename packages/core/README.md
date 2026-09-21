@@ -20,7 +20,7 @@ The current domains contain these features:
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
-| `notification`  | Notification records, inbox reads, message-activity generation, and departure settlement.                        |
+| `notification`  | Notification records, inbox/source reads, activity-driven generation, and departure settlement.                  |
 | `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
 | `agent`         | Permission to direct input to an agent workspace member.                                                         |
 | `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.                     |
@@ -42,7 +42,7 @@ return `NotificationApplication.NotFound`. Authorization and reads query current
 state without opening a transaction, honoring an outer commit when present. Reading never acknowledges a
 notification or grants access to its source. Core now requires `NotificationStore`.
 
-The HTTP API exposes these reads, and the web client provides session-scoped query
+The HTTP API exposes those inbox reads, and the web client provides session-scoped query
 atoms. Contact and Triage recipients are available to internal storage consumers; the
 member inbox API remains limited to the acting human or agent. The projection now generates
 notifications from the common activity-recorded fact for every activity kind. Quiet participation
@@ -51,6 +51,15 @@ sees `ParticipationEnded`, then generates notifications for the recorded recipie
 workspace departures record that activity through the internal lifecycle service. Participation
 domain facts change participation state only; notifications subscribe solely to recorded activity. It preserves historical recipient selection and references the originating participation.
 General acknowledgment, recipient processing, and delivery remain deferred.
+
+`NotificationApplication.resolveSource(notificationId)` first establishes notification ownership,
+then resolves the referenced recorded activity through the internal `NotificationSource` service.
+It validates historical recipient and participation links and returns a `Thread.TimelineItem`
+under current group access and `thread.read`. Missing, unsupported, or inaccessible sources return
+`SourceUnavailable`; inconsistent references fail internally. Unfollowing and discarded state do
+not themselves prevent historical reads. Resolution opens no transaction and does not acknowledge,
+join, or revive work. It is available through the gateway, with HTTP/UI integration still pending.
+See [source resolution](../../docs/thread-workflows.md#resolving-a-notification-source).
 
 Membership demonstrates the feature layout:
 
@@ -201,6 +210,8 @@ Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional
 `activity` and `message`, while participation items contain `activity` and a public `participant` joining summary. Current participants use
 `ThreadParticipation.Summary`, excluding internal identity snapshots and ended admissions.
 Reads honor caller transactions but open none, and make no notification or checkpoint changes.
+Internal `ThreadActivityReading` shares authorized subject resolution between timeline pages and
+notification-source reads. It and `NotificationSource` are excluded from `Core.Operations`.
 New Viewer bundles include the permission; stored role records are unchanged. See
 [thread reads](../../docs/thread-workflows.md#reading-conversations).
 
@@ -447,6 +458,11 @@ metadata. `Codec.PayloadCodec<S>` handles a payload schema, while
 `Codec.FactCodec<F>` pairs that codec with its fact definition. `Codec.EntryCodec<S>`
 maps a log's values to structured `Store.Content`; the journal uses it to persist
 the envelope header separately rather than wrapping everything in binary.
+
+`Log.Handle.getEntry(entryId)` and the journal's read-only `log.getEntry` resolve an optional
+decoded entry directly within the bound workspace and log. They validate entry identity and
+decode through the log's codec, honor an enclosing transaction, and perform no writes.
+Application readers remain responsible for authorization.
 
 Inline payload structs can stay inside their fact declarations. Obtain their
 types through `Fact.Payload<typeof MemberFacts.Added>` rather than adding a

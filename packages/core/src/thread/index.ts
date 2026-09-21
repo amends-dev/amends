@@ -23,6 +23,7 @@ export { ThreadActivityFacts } from "./activity/facts.ts";
 export { ThreadActivityStore } from "./activity/store.ts";
 export { ThreadActivityProjection } from "./activity/projection.ts";
 export { ThreadActivityRecording } from "./activity/recording.ts";
+export { ThreadActivityReading } from "./activity/reading.ts";
 export { ThreadParticipationDeparture } from "./participation/departure.ts";
 export { ThreadApplication } from "./application.ts";
 export { ThreadCreation } from "./creation.ts";

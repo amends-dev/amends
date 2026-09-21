@@ -62,6 +62,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Store.Service,
     Store.Service.of({
       readFacts: () => Effect.succeed([]),
+      getEntry: () => Effect.succeedNone,
       transaction: (program) =>
         program.pipe(
           Effect.provideService(Store.Transaction, {

@@ -27,6 +27,11 @@ one commit and read entries in order without scanning the log or sorting a batch
 workspace, log, subject, position, and entry index. Fact subjects are required;
 generic execution entries leave the entire fact header null.
 
+`Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
+log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
+transaction, and opens none. This supports notification-source reads without scanning the log
+or changing the schema.
+
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
 [storage envelope](../../docs/journal.md#storage-envelope).
@@ -168,3 +173,6 @@ authorization, gateway workflows, and invitation lifecycle, policy, and replay.
 as PostgreSQL, including invalid role edits, foreign grant scopes, invalid expiry,
 checkpoint validation, and rollback. Fixtures are in `support.ts` and
 `invitation-support.ts`.
+`notification-sources.test.ts` mirrors PostgreSQL coverage for current source authorization,
+historical recipient integrity, direct entry lookup, no-write resolution, staged visibility,
+rollback, reopening, and gateway outcomes.
