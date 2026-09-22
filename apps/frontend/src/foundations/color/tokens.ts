@@ -1,4 +1,4 @@
-/** Reading colors and neutral filled actions. Disabled text is only for inactive controls. */
+/** Reading, action, and focus colors. Disabled text is only for inactive controls. */
 export interface ColorTokens {
   readonly surface: {
     readonly canvas: string;
@@ -17,6 +17,7 @@ export interface ColorTokens {
     /** Translucent fill, supported on canvas and panel surfaces. */
     readonly disabled: string;
   };
+  readonly focus: { readonly ring: string };
 }
 
 export const cotton = {
@@ -36,6 +37,7 @@ export const cotton = {
     onFill: "oklch(0.97 0.01 90)",
     disabled: "oklch(0.24 0.014 84 / 0.08)",
   },
+  focus: { ring: "oklch(0.24 0.014 84)" },
 } as const satisfies ColorTokens;
 
 export const soot = {
@@ -55,6 +57,7 @@ export const soot = {
     onFill: "oklch(0.17 0.008 84)",
     disabled: "oklch(0.95 0.006 90 / 0.08)",
   },
+  focus: { ring: "oklch(0.95 0.006 90)" },
 } as const satisfies ColorTokens;
 
 export const colors = { cotton, soot } as const;

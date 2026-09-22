@@ -2,12 +2,14 @@
 
 The starting point for the shared Solid frontend intended for web and Tauri desktop.
 The [color foundation](src/foundations/color/README.md) defines four reading roles and six
-neutral filled-action roles for Cotton and Soot, with scoped theme styles and Storybook specimens. The
+neutral filled-action roles, plus a focus-ring color, for Cotton and Soot, with scoped theme styles and Storybook specimens. The
 [typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
 styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
 composes those foundations into native paragraphs, spans, headings, and inline code. The
 [spacing foundation](src/foundations/spacing/README.md) adds steps 0–6 as quarter-rem values.
-The [radius foundation](src/foundations/radius/README.md) adds square and pill corners. Neither
+The [radius foundation](src/foundations/radius/README.md) adds square and pill corners.
+The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
+a reusable `:focus-visible` class. Neither
 app consumes this package yet. The existing `ui`, `design-system`, and `web` packages remain in place.
 
 ## Run and verify
@@ -37,7 +39,7 @@ verifies the generated CSS and the accessibility addon checks the rendered speci
 both surfaces, with theme controls, nested scopes, and enlarged text. Six enabled pairings
 have contrast tests; browser play checks verify computed colors, transparency, and disabled
 semantics. Disabled readability is reviewed separately. These are static color specimens;
-Button and keyboard-focus behavior remain future slices.
+Button behavior remains a future slice.
 
 **Foundations / Typography** shows the three styles in both themes, a narrow container,
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
@@ -54,6 +56,12 @@ verifies scaling at a larger root size. These geometry checks run in the browser
 **Foundations / Radius** compares square and pill corners on different specimen sizes
 in both themes. Browser checks cover dimensions, corner values, and actual corner hit
 boundaries, including enlarged text and root-size restoration.
+
+**Foundations / Focus** uses native controls to review real Tab/Shift+Tab navigation, skipped
+disabled controls, and the shared focus style on square and pill shapes. The stories cover both
+surfaces, themes, nested scopes, and enlarged text. Four ring/surface contrast tests run in the
+suite; browser play checks measure ring clearance without taking focus. Actual focus visibility,
+outline geometry, and clipping require real browser keyboard input and visual review.
 
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
 to the foundations and Text primitive, separately from the workshop. Stories are discovered
@@ -89,7 +97,7 @@ For each addition:
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
 a design reference. Reading-color specimens retain their system-font scaffolding; typography specimens
-use the introduced fonts and styles. Action-color, spacing, and radius specimens compose Text with the
+use the introduced fonts and styles. Action-color, spacing, radius, and focus specimens compose Text with the
 reviewed foundations. Additional radii and global styles remain separate future slices.
 Color.js is a development
 dependency used by the contrast tests and specimens, not the production exports.

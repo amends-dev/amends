@@ -58,6 +58,12 @@ geometry assertions are not run under Happy DOM.
 The [radius stories](../apps/frontend/src/foundations/radius/README.md) use the browser to
 check dimensions, all four corner values, and curved hit boundaries across specimen sizes.
 They also cover enlarged text and restore document scrolling after their checks.
+The [focus stories](../apps/frontend/src/foundations/focus/README.md) check ring colors,
+surface contrast, and room for the outline. Four ring/surface contrast tests run in Vitest.
+Use real browser Tab/Shift+Tab presses to verify `:focus-visible`, disabled tab stops, computed
+outline dimensions, no layout shift, and clipping. Story play checks deliberately do not
+move focus; synthetic events cannot establish native input modality. Review both themes,
+nested scopes, narrow/enlarged layouts, pointer behavior, and forced-colors emulation.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin

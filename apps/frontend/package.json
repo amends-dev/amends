@@ -11,6 +11,8 @@
   "exports": {
     "./foundations/color": "./src/foundations/color/tokens.ts",
     "./foundations/color/styles": "./src/foundations/color/theme.css.ts",
+    "./foundations/focus": "./src/foundations/focus/tokens.ts",
+    "./foundations/focus/styles": "./src/foundations/focus/styles.css.ts",
     "./foundations/radius": "./src/foundations/radius/tokens.ts",
     "./foundations/spacing": "./src/foundations/spacing/tokens.ts",
     "./foundations/typography": "./src/foundations/typography/tokens.ts",

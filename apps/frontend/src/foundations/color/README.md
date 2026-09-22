@@ -1,6 +1,6 @@
 # Color
 
-Reading colors and neutral filled-action colors, with identical names in Cotton (light)
+Reading, neutral filled-action, and focus colors, with identical names in Cotton (light)
 and Soot (dark):
 
 | Role             | Purpose                   | Supported pairing |
@@ -21,13 +21,16 @@ The reading roles above support ordinary content. Filled actions add six roles:
 | `action.disabled`    | Translucent unavailable action | `text.disabled`, over canvas or panel           |
 | `text.disabled`      | Text on an unavailable control | `action.disabled`; not ordinary supporting text |
 
+`focus.ring` adds the outline color for keyboard focus on canvas and panel surfaces.
+The [focus foundation](../focus/README.md) owns its dimensions and reusable `:focus-visible` class.
+
 All values match the corresponding current [UI color tokens](../../../../ui/src/tokens/color.ts).
 The broader visual direction is recorded in the [Foundations v2 reference](<../../../../../design-system/Amends Foundations v2.dc.html>).
 Cotton uses a dark action fill with light text; Soot inverts that relationship. The older
 [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>) uses
 different hover/pressed and disabled values. This foundation preserves the current UI's
 state mapping and disabled fill instead of reintroducing those historical differences.
-Transparent/outlined actions, status, borders, focus, inverse surfaces, and selection remain deferred.
+Transparent/outlined actions, status, borders, inverse surfaces, and selection remain deferred.
 
 `action.disabled` has 8% alpha; its appearance depends on the surface underneath. Apply it
 as the background color with opaque `text.disabled`. Do not lower the whole element's
@@ -57,7 +60,7 @@ import { colorThemes, colorVars } from "@amends/frontend/foundations/color/style
 </section>;
 ```
 
-The theme class sets all ten variables, the canvas background, primary text color,
+The theme class sets all eleven variables, the canvas background, primary text color,
 and the browser's `color-scheme`. Descendants inherit the variables; a nested theme
 class overrides them for its subtree. Apply exactly one theme class to each scope.
 Importing the styles does not select a document theme, load fonts, or apply global resets.
@@ -97,7 +100,9 @@ Inactive controls are exempt from that criterion; disabled specimens need a sepa
 readability review on both surfaces. They do not carry a 4.5:1 pass claim, and disabled
 text must not be used for ordinary content. These checks do not establish readability for
 arbitrary cross-theme combinations or other colors. Surface differences are decorative
-and are not control boundaries. Focus and full Button accessibility remain later work.
+and are not control boundaries. Four focus-ring/surface pairings are separately checked
+against the 3:1 non-text threshold, with interactive specimens under Foundations / Focus.
+Full Button accessibility remains later work.
 
 Run `bun run --filter @amends/frontend test` and `bun run --filter @amends/frontend build`
 from the repository root, then inspect the stories in a real browser. Browser review

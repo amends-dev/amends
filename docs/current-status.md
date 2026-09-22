@@ -33,7 +33,9 @@ The new [frontend workshop](../apps/frontend/README.md) contains four surface/te
 roles for Cotton and Soot, scoped theme styles, and specimens for their supported pairings
 and nested scopes. Six neutral filled-action color roles add default, hover, pressed,
 and disabled specimens on both surfaces; enabled label contrast has automated checks.
-Keyboard focus and the Button primitive remain unimplemented in frontend.
+The focus foundation adds a themed 2px outline with 2px offset, applied through a reusable
+`:focus-visible` class. Storybook provides native controls for real keyboard review and
+browser checks of ring colors and clearance. The Button primitive remains unimplemented in frontend.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.

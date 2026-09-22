@@ -5,6 +5,16 @@ import { colors } from "@amends/frontend/foundations/color";
 for (const [theme, palette] of Object.entries(colors)) {
   describe(`${theme} color pairings`, () => {
     for (const [surface, background] of Object.entries(palette.surface)) {
+      it(`keeps focus.ring distinguishable on surface.${surface}`, () => {
+        const ring = new Color(palette.focus.ring);
+        const ground = new Color(background);
+        for (const color of [ring, ground]) {
+          expect(color.alpha).toBe(1);
+          expect(color.inGamut("srgb")).toBe(true);
+        }
+        // The offset places the ring against the surrounding surface, not the action fill.
+        expect(ring.contrastWCAG21(ground)).toBeGreaterThanOrEqual(3);
+      });
       for (const tone of ["primary", "secondary"] as const) {
         it(`keeps text.${tone} readable on surface.${surface}`, () => {
           const text = new Color(palette.text[tone]);
