@@ -7,6 +7,8 @@ import textMeta, { ReactiveProps } from "../src/primitives/text/text.stories.tsx
 import buttonMeta, {
   Activation,
   Forms,
+  SecondaryActivation,
+  SecondaryForms,
   ReactiveProps as ButtonReactiveProps,
 } from "../src/primitives/button/button.stories.tsx";
 
@@ -31,4 +33,11 @@ it("runs the Button form story", async () => {
 });
 it("runs the Button reactive-props story", async () => {
   await buttonStories.story(ButtonReactiveProps).run();
+});
+
+it("runs the secondary Button activation story", async () => {
+  await buttonStories.story(SecondaryActivation).run();
+});
+it("runs the secondary Button form story", async () => {
+  await buttonStories.story(SecondaryForms).run();
 });

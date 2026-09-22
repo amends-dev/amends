@@ -1,6 +1,6 @@
 # Button
 
-A primary filled button in one regular size, composed from the reviewed typography,
+Primary filled and secondary outlined buttons in one regular size, composed from the reviewed typography,
 action colors, spacing, radius, and focus foundations. It renders one native `<button>`.
 
 ```tsx
@@ -13,13 +13,16 @@ import "@amends/frontend/foundations/typography/fonts";
   <Button type="submit" form="reply-form" name="intent" value="publish">
     Publish reply
   </Button>
+  <Button variant="secondary">Save draft</Button>
   <Button disabled>Unavailable</Button>
 </section>;
 ```
 
 ## Contract
 
-`ButtonProps` is Solid's `JSX.ButtonHTMLAttributes<HTMLButtonElement>`. Native attributes,
+`ButtonProps` extends Solid's `JSX.ButtonHTMLAttributes<HTMLButtonElement>` with
+`variant?: "primary" | "secondary"` (also exported as `ButtonVariant`). It defaults to
+`primary`; `variant` is consumed by the component and is not forwarded to the DOM. Native attributes,
 events (including Solid's bound handlers), styles, ARIA/data attributes, and the actual
 button ref are forwarded. Native types are `button`, `submit`, and `reset`; omitting `type`
 or setting it to `undefined` uses `button`. This prevents accidental form submission.
@@ -38,12 +41,17 @@ typography foundation directly on the button, so a Text wrapper is unnecessary.
 
 `class` and truthy `classList` entries merge reactively with the component classes using
 the same convention as Text. False entries do not remove a class supplied elsewhere.
-Native props, content, and handlers update without replacing the element. Ordinary updates
+Variant, native props, content, and handlers update without replacing the element. Ordinary updates
 preserve focus; disabling a focused button follows the browser's native behavior.
 
 ## Appearance and sizing
 
-- Cotton uses the reviewed dark fill and light label; Soot inverts the pairing.
+- Primary uses the reviewed dark fill and light label in Cotton; Soot inverts the pairing.
+- Secondary uses primary text, a transparent background, and a 1px dashed `line.control`
+  border. Hover uses `action.hover` and `line.strong`; pressed uses `action.pressed` and
+  `line.strong`, including keyboard presses without hover.
+- Both variants share geometry, focus, and disabled treatment. Disabled buttons use the
+  existing translucent fill and text color with a transparent border.
 - Hover and pressed colors apply only while enabled. Disabled text and its translucent
   fill are intended for canvas and panel surfaces within the same theme.
 - `focusVisible` supplies the keyboard-focus indicator. The surrounding layout must leave
@@ -59,7 +67,9 @@ preserve focus; disabling a focused button follows the browser's native behavior
 The old UI's control minimums are fixed CSS pixels; these rem minimums intentionally scale
 with the reviewed typography and spacing. The new button uses an inline text layout to
 preserve wrapping and inline label content. This slice has no transition or pending animation.
-Additional emphasis variants, sizes, danger treatment, and icon-only controls remain future slices.
+Ghost emphasis, additional sizes, danger treatment, and icon-only controls remain future slices.
+Unlike the older UI, secondary explicitly selects the strong border on press as well as hover,
+so keyboard activation uses the reviewed high-contrast pairing.
 The older [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>)
 uses different historical state colors; the reviewed frontend action colors remain authoritative.
 
@@ -71,22 +81,24 @@ their own accessibility and layout review.
 
 **Primitives / Button** provides:
 
-- **Comparison:** enabled, disabled, and disabled-fieldset buttons in Cotton and Soot,
+- **Comparison:** both variants, including enabled, disabled, and disabled-fieldset buttons in Cotton and Soot,
   including canvas and panel surfaces. Hover, press, focus, and activate the real component.
-- **Playground:** controls for theme, label, native type, and disabled state.
-- **Activation:** click/Enter/Space counting and disabled tab-stop behavior.
-- **Forms:** default non-submitting behavior and explicit submission with name/value.
-- **Reactive Props:** label, class, and disabled-state updates on the same element.
+- **Playground:** controls for theme, variant, label, native type, and disabled state.
+- **Activation / Secondary Activation:** click/Enter/Space counting and disabled tab-stop behavior.
+- **Forms / Secondary Forms:** default non-submitting behavior and explicit submission with name/value.
+- **Reactive Props:** variant, label, class, and disabled-state updates on the same element.
 - **Long Labels / Enlarged Text:** wrapping within narrow containers in both themes.
 
-Activation, Forms, and Reactive Props run the same play scenarios in Storybook and the
+The activation and form stories for both variants, plus Reactive Props, run the same play scenarios in Storybook and the
 Bun/Vitest portable-story suite. Focused DOM tests cover forwarding, native submission,
 disabled activation, preventing default, reactive handlers/classes/types, refs, and element
 identity. Type examples reject unsupported tags, variants, and invalid native attributes.
 
-Comparison has a browser-only rendering check for all ten buttons. It compares actual text
-and background colors with the current theme, including disabled fieldsets and any active
-hover/press state. If a button already has visible focus, it also checks the ring. The check
+Comparison has a browser-only rendering check for all twenty buttons. It compares actual text,
+background, and all four border colors/styles/widths with the current theme, including disabled
+fieldsets and any active
+hover/press state. Enabled text and secondary borders also have contrast checks after compositing
+over their surface. If a button already has visible focus, it also checks the ring. The check
 does not move focus and skips author-color assertions in forced-colors mode. It catches stale
 CSS references after shared-token changes; it is not run under Happy DOM.
 

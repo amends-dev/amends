@@ -1,4 +1,4 @@
-import { style } from "@vanilla-extract/css";
+import { style, styleVariants } from "@vanilla-extract/css";
 import { colorVars } from "../../foundations/color/theme.css.ts";
 import { focusVisible } from "../../foundations/focus/styles.css.ts";
 import { radius } from "../../foundations/radius/tokens.ts";
@@ -20,18 +20,15 @@ export const root = style([
     padding: `${space[2]} ${space[5]}`,
     border: "1px solid transparent",
     borderRadius: radius.pill,
-    backgroundColor: colorVars.action.fill,
-    color: colorVars.action.onFill,
     textAlign: "center",
     whiteSpace: "normal",
     overflowWrap: "anywhere",
     cursor: "pointer",
     selectors: {
-      "&:hover:enabled": { backgroundColor: colorVars.action.fillHover },
-      "&:active:enabled": { backgroundColor: colorVars.action.fillPressed },
       "&:disabled": {
         backgroundColor: colorVars.action.disabled,
         color: colorVars.text.disabled,
+        borderColor: "transparent",
         cursor: "not-allowed",
         opacity: 1,
       },
@@ -41,3 +38,31 @@ export const root = style([
     },
   },
 ]);
+
+export const variants = styleVariants({
+  primary: {
+    backgroundColor: colorVars.action.fill,
+    color: colorVars.action.onFill,
+    selectors: {
+      "&:hover:enabled": { backgroundColor: colorVars.action.fillHover },
+      "&:active:enabled": { backgroundColor: colorVars.action.fillPressed },
+    },
+  },
+  secondary: {
+    backgroundColor: "transparent",
+    color: colorVars.text.primary,
+    borderStyle: "dashed",
+    borderColor: colorVars.line.control,
+    selectors: {
+      "&:hover:enabled": {
+        backgroundColor: colorVars.action.hover,
+        borderColor: colorVars.line.strong,
+      },
+      // Keyboard presses also need the strong border, even without hover.
+      "&:active:enabled": {
+        backgroundColor: colorVars.action.pressed,
+        borderColor: colorVars.line.strong,
+      },
+    },
+  },
+});

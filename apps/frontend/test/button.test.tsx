@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { createSignal, type JSX } from "solid-js";
-import { Button } from "@amends/frontend/primitives/button";
+import { Button, type ButtonVariant } from "@amends/frontend/primitives/button";
 
 afterEach(cleanup);
 
@@ -61,50 +61,83 @@ it("forwards native attributes, styles, bound events, and the native element ref
   expect(clicked).toHaveBeenCalledWith("reply", expect.any(MouseEvent));
 });
 
-it("prevents native activation when disabled and resumes when enabled", () => {
-  const [disabled, setDisabled] = createSignal(true);
-  const clicked = vi.fn();
-  render(() => (
-    <Button disabled={disabled()} onClick={clicked}>
-      Publish reply
-    </Button>
-  ));
-  const button = screen.getByRole("button", { name: "Publish reply" }) as HTMLButtonElement;
-  button.click();
-  expect(clicked).not.toHaveBeenCalled();
-  expect(button).toBeDisabled();
-  setDisabled(false);
-  expect(screen.getByRole("button", { name: "Publish reply" })).toBe(button);
-  button.click();
-  expect(clicked).toHaveBeenCalledOnce();
-});
-
-it("submits only when explicitly requested and preserves the submitter", () => {
-  const submitted = vi.fn();
-  render(() => (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        submitted(event.submitter);
-      }}
-    >
-      <Button>Save draft</Button>
-      <Button type="submit" name="intent" value="publish">
+it.each<ButtonVariant>(["primary", "secondary"])(
+  "prevents %s activation when disabled and resumes when enabled",
+  (variant) => {
+    const [disabled, setDisabled] = createSignal(true);
+    const clicked = vi.fn();
+    render(() => (
+      <Button variant={variant} disabled={disabled()} onClick={clicked}>
         Publish reply
       </Button>
-      <Button type="submit" disabled>
-        Unavailable
-      </Button>
-    </form>
+    ));
+    const button = screen.getByRole("button", { name: "Publish reply" }) as HTMLButtonElement;
+    button.click();
+    expect(clicked).not.toHaveBeenCalled();
+    expect(button).toBeDisabled();
+    setDisabled(false);
+    expect(screen.getByRole("button", { name: "Publish reply" })).toBe(button);
+    button.click();
+    expect(clicked).toHaveBeenCalledOnce();
+  },
+);
+
+it.each<ButtonVariant>(["primary", "secondary"])(
+  "submits %s only when explicitly requested and preserves the submitter",
+  (variant) => {
+    const submitted = vi.fn();
+    render(() => (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitted(event.submitter);
+        }}
+      >
+        <Button variant={variant}>Save draft</Button>
+        <Button variant={variant} type="submit" name="intent" value="publish">
+          Publish reply
+        </Button>
+        <Button variant={variant} type="submit" disabled>
+          Unavailable
+        </Button>
+      </form>
+    ));
+    (screen.getByRole("button", { name: "Save draft" }) as HTMLButtonElement).click();
+    expect(submitted).not.toHaveBeenCalled();
+    const submit = screen.getByRole("button", { name: "Publish reply" }) as HTMLButtonElement;
+    submit.click();
+    expect(submitted).toHaveBeenCalledOnce();
+    expect(submitted).toHaveBeenCalledWith(submit);
+    (screen.getByRole("button", { name: "Unavailable" }) as HTMLButtonElement).click();
+    expect(submitted).toHaveBeenCalledOnce();
+  },
+);
+
+it("switches variants without replacing the button or losing focus, native behavior, or consumer classes", () => {
+  const [variant, setVariant] = createSignal<ButtonVariant | undefined>();
+  const clicked = vi.fn();
+  render(() => (
+    <Button variant={variant()} class="consumer" classList={{ selected: true }} onClick={clicked}>
+      Save draft
+    </Button>
   ));
-  (screen.getByRole("button", { name: "Save draft" }) as HTMLButtonElement).click();
-  expect(submitted).not.toHaveBeenCalled();
-  const submit = screen.getByRole("button", { name: "Publish reply" }) as HTMLButtonElement;
-  submit.click();
-  expect(submitted).toHaveBeenCalledOnce();
-  expect(submitted).toHaveBeenCalledWith(submit);
-  (screen.getByRole("button", { name: "Unavailable" }) as HTMLButtonElement).click();
-  expect(submitted).toHaveBeenCalledOnce();
+  const button = screen.getByRole("button", { name: "Save draft" }) as HTMLButtonElement;
+  const initialClass = button.className;
+  setVariant("primary");
+  expect(button.className).toBe(initialClass);
+  button.focus();
+  setVariant("secondary");
+  expect(screen.getByRole("button", { name: "Save draft" })).toBe(button);
+  expect(button.className).not.toBe(initialClass);
+  expect(button).toHaveClass("consumer", "selected");
+  expect(button).not.toHaveAttribute("variant");
+  expect(button).toHaveAttribute("type", "button");
+  expect(button).toHaveFocus();
+  button.click();
+  expect(clicked).toHaveBeenCalledOnce();
+  setVariant(undefined);
+  expect(button.className).toBe(initialClass);
+  expect(button).toHaveFocus();
 });
 
 it("lets the caller prevent default submission without suppressing the click", () => {

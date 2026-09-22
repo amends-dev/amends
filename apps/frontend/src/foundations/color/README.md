@@ -37,7 +37,7 @@ default border falls below 3:1 against the pressed interior in both themes. Its 
 against the surrounding plain surface is a separate measurement. This contract verifies
 the strong border against both the tinted interior and the plain exterior.
 
-These roles prepare the secondary Button; this slice does not introduce that variant.
+The secondary [Button](../../primitives/button/README.md) uses these pairings for default, hover, and pressed states.
 
 `focus.ring` adds the outline color for keyboard focus on canvas and panel surfaces.
 The [focus foundation](../focus/README.md) owns its dimensions and reusable `:focus-visible` class.
@@ -48,7 +48,7 @@ Cotton uses a dark action fill with light text; Soot inverts that relationship. 
 [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>) uses
 different hover/pressed and disabled values. This foundation preserves the current UI's
 state mapping and disabled fill instead of reintroducing those historical differences.
-Outlined-action components, decorative border colors, status, inverse surfaces, and selection remain deferred.
+Decorative border colors, status, inverse surfaces, and selection remain deferred.
 
 `action.disabled` has 8% alpha; its appearance depends on the surface underneath. Apply it
 as the background color with opaque `text.disabled`. Do not lower the whole element's

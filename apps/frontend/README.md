@@ -10,7 +10,7 @@ composes those foundations into native paragraphs, spans, headings, and inline c
 The [radius foundation](src/foundations/radius/README.md) adds square and pill corners.
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
 a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
-composes these foundations into a primary action with native button behavior. Neither
+composes these foundations into primary and secondary actions with native button behavior. Neither
 app consumes this package yet. The existing `ui`, `design-system`, and `web` packages remain in place.
 
 ## Run and verify
@@ -45,8 +45,8 @@ The Button primitive has separate component and interaction stories.
 **Foundations / Color / Controls** shows default/strong borders and translucent hover/pressed
 backgrounds on both surfaces. Tests measure text and border contrast after compositing; browser
 play checks compare the actual CSS colors and an independent canvas blend. Nested themes,
-theme controls, and enlarged-text stories support visual review. The secondary Button remains
-a later slice.
+theme controls, and enlarged-text stories support visual review. The secondary Button consumes
+these reviewed color pairings.
 
 **Foundations / Typography** shows the three styles in both themes, a narrow container,
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
@@ -70,9 +70,9 @@ surfaces, themes, nested scopes, and enlarged text. Four ring/surface contrast t
 suite; browser play checks measure ring clearance without taking focus. Actual focus visibility,
 outline geometry, and clipping require real browser keyboard input and visual review.
 
-**Primitives / Button** covers the primary button on both surfaces and themes, native
+**Primitives / Button** covers both Button variants on both surfaces and themes, native
 disabled/fieldset behavior, activation, form submission, reactive props, and long labels.
-Activation, Forms, and Reactive Props also run in the portable-story suite. Real browser
+Activation and Forms for both variants, plus Reactive Props, run in the portable-story suite. Real browser
 checks establish actual hover/pressed/focus styles, native keyboard activation, wrapping,
 coarse-pointer sizing, forced colors, and enlarged text.
 Comparison also checks the rendered Button colors against the current palette, including

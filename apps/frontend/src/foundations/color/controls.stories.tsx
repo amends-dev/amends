@@ -226,7 +226,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "line.control, line.strong, action.hover, and action.pressed in both themes. The translucent fills use text.primary and line.strong. Computed-style and sRGB canvas checks verify the pairings after compositing. These are color specimens; the secondary Button remains a later slice.",
+          "line.control, line.strong, action.hover, and action.pressed in both themes. The translucent fills use text.primary and line.strong. Computed-style and sRGB canvas checks verify the pairings after compositing. These are static color specimens; the secondary Button has separate component stories.",
       },
     },
   },
