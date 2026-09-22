@@ -8,7 +8,8 @@ Read [README.md](README.md) before changing this package.
   entry points. Compare relevant existing source and design references before introducing
   a piece, and document intentional differences.
 - Add layers only as needed: foundations, primitives, compositions, features, and pages.
-  Lower layers must not depend on higher ones. Add public source exports only when
+  Runtime lower layers must not depend on higher ones. Development-only stories may
+  compose reviewed primitives to demonstrate foundations. Add public source exports only when
   there is production code to consume; exclude stories, fixtures, and Storybook setup.
 - Give every introduced piece Storybook coverage, including tokens. Colocate stories
   with source and render the same implementation consumers will use.

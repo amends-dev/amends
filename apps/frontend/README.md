@@ -5,7 +5,8 @@ The first [color foundation](src/foundations/color/README.md) defines four surfa
 roles for Cotton and Soot, with scoped theme styles and Storybook specimens. The
 [typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
 styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
-composes those foundations into native paragraphs, spans, headings, and inline code. Neither
+composes those foundations into native paragraphs, spans, headings, and inline code. The
+[spacing foundation](src/foundations/spacing/README.md) adds steps 0–6 as quarter-rem values. Neither
 app consumes this package yet. The existing `ui`, `design-system`, and `web` packages remain in place.
 
 ## Run and verify
@@ -38,6 +39,10 @@ and wrapping. These checks require a browser and are not part of the Happy DOM t
 **Primitives / Text** covers variants, tones, semantic elements, inline content, inheritance,
 and narrow layouts. Its Reactive Props story also runs through the portable-story test suite.
 Focused DOM and type checks verify the component's native-prop and reactivity contracts.
+
+**Foundations / Spacing** uses Text for labels and measures all seven scale steps,
+four-sided padding, and horizontal/vertical gaps in both themes. Its enlarged-text story
+verifies scaling at a larger root size. These geometry checks run in the browser.
 
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
 to the foundations and Text primitive, separately from the workshop. Stories are discovered
@@ -73,7 +78,8 @@ For each addition:
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
 a design reference. Color specimens retain their system-font scaffolding; typography specimens
-use the introduced fonts and styles. Spacing, radius, and global styles remain separate
+use the introduced fonts and styles. Spacing specimens compose Text and the new scale.
+Radius and global styles remain separate
 future slices. Color.js is a development
 dependency used by the contrast tests and specimens, not the production exports.
 The accessibility addon is available; automated screenshot-baseline testing and native

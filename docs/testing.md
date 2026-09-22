@@ -48,6 +48,10 @@ The [Text primitive](../apps/frontend/src/primitives/text/README.md) has DOM tes
 native semantics, forwarding, refs, class merging, and reactive updates, plus compile-time
 usage checks. Its Reactive Props story also runs through the portable-story suite; actual
 colors, typography, margins, and wrapping are verified in the browser.
+The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
+quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
+layout engine. Check all seven control values and the enlarged-root scenario; these
+geometry assertions are not run under Happy DOM.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin
