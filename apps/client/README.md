@@ -1,15 +1,15 @@
 # Amends client
 
 `@amends/client` owns the shared client runtime: routing, session lifetime, typed API
-access, and application composition over UI components from `@amends/frontend`.
+access, and application composition over UI components from `@amends/ui`.
 It is an `apps/*` workspace because it depends on Solid and the browser environment;
 portable backend packages under `packages/*` remain Effect-only.
 
 Web and desktop render the same `Application`. Platform entry points supply a router,
 an absolute API base URL, and a session store. Web uses browser history; Tauri uses
 hash routing so navigation and reloads stay within its bundled document. The client package
-owns runtime providers and routes. The frontend package owns the UI foundations,
-primitives, and compositions. Frontend does not depend on client or the backend.
+owns runtime providers and routes. The UI package owns the UI foundations,
+primitives, and compositions. UI does not depend on client or the backend.
 
 ## Current routes
 
@@ -64,8 +64,8 @@ and the future workspace picker. Future commands should have their own interacti
 owner and handle completion against the current session scope.
 
 Only `src/api` imports the HTTP contract and the gateway's session/directory
-schemas. Frontend cannot import client or API code, and client cannot import Tauri
-or platform entry points. Client uses declared frontend exports for its UI. The repository dependency check enforces
+schemas. UI cannot import client or API code, and client cannot import Tauri
+or platform entry points. Client uses declared UI exports for its UI. The repository dependency check enforces
 these source boundaries. Application code is exposed through `@amends/client`;
 component consumers retain their existing subpath exports.
 
@@ -96,7 +96,7 @@ bun run test
 ```
 
 Client integration stories run at `http://127.0.0.1:6008/`, with static output in
-`apps/client/dist`. The frontend UI workshop remains at port 6007 and has no client
+`apps/client/dist`. The UI workshop remains at port 6007 and has no client
 dependency. Stories, mocks, and workshop configuration are excluded from client exports.
 
 Verify both app frontend builds and both workshop builds after changing shared tooling. Browser review verifies app navigation and fonts; native review verifies the Tauri

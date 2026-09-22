@@ -3,7 +3,7 @@ import { Effect, Layer, Schema } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
-import "@amends/frontend/foundations/typography/fonts";
+import "@amends/ui/foundations/typography/fonts";
 import { Application } from "./application.tsx";
 import { SignIn } from "./api/contracts.ts";
 import type { SessionStore } from "./session/store.ts";

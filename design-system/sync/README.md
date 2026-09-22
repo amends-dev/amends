@@ -1,12 +1,13 @@
 # Token sync — historical Foundations v2 handoff
 
 The four files here are design-reference artifacts from an earlier UI structure.
-They are not imported by the application. The former `apps/ui` package has been
-removed; the handoff's paths and contract names are historical.
+They are not imported by the application. The legacy UI implementation was removed;
+the current `apps/ui` package is the renamed shared workshop. The handoff's source
+paths and contract names remain historical.
 
-Use the [frontend guide](../../apps/frontend/README.md) for current foundations,
-components, themes, and validation. Its [color foundation](../../apps/frontend/src/foundations/color/README.md)
-and [theme styles](../../apps/frontend/src/foundations/color/theme.css.ts) own the
+Use the [UI guide](../../apps/ui/README.md) for current foundations,
+components, themes, and validation. Its [color foundation](../../apps/ui/src/foundations/color/README.md)
+and [theme styles](../../apps/ui/src/foundations/color/theme.css.ts) own the
 current color contract. Other pieces are introduced and verified incrementally;
 these artifacts are not replacement source files or a complete current token map.
 

@@ -50,8 +50,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/api-http": "workspace:*",
-        "@amends/frontend": "workspace:*",
         "@amends/gateway": "workspace:*",
+        "@amends/ui": "workspace:*",
         "@effect/atom-solid": "catalog:",
         "@solidjs/router": "catalog:",
         "@vanilla-extract/css": "^1.21.2",
@@ -78,7 +78,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/client": "workspace:*",
-        "@amends/frontend": "workspace:*",
+        "@amends/ui": "workspace:*",
         "@solidjs/router": "catalog:",
         "solid-js": "^1.9.12",
       },
@@ -89,8 +89,22 @@
         "vite-plugin-solid": "^2.11.14",
       },
     },
-    "apps/frontend": {
-      "name": "@amends/frontend",
+    "apps/icons": {
+      "name": "@amends/icons",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@solidjs/testing-library": "^0.8.9",
+        "happy-dom": "^20.10.6",
+        "solid-js": "^1.9.12",
+        "vite": "^7.0.0",
+        "vite-plugin-solid": "^2.11.14",
+      },
+      "peerDependencies": {
+        "solid-js": "^1.9.12",
+      },
+    },
+    "apps/ui": {
+      "name": "@amends/ui",
       "version": "0.0.0",
       "dependencies": {
         "@amends/icons": "workspace:*",
@@ -117,26 +131,12 @@
         "solid-js": "^1.9.12",
       },
     },
-    "apps/icons": {
-      "name": "@amends/icons",
-      "version": "0.0.0",
-      "devDependencies": {
-        "@solidjs/testing-library": "^0.8.9",
-        "happy-dom": "^20.10.6",
-        "solid-js": "^1.9.12",
-        "vite": "^7.0.0",
-        "vite-plugin-solid": "^2.11.14",
-      },
-      "peerDependencies": {
-        "solid-js": "^1.9.12",
-      },
-    },
     "apps/web": {
       "name": "@amends/web",
       "version": "0.0.0",
       "dependencies": {
         "@amends/client": "workspace:*",
-        "@amends/frontend": "workspace:*",
+        "@amends/ui": "workspace:*",
         "@solidjs/router": "catalog:",
         "solid-js": "^1.9.12",
       },
@@ -226,8 +226,6 @@
 
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
 
-    "@amends/frontend": ["@amends/frontend@workspace:apps/frontend"],
-
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
@@ -239,6 +237,8 @@
     "@amends/storage-postgresql": ["@amends/storage-postgresql@workspace:adapters/storage-postgresql"],
 
     "@amends/storage-sqlite": ["@amends/storage-sqlite@workspace:adapters/storage-sqlite"],
+
+    "@amends/ui": ["@amends/ui@workspace:apps/ui"],
 
     "@amends/web": ["@amends/web@workspace:apps/web"],
 

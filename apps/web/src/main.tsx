@@ -1,5 +1,5 @@
 import { render } from "solid-js/web";
-import "@amends/frontend/foundations/typography/fonts";
+import "@amends/ui/foundations/typography/fonts";
 import "@amends/client/styles";
 import { App } from "./app.tsx";
 

@@ -28,7 +28,7 @@ sequence-based pages. Separate reads and pages do not share a snapshot.
 
 ## Design-system coverage
 
-The new [frontend workshop](../apps/frontend/README.md) contains four surface/text color
+The new [UI workshop](../apps/ui/README.md) contains four surface/text color
 roles for Cotton and Soot, scoped theme styles, and specimens for their supported pairings
 and nested scopes. Six neutral filled-action color roles add default, hover, pressed,
 and disabled specimens on both surfaces; enabled label contrast has automated checks.
@@ -49,7 +49,7 @@ interaction stories. Controlled pending blocks repeated activation while preserv
 with a running stitch and reduced-motion treatment. Danger tone supports all three variants
 through a tested `action.danger` palette, with dedicated hover/pressed fills and tinted states.
 Disabled appearance and focus remain shared across tones. Additional sizes remain
-unimplemented in frontend. IconButton provides named square actions using Button's variants and tones;
+unimplemented in UI. IconButton provides named square actions using Button's variants and tones;
 Tooltip supplies supplemental hover/focus text as a compact dark monospace label matching
 the Primitives v2 reference. Its dedicated surface/foreground pair stays dark/light in both
 themes, with top-start placement, viewport wrapping, and forced-colors treatment.
@@ -102,9 +102,9 @@ viewport inside that modal. Neither component is integrated into product flows o
 notifications. Product-shell integration, theme/collapse preference persistence, and
 component-level Tauri validation remain pending.
 Other foundations, additional font weights/subsets, and other production components remain
-unimplemented in frontend.
+unimplemented in UI.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
-layer. Both app entry points load the shared client application and frontend fonts.
+layer. Both app entry points load the shared client application and UI fonts.
 
 ## Shared client foundation
 
@@ -112,7 +112,7 @@ layer. Both app entry points load the shared client application and frontend fon
 session storage/lifetime, typed API access, and placeholder page states from
 [client](../apps/client/README.md). Web uses browser routing and
 an API proxy; Tauri uses hash routing and connects to the existing local host.
-Frontend is UI-only; client consumes its exports for application composition.
+UI is UI-only; client consumes its exports for application composition.
 Stored credentials are scoped by API URL and validated before protected content mounts.
 Changing credentials disposes the previous registry and requests. Session rejection,
 host failures, missing workspace access, and unknown routes have separate states.

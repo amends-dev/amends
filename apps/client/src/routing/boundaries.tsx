@@ -10,7 +10,7 @@ import {
   useContext,
   type ParentProps,
 } from "solid-js";
-import { Button } from "@amends/frontend/primitives/button";
+import { Button } from "@amends/ui/primitives/button";
 import type { WorkspaceDirectory } from "../api/contracts.ts";
 import { isUnauthorized } from "../api/client.ts";
 import { useApiClient } from "../api/context.tsx";

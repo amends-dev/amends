@@ -26,10 +26,10 @@ remaining gaps with links to their owning code.
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Platform entry points for the shared application.                                                                   |
 | [Desktop](../apps/desktop/README.md)                                                                    | Tauri prerequisites, host connection, and native verification.                                                      |
 | [Client](../apps/client/README.md)                                                                      | Shared routing, credential scopes, typed API access, and platform configuration.                                    |
-| [Frontend](../apps/frontend/README.md)                                                                  | Shared frontend workshop, foundations, primitives, and compositions.                                                |
+| [UI](../apps/ui/README.md)                                                                              | Shared UI workshop, foundations, primitives, and compositions.                                                      |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
-drawings, generation, and visual review in the frontend workshop.
+drawings, generation, and visual review in the UI workshop.
 
 ## Design and historical references
 
@@ -51,7 +51,7 @@ drawings, generation, and visual review in the frontend workshop.
 
 [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
 lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md),
-[frontend](../apps/frontend/AGENTS.md), [client](../apps/client/AGENTS.md),
+[UI](../apps/ui/AGENTS.md), [client](../apps/client/AGENTS.md),
 [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
 the root guidance rather than maintaining a second copy.
 

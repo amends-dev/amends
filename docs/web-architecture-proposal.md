@@ -1,11 +1,12 @@
 # Web architecture proposal
 
 Status: historical, previously accepted and implemented in the former web app.
-That implementation and the `ui` package were removed during the web/desktop
-bootstrap reset. This document preserves the earlier design rationale and audit;
+That implementation and the legacy `ui` package were removed during the web/desktop
+bootstrap reset. The current `apps/ui` package is the renamed shared workshop and
+does not restore the historical interfaces described below. This document preserves the earlier design rationale and audit;
 its source paths and examples describe that removed implementation, not current
 app behavior. See [web](../apps/web/README.md), [desktop](../apps/desktop/README.md),
-and [frontend](../apps/frontend/README.md) for current boundaries.
+and [UI](../apps/ui/README.md) for current boundaries.
 
 Backend workspace and live-change operations remain implemented; see
 [workspace workflows](workspace-workflows.md) and [known limitations](current-status.md).

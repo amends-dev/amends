@@ -1,7 +1,7 @@
 import { A } from "@solidjs/router";
-import { Button } from "@amends/frontend/primitives/button";
-import { Column, Container, Row } from "@amends/frontend/primitives/layout";
-import { Text } from "@amends/frontend/primitives/text";
+import { Button } from "@amends/ui/primitives/button";
+import { Column, Container, Row } from "@amends/ui/primitives/layout";
+import { Text } from "@amends/ui/primitives/text";
 import { paths } from "./routing/paths.ts";
 import { useSession } from "./session/provider.tsx";
 import type { ParentProps } from "solid-js";

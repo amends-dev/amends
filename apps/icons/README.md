@@ -2,7 +2,7 @@
 
 `@amends/icons` provides shared Solid SVG components for apps and UI packages. It
 has no runtime dependency beyond its Solid peer, no global styles, and no dependency
-on frontend, UI, application contracts, or a host. Add `"@amends/icons": "workspace:*"`
+on UI packages, application contracts, or a host. Add `"@amends/icons": "workspace:*"`
 to a consuming workspace's dependencies and run `bun install` at the root.
 
 ```tsx
@@ -25,7 +25,7 @@ notifications, and delete. `IconMarkMenu` is the reference's downward menu caret
 `IconMenu` remains the mobile hamburger. Named exports and individual subpaths both
 point to generated Solid source.
 Consumers must compile dependency TSX with their Solid plugin, as our Vite apps do.
-The frontend uses the package in Select, Drawer, Shell, and workshop glyphs. Other
+The UI package uses the package in Select, Drawer, Shell, and workshop glyphs. Other
 workspaces can adopt it incrementally.
 
 ## Rendering contract
@@ -86,7 +86,7 @@ From the repository root:
 bun run --filter @amends/icons generate
 bun run check:icons
 bun run test --project @amends/icons
-bun run --filter @amends/frontend dev
+bun run --filter @amends/ui dev
 ```
 
 The compiler validates the entire set before writing. Generation creates
@@ -135,7 +135,7 @@ consumers exclude Solid. Raw assets are available at `@amends/icons/svg/<name>.s
 copy them to a public location if needed. External images do not inherit the page's
 text color; use Solid inline icons for themed UI.
 
-Open **Foundations / Icons / Marks** in the frontend Storybook to review all 26 in the
+Open **Foundations / Icons / Marks** in the UI Storybook to review all 26 in the
 reference order, in Cotton and Soot at the mock's 15px display size. Clicking one names it.
 Gallery searches names, keywords, and categories across marks and utility icons. Matrix compares
 representative glyphs at all supported weights and named sizes plus 32px, in both

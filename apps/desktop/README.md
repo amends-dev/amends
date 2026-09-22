@@ -63,7 +63,7 @@ features need them. The production content security policy permits bundled asset
 API; development additionally permits the local Vite connection.
 
 `src/app.tsx` supplies `HashRouter` to the same shared `Application` used by web.
-Both build shared styles with vanilla-extract and load the frontend fonts explicitly.
+Both build shared styles with vanilla-extract and load the UI fonts explicitly.
 Tauri dependencies stay in this app; `@amends/client` knows only its endpoint,
 router, and storage interfaces.
 

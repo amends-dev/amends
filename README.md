@@ -49,7 +49,7 @@ hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/
   icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
-  frontend/           @amends/frontend: shared Solid foundations, components, and Storybook
+  ui/                 @amends/ui: shared Solid foundations, components, and Storybook
   client/             @amends/client: shared routes, sessions, API access, and app composition
   web/                @amends/web: browser entry point for the shared application
   desktop/            @amends/desktop: Tauri 2 entry point for the shared application

@@ -42,5 +42,5 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 
 `src/main.tsx` mounts Solid and loads shared fonts/global styles. `src/app.tsx` chooses
 `Router`, resolves the endpoint (default `/api`), and supplies the session store.
-Routes, session lifetime, typed API access, and application composition live in `client`, using UI components from `frontend`.
+Routes, session lifetime, typed API access, and application composition live in `client`, using UI components from `ui`.
 Vite deduplicates Solid and compiles the shared vanilla-extract styles.
