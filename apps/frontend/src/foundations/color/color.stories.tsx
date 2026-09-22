@@ -47,7 +47,7 @@ function ColorSpecimen(props: { theme: ColorTheme; children?: JSX.Element }) {
       data-color-theme={props.theme}
     >
       <h2 class={s.title}>{labels[props.theme]}</h2>
-      <p class={s.description}>Four roles. Both text colors work on both surfaces.</p>
+      <p class={s.description}>Reading colors. Primary and secondary text work on both surfaces.</p>
       <dl class={s.tokens}>
         <For each={roles}>
           {(role) => (
@@ -104,7 +104,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The first four semantic color roles, using the production tokens and scoped theme classes. Both text roles support both surfaces at a minimum contrast of 4.5:1. Specimen layout and system fonts are workshop scaffolding; other foundations are introduced separately.",
+          "The four reading color roles, using the production tokens and scoped theme classes. Primary and secondary text support both surfaces at a minimum contrast of 4.5:1. Neutral filled-action colors have separate stories under Color / Actions. Specimen layout and system fonts are workshop scaffolding.",
       },
     },
   },

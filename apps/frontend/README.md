@@ -1,8 +1,8 @@
 # Amends frontend
 
 The starting point for the shared Solid frontend intended for web and Tauri desktop.
-The first [color foundation](src/foundations/color/README.md) defines four surface/text
-roles for Cotton and Soot, with scoped theme styles and Storybook specimens. The
+The [color foundation](src/foundations/color/README.md) defines four reading roles and six
+neutral filled-action roles for Cotton and Soot, with scoped theme styles and Storybook specimens. The
 [typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
 styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
 composes those foundations into native paragraphs, spans, headings, and inline code. The
@@ -30,8 +30,14 @@ clearing, and the portable-story test runs that same scenario in Bun/Vitest. The
 
 Open **Foundations / Color / Comparison** to review both themes, or use the Cotton/Soot
 stories and their theme control. Nested Themes shows independent scopes in both directions.
-The eight text/background pairings have contrast tests using Color.js; browser review
+The eight reading text/background pairings have contrast tests using Color.js; browser review
 verifies the generated CSS and the accessibility addon checks the rendered specimens.
+
+**Foundations / Color / Actions** shows default, hover, pressed, and disabled pairings on
+both surfaces, with theme controls, nested scopes, and enlarged text. Six enabled pairings
+have contrast tests; browser play checks verify computed colors, transparency, and disabled
+semantics. Disabled readability is reviewed separately. These are static color specimens;
+Button and keyboard-focus behavior remain future slices.
 
 **Foundations / Typography** shows the three styles in both themes, a narrow container,
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
@@ -82,8 +88,8 @@ For each addition:
 5. Review that slice before starting another piece or changing an app to consume it.
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
-a design reference. Color specimens retain their system-font scaffolding; typography specimens
-use the introduced fonts and styles. Spacing and radius specimens compose Text with the
+a design reference. Reading-color specimens retain their system-font scaffolding; typography specimens
+use the introduced fonts and styles. Action-color, spacing, and radius specimens compose Text with the
 reviewed foundations. Additional radii and global styles remain separate future slices.
 Color.js is a development
 dependency used by the contrast tests and specimens, not the production exports.

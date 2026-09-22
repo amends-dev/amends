@@ -31,7 +31,10 @@ sequence-based pages. Separate reads and pages do not share a snapshot.
 
 The new [frontend workshop](../apps/frontend/README.md) contains four surface/text color
 roles for Cotton and Soot, scoped theme styles, and specimens for their supported pairings
-and nested scopes. Body, heading, and mono typography styles include their normal-weight
+and nested scopes. Six neutral filled-action color roles add default, hover, pressed,
+and disabled specimens on both surfaces; enabled label contrast has automated checks.
+Keyboard focus and the Button primitive remain unimplemented in frontend.
+Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.
 Spacing steps 0–6 are available as quarter-rem values, with browser-measured scale, padding,

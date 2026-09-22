@@ -36,9 +36,12 @@ allows the portable scenarios to run in the existing suite.
 The new [frontend workshop](../apps/frontend/README.md) uses the same portable-story
 approach to verify its Solid rendering and interaction setup. Build it independently
 with `bun run --filter @amends/frontend build`; no existing UI is imported into this package.
-Its [color foundation](../apps/frontend/src/foundations/color/README.md) tests all eight
-supported text/background pairings with Color.js. Storybook specimens support browser
-checks of the actual CSS variables, theme switching, nested scopes, and contrast.
+Its [color foundation](../apps/frontend/src/foundations/color/README.md) tests eight reading
+pairings and six enabled action pairings with Color.js. Storybook specimens support browser
+checks of the actual CSS variables, theme switching, nested scopes, and contrast. Action-color
+play checks verify computed text/fill/surface colors and alpha, enabled contrast, and disabled
+semantics; they need a browser and are excluded from Happy DOM. Visually review disabled colors
+on canvas and panel, narrow layouts, and enlarged text separately.
 The [typography stories](../apps/frontend/src/foundations/typography/README.md) run browser
 play checks for real font loading, computed metrics, and wrapping. They are intentionally
 excluded from Happy DOM portable-story tests because that environment cannot verify font
