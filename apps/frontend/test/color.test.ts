@@ -68,7 +68,14 @@ for (const [theme, palette] of Object.entries(colors)) {
         expect(new Color(action.onFill).contrastWCAG21(action[state])).toBeGreaterThanOrEqual(4.5);
       });
     }
-    for (const [surface, background] of Object.entries(palette.surface)) {
+    it("keeps compact tooltip text readable on its dedicated surface", () => {
+      expect(
+        new Color(palette.text.onTooltip).contrastWCAG21(palette.surface.tooltip),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+    // Ordinary content uses canvas/panel. Tooltip has its own contrasting foreground.
+    for (const surface of ["canvas", "panel"] as const) {
+      const background = palette.surface[surface];
       for (const state of ["rest", "hover", "pressed"] as const) {
         it(`keeps danger ${state} text, borders and focus readable on surface.${surface}`, () => {
           const action = palette.action.danger;

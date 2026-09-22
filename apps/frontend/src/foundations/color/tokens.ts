@@ -35,10 +35,13 @@ export interface ColorTokens {
   readonly surface: {
     readonly canvas: string;
     readonly panel: string;
+    /** Compact dark tooltip surface in either theme; pair only with text.onTooltip. */
+    readonly tooltip: string;
   };
   readonly text: {
     readonly primary: string;
     readonly secondary: string;
+    readonly onTooltip: string;
     /** Error messages on canvas and panel. */
     readonly invalid: string;
     readonly disabled: string;
@@ -116,10 +119,12 @@ export const cotton = {
   surface: {
     canvas: "oklch(0.955 0.012 88)",
     panel: "oklch(0.978 0.008 92)",
+    tooltip: "oklch(0.2 0.008 84)",
   },
   text: {
     primary: "oklch(0.24 0.014 84)",
     secondary: "oklch(0.41 0.014 84)",
+    onTooltip: "oklch(0.95 0.006 90)",
     invalid: cottonStatus.danger.text,
     disabled: "oklch(0.62 0.014 84)",
   },
@@ -157,10 +162,12 @@ export const soot = {
   surface: {
     canvas: "oklch(0.185 0.008 84)",
     panel: "oklch(0.215 0.009 84)",
+    tooltip: "oklch(0.2 0.008 84)",
   },
   text: {
     primary: "oklch(0.95 0.006 90)",
     secondary: "oklch(0.74 0.008 86)",
+    onTooltip: "oklch(0.95 0.006 90)",
     invalid: sootStatus.danger.text,
     disabled: "oklch(0.5 0.012 84)",
   },

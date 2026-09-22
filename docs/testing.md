@@ -132,6 +132,10 @@ Use Playwright for native dialog inertness, Escape/backdrop dismissal, focus ret
 reduced motion, rail tooltip placement, and resizing with a nested Select open. Verify that
 the dialog and popup close on desktop return and that drafts survive. Shell/Tooltip stories
 extend the same axe overlay-region matcher to tooltips; scan open drawers and popups too.
+Tooltip's Reference and Comparison stories support checking the Primitives v2 label's type,
+padding, corners, shadow, and start alignment. Check pointer movement into the popup, Escape,
+keyboard focus, narrow/long content, and enlarged text in the browser. The color tests verify
+the dedicated tooltip foreground/background pair independently from canvas/panel pairings.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

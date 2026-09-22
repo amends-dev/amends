@@ -3,12 +3,20 @@
 Reading, control, action, focus, and status colors, with identical names in Cotton (light)
 and Soot (dark):
 
-| Role             | Purpose                   | Supported pairing |
-| ---------------- | ------------------------- | ----------------- |
-| `surface.canvas` | Main background           | Both text roles   |
-| `surface.panel`  | Distinct content surface  | Both text roles   |
-| `text.primary`   | Headings and main content | Both surfaces     |
-| `text.secondary` | Supporting information    | Both surfaces     |
+| Role              | Purpose                   | Supported pairing      |
+| ----------------- | ------------------------- | ---------------------- |
+| `surface.canvas`  | Main background           | Primary/secondary text |
+| `surface.panel`   | Distinct content surface  | Primary/secondary text |
+| `text.primary`    | Headings and main content | Canvas and panel       |
+| `text.secondary`  | Supporting information    | Canvas and panel       |
+| `surface.tooltip` | Compact dark tooltip      | `text.onTooltip`       |
+| `text.onTooltip`  | Light tooltip label       | `surface.tooltip`      |
+
+The tooltip pair follows the Primitives v2 reference and remains dark with light text in
+both themes. It has its own 4.5:1 text contrast check. Ordinary reading, status, action,
+control-border, and focus tests apply to canvas/panel; those pairings are not implicitly
+supported on the tooltip surface. The color specimens show the dedicated pair, and Tooltip's
+stories review its compact typography and geometry.
 
 The reading roles above support ordinary content. Filled actions add six roles:
 

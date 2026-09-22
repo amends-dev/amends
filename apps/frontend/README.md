@@ -129,7 +129,10 @@ becoming two columns and then one while keeping their values. Separate stories c
 primitive, nested layouts, RTL, and enlarged text. See the [layout contract](src/primitives/layout/README.md).
 
 **Primitives / IconButton** and **Tooltip** provide named compact actions and supplemental
-hover/focus labels. **Compositions / Navigation**, **Drawer**, and **Shell** compose them into
+hover/focus labels. Tooltip matches the compact dark monospace label in the Primitives v2
+reference, with top-start placement, a soft shadow, and wrapping for long content. Reference,
+both-theme, and enlarged-text stories support visual comparison.
+**Compositions / Navigation**, **Drawer**, and **Shell** compose them into
 an expanded sidebar, desktop icon rail, and mobile modal drawer. Content is supplied through
 declarative child slots. One mounted sidebar tree preserves local state through collapse and
 viewport changes, including nested Select controls. Stories cover each supporting piece as

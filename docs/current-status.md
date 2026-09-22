@@ -51,7 +51,9 @@ with a running stitch and reduced-motion treatment. Danger tone supports all thr
 through a tested `action.danger` palette, with dedicated hover/pressed fills and tinted states.
 Disabled appearance and focus remain shared across tones. Additional sizes remain
 unimplemented in frontend. IconButton provides named square actions using Button's variants and tones;
-Tooltip supplies supplemental hover/focus text.
+Tooltip supplies supplemental hover/focus text as a compact dark monospace label matching
+the Primitives v2 reference. Its dedicated surface/foreground pair stays dark/light in both
+themes, with top-start placement, viewport wrapping, and forced-colors treatment.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.

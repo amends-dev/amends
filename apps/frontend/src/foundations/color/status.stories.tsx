@@ -211,8 +211,8 @@ function PortalSpecimen() {
           Nested theme and portaled status colors
         </Text>
         <Text>
-          Hover or focus Delivery details, then switch themes. The popup follows its trigger’s
-          theme.
+          This portal test overrides the tooltip's foreground and background as a pair. Hover or
+          focus Delivery details, then switch themes to verify the inherited status colors.
         </Text>
         <Button
           variant="secondary"
@@ -228,6 +228,9 @@ function PortalSpecimen() {
             data-status-portal
             style={{
               color: colorVars.status.danger.text,
+              "background-color": colorVars.surface.panel,
+              "border-style": "solid",
+              "border-width": "1px",
               "border-color": colorVars.status.danger.indicator,
             }}
           >

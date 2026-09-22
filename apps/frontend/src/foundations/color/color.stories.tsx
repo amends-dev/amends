@@ -11,6 +11,12 @@ const roles = [
   { group: "surface", name: "panel", usage: "A distinct content surface." },
   { group: "text", name: "primary", usage: "Headings and main content." },
   { group: "text", name: "secondary", usage: "Supporting information; still readable body text." },
+  {
+    group: "surface",
+    name: "tooltip",
+    usage: "Dark tooltip surface in either theme; use text.onTooltip.",
+  },
+  { group: "text", name: "onTooltip", usage: "Light text paired only with surface.tooltip." },
 ] as const;
 
 function Pairings(props: { theme: ColorTheme; surface: "canvas" | "panel" }) {
@@ -47,7 +53,10 @@ function ColorSpecimen(props: { theme: ColorTheme; children?: JSX.Element }) {
       data-color-theme={props.theme}
     >
       <h2 class={s.title}>{labels[props.theme]}</h2>
-      <p class={s.description}>Reading colors. Primary and secondary text work on both surfaces.</p>
+      <p class={s.description}>
+        Primary and secondary text work on canvas and panel. Tooltip has a dedicated dark/light
+        pair.
+      </p>
       <dl class={s.tokens}>
         <For each={roles}>
           {(role) => (
@@ -81,6 +90,22 @@ function ColorSpecimen(props: { theme: ColorTheme; children?: JSX.Element }) {
       </dl>
       <Pairings theme={props.theme} surface="canvas" />
       <Pairings theme={props.theme} surface="panel" />
+      <div
+        style={{
+          padding: "1rem",
+          "background-color": colorVars.surface.tooltip,
+          color: colorVars.text.onTooltip,
+        }}
+      >
+        Compact tooltip text on its dedicated dark surface.
+      </div>
+      <p class={s.ratio}>
+        text.onTooltip / surface.tooltip ·{" "}
+        {new Color(colors[props.theme].text.onTooltip)
+          .contrastWCAG21(colors[props.theme].surface.tooltip)
+          .toFixed(2)}
+        :1 contrast · minimum 4.5:1
+      </p>
       {props.children}
     </article>
   );

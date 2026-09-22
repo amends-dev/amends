@@ -28,7 +28,7 @@ export function Root(props: RootProps) {
   return (
     <AnchorContext.Provider value={{ anchor, setAnchor }}>
       <Primitive.Root
-        placement="top"
+        placement="top-start"
         openDelay={400}
         closeDelay={100}
         gutter={8}
