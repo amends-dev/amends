@@ -29,6 +29,8 @@
     "./primitives/select": "./src/primitives/select/index.ts",
     "./primitives/layout": "./src/primitives/layout/index.ts",
     "./primitives/divider": "./src/primitives/divider/index.ts",
+    "./primitives/avatar": "./src/primitives/avatar/index.ts",
+    "./primitives/status": "./src/primitives/status/index.ts",
     "./primitives/icon-button": "./src/primitives/icon-button/index.ts",
     "./primitives/tooltip": "./src/primitives/tooltip/index.ts",
     "./compositions/navigation": "./src/compositions/navigation/index.ts",

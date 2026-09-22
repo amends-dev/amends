@@ -16,6 +16,8 @@ This directory contains the existing Solid clients and a new frontend workshop:
   body/heading/mono typography, spacing steps 0–6, square/medium/pill radii, Text, Button, Input, Radio, Checkbox, Switch, Select, and layout primitives, Field and RadioGroup compositions, and their Storybook
   specimens alongside the setup verification story. A shared `:focus-visible` style has
   native-control specimens for keyboard review.
+  Avatar adds four neutral identity treatments with named/decorative fallbacks; Status
+  composes semantic dots and visible labels with caller-owned announcement behavior.
   Divider supplies plain/labeled dashed seams, with declarative action placement, and is reused
   by Navigation section headers. IconButton and Tooltip support declarative Navigation, Drawer, and Shell compositions,
   including a desktop icon rail and mobile modal navigation. Dialog shares native modal behavior

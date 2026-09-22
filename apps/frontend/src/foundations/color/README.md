@@ -282,3 +282,9 @@ The `toast` group pairs a dark `surface` with light `text` and amber `action` in
 Use these together; ordinary status and action colors target canvas/panel instead. Toast's
 focus ring and close control use `toast.text`. **Foundations / Color / Toast** displays the
 actual tokens and contrast ratios; tests require at least 4.5:1 for text/action pairings.
+
+The `avatar` group adds neutral surface/text pairs for human, contact, and system marks.
+Human/contact fills are soft silhouettes; system uses inverse ink. Agent avatars remain
+transparent and use the existing control border and secondary text. Both themes' filled
+text pairs are tested at 4.5:1 and checked for sRGB gamut. **Foundations / Color / Avatar**
+shows the actual values and pairings; the primitive's stories show their shapes and usage.

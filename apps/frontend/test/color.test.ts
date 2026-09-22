@@ -62,6 +62,11 @@ for (const [theme, palette] of Object.entries(colors)) {
       expect(palette.text.invalid).toBe(palette.status.danger.text);
       expect(palette.line.invalid).toBe(palette.status.danger.indicator);
     });
+    for (const [kind, pair] of Object.entries(palette.avatar)) {
+      it(`keeps ${kind} avatar fallback text readable on its surface`, () => {
+        expect(new Color(pair.text).contrastWCAG21(pair.surface)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
     for (const state of ["fill", "fillHover", "fillPressed"] as const) {
       it(`keeps danger action labels readable on ${state}`, () => {
         const action = palette.action.danger;

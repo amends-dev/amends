@@ -128,6 +128,14 @@ an optional column cap and full-width items. Responsive Form demonstrates three 
 becoming two columns and then one while keeping their values. Separate stories cover each
 primitive, nested layouts, RTL, and enlarged text. See the [layout contract](src/primitives/layout/README.md).
 
+**Primitives / Avatar** provides human, agent, contact, and system identity marks with
+named/decorative usage and declarative text fallbacks. New neutral avatar surface/text
+pairs have their own foundation specimens and contrast tests. **Primitives / Status**
+composes semantic indicators and visible labels without automatic live announcements.
+Both include theme/surface comparisons, reactive stories, RTL, and enlarged-text examples.
+See the [Avatar](src/primitives/avatar/README.md) and [Status](src/primitives/status/README.md)
+contracts.
+
 **Primitives / Divider** adds a shared dashed Line, composable Root, and compact Label.
 Stories cover plain, start/center/end labels, actions, both themes, long text, and RTL.
 Navigation section headers consume the same parts, keeping accessible section names and

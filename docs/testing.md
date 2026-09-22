@@ -134,6 +134,11 @@ story checks that changing container width keeps values and submission intact. C
 Row, Column, and Grid browser stories measure actual gutters, centering, wrapping, gaps,
 track widths/counts, and full-row spans. Use Playwright for viewport resize, real focus/tab
 order, nested layouts, RTL, and enlarged text; these geometry checks require a browser.
+Avatar/Status DOM and type tests cover named/decorative semantics, fallback content,
+reactivity, native refs/classes, and explicit announcement behavior. Their portable stories
+exercise identity changes, keyboard button composition, and status presentation changes.
+Avatar text/surface pairs join the color contrast/gamut tests. Browser review checks both
+surfaces/themes, actual shapes and colors, long labels, enlarged text, RTL, and forced colors.
 Divider's portable action story and DOM/type tests keep labels/headings and buttons accessible
 while only line segments are hidden. Its Layout story checks centering, equal line lengths,
 full-width standalone lines, and actual dashed borders in the browser. Review long labels,

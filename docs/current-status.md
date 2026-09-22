@@ -82,6 +82,11 @@ Container, Row, Column, Grid, and GridItem provide token-based spacing, centered
 wrapping groups, and equal-width grids that respond to their own container. Full-row items,
 nested layouts, RTL, and enlarged-text specimens are available. Numeric column spans,
 asymmetric grids, and responsive prop objects remain outside this initial layout slice.
+Avatar provides four neutral identity treatments with text fallbacks and explicit accessible
+naming or decorative usage. Filled avatar text pairs have separate contrast verification.
+Status provides semantic dots, hollow rings, and visible labels; domain mappings and live
+announcements belong to callers. Both have theme, narrow/enlarged, RTL, and reactive stories.
+Image avatars and identity/data integration remain future work.
 Divider provides shared horizontal dashed lines and composable labels/actions, using the
 existing seam and typography foundations. Navigation section headers reuse it; collapsed
 headers retain accessible names, hide action controls, and recover focus to a link when needed.
