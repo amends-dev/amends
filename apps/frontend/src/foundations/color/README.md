@@ -51,6 +51,10 @@ different hover/pressed and disabled values. This foundation preserves the curre
 state mapping and disabled fill instead of reintroducing those historical differences.
 `line.invalid` matches the existing UI’s `status.danger.indicator` values and is used by
 [Input](../../primitives/input/README.md). It is a border role, not an error-text color.
+`text.invalid` matches the old UI's `status.danger.text` for error messages on canvas/panel,
+with a 4.5:1 contrast contract. The [Field composition](../../compositions/field/README.md)
+uses it with an explicit error prefix. Controls stories show this text role alongside the
+invalid border. It does not add a general-purpose Text tone.
 The broader status palette, decorative borders, inverse surfaces, and selection remain deferred.
 
 `action.disabled` has 8% alpha; its appearance depends on the surface underneath. Apply it

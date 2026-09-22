@@ -50,7 +50,10 @@ and gap specimens at normal and enlarged root text sizes.
 Square, medium (10px), and pill radius values have browser-verified corner specimens across sizes and themes.
 The Input primitive supports native text/email/password/search/tel/URL entry with read-only,
 disabled, and caller-controlled invalid states. `line.invalid` supplies the reviewed invalid
-border. Field/label/error compositions, textarea, and specialized input types remain future pieces.
+border. The Field composition provides a label, required marker, help, and error text with explicit
+reactive association props; form state and validation timing stay with the consuming feature.
+`text.invalid` adds a verified error-text role. Textarea, grouped controls, and specialized
+input types remain future pieces.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

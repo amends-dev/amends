@@ -62,7 +62,7 @@ for (const [theme, palette] of Object.entries(colors)) {
         // The offset places the ring against the surrounding surface, not the action fill.
         expect(ring.contrastWCAG21(ground)).toBeGreaterThanOrEqual(3);
       });
-      for (const tone of ["primary", "secondary"] as const) {
+      for (const tone of ["primary", "secondary", "invalid"] as const) {
         it(`keeps text.${tone} readable on surface.${surface}`, () => {
           const text = new Color(palette.text[tone]);
           const ground = new Color(background);

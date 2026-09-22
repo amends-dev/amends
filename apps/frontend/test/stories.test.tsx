@@ -18,6 +18,11 @@ import buttonMeta, {
 } from "../src/primitives/button/button.stories.tsx";
 
 import inputMeta, { Editing, Forms as InputForms } from "../src/primitives/input/input.stories.tsx";
+import fieldMeta, {
+  ReactiveAssociations,
+  Forms as FieldForms,
+} from "../src/compositions/field/field.stories.tsx";
+const fieldStories = definePreview(preview).meta(fieldMeta);
 const inputStories = definePreview(preview).meta(inputMeta);
 
 const stories = definePreview(preview).meta(meta);
@@ -72,4 +77,11 @@ it("runs the Input editing story", async () => {
 });
 it("runs the Input form story", async () => {
   await inputStories.story(InputForms).run();
+});
+
+it("runs the Field association story", async () => {
+  await fieldStories.story(ReactiveAssociations).run();
+});
+it("runs the Field form story", async () => {
+  await fieldStories.story(FieldForms).run();
 });

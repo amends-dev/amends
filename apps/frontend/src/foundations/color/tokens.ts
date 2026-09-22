@@ -7,6 +7,8 @@ export interface ColorTokens {
   readonly text: {
     readonly primary: string;
     readonly secondary: string;
+    /** Error messages on canvas and panel. */
+    readonly invalid: string;
     readonly disabled: string;
   };
   readonly line: {
@@ -37,6 +39,7 @@ export const cotton = {
   text: {
     primary: "oklch(0.24 0.014 84)",
     secondary: "oklch(0.41 0.014 84)",
+    invalid: "oklch(0.42 0.14 28)",
     disabled: "oklch(0.62 0.014 84)",
   },
   line: {
@@ -64,6 +67,7 @@ export const soot = {
   text: {
     primary: "oklch(0.95 0.006 90)",
     secondary: "oklch(0.74 0.008 86)",
+    invalid: "oklch(0.78 0.12 30)",
     disabled: "oklch(0.5 0.012 84)",
   },
   line: {

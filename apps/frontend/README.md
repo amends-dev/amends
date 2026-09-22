@@ -85,8 +85,14 @@ portable stories; browser review covers focus, native validation/submission, For
 placeholder contrast, long content, and enlarged text. `line.invalid` has independent
 control-color specimens and contrast tests. See the [Input contract](src/primitives/input/README.md).
 
+**Compositions / Field** combines a label, required marker, help, and error text around one
+control. A render function supplies reactive associations without coupling Input to Field.
+The form owns values and validation timing. Comparison, reactive-association, form, and
+long/enlarged-text stories cover the composition; the two interaction stories also run as
+portable tests. See the [Field contract](src/compositions/field/README.md).
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations and Text/Button/Input primitives, separately from the workshop. Stories are discovered
+to the foundations and Text/Button/Input primitives and Field composition, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

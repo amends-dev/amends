@@ -12,7 +12,7 @@ import * as s from "./controls.stories.css.ts";
 const labels = { cotton: "Cotton", soot: "Soot" } as const;
 const specimens = {
   control: { label: "Default border", line: "control", overlay: null },
-  invalid: { label: "Invalid border", line: "invalid", overlay: null },
+  invalid: { label: "Invalid border and error text", line: "invalid", overlay: null },
   strong: { label: "Strong border", line: "strong", overlay: null },
   hover: { label: "Hover background", line: "strong", overlay: "hover" },
   pressed: { label: "Pressed background", line: "strong", overlay: "pressed" },
@@ -52,8 +52,17 @@ function Pairings(props: { theme: ColorTheme; surface: Surface }) {
                       : "transparent",
                   }}
                 >
-                  <Text as="span" variant="mono">
-                    Save draft
+                  <Text
+                    as="span"
+                    variant="mono"
+                    style={{
+                      color:
+                        specimen.line === "invalid"
+                          ? colorVars.text.invalid
+                          : colorVars.text.primary,
+                    }}
+                  >
+                    {specimen.line === "invalid" ? "Enter a complete email address." : "Save draft"}
                   </Text>
                 </div>
                 <figcaption>
@@ -71,6 +80,9 @@ function Pairings(props: { theme: ColorTheme; surface: Surface }) {
                       .toFixed(2)}
                     :1 border contrast
                   </Text>
+                  {specimen.line === "invalid" && (
+                    <Text variant="mono">text.invalid · {palette().text.invalid}</Text>
+                  )}
                   {specimen.overlay && (
                     <>
                       <Text tone="secondary">
@@ -167,7 +179,9 @@ const verifyControls: NonNullable<StoryObj["play"]> = async ({
         new Color(backdrop).deltaEOK(palette.surface[surface.dataset.controlSurface as Surface]),
       ).toBeLessThan(0.0001);
       await expect(new Color(backdrop).alpha).toBe(1);
-      await expect(text.deltaEOK(palette.text.primary)).toBeLessThan(0.0001);
+      await expect(
+        text.deltaEOK(specimen.line === "invalid" ? palette.text.invalid : palette.text.primary),
+      ).toBeLessThan(0.0001);
       await expect(text.alpha).toBe(1);
       await expect(rendered.opacity).toBe("1");
       const expectedFill = new Color(
@@ -227,7 +241,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "line.control, line.strong, line.invalid, action.hover, and action.pressed in both themes. The translucent fills use text.primary and line.strong. Computed-style and sRGB canvas checks verify the pairings after compositing. These are static color specimens; the secondary Button has separate component stories.",
+          "line.control, line.strong, line.invalid, text.invalid, action.hover, and action.pressed in both themes. The translucent fills use text.primary and line.strong. Computed-style and sRGB canvas checks verify the pairings after compositing. These are static color specimens; the secondary Button has separate component stories.",
       },
     },
   },

@@ -76,6 +76,12 @@ radius, and inherited-disabled form-data exclusion (Happy DOM does not model tha
 Use Playwright for native typing/Enter/Tab, invalid focus, read-only selection, forced colors,
 long values, 320px layouts, and enlarged text. Radius specimens include the 10px medium token;
 Controls specimens include the invalid-border role independently of Input.
+The [Field composition](../apps/frontend/src/compositions/field/README.md) has DOM/type tests for
+unique identities, native label/description associations, external-description deduplication,
+wrapper props, required/disabled/error changes, and control identity/focus/selection retention.
+Its reactive and form stories run as portable tests. Browser review verifies real label clicks,
+validation focus, native submission, disabled tab stops, narrow/enlarged message wrapping,
+forced colors, and error-text contrast. Four additional contrast tests cover `text.invalid`.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

@@ -45,7 +45,8 @@ excludes the value from form data. `readOnly` allows focus, selection, and copyi
 preserves form-data inclusion. ARIA alone does not enforce either behavior.
 The browser owns form constraints and reset defaults (`input.defaultValue`). Forms using
 reactive values should reset their state explicitly; the Forms story demonstrates this.
-There is no internal validation or form-state system and no dependency on the old Field component.
+There is no internal validation or form-state system. The new [Field composition](../../compositions/field/README.md)
+supplies labels, messages, and reactive association props; Input has no dependency on it.
 
 ## Appearance
 
