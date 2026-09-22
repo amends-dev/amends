@@ -49,6 +49,8 @@ import selectMeta, {
   ResetDefaults as selectResetDefaults,
   Keyboard as selectKeyboard,
 } from "../src/primitives/select/select.stories.tsx";
+import gridMeta, { ResponsiveForm } from "../src/primitives/layout/grid.stories.tsx";
+const gridStories = definePreview(preview).meta(gridMeta);
 const selectStories = definePreview(preview).meta(selectMeta);
 const groupStories = definePreview(preview).meta(radioGroupMeta);
 const radioStories = definePreview(preview).meta(radioMeta);
@@ -160,4 +162,7 @@ it("runs the select default reset story", async () => {
 });
 it("runs the select keyboard story", async () => {
   await selectStories.story(selectKeyboard).run();
+});
+it("keeps form values while changing the grid's available width", async () => {
+  await gridStories.story(ResponsiveForm).run();
 });

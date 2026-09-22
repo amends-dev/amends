@@ -59,6 +59,10 @@ behavior, and associated help/errors. Extra layouts, previews, and option metada
 binary Switch, and styled single-choice Select primitives are available. Select uses Kobalte
 for its listbox behavior with a themed popup and native form-value bridge. Searchable
 comboboxes, grouped options, multi-select, and higher-level settings compositions remain future work.
+Container, Row, Column, Grid, and GridItem provide token-based spacing, centered width limits,
+wrapping groups, and equal-width grids that respond to their own container. Full-row items,
+nested layouts, RTL, and enlarged-text specimens are available. Numeric column spans,
+asymmetric grids, and responsive prop objects remain outside this initial layout slice.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

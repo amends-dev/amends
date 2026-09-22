@@ -108,6 +108,12 @@ Open Menu stories review the reference design in both themes.
 See the [Checkbox](src/primitives/checkbox/README.md), [Switch](src/primitives/switch/README.md),
 and [Select](src/primitives/select/README.md) contracts.
 
+**Primitives / Layout** introduces Container, Row, Column, Grid, and GridItem. Gaps and
+gutters use the spacing scale; Grid fits equal-width columns to its container and supports
+an optional column cap and full-width items. Responsive Form demonstrates three fields
+becoming two columns and then one while keeping their values. Separate stories cover each
+primitive, nested layouts, RTL, and enlarged text. See the [layout contract](src/primitives/layout/README.md).
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
 to the foundations, primitives, and Field/RadioGroup compositions, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.

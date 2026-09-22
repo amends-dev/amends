@@ -26,7 +26,8 @@
     "./compositions/radio-group": "./src/compositions/radio-group/index.ts",
     "./primitives/checkbox": "./src/primitives/checkbox/index.ts",
     "./primitives/switch": "./src/primitives/switch/index.ts",
-    "./primitives/select": "./src/primitives/select/index.ts"
+    "./primitives/select": "./src/primitives/select/index.ts",
+    "./primitives/layout": "./src/primitives/layout/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",

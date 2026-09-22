@@ -104,6 +104,12 @@ label, role, focus, and contrast checks remain enabled; scan with the popup open
 Each primitive's interaction and form stories run as portable tests. Playwright verifies
 Space, Select navigation/typeahead/dismissal/focus return, popup themes/collision, actual marks/thumb positions, RTL, forced colors, and
 narrow/enlarged layouts. Recheck Input after changes to shared private field-control styles.
+Layout tests verify semantic form/list composition, native refs and events, and preservation of
+input identity, focus, and selection through layout-prop changes. The Responsive Form portable
+story checks that changing container width keeps values and submission intact. Container,
+Row, Column, and Grid browser stories measure actual gutters, centering, wrapping, gaps,
+track widths/counts, and full-row spans. Use Playwright for viewport resize, real focus/tab
+order, nested layouts, RTL, and enlarged text; these geometry checks require a browser.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these
