@@ -5,11 +5,12 @@ import {
   createMemo,
   createSignal,
   onCleanup,
+  on,
   splitProps,
   untrack,
   type JSX,
 } from "solid-js";
-import { colorVars } from "../../foundations/color/theme.css.ts";
+import { createOverlayScope } from "../overlay/scope.ts";
 import * as s from "./select.css.ts";
 
 export interface SelectOption {
@@ -32,10 +33,6 @@ export type SelectProps = Omit<
   required?: boolean;
   onInvalid?: (event: Event) => void;
 };
-
-const themeProperties = Object.values(colorVars).flatMap((group) =>
-  Object.values(group).map((value) => value.slice(4, -1)),
-);
 
 /** Single-choice popup. Kobalte owns keyboard/focus behavior; the caller owns options and validation. */
 export function Select(props: SelectProps): JSX.Element {
@@ -62,8 +59,17 @@ export function Select(props: SelectProps): JSX.Element {
   const [open, setOpen] = createSignal(false);
   let restoreFocus = true;
   const [inheritedDisabled, setInheritedDisabled] = createSignal(false);
-  const [portalStyle, setPortalStyle] = createSignal<JSX.CSSProperties>({});
-  const [direction, setDirection] = createSignal<"ltr" | "rtl">("ltr");
+  const scope = createOverlayScope(trigger);
+  createEffect(
+    on(
+      scope.mount,
+      () => {
+        restoreFocus = false;
+        setOpen(false);
+      },
+      { defer: true },
+    ),
+  );
   const currentValue = () => (local.value === undefined ? internalValue() : local.value);
   const options = createMemo(() => {
     const seen = new Set<string>();
@@ -84,19 +90,14 @@ export function Select(props: SelectProps): JSX.Element {
     local.onChange?.(value);
   };
 
-  // Copy the scoped theme into the portal; observe live theme/fieldset changes on ancestors.
+  // Recheck fieldset inheritance when the same control moves into another host.
   createEffect(() => {
+    scope.mount();
     const anchor = trigger(),
       native = nativeSelect(),
       ownDisabled = local.disabled;
     if (!anchor || !native) return;
     const update = () => {
-      const computed = getComputedStyle(anchor);
-      setPortalStyle({
-        ...Object.fromEntries(themeProperties.map((key) => [key, computed.getPropertyValue(key)])),
-        "color-scheme": computed.colorScheme,
-      });
-      setDirection(computed.direction === "rtl" ? "rtl" : "ltr");
       setInheritedDisabled(native.matches(":disabled") && !ownDisabled);
     };
     update();
@@ -104,7 +105,7 @@ export function Select(props: SelectProps): JSX.Element {
     for (let node = anchor.parentElement; node; node = node.parentElement)
       observer.observe(node, {
         attributes: true,
-        attributeFilter: ["class", "style", "dir", "disabled"],
+        attributeFilter: ["disabled"],
       });
     onCleanup(() => observer.disconnect());
   });
@@ -224,8 +225,8 @@ export function Select(props: SelectProps): JSX.Element {
           )}
         </For>
       </select>
-      <Primitive.Portal mount={trigger()?.closest("dialog") ?? undefined}>
-        <div style={portalStyle()} dir={direction()}>
+      <Primitive.Portal mount={scope.mount()}>
+        <div style={scope.style()} dir={scope.direction()}>
           <Primitive.Content
             class={s.content}
             onInteractOutside={() => {

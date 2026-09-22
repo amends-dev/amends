@@ -40,8 +40,9 @@ The focus foundation adds a themed 2px outline with 2px offset, applied through 
 browser checks of ring colors and clearance. The Button primitive provides primary filled,
 secondary outlined, and ghost actions in one regular size, native disabled/form behavior, and portable
 interaction stories. Controlled pending blocks repeated activation while preserving focus and layout,
-with a running stitch and reduced-motion treatment. Additional sizes, danger tone, and icon-only
-controls remain unimplemented in frontend.
+with a running stitch and reduced-motion treatment. Additional sizes and danger tone remain
+unimplemented in frontend. IconButton provides named square actions using Button's variants;
+Tooltip supplies supplemental hover/focus text.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.
@@ -63,6 +64,12 @@ Container, Row, Column, Grid, and GridItem provide token-based spacing, centered
 wrapping groups, and equal-width grids that respond to their own container. Full-row items,
 nested layouts, RTL, and enlarged-text specimens are available. Numeric column spans,
 asymmetric grids, and responsive prop objects remain outside this initial layout slice.
+Declarative Navigation, Drawer, and Shell compositions add native destination links, a
+desktop expanded sidebar/icon rail, and mobile modal navigation. The sidebar remains mounted
+through viewport changes, preserving drafts and selection. Desktop collapse preference is
+independent of mobile open state. Native dialog behavior, modal-aware Select/Tooltip portals,
+focus return, reduced motion, and independent sidebar/main scroll regions are available.
+Routing, preference persistence, application integration, and Tauri validation remain pending.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

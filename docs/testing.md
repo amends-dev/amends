@@ -110,6 +110,14 @@ story checks that changing container width keeps values and submission intact. C
 Row, Column, and Grid browser stories measure actual gutters, centering, wrapping, gaps,
 track widths/counts, and full-row spans. Use Playwright for viewport resize, real focus/tab
 order, nested layouts, RTL, and enlarged text; these geometry checks require a browser.
+Shell tests cover declarative slots, accessible navigation names, modified/canceled anchor
+activation, retained sidebar instances, and independent desktop/mobile state. IconButton,
+Tooltip, Navigation, Drawer, and desktop Shell interaction stories also run as portable tests.
+The mobile interaction story uses Storybook's phone viewport and must run in the browser.
+Use Playwright for native dialog inertness, Escape/backdrop dismissal, focus return, scrolling,
+reduced motion, rail tooltip placement, and resizing with a nested Select open. Verify that
+the dialog and popup close on desktop return and that drafts survive. Shell/Tooltip stories
+extend the same axe overlay-region matcher to tooltips; scan open drawers and popups too.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

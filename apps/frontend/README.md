@@ -114,8 +114,18 @@ an optional column cap and full-width items. Responsive Form demonstrates three 
 becoming two columns and then one while keeping their values. Separate stories cover each
 primitive, nested layouts, RTL, and enlarged text. See the [layout contract](src/primitives/layout/README.md).
 
+**Primitives / IconButton** and **Tooltip** provide named compact actions and supplemental
+hover/focus labels. **Compositions / Navigation**, **Drawer**, and **Shell** compose them into
+an expanded sidebar, desktop icon rail, and mobile modal drawer. Content is supplied through
+declarative child slots. One mounted sidebar tree preserves local state through collapse and
+viewport changes, including nested Select controls. Stories cover each supporting piece as
+well as themes, mobile/desktop, long navigation, RTL, enlarged text, and independent scroll regions.
+See the [Shell usage example](src/compositions/shell/README.md),
+[Navigation](src/compositions/navigation/README.md), [Drawer](src/compositions/drawer/README.md),
+[IconButton](src/primitives/icon-button/README.md), and [Tooltip](src/primitives/tooltip/README.md) contracts.
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations, primitives, and Field/RadioGroup compositions, separately from the workshop. Stories are discovered
+to the foundations, primitives, and compositions, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

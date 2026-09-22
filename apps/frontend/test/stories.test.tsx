@@ -50,6 +50,26 @@ import selectMeta, {
   Keyboard as selectKeyboard,
 } from "../src/primitives/select/select.stories.tsx";
 import gridMeta, { ResponsiveForm } from "../src/primitives/layout/grid.stories.tsx";
+import iconButtonMeta, {
+  Interaction as iconButtonInteraction,
+} from "../src/primitives/icon-button/icon-button.stories.tsx";
+import tooltipMeta, {
+  Keyboard as tooltipKeyboard,
+} from "../src/primitives/tooltip/tooltip.stories.tsx";
+import navigationMeta, {
+  Interaction as navigationInteraction,
+} from "../src/compositions/navigation/navigation.stories.tsx";
+import drawerMeta, {
+  Interaction as drawerInteraction,
+} from "../src/compositions/drawer/drawer.stories.tsx";
+import shellMeta, {
+  DesktopInteraction as shellDesktopInteraction,
+} from "../src/compositions/shell/shell.stories.tsx";
+const iconButtonStories = definePreview(preview).meta(iconButtonMeta);
+const tooltipStories = definePreview(preview).meta(tooltipMeta);
+const navigationStories = definePreview(preview).meta(navigationMeta);
+const drawerStories = definePreview(preview).meta(drawerMeta);
+const shellStories = definePreview(preview).meta(shellMeta);
 const gridStories = definePreview(preview).meta(gridMeta);
 const selectStories = definePreview(preview).meta(selectMeta);
 const groupStories = definePreview(preview).meta(radioGroupMeta);
@@ -165,4 +185,19 @@ it("runs the select keyboard story", async () => {
 });
 it("keeps form values while changing the grid's available width", async () => {
   await gridStories.story(ResponsiveForm).run();
+});
+it("runs icon button activation", async () => {
+  await iconButtonStories.story(iconButtonInteraction).run();
+});
+it("runs tooltip keyboard behavior", async () => {
+  await tooltipStories.story(tooltipKeyboard).run();
+});
+it("runs navigation rail behavior", async () => {
+  await navigationStories.story(navigationInteraction).run();
+});
+it("runs drawer state preservation", async () => {
+  await drawerStories.story(drawerInteraction).run();
+});
+it("runs shell desktop collapse behavior", async () => {
+  await shellStories.story(shellDesktopInteraction).run();
 });

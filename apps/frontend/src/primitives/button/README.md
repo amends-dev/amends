@@ -108,7 +108,8 @@ dimension through a scoped resize observer; unlike the old percentage radius, th
 on tall wrapped buttons and keeps the stitch clear of the text. The observer disconnects when
 pending ends or the button unmounts.
 These remain private Button styles; no shared motion or stroke catalog is introduced. There are no
-hover transitions. Additional sizes, danger treatment, and icon-only controls remain future slices.
+hover transitions. Additional sizes and danger treatment remain future slices.
+Named icon-only actions use the separate [IconButton](../icon-button/README.md) primitive.
 Unlike the older UI, secondary explicitly selects the strong border on press as well as hover,
 so keyboard activation uses the reviewed high-contrast pairing.
 The older [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>)

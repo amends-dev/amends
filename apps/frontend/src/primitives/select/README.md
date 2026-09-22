@@ -39,6 +39,9 @@ state. Field supplies label, help, and error IDs. A standalone Select needs `ari
 
 The popup is portaled to the document body (or the trigger's native dialog), copies the
 trigger's scoped color variables and direction, and follows ancestor theme changes.
+Drawer and Shell provide the current modal host through the shared private overlay helper.
+Moving a mounted sidebar between desktop and mobile dismisses its open popup without moving
+focus back to the obsolete host; its value and trigger remain intact.
 The trigger's `aria-controls` connects the portaled listbox. It matches the trigger width,
 flips/shifts to fit the viewport, and scrolls long option
 lists. Selected labels and option text wrap. Disabled options are skipped by navigation;
