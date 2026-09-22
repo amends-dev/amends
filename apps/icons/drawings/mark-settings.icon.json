@@ -1,0 +1,7 @@
+{
+  "name": "mark-settings",
+  "title": "Settings mark",
+  "categories": ["navigation", "controls"],
+  "keywords": ["mark", "settings", "gear", "configure"],
+  "shapes": [{ "use": "settings" }]
+}

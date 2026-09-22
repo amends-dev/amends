@@ -1,0 +1,17 @@
+{
+  "name": "mark-mail",
+  "title": "Mail mark",
+  "categories": ["navigation", "content"],
+  "keywords": ["mark", "mail", "inbox", "envelope"],
+  "shapes": [
+    { "rect": [3, 5, 18, 14], "radius": 1 },
+    {
+      "polyline": [
+        [3, 7],
+        [12, 13],
+        [21, 7]
+      ],
+      "corner": 0
+    }
+  ]
+}

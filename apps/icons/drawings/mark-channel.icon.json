@@ -1,0 +1,12 @@
+{
+  "name": "mark-channel",
+  "title": "Channel mark",
+  "categories": ["navigation"],
+  "keywords": ["mark", "channel", "group", "hash"],
+  "shapes": [
+    { "line": [8, 4, 7, 20] },
+    { "line": [17, 4, 16, 20] },
+    { "line": [4, 9, 20, 9] },
+    { "line": [4, 16, 20, 16] }
+  ]
+}

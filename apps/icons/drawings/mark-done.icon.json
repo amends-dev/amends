@@ -1,0 +1,16 @@
+{
+  "name": "mark-done",
+  "title": "Done mark",
+  "categories": ["actions", "status"],
+  "keywords": ["mark", "done", "check", "complete"],
+  "shapes": [
+    {
+      "polyline": [
+        [4, 12],
+        [10, 18],
+        [20, 6]
+      ],
+      "corner": 0
+    }
+  ]
+}

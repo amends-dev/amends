@@ -20,6 +20,176 @@ const meta = {
 export default meta;
 type Story = StoryObj;
 
+const markOrder = [
+  "home",
+  "triage",
+  "channel",
+  "mail",
+  "tasks",
+  "agents",
+  "resources",
+  "tools",
+  "environments",
+  "connections",
+  "marketplace",
+  "settings",
+  "search",
+  "mention",
+  "command",
+  "attach",
+  "send",
+  "open",
+  "back",
+  "menu",
+  "close",
+  "done",
+  "more",
+  "new",
+  "retry",
+  "reply",
+] as const;
+const referenceGlyphs = [
+  "⌂",
+  "⟁",
+  "#",
+  "✉",
+  "⌗",
+  "◎",
+  "▤",
+  "⚒",
+  "▣",
+  "⚭",
+  "⊞",
+  "⚙",
+  "⌕",
+  "@",
+  "/",
+  "⊕",
+  "↑",
+  "→",
+  "←",
+  "▾",
+  "✕",
+  "✓",
+  "⋯",
+  "+",
+  "↻",
+  "↩",
+] as const;
+const marks = markOrder.map((name) => {
+  const icon = iconCatalog.find((entry) => entry.name === `mark-${name}`);
+  if (!icon) throw new Error(`Missing ${name} mark in the icon catalog`);
+  return { ...icon, referenceGlyph: referenceGlyphs[markOrder.indexOf(name)]! };
+});
+function MarksSpecimen() {
+  const [selected, setSelected] = createSignal("mark-home");
+  return (
+    <main>
+      <For each={["cotton", "soot"] as const}>
+        {(theme) => (
+          <Column class={colorThemes[theme]} gap={4} style={{ padding: "1.5rem" }}>
+            <Text as="h2" variant="heading">
+              {theme} · marks
+            </Text>
+            <Row gap={3}>
+              <Text as="span" variant="mono" tone="secondary">
+                Glyphs · {marks.length} · click one
+              </Text>
+              <Text as="span" variant="mono" data-selected-mark>
+                {selected().slice(5)}
+              </Text>
+            </Row>
+            <div
+              style={{
+                display: "grid",
+                "grid-template-columns": "repeat(auto-fill, minmax(44px, 1fr))",
+                gap: "6px",
+                "max-width": "62.5rem",
+              }}
+            >
+              <For each={marks}>
+                {(mark) => (
+                  <IconButton
+                    aria-label={mark.name.slice(5)}
+                    aria-pressed={selected() === mark.name}
+                    variant={selected() === mark.name ? "soft" : "ghost"}
+                    onClick={() => setSelected(mark.name)}
+                    data-mark-name={mark.name}
+                  >
+                    <Dynamic component={icons[mark.exportName]} size={15} weight={1.75} />
+                  </IconButton>
+                )}
+              </For>
+            </div>
+          </Column>
+        )}
+      </For>
+    </main>
+  );
+}
+export const Marks = {
+  render: MarksSpecimen,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(marks).toHaveLength(26);
+    await expect(canvas.getAllByRole("button", { name: "home" })).toHaveLength(2);
+    await userEvent.click(canvas.getAllByRole("button", { name: "reply" })[0]!);
+    await expect(canvas.getAllByRole("button", { name: "reply" })[0]).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(
+      canvas.getAllByText("reply", { selector: "span[data-selected-mark]" }),
+    ).toHaveLength(2);
+  },
+} satisfies Story;
+
+export const ReferenceComparison = {
+  render: () => (
+    <main>
+      <For each={["cotton", "soot"] as const}>
+        {(theme) => (
+          <Column class={colorThemes[theme]} gap={3} style={{ padding: "1.5rem" }}>
+            <Text as="h2" variant="heading">
+              {theme} · reference and SVG
+            </Text>
+            <div
+              style={{
+                display: "grid",
+                "grid-template-columns": "minmax(8rem, 1fr) 5rem 5rem",
+                gap: "0.5rem",
+                "max-width": "30rem",
+                "align-items": "center",
+              }}
+            >
+              <Text variant="mono" tone="secondary">
+                Mark
+              </Text>
+              <Text variant="mono" tone="secondary">
+                Mock
+              </Text>
+              <Text variant="mono" tone="secondary">
+                SVG
+              </Text>
+              <For each={marks}>
+                {(mark) => (
+                  <>
+                    <Text variant="mono">{mark.name.slice(5)}</Text>
+                    <Text as="span" variant="mono" style={{ "font-size": "0.9375rem" }}>
+                      {mark.referenceGlyph}
+                    </Text>
+                    <Dynamic component={icons[mark.exportName]} size={15} weight={1.75} />
+                  </>
+                )}
+              </For>
+            </div>
+          </Column>
+        )}
+      </For>
+    </main>
+  ),
+} satisfies Story;
+
 function GallerySpecimen() {
   const [query, setQuery] = createSignal("");
   const filtered = createMemo(() => {
@@ -40,7 +210,8 @@ function GallerySpecimen() {
           Icons
         </Text>
         <Text>
-          Shared Solid icons drawn on a 24-unit grid. Search by shape, meaning, or category.
+          The 26 reference marks and retained utility drawings share a 24-unit SVG grid. Search by
+          shape, meaning, or category.
         </Text>
         <label for="icon-search">
           <Text as="span">Find an icon</Text>
@@ -95,9 +266,9 @@ export const Gallery = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const search = canvas.getByRole("searchbox", { name: "Find an icon" });
-    await userEvent.type(search, "magnifier");
+    await userEvent.type(search, "mark search");
     await expect(canvas.getByRole("status")).toHaveTextContent("1 icon");
-    await expect(canvas.getAllByText("IconSearch")).toHaveLength(2);
+    await expect(canvas.getAllByText("IconMarkSearch")).toHaveLength(2);
     await userEvent.clear(search);
     await expect(canvas.getByRole("status")).toHaveTextContent(`${iconCatalog.length} icons`);
   },
@@ -117,7 +288,7 @@ function MatrixSpecimen(props: { enlarged?: boolean }) {
     );
   });
   const specimens = iconCatalog.filter((icon) =>
-    ["check", "circle-check", "search", "settings", "sidebar-left-open"].includes(icon.name),
+    ["mark-done", "mark-new", "mark-search", "mark-settings", "mark-menu"].includes(icon.name),
   );
   return (
     <main>
@@ -159,16 +330,16 @@ function MatrixSpecimen(props: { enlarged?: boolean }) {
             </For>
             <Row>
               <IconButton aria-label="Search workspace">
-                <icons.IconSearch />
+                <icons.IconMarkSearch />
               </IconButton>
               <IconButton aria-label="Delete draft" tone="danger">
                 <icons.IconTrash />
               </IconButton>
               <IconButton aria-label="Unavailable action" disabled>
-                <icons.IconPlus />
+                <icons.IconMarkNew />
               </IconButton>
               <Text as="span">
-                <icons.IconCheck size="sm" /> Saved
+                <icons.IconMarkDone size="sm" /> Saved
               </Text>
             </Row>
             <div dir="rtl">

@@ -1,0 +1,7 @@
+{
+  "name": "mark-new",
+  "title": "New mark",
+  "categories": ["actions"],
+  "keywords": ["mark", "new", "add", "plus"],
+  "shapes": [{ "line": [12, 4, 12, 20] }, { "line": [4, 12, 20, 12] }]
+}

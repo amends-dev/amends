@@ -45,5 +45,7 @@ state, and the default non-submitting type. Browser review checks actual geometr
 Circular Text shows the mock's compact outlined `⋯` and soft-filled `↻` glyphs alongside a regular circular SVG
 button in both themes. Circular Interaction checks pointer and keyboard activation. Browser
 review checks 34px circular geometry, coarse-pointer expansion, enlarged text, and forced colors.
+Circular Marks shows the new SVG redraws of More and Retry in those same controls; the text
+story remains an example of the component's text-glyph capability.
 Danger Comparison and Danger Interaction cover the same variants, disabled appearance,
 and native activation with destructive labels. Disabled and focus treatment remain shared.

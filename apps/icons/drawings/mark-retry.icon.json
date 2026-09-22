@@ -1,0 +1,17 @@
+{
+  "name": "mark-retry",
+  "title": "Retry mark",
+  "categories": ["actions", "status"],
+  "keywords": ["mark", "retry", "refresh", "repeat"],
+  "shapes": [
+    { "arc": [12, 12, 8, -90, 180] },
+    {
+      "polyline": [
+        [7, 8],
+        [4, 12],
+        [8, 15]
+      ],
+      "corner": 0
+    }
+  ]
+}

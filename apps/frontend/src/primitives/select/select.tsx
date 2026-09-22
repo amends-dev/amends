@@ -1,5 +1,5 @@
 import * as Primitive from "@kobalte/core/select";
-import { IconCheck, IconChevronDown } from "@amends/icons";
+import { IconMarkDone, IconMarkMenu } from "@amends/icons";
 import {
   For,
   createEffect,
@@ -173,7 +173,7 @@ export function Select(props: SelectProps): JSX.Element {
         <Primitive.Item item={itemProps.item} class={s.item}>
           <span class={s.indicatorSlot} aria-hidden="true">
             <Primitive.ItemIndicator>
-              <IconCheck size="sm" />
+              <IconMarkDone size="sm" />
             </Primitive.ItemIndicator>
           </span>
           <Primitive.ItemLabel class={s.optionLabel}>
@@ -195,7 +195,7 @@ export function Select(props: SelectProps): JSX.Element {
           {(state) => state.selectedOption().label}
         </Primitive.Value>
         <Primitive.Icon class={s.icon}>
-          <IconChevronDown size="sm" />
+          <IconMarkMenu size="sm" />
         </Primitive.Icon>
       </Primitive.Trigger>
       <select

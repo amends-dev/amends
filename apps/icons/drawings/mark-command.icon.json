@@ -1,0 +1,7 @@
+{
+  "name": "mark-command",
+  "title": "Command mark",
+  "categories": ["actions", "controls"],
+  "keywords": ["mark", "command", "slash", "shortcut"],
+  "shapes": [{ "line": [7, 20, 17, 4] }]
+}

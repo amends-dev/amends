@@ -1,0 +1,12 @@
+{
+  "name": "mark-resources",
+  "title": "Resources mark",
+  "categories": ["navigation", "content"],
+  "keywords": ["mark", "resources", "documents", "stack"],
+  "shapes": [
+    { "rect": [4, 4, 16, 16], "radius": 1 },
+    { "line": [8, 9, 16, 9] },
+    { "line": [8, 13, 16, 13] },
+    { "line": [8, 17, 16, 17] }
+  ]
+}

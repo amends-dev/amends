@@ -1,0 +1,25 @@
+{
+  "name": "mark-reply",
+  "title": "Reply mark",
+  "categories": ["actions", "content"],
+  "keywords": ["mark", "reply", "return", "respond"],
+  "shapes": [
+    {
+      "polyline": [
+        [20, 19],
+        [12, 19],
+        [12, 8],
+        [5, 8]
+      ],
+      "corner": 1
+    },
+    {
+      "polyline": [
+        [9, 4],
+        [5, 8],
+        [9, 12]
+      ],
+      "corner": 0
+    }
+  ]
+}

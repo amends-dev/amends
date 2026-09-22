@@ -172,10 +172,13 @@ Title, Description, and Close parts. Its Ada reference composes Avatar and Text 
 popover owns positioning, focus, and dismissal. It inherits the trigger's theme and direction
 inside or outside native Dialog and Drawer. See the [Popover contract](src/compositions/popover/README.md).
 
-The shared [icons package](../icons/README.md) supplies Select's chevron/check, Drawer close,
-Shell navigation toggles, and workshop glyphs. **Foundations / Icons** adds a searchable
-catalog, both-theme size/weight matrix, enlarged root text, and reactive accessibility
-specimens. The components import `@amends/icons`; catalog lookup stays in story code.
+The shared [icons package](../icons/README.md) now includes all 26 SVG redraws from the
+Primitives v2 Marks reference. Select's caret/check, Drawer and Toast close controls,
+navigation actions, and the workshop shell use the matching marks. Utility drawings remain
+for controls the mock does not name, including the mobile hamburger and sidebar toggles.
+**Foundations / Icons / Marks** shows the reference order in both themes; Gallery, Matrix,
+enlarged root text, and reactive accessibility specimens cover the full package. Components
+import `@amends/icons`; catalog lookup stays in story code.
 
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
 to the foundations, primitives, and compositions, separately from the workshop. Stories are discovered

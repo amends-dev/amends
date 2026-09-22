@@ -1,0 +1,11 @@
+{
+  "name": "mark-more",
+  "title": "More mark",
+  "categories": ["actions", "controls"],
+  "keywords": ["mark", "more", "ellipsis", "overflow"],
+  "shapes": [
+    { "line": [4.5, 12, 5.5, 12] },
+    { "line": [11.5, 12, 12.5, 12] },
+    { "line": [18.5, 12, 19.5, 12] }
+  ]
+}

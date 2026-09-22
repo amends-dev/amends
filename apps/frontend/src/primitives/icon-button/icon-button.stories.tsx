@@ -9,6 +9,7 @@ import { colorThemes } from "@amends/frontend/foundations/color/styles";
 import { EnlargedText as Enlarge } from "../overlay/overlay.stories-support.tsx";
 import "@amends/frontend/foundations/typography/fonts";
 import { DemoIcon } from "./icon-button.stories-support.tsx";
+import { IconMarkMore, IconMarkRetry } from "@amends/icons";
 const meta = {
   title: "Primitives/IconButton",
   parameters: { layout: "fullscreen" as const },
@@ -136,6 +137,29 @@ export const CircularEnlargedText = {
     </Enlarge>
   ),
   tags: ["!autodocs"],
+} satisfies Story;
+export const CircularMarks = {
+  render: () => (
+    <main>
+      <For each={["cotton", "soot"] as const}>
+        {(theme) => (
+          <Column gap={4} class={colorThemes[theme]} style={{ padding: "1.5rem" }}>
+            <Text as="h2" variant="heading">
+              {theme} · SVG marks
+            </Text>
+            <Row gap={4}>
+              <IconButton shape="circle" size="compact" variant="secondary" aria-label="More">
+                <IconMarkMore size="sm" />
+              </IconButton>
+              <IconButton shape="circle" size="compact" variant="soft" aria-label="Retry">
+                <IconMarkRetry size="sm" />
+              </IconButton>
+            </Row>
+          </Column>
+        )}
+      </For>
+    </main>
+  ),
 } satisfies Story;
 function Counter(props: { tone?: ButtonTone }) {
   const [count, setCount] = createSignal(0);

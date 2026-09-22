@@ -1,0 +1,25 @@
+{
+  "name": "mark-home",
+  "title": "Home mark",
+  "categories": ["navigation"],
+  "keywords": ["mark", "home", "overview", "house"],
+  "shapes": [
+    {
+      "polyline": [
+        [3, 11],
+        [12, 4],
+        [21, 11]
+      ],
+      "corner": 0
+    },
+    {
+      "polyline": [
+        [6, 10],
+        [6, 20],
+        [18, 20],
+        [18, 10]
+      ],
+      "corner": 0
+    }
+  ]
+}

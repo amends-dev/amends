@@ -1,0 +1,17 @@
+{
+  "name": "mark-menu",
+  "title": "Menu mark",
+  "categories": ["navigation", "controls"],
+  "keywords": ["mark", "menu", "down", "caret", "picker"],
+  "shapes": [
+    {
+      "polyline": [
+        [8, 10],
+        [16, 10],
+        [12, 14]
+      ],
+      "close": true,
+      "corner": 0
+    }
+  ]
+}

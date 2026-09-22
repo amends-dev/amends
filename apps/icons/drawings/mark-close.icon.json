@@ -1,0 +1,7 @@
+{
+  "name": "mark-close",
+  "title": "Close mark",
+  "categories": ["actions"],
+  "keywords": ["mark", "close", "dismiss", "cancel"],
+  "shapes": [{ "line": [5, 5, 19, 19] }, { "line": [5, 19, 19, 5] }]
+}

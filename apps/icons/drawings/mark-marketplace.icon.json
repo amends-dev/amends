@@ -1,0 +1,11 @@
+{
+  "name": "mark-marketplace",
+  "title": "Marketplace mark",
+  "categories": ["navigation"],
+  "keywords": ["mark", "marketplace", "add", "square"],
+  "shapes": [
+    { "rect": [4, 4, 16, 16], "radius": 0 },
+    { "line": [12, 8, 12, 16] },
+    { "line": [8, 12, 16, 12] }
+  ]
+}

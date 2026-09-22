@@ -3,7 +3,7 @@
 import { splitProps, type JSX } from "solid-js";
 import { type ButtonProps } from "../../primitives/button/index.ts";
 import { IconButton } from "../../primitives/icon-button/index.ts";
-import { IconX } from "@amends/icons";
+import { IconMarkClose } from "@amends/icons";
 import { createModalParts } from "../../primitives/overlay/modal.tsx";
 import { callHandler, classes } from "../../primitives/internal/props.ts";
 import * as s from "./drawer.css.ts";
@@ -22,7 +22,7 @@ export function Close(props: Omit<ButtonProps, "pending">) {
         if (!event.defaultPrevented) state.setOpen(false);
       }}
     >
-      {local.children ?? <IconX />}
+      {local.children ?? <IconMarkClose />}
     </IconButton>
   );
 }

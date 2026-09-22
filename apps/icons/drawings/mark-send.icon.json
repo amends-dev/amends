@@ -1,0 +1,17 @@
+{
+  "name": "mark-send",
+  "title": "Send mark",
+  "categories": ["actions"],
+  "keywords": ["mark", "send", "up", "submit"],
+  "shapes": [
+    { "line": [12, 20, 12, 4] },
+    {
+      "polyline": [
+        [5, 11],
+        [12, 4],
+        [19, 11]
+      ],
+      "corner": 0
+    }
+  ]
+}

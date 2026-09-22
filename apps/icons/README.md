@@ -6,18 +6,24 @@ on frontend, UI, application contracts, or a host. Add `"@amends/icons": "worksp
 to a consuming workspace's dependencies and run `bun install` at the root.
 
 ```tsx
-import { IconSearch, IconCircleCheck } from "@amends/icons";
-import { IconX } from "@amends/icons/x";
+import { IconMarkSearch, IconCircleCheck } from "@amends/icons";
+import { IconMarkDone } from "@amends/icons/mark-done";
 
 <button aria-label="Search workspace">
-  <IconSearch />
+  <IconMarkSearch />
 </button>;
 <IconCircleCheck label="Completed" size="sm" />;
-<IconX size={24} weight={1.75} />;
+<IconMarkDone size={24} weight={1.75} />;
 ```
 
-The 23 initial outline icons cover current frontend navigation, actions, and status
-symbols. Named exports and individual subpaths both point to generated Solid source.
+The 26 `mark-*` drawings reinterpret the named glyphs in the
+[Primitives v2 Marks reference](<../../design-system/Amends Primitives v2.dc.html>) as
+portable SVGs. They are the visual reference for frontend navigation and actions when
+the reference names the control. The earlier 23 outline utility icons remain for
+controls without a corresponding mark, including the mobile hamburger, sidebar toggles,
+notifications, and delete. `IconMarkMenu` is the reference's downward menu caret;
+`IconMenu` remains the mobile hamburger. Named exports and individual subpaths both
+point to generated Solid source.
 Consumers must compile dependency TSX with their Solid plugin, as our Vite apps do.
 The frontend uses the package in Select, Drawer, Shell, and workshop glyphs. Other
 workspaces can adopt it incrementally.
@@ -129,8 +135,9 @@ consumers exclude Solid. Raw assets are available at `@amends/icons/svg/<name>.s
 copy them to a public location if needed. External images do not inherit the page's
 text color; use Solid inline icons for themed UI.
 
-Open **Foundations / Icons** in the frontend Storybook. Gallery searches names,
-keywords, and categories and displays every icon in Cotton and Soot. Matrix compares
+Open **Foundations / Icons / Marks** in the frontend Storybook to review all 26 in the
+reference order, in Cotton and Soot at the mock's 15px display size. Clicking one names it.
+Gallery searches names, keywords, and categories across marks and utility icons. Matrix compares
 representative glyphs at all supported weights and named sizes plus 32px, in both
 themes, with real IconButtons and text. Enlarged Text checks rem scaling; Reactive
 Props demonstrates decorative/named transitions without replacing the SVG. Gallery
@@ -147,6 +154,10 @@ Drawings and rounded-corner construction are adapted from
 under the included [MIT license](LICENSE). All 23 initial compiled paths were checked
 against that revision's outline SVGs. The compiler is a smaller typed adaptation for
 our current set, not a compatibility implementation of Regen's entire drawing language.
+The 26 mark drawings were added from the Amends Primitives v2 reference's named glyphs;
+`mark-settings` reuses the existing MIT-licensed gear construction. Their SVG paths are
+our drawings, not embedded text glyphs, so they keep the package's theming, sizing, and
+accessibility contract across platforms.
 
 Intentional differences are Solid output, Bun execution, rem-based named sizes,
 constant default stroke weight, separate metadata, and Storybook review. Tonal/filled

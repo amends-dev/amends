@@ -1,0 +1,17 @@
+{
+  "name": "mark-open",
+  "title": "Open mark",
+  "categories": ["actions", "navigation"],
+  "keywords": ["mark", "open", "right", "forward"],
+  "shapes": [
+    { "line": [4, 12, 20, 12] },
+    {
+      "polyline": [
+        [13, 5],
+        [20, 12],
+        [13, 19]
+      ],
+      "corner": 0
+    }
+  ]
+}

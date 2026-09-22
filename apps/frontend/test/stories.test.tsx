@@ -4,6 +4,7 @@ import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, { Rendering } from "../src/setup.stories.tsx";
 import iconsMeta, {
+  Marks as IconsMarks,
   Gallery as IconsGallery,
   ReactiveProps as IconsReactiveProps,
 } from "../src/foundations/icons/icons.stories.tsx";
@@ -94,6 +95,9 @@ afterEach(cleanup);
 
 it("runs the icon gallery search story", async () => {
   await iconsStories.story(IconsGallery).run();
+});
+it("runs the SVG Marks selection story", async () => {
+  await iconsStories.story(IconsMarks).run();
 });
 it("runs the icon reactive accessibility story", async () => {
   await iconsStories.story(IconsReactiveProps).run();

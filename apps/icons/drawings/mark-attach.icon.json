@@ -1,0 +1,7 @@
+{
+  "name": "mark-attach",
+  "title": "Attach mark",
+  "categories": ["actions", "content"],
+  "keywords": ["mark", "attach", "add", "file"],
+  "shapes": [{ "circle": [12, 12, 8] }, { "line": [12, 8, 12, 16] }, { "line": [8, 12, 16, 12] }]
+}

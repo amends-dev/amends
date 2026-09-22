@@ -51,7 +51,7 @@ Select and Tooltip use a private shared overlay host to keep their portals withi
 modal. Nested Select handles its own Escape before the drawer sees it. Applications should
 use modal-aware primitives for other overlays too.
 
-Close defaults to a decorative `IconX` from `@amends/icons`. The button owns its
+Close defaults to a decorative `IconMarkClose` from `@amends/icons`. The button owns its
 accessible action name; callers can still supply another child glyph.
 
 **Compositions / Drawer** provides closed, open, and state-preservation stories. DOM/portable

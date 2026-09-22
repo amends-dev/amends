@@ -1,0 +1,7 @@
+{
+  "name": "mark-search",
+  "title": "Search mark",
+  "categories": ["navigation", "controls"],
+  "keywords": ["mark", "search", "find", "magnifier"],
+  "shapes": [{ "circle": [10, 10, 6] }, { "line": [14.5, 14.5, 20, 20] }]
+}

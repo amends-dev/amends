@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { Divider } from "@amends/frontend/primitives/divider";
 import { Button } from "@amends/frontend/primitives/button";
 import { IconButton } from "@amends/frontend/primitives/icon-button";
-import { IconPlus } from "@amends/icons";
+import { IconMarkNew } from "@amends/icons";
 import { Text } from "@amends/frontend/primitives/text";
 import { Column } from "@amends/frontend/primitives/layout";
 import { colorThemes, colorVars } from "@amends/frontend/foundations/color/styles";
@@ -50,7 +50,7 @@ function Specimen(props: { theme: ColorTheme }) {
             aria-label="Create group"
             onClick={() => setCreated((n) => n + 1)}
           >
-            <IconPlus />
+            <IconMarkNew />
           </IconButton>
         </Divider.Root>
         <Divider.Root>
@@ -121,7 +121,7 @@ function LongSpecimen() {
         <Divider.Label as="h2">Participants from across the whole workspace</Divider.Label>
         <Divider.Line />
         <IconButton aria-label="Add participant" variant="ghost">
-          <IconPlus />
+          <IconMarkNew />
         </IconButton>
       </Divider.Root>
       <Divider.Root>

@@ -5,7 +5,7 @@ import { Navigation } from "@amends/frontend/compositions/navigation";
 import { Divider } from "@amends/frontend/primitives/divider";
 import { Button } from "@amends/frontend/primitives/button";
 import { IconButton } from "@amends/frontend/primitives/icon-button";
-import { IconPlus } from "@amends/icons";
+import { IconMarkNew } from "@amends/icons";
 import { Column, Row } from "@amends/frontend/primitives/layout";
 import { Text } from "@amends/frontend/primitives/text";
 import { colorThemes } from "@amends/frontend/foundations/color/styles";
@@ -37,7 +37,7 @@ function DemoLinks(props: { onCreate?: () => void }) {
               aria-label="Create group"
               onClick={() => props.onCreate?.()}
             >
-              <IconPlus />
+              <IconMarkNew />
             </IconButton>
           </Navigation.SectionActions>
         </Navigation.SectionHeader>

@@ -6,7 +6,7 @@ Compound navigation with native anchors and declarative child slots:
 import { Navigation } from "@amends/frontend/compositions/navigation";
 import { Divider } from "@amends/frontend/primitives/divider";
 import { IconButton } from "@amends/frontend/primitives/icon-button";
-import { IconPlus } from "@amends/icons";
+import { IconMarkNew } from "@amends/icons";
 
 <Navigation.Root aria-label="Workspace">
   <Navigation.Section>
@@ -15,7 +15,7 @@ import { IconPlus } from "@amends/icons";
       <Divider.Line />
       <Navigation.SectionActions>
         <IconButton aria-label="Create group" variant="ghost">
-          <IconPlus />
+          <IconMarkNew />
         </IconButton>
       </Navigation.SectionActions>
     </Navigation.SectionHeader>

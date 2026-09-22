@@ -1,0 +1,7 @@
+{
+  "name": "mark-agents",
+  "title": "Agents mark",
+  "categories": ["navigation", "agent"],
+  "keywords": ["mark", "agents", "principal", "concentric"],
+  "shapes": [{ "circle": [12, 12, 8] }, { "circle": [12, 12, 3] }]
+}

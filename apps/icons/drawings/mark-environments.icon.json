@@ -1,0 +1,10 @@
+{
+  "name": "mark-environments",
+  "title": "Environments mark",
+  "categories": ["navigation", "content"],
+  "keywords": ["mark", "environments", "sandbox", "square"],
+  "shapes": [
+    { "rect": [4, 4, 16, 16], "radius": 0 },
+    { "rect": [8, 8, 8, 8], "radius": 0 }
+  ]
+}

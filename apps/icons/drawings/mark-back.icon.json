@@ -1,0 +1,17 @@
+{
+  "name": "mark-back",
+  "title": "Back mark",
+  "categories": ["actions", "navigation"],
+  "keywords": ["mark", "back", "left", "previous"],
+  "shapes": [
+    { "line": [20, 12, 4, 12] },
+    {
+      "polyline": [
+        [11, 5],
+        [4, 12],
+        [11, 19]
+      ],
+      "corner": 0
+    }
+  ]
+}

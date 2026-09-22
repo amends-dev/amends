@@ -6,7 +6,7 @@ The three independent parts compose through children; their order determines pla
 ```tsx
 import { Divider } from "@amends/frontend/primitives/divider";
 import { IconButton } from "@amends/frontend/primitives/icon-button";
-import { IconPlus } from "@amends/icons";
+import { IconMarkNew } from "@amends/icons";
 
 <Divider.Line />;
 
@@ -14,7 +14,7 @@ import { IconPlus } from "@amends/icons";
   <Divider.Label as="h2">Channels</Divider.Label>
   <Divider.Line />
   <IconButton aria-label="Create channel" variant="ghost">
-    <IconPlus />
+    <IconMarkNew />
   </IconButton>
 </Divider.Root>;
 

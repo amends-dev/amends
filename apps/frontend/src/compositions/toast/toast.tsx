@@ -1,4 +1,4 @@
-import { IconX } from "@amends/icons";
+import { IconMarkClose } from "@amends/icons";
 import {
   For,
   createContext,
@@ -303,7 +303,7 @@ export function Close(props: JSX.ButtonHTMLAttributes<HTMLButtonElement>) {
         if (!event.defaultPrevented) state.close();
       }}
     >
-      {local.children ?? <IconX />}
+      {local.children ?? <IconMarkClose />}
     </button>
   );
 }

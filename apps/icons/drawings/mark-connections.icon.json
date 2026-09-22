@@ -1,0 +1,7 @@
+{
+  "name": "mark-connections",
+  "title": "Connections mark",
+  "categories": ["navigation", "content"],
+  "keywords": ["mark", "connections", "linked", "rings"],
+  "shapes": [{ "circle": [9, 12, 5] }, { "circle": [15, 12, 5] }]
+}

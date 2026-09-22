@@ -1,0 +1,12 @@
+{
+  "name": "mark-tasks",
+  "title": "Tasks mark",
+  "categories": ["navigation", "content"],
+  "keywords": ["mark", "tasks", "grid", "work"],
+  "shapes": [
+    { "line": [8, 5, 8, 19] },
+    { "line": [16, 5, 16, 19] },
+    { "line": [5, 9, 19, 9] },
+    { "line": [5, 15, 19, 15] }
+  ]
+}

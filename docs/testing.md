@@ -34,8 +34,9 @@ environment on Bun, invoke the generator with a timeout, and verify that individ
 icon imports exclude unrelated geometry and metadata-only imports exclude Solid.
 `bun run check:icons` verifies generated files without writing; it is included in
 `bun run check` and the pre-commit hook. The frontend's Foundations / Icons stories
-provide gallery search and reactive naming portable tests, plus browser review of
-sizes, weights, both themes, real controls, and enlarged root text.
+provide Marks selection, gallery search, and reactive naming portable tests. Browser
+review compares all 26 SVG marks with the Primitives v2 reference at 15px, then checks
+sizes, weights, both themes, affected controls, RTL, and enlarged root text.
 
 The [design-system workshop](../apps/design-system/README.md) has component tests plus portable
 tests that execute the same Storybook render/play scenarios. Test declarations use `@effect/vitest`;
