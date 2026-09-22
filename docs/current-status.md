@@ -39,7 +39,9 @@ The focus foundation adds a themed 2px outline with 2px offset, applied through 
 `:focus-visible` class. Storybook provides native controls for real keyboard review and
 browser checks of ring colors and clearance. The Button primitive provides primary filled,
 secondary outlined, and ghost actions in one regular size, native disabled/form behavior, and portable
-interaction stories. Pending behavior and icon-only controls remain unimplemented in frontend.
+interaction stories. Controlled pending blocks repeated activation while preserving focus and layout,
+with a running stitch and reduced-motion treatment. Additional sizes, danger tone, and icon-only
+controls remain unimplemented in frontend.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.

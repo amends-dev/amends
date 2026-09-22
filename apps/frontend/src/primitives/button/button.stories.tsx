@@ -15,7 +15,7 @@ const labels = { cotton: "Cotton", soot: "Soot" } as const;
 const variants = ["primary", "secondary", "ghost"] as const;
 const actionLabels = { primary: "Publish reply", secondary: "Save draft", ghost: "Change email" };
 
-function ThemeSpecimen(props: { theme: ColorTheme }) {
+function ThemeSpecimen(props: { theme: ColorTheme; pending?: boolean }) {
   const [count, setCount] = createSignal(0);
   return (
     <article
@@ -27,8 +27,9 @@ function ThemeSpecimen(props: { theme: ColorTheme }) {
         {labels[props.theme]}
       </Text>
       <Text tone="secondary">
-        Hover, press, or use Tab to inspect all three variants. Click, Enter, and Space activate
-        them.
+        {props.pending
+          ? "Publishing… These controlled pending examples keep their labels and remain focusable. Activation is blocked."
+          : "Hover, press, or use Tab to inspect all three variants. Click, Enter, and Space activate them."}
       </Text>
       <For each={["canvas", "panel"] as const}>
         {(surface) => (
@@ -45,11 +46,16 @@ function ThemeSpecimen(props: { theme: ColorTheme }) {
                     {variant}
                   </Text>
                   <div class={s.row}>
-                    <Button variant={variant} onClick={() => setCount((count) => count + 1)}>
+                    <Button
+                      variant={variant}
+                      pending={props.pending}
+                      onClick={() => setCount((count) => count + 1)}
+                    >
                       {actionLabels[variant]}
                     </Button>
                     <Button
                       variant={variant}
+                      pending={props.pending}
                       disabled
                       onClick={() => setCount((count) => count + 1)}
                     >
@@ -69,6 +75,7 @@ function ThemeSpecimen(props: { theme: ColorTheme }) {
             {(variant) => (
               <Button
                 variant={variant}
+                pending={props.pending}
                 data-button-variant={variant}
                 onClick={() => setCount((count) => count + 1)}
               >
@@ -207,7 +214,73 @@ function ReactiveFixture() {
   );
 }
 
-function LongLabelSpecimens() {
+function PendingFixture(props: { variant: ButtonVariant }) {
+  const [pending, setPending] = createSignal(false);
+  const [attempts, setAttempts] = createSignal(0);
+  const [outcome, setOutcome] = createSignal("Ready to publish.");
+  const finish = (message: string) => {
+    setPending(false);
+    setOutcome(message);
+  };
+  return (
+    <main class={`${colorThemes.cotton} ${s.frame} ${s.stack}`}>
+      <Text as="h1" variant="heading">
+        Pending and recovery
+      </Text>
+      <Text tone="secondary">
+        Publish a reply, then resolve the simulated operation. The form owns the work and the status
+        message.
+      </Text>
+      <form
+        class={s.stack}
+        onSubmit={(event) => {
+          event.preventDefault();
+          // The form also guards direct submissions that bypass a button click.
+          if (pending()) return;
+          setAttempts((count) => count + 1);
+          setPending(true);
+        }}
+      >
+        <label class={s.label}>
+          Reply title
+          <input class={s.input} name="title" value="Proposal" />
+        </label>
+        <div>
+          <Button
+            variant={props.variant}
+            type="submit"
+            pending={pending()}
+            aria-describedby="publication-status"
+          >
+            Publish reply
+          </Button>
+        </div>
+      </form>
+      <Text id="publication-status" role="status">
+        {pending() ? "Publishing…" : outcome()}
+      </Text>
+      <Text>Attempts: {attempts()}</Text>
+      <div class={s.row}>
+        <Button
+          variant="secondary"
+          disabled={!pending()}
+          onClick={() => finish("Reply published.")}
+        >
+          Complete successfully
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!pending()}
+          onClick={() => finish("Could not publish. Try again.")}
+        >
+          Simulate failure
+        </Button>
+      </div>
+    </main>
+  );
+}
+
+function LongLabelSpecimens(props: { pending?: boolean }) {
   return (
     <main class={s.comparison}>
       <For each={["cotton", "soot"] as const}>
@@ -226,15 +299,17 @@ function LongLabelSpecimens() {
                     {variant}
                   </Text>
                   <div>
-                    <Button variant={variant}>Publish this proposal and notify the group</Button>
+                    <Button variant={variant} pending={props.pending}>
+                      Publish this proposal and notify the group
+                    </Button>
                   </div>
                   <div>
-                    <Button variant={variant}>
+                    <Button variant={variant} pending={props.pending}>
                       Publish_reply_abcdefghijklmnopqrstuvwxyz_1234567890
                     </Button>
                   </div>
                   <div>
-                    <Button variant={variant} disabled>
+                    <Button variant={variant} pending={props.pending} disabled>
                       Publish this proposal and notify the group
                     </Button>
                   </div>
@@ -248,7 +323,7 @@ function LongLabelSpecimens() {
   );
 }
 
-function EnlargedButtons() {
+function EnlargedButtons(props: { pending?: boolean }) {
   onMount(() => {
     const root = document.documentElement.style;
     const previous = root.getPropertyValue("font-size");
@@ -259,7 +334,7 @@ function EnlargedButtons() {
       else root.removeProperty("font-size");
     });
   });
-  return <LongLabelSpecimens />;
+  return <LongLabelSpecimens pending={props.pending} />;
 }
 
 type Args = ButtonProps & { theme: ColorTheme };
@@ -279,6 +354,7 @@ const meta = {
     variant: "primary",
     children: "Publish reply",
     disabled: false,
+    pending: false,
     type: "button",
   },
   argTypes: {
@@ -286,12 +362,13 @@ const meta = {
     variant: { control: "select", options: variants },
     children: { control: "text" },
     disabled: { control: "boolean" },
+    pending: { control: "boolean" },
     type: { control: "select", options: ["button", "submit", "reset"] },
   },
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen" as const,
-    controls: { include: ["theme", "variant", "children", "disabled", "type"] },
+    controls: { include: ["theme", "variant", "children", "disabled", "pending", "type"] },
     docs: {
       description: {
         component:
@@ -327,9 +404,25 @@ export const Comparison = {
         const variant = button.closest<HTMLElement>("[data-button-variant]")!.dataset
           .buttonVariant as ButtonVariant;
         const disabled = button.matches(":disabled");
-        const active = button.matches(":active");
-        const hover = button.matches(":hover");
+        const pending = button.dataset.pending === "true";
+        const active = !pending && button.matches(":active");
+        const hover = !pending && button.matches(":hover");
         const rendered = getComputedStyle(button);
+        if (pending) {
+          await expect(button).toHaveAttribute("aria-busy", "true");
+          await expect(button).toHaveAttribute("aria-disabled", "true");
+          const indicator = button.querySelector("svg")!;
+          await expect(indicator).toHaveAttribute("aria-hidden", "true");
+          const path = getComputedStyle(indicator.querySelector("rect")!);
+          await expect(new Color(path.stroke).deltaEOK(rendered.color)).toBeLessThan(0.0001);
+          const reduced = doc.defaultView!.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (reduced) await expect(path.animationName).toBe("none");
+          else {
+            await expect(path.animationName).not.toBe("none");
+            await expect(path.animationDuration).toBe("2.6s");
+          }
+          await expect(rendered.cursor).toBe(disabled ? "not-allowed" : "progress");
+        }
         const background = new Color(rendered.backgroundColor);
         const text = new Color(rendered.color);
         const expectedBackground = new Color(
@@ -481,3 +574,89 @@ export const EnlargedText = {
   tags: ["!autodocs"],
   parameters: { controls: { disable: true } },
 } satisfies Story;
+
+export const PendingComparison = {
+  ...Comparison,
+  render: () => (
+    <main class={s.comparison}>
+      <ThemeSpecimen theme="cotton" pending />
+      <ThemeSpecimen theme="soot" pending />
+    </main>
+  ),
+} satisfies Story;
+// Keep the stitch circular at its ends when labels make the button taller than it is wide.
+async function verifyPendingLayout(canvasElement: HTMLElement) {
+  const doc = canvasElement.ownerDocument;
+  await doc.fonts.ready;
+  await new Promise<void>((resolve) =>
+    doc.defaultView!.requestAnimationFrame(() =>
+      doc.defaultView!.requestAnimationFrame(() => resolve()),
+    ),
+  );
+  for (const button of canvasElement.querySelectorAll<HTMLButtonElement>("button")) {
+    const indicator = button.querySelector("svg")!;
+    const path = indicator.querySelector("rect")!;
+    const radius = Math.min(indicator.clientWidth, indicator.clientHeight) / 2;
+    await expect(radius).toBeGreaterThan(0);
+    await expect(Number(path.getAttribute("rx"))).toBe(radius);
+    await expect(Number(path.getAttribute("ry"))).toBe(radius);
+    await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
+    await expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight);
+    const bounds = button.getBoundingClientRect();
+    const strokeBounds = indicator.getBoundingClientRect();
+    await expect(strokeBounds.left).toBeGreaterThan(bounds.left);
+    await expect(strokeBounds.right).toBeLessThan(bounds.right);
+    await expect(strokeBounds.top).toBeGreaterThan(bounds.top);
+    await expect(strokeBounds.bottom).toBeLessThan(bounds.bottom);
+  }
+}
+
+export const PendingLongLabels = {
+  ...LongLabels,
+  render: () => <LongLabelSpecimens pending />,
+  play: ({ canvasElement }) => verifyPendingLayout(canvasElement),
+} satisfies Story;
+export const PendingEnlargedText = {
+  ...EnlargedText,
+  render: () => <EnlargedButtons pending />,
+  play: ({ canvasElement }) => verifyPendingLayout(canvasElement),
+} satisfies Story;
+
+export const Pending = {
+  render: (props) => <PendingFixture variant={props.variant ?? "primary"} />,
+  parameters: { controls: { disable: true } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: "Publish reply" });
+    const status = canvas.getByRole("status");
+    await userEvent.click(button);
+    await expect(button).toHaveFocus();
+    await expect(button).not.toBeDisabled();
+    await expect(button).toHaveAttribute("aria-busy", "true");
+    await expect(button).toHaveAttribute("aria-disabled", "true");
+    await expect(status).toHaveTextContent("Publishing…");
+    await userEvent.click(button);
+    await userEvent.keyboard("{Enter} ");
+    await expect(canvas.getByText("Attempts: 1")).toBeInTheDocument();
+    await expect(button).toHaveFocus();
+    await userEvent.tab();
+    await expect(canvas.getByRole("button", { name: "Complete successfully" })).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    await expect(button).toHaveFocus();
+    await userEvent.click(canvas.getByRole("button", { name: "Complete successfully" }));
+    await expect(status).toHaveTextContent("Reply published.");
+    await expect(button).not.toHaveAttribute("aria-busy");
+    await expect(button).not.toHaveAttribute("aria-disabled");
+    await expect(canvas.getByRole("button", { name: "Publish reply" })).toBe(button);
+    await userEvent.click(button);
+    await expect(canvas.getByText("Attempts: 2")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Simulate failure" }));
+    await expect(status).toHaveTextContent("Could not publish. Try again.");
+    await userEvent.click(button);
+    await expect(canvas.getByText("Attempts: 3")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Complete successfully" }));
+    await expect(status).toHaveTextContent("Reply published.");
+  },
+} satisfies Story;
+export const SecondaryPending = { ...Pending, args: { variant: "secondary" } } satisfies Story;
+export const GhostPending = { ...Pending, args: { variant: "ghost" } } satisfies Story;

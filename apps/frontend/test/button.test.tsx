@@ -203,3 +203,154 @@ it("updates native props, content, classes, and handlers without replacing or bl
   expect(button.className).toBe(originalClass);
   expect(button).toHaveAttribute("type", "button");
 });
+
+it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
+  "keeps the %s button focused and named while pending, blocks clicks, and recovers",
+  (variant) => {
+    const [pending, setPending] = createSignal(false);
+    const clicked = vi.fn();
+    render(() => (
+      <Button variant={variant} pending={pending()} onClick={[clicked, "publish"]}>
+        Publish reply
+      </Button>
+    ));
+    const button = screen.getByRole("button", { name: "Publish reply" }) as HTMLButtonElement;
+    button.focus();
+    setPending(true);
+    expect(screen.getByRole("button", { name: "Publish reply" })).toBe(button);
+    expect(button).toHaveFocus();
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).not.toHaveAttribute("pending");
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    button.click();
+    expect(clicked).not.toHaveBeenCalled();
+    setPending(false);
+    expect(button).toHaveFocus();
+    expect(button).not.toHaveAttribute("aria-busy");
+    expect(button).not.toHaveAttribute("aria-disabled");
+    expect(button.querySelector("svg")).toBeNull();
+    button.click();
+    expect(clicked).toHaveBeenCalledExactlyOnceWith("publish", expect.any(MouseEvent));
+  },
+);
+
+it.each(["submit", "reset"] as const)(
+  "blocks the native %s action while pending and restores it afterward",
+  (type) => {
+    const [pending, setPending] = createSignal(true);
+    const action = vi.fn();
+    const clicked = vi.fn();
+    render(() => (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          action("submit");
+        }}
+        onReset={() => action("reset")}
+      >
+        <Button type={type} pending={pending()} onClick={clicked}>
+          Act
+        </Button>
+      </form>
+    ));
+    const button = screen.getByRole("button", { name: "Act" }) as HTMLButtonElement;
+    button.click();
+    expect(clicked).not.toHaveBeenCalled();
+    expect(action).not.toHaveBeenCalled();
+    setPending(false);
+    button.click();
+    expect(clicked).toHaveBeenCalledOnce();
+    expect(action).toHaveBeenCalledExactlyOnceWith(type);
+  },
+);
+
+it("preserves caller ARIA semantics outside pending and lets native disabled take precedence", () => {
+  const [pending, setPending] = createSignal(false);
+  const [disabled, setDisabled] = createSignal(false);
+  const [busy, setBusy] = createSignal<"true" | "false">("false");
+  const clicked = vi.fn();
+  render(() => (
+    <Button
+      pending={pending()}
+      disabled={disabled()}
+      aria-busy={busy()}
+      aria-disabled="true"
+      onClick={clicked}
+    >
+      Act
+    </Button>
+  ));
+  const button = screen.getByRole("button", { name: "Act" }) as HTMLButtonElement;
+  // aria-disabled alone retains its native informational meaning.
+  button.click();
+  expect(clicked).toHaveBeenCalledOnce();
+  setPending(true);
+  expect(button).toHaveAttribute("aria-busy", "true");
+  setDisabled(true);
+  expect(button).toBeDisabled();
+  button.click();
+  expect(clicked).toHaveBeenCalledOnce();
+  setPending(false);
+  expect(button).toHaveAttribute("aria-busy", "false");
+  expect(button).toHaveAttribute("aria-disabled", "true");
+  expect(button).toBeDisabled();
+  setBusy("true");
+  expect(button).toHaveAttribute("aria-busy", "true");
+  expect(button.querySelector("svg")).toBeNull();
+  setDisabled(false);
+  button.click();
+  expect(clicked).toHaveBeenCalledTimes(2);
+});
+
+it("allows the initiating submission when the click handler synchronously enters pending", () => {
+  const [pending, setPending] = createSignal(false);
+  const submitted = vi.fn();
+  render(() => (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submitted();
+      }}
+    >
+      <Button type="submit" pending={pending()} onClick={() => setPending(true)}>
+        Publish reply
+      </Button>
+    </form>
+  ));
+  const button = screen.getByRole("button", { name: "Publish reply" }) as HTMLButtonElement;
+  button.click();
+  expect(submitted).toHaveBeenCalledOnce();
+  expect(button).toHaveAttribute("aria-busy", "true");
+  button.click();
+  expect(submitted).toHaveBeenCalledOnce();
+});
+
+it("releases indicator measurements when pending ends and when the button unmounts", () => {
+  const observe = vi.fn();
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe = observe;
+      disconnect = disconnect;
+    },
+  );
+  try {
+    const [pending, setPending] = createSignal(false);
+    const view = render(() => <Button pending={pending()}>Publish reply</Button>);
+    expect(observe).not.toHaveBeenCalled();
+    setPending(true);
+    expect(observe).toHaveBeenCalledOnce();
+    setPending(false);
+    expect(disconnect).toHaveBeenCalledOnce();
+    setPending(true);
+    expect(observe).toHaveBeenCalledTimes(2);
+    view.unmount();
+    expect(disconnect).toHaveBeenCalledTimes(2);
+  } finally {
+    cleanup();
+    vi.unstubAllGlobals();
+  }
+});

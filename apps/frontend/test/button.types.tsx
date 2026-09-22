@@ -25,8 +25,9 @@ export function buttonTypeExamples() {
   <Button type="primary" />;
   // @ts-expect-error Additional visual variants are not part of this slice.
   <Button variant="outline" />;
-  // @ts-expect-error Pending behavior has not been introduced.
-  <Button pending />;
+  <Button pending>Publish reply</Button>;
+  // @ts-expect-error Pending is a boolean controlled by the caller.
+  <Button pending="true" />;
   // @ts-expect-error The ref receives a button, not an anchor.
   <Button ref={(element: HTMLAnchorElement) => element} />;
 }

@@ -71,10 +71,11 @@ suite; browser play checks measure ring clearance without taking focus. Actual f
 outline geometry, and clipping require real browser keyboard input and visual review.
 
 **Primitives / Button** covers all three Button variants on both surfaces and themes, native
-disabled/fieldset behavior, activation, form submission, reactive props, and long labels.
-Activation and Forms for all three variants, plus Reactive Props, run in the portable-story suite. Real browser
+disabled/fieldset behavior, controlled pending and recovery, activation, form submission, reactive props, and long labels.
+Activation, Forms, and Pending for all three variants, plus Reactive Props, run in the portable-story suite. Real browser
 checks establish actual hover/pressed/focus styles, native keyboard activation, wrapping,
-coarse-pointer sizing, forced colors, and enlarged text.
+coarse-pointer sizing, forced colors, enlarged text, pending layout stability, and reduced motion.
+Pending stories include both static specimens and caller-controlled success/failure/retry scenarios.
 Comparison also checks the rendered Button colors against the current palette, including
 native disabled states, so stale shared-style references fail visibly in Storybook.
 

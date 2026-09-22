@@ -11,6 +11,9 @@ import buttonMeta, {
   SecondaryForms,
   GhostActivation,
   GhostForms,
+  Pending,
+  SecondaryPending,
+  GhostPending,
   ReactiveProps as ButtonReactiveProps,
 } from "../src/primitives/button/button.stories.tsx";
 
@@ -49,4 +52,14 @@ it("runs the ghost Button activation story", async () => {
 });
 it("runs the ghost Button form story", async () => {
   await buttonStories.story(GhostForms).run();
+});
+
+it("runs the primary Button pending and recovery story", async () => {
+  await buttonStories.story(Pending).run();
+});
+it("runs the secondary Button pending and recovery story", async () => {
+  await buttonStories.story(SecondaryPending).run();
+});
+it("runs the ghost Button pending and recovery story", async () => {
+  await buttonStories.story(GhostPending).run();
 });
