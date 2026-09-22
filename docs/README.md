@@ -25,6 +25,7 @@ remaining gaps with links to their owning code.
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md)                                    | Runtime composition, configuration, startup, and development identity.                                              |
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Implemented clients, queries, sessions, and routes.                                                                 |
 | [UI](../apps/ui/README.md)                                                                              | Component contracts, styles, accessibility, and composition patterns.                                               |
+| [Design system](../apps/design-system/README.md)                                                        | Shared product components, Storybook states, portable interaction tests, and web integration.                       |
 
 ## Design and historical references
 
@@ -46,7 +47,7 @@ remaining gaps with links to their owning code.
 ## Contributor instructions
 
 [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
-lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md),
+lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md), [design-system](../apps/design-system/AGENTS.md),
 [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
 the root guidance rather than maintaining a second copy.
 

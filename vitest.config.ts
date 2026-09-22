@@ -26,6 +26,7 @@ export default defineConfig({
         },
       },
       "apps/ui/vite.config.ts",
+      "apps/design-system/vite.config.ts",
       "apps/web/vite.config.ts",
     ],
   },

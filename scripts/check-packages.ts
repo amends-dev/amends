@@ -44,7 +44,9 @@ for (const { path, manifest } of packages) {
 }
 
 // Keep endpoint construction in web/api and presentation independent of application contracts.
-for await (const path of new Bun.Glob("apps/{ui,web}/src/**/*.{ts,tsx}").scan({ cwd: root })) {
+for await (const path of new Bun.Glob("apps/{ui,design-system,web}/src/**/*.{ts,tsx}").scan({
+  cwd: root,
+})) {
   const source = await Bun.file(`${root}/${path}`).text();
   const imports = new Bun.Transpiler({ loader: path.endsWith(".tsx") ? "tsx" : "ts" }).scanImports(
     source,
@@ -64,12 +66,30 @@ for await (const path of new Bun.Glob("apps/{ui,web}/src/**/*.{ts,tsx}").scan({ 
     if (
       path.startsWith("apps/ui/") &&
       (dependency.startsWith("@amends/") ||
-        target.startsWith(resolve(root, "apps/web") + "/") ||
+        (target.startsWith(resolve(root, "apps") + "/") &&
+          !target.startsWith(resolve(root, "apps/ui") + "/")) ||
         target.startsWith(resolve(root, "packages") + "/") ||
         target.startsWith(resolve(root, "adapters") + "/") ||
         target.startsWith(resolve(root, "hosts") + "/"))
     )
       errors.push(`${path}: UI must not import application code or contracts (${dependency}).`);
+    if (
+      path.startsWith("apps/design-system/") &&
+      ((dependency.startsWith("@amends/") && !dependency.startsWith("@amends/ui/")) ||
+        dependency === "storybook" ||
+        dependency.startsWith("storybook/") ||
+        dependency.startsWith("storybook-") ||
+        dependency.startsWith("@storybook/") ||
+        target.startsWith(resolve(root, "apps/web") + "/") ||
+        target.startsWith(resolve(root, "apps/design-system/stories") + "/") ||
+        target.startsWith(resolve(root, "apps/design-system/.storybook") + "/") ||
+        target.startsWith(resolve(root, "packages") + "/") ||
+        target.startsWith(resolve(root, "adapters") + "/") ||
+        target.startsWith(resolve(root, "hosts") + "/"))
+    )
+      errors.push(
+        `${path}: feature UI must remain independent of application services and Storybook (${dependency}).`,
+      );
     if (
       path.startsWith("apps/web/") &&
       !path.startsWith("apps/web/src/api/") &&
@@ -85,5 +105,7 @@ if (errors.length > 0) {
   console.error(errors.join("\n"));
   process.exitCode = 1;
 } else {
-  console.log(`Checked ${packages.length} shared packages and web/UI import boundaries.`);
+  console.log(
+    `Checked ${packages.length} shared packages and web/design-system/UI import boundaries.`,
+  );
 }

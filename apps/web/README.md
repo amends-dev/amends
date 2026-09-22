@@ -1,9 +1,11 @@
 # Amends web
 
 Solid application over `@amends/api-http`, using `@amends/ui` for visual components.
-Pages compose one shared shell. Features own domain interactions and read data through
+Pages compose one shared shell. Features integrate domain interactions and read data through
 named web API modules. Session and workspace boundaries supply scope independently of
 visual layout.
+The invitation form now comes from [the design-system package](../design-system/README.md),
+where its states and interactions run in isolation. Other feature components remain local today.
 
 ## Run and verify
 
@@ -50,6 +52,7 @@ still need the local host. The local Bun host does not serve the web build.
 | `components/`                                      | Application presentation and common result rendering.                                        |
 | `theme/`                                           | Browser appearance preferences.                                                              |
 | `@amends/ui`                                       | Shared presentation, accessibility, and layout; no API or application imports.               |
+| `@amends/design-system`                            | Reusable product components with local drafts and interactions, developed in Storybook.      |
 
 Page folders reflect the domain, regardless of URL nesting or visual similarity.
 Sign-in is `pages/session/sign-in.tsx`; selection and settings are in
@@ -86,6 +89,13 @@ objects. Form drafts, disclosure state, and scroll position belong to each insta
 `WorkspaceBoundary` resolves that membership from the directory and accepts explicit
 loading, error, and unavailable presentations. Changing the workspace remounts its
 content owner. Tests can supply the context directly without a route.
+
+For extracted features, the local component is an integration wrapper. `IssueInvitationForm`
+maps role-query results into presentation states, supplies backend role IDs and assignability,
+converts the draft's relative expiry to an absolute timestamp, and maps command outcomes into
+safe messages. The shared form owns the draft, pending state, validation feedback, and retry
+interaction. The wrapper remounts it when workspace identity changes. Both production web and
+Storybook consume the same shared component; neither copies the other's form markup.
 
 ## Queries, commands, and failures
 

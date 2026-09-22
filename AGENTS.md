@@ -55,8 +55,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may
   take a contract as a development dependency to act as a client.
-- `apps/*`: user-facing clients. `ui` holds the design system's components, tokens,
-  and styles; `web` is the Solid application, which talks to a host only through
+- `apps/*`: user-facing clients and shared UI. `ui` holds visual primitives, tokens,
+  and styles; `design-system` holds reusable product interactions and their standalone
+  Storybook workshop; `web` composes them and talks to a host only through
   the HTTP contract. Apps may install UI dependencies and consume shared packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`

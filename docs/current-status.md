@@ -27,6 +27,15 @@ Thread starts, reads, replies, and follow/unfollow use the shared group-audience
 Group and thread discovery and current-participant lists are unpaginated; timelines have
 sequence-based pages. Separate reads and pages do not share a snapshot.
 
+## Design-system coverage
+
+The [Storybook workshop](../apps/design-system/README.md) runs independently of web and the
+backend. The invitation form is the first extracted feature; production web imports the same
+component used by its state and interaction stories. Representative UI foundations are also
+included. Other existing features have not been migrated, and the workshop does not yet cover
+every UI component. Portable interaction tests run in the current Bun/Vitest suite; the browser
+has an accessibility addon, but automated screenshot-baseline testing is not implemented.
+
 ## Notification recipients and generation
 
 The [notification schema](../packages/core/src/notification/notification.ts) supports

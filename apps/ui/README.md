@@ -10,7 +10,8 @@ bun run --filter @amends/ui typecheck
 bun run --filter @amends/ui test
 ```
 
-This is a source package, with no standalone application or specimen server. The
+This is a source package. The [design-system workshop](../design-system/README.md)
+demonstrates representative primitives and reusable feature components in Storybook. The
 design references are in [`design-system`](../../design-system/). A consuming app
 owns routing, appearance preferences, and component composition.
 The [token-sync handoff](../../design-system/sync/README.md) is historical; current
@@ -204,8 +205,9 @@ Thread sequence determines order; timestamps are display information. The web mu
 reconstruct a timeline by sorting unrelated messages, tasks, and turn records. Activity
 references its domain subject and preserves the historical change it reports. Detailed
 harness/tool output belongs in the turn log; it is not automatically a thread message.
-The backend thread/turn contracts are still planned, so the current UI components accept
-presentation data without inventing that protocol.
+Group-thread workflows are implemented in core; their HTTP/UI integration and turn execution
+remain work. These primitives accept presentation data; feature integrations map the approved
+contracts rather than inventing a protocol in visual components.
 
 Use `TurnSummary` for execution details, independently of the closing message. Number turns
 chronologically within the thread, position them at their start time, and include working,

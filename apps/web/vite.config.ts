@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 import solid from "vite-plugin-solid";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 
@@ -22,6 +23,7 @@ export default defineConfig({
   test: {
     name: "@amends/web",
     environment: "happy-dom",
+    setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
     include: ["test/**/*.test.{ts,tsx}"],
   },
 });

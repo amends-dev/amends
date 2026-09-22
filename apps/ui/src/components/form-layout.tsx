@@ -5,6 +5,8 @@ export function FormLayout(props: {
   children: JSX.Element;
   id?: string;
   fullWidth?: boolean;
+  /** Let the consuming form present validation feedback and manage focus itself. */
+  noValidate?: boolean;
   onSubmit: JSX.EventHandler<HTMLFormElement, SubmitEvent>;
 }) {
   return (
@@ -13,6 +15,7 @@ export function FormLayout(props: {
       class={s.root}
       data-full-width={props.fullWidth || undefined}
       onSubmit={props.onSubmit}
+      noValidate={props.noValidate}
     >
       {props.children}
     </form>

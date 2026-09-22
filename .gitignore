@@ -8,6 +8,8 @@ dist
 
 # code coverage
 coverage
+.playwright-cli/
+output/playwright/
 *.lcov
 
 # logs

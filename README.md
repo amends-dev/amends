@@ -46,6 +46,7 @@ hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/
   ui/                 @amends/ui: Solid components, tokens, and styles
+  design-system/      @amends/design-system: shared feature UI and Storybook workshop
   web/                @amends/web: Solid application over the HTTP contract
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff

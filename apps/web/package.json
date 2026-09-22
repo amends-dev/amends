@@ -17,6 +17,7 @@
   "dependencies": {
     "@amends/api-http": "workspace:*",
     "@amends/core": "workspace:*",
+    "@amends/design-system": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/ui": "workspace:*",
     "@effect/atom-solid": "catalog:",
