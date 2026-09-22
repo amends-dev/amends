@@ -32,6 +32,8 @@
     "**/node_modules/**",
     "**/dist/**",
     "**/out/**",
-    "**/coverage/**"
+    "**/coverage/**",
+    "**/target/**",
+    "apps/desktop/src-tauri/gen/**"
   ]
 }

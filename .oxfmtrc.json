@@ -9,6 +9,8 @@
     "**/dist/**",
     "**/out/**",
     "**/coverage/**",
-    "bun.lock"
+    "bun.lock",
+    "**/target/**",
+    "apps/desktop/src-tauri/gen/**"
   ]
 }

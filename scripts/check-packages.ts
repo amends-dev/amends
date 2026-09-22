@@ -43,8 +43,20 @@ for (const { path, manifest } of packages) {
   }
 }
 
-// Keep endpoint construction in web/api and presentation independent of application contracts.
-for await (const path of new Bun.Glob("apps/{icons,ui,design-system,web}/src/**/*.{ts,tsx}").scan({
+// Retired presentation packages must not return as application dependencies.
+for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })) {
+  const manifest: PackageManifest = await Bun.file(`${root}/${path}`).json();
+  for (const section of sections) {
+    for (const name of Object.keys(manifest[section] ?? {})) {
+      if (name === "@amends/ui" || name === "@amends/design-system") {
+        errors.push(`${path}: ${section}.${name} is retired; use @amends/frontend.`);
+      }
+    }
+  }
+}
+
+// Shared presentation stays independent of application and backend entry points.
+for await (const path of new Bun.Glob("apps/{icons,frontend,web,desktop}/src/**/*.{ts,tsx}").scan({
   cwd: root,
 })) {
   const source = await Bun.file(`${root}/${path}`).text();
@@ -89,42 +101,27 @@ for await (const path of new Bun.Glob("apps/{icons,ui,design-system,web}/src/**/
         `${path}: icon runtime must depend only on Solid and its own source (${dependency}).`,
       );
     if (
-      path.startsWith("apps/ui/") &&
-      ((dependency.startsWith("@amends/") && !iconImport) ||
-        (target.startsWith(resolve(root, "apps") + "/") &&
-          !target.startsWith(resolve(root, "apps/ui") + "/")) ||
-        target.startsWith(resolve(root, "packages") + "/") ||
-        target.startsWith(resolve(root, "adapters") + "/") ||
-        target.startsWith(resolve(root, "hosts") + "/"))
+      dependency === "@amends/ui" ||
+      dependency.startsWith("@amends/ui/") ||
+      dependency === "@amends/design-system" ||
+      dependency.startsWith("@amends/design-system/")
     )
-      errors.push(`${path}: UI must not import application code or contracts (${dependency}).`);
+      errors.push(`${path}: ${dependency} is retired; use @amends/frontend.`);
     if (
-      path.startsWith("apps/design-system/") &&
+      path.startsWith("apps/frontend/") &&
       ((dependency.startsWith("@amends/") &&
-        !dependency.startsWith("@amends/ui/") &&
+        !dependency.startsWith("@amends/frontend/") &&
         !iconImport) ||
-        dependency === "storybook" ||
-        dependency.startsWith("storybook/") ||
-        dependency.startsWith("storybook-") ||
-        dependency.startsWith("@storybook/") ||
-        target.startsWith(resolve(root, "apps/web") + "/") ||
-        target.startsWith(resolve(root, "apps/design-system/stories") + "/") ||
-        target.startsWith(resolve(root, "apps/design-system/.storybook") + "/") ||
+        (target.startsWith(resolve(root, "apps") + "/") &&
+          !target.startsWith(resolve(root, "apps/frontend") + "/")) ||
+        dependency.startsWith("@tauri-apps/") ||
         target.startsWith(resolve(root, "packages") + "/") ||
         target.startsWith(resolve(root, "adapters") + "/") ||
         target.startsWith(resolve(root, "hosts") + "/"))
     )
       errors.push(
-        `${path}: feature UI must remain independent of application services and Storybook (${dependency}).`,
+        `${path}: frontend must remain independent of platform and backend code (${dependency}).`,
       );
-    if (
-      path.startsWith("apps/web/") &&
-      !path.startsWith("apps/web/src/api/") &&
-      (target === resolve(root, "apps/web/src/api/client.ts") ||
-        dependency === "@amends/api-http" ||
-        dependency.startsWith("@amends/api-http/"))
-    )
-      errors.push(`${path}: use a named web API module instead of ${dependency}.`);
   }
 }
 
@@ -133,6 +130,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and icons/web/design-system/UI import boundaries.`,
+    `Checked ${packages.length} shared packages and icons/frontend/web/desktop import boundaries.`,
   );
 }

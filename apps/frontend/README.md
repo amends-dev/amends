@@ -11,7 +11,9 @@ The [radius foundation](src/foundations/radius/README.md) adds square, medium (1
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
 a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
 composes these foundations into primary, secondary, and ghost actions with native button behavior. Neither
-app consumes this package yet. The existing `ui`, `design-system`, and `web` packages remain in place.
+app consumes this package yet. [Web](../web/README.md) and [desktop](../desktop/README.md)
+are minimal bootstraps awaiting shared frontend integration. The legacy `ui` and
+`design-system` packages have been removed.
 
 ## Run and verify
 
@@ -25,8 +27,7 @@ bun run --filter @amends/frontend build
 bun run check
 ```
 
-Development serves Storybook at `http://127.0.0.1:6007`, alongside the existing workshop
-on port 6006. Open **Setup / Workshop / Rendering** to check the Solid renderer: typing
+Development serves Storybook at `http://127.0.0.1:6007`. Open **Setup / Workshop / Rendering** to check the Solid renderer: typing
 in the native input updates the output. The story's play function verifies typing and
 clearing, and the portable-story test runs that same scenario in Bun/Vitest. The root
 `bun run test` includes this project.

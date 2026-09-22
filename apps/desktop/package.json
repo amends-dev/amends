@@ -1,0 +1,24 @@
+{
+  "name": "@amends/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "dev:frontend": "bun run --bun vite",
+    "build:frontend": "bun run typecheck && bun run --bun vite build",
+    "preview": "bun run --bun vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:native": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo check --locked --manifest-path src-tauri/Cargo.toml",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.12"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.5",
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.14"
+  }
+}

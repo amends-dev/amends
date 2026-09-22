@@ -1,7 +1,8 @@
 # Workspace workflows
 
 This guide describes the implemented workspace, membership, and invitation
-workflows. For server setup and development authentication, see the
+workflows in the backend. Web and desktop currently contain bootstrap pages only;
+the former web workflow screens have been removed. For server setup and development authentication, see the
 [local host guide](../hosts/local/README.md). The
 [HTTP contract](../packages/api-http/README.md) defines the available endpoints;
 [core design](./core-model.md) records the broader model and planned work.
@@ -22,10 +23,6 @@ a workspace. Names are display labels; IDs remain the stable routing identity.
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
   -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
 ```
-
-The web picker opens a name form when you click **New workspace**. Submitting
-**Create workspace** trims the name and opens the new workspace after creation.
-Cancelling creates nothing. The name appears in the picker, sidebar, and settings.
 
 `GET /me/workspaces` lists the caller's
 memberships, including ended ones, with each workspace's active member count,
@@ -135,10 +132,8 @@ unfamiliar roles require the owner. The Owner assignment and owner membership ar
 protected from these mutations, including attempts by the owner. Ownership transfer
 has its own operation. Custom-role management remains unimplemented.
 
-The web member details show actual assignments with revoke and change-role controls
-when permitted. The workspace change stream invalidates access queries automatically.
-After a stale-change error, review the updated access before submitting again.
-Invitation forms offer role choices from the same backend policy.
+Clients should reread access after a stale-change error before submitting again.
+Future invitation forms should offer role choices from the same backend policy.
 
 ## Ownership transfer
 

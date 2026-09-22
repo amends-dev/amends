@@ -3,9 +3,9 @@
 Read [README.md](README.md) before changing this package.
 
 - Build incrementally. Introduce one needed foundation or component per reviewable
-  change. Existing packages stay in place; do not bulk-copy or re-export their catalogs.
-- Do not import `@amends/ui`, `@amends/design-system`, `@amends/web`, or platform
-  entry points. Compare relevant existing source and design references before introducing
+  change. Do not bulk-copy or re-export legacy catalogs.
+- Do not import the retired `@amends/ui` or `@amends/design-system` packages,
+  `@amends/web`, `@amends/desktop`, or platform entry points. Compare relevant existing source and design references before introducing
   a piece, and document intentional differences.
 - Add layers only as needed: foundations, primitives, compositions, features, and pages.
   Runtime lower layers must not depend on higher ones. Development-only stories may

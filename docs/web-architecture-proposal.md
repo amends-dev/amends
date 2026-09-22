@@ -1,17 +1,15 @@
 # Web architecture proposal
 
-Status: accepted. The shared shell, domain page structure, existing-domain features, and
-data lifecycle conventions are implemented. The [web README](../apps/web/README.md) and
-[UI README](../apps/ui/README.md) describe the current public interfaces. The audit below
-records the pre-refactor findings; migration examples retain their design rationale.
-Turn and thread APIs remain proposed because those domains do not yet exist in the HTTP
-contract.
+Status: historical, previously accepted and implemented in the former web app.
+That implementation and the `ui` package were removed during the web/desktop
+bootstrap reset. This document preserves the earlier design rationale and audit;
+its source paths and examples describe that removed implementation, not current
+app behavior. See [web](../apps/web/README.md), [desktop](../apps/desktop/README.md),
+and [frontend](../apps/frontend/README.md) for current boundaries.
 
-Later workspace-name, role, ownership, notification-read, and live-change work is
-documented in the [workspace workflows](workspace-workflows.md) and current READMEs.
-The workspace change feed is implemented, but it does not supply the proposed
-turn-history protocol. See [known limitations](current-status.md) for its delivery,
-authorization, and reconnect constraints.
+Backend workspace and live-change operations remain implemented; see
+[workspace workflows](workspace-workflows.md) and [known limitations](current-status.md).
+Turn and thread APIs below remain proposed HTTP work.
 
 ## Intended result
 
@@ -48,12 +46,10 @@ is not a domain, page family, component, or shell variant in the proposed struct
 | UI layouts      | `DetailLayout`, `MasterDetail`, `FormColumns`, and `InspectorLayout` already implement useful responsive behavior.                      | Preserve these patterns and their tests.                                          |
 | Verification    | Web tests cover sign-in; UI tests cover many controls, layouts, focus behaviors, and logs.                                              | Add web data-lifecycle coverage before treating the architecture as established.  |
 
-Refactored source locations: [client](../apps/web/src/api/client.ts),
-[Settings](../apps/web/src/pages/workspaces/settings.tsx),
-[workspace shell](../apps/web/src/pages/workspaces/layout.tsx),
-[shared shell](../apps/ui/src/components/shell.tsx),
-[HTTP contract](../packages/api-http/README.md), and
-[web tests](../apps/web/test/sign-in.test.tsx).
+Former source locations (available in Git history): `apps/web/src/api/client.ts`,
+`apps/web/src/pages/workspaces/settings.tsx`, `apps/web/src/pages/workspaces/layout.tsx`,
+`apps/ui/src/components/shell.tsx`, and `apps/web/test/sign-in.test.tsx`.
+The [HTTP contract](../packages/api-http/README.md) remains current.
 
 The refactor addressed these concrete correctness issues in the former implementation:
 
@@ -102,9 +98,8 @@ These are rough product references, not authoritative schemas. In particular:
   recommended assembling separate collections using timestamps and journal tie-breaking.
   The refactor replaces that guidance with the newer core model.
 
-See [turn ownership](core-model.md#agreed-a-turn-is-an-attempt-on-a-thread),
-[thread activity](core-model.md#agreed-the-thread-timeline-records-typed-activity), and
-[current UI guidance](../apps/ui/README.md#conversations-and-execution).
+See [turn ownership](core-model.md#agreed-a-turn-is-an-attempt-on-a-thread) and
+[thread activity](core-model.md#agreed-the-thread-timeline-records-typed-activity).
 
 ## Four responsibilities
 

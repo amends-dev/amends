@@ -1,49 +1,47 @@
 # User-facing applications
 
-This directory contains the existing Solid clients and a new frontend workshop:
+- [icons](icons/README.md) provides canonical drawings, generated Solid icons/SVGs,
+  and a separate metadata catalog through `@amends/icons`.
+- [frontend](frontend/README.md) provides the shared Solid foundations, primitives,
+  and compositions, verified in its standalone Storybook workshop.
+- [web](web/README.md) is a minimal Solid/Vite browser bootstrap on port 4321.
+- [desktop](desktop/README.md) is a minimal Tauri 2 desktop bootstrap with a
+  Solid/Vite webview on development port 1420.
 
-- [icons](icons/README.md) provides canonical drawings, generated Solid icons and SVGs,
-  and a separate searchable catalog. UI packages and apps import it through `@amends/icons`.
-- [ui](ui/README.md) provides components, tokens, styles, and layout without
-  application or API imports.
-- [design-system](design-system/README.md) provides reusable product interactions and
-  their standalone Storybook workshop. Its invitation form is consumed by web.
-- [web](web/README.md) composes the UI and calls the shared HTTP contract through
-  its named API modules. It implements sign-in and workspace management; other
-  domain pages remain placeholders.
-- [frontend](frontend/README.md) starts the shared frontend intended for web and Tauri
-  desktop. It contains reading, action, control-border, and focus colors, scoped Cotton/Soot themes,
-  body/heading/mono typography, spacing steps 0–6, square/medium/pill radii, Text, Button, Input, Radio, Checkbox, Switch, Select, and layout primitives, Field and RadioGroup compositions, and their Storybook
-  specimens alongside the setup verification story. A shared `:focus-visible` style has
-  native-control specimens for keyboard review.
-  Avatar adds four neutral identity treatments with named/decorative fallbacks; Status
-  composes semantic dots and visible labels with caller-owned announcement behavior.
-  Divider supplies plain/labeled dashed seams, with declarative action placement, and is reused
-  by Navigation section headers. IconButton and Tooltip support declarative Navigation, Drawer, and Shell compositions,
-  including a desktop icon rail and mobile modal navigation. Dialog shares native modal behavior
-  with Drawer; Toast adds scoped feedback queues, declarative message/actions, and pausable timers.
-  Semantic status colors cover success, warning, pending, danger, idle, and running, with
-  tested text/indicator pairings and soft backgrounds. Decorative seams have a separate role
-  from control boundaries. Supported color pairings target WCAG 2.2 AA.
-  Text exposes semantic status tones; Button and IconButton support a danger tone independently
-  of primary/secondary/ghost variants, with shared disabled and focus behavior.
-  Foundations and components will be introduced individually, with stories at every layer;
-  existing packages remain in place.
+The former `ui` and `design-system` workspaces have been removed. The old web
+screens, routes, sessions, API integrations, and their tests were removed with
+that reset. The backend remains independently available. Both bootstraps currently
+render a plain page and do not connect to it or import `frontend`.
 
-Run the API with `bun run start` after the [local host setup](../hosts/local/README.md#run),
-then run `bun run --filter @amends/web dev` in another terminal.
-The workshop needs no backend: run `bun run --filter @amends/design-system dev`.
-The new frontend workshop also needs no backend: run
-`bun run --filter @amends/frontend dev` and open `http://127.0.0.1:6007`.
+## Development
 
-Apps may depend on shared packages via `workspace:*` and use UI or platform
-dependencies appropriate to their target. UI source must remain independent of
-application contracts; shared icons are allowed. The icons runtime depends only on Solid
-and its own source. Design-system runtime source also excludes transport, web, and
-Storybook imports; web endpoint construction belongs in `src/api/`.
-`bun run check:packages` enforces these source boundaries. Shared packages cannot import apps.
+From the repository root after `bun install`:
 
-Each app needs its own `package.json`, a `typecheck` script, and a `tsconfig.json`
-extending `../../tsconfig.base.json`. Enable browser, desktop, or framework types
-in that app's configuration. Install dependencies from the repository root to
-keep one lockfile.
+```sh
+bun run --filter @amends/web dev
+bun run --filter @amends/desktop dev
+bun run --filter @amends/frontend dev
+```
+
+Run each in its own terminal. Storybook serves at `http://127.0.0.1:6007/`.
+Desktop requires [native tools](desktop/README.md#run-and-verify); web and Storybook
+need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
+
+## Shared frontend integration
+
+The next slice will introduce `@amends/frontend` into both app entry points,
+including fonts, theme setup, and vanilla-extract compilation. Shared screens and
+interactions belong in frontend with Storybook coverage. Browser and Tauri startup,
+native permissions, and platform services belong in their respective apps.
+Shared components receive capabilities/data through explicit interfaces instead
+of importing a platform entry point. Neither app should depend on the other.
+
+Apps may consume shared packages through `workspace:*`. Shared packages cannot
+import apps. `bun run check:packages` enforces shared-package declarations,
+icon runtime isolation, frontend/platform boundaries, and the retirement of the
+old UI dependencies. Cross-workspace imports use declared package names.
+
+Each workspace has its own manifest, `typecheck` script, and `tsconfig.json`
+extending the root configuration. Root checks cover both bootstraps' TypeScript;
+`desktop` has a separate native check. Install at the repository root to keep
+one Bun lockfile.

@@ -1,6 +1,6 @@
 # amends-v2
 
-A Bun and TypeScript monorepo with a Solid web app, an HTTP API, and workspace
+A Bun and TypeScript monorepo with Solid web and Tauri desktop bootstraps, an HTTP API, and workspace
 services backed by SQLite or PostgreSQL. The root workspace catalog pins Effect
 **4.0.0-rc.115**, and `bun.lock` records resolved dependencies.
 
@@ -16,17 +16,20 @@ bun run start
 `bun run dev` restarts it when files change. Its default SQLite file is
 `hosts/local/data/amends.sqlite`. Startup does not create that parent directory,
 so the `mkdir` step is required on a fresh clone. The server creates workspaces
-only when requested through the API or web app.
+only when requested through the API.
 
-In another terminal, run `bun run --filter @amends/web dev` and open
-`http://127.0.0.1:4321/`. The web server proxies `/api` to the local host. Development
-sign-in prints the one-time code in the host terminal. The API exposes OpenAPI at
-`/openapi.json` and interactive documentation at `/docs`.
+Run `bun run --filter @amends/web dev` and open `http://127.0.0.1:4321/`, or run
+`bun run --filter @amends/desktop dev` to open the Tauri app after installing its
+[native prerequisites](apps/desktop/README.md#run-and-verify). Both are minimal
+bootstraps and run without the API. Shared frontend integration is the next step.
+The API independently exposes OpenAPI at `/openapi.json` and documentation at `/docs`;
+development sign-in prints the one-time code in the host terminal.
 
 See the [local host guide](hosts/local/README.md) for storage configuration and
 development authentication, and the [web guide](apps/web/README.md) for app commands.
 Workspace creation, invitations, membership, roles, and ownership transfer are
-implemented. Notification reads and live workspace changes have
+implemented in the backend. Their former web screens have been removed during the
+frontend reset. Notification reads and live workspace changes have
 [known limitations](docs/current-status.md); task, thread, and agent execution
 remain design work. The [documentation index](docs/README.md) separates current
 guides from proposals and historical references.
@@ -46,10 +49,9 @@ hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/
   icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
-  ui/                 @amends/ui: Solid components, tokens, and styles
-  design-system/      @amends/design-system: shared feature UI and Storybook workshop
-  frontend/           @amends/frontend: visual foundations, Text/Button primitives, and Storybook
-  web/                @amends/web: Solid application over the HTTP contract
+  frontend/           @amends/frontend: shared Solid foundations, components, and Storybook
+  web/                @amends/web: Solid/Vite browser bootstrap
+  desktop/            @amends/desktop: Tauri 2 shell and Solid/Vite webview bootstrap
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff
 scripts/              repository tooling

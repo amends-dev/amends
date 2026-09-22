@@ -7,33 +7,12 @@
     "dev": "bun run --bun vite",
     "build": "bun run typecheck && bun run --bun vite build",
     "preview": "bun run --bun vite preview --host 127.0.0.1",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "oxlint ./src ./vite.config.ts",
-    "lint:fix": "oxlint --fix --quiet ./src ./vite.config.ts",
-    "format": "oxfmt --check --no-error-on-unmatched-pattern \"./{src,test}/**/*.{ts,tsx}\" \"./vite.config.ts\"",
-    "format:fix": "oxfmt --write --no-error-on-unmatched-pattern \"./{src,test}/**/*.{ts,tsx}\" \"./vite.config.ts\"",
-    "test": "bun run --bun vitest run --config vite.config.ts"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@amends/api-http": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/design-system": "workspace:*",
-    "@amends/gateway": "workspace:*",
-    "@amends/ui": "workspace:*",
-    "@effect/atom-solid": "catalog:",
-    "@solid-primitives/keyed": "catalog:",
-    "@solid-primitives/map": "catalog:",
-    "@solidjs/meta": "catalog:",
-    "@solidjs/router": "catalog:",
-    "effect": "catalog:",
     "solid-js": "^1.9.12"
   },
   "devDependencies": {
-    "@solidjs/testing-library": "^0.8.9",
-    "@testing-library/user-event": "^14.6.7",
-    "@vanilla-extract/css": "^1.21.2",
-    "@vanilla-extract/vite-plugin": "^5.2.6",
-    "happy-dom": "^20.10.6",
     "vite": "^7.0.0",
     "vite-plugin-solid": "^2.11.14"
   }

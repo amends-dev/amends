@@ -14,19 +14,17 @@ bun run test
 bun run test packages/core/test
 bun run test --project backend
 bun run test --project postgresql
-bun run test --project @amends/ui
 bun run test --project @amends/icons
-bun run test --project @amends/design-system
 bun run test --project @amends/frontend
-bun run test --project @amends/web
 bun run test --watch packages/core/test
 bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
 covers shared packages, SQLite, and the local host. PostgreSQL has its own project
-and global setup. The UI, design-system, frontend, and web projects use their Solid/Vite transforms and
-Happy DOM environments. Vendored repositories are outside test discovery.
+and global setup. The frontend project uses Solid/Vite transforms and Happy DOM. Web and desktop
+currently have no behavior test suites; verify their frontend builds and desktop
+startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
 
 The [icons package](../apps/icons/README.md) tests geometry validation, composition,
 Solid naming/prop reactivity, and consumer bundles. Its build tests run in the Node
@@ -38,14 +36,7 @@ provide Marks selection, gallery search, and reactive naming portable tests. Bro
 review compares all 26 SVG marks with the Primitives v2 reference at 15px, then checks
 sizes, weights, both themes, affected controls, RTL, and enlarged root text.
 
-The [design-system workshop](../apps/design-system/README.md) has component tests plus portable
-tests that execute the same Storybook render/play scenarios. Test declarations use `@effect/vitest`;
-browser-instrumented play functions use `storybook/test`. The Storybook Vitest addon is not installed
-because its current peer range excludes our Vitest 5 runner. The public Solid `/next` preview factory
-allows the portable scenarios to run in the existing suite.
-
-The new [frontend workshop](../apps/frontend/README.md) uses the same portable-story
-approach to verify its Solid rendering and interaction setup. Build it independently
+The new [frontend workshop](../apps/frontend/README.md) uses portable Storybook render/play scenarios to verify its Solid rendering and interaction setup. Build it independently
 with `bun run --filter @amends/frontend build`; no existing UI is imported into this package.
 Its [color foundation](../apps/frontend/src/foundations/color/README.md) tests eight reading
 pairings and six enabled action pairings with Color.js. Storybook specimens support browser
@@ -191,9 +182,8 @@ nested scopes, narrow/enlarged layouts, pointer behavior, and forced-colors emul
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin
 from automatically adding an unresolved setup path when another package installs Storybook.
-Build the workshop with `bun run --filter @amends/design-system build` and the consuming app
-with `bun run --filter @amends/web build`. The root `vite-node` override keeps vanilla-extract's
-evaluator on its supported Vite 7 line; verify both builds before changing it.
+Build the workshop with `bun run --filter @amends/frontend build`. The root `vite-node` override keeps vanilla-extract's
+evaluator on its supported Vite 7 line; verify the workshop build before changing it.
 
 ## Choosing a test API
 

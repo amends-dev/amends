@@ -57,12 +57,13 @@ currently run through TypeScript. Check compatibility before changing this setup
   take a contract as a development dependency to act as a client.
 - `apps/*`: user-facing clients and shared UI. `icons` holds canonical drawings and generated
   Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume it.
-  `ui` holds visual primitives, tokens,
-  and styles; `design-system` holds reusable product interactions and their standalone
-  Storybook workshop; `web` composes them and talks to a host only through
-  the HTTP contract. `frontend` is a separate, incremental shared-frontend workshop:
-  introduce and verify one foundation or component at a time, leaving existing packages
-  in place. Apps may install UI dependencies and consume shared packages.
+  `frontend` holds shared visual foundations, primitives, and compositions with a
+  standalone Storybook workshop. Introduce and verify one foundation or component
+  at a time. `web` and `desktop` are minimal Solid entry points; `desktop` owns the
+  Tauri shell. Both will consume `frontend`; platform APIs stay in the entry apps.
+  The former `ui` and `design-system` packages are retired. Apps may install UI
+  dependencies and consume shared packages. Run desktop's `check:native` after
+  changing Rust or Tauri configuration; root checks cover its TypeScript only.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no

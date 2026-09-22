@@ -1,28 +1,10 @@
 <!doctype html>
-<html lang="en" data-theme="cotton">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f2f0e7" />
     <title>Amends</title>
-    <script>
-      // Resolve appearance before CSS loads so a saved dark theme never flashes light.
-      (() => {
-        let preference = "system";
-        try {
-          const saved = localStorage.getItem("amends.theme");
-          if (saved === "cotton" || saved === "soot") preference = saved;
-        } catch {}
-        document.documentElement.dataset.themePreference = preference;
-        document.documentElement.dataset.theme =
-          preference === "system"
-            ? matchMedia("(prefers-color-scheme: dark)").matches
-              ? "soot"
-              : "cotton"
-            : preference;
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

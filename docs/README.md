@@ -23,10 +23,9 @@ remaining gaps with links to their owning code.
 | [Adapters](../adapters/README.md)                                                                       | Store validation, construction, and migration conventions.                                                          |
 | [SQLite](../adapters/storage-sqlite/README.md) / [PostgreSQL](../adapters/storage-postgresql/README.md) | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md)                                    | Runtime composition, configuration, startup, and development identity.                                              |
-| [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Implemented clients, queries, sessions, and routes.                                                                 |
-| [UI](../apps/ui/README.md)                                                                              | Component contracts, styles, accessibility, and composition patterns.                                               |
-| [Design system](../apps/design-system/README.md)                                                        | Shared product components, Storybook states, portable interaction tests, and web integration.                       |
-| [Frontend](../apps/frontend/README.md)                                                                  | Shared frontend workshop, visual foundations, Text/Button primitives, and incremental component development.        |
+| [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Browser bootstrap and the shared frontend integration boundary.                                                     |
+| [Desktop](../apps/desktop/README.md)                                                                    | Tauri prerequisites, native commands, and bootstrap verification.                                                   |
+| [Frontend](../apps/frontend/README.md)                                                                  | Shared frontend workshop, foundations, primitives, and compositions.                                                |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
 drawings, generation, and visual review in the frontend workshop.
@@ -40,8 +39,7 @@ drawings, generation, and visual review in the frontend workshop.
   and architecture proposal. Its module inventory reflects the pinned source;
   proposed workflow, cluster, AI, and MCP choices are not implemented integrations.
 - [Web architecture proposal](web-architecture-proposal.md) preserves accepted design
-  rationale and findings from before the refactor. The web/UI READMEs own current
-  interfaces; the proposed TurnLog backend and component remain future work.
+  rationale and findings from before the refactor. It describes the former web/UI implementation, removed during the bootstrap reset; the proposed TurnLog backend and component remain future work.
 - [Design-system references](../design-system/) are product and visual mocks, not
   implemented API schemas. [Token sync](../design-system/sync/README.md) explains the
   historical handoff and points to the current token and style modules.
@@ -51,7 +49,7 @@ drawings, generation, and visual review in the frontend workshop.
 ## Contributor instructions
 
 [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
-lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md), [design-system](../apps/design-system/AGENTS.md),
+lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md),
 [frontend](../apps/frontend/AGENTS.md),
 [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
 the root guidance rather than maintaining a second copy.

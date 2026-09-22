@@ -4,8 +4,7 @@ This page records implementation gaps, not completed fixes. Keep each item align
 with its owning code and guide when changing the behavior.
 
 Workspace creation, membership, required-role invitations, assignment management,
-and ownership transfer are implemented through core, the gateway, HTTP, and the
-Solid web app. SQLite and PostgreSQL persist their journal and projections. See
+and ownership transfer are implemented through core, the gateway, and HTTP. SQLite and PostgreSQL persist their journal and projections. See
 [workspace workflows](workspace-workflows.md) for the available operations.
 Core and both adapters implement [private group creation and membership lifecycle](group-workflows.md),
 including permission-based addition/removal, self-leave, ordinary group reads, and management
@@ -104,14 +103,20 @@ notifications. Routing, preference persistence, application integration, and Tau
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
-layer. Existing packages stay in place; web and Tauri integration remain pending.
+layer. Shared frontend integration in web and Tauri remains pending.
 
-The [Storybook workshop](../apps/design-system/README.md) runs independently of web and the
-backend. The invitation form is the first extracted feature; production web imports the same
-component used by its state and interaction stories. Representative UI foundations are also
-included. Other existing features have not been migrated, and the workshop does not yet cover
-every UI component. Portable interaction tests run in the current Bun/Vitest suite; the browser
-has an accessibility addon, but automated screenshot-baseline testing is not implemented.
+## Web and desktop bootstrap
+
+[Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) render minimal
+Solid pages. Desktop supplies a Tauri 2 native shell. Both run without the backend;
+neither imports `frontend` yet. The legacy `ui` and `design-system` packages and
+web's routes, session/data layer, product screens, and integration tests have been
+removed. Those backend workflows remain implemented but have no current app UI.
+
+Shared screen composition, theme setup, routing, authentication, backend transport,
+and platform capabilities remain future integration work. The frontend workshop
+continues to verify its components independently. Tauri distribution signing,
+updates, production artwork, and cross-platform installer verification are pending.
 
 ## Notification recipients and generation
 
@@ -160,7 +165,7 @@ Private group, thread, and notification acknowledgment facts are withheld, inclu
 group-only commits produce no public change until audience-aware group delivery exists.
 It does not filter fields or events by permission, or continuously recheck membership.
 Removal therefore does not itself close an existing subscription. Reconnecting
-checks access again, and Ready refreshes the browser's current view.
+checks access again; future clients must use Ready to refresh their views.
 
 The journal's storage-backed `log.tail` can catch up from durable history. It is a
 separate internal API and is not the transport used by the
@@ -203,13 +208,10 @@ creation is still absent.
 
 ## Edge resource controls
 
-The [browser change consumer](../apps/web/src/api/changes.ts) retries transient
-failures with jittered exponential delays capped at 30 seconds and stops on
-unauthorized/not-member errors. However, [Stream.retry](../repos/effect/packages/effect/src/Stream.ts)
-resets its schedule whenever a message arrives. Repeated Ready/disconnect cycles
-can keep the delay near its initial 500ms and repeatedly invalidate mounted queries.
-A stable-connection threshold, retry budget, and coverage for this repeated-cycle
-case remain absent.
+There is no active browser change consumer after the web reset. When restoring live
+updates, provide a stable-connection threshold and retry budget: the former consumer
+reset its backoff after every Ready message, allowing repeated Ready/disconnect cycles
+to continually refresh queries near the initial delay.
 
 The [local server](../hosts/local/src/server.ts) configures the listener without an
 application body-size limit or SSE connection/admission policy. Effect's

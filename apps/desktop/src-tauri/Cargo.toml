@@ -1,0 +1,12 @@
+[package]
+name = "amends-desktop"
+version = "0.0.0"
+description = "Amends desktop application"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.6", features = [] }
