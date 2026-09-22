@@ -10,10 +10,10 @@ composes those foundations into native paragraphs, spans, headings, and inline c
 The [radius foundation](src/foundations/radius/README.md) adds square, medium (10px), and pill corners.
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
 a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
-composes these foundations into primary, secondary, and ghost actions with native button behavior. Neither
-app consumes this package yet. [Web](../web/README.md) and [desktop](../desktop/README.md)
-are minimal bootstraps awaiting shared frontend integration. The legacy `ui` and
-`design-system` packages have been removed.
+composes these foundations into primary, secondary, and ghost actions with native button behavior. [Web](../web/README.md) and [desktop](../desktop/README.md) consume these UI components
+through the [client package](../client/README.md). Client owns routes, sessions, API
+access, and application composition. Frontend remains UI-only: components receive
+presentation data and callbacks. The legacy `ui` and `design-system` packages are removed.
 
 ## Run and verify
 

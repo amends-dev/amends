@@ -4,14 +4,17 @@
   and a separate metadata catalog through `@amends/icons`.
 - [frontend](frontend/README.md) provides the shared Solid foundations, primitives,
   and compositions, verified in its standalone Storybook workshop.
-- [web](web/README.md) is a minimal Solid/Vite browser bootstrap on port 4321.
-- [desktop](desktop/README.md) is a minimal Tauri 2 desktop bootstrap with a
+- [client](client/README.md) owns shared routing, sessions, API access, and application
+  composition using frontend components. It has its own integration stories and tests.
+- [web](web/README.md) runs the shared application with browser routing on port 4321.
+- [desktop](desktop/README.md) runs the shared application in Tauri 2 with hash routing and a
   Solid/Vite webview on development port 1420.
 
 The former `ui` and `design-system` workspaces have been removed. The old web
 screens, routes, sessions, API integrations, and their tests were removed with
-that reset. The backend remains independently available. Both bootstraps currently
-render a plain page and do not connect to it or import `frontend`.
+that reset. Both entry apps now consume the shared application foundation, including
+routing, session lifecycle, API access, and placeholder page states. The sign-in page
+is the next slice; the full product workflows remain backend-only.
 
 ## Development
 
@@ -21,24 +24,29 @@ From the repository root after `bun install`:
 bun run --filter @amends/web dev
 bun run --filter @amends/desktop dev
 bun run --filter @amends/frontend dev
+bun run --filter @amends/client dev:storybook
 ```
 
-Run each in its own terminal. Storybook serves at `http://127.0.0.1:6007/`.
+Run each in its own terminal. The frontend UI workshop serves at
+`http://127.0.0.1:6007/`; client integration stories serve at port 6008.
 Desktop requires [native tools](desktop/README.md#run-and-verify); web and Storybook
 need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
 
-## Shared frontend integration
+## Client and UI boundaries
 
-The next slice will introduce `@amends/frontend` into both app entry points,
-including fonts, theme setup, and vanilla-extract compilation. Shared screens and
-interactions belong in frontend with Storybook coverage. Browser and Tauri startup,
-native permissions, and platform services belong in their respective apps.
-Shared components receive capabilities/data through explicit interfaces instead
-of importing a platform entry point. Neither app should depend on the other.
+`@amends/client` owns routes, the credential-scoped Effect atom registry,
+session validation, and typed API access. Its [guide](client/README.md)
+describes the route and lifecycle contracts. Client routes connect UI components to these
+providers. Frontend components receive data and callbacks and have no dependency on client.
+
+Web supplies browser routing and defaults to `/api` through its development proxy.
+Desktop supplies hash routing and connects to the existing Bun host at port 8787.
+Both supply endpoint-scoped web-storage adapters. Platform APIs stay in the entry apps;
+frontend cannot import client, routing/session state, or API code.
 
 Apps may consume shared packages through `workspace:*`. Shared packages cannot
 import apps. `bun run check:packages` enforces shared-package declarations,
-icon runtime isolation, frontend/platform boundaries, and the retirement of the
+icon runtime isolation, frontend/client/platform boundaries, and the retirement of the
 old UI dependencies. Cross-workspace imports use declared package names.
 
 Each workspace has its own manifest, `typecheck` script, and `tsconfig.json`

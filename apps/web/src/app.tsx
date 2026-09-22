@@ -1,8 +1,16 @@
+import { Router } from "@solidjs/router";
+import { Application, createBrowserSessionStore, resolveApiBaseUrl } from "@amends/client";
+
 export function App() {
+  const apiBaseUrl = resolveApiBaseUrl(
+    import.meta.env.VITE_AMENDS_API_URL ?? "/api",
+    window.location.href,
+  );
   return (
-    <main>
-      <h1>Amends</h1>
-      <p>Web app</p>
-    </main>
+    <Application
+      router={Router}
+      apiBaseUrl={apiBaseUrl}
+      sessionStore={createBrowserSessionStore(apiBaseUrl)}
+    />
   );
 }

@@ -1,6 +1,6 @@
 # amends-v2
 
-A Bun and TypeScript monorepo with Solid web and Tauri desktop bootstraps, an HTTP API, and workspace
+A Bun and TypeScript monorepo with a shared Solid application for web and Tauri desktop, an HTTP API, and workspace
 services backed by SQLite or PostgreSQL. The root workspace catalog pins Effect
 **4.0.0-rc.115**, and `bun.lock` records resolved dependencies.
 
@@ -20,8 +20,8 @@ only when requested through the API.
 
 Run `bun run --filter @amends/web dev` and open `http://127.0.0.1:4321/`, or run
 `bun run --filter @amends/desktop dev` to open the Tauri app after installing its
-[native prerequisites](apps/desktop/README.md#run-and-verify). Both are minimal
-bootstraps and run without the API. Shared frontend integration is the next step.
+[native prerequisites](apps/desktop/README.md#run-and-verify). Both use the shared client routes and session providers. Guests see the sign-in
+placeholder; restored sessions require the API. The sign-in page is the next step.
 The API independently exposes OpenAPI at `/openapi.json` and documentation at `/docs`;
 development sign-in prints the one-time code in the host terminal.
 
@@ -50,8 +50,9 @@ hosts/
 apps/
   icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
   frontend/           @amends/frontend: shared Solid foundations, components, and Storybook
-  web/                @amends/web: Solid/Vite browser bootstrap
-  desktop/            @amends/desktop: Tauri 2 shell and Solid/Vite webview bootstrap
+  client/             @amends/client: shared routes, sessions, API access, and app composition
+  web/                @amends/web: browser entry point for the shared application
+  desktop/            @amends/desktop: Tauri 2 entry point for the shared application
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff
 scripts/              repository tooling

@@ -16,14 +16,15 @@ bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends/icons
 bun run test --project @amends/frontend
+bun run test --project @amends/client
 bun run test --watch packages/core/test
 bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
 covers shared packages, SQLite, and the local host. PostgreSQL has its own project
-and global setup. The frontend project uses Solid/Vite transforms and Happy DOM. Web and desktop
-currently have no behavior test suites; verify their frontend builds and desktop
+and global setup. Frontend and client use Solid/Vite transforms and Happy DOM. Web and desktop
+share route/session coverage in the client project; verify both frontend builds and desktop
 startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
 
 The [icons package](../apps/icons/README.md) tests geometry validation, composition,
@@ -263,3 +264,15 @@ Core tests validate the acknowledgment codec and withholding its facts from the 
 Subprocess fixtures create an existing temporary database parent, so passing host
 tests do not prove that the default SQLite path works on a fresh clone. Follow the
 [setup guide](../hosts/local/README.md#run) to create that directory first.
+
+## Application foundation
+
+`apps/client/test/application.test.tsx` covers session storage, identity changes,
+request cancellation, safe redirects, validation failures/retry, workspace access,
+and router navigation. The client `Setup / Application` sign-out story runs in its
+portable suite. Its integration workshop uses port 6008 (`bun run --filter @amends/client dev:storybook`);
+frontend retains the independent UI workshop at port 6007. Build client stories with
+`bun run --filter @amends/client build:storybook`. These use isolated transports/stores and never require real credentials.
+The local host's HTTP tests exercise desktop CORS preflights and 401 response headers.
+After changing runtime setup, also perform the local-host temporary-port startup check
+and verify the desktop bundle against its own hash URL.

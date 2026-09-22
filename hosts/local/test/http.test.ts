@@ -5,7 +5,7 @@ import { Identity } from "@amends/core/identity";
 import { Member } from "@amends/core/workspace";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer } from "effect";
-import { HttpClientRequest, HttpRouter } from "effect/unstable/http";
+import { HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -221,4 +221,41 @@ it.live(
         );
       }),
     ),
+);
+
+it.live("allows desktop CORS preflights and includes CORS headers on authentication failures", () =>
+  temporary((filename) =>
+    Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      for (const origin of [
+        "http://127.0.0.1:1420",
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+      ]) {
+        const preflight = yield* client.options("/session/code", {
+          headers: {
+            origin,
+            "access-control-request-method": "POST",
+            "access-control-request-headers": "authorization,content-type",
+          },
+        });
+        expect(preflight.status).toBe(204);
+        expect(preflight.headers["access-control-allow-origin"]).toBe(origin);
+        expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
+          "authorization",
+        );
+        const denied = yield* client.get("/me/workspaces", { headers: { origin } });
+        expect(denied.status).toBe(401);
+        expect(denied.headers["access-control-allow-origin"]).toBe(origin);
+      }
+      const other = yield* client.options("/session/code", {
+        headers: {
+          origin: "https://untrusted.invalid",
+          "access-control-request-method": "POST",
+        },
+      });
+      expect(other.headers["access-control-allow-origin"]).toBeUndefined();
+    }).pipe(Effect.provide(server(filename).layer)),
+  ),
 );

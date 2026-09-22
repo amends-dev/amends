@@ -10,9 +10,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@amends/client": "workspace:*",
+    "@amends/frontend": "workspace:*",
+    "@solidjs/router": "catalog:",
     "solid-js": "^1.9.12"
   },
   "devDependencies": {
+    "@vanilla-extract/vite-plugin": "^5.2.6",
     "vite": "^7.0.0",
     "vite-plugin-solid": "^2.11.14"
   }

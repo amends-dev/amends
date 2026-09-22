@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import solid from "vite-plugin-solid";
 
 export default defineConfig({
-  plugins: [solid()],
+  plugins: [solid(), vanillaExtractPlugin()],
   resolve: { dedupe: ["solid-js"] },
   clearScreen: false,
   server: {

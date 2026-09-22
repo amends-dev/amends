@@ -45,14 +45,46 @@
         "@effect/platform-bun": "catalog:",
       },
     },
+    "apps/client": {
+      "name": "@amends/client",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/api-http": "workspace:*",
+        "@amends/frontend": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "@effect/atom-solid": "catalog:",
+        "@solidjs/router": "catalog:",
+        "@vanilla-extract/css": "^1.21.2",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@solidjs/testing-library": "^0.8.9",
+        "@storybook/addon-a11y": "10.6.0",
+        "@storybook/addon-docs": "10.6.0",
+        "@vanilla-extract/vite-plugin": "^5.2.6",
+        "happy-dom": "^20.10.6",
+        "solid-js": "^1.9.12",
+        "storybook": "10.6.0",
+        "storybook-solidjs-vite": "10.7.2",
+        "vite": "^7.0.0",
+        "vite-plugin-solid": "^2.11.14",
+      },
+      "peerDependencies": {
+        "solid-js": "^1.9.12",
+      },
+    },
     "apps/desktop": {
       "name": "@amends/desktop",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/client": "workspace:*",
+        "@amends/frontend": "workspace:*",
+        "@solidjs/router": "catalog:",
         "solid-js": "^1.9.12",
       },
       "devDependencies": {
         "@tauri-apps/cli": "2.11.5",
+        "@vanilla-extract/vite-plugin": "^5.2.6",
         "vite": "^7.0.0",
         "vite-plugin-solid": "^2.11.14",
       },
@@ -103,9 +135,13 @@
       "name": "@amends/web",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/client": "workspace:*",
+        "@amends/frontend": "workspace:*",
+        "@solidjs/router": "catalog:",
         "solid-js": "^1.9.12",
       },
       "devDependencies": {
+        "@vanilla-extract/vite-plugin": "^5.2.6",
         "vite": "^7.0.0",
         "vite-plugin-solid": "^2.11.14",
       },
@@ -184,6 +220,8 @@
 
     "@amends/api-http": ["@amends/api-http@workspace:packages/api-http"],
 
+    "@amends/client": ["@amends/client@workspace:apps/client"],
+
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
@@ -247,6 +285,8 @@
     "@corvu/utils": ["@corvu/utils@0.4.2", "", { "dependencies": { "@floating-ui/dom": "^1.6.11" }, "peerDependencies": { "solid-js": "^1.8" } }, "sha512-Ox2kYyxy7NoXdKWdHeDEjZxClwzO4SKM8plAaVwmAJPxHMqA0rLOoAsa+hBDwRLpctf+ZRnAd/ykguuJidnaTA=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.12.1", "", {}, "sha512-yHwomvolVafvUXhy5TdiJVkuNCxXn+bKOs2aWiWEQh/5YaV97Oa/abJz3dmx7lxgIUsUlS1Jl4mEfvJPo3YsVw=="],
+
+    "@effect/atom-solid": ["@effect/atom-solid@4.0.0-rc.115", "", { "peerDependencies": { "effect": "^4.0.0-rc.115", "solid-js": ">=1.9.14 <2.0.0" } }, "sha512-ULA4diJu+rWrYa6ij+CEjEJyTIxOPsZXm6el177jNgV+Smiq1ERIYmUHYSrpPnqFlnSBpwkzIBAI+AOlUkFUiQ=="],
 
     "@effect/platform-bun": ["@effect/platform-bun@4.0.0-rc.115", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-rc.115" }, "peerDependencies": { "effect": "^4.0.0-rc.115" } }, "sha512-ilTFcs66ghInP8WHCJYa4bx/yzohYM9dRR//qjmVBBpSKu1hrCTiRWpEcc1N6zrnOEPk2kyVaKg5ykSMgiBMqQ=="],
 

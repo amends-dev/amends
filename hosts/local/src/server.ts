@@ -10,7 +10,21 @@ import { DevelopmentAuthentication } from "./authentication/authentication.ts";
  *
  * @category layers
  */
-export const layerRoutes = Layer.mergeAll(Routes.layer, Routes.layerDocs);
+export const layerRoutes = Layer.mergeAll(
+  Routes.layer,
+  Routes.layerDocs,
+  HttpRouter.cors({
+    allowedOrigins: [
+      "http://127.0.0.1:1420",
+      "tauri://localhost",
+      "http://tauri.localhost",
+      "https://tauri.localhost",
+    ],
+    allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type", "traceparent", "tracestate"],
+    credentials: false,
+  }),
+);
 
 /**
  * Serve the routes over a host on the loopback interface; the web development proxy targets this.

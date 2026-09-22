@@ -1,8 +1,16 @@
+import { HashRouter } from "@solidjs/router";
+import { Application, createBrowserSessionStore, resolveApiBaseUrl } from "@amends/client";
+
 export function App() {
+  const apiBaseUrl = resolveApiBaseUrl(
+    import.meta.env.VITE_AMENDS_API_URL ?? "http://127.0.0.1:8787",
+    window.location.href,
+  );
   return (
-    <main>
-      <h1>Amends</h1>
-      <p>Desktop app</p>
-    </main>
+    <Application
+      router={HashRouter}
+      apiBaseUrl={apiBaseUrl}
+      sessionStore={createBrowserSessionStore(apiBaseUrl)}
+    />
   );
 }

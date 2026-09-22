@@ -51,12 +51,36 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
       if (name === "@amends/ui" || name === "@amends/design-system") {
         errors.push(`${path}: ${section}.${name} is retired; use @amends/frontend.`);
       }
+      if (
+        path === "apps/frontend/package.json" &&
+        ((name.startsWith("@amends/") && name !== "@amends/icons") ||
+          name === "effect" ||
+          name.startsWith("@effect/atom-") ||
+          name === "@solidjs/router" ||
+          name.startsWith("@tauri-apps/"))
+      )
+        errors.push(
+          `${path}: frontend is UI-only; ${section}.${name} belongs in client or a platform app.`,
+        );
+      if (
+        path === "apps/client/package.json" &&
+        ((name.startsWith("@amends/") &&
+          !["@amends/frontend", "@amends/icons", "@amends/api-http", "@amends/gateway"].includes(
+            name,
+          )) ||
+          name.startsWith("@tauri-apps/"))
+      )
+        errors.push(
+          `${path}: client must not depend on platform or backend implementations (${section}.${name}).`,
+        );
     }
   }
 }
 
-// Shared presentation stays independent of application and backend entry points.
-for await (const path of new Bun.Glob("apps/{icons,frontend,web,desktop}/src/**/*.{ts,tsx}").scan({
+// Frontend is UI-only; client/api owns shared client contract imports.
+for await (const path of new Bun.Glob(
+  "apps/{icons,frontend,client,web,desktop}/src/**/*.{ts,tsx}",
+).scan({
   cwd: root,
 })) {
   const source = await Bun.file(`${root}/${path}`).text();
@@ -107,20 +131,49 @@ for await (const path of new Bun.Glob("apps/{icons,frontend,web,desktop}/src/**/
       dependency.startsWith("@amends/design-system/")
     )
       errors.push(`${path}: ${dependency} is retired; use @amends/frontend.`);
+    const frontendImport =
+      dependency === "@amends/frontend" || dependency.startsWith("@amends/frontend/");
+    const clientImport =
+      dependency === "@amends/client" || dependency.startsWith("@amends/client/");
+    const contractImport =
+      path.startsWith("apps/client/src/api/") &&
+      ["@amends/api-http", "@amends/gateway/sign-in", "@amends/gateway/directory"].includes(
+        dependency,
+      );
     if (
       path.startsWith("apps/frontend/") &&
-      ((dependency.startsWith("@amends/") &&
-        !dependency.startsWith("@amends/frontend/") &&
-        !iconImport) ||
+      ((dependency.startsWith("@amends/") && !frontendImport && !iconImport) ||
+        dependency === "effect" ||
+        dependency.startsWith("effect/") ||
+        dependency.startsWith("@effect/atom-") ||
+        dependency === "@solidjs/router" ||
+        dependency.startsWith("@solidjs/router/") ||
+        dependency.startsWith("@tauri-apps/") ||
         (target.startsWith(resolve(root, "apps") + "/") &&
           !target.startsWith(resolve(root, "apps/frontend") + "/")) ||
-        dependency.startsWith("@tauri-apps/") ||
         target.startsWith(resolve(root, "packages") + "/") ||
         target.startsWith(resolve(root, "adapters") + "/") ||
         target.startsWith(resolve(root, "hosts") + "/"))
     )
       errors.push(
-        `${path}: frontend must remain independent of platform and backend code (${dependency}).`,
+        `${path}: frontend is UI-only and must not import client, API, or platform code (${dependency}).`,
+      );
+    if (
+      path.startsWith("apps/client/") &&
+      ((dependency.startsWith("@amends/") &&
+        !clientImport &&
+        !frontendImport &&
+        !iconImport &&
+        !contractImport) ||
+        dependency.startsWith("@tauri-apps/") ||
+        (target.startsWith(resolve(root, "apps") + "/") &&
+          !target.startsWith(resolve(root, "apps/client") + "/")) ||
+        target.startsWith(resolve(root, "packages") + "/") ||
+        target.startsWith(resolve(root, "adapters") + "/") ||
+        target.startsWith(resolve(root, "hosts") + "/"))
+    )
+      errors.push(
+        `${path}: use frontend exports and named client API modules; platform/backend implementations stay outside client (${dependency}).`,
       );
   }
 }
@@ -130,6 +183,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and icons/frontend/web/desktop import boundaries.`,
+    `Checked ${packages.length} shared packages and icons/frontend/client/web/desktop import boundaries.`,
   );
 }

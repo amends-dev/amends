@@ -99,24 +99,30 @@ descriptions, scrolling bodies, and actions. Controlled form recovery is demonst
 Toast provides provider-scoped queues, polite feedback, persistent actions, paused timers,
 and keyboard access, with dedicated dark-surface color pairings. Modal feedback uses a
 viewport inside that modal. Neither component is integrated into product flows or backend
-notifications. Routing, preference persistence, application integration, and Tauri validation remain pending.
+notifications. Product-shell integration, theme/collapse preference persistence, and
+component-level Tauri validation remain pending.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
-layer. Shared frontend integration in web and Tauri remains pending.
+layer. Both app entry points load the shared client application and frontend fonts.
 
-## Web and desktop bootstrap
+## Shared client foundation
 
-[Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) render minimal
-Solid pages. Desktop supplies a Tauri 2 native shell. Both run without the backend;
-neither imports `frontend` yet. The legacy `ui` and `design-system` packages and
-web's routes, session/data layer, product screens, and integration tests have been
-removed. Those backend workflows remain implemented but have no current app UI.
+[Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) share routes,
+session storage/lifetime, typed API access, and placeholder page states from
+[client](../apps/client/README.md). Web uses browser routing and
+an API proxy; Tauri uses hash routing and connects to the existing local host.
+Frontend is UI-only; client consumes its exports for application composition.
+Stored credentials are scoped by API URL and validated before protected content mounts.
+Changing credentials disposes the previous registry and requests. Session rejection,
+host failures, missing workspace access, and unknown routes have separate states.
 
-Shared screen composition, theme setup, routing, authentication, backend transport,
-and platform capabilities remain future integration work. The frontend workshop
-continues to verify its components independently. Tauri distribution signing,
-updates, production artwork, and cross-platform installer verification are pending.
+The sign-in page, email/code interaction, workspace picker/creation, application shell,
+and domain pages remain unimplemented. Only local sign-out exists; server revocation,
+token refresh, native credential storage, and web/desktop login synchronization are
+future work. The removed legacy web screens remain available in Git history.
+Theme preferences, route focus management, Tauri signing/updates, production artwork,
+and cross-platform installer verification are pending.
 
 ## Notification recipients and generation
 

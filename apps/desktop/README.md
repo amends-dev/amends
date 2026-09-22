@@ -1,8 +1,9 @@
 # Amends desktop
 
-Tauri 2 desktop shell with a minimal Solid/Vite entry point. It opens one native
-window containing the bootstrap page. It has no native commands/plugins, API
-connection, sidecar host, session persistence, or product screens.
+Tauri 2 desktop shell for the [shared application foundation](../client/README.md).
+It uses hash routing, webview session persistence, and the existing Bun host over HTTP.
+The sign-in/workspace routes are placeholders awaiting product pages. Desktop does not
+start a backend process or use native commands/plugins.
 
 ## Run and verify
 
@@ -27,7 +28,9 @@ bun run --filter @amends/desktop dev
 ```
 
 Tauri starts Vite at `http://127.0.0.1:1420/`, compiles Rust, and opens the window.
-The web bootstrap uses port 4321, so both can run together. Neither needs the API.
+Web uses port 4321, so both can run together. Guests reach the sign-in placeholder
+without an API request. Start the [existing host](../../hosts/local/README.md#run)
+separately for restored-session validation and future sign-in operations.
 The [Vite integration](https://v2.tauri.app/start/frontend/vite/) uses a fixed dev
 port and bundles `dist` through `src-tauri/tauri.conf.json`.
 
@@ -44,7 +47,7 @@ bun run test
 
 `dev:frontend` and `preview` run just the webview content in a browser. `typecheck`
 checks TypeScript only; root `check` includes it. Run `check:native` separately
-when changing Rust or Tauri configuration. The bootstrap has no behavior test suite;
+when changing Rust or Tauri configuration. Shared route/session tests run in client;
 verify the native window as well as both frontend builds after changing startup.
 
 Native output goes to `src-tauri/target`, including `release/bundle` for installers.
@@ -52,15 +55,23 @@ Cargo's lockfile is committed; build output and generated schemas are ignored.
 The generated Tauri icons are temporary scaffold assets. Distribution signing,
 application artwork, installers on other operating systems, and updates are future work.
 
-## Shared frontend boundary
+## Shared frontend and host connection
 
 `src/main.tsx` owns webview startup; `src-tauri` owns the native window and permissions.
 The window currently has no native command permissions. Add capabilities only as
-features need them. The production content security policy permits bundled assets;
-development additionally permits the local Vite connection.
+features need them. The production content security policy permits bundled assets and the configured local
+API; development additionally permits the local Vite connection.
 
-The next step is to compose [frontend](../frontend/README.md) in `src/app.tsx`,
-using the same exported components/screens as [web](../web/README.md). Add its fonts,
-styles, and vanilla-extract build integration then. Keep Tauri imports and platform
-services in this app and pass capabilities into shared UI. Backend connectivity
-and any decision to launch a local host belong to a later integration step.
+`src/app.tsx` supplies `HashRouter` to the same shared `Application` used by web.
+Both build shared styles with vanilla-extract and load the frontend fonts explicitly.
+Tauri dependencies stay in this app; `@amends/client` knows only its endpoint,
+router, and storage interfaces.
+
+The default API URL is `http://127.0.0.1:8787`. The content security policy permits
+that connection, and the local host allows the development and bundled Tauri origins.
+`VITE_AMENDS_API_URL` can select a different HTTP(S) host at build/dev startup; also
+add that exact origin to `connect-src` in both CSP configurations and configure the
+host's CORS policy. API URLs cannot contain credentials, query parameters, or fragments.
+Credentials are scoped to the normalized API URL and this webview origin. Web and
+desktop do not automatically share a login. OS credential storage and host selection
+UI remain later work.

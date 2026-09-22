@@ -39,6 +39,16 @@ at the repository root runs the host in `hosts/local`, so its default database i
 without the setup step, the default path fails on a fresh clone. Use an absolute
 filename with an existing parent to choose another location.
 
+## Browser and desktop access
+
+The web development server proxies `/api` to this host. Desktop connects directly to
+`http://127.0.0.1:8787`; it does not start a host process. The local server's CORS layer
+allows `http://127.0.0.1:1420`, `tauri://localhost`, `http://tauri.localhost`, and
+`https://tauri.localhost`, with authorization/content-type and tracing headers.
+It also applies to authentication failures so clients can handle a 401. Other origins
+receive no allow-origin header. Cookies are not used; requests carry bearer tokens.
+Different web origins require a same-origin proxy or an explicit host CORS change.
+
 ## Modules and construction
 
 Follow the [host conventions](../README.md). Each implementation owns its

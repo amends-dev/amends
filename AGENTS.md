@@ -59,8 +59,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume it.
   `frontend` holds shared visual foundations, primitives, and compositions with a
   standalone Storybook workshop. Introduce and verify one foundation or component
-  at a time. `web` and `desktop` are minimal Solid entry points; `desktop` owns the
-  Tauri shell. Both will consume `frontend`; platform APIs stay in the entry apps.
+  at a time. It is UI-only and must not depend on client state, routing, or API
+  contracts. `client` owns shared routes, session lifetime, typed API access, and
+  application composition using frontend exports. `web` and `desktop` supply routing,
+  API URL, and persistence to client. `desktop` owns the Tauri shell; platform APIs
+  stay in the entry apps.
   The former `ui` and `design-system` packages are retired. Apps may install UI
   dependencies and consume shared packages. Run desktop's `check:native` after
   changing Rust or Tauri configuration; root checks cover its TypeScript only.

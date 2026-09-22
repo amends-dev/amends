@@ -1,9 +1,9 @@
 # Amends web
 
-Minimal Solid/Vite browser entry point. It renders a bootstrap page with no backend
-connection, routing, session persistence, or product screens. The former web UI,
-its integration code/tests, and the `ui` and `design-system` packages have been removed.
-The backend contracts and services remain available independently.
+Solid/Vite browser entry point for the [shared application foundation](../client/README.md).
+It supplies browser-history routing, API configuration, and browser session persistence.
+The sign-in and workspace routes currently contain placeholders; their product pages
+will be introduced separately.
 
 ## Run and verify
 
@@ -11,10 +11,19 @@ From the repository root:
 
 ```sh
 bun install --frozen-lockfile
+mkdir -p hosts/local/data
+bun run start
+```
+
+In another terminal:
+
+```sh
 bun run --filter @amends/web dev
 ```
 
-Open `http://127.0.0.1:4321/`. No API process is required.
+Open `http://127.0.0.1:4321/`. Guests reach the sign-in placeholder without contacting
+the host. Restored sessions are validated before protected routes render. Vite proxies
+`/api` to `http://127.0.0.1:8787`; the local host remains a separate process.
 
 ```sh
 bun run --filter @amends/web build
@@ -23,14 +32,15 @@ bun run check
 bun run test
 ```
 
-The build outputs static assets to `apps/web/dist`. The local Bun host does not serve
-these assets. There is no API proxy until transport is integrated again.
+Build output is `apps/web/dist`. The local host does not serve these files. A production
+web server must serve `index.html` for application routes and proxy `/api` to the API.
+Alternatively set `VITE_AMENDS_API_URL` at build/dev startup to an HTTP(S) API base URL;
+that host must allow the web origin when cross-origin. The endpoint is public configuration,
+never a place for secrets. Sessions are stored separately for each normalized API URL.
 
-## Next integration
+## Ownership
 
-Keep browser startup in `src/main.tsx` and application composition in `src/app.tsx`.
-The [frontend package](../frontend/README.md) will supply shared foundations,
-components, and screens to this app and [desktop](../desktop/README.md).
-Neither bootstrap imports it yet. Introduce its styles, fonts, and vanilla-extract
-build plugin when adding the first shared screen. Keep platform APIs in the app
-entry points and pass needed capabilities into shared components.
+`src/main.tsx` mounts Solid and loads shared fonts/global styles. `src/app.tsx` chooses
+`Router`, resolves the endpoint (default `/api`), and supplies the session store.
+Routes, session lifetime, typed API access, and application composition live in `client`, using UI components from `frontend`.
+Vite deduplicates Solid and compiles the shared vanilla-extract styles.
