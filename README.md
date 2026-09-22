@@ -47,7 +47,7 @@ hosts/
 apps/
   ui/                 @amends/ui: Solid components, tokens, and styles
   design-system/      @amends/design-system: shared feature UI and Storybook workshop
-  frontend/           @amends/frontend: incremental shared frontend, starting with Storybook setup
+  frontend/           @amends/frontend: incremental shared frontend, color foundations and Storybook
   web/                @amends/web: Solid application over the HTTP contract
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff

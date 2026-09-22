@@ -1,9 +1,10 @@
 # Amends frontend
 
 The starting point for the shared Solid frontend intended for web and Tauri desktop.
-This package currently contains only a standalone Storybook setup and its verification
-story. It has no production exports, tokens, themes, or components, and neither app
-consumes it yet. The existing `ui`, `design-system`, and `web` packages remain in place.
+The first [color foundation](src/foundations/color/README.md) defines four surface/text
+roles for Cotton and Soot, with scoped theme styles and Storybook specimens. There are
+no production components yet, and neither app consumes this package. The existing `ui`,
+`design-system`, and `web` packages remain in place.
 
 ## Run and verify
 
@@ -23,12 +24,17 @@ in the native input updates the output. The story's play function verifies typin
 clearing, and the portable-story test runs that same scenario in Bun/Vitest. The root
 `bun run test` includes this project.
 
-The build produces a static workshop in `apps/frontend/dist`. Storybook configuration
-is the package's current entry point; production source exports will be added with the
-first foundation. Stories are discovered under `src/**/*.stories.tsx`.
+Open **Foundations / Color / Comparison** to review both themes, or use the Cotton/Soot
+stories and their theme control. Nested Themes shows independent scopes in both directions.
+The eight text/background pairings have contrast tests using Color.js; browser review
+verifies the generated CSS and the accessibility addon checks the rendered specimens.
+
+The build produces a static workshop in `apps/frontend/dist`. Production exports point
+to the color tokens and theme styles, separately from the workshop. Stories are discovered
+under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.
-The builder loads the Solid plugin from `vite.config.ts`. Tests use the public `/next`
+The builder loads the Solid and vanilla-extract plugins from `vite.config.ts`. Tests use the public `/next`
 portable-story factory and the repository's explicit DOM-matcher setup. No Storybook
 Vitest addon is installed; its 10.6.0 peer range excludes this repository's Vitest 5.
 
@@ -56,6 +62,8 @@ For each addition:
 5. Review that slice before starting another piece or changing an app to consume it.
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
-a design reference. Themes and styling tooling will arrive with the relevant foundations.
+a design reference. Color specimens use system fonts and local layout styles; typography,
+spacing, radius, and global styles remain separate future slices. Color.js is a development
+dependency used by the contrast tests and specimens, not the production exports.
 The accessibility addon is available; automated screenshot-baseline testing and native
 desktop validation are not configured. Tauri integration remains a later step.

@@ -10,7 +10,8 @@ This directory contains the existing Solid clients and a new frontend workshop:
   its named API modules. It implements sign-in and workspace management; other
   domain pages remain placeholders.
 - [frontend](frontend/README.md) starts the shared frontend intended for web and Tauri
-  desktop. It currently contains only Storybook setup and a rendering/interaction story.
+  desktop. It contains the first four surface/text color roles, scoped Cotton/Soot themes,
+  and their Storybook specimens alongside the setup verification story.
   Foundations and components will be introduced individually, with stories at every layer;
   existing packages remain in place.
 

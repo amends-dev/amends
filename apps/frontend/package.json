@@ -3,16 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "**/*.css.ts",
+    "**/*.css"
+  ],
+  "exports": {
+    "./foundations/color": "./src/foundations/color/tokens.ts",
+    "./foundations/color/styles": "./src/foundations/color/theme.css.ts"
+  },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",
     "build": "bun run typecheck && bun run --bun storybook build --output-dir dist --disable-telemetry",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun run --bun vitest run --config vite.config.ts"
   },
+  "dependencies": {
+    "@vanilla-extract/css": "^1.21.2"
+  },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.9",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
+    "@vanilla-extract/vite-plugin": "^5.2.6",
+    "colorjs.io": "0.7.1",
     "happy-dom": "^20.10.6",
     "solid-js": "^1.9.12",
     "storybook": "10.6.0",

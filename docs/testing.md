@@ -36,6 +36,9 @@ allows the portable scenarios to run in the existing suite.
 The new [frontend workshop](../apps/frontend/README.md) uses the same portable-story
 approach to verify its Solid rendering and interaction setup. Build it independently
 with `bun run --filter @amends/frontend build`; no existing UI is imported into this package.
+Its [color foundation](../apps/frontend/src/foundations/color/README.md) tests all eight
+supported text/background pairings with Color.js. Storybook specimens support browser
+checks of the actual CSS variables, theme switching, nested scopes, and contrast.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin
