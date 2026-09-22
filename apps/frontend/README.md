@@ -177,6 +177,11 @@ Title, Description, and Close parts. Its Ada reference composes Avatar and Text 
 popover owns positioning, focus, and dismissal. It inherits the trigger's theme and direction
 inside or outside native Dialog and Drawer. See the [Popover contract](src/compositions/popover/README.md).
 
+**Compositions / Breadcrumb** adds a page-header location trail with native ancestor links,
+a non-link current page, decorative slashes, and ordered-list navigation semantics. Stories
+cover the task-detail reference, one through four levels, both themes, narrow wrapping,
+RTL, and link activation. See the [Breadcrumb contract](src/compositions/breadcrumb/README.md).
+
 The shared [icons package](../icons/README.md) now includes all 26 SVG redraws from the
 Primitives v2 Marks reference. Select's caret/check, Drawer and Toast close controls,
 navigation actions, and the workshop shell use the matching marks. Utility drawings remain
