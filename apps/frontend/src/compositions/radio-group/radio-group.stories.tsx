@@ -74,7 +74,7 @@ function StateSpecimens() {
     <main class={s.comparison}>
       <For each={["cotton", "soot"] as const}>
         {(theme) => (
-          <section class={`${colorThemes[theme]} ${s.frame} ${s.stack}`}>
+          <section class={`${colorThemes[theme]} ${s.frame} ${s.stack}`} data-group-theme={theme}>
             <Text as="h2" variant="heading">
               {theme}
             </Text>
@@ -359,6 +359,30 @@ export const Comparison = {
     await expect(groups).toHaveLength(8);
     await expect(radios).toHaveLength(24);
     await expect(new Set([...radios].map((radio) => radio.id)).size).toBe(24);
+    const rootSize = Number.parseFloat(getComputedStyle(doc.documentElement).fontSize);
+    for (const group of groups) {
+      const legend = group.querySelector("legend")!;
+      const help = doc.getElementById(`${group.id}-description`)!;
+      await expect(getComputedStyle(legend).fontFamily).toContain("IBM Plex Mono");
+      await expect(Number.parseFloat(getComputedStyle(legend).fontSize)).toBeCloseTo(
+        (rootSize * 10.5) / 16,
+        2,
+      );
+      await expect(getComputedStyle(legend).textTransform).toBe("uppercase");
+      await expect(Number.parseFloat(getComputedStyle(help).fontSize)).toBeCloseTo(
+        (rootSize * 12.5) / 16,
+        2,
+      );
+      if (doc.defaultView!.matchMedia("(forced-colors: active)").matches) continue;
+      const theme = group.closest<HTMLElement>("[data-group-theme]")!.dataset
+        .groupTheme as ColorTheme;
+      const surface = getComputedStyle(group.closest("[data-group-surface]")!).backgroundColor;
+      for (const text of [legend, help]) {
+        const color = new Color(getComputedStyle(text).color);
+        await expect(color.deltaEOK(colors[theme].text.secondary)).toBeLessThan(0.0001);
+        await expect(color.contrastWCAG21(surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
     for (const radio of radios) {
       const labelText = doc.getElementById(radio.getAttribute("aria-labelledby")!)!;
       await expect(radio).toHaveAccessibleName(labelText.textContent!);
@@ -372,6 +396,16 @@ export const Comparison = {
       const card = group.dataset.groupVariant === "card";
       const label = radio.parentElement!;
       const rendered = getComputedStyle(label);
+      await expect(Number.parseFloat(getComputedStyle(labelText).fontSize)).toBeCloseTo(
+        (rootSize * 14) / 16,
+        2,
+      );
+      const optionDescription = doc.getElementById(`${radio.id}-description`);
+      if (optionDescription)
+        await expect(Number.parseFloat(getComputedStyle(optionDescription).fontSize)).toBeCloseTo(
+          (rootSize * 12.5) / 16,
+          2,
+        );
       const disabled = radio.matches(":disabled");
       const hover = label.matches(":hover"),
         active = label.matches(":active");
@@ -416,6 +450,33 @@ export const Comparison = {
 export const States = {
   render: () => <StateSpecimens />,
   parameters: { controls: { disable: true } },
+  play: async ({ canvasElement }) => {
+    const doc = canvasElement.ownerDocument;
+    await doc.fonts.ready;
+    const rootSize = Number.parseFloat(getComputedStyle(doc.documentElement).fontSize);
+    for (const group of canvasElement.querySelectorAll('fieldset[aria-invalid="true"]')) {
+      const error = doc.getElementById(`${group.id}-error`)!;
+      const indicator = error.firstElementChild!;
+      const prefix = error.lastElementChild!.firstElementChild!;
+      await expect(Number.parseFloat(getComputedStyle(error).fontSize)).toBeCloseTo(
+        (rootSize * 12.5) / 16,
+        2,
+      );
+      await expect(indicator).toHaveAttribute("aria-hidden", "true");
+      await expect(getComputedStyle(prefix).clipPath).toBe("inset(50%)");
+      for (const radio of group.querySelectorAll('input[type="radio"]'))
+        await expect(radio).toHaveAccessibleDescription(expect.stringContaining("Error: "));
+      if (doc.defaultView!.matchMedia("(forced-colors: active)").matches) continue;
+      const theme = group.closest<HTMLElement>("[data-group-theme]")!.dataset
+        .groupTheme as ColorTheme;
+      const surface = getComputedStyle(group.closest("section")!).backgroundColor;
+      const errorColor = new Color(getComputedStyle(error).color);
+      const dotColor = new Color(getComputedStyle(indicator).backgroundColor);
+      await expect(errorColor.deltaEOK(colors[theme].text.invalid)).toBeLessThan(0.0001);
+      await expect(errorColor.contrastWCAG21(surface)).toBeGreaterThanOrEqual(4.5);
+      await expect(dotColor.deltaEOK(colors[theme].status.danger.indicator)).toBeLessThan(0.0001);
+    }
+  },
 } satisfies Story;
 export const Playground = {} satisfies Story;
 export const Interaction = {

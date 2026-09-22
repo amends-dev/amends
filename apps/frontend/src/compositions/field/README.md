@@ -83,6 +83,8 @@ Supporting text is 11px mono. Error messages use 12.5px body text and a 6px dot 
 with the first line when the message wraps. These component sizes are expressed in rem;
 font families and line heights come from the typography foundation. The 8px field gap
 and native control sizing remain part of their existing contracts.
+The label and error treatment is shared with RadioGroup through private form feedback styles
+and markup.
 
 Labels and help use the reviewed `text.secondary` role, giving them quieter emphasis
 while retaining the contrast contract on canvas/panel in Cotton and Soot. Error text uses

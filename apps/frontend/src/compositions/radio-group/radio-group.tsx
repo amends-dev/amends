@@ -1,6 +1,8 @@
 import { For, Show, createMemo, createUniqueId, splitProps, type JSX } from "solid-js";
 import { Radio } from "../../primitives/radio/index.ts";
 import { Text } from "../../primitives/text/index.ts";
+import { FormError } from "../form-error.tsx";
+import * as feedback from "../form-feedback.css.ts";
 import * as s from "./radio-group.css.ts";
 
 export interface RadioOption {
@@ -81,7 +83,7 @@ export function RadioGroup(props: RadioGroupProps): JSX.Element {
       aria-invalid={invalid()}
       class={classes()}
     >
-      <legend class={s.legend}>
+      <legend class={`${feedback.label} ${s.legend}`}>
         {local.label}
         <Show when={local.required}>
           <span aria-hidden="true"> (required)</span>
@@ -114,7 +116,7 @@ export function RadioGroup(props: RadioGroupProps): JSX.Element {
                     }}
                   />
                   <span class={s.copy}>
-                    <Text as="span" id={`${optionId}-label`}>
+                    <Text as="span" id={`${optionId}-label`} class={s.optionLabel}>
                       {option().label}
                     </Text>
                     <Show when={option().description}>
@@ -129,14 +131,12 @@ export function RadioGroup(props: RadioGroupProps): JSX.Element {
           </For>
         </div>
         <Show when={local.description}>
-          <Text id={`${id()}-description`} tone="secondary">
+          <Text id={`${id()}-description`} tone="secondary" class={s.description}>
             {local.description}
           </Text>
         </Show>
         <Show when={local.error}>
-          <Text id={`${id()}-error`} class={s.error}>
-            Error: {local.error}
-          </Text>
+          <FormError id={`${id()}-error`}>{local.error}</FormError>
         </Show>
       </div>
     </fieldset>

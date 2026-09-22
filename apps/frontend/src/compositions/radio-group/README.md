@@ -61,7 +61,8 @@ The group uses a fieldset/legend. The required marker is visual only; every radi
 `required`. Option labels are clickable, and each radio's accessible name is its option label;
 option descriptions are separate accessible descriptions. Group help/error text and caller
 `aria-describedby` IDs are merged and deduplicated, then each option adds its own description.
-An `error` sets `aria-invalid` on the fieldset and radios and displays “Error:” text. Otherwise
+An `error` sets `aria-invalid` on the fieldset and radios. The visible message has a danger
+dot; a visually hidden “Error:” prefix remains in each radio's accessible description. Otherwise
 caller `aria-invalid` is retained. Explicit group IDs must be unique and reserve the derived
 `-description`/`-error` IDs. Option IDs are independently generated.
 
@@ -71,7 +72,13 @@ native grouping semantics rather than putting several radios inside Field.
 
 ## Design and review
 
-Both variants use body text, reviewed spacing, and the Radio's existing focus ring. The plain
+The group legend shares Field's 10.5px uppercase mono label style. Option names use 14px
+body text; option and group descriptions use 12.5px body text. Errors share Field's 12.5px
+danger message and 6px dot. These sizes use rem so they scale with browser text settings.
+Shared form feedback keeps the label and error treatment consistent between Field and
+RadioGroup; the text colors use reviewed semantic roles on both themes and surfaces.
+
+Both variants use reviewed spacing and the Radio's existing focus ring. The plain
 variant has no visible container border. Cards use the existing dashed control border, 10px
 corners, a strong selected/focused border, and the reviewed hover/pressed overlays. Selected
 cards use the hover overlay plus the checked Radio dot. Disabled cards use the disabled fill;
@@ -85,7 +92,8 @@ Interaction, Forms, Card Forms, Refreshed Options, External Form, Long Content, 
 interaction/form variants and refreshed options run as portable stories. DOM/type checks
 cover grouping/isolation, associations, callbacks, option refresh, required/disabled/error
 changes, external form attributes, and duplicate values. Browser Comparison checks actual
-card colors and label/description contrast on both surfaces in both themes.
+card colors, typography, and label/description contrast on both surfaces in both themes.
+States checks the error dot, message size, accessible prefix, and danger colors.
 
 Use Playwright for actual arrows/Space/Tab, clicking whole cards, native required validation,
 form reset/data, external forms and inherited disabling, option-refresh focus, forced colors,

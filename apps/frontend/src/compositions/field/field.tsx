@@ -1,5 +1,7 @@
 import { Show, createUniqueId, splitProps, type JSX } from "solid-js";
 import { Text } from "../../primitives/text/index.ts";
+import { FormError } from "../form-error.tsx";
+import * as feedback from "../form-feedback.css.ts";
 import * as s from "./field.css.ts";
 
 export interface FieldControlProps {
@@ -82,7 +84,7 @@ export function Field(props: FieldProps): JSX.Element {
       .join(" ");
   return (
     <div {...native} class={classes()}>
-      <label id={`${control.id}-label`} for={control.id} class={s.label}>
+      <label id={`${control.id}-label`} for={control.id} class={feedback.label}>
         {local.label}
         <Show when={local.required}>
           <span aria-hidden="true"> (required)</span>
@@ -100,13 +102,7 @@ export function Field(props: FieldProps): JSX.Element {
         </Text>
       </Show>
       <Show when={local.error}>
-        <Text id={`${control.id}-error`} tone="danger" class={s.error}>
-          <span class={s.errorIndicator} aria-hidden="true" />
-          <span class={s.errorMessage}>
-            <span class={s.errorPrefix}>Error: </span>
-            {local.error}
-          </span>
-        </Text>
+        <FormError id={`${control.id}-error`}>{local.error}</FormError>
       </Show>
     </div>
   );

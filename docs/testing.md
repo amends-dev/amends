@@ -117,8 +117,9 @@ The [RadioGroup composition](../apps/frontend/src/compositions/radio-group/READM
 controlled callbacks, group isolation, associations, refreshed-option identity/focus, removed
 or disabled selections, native attributes, and duplicate values. Plain/card interaction and
 form stories plus refreshed options run as portable tests. Browser verification covers card
-contrast, native navigation/validation, reset, external form data, disabled fieldsets, forced
-colors, and narrow/enlarged layouts.
+contrast, compact legend/option/help typography, the shared error dot and accessible prefix,
+native navigation/validation, reset, external form data, disabled fieldsets, forced colors,
+and narrow/enlarged layouts.
 Checkbox/Switch tests cover forwarding/ref/events, reactive checked/disabled state, native
 form values/reset and required validity, and checkbox mixed clearing. Select tests cover
 initial/reactive values, refreshed options, Field associations, validity, form data/reset, and

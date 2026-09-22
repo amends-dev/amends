@@ -2,7 +2,6 @@ import { style, styleVariants } from "@vanilla-extract/css";
 import { colorVars } from "../../foundations/color/theme.css.ts";
 import { space } from "../../foundations/spacing/tokens.ts";
 import { radius } from "../../foundations/radius/tokens.ts";
-import { typographyStyles } from "../../foundations/typography/styles.css.ts";
 
 export const root = style({
   margin: 0,
@@ -11,10 +10,7 @@ export const root = style({
   minWidth: 0,
   overflowWrap: "anywhere",
 });
-export const legend = style([
-  typographyStyles.body,
-  { padding: 0, marginBottom: space[2], color: colorVars.text.primary, maxWidth: "100%" },
-]);
+export const legend = style({ padding: 0, marginBottom: space[2], maxWidth: "100%" });
 export const stack = style({
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",
@@ -56,5 +52,8 @@ export const variants = styleVariants({
   },
 });
 export const copy = style({ display: "grid", gap: space[1], minWidth: 0, flex: "1 1 10rem" });
-export const description = style({ color: colorVars.text.secondary });
-export const error = style({ color: colorVars.text.invalid });
+export const optionLabel = style({ selectors: { "&&": { fontSize: "0.875rem" } } });
+export const description = style({
+  color: colorVars.text.secondary,
+  selectors: { "&&": { fontSize: "0.78125rem" } },
+});
