@@ -166,6 +166,11 @@ See the [Dialog](src/compositions/dialog/README.md) and [Toast](src/compositions
 contracts. **Foundations / Color / Toast** shows its dedicated dark surface, light text,
 and amber action pairings in both themes.
 
+**Compositions / Popover** adds a declarative, nonmodal anchored panel with Trigger, Content,
+Title, Description, and Close parts. Its Ada reference composes Avatar and Text while the
+popover owns positioning, focus, and dismissal. It inherits the trigger's theme and direction
+inside or outside native Dialog and Drawer. See the [Popover contract](src/compositions/popover/README.md).
+
 The shared [icons package](../icons/README.md) supplies Select's chevron/check, Drawer close,
 Shell navigation toggles, and workshop glyphs. **Foundations / Icons** adds a searchable
 catalog, both-theme size/weight matrix, enlarged root text, and reactive accessibility

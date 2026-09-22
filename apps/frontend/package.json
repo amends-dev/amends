@@ -35,6 +35,7 @@
     "./primitives/tooltip": "./src/primitives/tooltip/index.ts",
     "./compositions/navigation": "./src/compositions/navigation/index.ts",
     "./compositions/dialog": "./src/compositions/dialog/index.ts",
+    "./compositions/popover": "./src/compositions/popover/index.ts",
     "./compositions/toast": "./src/compositions/toast/index.ts",
     "./compositions/drawer": "./src/compositions/drawer/index.ts",
     "./compositions/shell": "./src/compositions/shell/index.ts"

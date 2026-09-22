@@ -166,6 +166,10 @@ and focus recovery. Timer tests use Vitest fake timers in these synchronous UI t
 Use their browser stories for native Tab containment, dismissal, nested Select and toast
 interaction inside a dialog, Alt+T, viewport overflow, enlarged text, forced colors, and reduced motion.
 Toast text/action colors have dedicated contrast tests and a foundation specimen.
+The [Popover composition](../apps/frontend/src/compositions/popover/README.md) runs portable
+stories for content actions, guarded closing, controlled state, icon triggers, and mounting
+in native Dialog and Drawer. Browser checks cover Escape/outside focus behavior, edge
+placement, narrow and enlarged text, RTL, theme colors, forced colors, and Storybook accessibility.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these
