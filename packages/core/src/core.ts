@@ -12,6 +12,7 @@ import { ThreadParticipationDeparture } from "./thread/participation/departure.t
 import { ThreadActivityRecording } from "./thread/activity/recording.ts";
 import { ThreadActivityReading } from "./thread/activity/reading.ts";
 import { NotificationSource } from "./notification/source.ts";
+import { NotificationAcknowledgment } from "./notification/acknowledgment.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
@@ -132,6 +133,7 @@ const operations = Layer.mergeAll(
       threadAccess,
       activityReading,
       notificationSource,
+      NotificationAcknowledgment.layer,
       admissions,
       recording,
       departures,

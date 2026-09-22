@@ -56,6 +56,7 @@ const run = <A, E>(
       listPendingByRecipient: () => Effect.die("Unexpected notification read"),
       insert: () => Effect.die("Unexpected notification write"),
       discardPendingForParticipation: () => Effect.die("Unexpected notification write"),
+      acknowledge: () => Effect.die("Unexpected notification write"),
     }),
     Effect.provideService(ThreadParticipationStore.Service, {
       workspaceId,

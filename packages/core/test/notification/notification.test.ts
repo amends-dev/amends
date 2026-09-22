@@ -12,6 +12,44 @@ const wire = {
   recordedAt: "2026-09-19T12:00:00.000Z",
   state: { _tag: "Pending" },
 } as const;
+it.effect(
+  "Seen acknowledgments preserve their outcome and timestamp through the notification codec",
+  () =>
+    Effect.gen(function* () {
+      const encoded = {
+        ...wire,
+        state: {
+          _tag: "Acknowledged",
+          outcome: { _tag: "Seen" },
+          acknowledgedAt: "2026-09-21T12:00:00.123Z",
+        },
+      };
+      const record = yield* Schema.decodeUnknownEffect(Notification.Record)(encoded);
+      const codec = Codec.makeForSchema(Notification.Record);
+      expect(
+        yield* Schema.encodeEffect(Notification.Record)(
+          yield* codec.decode(yield* codec.encode(record)),
+        ),
+      ).toEqual(encoded);
+      const decode = Schema.decodeUnknownOption(Notification.Record);
+      for (const invalid of [
+        ...["Agent", "Contact", "Triage"].map((kind) => ({
+          ...encoded,
+          recipient: { _tag: kind, id: "recipient" },
+        })),
+        { ...encoded, state: { ...encoded.state, acknowledgedAt: "invalid" } },
+        {
+          ...encoded,
+          state: { ...encoded.state, outcome: { _tag: "TurnAccepted", turnId: "unverified" } },
+        },
+        {
+          ...encoded,
+          state: { _tag: "Acknowledged", acknowledgedAt: encoded.state.acknowledgedAt },
+        },
+      ])
+        expect(Option.isNone(decode(invalid))).toBe(true);
+    }),
+);
 it.effect.each(["Human", "Agent", "Contact"] as const)(
   "a %s notification preserves its source, recipient kind, and recorded time through codecs",
   (kind) =>

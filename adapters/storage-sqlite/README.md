@@ -64,6 +64,10 @@ associations are unique within the workspace. Inserts join the journal transacti
 source existence and recipient selection remain generation responsibilities.
 The notification projection generates opening and reply message notifications from recorded thread activity
 and discards pending agent input when its participation ends.
+`NotificationStore.acknowledge` conditionally changes a pending notification to `Acknowledged`,
+preserving source and recipient fields. It validates the outcome against the recipient and requires
+the active transaction. Human `Seen` and its timestamp live in the existing JSON record, so this
+operation requires no SQLite schema change.
 
 ## Transactions
 
@@ -176,3 +180,5 @@ checkpoint validation, and rollback. Fixtures are in `support.ts` and
 `notification-sources.test.ts` mirrors PostgreSQL coverage for current source authorization,
 historical recipient integrity, direct entry lookup, no-write resolution, staged visibility,
 rollback, reopening, and gateway outcomes.
+`notification-acknowledgment.test.ts` mirrors PostgreSQL's ownership, atomicity, repeat handling,
+concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.

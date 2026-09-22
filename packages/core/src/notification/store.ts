@@ -32,7 +32,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * Workspace-bound notification read model. Reads use the current transaction
  * when present, otherwise committed state, and return isolated records. These
  * internal reads do not authorize callers; application operations must do so.
- * Both storage adapters implement this contract; acknowledgment writes remain deferred.
+ * Both storage adapters implement this contract.
  */
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -65,6 +65,11 @@ export interface Interface {
    */
   readonly insert: (
     record: Notification.Record,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /** Pending-only projection write. Preserve source/history; reject missing, terminal, or incompatible records. */
+  readonly acknowledge: (
+    id: Notification.Id,
+    acknowledgment: Notification.Acknowledgment,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** Settle pending agent input for this ended participation, preserving source and recipient history. */
   readonly discardPendingForParticipation: (

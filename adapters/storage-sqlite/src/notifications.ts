@@ -77,6 +77,50 @@ export const make = Effect.fn("Notifications.make")(function* () {
       (recipient, options) => list(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
     ),
+    acknowledge: Effect.fn("Notifications.acknowledge")(function* (input, value) {
+      yield* Store.Transaction;
+      const id = yield* Schema.decodeEffect(Notification.Id)(input).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "acknowledge")),
+      );
+      const acknowledgment = yield* Schema.decodeEffect(Schema.toType(Notification.Acknowledgment))(
+        value,
+      ).pipe(Effect.mapError(storeConflict(NotificationStore, "acknowledge")));
+      const rows = yield* guard(
+        sql`SELECT ${columns} FROM notifications WHERE workspace_id = ${workspaceId} AND id = ${id}`,
+        true,
+      ).pipe(
+        Effect.flatMap(decode),
+        Effect.map(records),
+        Effect.mapError(storeFailure(NotificationStore, "acknowledge")),
+      );
+      const current = rows[0];
+      if (current === undefined || current.state._tag !== "Pending")
+        return yield* new NotificationStore.Conflict({
+          operation: "acknowledge",
+          message: "Expected a pending notification",
+        });
+      const record = yield* validateRecord(
+        Object.assign({}, current, {
+          state: {
+            _tag: "Acknowledged",
+            outcome: acknowledgment.outcome,
+            acknowledgedAt: acknowledgment.acknowledgedAt,
+          },
+        }),
+      ).pipe(Effect.mapError(storeConflict(NotificationStore, "acknowledge")));
+      const data = yield* encode(record).pipe(
+        Effect.mapError(storeFailure(NotificationStore, "acknowledge")),
+      );
+      const updated = yield* guard(
+        sql`UPDATE notifications SET record = ${data} WHERE workspace_id = ${workspaceId} AND id = ${id} AND json_extract(record, '$.state._tag') = 'Pending' RETURNING id`,
+        true,
+      ).pipe(Effect.mapError(storeError(NotificationStore, "acknowledge")));
+      if (updated.length !== 1)
+        return yield* new NotificationStore.Conflict({
+          operation: "acknowledge",
+          message: "Notification is no longer pending",
+        });
+    }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (input) {
         yield* Store.Transaction;

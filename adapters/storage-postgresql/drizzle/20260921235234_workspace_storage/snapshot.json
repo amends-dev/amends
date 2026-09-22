@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "7ee10211-1d1a-480b-b95e-e3371665c352",
+  "id": "02c594cf-73b9-42f7-863c-ebc09a84f191",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1287,6 +1287,32 @@
       "generated": null,
       "identity": null,
       "name": "discard_reason",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "acknowledgment_outcome",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "acknowledged_at",
       "entityType": "columns",
       "schema": "public",
       "table": "notifications"
@@ -3350,7 +3376,7 @@
       "table": "members"
     },
     {
-      "value": "(\"state\" = 'Pending' AND \"discard_reason\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" = 'participation-ended')",
+      "value": "(\"state\" = 'Pending' AND \"discard_reason\" IS NULL AND \"acknowledgment_outcome\" IS NULL AND \"acknowledged_at\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" IS NOT NULL AND \"discard_reason\" = 'participation-ended' AND \"acknowledgment_outcome\" IS NULL AND \"acknowledged_at\" IS NULL) OR (\"state\" = 'Acknowledged' AND \"discard_reason\" IS NULL AND \"acknowledgment_outcome\" IS NOT NULL AND \"acknowledgment_outcome\" = 'Seen' AND \"acknowledged_at\" IS NOT NULL AND \"recipient_kind\" = 'Human')",
       "name": "notification_state",
       "entityType": "checks",
       "schema": "public",

@@ -10,11 +10,26 @@ import { notifications } from "./schema.ts";
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
 const validateRecipient = Schema.decodeEffect(Notification.Recipient);
 const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
-const decode = Schema.decodeUnknownEffect(
+const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...Notification.Record.fields, recordedAt: Schema.DateTimeUtcFromDate }),
+    Schema.Struct({
+      ...Notification.Record.fields,
+      recordedAt: Schema.DateTimeUtcFromDate,
+      state: Schema.Union([
+        Notification.State.cases.Pending,
+        Notification.State.cases.Discarded,
+        Schema.Struct({
+          ...Notification.State.cases.Acknowledged.fields,
+          acknowledgedAt: Schema.DateTimeUtcFromDate,
+        }),
+      ]),
+    }),
   ),
 );
+const decode = (rows: ReadonlyArray<unknown>) =>
+  decodeRows(rows).pipe(
+    Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
+  );
 
 type NotificationRow = typeof notifications.$inferSelect;
 const toEncodedRecord = (row: NotificationRow) => ({
@@ -30,11 +45,21 @@ const toEncodedRecord = (row: NotificationRow) => ({
   recordedAt: row.recordedAt,
   ...(row.participationId === null ? {} : { participationId: row.participationId }),
   state:
-    row.state === "Pending"
+    row.state === "Acknowledged"
       ? row.discardReason === null
-        ? { _tag: "Pending" }
+        ? {
+            _tag: "Acknowledged",
+            outcome: { _tag: row.acknowledgmentOutcome },
+            acknowledgedAt: row.acknowledgedAt,
+          }
         : undefined
-      : { _tag: row.state, reason: row.discardReason },
+      : row.acknowledgmentOutcome !== null || row.acknowledgedAt !== null
+        ? undefined
+        : row.state === "Pending"
+          ? row.discardReason === null
+            ? { _tag: "Pending" }
+            : undefined
+          : { _tag: row.state, reason: row.discardReason },
 });
 
 /**
@@ -109,6 +134,56 @@ export const make = Effect.fn("Notifications.make")(function* () {
       (recipient, options) => list(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
     ),
+    acknowledge: Effect.fn("Notifications.acknowledge")(function* (input, value) {
+      yield* Store.Transaction;
+      const id = yield* Schema.decodeEffect(Notification.Id)(input).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "acknowledge")),
+      );
+      const acknowledgment = yield* Schema.decodeEffect(Schema.toType(Notification.Acknowledgment))(
+        value,
+      ).pipe(Effect.mapError(storeConflict(NotificationStore, "acknowledge")));
+      const rows = yield* guard(
+        db
+          .select()
+          .from(notifications)
+          .where(and(inWorkspace, eq(notifications.id, id))),
+        true,
+      ).pipe(
+        Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
+        Effect.mapError(storeFailure(NotificationStore, "acknowledge")),
+      );
+      const current = rows[0];
+      if (current === undefined || current.state._tag !== "Pending")
+        return yield* new NotificationStore.Conflict({
+          operation: "acknowledge",
+          message: "Expected a pending notification",
+        });
+      yield* validateRecord({
+        ...current,
+        state: {
+          _tag: "Acknowledged",
+          outcome: acknowledgment.outcome,
+          acknowledgedAt: acknowledgment.acknowledgedAt,
+        },
+      }).pipe(Effect.mapError(storeConflict(NotificationStore, "acknowledge")));
+      const updated = yield* guard(
+        db
+          .update(notifications)
+          .set({
+            state: "Acknowledged",
+            acknowledgmentOutcome: acknowledgment.outcome._tag,
+            acknowledgedAt: DateTime.toDate(acknowledgment.acknowledgedAt),
+          })
+          .where(and(inWorkspace, eq(notifications.id, id), eq(notifications.state, "Pending")))
+          .returning({ id: notifications.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(NotificationStore, "acknowledge")));
+      if (updated.length !== 1)
+        return yield* new NotificationStore.Conflict({
+          operation: "acknowledge",
+          message: "Notification is no longer pending",
+        });
+    }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (input) {
         yield* Store.Transaction;
@@ -149,6 +224,12 @@ export const make = Effect.fn("Notifications.make")(function* () {
           sourceEntryId: record.source.entryId,
           participationId: record.participationId ?? null,
           discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
+          acknowledgmentOutcome:
+            record.state._tag === "Acknowledged" ? record.state.outcome._tag : null,
+          acknowledgedAt:
+            record.state._tag === "Acknowledged"
+              ? DateTime.toDate(record.state.acknowledgedAt)
+              : null,
           recipientKind: record.recipient._tag,
           recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
           recordedAt: DateTime.toDate(record.recordedAt),

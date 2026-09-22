@@ -20,7 +20,7 @@ The current domains contain these features:
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
-| `notification`  | Notification records, inbox/source reads, activity-driven generation, and departure settlement.                  |
+| `notification`  | Notification records, inbox/source reads, acknowledgment, activity-driven generation, and departure settlement.  |
 | `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
 | `agent`         | Permission to direct input to an agent workspace member.                                                         |
 | `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.                     |
@@ -33,7 +33,7 @@ management.
 
 The notification foundation is exported as `@amends/core/notification`. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient and
-supports `Pending` and departure-related `Discarded` states. Triage is one recipient per workspace,
+supports `Pending`, departure-related `Discarded`, and human `Acknowledged` states. Triage is one recipient per workspace,
 represented by `{ _tag: "Triage" }` without a person ID. Both storage adapters implement its bounded recipient reads
 and transactional insert. `NotificationApplication.get`, `list`, and `listPending`
 require current active membership and derive the recipient from the acting identity.
@@ -49,8 +49,10 @@ notifications from the common activity-recorded fact for every activity kind. Qu
 activity selects no recipients. The same activity handler settles pending agent input when it
 sees `ParticipationEnded`, then generates notifications for the recorded recipients. Group and
 workspace departures record that activity through the internal lifecycle service. Participation
-domain facts change participation state only; notifications subscribe solely to recorded activity. It preserves historical recipient selection and references the originating participation.
-General acknowledgment, recipient processing, and delivery remain deferred.
+domain facts change participation state only; notification generation and departure settlement
+subscribe to recorded activity. The projection preserves historical recipient selection and
+references the originating participation. Notification-owned facts record acknowledgment separately.
+Agent/contact/triage processing and delivery remain deferred.
 
 `NotificationApplication.resolveSource(notificationId)` first establishes notification ownership,
 then resolves the referenced recorded activity through the internal `NotificationSource` service.
@@ -60,6 +62,21 @@ under current group access and `thread.read`. Missing, unsupported, or inaccessi
 not themselves prevent historical reads. Resolution opens no transaction and does not acknowledge,
 join, or revive work. It is available through the gateway, with HTTP/UI integration still pending.
 See [source resolution](../../docs/thread-workflows.md#resolving-a-notification-source).
+
+`NotificationApplication.acknowledge(notificationId)` records `Seen` for the acting human's own
+notification, under active membership with no action grant or source-access requirement. It returns
+the record with `Acknowledged { outcome: { _tag: "Seen" }, acknowledgedAt }`, removes it from pending
+results, and preserves history. Repeats return the original timestamp without another fact.
+Agents receive `HumanRecipientRequired`; incompatible terminal states return `AlreadyHandled`.
+The operation and its projection/checkpoints share one commit, including any enclosing transaction.
+
+Internal `NotificationAcknowledgment.record(id, outcome)` requires the caller's transaction and
+publication context. It validates and records acknowledgment through `NotificationFacts.Acknowledged`
+and is excluded from `Core.Operations`. Future turn/delivery workflows own their durable handoff and
+call this service in the same commit. Notifications never create turns, accept their input, or execute
+work. Only the `Seen` outcome is currently implemented. Acknowledgment facts generate no activity or
+notifications and are withheld from the workspace-wide change feed. HTTP/UI actions remain pending.
+See [human acknowledgment](../../docs/thread-workflows.md#acknowledging-a-notification).
 
 Membership demonstrates the feature layout:
 

@@ -23,10 +23,24 @@ export const Recipient = Schema.TaggedUnion({
 });
 export type Recipient = typeof Recipient.Type;
 
-/** Acknowledgment outcomes will extend this state when their operations are implemented. */
+/** Extend with durable handoff outcomes when the owning turn/delivery workflows exist. */
+export const AcknowledgmentOutcome = Schema.TaggedUnion({ Seen: {} });
+export type AcknowledgmentOutcome = typeof AcknowledgmentOutcome.Type;
+
+export const Acknowledgment = Schema.Struct({
+  outcome: AcknowledgmentOutcome,
+  acknowledgedAt: Schema.DateTimeUtcFromString,
+});
+export interface Acknowledgment extends Schema.Schema.Type<typeof Acknowledgment> {}
+
+/** The outcome determines which recipient contract can record an acknowledgment. */
+export const acceptsAcknowledgment = (recipient: Recipient, outcome: AcknowledgmentOutcome) =>
+  AcknowledgmentOutcome.match(outcome, { Seen: () => recipient._tag === "Human" });
+
 export const State = Schema.TaggedUnion({
   Pending: {},
   Discarded: { reason: Schema.Literal("participation-ended") },
+  Acknowledged: Acknowledgment.fields,
 });
 export type State = typeof State.Type;
 
@@ -44,7 +58,14 @@ export const Record = Schema.Struct({
   recipient: Recipient,
   recordedAt: Schema.DateTimeUtcFromString,
   state: State,
-});
+}).check(
+  Schema.makeFilter(
+    (record) =>
+      record.state._tag !== "Acknowledged" ||
+      acceptsAcknowledgment(record.recipient, record.state.outcome) ||
+      "Acknowledgment outcome does not match the recipient",
+  ),
+);
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
 export * as Notification from "./notification.ts";

@@ -30,8 +30,10 @@ sequence-based pages. Separate reads and pages do not share a snapshot.
 ## Notification recipients and generation
 
 The [notification schema](../packages/core/src/notification/notification.ts) supports
-Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending` and
-`Discarded { reason: "participation-ended" }` states. Both adapters store these variants and enforce source/recipient
+Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending`,
+`Discarded { reason: "participation-ended" }`, and `Acknowledged` states. The implemented
+acknowledgment outcome is human `Seen`, with an `acknowledgedAt` timestamp.
+Both adapters store these variants and enforce source/recipient
 uniqueness. The [application](../packages/core/src/notification/application.ts) exposes
 only the acting human or agent's inbox, with active membership required. Contact
 and Triage reads are available only through internal stores.
@@ -48,8 +50,12 @@ the shared activity-recorded fact and its historical recipient selection, for ev
 Follow and participation endings currently select no recipients. Ending activity settles pending
 agent input before the same handler generates notifications for selected recipients. Participation
 domain facts do not directly change notifications. Group and workspace departures record ending
-activity for each affected thread through the same internal lifecycle service. General acknowledgment, recipient
-processing, silent completion, and delivery remain unimplemented. Existing tests also seed
+activity for each affected thread through the same internal lifecycle service. Human acknowledgment
+is implemented through core and the gateway using notification-owned acknowledgment facts. The shared
+internal service records outcomes within the caller's transaction; future turn workflows own turn
+creation, input acceptance, and execution. Agent/contact/triage handling, silent completion, and
+delivery remain unimplemented. Acknowledgment HTTP/UI actions are also pending; see
+[human acknowledgment](thread-workflows.md#acknowledging-a-notification). Existing tests also seed
 notifications for storage and inbox contracts. Quiet participation activity creates no notifications.
 Turn/task activity kinds remain design intent.
 
@@ -64,7 +70,7 @@ or another process's commit can leave a connected client's view stale.
 
 [ChangeFeedApplication.watch](../packages/core/src/change-feed/application.ts) checks
 membership at subscription time and forwards supported workspace-management events.
-Private group and thread facts are withheld, including message text, recipients, and provenance;
+Private group, thread, and notification acknowledgment facts are withheld, including message text, recipients, and provenance;
 group-only commits produce no public change until audience-aware group delivery exists.
 It does not filter fields or events by permission, or continuously recheck membership.
 Removal therefore does not itself close an existing subscription. Reconnecting

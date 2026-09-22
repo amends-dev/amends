@@ -96,6 +96,9 @@ These [known limitations](current-status.md) remain open even when the existing
 suite passes. Notification storage and inbox tests seed records; thread workflow tests verify
 opening and reply publication, participation admission, recipient selection, concurrent sequencing,
 quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on both adapters.
+Acknowledgment suites verify human ownership, stable repeat handling, source-access loss, caller
+transactions, projection/checkpoint rollback, concurrent requests, and replay after departure.
+Core tests validate the acknowledgment codec and withholding its facts from the public change feed.
 
 Subprocess fixtures create an existing temporary database parent, so passing host
 tests do not prove that the default SQLite path works on a fresh clone. Follow the

@@ -103,11 +103,14 @@ separate creation and Group-scoped membership-management permissions. Self-leave
 management grant; workspace removal also settles group admissions. Ordinary group reads require
 membership and `group.read`; separate management reads expose known-group metadata and current
 admissions under `group.membership.manage`. The notification surface includes its record, store contract,
-authorized inbox and source reads, activity-driven generation, and pending-agent-input settlement.
+authorized inbox and source reads, human acknowledgment, activity-driven generation, and pending-agent-input settlement.
 Notification reads derive the recipient from the current actor and require active membership.
 `NotificationApplication.resolveSource` returns a typed timeline item after ownership, historical
 reference validation, and current group access plus `thread.read` checks. It makes no state changes;
-its HTTP/UI integration remains pending. Member and invitation operations include listing: members you
+its HTTP/UI integration remains pending. `NotificationApplication.acknowledge` records human `Seen`
+through the internal `NotificationAcknowledgment` service within one commit. Future turn workflows
+own turn creation and input acceptance and reuse that service to record acknowledgment. Its HTTP/UI
+action and other recipient outcomes remain pending. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 
 `@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one

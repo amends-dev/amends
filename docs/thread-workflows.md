@@ -1,7 +1,8 @@
 # Thread workflows
 
 Core and both storage adapters implement human opening messages, replies, following/unfollowing,
-and authorized reads in private team groups. Call the thread application services through
+and authorized reads in private team groups, with source resolution and human notification acknowledgment.
+Call the application services through
 `Gateway.asMember` or a trusted workspace context. HTTP/UI, DMs,
 standalone threads, attachments, and agent execution remain separate implementation steps.
 
@@ -260,6 +261,36 @@ and have the same snapshot and revocation limits as timeline reads.
 Source resolution is implemented in core, the gateway, and both adapters. Its HTTP route and
 client integration remain future work.
 
+## Acknowledging a notification
+
+`NotificationApplication.acknowledge(notificationId)` records that the acting human saw their
+notification and returns the updated `Notification.Record`. It requires active workspace
+membership and ownership, checked inside the journal commit. It needs no action grant or thread
+access: a person can clear an old notification after leaving its group or losing `thread.read`.
+Acknowledgment does not resolve the source, rejoin participation, or mark conversation content read.
+
+The state becomes `{ _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt }`, with the
+server's current time. The notification keeps its ID, source, recipient, participation reference,
+and original recorded time. It remains in inbox history and disappears from pending results.
+Repeating the same acknowledgment returns its original state and timestamp without another fact
+or checkpoint change. Missing and other recipients' IDs return `NotificationApplication.NotFound`.
+An owned agent notification returns `HumanRecipientRequired`; an incompatible terminal state
+returns `AlreadyHandled`. Removed or identity-mismatched actors fail the current membership check.
+
+Internal `NotificationAcknowledgment.record(id, outcome)` owns acknowledgment validation,
+repeat handling, and publication of `NotificationFacts.Acknowledged`. It requires an existing
+`Store.Transaction` and `Publication.Service` and is excluded from `Core.Operations`. The human
+application owns authorization and the commit. Future agent/turn workflows will own turn creation,
+input acceptance, execution, and their transaction, calling this shared service to record the
+acknowledgment. Notifications do not create or run turns. `Seen` is the only implemented outcome;
+turn and delivery references will be added with their owning workflows.
+
+The acknowledgment fact and its projection update commit together with checkpoints. Failure or
+an enclosing rollback restores pending state. Replay preserves the recorded outcome and timestamp
+without checking current membership or time. Acknowledgment creates no thread activity and no
+new notifications. Its fact is withheld from the workspace-wide feed. The operation is implemented
+through core and the gateway on both adapters; its HTTP route and client action remain pending.
+
 ## Recorded changes and replay
 
 Every timeline item uses `ThreadActivityFacts.Recorded` with the same `{ activity, recipients }`
@@ -274,10 +305,11 @@ notifications from the recorded recipient selection without switching on activit
 recomputing current membership. The workflow selects recipients: messages follow addressing
 rules, while explicit follow and all participation endings currently select an empty list.
 Quiet activity still passes through the same recording and notification pipeline. Recorded activity
-is the notification projection’s sole input: for `ParticipationEnded`, it first discards existing
+is the projection's sole input for generation and departure settlement: for `ParticipationEnded`, it first discards existing
 pending input for that agent participation, then runs the common recipient-generation step.
 An empty recipient list suppresses new notifications without suppressing cleanup. Participation
 domain facts update participation state; they do not directly change notifications.
+Notification-owned acknowledgment facts separately record recipient handling in that projection.
 
 The workflow records, in order, a thread, its initial participations, a user message, and one
 `MessagePublished` activity at sequence 1. The timeline has an increasing sequence per thread;
@@ -337,15 +369,15 @@ Actual turn cancellation will be added with turn execution; there are no running
 
 ## Privacy and current limits
 
-Thread creation, participation, message, and activity facts are withheld from the workspace-wide
+Thread creation, participation, message, activity, and notification acknowledgment facts are withheld from the workspace-wide
 change feed, including text, recipient selection, and provenance. Mixed commits retain only their
 other supported public events. A thread-only commit therefore provides no inbox refresh signal
 through that feed. Audience-aware thread subscriptions and live notification delivery remain work.
 Notifications expose source references, not continuing authority to read the source conversation.
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
-authorized thread APIs. Managing other participants, general
-acknowledgment, silent agent completion, turn execution, task activity, DMs, and standalone threads
+authorized thread APIs. Managing other participants, agent/contact/triage acknowledgment,
+silent agent completion, turn execution, task activity, DMs, and standalone threads
 remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
 Opening messages and participation activity updated both development schema baselines. Recreate disposable
@@ -353,6 +385,9 @@ development databases when adopting that baseline; no upgrade chain or automatic
 apply only to fresh workspace initialization unless stored roles are explicitly updated.
 Activity rows reference either a message or a participation lifecycle occurrence. Existing stored roles do not automatically gain
 `thread.read`, `thread.publish`, or `thread.follow`; assign explicit grants or update those roles before using the new operations.
+Human acknowledgment adds outcome and timestamp columns to PostgreSQL's development baseline;
+recreate disposable PostgreSQL databases when adopting it. SQLite stores the state in its existing
+JSON record and needs no schema change for acknowledgment.
 
 ## Verification
 
@@ -372,6 +407,9 @@ Source-resolution suites cover human/agent ownership, current grant and audience
 historical reads after unfollow or readmission, discarded agent input, malformed references,
 message and participation subjects, direct entry lookup, read-only behavior, outer commits,
 reopening, and gateway outcomes on both adapters.
+Acknowledgment suites cover ownership, agent rejection, stable repeat handling, source-access loss,
+projection/checkpoint rollback, caller transactions, concurrent requests, direct-store validation,
+reopening, and replay after departure. Core tests verify codec validation and change-feed privacy.
 They also exercise the common notification generator with nonempty recipient selections on
 non-message activity, ending activity for all departure paths, and rollback after a partial
 multi-thread departure cascade.

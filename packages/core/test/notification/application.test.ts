@@ -1,8 +1,9 @@
 import { NotificationSource } from "../../src/notification/source.ts";
+import { NotificationAcknowledgment } from "../../src/notification/acknowledgment.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import { DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../../src/authorization/authorization.ts";
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
 import { GrantResolver } from "../../src/authorization/grant-resolver.ts";
@@ -86,6 +87,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     listPendingByRecipient: list,
     insert: unexpected,
     discardPendingForParticipation: unexpected,
+    acknowledge: unexpected,
     ...overrides,
   });
   const host = Layer.mergeAll(
@@ -105,6 +107,15 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provide(host))),
     Layer.provide(notifications),
     Layer.provide(Layer.succeed(NotificationSource.Service, { workspaceId, resolve: unexpected })),
+    Layer.provide(
+      Layer.succeed(NotificationAcknowledgment.Service, { workspaceId, record: unexpected }),
+    ),
+    Layer.provide(
+      Layer.succeed(
+        Crypto.Crypto,
+        Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),
+      ),
+    ),
   );
 };
 const run = <A, E>(
@@ -126,7 +137,12 @@ it.effect(
   () =>
     Effect.gen(function* () {
       expectTypeOf<Layer.Services<typeof NotificationApplication.layer>>().toEqualTypeOf<
-        NotificationStore.Service | Authorization.Service | NotificationSource.Service
+        | NotificationStore.Service
+        | Authorization.Service
+        | NotificationSource.Service
+        | NotificationAcknowledgment.Service
+        | Journal.Service
+        | Crypto.Crypto
       >();
       expectTypeOf<
         Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>

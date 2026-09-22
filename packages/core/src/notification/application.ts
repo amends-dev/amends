@@ -1,4 +1,5 @@
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
+import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Actor } from "../identity/actor.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -6,6 +7,9 @@ import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationSource } from "./source.ts";
 import type { Thread } from "../thread/thread.ts";
+import { Journal } from "../journal/journal.ts";
+import { Publication } from "../journal/publication.ts";
+import { NotificationAcknowledgment } from "./acknowledgment.ts";
 
 /** Missing and other recipients' notifications deliberately share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("NotificationApplication.NotFound", {
@@ -27,6 +31,14 @@ export class SourceUnavailable extends Schema.TaggedError<SourceUnavailable>()(
   "NotificationApplication.SourceUnavailable",
   { notificationId: Notification.Id },
 ) {}
+export class HumanRecipientRequired extends Schema.TaggedError<HumanRecipientRequired>()(
+  "NotificationApplication.HumanRecipientRequired",
+  {},
+) {}
+export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()(
+  "NotificationApplication.AlreadyHandled",
+  { notificationId: Notification.Id },
+) {}
 
 export type Error =
   | Authorization.Error
@@ -42,12 +54,21 @@ export type ResolveError =
       NotificationSource.Unavailable | NotificationSource.InvalidReference
     >
   | SourceUnavailable;
+export type AcknowledgeError =
+  | PlatformError.PlatformError
+  | Error
+  | Exclude<
+      NotificationAcknowledgment.Error,
+      NotificationAcknowledgment.AlreadyHandled | NotificationAcknowledgment.InvalidReference
+    >
+  | HumanRecipientRequired
+  | AlreadyHandled;
 
 /**
- * Read the acting identity's inbox within one workspace. Active membership is
+ * Read the acting identity's inbox and acknowledge human receipt within one workspace. Active membership is
  * required; owning a role does not grant access to another recipient's inbox.
- * Authorization and reads use current state without opening a transaction; an
- * existing caller transaction is honored, including its staged changes.
+ * Reads use current state without opening a transaction. Acknowledgment checks
+ * authority inside its commit; an existing caller transaction is honored by both.
  * Reading a notification neither acknowledges it nor grants access to its source.
  */
 export interface Interface {
@@ -64,6 +85,10 @@ export interface Interface {
   readonly resolveSource: (
     notificationId: Notification.Id,
   ) => Effect.Effect<Thread.TimelineItem, ResolveError, Actor.Service>;
+  /** Record that the acting human saw their notification; source access is independent. */
+  readonly acknowledge: (
+    notificationId: Notification.Id,
+  ) => Effect.Effect<Notification.Record, AcknowledgeError, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -92,14 +117,23 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
-  NotificationStore.Service | Authorization.Service | NotificationSource.Service
+  | NotificationStore.Service
+  | Authorization.Service
+  | NotificationSource.Service
+  | NotificationAcknowledgment.Service
+  | Journal.Service
+  | Crypto.Crypto
 > {
   const notifications = yield* NotificationStore.Service;
   const authorization = yield* Authorization.Service;
   const source = yield* NotificationSource.Service;
+  const acknowledgment = yield* NotificationAcknowledgment.Service;
+  const journal = yield* Journal.Service;
+  const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, notifications.workspaceId);
   yield* requireWorkspace(workspaceId, source.workspaceId);
+  yield* requireWorkspace(workspaceId, acknowledgment.workspaceId);
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
@@ -172,11 +206,28 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       }),
     );
   });
-  return Service.of({ workspaceId, get, list, listPending, resolveSource });
+  const acknowledge = Effect.fn("NotificationApplication.acknowledge")(
+    function* (notificationId: Notification.Id) {
+      const notification = yield* get(notificationId);
+      if (notification.recipient._tag !== "Human") return yield* new HumanRecipientRequired({});
+      return yield* acknowledgment.record(notification.id, { _tag: "Seen" }).pipe(
+        Effect.catchTags({
+          "NotificationAcknowledgment.AlreadyHandled": (error) =>
+            Effect.fail(new AlreadyHandled({ notificationId: error.notificationId })),
+          "NotificationAcknowledgment.InvalidReference": (error) =>
+            Effect.fail(new InvalidResponse({ message: error.message })),
+        }),
+      );
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  return Service.of({ workspaceId, get, list, listPending, resolveSource, acknowledge });
 });
 
 /**
- * Provide notification reads over the caller's workspace services.
+ * Provide notification operations over the caller's workspace services.
  *
  * @category layers
  */

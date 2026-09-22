@@ -21,8 +21,10 @@ metadata, timeline pages, and current-participant summaries are also implemented
 `ThreadMessageApplication`, admitting the author and eligible mentions in the same commit.
 `ThreadParticipationApplication` implements self-follow/unfollow, quiet follow activity, and pending
 agent-input settlement. `NotificationApplication.resolveSource` resolves owned notifications under
-current thread access, without acknowledgment or participation changes. Other participation
-management, DMs, public groups, group/thread HTTP/UI, turns, execution, general acknowledgment, triage, and channel
+current thread access, without acknowledgment or participation changes. Human acknowledgment is
+implemented through `NotificationApplication.acknowledge` and a shared internal acknowledgment
+service. Other participation management, DMs, public groups, group/thread HTTP/UI, turns, execution,
+agent/contact/triage acknowledgment, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
 
@@ -2727,8 +2729,9 @@ responsibility for the input represented by its source activity. Its acknowledgm
 contains the accepting `turnId`. A human acknowledgment in amends records when the person
 saw the notification. A contact's outward-delivery acknowledgment instead references the
 channel delivery that accepted responsibility. Several notifications can carry the same
-delivery reference. These are different outcomes; the exact tagged payload schema remains
-open. Neither agent nor contact handoff implies that execution or transport has completed.
+delivery reference. These are different outcomes. Human handling now stores
+`Acknowledged { outcome: { _tag: "Seen" }, acknowledgedAt }`; turn, delivery, and informational
+outcome schemas remain open. Neither agent nor contact handoff implies that execution or transport has completed.
 Attempting delivery without preserving the accepted work is insufficient acknowledgment.
 
 Several notifications can be accepted by one turn. Notification creation does not imply
@@ -2738,7 +2741,16 @@ available as history without retroactive work notifications.
 
 Recording thread activity must durably establish the notifications to create. Retried
 notification processing must not accidentally create competing turns or duplicate input.
-Exact storage, acknowledgment fields, and retry mechanics remain open. For discarded or
+Human acknowledgment now records a notification-owned fact and updates its state in one commit;
+repeated calls preserve the original timestamp. Active membership and ownership are required, with
+no thread-access requirement. `NotificationAcknowledgment` provides the shared internal recording
+operation, requiring its caller's transaction. Agent/turn workflows own creating turns, accepting
+input, and execution; they will call this service to record acknowledgment in the same commit.
+The notification domain owns acknowledgment only and does not orchestrate that work. The human
+operation is available through core and the gateway, with HTTP/UI actions still pending. See
+[acknowledgment](thread-workflows.md#acknowledging-a-notification).
+
+Other recipients' storage, acknowledgment fields, and retry mechanics remain open. For discarded or
 informational notifications, recording acknowledgment with no work is a proposed
 representation; they must not remain pending or repeatedly trigger processing. The
 acknowledgment outcome for policy evaluation by triage remains to be defined.

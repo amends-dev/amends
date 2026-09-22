@@ -1,4 +1,5 @@
 import { ThreadFacts } from "../thread/facts.ts";
+import { NotificationFacts } from "../notification/facts.ts";
 import { ThreadMessageFacts } from "../thread/message/facts.ts";
 import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
@@ -61,6 +62,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
                   ThreadParticipationFacts.Added,
                   ThreadParticipationFacts.Ended,
                   ThreadActivityFacts.Recorded,
+                  NotificationFacts.Acknowledged,
                 ].some((fact) => fact.name === event.name && fact.version === event.version) ||
                 (event.name === GroupFacts.Created.name &&
                   event.version === GroupFacts.Created.version) ||

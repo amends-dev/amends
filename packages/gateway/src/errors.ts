@@ -74,6 +74,8 @@ export const PublicError = Schema.Union([
   MemberApplication.AlreadyRemoved,
   NotificationApplication.NotFound,
   NotificationApplication.SourceUnavailable,
+  NotificationApplication.HumanRecipientRequired,
+  NotificationApplication.AlreadyHandled,
   ThreadApplication.GroupNotFound,
   ThreadApplication.NotFound,
   ThreadApplication.ParticipantUnavailable,

@@ -1,3 +1,4 @@
+import { Notification, NotificationFacts } from "@amends/core/notification";
 import {
   Thread,
   ThreadFacts,
@@ -291,6 +292,12 @@ it.effect("private group commits are withheld and mixed commits retain only publ
               occurredAt: group.createdAt,
             },
           });
+          yield* journal.publish(NotificationFacts.Acknowledged, {
+            workspaceId,
+            notificationId: Notification.Id.make("private-notification"),
+            recipient: actor.identity,
+            acknowledgment: { outcome: { _tag: "Seen" }, acknowledgedAt: group.createdAt },
+          });
           yield* journal.publish(ThreadMessageFacts.Published, {
             id: messageId,
             workspaceId,
@@ -348,6 +355,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
       expect(JSON.stringify(messages)).not.toContain("Private name");
       expect(JSON.stringify(messages)).not.toContain("private-thread");
       expect(JSON.stringify(messages)).not.toContain("Private proposal");
+      expect(JSON.stringify(messages)).not.toContain("private-notification");
     }),
   ),
 );

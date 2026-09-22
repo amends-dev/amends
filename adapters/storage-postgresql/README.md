@@ -71,6 +71,11 @@ Notification IDs and source/recipient associations are unique within the workspa
 Inserts join the journal transaction; source existence and recipient selection
 remain generation responsibilities. The notification projection generates opening and reply message notifications from recorded thread activity
 and discards pending agent input when its participation ends.
+`NotificationStore.acknowledge` conditionally changes a pending notification to `Acknowledged`,
+preserving source and recipient fields. It validates the outcome against the recipient and requires
+the active transaction. Human `Seen` uses `acknowledgment_outcome` and `acknowledged_at` columns;
+the state constraint rejects missing fields, inconsistent variants, and nonhuman Seen records.
+This replaces the development baseline. Recreate disposable PostgreSQL databases when adopting it.
 
 ## Transactions
 
@@ -190,3 +195,5 @@ remain separate from these shared contract expectations.
 `notification-sources.test.ts` mirrors SQLite coverage for current source authorization,
 historical recipient integrity, direct entry lookup, no-write resolution, staged visibility,
 rollback, reopening, and gateway outcomes.
+`notification-acknowledgment.test.ts` mirrors SQLite's ownership, atomicity, repeat handling,
+concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.
