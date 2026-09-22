@@ -39,6 +39,11 @@ with `bun run --filter @amends/frontend build`; no existing UI is imported into 
 Its [color foundation](../apps/frontend/src/foundations/color/README.md) tests all eight
 supported text/background pairings with Color.js. Storybook specimens support browser
 checks of the actual CSS variables, theme switching, nested scopes, and contrast.
+The [typography stories](../apps/frontend/src/foundations/typography/README.md) run browser
+play checks for real font loading, computed metrics, and wrapping. They are intentionally
+excluded from Happy DOM portable-story tests because that environment cannot verify font
+rendering. Review their Interactions and Accessibility panels in Storybook, including the
+narrow and enlarged-text scenarios.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin

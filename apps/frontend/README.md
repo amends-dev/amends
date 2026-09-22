@@ -2,8 +2,10 @@
 
 The starting point for the shared Solid frontend intended for web and Tauri desktop.
 The first [color foundation](src/foundations/color/README.md) defines four surface/text
-roles for Cotton and Soot, with scoped theme styles and Storybook specimens. There are
-no production components yet, and neither app consumes this package. The existing `ui`,
+roles for Cotton and Soot, with scoped theme styles and Storybook specimens. The
+[typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
+styles with explicit font loading. There are no production components yet, and neither app
+consumes this package. The existing `ui`,
 `design-system`, and `web` packages remain in place.
 
 ## Run and verify
@@ -29,8 +31,12 @@ stories and their theme control. Nested Themes shows independent scopes in both 
 The eight text/background pairings have contrast tests using Color.js; browser review
 verifies the generated CSS and the accessibility addon checks the rendered specimens.
 
+**Foundations / Typography** shows the three styles in both themes, a narrow container,
+and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
+and wrapping. These checks require a browser and are not part of the Happy DOM test suite.
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the color tokens and theme styles, separately from the workshop. Stories are discovered
+to the color and typography definitions, styles, and font entry, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.
@@ -62,8 +68,9 @@ For each addition:
 5. Review that slice before starting another piece or changing an app to consume it.
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
-a design reference. Color specimens use system fonts and local layout styles; typography,
-spacing, radius, and global styles remain separate future slices. Color.js is a development
+a design reference. Color specimens retain their system-font scaffolding; typography specimens
+use the introduced fonts and styles. Spacing, radius, and global styles remain separate
+future slices. Color.js is a development
 dependency used by the contrast tests and specimens, not the production exports.
 The accessibility addon is available; automated screenshot-baseline testing and native
 desktop validation are not configured. Tauri integration remains a later step.
