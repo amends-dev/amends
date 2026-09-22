@@ -60,6 +60,7 @@ import gridMeta, { ResponsiveForm } from "../src/primitives/layout/grid.stories.
 import iconButtonMeta, {
   Interaction as iconButtonInteraction,
   DangerInteraction as iconButtonDangerInteraction,
+  CircularInteraction as iconButtonCircularInteraction,
 } from "../src/primitives/icon-button/icon-button.stories.tsx";
 import tooltipMeta, {
   Keyboard as tooltipKeyboard,
@@ -207,6 +208,9 @@ it("runs icon button activation", async () => {
 });
 it("runs danger icon button activation", async () => {
   await iconButtonStories.story(iconButtonDangerInteraction).run();
+});
+it("runs circular text icon button activation", async () => {
+  await iconButtonStories.story(iconButtonCircularInteraction).run();
 });
 it.each([DangerPending, DangerSecondaryPending, DangerGhostPending])(
   "runs danger button pending and recovery %#",

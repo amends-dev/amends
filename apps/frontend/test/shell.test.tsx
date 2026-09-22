@@ -58,6 +58,28 @@ it("IconButton preserves native form/disabled/ref behavior and a stable accessib
   (screen.getByRole("button", { name: "Unavailable" }) as HTMLButtonElement).click();
   expect(click).toHaveBeenCalledOnce();
 });
+it("IconButton updates shape and size without replacing a focused text-glyph button", () => {
+  const [shape, setShape] = createSignal<"square" | "circle">("square");
+  const [size, setSize] = createSignal<"regular" | "compact">("regular");
+  render(() => (
+    <IconButton shape={shape()} size={size()} aria-label="More">
+      ⋯
+    </IconButton>
+  ));
+  const button = screen.getByRole("button", { name: "More" });
+  const originalClass = button.className;
+  button.focus();
+  setShape("circle");
+  setSize("compact");
+  expect(screen.getByRole("button", { name: "More" })).toBe(button);
+  expect(button).toHaveFocus();
+  expect(button).toHaveAttribute("data-icon-button-shape", "circle");
+  expect(button).toHaveAttribute("data-icon-button-size", "compact");
+  expect(button.className).not.toBe(originalClass);
+  expect(button).not.toHaveAttribute("shape");
+  expect(button).not.toHaveAttribute("size");
+  expect(button.firstElementChild).toHaveAttribute("aria-hidden", "true");
+});
 it("navigation preserves link identity and names when compact presentation changes", () => {
   const [compact, setCompact] = createSignal(false),
     [label, setLabel] = createSignal("Threads");

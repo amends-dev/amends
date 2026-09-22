@@ -145,7 +145,8 @@ Navigation section headers consume the same parts, keeping accessible section na
 hiding trailing actions in the icon rail. See the [Divider contract](src/primitives/divider/README.md).
 
 **Primitives / IconButton** and **Tooltip** provide named compact actions and supplemental
-hover/focus labels. Tooltip matches the compact dark monospace label in the Primitives v2
+hover/focus labels. IconButton supports circular text glyphs at the mock's compact size while
+retaining its existing square default. Tooltip matches the compact dark monospace label in the Primitives v2
 reference, with top-start placement, a soft shadow, and wrapping for long content. Reference,
 both-theme, and enlarged-text stories support visual comparison.
 **Compositions / Navigation**, **Drawer**, and **Shell** compose them into

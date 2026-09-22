@@ -93,6 +93,9 @@ The same comparison checks cover danger variants, disabled fieldsets, and pendin
 Danger recovery stories run as portable tests for all three variants; IconButton has its own
 danger activation story. Contrast tests cover the dedicated `action.danger` fill/tint/border
 pairings, and foundation stories display the tokens separately from the real Button consumers.
+IconButton's Circular Interaction story runs pointer and keyboard activation with a text glyph;
+browser review checks its 34px circular geometry, coarse-pointer target, both themes,
+enlarged text, and forced colors.
 The [Input primitive](../apps/frontend/src/primitives/input/README.md) has native-prop, ref/event,
 reactivity, selection, validity, form-data, reset-default, and type checks. Editing and Forms
 run as portable stories. Browser Comparison verifies actual themed colors, placeholders,

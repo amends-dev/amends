@@ -6,6 +6,7 @@ import { IconButton } from "@amends/frontend/primitives/icon-button";
 import { Row, Column } from "@amends/frontend/primitives/layout";
 import { Text } from "@amends/frontend/primitives/text";
 import { colorThemes } from "@amends/frontend/foundations/color/styles";
+import { EnlargedText as Enlarge } from "../overlay/overlay.stories-support.tsx";
 import "@amends/frontend/foundations/typography/fonts";
 import { DemoIcon } from "./icon-button.stories-support.tsx";
 const meta = {
@@ -63,6 +64,79 @@ export const Comparison = { render: () => <ComparisonSpecimen /> } satisfies Sto
 export const DangerComparison = {
   render: () => <ComparisonSpecimen tone="danger" />,
 } satisfies Story;
+function CircularTextSpecimen() {
+  return (
+    <main>
+      <For each={["cotton", "soot"] as const}>
+        {(theme) => (
+          <Column gap={4} class={colorThemes[theme]} style={{ padding: "1.5rem" }}>
+            <Text as="h2" variant="heading">
+              {theme}
+            </Text>
+            <Row gap={4} align="center">
+              <IconButton shape="circle" size="compact" variant="secondary" aria-label="More">
+                ⋯
+              </IconButton>
+              <IconButton shape="circle" size="compact" variant="soft" aria-label="Retry">
+                ↻
+              </IconButton>
+              <IconButton shape="circle" variant="secondary" aria-label="Search">
+                <DemoIcon name="search" />
+              </IconButton>
+              <IconButton
+                shape="circle"
+                size="compact"
+                variant="secondary"
+                aria-label="Unavailable"
+                disabled
+              >
+                ⋯
+              </IconButton>
+            </Row>
+          </Column>
+        )}
+      </For>
+    </main>
+  );
+}
+export const CircularText = {
+  render: CircularTextSpecimen,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      rootSize = Number.parseFloat(
+        getComputedStyle(canvasElement.ownerDocument.documentElement).fontSize,
+      ),
+      expectedSize =
+        (rootSize *
+          (canvasElement.ownerDocument.defaultView!.matchMedia("(any-pointer: coarse)").matches
+            ? 44
+            : 34)) /
+        16;
+    await expect(canvas.getAllByRole("button", { name: "More" })).toHaveLength(2);
+    for (const button of canvas.getAllByRole("button", { name: "More" })) {
+      await expect(button).toHaveAttribute("data-icon-button-shape", "circle");
+      await expect(button).toHaveAttribute("data-icon-button-size", "compact");
+      await expect(button.firstElementChild).toHaveAttribute("aria-hidden", "true");
+      await expect(button.getBoundingClientRect().width).toBeCloseTo(expectedSize, 2);
+      await expect(button.getBoundingClientRect().height).toBeCloseTo(expectedSize, 2);
+      await expect(getComputedStyle(button).borderRadius).toBe("9999px");
+      await expect(getComputedStyle(button.firstElementChild!).fontSize).toBe(
+        `${(rootSize * 13) / 16}px`,
+      );
+    }
+    for (const button of canvas.getAllByRole("button", { name: "Retry" })) {
+      await expect(getComputedStyle(button).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    }
+  },
+} satisfies Story;
+export const CircularEnlargedText = {
+  render: () => (
+    <Enlarge>
+      <CircularTextSpecimen />
+    </Enlarge>
+  ),
+  tags: ["!autodocs"],
+} satisfies Story;
 function Counter(props: { tone?: ButtonTone }) {
   const [count, setCount] = createSignal(0);
   return (
@@ -97,6 +171,36 @@ export const DangerInteraction = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Delete draft" }));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.keyboard(" ");
+    await expect(canvas.getByRole("status")).toHaveTextContent("Count: 3");
+  },
+} satisfies Story;
+
+export const CircularInteraction = {
+  render: () => {
+    const [count, setCount] = createSignal(0);
+    return (
+      <main class={colorThemes.cotton} style={{ padding: "1.5rem" }}>
+        <Row>
+          <IconButton
+            shape="circle"
+            size="compact"
+            variant="secondary"
+            aria-label="More"
+            onClick={() => setCount((n) => n + 1)}
+          >
+            ⋯
+          </IconButton>
+          <Text role="status">Count: {count()}</Text>
+        </Row>
+      </main>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      button = canvas.getByRole("button", { name: "More" });
+    await userEvent.click(button);
     await userEvent.keyboard("{Enter}");
     await userEvent.keyboard(" ");
     await expect(canvas.getByRole("status")).toHaveTextContent("Count: 3");

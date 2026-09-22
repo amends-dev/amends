@@ -8,6 +8,12 @@ export function examples() {
   <IconButton tone="danger" variant="secondary" aria-label="Remove member">
     ×
   </IconButton>;
+  <IconButton shape="circle" size="compact" variant="secondary" aria-label="More">
+    ⋯
+  </IconButton>;
+  <IconButton shape="circle" size="compact" variant="soft" aria-label="Retry">
+    ↻
+  </IconButton>;
   // @ts-expect-error IconButton supports the same action tones as Button.
   <IconButton tone="warning" aria-label="Warning">
     !
