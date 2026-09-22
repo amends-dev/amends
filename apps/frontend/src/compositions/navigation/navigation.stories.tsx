@@ -2,13 +2,16 @@ import { For, createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Navigation } from "@amends/frontend/compositions/navigation";
+import { Divider } from "@amends/frontend/primitives/divider";
 import { Button } from "@amends/frontend/primitives/button";
+import { IconButton } from "@amends/frontend/primitives/icon-button";
+import { IconPlus } from "@amends/icons";
 import { Column, Row } from "@amends/frontend/primitives/layout";
 import { Text } from "@amends/frontend/primitives/text";
 import { colorThemes } from "@amends/frontend/foundations/color/styles";
 import { DemoIcon } from "../../primitives/icon-button/icon-button.stories-support.tsx";
 import "@amends/frontend/foundations/typography/fonts";
-function DemoLinks() {
+function DemoLinks(props: { onCreate?: () => void }) {
   return (
     <>
       <Navigation.Link target="_self" href="#home">
@@ -25,7 +28,19 @@ function DemoLinks() {
         <Navigation.Count aria-label="3 unread">3</Navigation.Count>
       </Navigation.Link>
       <Navigation.Section>
-        <Navigation.SectionLabel>Workspace</Navigation.SectionLabel>
+        <Navigation.SectionHeader>
+          <Navigation.SectionLabel>Workspace</Navigation.SectionLabel>
+          <Divider.Line />
+          <Navigation.SectionActions>
+            <IconButton
+              variant="ghost"
+              aria-label="Create group"
+              onClick={() => props.onCreate?.()}
+            >
+              <IconPlus />
+            </IconButton>
+          </Navigation.SectionActions>
+        </Navigation.SectionHeader>
         <Navigation.Link target="_self" href="#groups">
           <Navigation.Icon>
             <DemoIcon name="groups" />
@@ -91,6 +106,7 @@ export const Comparison = {
 } satisfies Story;
 function Toggle() {
   const [compact, setCompact] = createSignal(false);
+  const [created, setCreated] = createSignal(0);
   return (
     <main class={colorThemes.soot} style={{ padding: "1.5rem", "min-height": "28rem" }}>
       <Column align="start" gap={4}>
@@ -102,8 +118,11 @@ function Toggle() {
           compact={compact()}
           style={{ width: compact() ? "2.75rem" : "16rem", "max-width": "100%" }}
         >
-          <DemoLinks />
+          <DemoLinks onCreate={() => setCreated((n) => n + 1)} />
         </Navigation.Root>
+        <Text as="p" role="status">
+          Created groups: {created()}
+        </Text>
       </Column>
     </main>
   );
@@ -114,13 +133,31 @@ export const Interaction = {
     const canvas = within(canvasElement),
       page = within(canvasElement.ownerDocument.body),
       link = canvas.getByRole("link", { name: "Groups" });
-    await userEvent.click(canvas.getByRole("button", { name: "Toggle rail" }));
+    const action = canvas.getByRole("button", { name: "Create group" });
+    await userEvent.click(action);
+    await expect(canvas.getByRole("status")).toHaveTextContent("Created groups: 1");
+    // A caller can collapse navigation while focus is still inside the action slot.
+    action.focus();
+    canvas.getByRole("button", { name: "Toggle rail" }).click();
+    await expect(canvas.queryByRole("button", { name: "Create group" })).toBeNull();
+    await expect(canvas.getByRole("group", { name: "Workspace" })).toBeVisible();
     await expect(canvas.getByRole("link", { name: "Groups" })).toBe(link);
+    await expect(link).toHaveFocus();
     link.focus();
     await waitFor(() => expect(page.getByRole("tooltip")).toHaveTextContent("Groups"));
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(page.queryByRole("tooltip")).toBeNull());
     await expect(link).toHaveFocus();
     await userEvent.click(canvas.getByRole("button", { name: "Toggle rail" }));
+    await expect(canvas.getByRole("button", { name: "Create group" })).toBe(action);
+    await userEvent.click(action);
+    await expect(canvas.getByRole("status")).toHaveTextContent("Created groups: 2");
   },
+} satisfies Story;
+export const Rtl = {
+  render: () => (
+    <div dir="rtl">
+      <Toggle />
+    </div>
+  ),
 } satisfies Story;

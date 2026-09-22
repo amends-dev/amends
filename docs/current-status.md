@@ -82,6 +82,9 @@ Container, Row, Column, Grid, and GridItem provide token-based spacing, centered
 wrapping groups, and equal-width grids that respond to their own container. Full-row items,
 nested layouts, RTL, and enlarged-text specimens are available. Numeric column spans,
 asymmetric grids, and responsive prop objects remain outside this initial layout slice.
+Divider provides shared horizontal dashed lines and composable labels/actions, using the
+existing seam and typography foundations. Navigation section headers reuse it; collapsed
+headers retain accessible names, hide action controls, and recover focus to a link when needed.
 Declarative Navigation, Drawer, and Shell compositions add native destination links, a
 desktop expanded sidebar/icon rail, and mobile modal navigation. The sidebar remains mounted
 through viewport changes, preserving drafts and selection. Desktop collapse preference is

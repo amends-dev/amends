@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-li
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { Shell } from "@amends/frontend/compositions/shell";
 import { Navigation } from "@amends/frontend/compositions/navigation";
+import { Divider } from "@amends/frontend/primitives/divider";
 import { Drawer } from "@amends/frontend/compositions/drawer";
 import { IconButton } from "@amends/frontend/primitives/icon-button";
 import { Input } from "@amends/frontend/primitives/input";
@@ -63,7 +64,10 @@ it("navigation preserves link identity and names when compact presentation chang
   render(() => (
     <Navigation.Root compact={compact()} aria-label="Workspace">
       <Navigation.Section>
-        <Navigation.SectionLabel>Conversations</Navigation.SectionLabel>
+        <Navigation.SectionHeader>
+          <Navigation.SectionLabel>Conversations</Navigation.SectionLabel>
+          <Divider.Line />
+        </Navigation.SectionHeader>
         <Navigation.Link href="#threads" aria-current="page">
           <Navigation.Icon>t</Navigation.Icon>
           <Navigation.Label>{label()}</Navigation.Label>

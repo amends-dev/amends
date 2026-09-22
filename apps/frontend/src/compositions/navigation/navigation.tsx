@@ -1,5 +1,6 @@
 import {
   createContext,
+  createEffect,
   createSignal,
   createUniqueId,
   onCleanup,
@@ -9,6 +10,7 @@ import {
   type JSX,
 } from "solid-js";
 import { Tooltip } from "../../primitives/tooltip/index.ts";
+import { Divider } from "../../primitives/divider/index.ts";
 import { callHandler, classes } from "../../primitives/internal/props.ts";
 import { NavigationPresentationContext } from "./presentation.ts";
 import * as s from "./navigation.css.ts";
@@ -48,6 +50,7 @@ export function Section(props: JSX.HTMLAttributes<HTMLDivElement>) {
       <div
         {...native}
         role="group"
+        data-navigation-section
         aria-labelledby={labelled() ? id : undefined}
         class={classes(s.section, local.class, local.classList)}
       >
@@ -62,7 +65,45 @@ export function SectionLabel(props: JSX.HTMLAttributes<HTMLHeadingElement>) {
   section.register();
   const [local, native] = splitProps(props, ["class", "classList"]);
   return (
-    <h2 {...native} id={section.id} class={classes(s.sectionLabel, local.class, local.classList)} />
+    <Divider.Label
+      as="h2"
+      {...native}
+      id={section.id}
+      class={classes(s.sectionLabel, local.class, local.classList)}
+    />
+  );
+}
+/** A shared Divider row whose compact presentation belongs to Navigation. */
+export function SectionHeader(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return (
+    <Divider.Root {...native} class={classes(s.sectionHeader, local.class, local.classList)} />
+  );
+}
+/** Keep actions mounted, but remove them from layout and keyboard navigation in the rail. */
+export function SectionActions(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const navigation = useContext(NavigationPresentationContext);
+  const [local, native] = splitProps(props, ["class", "classList", "ref", "hidden"]);
+  const [element, setElement] = createSignal<HTMLDivElement>();
+  createEffect(() => {
+    const node = element();
+    if (!navigation.compact() || !node?.contains(node.ownerDocument.activeElement)) return;
+    const section = node.closest("[data-navigation-section]");
+    const target =
+      section?.querySelector<HTMLAnchorElement>("a[href]") ??
+      node.closest("nav")?.querySelector<HTMLAnchorElement>("a[href]");
+    target?.focus({ preventScroll: true });
+  });
+  return (
+    <div
+      {...native}
+      hidden={navigation.compact() || local.hidden}
+      ref={(node) => {
+        setElement(node);
+        if (typeof local.ref === "function") local.ref(node);
+      }}
+      class={classes(s.sectionActions, local.class, local.classList)}
+    />
   );
 }
 const LinkContext = createContext<{ register: (text: Accessor<string>) => void }>();

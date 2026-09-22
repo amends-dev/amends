@@ -23,18 +23,26 @@ export const section = style({
   gap: space[1],
   minWidth: 0,
   marginTop: space[4],
-  paddingTop: space[3],
-  borderTop: `1px dashed ${colorVars.line.seam}`,
 });
-export const sectionLabel = style([
-  typographyStyles.mono,
-  {
-    margin: 0,
-    padding: `${space[1]} ${space[3]}`,
-    color: colorVars.text.secondary,
-    selectors: { [`${root}[data-compact="true"] &`]: hiddenText },
+export const sectionHeader = style({
+  padding: `${space[1]} ${space[3]}`,
+  minHeight: "1.5rem",
+  selectors: {
+    [`${root}[data-compact="true"] &`]: { width: "1.75rem", alignSelf: "center", paddingInline: 0 },
   },
-]);
+});
+export const sectionLabel = style({
+  selectors: { [`${root}[data-compact="true"] &`]: hiddenText },
+});
+export const sectionActions = style({
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: space[1],
+  flexShrink: 0,
+  maxWidth: "100%",
+  selectors: { "&[hidden]": { display: "none" } },
+});
 export const link = style([
   typographyStyles.body,
   focusVisible,

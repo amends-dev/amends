@@ -134,6 +134,11 @@ story checks that changing container width keeps values and submission intact. C
 Row, Column, and Grid browser stories measure actual gutters, centering, wrapping, gaps,
 track widths/counts, and full-row spans. Use Playwright for viewport resize, real focus/tab
 order, nested layouts, RTL, and enlarged text; these geometry checks require a browser.
+Divider's portable action story and DOM/type tests keep labels/headings and buttons accessible
+while only line segments are hidden. Its Layout story checks centering, equal line lengths,
+full-width standalone lines, and actual dashed borders in the browser. Review long labels,
+RTL, enlarged text, and forced colors. Navigation's interaction story and DOM tests cover
+retained section actions, collapsed visibility, section names, and focus recovery to a link.
 Shell tests cover declarative slots, accessible navigation names, modified/canceled anchor
 activation, retained sidebar instances, and independent desktop/mobile state. IconButton,
 Tooltip, Navigation, Drawer, and desktop Shell interaction stories also run as portable tests.

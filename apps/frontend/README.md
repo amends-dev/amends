@@ -128,6 +128,11 @@ an optional column cap and full-width items. Responsive Form demonstrates three 
 becoming two columns and then one while keeping their values. Separate stories cover each
 primitive, nested layouts, RTL, and enlarged text. See the [layout contract](src/primitives/layout/README.md).
 
+**Primitives / Divider** adds a shared dashed Line, composable Root, and compact Label.
+Stories cover plain, start/center/end labels, actions, both themes, long text, and RTL.
+Navigation section headers consume the same parts, keeping accessible section names and
+hiding trailing actions in the icon rail. See the [Divider contract](src/primitives/divider/README.md).
+
 **Primitives / IconButton** and **Tooltip** provide named compact actions and supplemental
 hover/focus labels. Tooltip matches the compact dark monospace label in the Primitives v2
 reference, with top-start placement, a soft shadow, and wrapping for long content. Reference,

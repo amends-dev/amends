@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Shell } from "@amends/frontend/compositions/shell";
 import { Navigation } from "@amends/frontend/compositions/navigation";
+import { Divider } from "@amends/frontend/primitives/divider";
 import { Field } from "@amends/frontend/compositions/field";
 import { Input } from "@amends/frontend/primitives/input";
 import { Select } from "@amends/frontend/primitives/select";
@@ -80,7 +81,10 @@ export function ShellFixture(props: Args) {
               <Navigation.Count aria-label="3 unread">3</Navigation.Count>
             </Navigation.Link>
             <Navigation.Section>
-              <Navigation.SectionLabel>Workspace</Navigation.SectionLabel>
+              <Navigation.SectionHeader>
+                <Navigation.SectionLabel>Workspace</Navigation.SectionLabel>
+                <Divider.Line />
+              </Navigation.SectionHeader>
               <Navigation.Link
                 target="_self"
                 href="#groups"
