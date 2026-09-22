@@ -1,7 +1,7 @@
 import { splitProps, type JSX } from "solid-js";
 import * as s from "./button.css.ts";
 
-export type ButtonVariant = "primary" | "secondary";
+export type ButtonVariant = "primary" | "secondary" | "ghost";
 export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
 };

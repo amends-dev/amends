@@ -2,6 +2,7 @@ import { Button } from "@amends/frontend/primitives/button";
 
 // Type-checked examples; not rendered by the test runner.
 export function buttonTypeExamples() {
+  <Button variant="ghost">Change email</Button>;
   <Button variant="secondary" type="submit">
     Save draft
   </Button>;
@@ -23,7 +24,7 @@ export function buttonTypeExamples() {
   // @ts-expect-error Only native button types are supported.
   <Button type="primary" />;
   // @ts-expect-error Additional visual variants are not part of this slice.
-  <Button variant="ghost" />;
+  <Button variant="outline" />;
   // @ts-expect-error Pending behavior has not been introduced.
   <Button pending />;
   // @ts-expect-error The ref receives a button, not an anchor.

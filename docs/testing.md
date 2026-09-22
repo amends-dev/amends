@@ -60,10 +60,10 @@ colors, typography, margins, and wrapping are verified in the browser.
 The [Button primitive](../apps/frontend/src/primitives/button/README.md) has DOM and type checks
 for native semantics, prop/ref/event forwarding, disabled activation, explicit form submission,
 preventing default, and reactive updates, including variant changes that preserve focus and the element. Activation
-and Forms for both variants, plus Reactive Props, run as portable
+and Forms for all three variants, plus Reactive Props, run as portable
 stories. Real browser checks cover native Enter/Space/Tab input, actual state colors and outlines,
 inherited fieldset disabling, narrow/enlarged labels, coarse pointers, and forced colors.
-Button Comparison additionally checks both variants' computed fills, text, borders, and
+Button Comparison additionally checks all three variants' computed fills, text, borders, and
 composited contrast against the current palette. Run it
 after shared color changes to catch stale dependent styles in the development server, even
 when the standalone color stories and production build pass.

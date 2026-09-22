@@ -65,4 +65,12 @@ export const variants = styleVariants({
       },
     },
   },
+  ghost: {
+    backgroundColor: "transparent",
+    color: colorVars.text.primary,
+    selectors: {
+      "&:hover:enabled": { backgroundColor: colorVars.action.hover },
+      "&:active:enabled": { backgroundColor: colorVars.action.pressed },
+    },
+  },
 });

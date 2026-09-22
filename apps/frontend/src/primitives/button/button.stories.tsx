@@ -12,7 +12,8 @@ import "@amends/frontend/foundations/typography/fonts";
 import * as s from "./button.stories.css.ts";
 
 const labels = { cotton: "Cotton", soot: "Soot" } as const;
-const variants = ["primary", "secondary"] as const;
+const variants = ["primary", "secondary", "ghost"] as const;
+const actionLabels = { primary: "Publish reply", secondary: "Save draft", ghost: "Change email" };
 
 function ThemeSpecimen(props: { theme: ColorTheme }) {
   const [count, setCount] = createSignal(0);
@@ -26,7 +27,8 @@ function ThemeSpecimen(props: { theme: ColorTheme }) {
         {labels[props.theme]}
       </Text>
       <Text tone="secondary">
-        Hover, press, or use Tab to inspect both variants. Click, Enter, and Space activate them.
+        Hover, press, or use Tab to inspect all three variants. Click, Enter, and Space activate
+        them.
       </Text>
       <For each={["canvas", "panel"] as const}>
         {(surface) => (
@@ -44,7 +46,7 @@ function ThemeSpecimen(props: { theme: ColorTheme }) {
                   </Text>
                   <div class={s.row}>
                     <Button variant={variant} onClick={() => setCount((count) => count + 1)}>
-                      {variant === "primary" ? "Publish reply" : "Save draft"}
+                      {actionLabels[variant]}
                     </Button>
                     <Button
                       variant={variant}
@@ -70,7 +72,7 @@ function ThemeSpecimen(props: { theme: ColorTheme }) {
                 data-button-variant={variant}
                 onClick={() => setCount((count) => count + 1)}
               >
-                {variant === "primary" ? "Publish reply" : "Save draft"}
+                {actionLabels[variant]}
               </Button>
             )}
           </For>
@@ -293,7 +295,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Primary and secondary Buttons, composed from the reviewed foundations. One regular size, native semantics, primary appearance and type=button by default. Try real hover, press, Tab, Enter, and Space in the browser.",
+          "Primary, secondary, and ghost Buttons, composed from the reviewed foundations. One regular size, native semantics, primary appearance and type=button by default. Try real hover, press, Tab, Enter, and Space in the browser.",
       },
     },
   },
@@ -316,7 +318,7 @@ export const Comparison = {
     await doc.fonts.ready;
     if (doc.defaultView!.matchMedia("(forced-colors: active)").matches) return;
     const buttons = canvasElement.querySelectorAll<HTMLButtonElement>("button");
-    await expect(buttons).toHaveLength(20);
+    await expect(buttons).toHaveLength(30);
     await step("Verify Button colors resolve from the current theme", async () => {
       for (const button of buttons) {
         const theme = button.closest<HTMLElement>("[data-button-theme]")!.dataset
@@ -355,7 +357,7 @@ export const Comparison = {
           ),
         ).toBeLessThan(0.0001);
         const expectedBorder = new Color(
-          disabled || variant === "primary"
+          disabled || variant !== "secondary"
             ? "transparent"
             : active || hover
               ? palette.line.strong
@@ -441,6 +443,12 @@ export const ReactiveProps = {
     await expect(canvas.getByTestId("reactive-button")).toBe(button);
     await expect(button.className).not.toBe(originalClass);
     await expect(button).not.toHaveAttribute("variant");
+    const secondaryClass = button.className;
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "Variant" }), "ghost");
+    await expect(canvas.getByTestId("reactive-button")).toBe(button);
+    await expect(button.className).not.toBe(originalClass);
+    await expect(button.className).not.toBe(secondaryClass);
+    await expect(button).not.toHaveAttribute("variant");
     await userEvent.click(canvas.getByRole("checkbox", { name: "Use updated label" }));
     await expect(canvas.getByRole("button", { name: "Send update" })).toBe(button);
     await expect(button).toHaveClass("updated-label", "selected");
@@ -462,6 +470,8 @@ export const SecondaryActivation = {
   args: { variant: "secondary" },
 } satisfies Story;
 export const SecondaryForms = { ...Forms, args: { variant: "secondary" } } satisfies Story;
+export const GhostActivation = { ...Activation, args: { variant: "ghost" } } satisfies Story;
+export const GhostForms = { ...Forms, args: { variant: "ghost" } } satisfies Story;
 export const LongLabels = {
   render: () => <LongLabelSpecimens />,
   parameters: { controls: { disable: true } },

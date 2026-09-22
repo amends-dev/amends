@@ -1,6 +1,6 @@
 # Button
 
-Primary filled and secondary outlined buttons in one regular size, composed from the reviewed typography,
+Primary filled, secondary outlined, and ghost buttons in one regular size, composed from the reviewed typography,
 action colors, spacing, radius, and focus foundations. It renders one native `<button>`.
 
 ```tsx
@@ -14,6 +14,7 @@ import "@amends/frontend/foundations/typography/fonts";
     Publish reply
   </Button>
   <Button variant="secondary">Save draft</Button>
+  <Button variant="ghost">Change email</Button>
   <Button disabled>Unavailable</Button>
 </section>;
 ```
@@ -21,7 +22,7 @@ import "@amends/frontend/foundations/typography/fonts";
 ## Contract
 
 `ButtonProps` extends Solid's `JSX.ButtonHTMLAttributes<HTMLButtonElement>` with
-`variant?: "primary" | "secondary"` (also exported as `ButtonVariant`). It defaults to
+`variant?: "primary" | "secondary" | "ghost"` (also exported as `ButtonVariant`). It defaults to
 `primary`; `variant` is consumed by the component and is not forwarded to the DOM. Native attributes,
 events (including Solid's bound handlers), styles, ARIA/data attributes, and the actual
 button ref are forwarded. Native types are `button`, `submit`, and `reset`; omitting `type`
@@ -50,7 +51,10 @@ preserve focus; disabling a focused button follows the browser's native behavior
 - Secondary uses primary text, a transparent background, and a 1px dashed `line.control`
   border. Hover uses `action.hover` and `line.strong`; pressed uses `action.pressed` and
   `line.strong`, including keyboard presses without hover.
-- Both variants share geometry, focus, and disabled treatment. Disabled buttons use the
+- Ghost uses primary text on a transparent background with no visible border. Hover and
+  pressed states use `action.hover` and `action.pressed`. Its transparent 1px border preserves
+  the same geometry as the other variants. Use it for quieter actions such as “Change email.”
+- All three variants share geometry, focus, and disabled treatment. Disabled buttons use the
   existing translucent fill and text color with a transparent border.
 - Hover and pressed colors apply only while enabled. Disabled text and its translucent
   fill are intended for canvas and panel surfaces within the same theme.
@@ -67,7 +71,7 @@ preserve focus; disabling a focused button follows the browser's native behavior
 The old UI's control minimums are fixed CSS pixels; these rem minimums intentionally scale
 with the reviewed typography and spacing. The new button uses an inline text layout to
 preserve wrapping and inline label content. This slice has no transition or pending animation.
-Ghost emphasis, additional sizes, danger treatment, and icon-only controls remain future slices.
+Additional sizes, pending behavior, danger treatment, and icon-only controls remain future slices.
 Unlike the older UI, secondary explicitly selects the strong border on press as well as hover,
 so keyboard activation uses the reviewed high-contrast pairing.
 The older [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>)
@@ -81,23 +85,22 @@ their own accessibility and layout review.
 
 **Primitives / Button** provides:
 
-- **Comparison:** both variants, including enabled, disabled, and disabled-fieldset buttons in Cotton and Soot,
+- **Comparison:** all three variants, including enabled, disabled, and disabled-fieldset buttons in Cotton and Soot,
   including canvas and panel surfaces. Hover, press, focus, and activate the real component.
 - **Playground:** controls for theme, variant, label, native type, and disabled state.
-- **Activation / Secondary Activation:** click/Enter/Space counting and disabled tab-stop behavior.
-- **Forms / Secondary Forms:** default non-submitting behavior and explicit submission with name/value.
+- **Activation / Secondary Activation / Ghost Activation:** click/Enter/Space counting and disabled tab-stop behavior.
+- **Forms / Secondary Forms / Ghost Forms:** default non-submitting behavior and explicit submission with name/value.
 - **Reactive Props:** variant, label, class, and disabled-state updates on the same element.
 - **Long Labels / Enlarged Text:** wrapping within narrow containers in both themes.
 
-The activation and form stories for both variants, plus Reactive Props, run the same play scenarios in Storybook and the
+The activation and form stories for all three variants, plus Reactive Props, run the same play scenarios in Storybook and the
 Bun/Vitest portable-story suite. Focused DOM tests cover forwarding, native submission,
 disabled activation, preventing default, reactive handlers/classes/types, refs, and element
 identity. Type examples reject unsupported tags, variants, and invalid native attributes.
 
-Comparison has a browser-only rendering check for all twenty buttons. It compares actual text,
+Comparison has a browser-only rendering check for all thirty buttons. It compares actual text,
 background, and all four border colors/styles/widths with the current theme, including disabled
-fieldsets and any active
-hover/press state. Enabled text and secondary borders also have contrast checks after compositing
+fieldsets and any active hover/press state. Enabled text and secondary borders also have contrast checks after compositing
 over their surface. If a button already has visible focus, it also checks the ring. The check
 does not move focus and skips author-color assertions in forced-colors mode. It catches stale
 CSS references after shared-token changes; it is not run under Happy DOM.

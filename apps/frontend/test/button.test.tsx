@@ -61,7 +61,7 @@ it("forwards native attributes, styles, bound events, and the native element ref
   expect(clicked).toHaveBeenCalledWith("reply", expect.any(MouseEvent));
 });
 
-it.each<ButtonVariant>(["primary", "secondary"])(
+it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
   "prevents %s activation when disabled and resumes when enabled",
   (variant) => {
     const [disabled, setDisabled] = createSignal(true);
@@ -82,7 +82,7 @@ it.each<ButtonVariant>(["primary", "secondary"])(
   },
 );
 
-it.each<ButtonVariant>(["primary", "secondary"])(
+it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
   "submits %s only when explicitly requested and preserves the submitter",
   (variant) => {
     const submitted = vi.fn();
@@ -113,32 +113,35 @@ it.each<ButtonVariant>(["primary", "secondary"])(
   },
 );
 
-it("switches variants without replacing the button or losing focus, native behavior, or consumer classes", () => {
-  const [variant, setVariant] = createSignal<ButtonVariant | undefined>();
-  const clicked = vi.fn();
-  render(() => (
-    <Button variant={variant()} class="consumer" classList={{ selected: true }} onClick={clicked}>
-      Save draft
-    </Button>
-  ));
-  const button = screen.getByRole("button", { name: "Save draft" }) as HTMLButtonElement;
-  const initialClass = button.className;
-  setVariant("primary");
-  expect(button.className).toBe(initialClass);
-  button.focus();
-  setVariant("secondary");
-  expect(screen.getByRole("button", { name: "Save draft" })).toBe(button);
-  expect(button.className).not.toBe(initialClass);
-  expect(button).toHaveClass("consumer", "selected");
-  expect(button).not.toHaveAttribute("variant");
-  expect(button).toHaveAttribute("type", "button");
-  expect(button).toHaveFocus();
-  button.click();
-  expect(clicked).toHaveBeenCalledOnce();
-  setVariant(undefined);
-  expect(button.className).toBe(initialClass);
-  expect(button).toHaveFocus();
-});
+it.each<ButtonVariant>(["secondary", "ghost"])(
+  "switches to %s without replacing the button or losing focus, native behavior, or consumer classes",
+  (nextVariant) => {
+    const [variant, setVariant] = createSignal<ButtonVariant | undefined>();
+    const clicked = vi.fn();
+    render(() => (
+      <Button variant={variant()} class="consumer" classList={{ selected: true }} onClick={clicked}>
+        Save draft
+      </Button>
+    ));
+    const button = screen.getByRole("button", { name: "Save draft" }) as HTMLButtonElement;
+    const initialClass = button.className;
+    setVariant("primary");
+    expect(button.className).toBe(initialClass);
+    button.focus();
+    setVariant(nextVariant);
+    expect(screen.getByRole("button", { name: "Save draft" })).toBe(button);
+    expect(button.className).not.toBe(initialClass);
+    expect(button).toHaveClass("consumer", "selected");
+    expect(button).not.toHaveAttribute("variant");
+    expect(button).toHaveAttribute("type", "button");
+    expect(button).toHaveFocus();
+    button.click();
+    expect(clicked).toHaveBeenCalledOnce();
+    setVariant(undefined);
+    expect(button.className).toBe(initialClass);
+    expect(button).toHaveFocus();
+  },
+);
 
 it("lets the caller prevent default submission without suppressing the click", () => {
   const clicked = vi.fn();
