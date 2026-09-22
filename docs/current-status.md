@@ -55,7 +55,10 @@ reactive association props; form state and validation timing stay with the consu
 `text.invalid` adds a verified error-text role. Textarea, grouped controls, and specialized
 input types remain future pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
-behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred.
+behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),
+binary Switch, and styled single-choice Select primitives are available. Select uses Kobalte
+for its listbox behavior with a themed popup and native form-value bridge. Searchable
+comboboxes, grouped options, multi-select, and higher-level settings compositions remain future work.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

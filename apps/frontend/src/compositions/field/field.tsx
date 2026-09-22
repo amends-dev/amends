@@ -7,6 +7,7 @@ export interface FieldControlProps {
   readonly required: boolean;
   readonly disabled: boolean;
   readonly "aria-invalid": true | undefined;
+  readonly "aria-labelledby": string;
   readonly "aria-describedby": string | undefined;
 }
 export type FieldProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
@@ -51,6 +52,9 @@ export function Field(props: FieldProps): JSX.Element {
     get "aria-invalid"() {
       return local.error ? true : undefined;
     },
+    get "aria-labelledby"() {
+      return `${control.id}-label`;
+    },
     get "aria-describedby"() {
       const ids = [
         local.controlDescribedBy,
@@ -78,7 +82,7 @@ export function Field(props: FieldProps): JSX.Element {
       .join(" ");
   return (
     <div {...native} class={classes()}>
-      <label for={control.id} class={s.label}>
+      <label id={`${control.id}-label`} for={control.id} class={s.label}>
         {local.label}
         <Show when={local.required}>
           <span aria-hidden="true"> (required)</span>

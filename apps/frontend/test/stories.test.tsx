@@ -33,6 +33,23 @@ import radioGroupMeta, {
   CardForms,
   RefreshedOptions,
 } from "../src/compositions/radio-group/radio-group.stories.tsx";
+import checkboxMeta, {
+  Interaction as checkboxInteraction,
+  Forms as checkboxForms,
+} from "../src/primitives/checkbox/checkbox.stories.tsx";
+const checkboxStories = definePreview(preview).meta(checkboxMeta);
+import switchMeta, {
+  Interaction as switchInteraction,
+  Forms as switchForms,
+} from "../src/primitives/switch/switch.stories.tsx";
+const switchStories = definePreview(preview).meta(switchMeta);
+import selectMeta, {
+  Interaction as selectInteraction,
+  Forms as selectForms,
+  ResetDefaults as selectResetDefaults,
+  Keyboard as selectKeyboard,
+} from "../src/primitives/select/select.stories.tsx";
+const selectStories = definePreview(preview).meta(selectMeta);
 const groupStories = definePreview(preview).meta(radioGroupMeta);
 const radioStories = definePreview(preview).meta(radioMeta);
 const fieldStories = definePreview(preview).meta(fieldMeta);
@@ -117,3 +134,30 @@ for (const [name, story] of Object.entries({
     await groupStories.story(story).run();
   });
 }
+
+it("runs the checkbox interaction story", async () => {
+  await checkboxStories.story(checkboxInteraction).run();
+});
+it("runs the checkbox form story", async () => {
+  await checkboxStories.story(checkboxForms).run();
+});
+
+it("runs the switch interaction story", async () => {
+  await switchStories.story(switchInteraction).run();
+});
+it("runs the switch form story", async () => {
+  await switchStories.story(switchForms).run();
+});
+
+it("runs the select interaction story", async () => {
+  await selectStories.story(selectInteraction).run();
+});
+it("runs the select form story", async () => {
+  await selectStories.story(selectForms).run();
+});
+it("runs the select default reset story", async () => {
+  await selectStories.story(selectResetDefaults).run();
+});
+it("runs the select keyboard story", async () => {
+  await selectStories.story(selectKeyboard).run();
+});

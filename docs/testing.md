@@ -92,6 +92,18 @@ or disabled selections, native attributes, and duplicate values. Plain/card inte
 form stories plus refreshed options run as portable tests. Browser verification covers card
 contrast, native navigation/validation, reset, external form data, disabled fieldsets, forced
 colors, and narrow/enlarged layouts.
+Checkbox/Switch tests cover forwarding/ref/events, reactive checked/disabled state, native
+form values/reset and required validity, and checkbox mixed clearing. Select tests cover
+initial/reactive values, refreshed options, Field associations, validity, form data/reset, and
+disabled popup handling. Real browser checks also verify inherited fieldset disabling.
+The frontend test setup supplies the browser's initial `animation-name: none` value,
+which Happy DOM omits, so Kobalte popup presence can finish cleanup.
+Select stories extend axe's overlay-region matcher to include labelled listbox popups:
+they are connected to their trigger but portaled outside page landmarks. All other region,
+label, role, focus, and contrast checks remain enabled; scan with the popup open too.
+Each primitive's interaction and form stories run as portable tests. Playwright verifies
+Space, Select navigation/typeahead/dismissal/focus return, popup themes/collision, actual marks/thumb positions, RTL, forced colors, and
+narrow/enlarged layouts. Recheck Input after changes to shared private field-control styles.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

@@ -100,8 +100,16 @@ help/error associations, required state, and disabled options. Selection and res
 the caller. Stories cover both variants, refreshed options, forms, and narrow/enlarged layouts.
 See the [RadioGroup contract](src/compositions/radio-group/README.md).
 
+**Primitives / Checkbox**, **Switch**, and **Select** add native checkbox/mixed state, binary
+switch semantics, and a styled single-choice popup. Each has independent comparisons, interaction/
+form stories, and narrow/enlarged specimens. Switch also covers RTL. Select shares private
+field-control styling with Input and composes with Field. Kobalte supplies its popup behavior;
+Open Menu stories review the reference design in both themes.
+See the [Checkbox](src/primitives/checkbox/README.md), [Switch](src/primitives/switch/README.md),
+and [Select](src/primitives/select/README.md) contracts.
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations and Text/Button/Input/Radio primitives and Field/RadioGroup compositions, separately from the workshop. Stories are discovered
+to the foundations, primitives, and Field/RadioGroup compositions, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

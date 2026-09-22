@@ -23,7 +23,10 @@
     "./primitives/input": "./src/primitives/input/index.ts",
     "./compositions/field": "./src/compositions/field/index.ts",
     "./primitives/radio": "./src/primitives/radio/index.ts",
-    "./compositions/radio-group": "./src/compositions/radio-group/index.ts"
+    "./compositions/radio-group": "./src/compositions/radio-group/index.ts",
+    "./primitives/checkbox": "./src/primitives/checkbox/index.ts",
+    "./primitives/switch": "./src/primitives/switch/index.ts",
+    "./primitives/select": "./src/primitives/select/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",
@@ -35,6 +38,7 @@
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/instrument-serif": "^5.3.0",
+    "@kobalte/core": "^0.13.14",
     "@vanilla-extract/css": "^1.21.2"
   },
   "devDependencies": {

@@ -30,7 +30,7 @@ Select a color theme on an ancestor and load the frontend fonts at the app bound
 ## Ownership and associations
 
 Field supplies a reactive `FieldControlProps` object to its required child function:
-`id`, `required`, `disabled`, `aria-invalid`, and `aria-describedby`. Spread it onto one
+`id`, `required`, `disabled`, `aria-labelledby`, `aria-invalid`, and `aria-describedby`. Spread it onto one
 labelable control. Put the spread last and configure those attributes through Field;
 Input remains independent and does not import composition code or read Field context.
 Native controls can consume the same object. Radio groups and multiple controls per
@@ -52,7 +52,9 @@ and deduplicates these with IDs for currently visible help and errors. External 
 in their supplied order, then help and error follow. The caller ensures external IDs
 refer to existing content. Empty help/error strings render nothing and add no association.
 
-The label uses native `for`; clicking it focuses an enabled control. The visible
+The label uses native `for`; clicking it focuses an enabled control. Its explicit
+`aria-labelledby` association also supports controls such as Select that include their
+selected value in the accessible name. The visible
 “(required)” marker is hidden from the accessible name because native `required` carries
 the state. Error text sets `aria-invalid`, with a visible “Error:” prefix and a distinct
 text color. Clearing the error removes its message and association. Descriptions remain
