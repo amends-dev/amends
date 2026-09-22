@@ -9,6 +9,7 @@ const labels = { cotton: "Cotton", soot: "Soot" } as const;
 const roles = [
   { group: "surface", name: "canvas", usage: "The main background." },
   { group: "surface", name: "panel", usage: "A distinct content surface." },
+  { group: "surface", name: "skeleton", usage: "Decorative first-paint bars on canvas or panel." },
   { group: "text", name: "primary", usage: "Headings and main content." },
   { group: "text", name: "secondary", usage: "Supporting information; still readable body text." },
   {
@@ -54,8 +55,8 @@ function ColorSpecimen(props: { theme: ColorTheme; children?: JSX.Element }) {
     >
       <h2 class={s.title}>{labels[props.theme]}</h2>
       <p class={s.description}>
-        Primary and secondary text work on canvas and panel. Tooltip has a dedicated dark/light
-        pair.
+        Primary and secondary text work on canvas and panel. Skeleton is decorative; tooltip has a
+        dedicated dark/light pair.
       </p>
       <dl class={s.tokens}>
         <For each={roles}>
@@ -129,7 +130,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The four reading color roles, using the production tokens and scoped theme classes. Primary and secondary text support both surfaces at a minimum contrast of 4.5:1. Neutral filled-action colors have separate stories under Color / Actions. Specimen layout and system fonts are workshop scaffolding.",
+          "The four reading color roles, plus decorative skeleton fill and the dedicated tooltip pair, use production tokens and scoped theme classes. Primary and secondary text support canvas and panel at a minimum contrast of 4.5:1. Neutral filled-action colors have separate stories under Color / Actions. Specimen layout and system fonts are workshop scaffolding.",
       },
     },
   },

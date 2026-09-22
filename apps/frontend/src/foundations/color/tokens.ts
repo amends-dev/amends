@@ -41,6 +41,8 @@ export interface ColorTokens {
   readonly surface: {
     readonly canvas: string;
     readonly panel: string;
+    /** Decorative first-paint placeholder on canvas or panel; never a text surface. */
+    readonly skeleton: string;
     /** Compact dark tooltip surface in either theme; pair only with text.onTooltip. */
     readonly tooltip: string;
   };
@@ -137,6 +139,7 @@ export const cotton = {
   surface: {
     canvas: "oklch(0.955 0.012 88)",
     panel: "oklch(0.978 0.008 92)",
+    skeleton: "oklch(0.92 0.014 88)",
     tooltip: "oklch(0.2 0.008 84)",
   },
   text: {
@@ -186,6 +189,7 @@ export const soot = {
   surface: {
     canvas: "oklch(0.185 0.008 84)",
     panel: "oklch(0.215 0.009 84)",
+    skeleton: "oklch(0.31 0.01 84)",
     tooltip: "oklch(0.2 0.008 84)",
   },
   text: {

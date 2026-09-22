@@ -144,6 +144,11 @@ Stories cover plain, start/center/end labels, actions, both themes, long text, a
 Navigation section headers consume the same parts, keeping accessible section names and
 hiding trailing actions in the icon rail. See the [Divider contract](src/primitives/divider/README.md).
 
+**Primitives / Skeleton** adds static, decorative first-paint bars using a dedicated neutral
+color in Cotton and Soot. The reference story matches the mock's three bars; comparison and
+narrow stories check both surfaces and constrained layout. The containing region owns its
+loading semantics. See the [Skeleton contract](src/primitives/skeleton/README.md).
+
 **Primitives / IconButton** and **Tooltip** provide named compact actions and supplemental
 hover/focus labels. IconButton supports circular text glyphs at the mock's compact size while
 retaining its existing square default. Tooltip matches the compact dark monospace label in the Primitives v2
