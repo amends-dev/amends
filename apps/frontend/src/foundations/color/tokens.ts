@@ -1,4 +1,4 @@
-/** Reading, action, and focus colors. Disabled text is only for inactive controls. */
+/** Reading, control, action, and focus colors. Disabled text is only for inactive controls. */
 export interface ColorTokens {
   readonly surface: {
     readonly canvas: string;
@@ -9,11 +9,18 @@ export interface ColorTokens {
     readonly secondary: string;
     readonly disabled: string;
   };
+  readonly line: {
+    readonly control: string;
+    readonly strong: string;
+  };
   readonly action: {
     readonly fill: string;
     readonly fillHover: string;
     readonly fillPressed: string;
     readonly onFill: string;
+    /** Translucent backgrounds for text.primary, over canvas or panel. */
+    readonly hover: string;
+    readonly pressed: string;
     /** Translucent fill, supported on canvas and panel surfaces. */
     readonly disabled: string;
   };
@@ -30,11 +37,17 @@ export const cotton = {
     secondary: "oklch(0.41 0.014 84)",
     disabled: "oklch(0.62 0.014 84)",
   },
+  line: {
+    control: "oklch(0.6 0.016 84)",
+    strong: "oklch(0.42 0.016 84)",
+  },
   action: {
     fill: "oklch(0.24 0.014 84)",
     fillHover: "oklch(0.32 0.014 84)",
     fillPressed: "oklch(0.17 0.008 84)",
     onFill: "oklch(0.97 0.01 90)",
+    hover: "oklch(0.24 0.014 84 / 0.05)",
+    pressed: "oklch(0.24 0.014 84 / 0.12)",
     disabled: "oklch(0.24 0.014 84 / 0.08)",
   },
   focus: { ring: "oklch(0.24 0.014 84)" },
@@ -50,11 +63,17 @@ export const soot = {
     secondary: "oklch(0.74 0.008 86)",
     disabled: "oklch(0.5 0.012 84)",
   },
+  line: {
+    control: "oklch(0.57 0.012 84)",
+    strong: "oklch(0.74 0.008 86)",
+  },
   action: {
     fill: "oklch(0.95 0.006 90)",
     fillHover: "oklch(0.87 0.008 86)",
     fillPressed: "oklch(0.8 0.008 86)",
     onFill: "oklch(0.17 0.008 84)",
+    hover: "oklch(0.95 0.006 90 / 0.06)",
+    pressed: "oklch(0.95 0.006 90 / 0.14)",
     disabled: "oklch(0.95 0.006 90 / 0.08)",
   },
   focus: { ring: "oklch(0.95 0.006 90)" },

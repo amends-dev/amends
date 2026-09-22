@@ -84,6 +84,12 @@ Bun/Vitest portable-story suite. Focused DOM tests cover forwarding, native subm
 disabled activation, preventing default, reactive handlers/classes/types, refs, and element
 identity. Type examples reject unsupported tags, variants, and invalid native attributes.
 
+Comparison has a browser-only rendering check for all ten buttons. It compares actual text
+and background colors with the current theme, including disabled fieldsets and any active
+hover/press state. If a button already has visible focus, it also checks the ring. The check
+does not move focus and skips author-color assertions in forced-colors mode. It catches stale
+CSS references after shared-token changes; it is not run under Happy DOM.
+
 Real browser verification is still required for native keyboard events, `:hover`, `:active`,
 `:focus-visible`, inherited fieldset disabling, actual fonts/colors/dimensions, clipping,
 coarse pointers, and forced colors. Check long labels at 320px and 200% root text size,

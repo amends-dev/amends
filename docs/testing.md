@@ -42,6 +42,12 @@ checks of the actual CSS variables, theme switching, nested scopes, and contrast
 play checks verify computed text/fill/surface colors and alpha, enabled contrast, and disabled
 semantics; they need a browser and are excluded from Happy DOM. Visually review disabled colors
 on canvas and panel, narrow layouts, and enlarged text separately.
+Control-color tests add eight plain border pairings and eight overlay/surface combinations.
+The development-only blend helper has endpoint and unsupported-input tests. Browser play
+checks verify actual colors and alpha, compare text/border contrast after compositing, and
+cross-check the blend against an sRGB canvas render. Review all Controls stories, including
+nested themes, theme switching, and narrow/enlarged layouts; these browser checks do not run
+under Happy DOM.
 The [typography stories](../apps/frontend/src/foundations/typography/README.md) run browser
 play checks for real font loading, computed metrics, and wrapping. They are intentionally
 excluded from Happy DOM portable-story tests because that environment cannot verify font
@@ -56,6 +62,9 @@ for native semantics, prop/ref/event forwarding, disabled activation, explicit f
 preventing default, and reactive updates. Activation, Forms, and Reactive Props run as portable
 stories. Real browser checks cover native Enter/Space/Tab input, actual state colors and outlines,
 inherited fieldset disabling, narrow/enlarged labels, coarse pointers, and forced colors.
+Button Comparison additionally checks computed colors against the current palette. Run it
+after shared color changes to catch stale dependent styles in the development server, even
+when the standalone color stories and production build pass.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

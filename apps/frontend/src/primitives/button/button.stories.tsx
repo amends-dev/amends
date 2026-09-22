@@ -1,10 +1,12 @@
 import { For, createSignal, onCleanup, onMount, splitProps } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import Color from "colorjs.io";
 import { Button, type ButtonProps } from "@amends/frontend/primitives/button";
 import { Text } from "@amends/frontend/primitives/text";
-import type { ColorTheme } from "@amends/frontend/foundations/color";
+import { colors, type ColorTheme } from "@amends/frontend/foundations/color";
 import { colorThemes, colorVars } from "@amends/frontend/foundations/color/styles";
+import { focus } from "@amends/frontend/foundations/focus";
 import "@amends/frontend/foundations/typography/fonts";
 import * as s from "./button.stories.css.ts";
 
@@ -243,6 +245,48 @@ export const Comparison = {
     </main>
   ),
   parameters: { controls: { disable: true } },
+  // A shared token edit can leave a stale dependent stylesheet during development.
+  // Check the consumer's computed colors, not only that the new token specimens render.
+  play: async ({ canvasElement, step }) => {
+    const doc = canvasElement.ownerDocument;
+    await doc.fonts.ready;
+    if (doc.defaultView!.matchMedia("(forced-colors: active)").matches) return;
+    const buttons = canvasElement.querySelectorAll<HTMLButtonElement>("button");
+    await expect(buttons).toHaveLength(10);
+    await step("Verify Button colors resolve from the current theme", async () => {
+      for (const button of buttons) {
+        const theme = button.closest<HTMLElement>("[data-button-theme]")!.dataset
+          .buttonTheme as ColorTheme;
+        const palette = colors[theme];
+        const disabled = button.matches(":disabled");
+        const fill = disabled
+          ? "disabled"
+          : button.matches(":active")
+            ? "fillPressed"
+            : button.matches(":hover")
+              ? "fillHover"
+              : "fill";
+        const rendered = getComputedStyle(button);
+        const background = new Color(rendered.backgroundColor);
+        const text = new Color(rendered.color);
+        const expectedBackground = new Color(palette.action[fill]);
+        await expect(background.alpha).toBeCloseTo(expectedBackground.alpha, 6);
+        await expect(background.deltaEOK(expectedBackground)).toBeLessThan(0.0001);
+        await expect(text.alpha).toBe(1);
+        await expect(
+          text.deltaEOK(disabled ? palette.text.disabled : palette.action.onFill),
+        ).toBeLessThan(0.0001);
+        if (button.matches(":focus-visible")) {
+          await expect(rendered.outlineStyle).toBe("solid");
+          await expect(rendered.outlineWidth).toBe(focus.width);
+          await expect(rendered.outlineOffset).toBe(focus.offset);
+          await expect(new Color(rendered.outlineColor).deltaEOK(palette.focus.ring)).toBeLessThan(
+            0.0001,
+          );
+        }
+      }
+    });
+  },
 } satisfies Story;
 export const Playground = {} satisfies Story;
 export const Activation = {

@@ -1,8 +1,8 @@
 # Amends frontend
 
 The starting point for the shared Solid frontend intended for web and Tauri desktop.
-The [color foundation](src/foundations/color/README.md) defines four reading roles and six
-neutral filled-action roles, plus a focus-ring color, for Cotton and Soot, with scoped theme styles and Storybook specimens. The
+The [color foundation](src/foundations/color/README.md) defines reading, action, control-border,
+and focus colors for Cotton and Soot, with scoped theme styles and Storybook specimens. The
 [typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
 styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
 composes those foundations into native paragraphs, spans, headings, and inline code. The
@@ -39,8 +39,14 @@ verifies the generated CSS and the accessibility addon checks the rendered speci
 **Foundations / Color / Actions** shows default, hover, pressed, and disabled pairings on
 both surfaces, with theme controls, nested scopes, and enlarged text. Six enabled pairings
 have contrast tests; browser play checks verify computed colors, transparency, and disabled
-semantics. Disabled readability is reviewed separately. These are static color specimens;
+semantics. Disabled readability is reviewed separately. These are static color specimens.
 The Button primitive has separate component and interaction stories.
+
+**Foundations / Color / Controls** shows default/strong borders and translucent hover/pressed
+backgrounds on both surfaces. Tests measure text and border contrast after compositing; browser
+play checks compare the actual CSS colors and an independent canvas blend. Nested themes,
+theme controls, and enlarged-text stories support visual review. The secondary Button remains
+a later slice.
 
 **Foundations / Typography** shows the three styles in both themes, a narrow container,
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
@@ -69,6 +75,8 @@ disabled/fieldset behavior, activation, form submission, reactive props, and lon
 Activation, Forms, and Reactive Props also run in the portable-story suite. Real browser
 checks establish actual hover/pressed/focus styles, native keyboard activation, wrapping,
 coarse-pointer sizing, forced colors, and enlarged text.
+Comparison also checks the rendered Button colors against the current palette, including
+native disabled states, so stale shared-style references fail visibly in Storybook.
 
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
 to the foundations and Text/Button primitives, separately from the workshop. Stories are discovered
@@ -99,7 +107,8 @@ For each addition:
    values; component stories render the actual component.
 3. Cover meaningful variants and states, adding interaction tests when there is behavior.
 4. Run checks and the workshop build, then inspect the result in the browser for design
-   consistency, accessibility, and relevant viewport sizes.
+   consistency, accessibility, and relevant viewport sizes. When a foundation changes,
+   revisit existing consumers too, including Button Comparison for color changes.
 5. Review that slice before starting another piece or changing an app to consume it.
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not

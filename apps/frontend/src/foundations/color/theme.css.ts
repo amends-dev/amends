@@ -1,7 +1,12 @@
-import { createTheme, createThemeContract, style } from "@vanilla-extract/css";
+import { createGlobalThemeContract, createTheme, style } from "@vanilla-extract/css";
 import { cotton, soot } from "./tokens.ts";
 
-export const colorVars = createThemeContract(cotton);
+// Stable names keep existing consumers valid when roles are inserted or reordered.
+// Only the names are global; values are still assigned by the scoped theme classes below.
+export const colorVars = createGlobalThemeContract(
+  cotton,
+  (_value, path) => `amends-frontend-color-${path.join("-")}`,
+);
 
 const canvas = style({
   backgroundColor: colorVars.surface.canvas,

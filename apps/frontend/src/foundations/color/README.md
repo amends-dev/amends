@@ -1,6 +1,6 @@
 # Color
 
-Reading, neutral filled-action, and focus colors, with identical names in Cotton (light)
+Reading, control, action, and focus colors, with identical names in Cotton (light)
 and Soot (dark):
 
 | Role             | Purpose                   | Supported pairing |
@@ -21,6 +21,24 @@ The reading roles above support ordinary content. Filled actions add six roles:
 | `action.disabled`    | Translucent unavailable action | `text.disabled`, over canvas or panel           |
 | `text.disabled`      | Text on an unavailable control | `action.disabled`; not ordinary supporting text |
 
+Control borders and translucent action backgrounds add four roles:
+
+| Role             | Purpose                   | Supported pairing                                      |
+| ---------------- | ------------------------- | ------------------------------------------------------ |
+| `line.control`   | Default control border    | Plain canvas and panel surfaces                        |
+| `line.strong`    | Emphasized control border | Plain surfaces and both action overlays                |
+| `action.hover`   | Subtle hover background   | `text.primary` and `line.strong`, over canvas or panel |
+| `action.pressed` | Subtle pressed background | `text.primary` and `line.strong`, over canvas or panel |
+
+Hover alpha is 5% in Cotton and 6% in Soot; pressed alpha is 12% and 14% respectively.
+Apply these values as background colors, keeping the text and border opaque. Their rendered
+color depends on the underlying surface. Use `line.strong` in the tinted specimens: the
+default border falls below 3:1 against the pressed interior in both themes. Its contrast
+against the surrounding plain surface is a separate measurement. This contract verifies
+the strong border against both the tinted interior and the plain exterior.
+
+These roles prepare the secondary Button; this slice does not introduce that variant.
+
 `focus.ring` adds the outline color for keyboard focus on canvas and panel surfaces.
 The [focus foundation](../focus/README.md) owns its dimensions and reusable `:focus-visible` class.
 
@@ -30,7 +48,7 @@ Cotton uses a dark action fill with light text; Soot inverts that relationship. 
 [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>) uses
 different hover/pressed and disabled values. This foundation preserves the current UI's
 state mapping and disabled fill instead of reintroducing those historical differences.
-Transparent/outlined actions, status, borders, inverse surfaces, and selection remain deferred.
+Outlined-action components, decorative border colors, status, inverse surfaces, and selection remain deferred.
 
 `action.disabled` has 8% alpha; its appearance depends on the surface underneath. Apply it
 as the background color with opaque `text.disabled`. Do not lower the whole element's
@@ -60,9 +78,19 @@ import { colorThemes, colorVars } from "@amends/frontend/foundations/color/style
 </section>;
 ```
 
-The theme class sets all eleven variables, the canvas background, primary text color,
+The theme class sets all fifteen variables, the canvas background, primary text color,
 and the browser's `color-scheme`. Descendants inherit the variables; a nested theme
 class overrides them for its subtree. Apply exactly one theme class to each scope.
+Variable names use the stable `--amends-frontend-color-` namespace followed by their role
+path, such as `--amends-frontend-color-action-fill`. `createGlobalThemeContract` names the
+variables; `createTheme` still assigns their values only within the chosen class. Adding
+or reordering roles does not rename existing variables or theme classes.
+
+The earlier generated identifiers depended on token order. In the running workshop, adding
+roles left cached Button CSS referencing variable names that the updated theme no longer
+defined. The Button Comparison story now checks consumer colors in the browser. After a
+foundation change, revisit its existing consumers as well as the new specimens; a successful
+static build alone does not verify the running development server.
 Importing the styles does not select a document theme, load fonts, or apply global resets.
 Consumers need vanilla-extract's build integration; the frontend Vite config provides it.
 
@@ -91,6 +119,27 @@ restores its previous value and priority on disposal; it is excluded from shared
 canvases. Review narrow layouts and root-size restoration in a real browser. These play
 checks depend on computed styles and are not run under Happy DOM.
 
+**Foundations / Color / Controls** provides Comparison, Cotton, Soot, Nested Themes, and
+Enlarged Text. Static specimens show both border roles on plain surfaces and both overlays
+with primary text and the strong border. The 1px dashed pill outlines are workshop examples;
+they do not introduce a border-geometry API or a Button variant.
+
+The unit tests cover eight plain border pairings and eight overlay/surface combinations.
+Overlay contrast is measured after [source-over alpha compositing](https://www.w3.org/TR/compositing-1/#simplealphacompositing)
+in encoded sRGB. The [review helper](contrast.ts) uses Color.js for conversion, then blends
+the channels over an opaque surface. It rejects translucent backdrops, colors outside sRGB,
+and unresolved channels rather than making an unstated rendering assumption. This helper
+and Color.js remain development-only; production exports contain only the tokens and styles.
+
+Control-story browser checks verify the computed surface, text, fill alpha, and all four
+border colors. They check text at 4.5:1 and borders at 3:1 against the supported backgrounds.
+An independent sRGB canvas render verifies the blend calculation within two 8-bit channel
+steps to allow pixel quantization. This checks browser compositing, not screenshot equality.
+Inspect the dashed outlines and labels visually, including narrow/enlarged layouts and theme
+switching. Forced colors replace the author palette, so token/contrast assertions are skipped
+in that mode. Enlarged Text restores the prior root size and priority and is excluded from
+shared Docs canvases. Browser checks are not part of the Happy DOM suite.
+
 The test suite measures eight reading pairings and six enabled action pairings with Color.js. It
 checks that the values are opaque and in the sRGB gamut, and that each unrounded
 contrast ratio meets the 4.5:1 normal-text requirement of
@@ -103,6 +152,7 @@ text must not be used for ordinary content. These checks do not establish readab
 arbitrary cross-theme combinations or other colors. Surface differences are decorative
 and are not control boundaries. Four focus-ring/surface pairings are separately checked
 against the 3:1 non-text threshold, with interactive specimens under Foundations / Focus.
+Border thresholds follow [WCAG 2.2 SC 1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 Button semantics and interaction checks live with the primitive.
 
 Run `bun run --filter @amends/frontend test` and `bun run --filter @amends/frontend build`

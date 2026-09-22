@@ -33,6 +33,8 @@ The new [frontend workshop](../apps/frontend/README.md) contains four surface/te
 roles for Cotton and Soot, scoped theme styles, and specimens for their supported pairings
 and nested scopes. Six neutral filled-action color roles add default, hover, pressed,
 and disabled specimens on both surfaces; enabled label contrast has automated checks.
+Control-border colors and translucent hover/pressed backgrounds have scoped specimens and
+contrast checks after compositing. The tinted specimens pair primary text with the strong border.
 The focus foundation adds a themed 2px outline with 2px offset, applied through a reusable
 `:focus-visible` class. Storybook provides native controls for real keyboard review and
 browser checks of ring colors and clearance. The first Button primitive adds a primary filled
