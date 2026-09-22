@@ -1,11 +1,12 @@
 # Radius
 
-Two CSS-ready values, matching the corresponding [UI radius tokens](../../../../ui/src/tokens/scale.ts):
+Three CSS-ready values, matching the corresponding [UI radius tokens](../../../../ui/src/tokens/scale.ts):
 
-| Token         | Value    | Purpose                      |
-| ------------- | -------- | ---------------------------- |
-| `radius.none` | `0px`    | Square corners               |
-| `radius.pill` | `9999px` | Fully rounded control shapes |
+| Token           | Value    | Purpose                          |
+| --------------- | -------- | -------------------------------- |
+| `radius.none`   | `0px`    | Square corners                   |
+| `radius.medium` | `10px`   | Moderately rounded input corners |
+| `radius.pill`   | `9999px` | Fully rounded control shapes     |
 
 ```tsx
 import { radius, type RadiusName } from "@amends/frontend/foundations/radius";
@@ -17,9 +18,9 @@ const shape: RadiusName = "pill";
 
 These are plain values with no runtime imports, generated CSS, or theme requirements.
 They also work directly in vanilla-extract styles. This slice does not add the existing
-small/medium/large/dialog radii or introduce any control dimensions or components.
+small/large/dialog radii or introduce any control dimensions or components.
 
-Both values use CSS pixels and stay unchanged when the root text size changes. The large
+All three values use CSS pixels and stay unchanged when the root text size changes. The large
 pill value is constrained by the browser to fit the box: control-sized squares become
 circles and wide rectangles become capsules. This follows CSS's
 [overlapping-corner rule](https://www.w3.org/TR/css-backgrounds-3/#corner-overlap).
@@ -29,7 +30,7 @@ Radius alone does not add padding or clip child content; consumers own content l
 
 **Foundations / Radius** uses Text for labels and spacing tokens for layout:
 
-- **Comparison:** both radii on squares and rectangles in Cotton and Soot. The `size`
+- **Comparison:** all three radii on squares and rectangles in Cotton and Soot. The `size`
   control switches between compact, regular, and large specimens.
 - **Sizes:** all three specimen sizes together in both themes.
 - **Enlarged Text:** the regular specimens with the preview root set to `200%`. Text,
@@ -42,7 +43,7 @@ font-size value and priority on disposal and is excluded from shared Docs canvas
 
 Browser `play` checks verify the rendered dimensions and all four computed corner values.
 They also check that each shape's center is inside its hit area and that points near each
-bounding-box corner belong to square shapes but fall outside pill shapes. CSS clips
+bounding-box corner belong to square shapes but fall outside medium and pill shapes. CSS clips
 [pointer hit areas to curved border edges](https://www.w3.org/TR/css-backgrounds-3/#corner-clipping).
 The checks scroll specimens into view and restore the original document scroll position
 afterward. Screenshots and visual review still establish how the curves look; these are

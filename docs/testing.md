@@ -42,7 +42,7 @@ checks of the actual CSS variables, theme switching, nested scopes, and contrast
 play checks verify computed text/fill/surface colors and alpha, enabled contrast, and disabled
 semantics; they need a browser and are excluded from Happy DOM. Visually review disabled colors
 on canvas and panel, narrow layouts, and enlarged text separately.
-Control-color tests add eight plain border pairings and eight overlay/surface combinations.
+Control-color tests add twelve plain border pairings and eight overlay/surface combinations.
 The development-only blend helper has endpoint and unsupported-input tests. Browser play
 checks verify actual colors and alpha, compare text/border contrast after compositing, and
 cross-check the blend against an sRGB canvas render. Review all Controls stories, including
@@ -69,6 +69,13 @@ Button Comparison additionally checks all three variants' computed fills, text, 
 composited contrast against the current palette. Run it
 after shared color changes to catch stale dependent styles in the development server, even
 when the standalone color stories and production build pass.
+The [Input primitive](../apps/frontend/src/primitives/input/README.md) has native-prop, ref/event,
+reactivity, selection, validity, form-data, reset-default, and type checks. Editing and Forms
+run as portable stories. Browser Comparison verifies actual themed colors, placeholders,
+radius, and inherited-disabled form-data exclusion (Happy DOM does not model that exclusion).
+Use Playwright for native typing/Enter/Tab, invalid focus, read-only selection, forced colors,
+long values, 320px layouts, and enlarged text. Radius specimens include the 10px medium token;
+Controls specimens include the invalid-border role independently of Input.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

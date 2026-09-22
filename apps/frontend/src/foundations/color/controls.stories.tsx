@@ -12,11 +12,12 @@ import * as s from "./controls.stories.css.ts";
 const labels = { cotton: "Cotton", soot: "Soot" } as const;
 const specimens = {
   control: { label: "Default border", line: "control", overlay: null },
+  invalid: { label: "Invalid border", line: "invalid", overlay: null },
   strong: { label: "Strong border", line: "strong", overlay: null },
   hover: { label: "Hover background", line: "strong", overlay: "hover" },
   pressed: { label: "Pressed background", line: "strong", overlay: "pressed" },
 } as const;
-const cases = ["control", "strong", "hover", "pressed"] as const;
+const cases = ["control", "strong", "invalid", "hover", "pressed"] as const;
 type Case = keyof typeof specimens;
 type Surface = "canvas" | "panel";
 
@@ -222,11 +223,11 @@ const meta = {
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
-    controlSampleCount: 8,
+    controlSampleCount: 10,
     docs: {
       description: {
         component:
-          "line.control, line.strong, action.hover, and action.pressed in both themes. The translucent fills use text.primary and line.strong. Computed-style and sRGB canvas checks verify the pairings after compositing. These are static color specimens; the secondary Button has separate component stories.",
+          "line.control, line.strong, line.invalid, action.hover, and action.pressed in both themes. The translucent fills use text.primary and line.strong. Computed-style and sRGB canvas checks verify the pairings after compositing. These are static color specimens; the secondary Button has separate component stories.",
       },
     },
   },
@@ -237,7 +238,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Comparison = {
   render: () => <ComparisonSpecimen />,
-  parameters: { controls: { disable: true }, controlSampleCount: 16 },
+  parameters: { controls: { disable: true }, controlSampleCount: 20 },
 } satisfies Story;
 export const Cotton = { args: { theme: "cotton" } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;
@@ -252,12 +253,12 @@ export const NestedThemes = {
       </ControlSpecimen>
     </main>
   ),
-  parameters: { controls: { disable: true }, controlSampleCount: 32 },
+  parameters: { controls: { disable: true }, controlSampleCount: 40 },
 } satisfies Story;
 export const EnlargedText = {
   render: () => <EnlargedControls />,
   tags: ["!autodocs"],
-  parameters: { controls: { disable: true }, controlSampleCount: 16 },
+  parameters: { controls: { disable: true }, controlSampleCount: 20 },
   play: async (context) => {
     await expect(document.documentElement.style.fontSize).toBe("200%");
     await verifyControls(context);

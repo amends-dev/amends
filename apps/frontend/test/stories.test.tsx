@@ -17,6 +17,9 @@ import buttonMeta, {
   ReactiveProps as ButtonReactiveProps,
 } from "../src/primitives/button/button.stories.tsx";
 
+import inputMeta, { Editing, Forms as InputForms } from "../src/primitives/input/input.stories.tsx";
+const inputStories = definePreview(preview).meta(inputMeta);
+
 const stories = definePreview(preview).meta(meta);
 const textStories = definePreview(preview).meta(textMeta);
 const buttonStories = definePreview(preview).meta(buttonMeta);
@@ -62,4 +65,11 @@ it("runs the secondary Button pending and recovery story", async () => {
 });
 it("runs the ghost Button pending and recovery story", async () => {
   await buttonStories.story(GhostPending).run();
+});
+
+it("runs the Input editing story", async () => {
+  await inputStories.story(Editing).run();
+});
+it("runs the Input form story", async () => {
+  await inputStories.story(InputForms).run();
 });

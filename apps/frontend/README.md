@@ -7,7 +7,7 @@ and focus colors for Cotton and Soot, with scoped theme styles and Storybook spe
 styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
 composes those foundations into native paragraphs, spans, headings, and inline code. The
 [spacing foundation](src/foundations/spacing/README.md) adds steps 0–6 as quarter-rem values.
-The [radius foundation](src/foundations/radius/README.md) adds square and pill corners.
+The [radius foundation](src/foundations/radius/README.md) adds square, medium (10px), and pill corners.
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
 a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
 composes these foundations into primary, secondary, and ghost actions with native button behavior. Neither
@@ -60,7 +60,7 @@ Focused DOM and type checks verify the component's native-prop and reactivity co
 four-sided padding, and horizontal/vertical gaps in both themes. Its enlarged-text story
 verifies scaling at a larger root size. These geometry checks run in the browser.
 
-**Foundations / Radius** compares square and pill corners on different specimen sizes
+**Foundations / Radius** compares square, medium, and pill corners on different specimen sizes
 in both themes. Browser checks cover dimensions, corner values, and actual corner hit
 boundaries, including enlarged text and root-size restoration.
 
@@ -79,8 +79,14 @@ Pending stories include both static specimens and caller-controlled success/fail
 Comparison also checks the rendered Button colors against the current palette, including
 native disabled states, so stale shared-style references fail visibly in Storybook.
 
+**Primitives / Input** provides native text, email, password, search, tel, and URL entry with
+empty/filled, read-only, disabled/fieldset, and invalid states. Editing and Forms run as
+portable stories; browser review covers focus, native validation/submission, FormData,
+placeholder contrast, long content, and enlarged text. `line.invalid` has independent
+control-color specimens and contrast tests. See the [Input contract](src/primitives/input/README.md).
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations and Text/Button primitives, separately from the workshop. Stories are discovered
+to the foundations and Text/Button/Input primitives, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

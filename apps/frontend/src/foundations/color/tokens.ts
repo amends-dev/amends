@@ -12,6 +12,8 @@ export interface ColorTokens {
   readonly line: {
     readonly control: string;
     readonly strong: string;
+    /** Invalid-control border on canvas and panel; not an error-text color. */
+    readonly invalid: string;
   };
   readonly action: {
     readonly fill: string;
@@ -40,6 +42,7 @@ export const cotton = {
   line: {
     control: "oklch(0.6 0.016 84)",
     strong: "oklch(0.42 0.016 84)",
+    invalid: "oklch(0.51 0.17 28)",
   },
   action: {
     fill: "oklch(0.24 0.014 84)",
@@ -66,6 +69,7 @@ export const soot = {
   line: {
     control: "oklch(0.57 0.012 84)",
     strong: "oklch(0.74 0.008 86)",
+    invalid: "oklch(0.72 0.15 30)",
   },
   action: {
     fill: "oklch(0.95 0.006 90)",

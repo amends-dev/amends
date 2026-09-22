@@ -8,7 +8,7 @@ import { Text } from "@amends/frontend/primitives/text";
 import "@amends/frontend/foundations/typography/fonts";
 import * as s from "./radius.stories.css.ts";
 
-const names = ["none", "pill"] as const satisfies readonly RadiusName[];
+const names = ["none", "medium", "pill"] as const satisfies readonly RadiusName[];
 const themes = ["cotton", "soot"] as const;
 const labels = { cotton: "Cotton", soot: "Soot" } as const;
 // Rem dimensions belong to these specimens, not the production radius export.
@@ -191,11 +191,11 @@ const meta = {
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
-    radiusSpecimenCount: 8,
+    radiusSpecimenCount: 12,
     docs: {
       description: {
         component:
-          "Only radius.none (0px) and radius.pill (9999px). Squares and rectangles use the exported values, with Text labels and spacing tokens. Browser checks verify dimensions, four corner values, and corner hit boundaries. Enlarged Text is available separately in the sidebar.",
+          "radius.none (0px), radius.medium (10px), and radius.pill (9999px). Squares and rectangles use the exported values, with Text labels and spacing tokens. Browser checks verify dimensions, four corner values, and corner hit boundaries. Enlarged Text is available separately in the sidebar.",
       },
     },
   },
@@ -206,7 +206,7 @@ type Story = StoryObj<typeof meta>;
 export const Comparison = {} satisfies Story;
 export const Sizes = {
   render: () => <AllSizes />,
-  parameters: { controls: { disable: true }, radiusSpecimenCount: 24 },
+  parameters: { controls: { disable: true }, radiusSpecimenCount: 36 },
 } satisfies Story;
 export const EnlargedText = {
   render: () => <EnlargedRadii />,

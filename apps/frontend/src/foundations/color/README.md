@@ -21,11 +21,12 @@ The reading roles above support ordinary content. Filled actions add six roles:
 | `action.disabled`    | Translucent unavailable action | `text.disabled`, over canvas or panel           |
 | `text.disabled`      | Text on an unavailable control | `action.disabled`; not ordinary supporting text |
 
-Control borders and translucent action backgrounds add four roles:
+Control borders and translucent action backgrounds add five roles:
 
 | Role             | Purpose                   | Supported pairing                                      |
 | ---------------- | ------------------------- | ------------------------------------------------------ |
 | `line.control`   | Default control border    | Plain canvas and panel surfaces                        |
+| `line.invalid`   | Invalid control border    | Plain canvas and panel surfaces                        |
 | `line.strong`    | Emphasized control border | Plain surfaces and both action overlays                |
 | `action.hover`   | Subtle hover background   | `text.primary` and `line.strong`, over canvas or panel |
 | `action.pressed` | Subtle pressed background | `text.primary` and `line.strong`, over canvas or panel |
@@ -48,7 +49,9 @@ Cotton uses a dark action fill with light text; Soot inverts that relationship. 
 [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>) uses
 different hover/pressed and disabled values. This foundation preserves the current UI's
 state mapping and disabled fill instead of reintroducing those historical differences.
-Decorative border colors, status, inverse surfaces, and selection remain deferred.
+`line.invalid` matches the existing UI’s `status.danger.indicator` values and is used by
+[Input](../../primitives/input/README.md). It is a border role, not an error-text color.
+The broader status palette, decorative borders, inverse surfaces, and selection remain deferred.
 
 `action.disabled` has 8% alpha; its appearance depends on the surface underneath. Apply it
 as the background color with opaque `text.disabled`. Do not lower the whole element's
@@ -124,7 +127,7 @@ Enlarged Text. Static specimens show both border roles on plain surfaces and bot
 with primary text and the strong border. The 1px dashed pill outlines are workshop examples;
 they do not introduce a border-geometry API or a Button variant.
 
-The unit tests cover eight plain border pairings and eight overlay/surface combinations.
+The unit tests cover twelve plain border pairings and eight overlay/surface combinations.
 Overlay contrast is measured after [source-over alpha compositing](https://www.w3.org/TR/compositing-1/#simplealphacompositing)
 in encoded sRGB. The [review helper](contrast.ts) uses Color.js for conversion, then blends
 the channels over an opaque surface. It rejects translucent backdrops, colors outside sRGB,
