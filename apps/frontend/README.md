@@ -93,11 +93,15 @@ portable tests. See the [Field contract](src/compositions/field/README.md).
 
 **Primitives / Radio** introduces the visible circular native radio, with selected/unselected,
 focus, disabled, and inherited-disabled specimens in both themes. Interaction and form stories
-exercise native grouping and reset. Labels/fieldsets in the workshop are scaffolding; RadioGroup
-and card presentation remain future pieces. See the [Radio contract](src/primitives/radio/README.md).
+exercise native grouping and reset. Labels/fieldsets in the workshop are scaffolding; RadioGroup and its card presentation are available as a separate composition. See the [Radio contract](src/primitives/radio/README.md).
+
+**Compositions / RadioGroup** uses Radio for plain and card choices with a native group label,
+help/error associations, required state, and disabled options. Selection and reset belong to
+the caller. Stories cover both variants, refreshed options, forms, and narrow/enlarged layouts.
+See the [RadioGroup contract](src/compositions/radio-group/README.md).
 
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations and Text/Button/Input/Radio primitives and Field composition, separately from the workshop. Stories are discovered
+to the foundations and Text/Button/Input/Radio primitives and Field/RadioGroup compositions, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

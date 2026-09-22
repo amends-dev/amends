@@ -1,8 +1,8 @@
 # Radio
 
 One visible native `<input type="radio">`. The caller supplies a label and groups choices
-with a common `name` inside a native fieldset/legend. No RadioGroup or card component is
-introduced in this slice; story labels and groups are workshop scaffolding.
+with a common `name` inside a native fieldset/legend. The [RadioGroup composition](../../compositions/radio-group/README.md) adds plain/card choices
+and group associations. Radio itself stays independent; its story groups are workshop scaffolding.
 
 ```tsx
 import { Radio } from "@amends/frontend/primitives/radio";

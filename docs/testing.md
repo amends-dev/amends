@@ -86,6 +86,12 @@ The [Radio primitive](../apps/frontend/src/primitives/radio/README.md) has DOM/t
 forwarding, reactive checked/disabled props, native grouping, form values/reset, and fieldset
 disabling. Interaction and Forms run as portable stories. Use Playwright for native Tab/arrows/
 Space, label activation, state colors, forced colors, and narrow/enlarged labels.
+The [RadioGroup composition](../apps/frontend/src/compositions/radio-group/README.md) tests
+controlled callbacks, group isolation, associations, refreshed-option identity/focus, removed
+or disabled selections, native attributes, and duplicate values. Plain/card interaction and
+form stories plus refreshed options run as portable tests. Browser verification covers card
+contrast, native navigation/validation, reset, external form data, disabled fieldsets, forced
+colors, and narrow/enlarged layouts.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

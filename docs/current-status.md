@@ -54,7 +54,8 @@ border. The Field composition provides a label, required marker, help, and error
 reactive association props; form state and validation timing stay with the consuming feature.
 `text.invalid` adds a verified error-text role. Textarea, grouped controls, and specialized
 input types remain future pieces. The visible Radio primitive supports native selection and
-form semantics; RadioGroup and radio-card compositions remain unimplemented.
+form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
+behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

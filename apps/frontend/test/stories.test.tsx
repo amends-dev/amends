@@ -26,6 +26,14 @@ import radioMeta, {
   Interaction as RadioInteraction,
   Forms as RadioForms,
 } from "../src/primitives/radio/radio.stories.tsx";
+import radioGroupMeta, {
+  Interaction as GroupInteraction,
+  CardInteraction,
+  Forms as GroupForms,
+  CardForms,
+  RefreshedOptions,
+} from "../src/compositions/radio-group/radio-group.stories.tsx";
+const groupStories = definePreview(preview).meta(radioGroupMeta);
 const radioStories = definePreview(preview).meta(radioMeta);
 const fieldStories = definePreview(preview).meta(fieldMeta);
 const inputStories = definePreview(preview).meta(inputMeta);
@@ -97,3 +105,15 @@ it("runs the Radio interaction story", async () => {
 it("runs the Radio form story", async () => {
   await radioStories.story(RadioForms).run();
 });
+
+for (const [name, story] of Object.entries({
+  GroupInteraction,
+  CardInteraction,
+  GroupForms,
+  CardForms,
+  RefreshedOptions,
+})) {
+  it(`runs the RadioGroup ${name} story`, async () => {
+    await groupStories.story(story).run();
+  });
+}
