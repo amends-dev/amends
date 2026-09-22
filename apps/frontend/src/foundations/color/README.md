@@ -1,6 +1,6 @@
 # Color
 
-Reading, control, action, and focus colors, with identical names in Cotton (light)
+Reading, control, action, focus, and status colors, with identical names in Cotton (light)
 and Soot (dark):
 
 | Role             | Purpose                   | Supported pairing |
@@ -31,6 +31,11 @@ Control borders and translucent action backgrounds add five roles:
 | `action.hover`   | Subtle hover background   | `text.primary` and `line.strong`, over canvas or panel |
 | `action.pressed` | Subtle pressed background | `text.primary` and `line.strong`, over canvas or panel |
 
+`line.seam` is a separate decorative divider from the Foundations v2 reference. Shell,
+Navigation, and Drawer use it for dashed section rules. It is intentionally lower contrast
+than control borders and must not identify an input, interactive target, or state. Those
+uses need `line.control`, `line.strong`, or the relevant status indicator.
+
 Hover alpha is 5% in Cotton and 6% in Soot; pressed alpha is 12% and 14% respectively.
 Apply these values as background colors, keeping the text and border opaque. Their rendered
 color depends on the underlying surface. Use `line.strong` in the tinted specimens: the
@@ -43,7 +48,8 @@ The secondary [Button](../../primitives/button/README.md) uses these pairings fo
 `focus.ring` adds the outline color for keyboard focus on canvas and panel surfaces.
 The [focus foundation](../focus/README.md) owns its dimensions and reusable `:focus-visible` class.
 
-All values match the corresponding current [UI color tokens](../../../../ui/src/tokens/color.ts).
+The existing reading, action, control, and focus values retain their reviewed pairings from
+the [UI color tokens](../../../../ui/src/tokens/color.ts).
 The broader visual direction is recorded in the [Foundations v2 reference](<../../../../../design-system/Amends Foundations v2.dc.html>).
 Cotton uses a dark action fill with light text; Soot inverts that relationship. The older
 [Primitives v2 reference](<../../../../../design-system/Amends Primitives v2.dc.html>) uses
@@ -54,15 +60,100 @@ state mapping and disabled fill instead of reintroducing those historical differ
 `text.invalid` matches the old UI's `status.danger.text` for error messages on canvas/panel,
 with a 4.5:1 contrast contract. The [Field composition](../../compositions/field/README.md)
 uses it with an explicit error prefix. Controls stories show this text role alongside the
-invalid border. It does not add a general-purpose Text tone.
-The broader status palette, decorative borders, inverse surfaces, and selection remain deferred.
+invalid border. The Text primitive also exposes the danger text role through `tone="danger"`.
+Status colors and decorative seams are described below. Additional surfaces, brand/link colors,
+and selection remain separate future slices.
 
 `action.disabled` has 8% alpha; its appearance depends on the surface underneath. Apply it
 as the background color with opaque `text.disabled`. Do not lower the whole element's
 opacity. These values describe appearance only: the component must provide disabled
 semantics and prevent activation. The foundation does not implement a Button or interaction
-selectors. The Text primitive's tones remain `inherit`, `primary`, and `secondary`; an action
-label can inherit its enclosing element's `action.onFill` or `text.disabled` color.
+selectors. Text supports reading and semantic status tones; an action label should inherit
+its enclosing element's contrasting foreground instead of overriding it with a status tone.
+
+## Status colors and accessibility contract
+
+`status` has six semantic roles. Their names describe meaning, not a particular hue or component:
+
+| Role      | Meaning                                         | Available color roles       |
+| --------- | ----------------------------------------------- | --------------------------- |
+| `idle`    | No active work; not disabled UI                 | `text`, `indicator`         |
+| `running` | Work in progress, in neutral ink                | `text`, `indicator`         |
+| `success` | Successful completion, green                    | `text`, `indicator`, `soft` |
+| `warning` | Caution or a potential problem, amber           | `text`, `indicator`, `soft` |
+| `pending` | Waiting for a decision or event, amber          | `text`, `indicator`, `soft` |
+| `danger`  | Error, invalid data, or destructive intent, red | `text`, `indicator`, `soft` |
+
+Warning and pending deliberately share underlying amber values but have independent semantic
+names and CSS variables. Use their labels and distinct shapes to communicate the difference.
+Button's `pending` prop means a busy action; it continues to use neutral action colors and its
+running stitch, not the waiting-state amber.
+
+Indicator values follow the Foundations v2 swatches, including the neutral idle/running roles.
+Text has its own foreground values; the reference swatch alone is not a promise of readable
+small text. Cotton's amber text uses chroma 0.085 instead of the old UI's out-of-sRGB 0.1.
+Soft backgrounds use 10–12% alpha over canvas or panel. Cotton's amber tint uses 12% rather
+than the old UI's 13%, matching the reference range. No runtime gamut mapping is required.
+`text.invalid` and `line.invalid` are value aliases of the danger text/indicator, preserving
+the existing form-control API and one source of truth for validation colors.
+
+This foundation targets the color requirements of **WCAG 2.2 AA**:
+
+- Ordinary reading, action labels, placeholders, and status text: at least **4.5:1** on the
+  documented background. We use that threshold even where large text could qualify for 3:1.
+- Meaningful icons, state indicators, control boundaries, and focus rings: at least **3:1**
+  against their supported adjacent backgrounds. A status indicator is tested on plain surfaces
+  and its own soft tint. Soft-background contrast is calculated after alpha compositing.
+- Every status example includes visible words and a distinct shape. Color alone cannot
+  communicate success, caution, waiting, or failure. An error also needs the control's
+  programmatic invalid state and associated message; the Field composition already provides these.
+- Decorative surfaces, tints, and seams have no 3:1 boundary requirement. Inactive controls
+  are exempt from the WCAG contrast minimum, but their muted colors are reserved for actual
+  disabled controls, not secondary content or read-only values.
+
+These thresholds come from [text contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html),
+[non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html), and
+[use of color](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html).
+Role-based state colors also follow established practice in the
+[U.S. Web Design System](https://designsystem.digital.gov/design-tokens/color/state-tokens/).
+WCAG does not prescribe these hues, token names, or an OKLCH storage format; those are our
+design choices. Passing the supported color pairings does not establish whole-application
+WCAG conformance, which also depends on semantics, keyboard behavior, layout, and usage.
+
+Use `status.*.soft` as a background and its matching `text`/`indicator` above it. Do not use
+an indicator as arbitrary small text or as a filled button with an untested foreground.
+Button and IconButton now provide a danger action tone using the dedicated action palette
+below. Text provides success/warning/danger/pending tones. Alert components remain a future slice.
+Browser forced-colors mode must remain enabled: do not preserve author colors with
+`forced-color-adjust: none`. Visible words and SVG shapes keep the status meaningful when
+the user's system palette replaces the colors.
+SVGs with an explicit status color may retain it in forced-colors mode; map their foreground
+to `CanvasText` there, as the status specimens do, rather than relying on automatic recoloring.
+
+## Danger action colors
+
+`action.danger` separates destructive interaction states from status feedback:
+
+| Role                               | Purpose                                                  |
+| ---------------------------------- | -------------------------------------------------------- |
+| `fill`, `fillHover`, `fillPressed` | Default, hover, and pressed filled action backgrounds    |
+| `onFill`                           | The contrasting label/glyph on all three fills           |
+| `text`                             | Label/glyph on transparent or tinted backgrounds         |
+| `border`, `borderStrong`           | Default and hover/pressed outlined boundaries            |
+| `hover`, `pressed`                 | Translucent backgrounds for secondary and ghost variants |
+
+Text and resting fill derive from the danger status text. Strong borders use that same
+foreground; default borders use the danger indicator. Cotton uses dark red fills and light
+labels; Soot uses light red fills and dark labels. Hover/pressed colors are separate reviewed
+values, including reduced chroma in Soot's hover fill to stay within sRGB. Tints use 10%/18%
+alpha in Cotton and 12%/20% in Soot. All enabled label pairs meet 4.5:1; outlined borders meet
+3:1 against both the surrounding surface and the composited interior. Disabled/focus roles
+remain shared. `ActionToneColors` describes this enabled-state shape.
+
+**Foundations / Color / Danger actions** shows these token pairings independently of Button.
+Button's Danger Comparison and Danger Pending Comparison verify the real consumer, including
+disabled fieldsets and the currently active browser state. The color tests cover all fills,
+tints, boundaries, and focus against supported surfaces without rounding pass thresholds.
 
 ## Consume
 
@@ -85,7 +176,7 @@ import { colorThemes, colorVars } from "@amends/frontend/foundations/color/style
 </section>;
 ```
 
-The theme class sets all fifteen variables, the canvas background, primary text color,
+The theme class sets all color variables, the canvas background, primary text color,
 and the browser's `color-scheme`. Descendants inherit the variables; a nested theme
 class overrides them for its subtree. Apply exactly one theme class to each scope.
 Variable names use the stable `--amends-frontend-color-` namespace followed by their role
@@ -161,6 +252,18 @@ and are not control boundaries. Four focus-ring/surface pairings are separately 
 against the 3:1 non-text threshold, with interactive specimens under Foundations / Focus.
 Border thresholds follow [WCAG 2.2 SC 1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 Button semantics and interaction checks live with the primitive.
+
+**Foundations / Color / Status** adds Comparison, Cotton, Soot, Nested Themes, Enlarged Text,
+and Portal Themes. The first five check actual scoped CSS values, text/indicator contrast,
+and translucent rendering against an independent sRGB canvas blend. Portal Themes verifies
+that nested status variables follow Tooltip's trigger scope when switching themes. The
+shared Select/Tooltip bridge recursively copies the contract, including nested status roles,
+into their current overlay host. Stable existing variable names remain unchanged.
+
+Tests verify every token's sRGB gamut and opacity, matching theme contracts, validation
+aliases, and each supported status pairing. Contrast assertions use unrounded values; the
+displayed ratios are rounded for readability. Browser review also covers forced colors,
+narrow/enlarged layouts, and existing Button, Input, Select, and Shell consumers.
 
 Run `bun run --filter @amends/frontend test` and `bun run --filter @amends/frontend build`
 from the repository root, then inspect the stories in a real browser. Browser review

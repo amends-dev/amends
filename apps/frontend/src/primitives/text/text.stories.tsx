@@ -1,4 +1,4 @@
-import { For, createSignal, splitProps } from "solid-js";
+import { For, createSignal, onMount, onCleanup, splitProps } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import {
@@ -9,13 +9,17 @@ import {
 } from "@amends/frontend/primitives/text";
 import type { TypographyRole } from "@amends/frontend/foundations/typography";
 import { typographyStyles } from "@amends/frontend/foundations/typography/styles";
-import { colorThemes } from "@amends/frontend/foundations/color/styles";
-import type { ColorTheme } from "@amends/frontend/foundations/color";
+import { colorThemes, colorVars } from "@amends/frontend/foundations/color/styles";
+import { colors, type ColorTheme } from "@amends/frontend/foundations/color";
+import Color from "colorjs.io";
+import { compositeOnSurface } from "../../foundations/color/contrast.ts";
 import "@amends/frontend/foundations/typography/fonts";
 import * as s from "./text.stories.css.ts";
 
 const variants = ["body", "heading", "mono"] as const;
 const tones = ["inherit", "primary", "secondary"] as const;
+const semanticTones = ["success", "warning", "danger", "pending"] as const;
+const allTones = [...tones, ...semanticTones] as const;
 const elements = ["p", "span", "h1", "h2", "h3", "h4", "h5", "h6", "code"] as const;
 const labels = { cotton: "Cotton", soot: "Soot" } as const;
 const samples = {
@@ -88,7 +92,7 @@ function ReactiveFixture() {
             value={tone()}
             onChange={(event) => setTone(event.currentTarget.value as TextTone)}
           >
-            <For each={tones}>{(value) => <option value={value}>{value}</option>}</For>
+            <For each={allTones}>{(value) => <option value={value}>{value}</option>}</For>
           </select>
         </label>
         <label class={s.label}>
@@ -131,7 +135,7 @@ const meta = {
     theme: { control: "select", options: ["cotton", "soot"] },
     as: { control: "select", options: elements },
     variant: { control: "select", options: variants },
-    tone: { control: "select", options: tones },
+    tone: { control: "select", options: allTones },
     children: { control: "text" },
   },
   tags: ["autodocs"],
@@ -246,6 +250,12 @@ export const ReactiveProps = {
     const headingClasses = original.className;
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "Tone" }), "secondary");
     await expect(original.className).not.toBe(headingClasses);
+    for (const tone of semanticTones) {
+      await userEvent.selectOptions(canvas.getByRole("combobox", { name: "Tone" }), tone);
+      await expect(canvas.getByTestId("reactive-text")).toBe(original);
+      await expect(original).not.toHaveAttribute("tone");
+      await expect(original).not.toHaveAttribute("role");
+    }
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "Element" }), "h2");
     const heading = canvas.getByRole("heading", {
       level: 2,
@@ -259,4 +269,112 @@ export const ReactiveProps = {
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "Element" }), "p");
     await expect(canvas.getByTestId("reactive-text").className).toBe(initialClasses);
   },
+} satisfies Story;
+
+const statusMessages = {
+  success: "Success: invitation sent.",
+  warning: "Warning: review the selected permissions.",
+  danger: "Error: this invitation could not be sent.",
+  pending: "Pending: awaiting a response.",
+} as const;
+function SemanticSpecimens(props: { enlarged?: boolean }) {
+  onMount(() => {
+    if (!props.enlarged) return;
+    const style = document.documentElement.style;
+    const previous = style.getPropertyValue("font-size"),
+      priority = style.getPropertyPriority("font-size");
+    style.setProperty("font-size", "200%");
+    onCleanup(() =>
+      previous
+        ? style.setProperty("font-size", previous, priority)
+        : style.removeProperty("font-size"),
+    );
+  });
+  return (
+    <main class={s.comparison}>
+      <For each={["cotton", "soot"] as const}>
+        {(theme) => (
+          <article class={`${colorThemes[theme]} ${s.scope} ${s.stack}`} data-text-theme={theme}>
+            <Text as="h2" variant="heading">
+              {labels[theme]} semantic text
+            </Text>
+            <Text tone="secondary">
+              Tone supplies color. The message supplies meaning; live announcements are
+              caller-owned.
+            </Text>
+            <For each={["canvas", "panel"] as const}>
+              {(surface) => (
+                <section
+                  class={`${s.panel} ${s.stack}`}
+                  style={{ "background-color": colorVars.surface[surface] }}
+                  data-text-surface={surface}
+                >
+                  <Text as="h3">On surface.{surface}</Text>
+                  <For each={semanticTones}>
+                    {(tone) => (
+                      <div class={s.group}>
+                        <Text variant="mono" tone="secondary">
+                          tone="{tone}"
+                        </Text>
+                        <For each={[false, true]}>
+                          {(soft) => (
+                            <div
+                              style={{
+                                padding: "0.75rem",
+                                "background-color": soft
+                                  ? colorVars.status[tone].soft
+                                  : "transparent",
+                              }}
+                              data-text-soft={soft}
+                            >
+                              <Text tone={tone} data-semantic-text={tone}>
+                                {statusMessages[tone]}{" "}
+                                <Text as="span">Details inherit the same tone.</Text>
+                              </Text>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    )}
+                  </For>
+                </section>
+              )}
+            </For>
+          </article>
+        )}
+      </For>
+    </main>
+  );
+}
+export const SemanticTones = {
+  render: () => <SemanticSpecimens />,
+  parameters: { controls: { disable: true } },
+  play: async ({ canvasElement }) => {
+    await canvasElement.ownerDocument.fonts.ready;
+    const samples = canvasElement.querySelectorAll<HTMLElement>("[data-semantic-text]");
+    await expect(samples).toHaveLength(32);
+    if (window.matchMedia("(forced-colors: active)").matches) return;
+    for (const sample of samples) {
+      const theme = sample.closest<HTMLElement>("[data-text-theme]")!.dataset
+        .textTheme as ColorTheme;
+      const tone = sample.dataset.semanticText as (typeof semanticTones)[number];
+      const surface = sample.closest<HTMLElement>("[data-text-surface]")!;
+      const computed = getComputedStyle(sample);
+      const text = new Color(computed.color);
+      await expect(text.deltaEOK(colors[theme].status[tone].text)).toBeLessThan(0.0001);
+      const ground = compositeOnSurface(
+        getComputedStyle(sample.parentElement!).backgroundColor,
+        getComputedStyle(surface).backgroundColor,
+      );
+      await expect(text.contrastWCAG21(ground)).toBeGreaterThanOrEqual(4.5);
+      await expect(getComputedStyle(sample.firstElementChild!).color).toBe(computed.color);
+      await expect(sample).not.toHaveAttribute("role");
+      await expect(sample).not.toHaveAttribute("aria-live");
+    }
+  },
+} satisfies Story;
+export const SemanticEnlargedText = {
+  ...SemanticTones,
+  render: () => <SemanticSpecimens enlarged />,
+  tags: ["!autodocs"],
 } satisfies Story;

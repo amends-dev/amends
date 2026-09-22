@@ -1,4 +1,5 @@
 import { keyframes, style, styleVariants } from "@vanilla-extract/css";
+import type { ActionToneColors } from "../../foundations/color/tokens.ts";
 import { colorVars } from "../../foundations/color/theme.css.ts";
 import { focusVisible } from "../../foundations/focus/styles.css.ts";
 import { radius } from "../../foundations/radius/tokens.ts";
@@ -41,43 +42,60 @@ export const root = style([
   },
 ]);
 
-export const variants = styleVariants({
-  primary: {
-    backgroundColor: colorVars.action.fill,
-    color: colorVars.action.onFill,
-    selectors: {
-      '&:hover:enabled:not([data-pending="true"])': { backgroundColor: colorVars.action.fillHover },
-      '&:active:enabled:not([data-pending="true"])': {
-        backgroundColor: colorVars.action.fillPressed,
+function createVariants(action: ActionToneColors) {
+  return styleVariants({
+    primary: {
+      backgroundColor: action.fill,
+      color: action.onFill,
+      selectors: {
+        '&:hover:enabled:not([data-pending="true"])': { backgroundColor: action.fillHover },
+        '&:active:enabled:not([data-pending="true"])': {
+          backgroundColor: action.fillPressed,
+        },
       },
     },
-  },
-  secondary: {
-    backgroundColor: "transparent",
-    color: colorVars.text.primary,
-    borderStyle: "dashed",
-    borderColor: colorVars.line.control,
-    selectors: {
-      '&:hover:enabled:not([data-pending="true"])': {
-        backgroundColor: colorVars.action.hover,
-        borderColor: colorVars.line.strong,
-      },
-      // Keyboard presses also need the strong border, even without hover.
-      '&:active:enabled:not([data-pending="true"])': {
-        backgroundColor: colorVars.action.pressed,
-        borderColor: colorVars.line.strong,
+    secondary: {
+      backgroundColor: "transparent",
+      color: action.text,
+      borderStyle: "dashed",
+      borderColor: action.border,
+      selectors: {
+        '&:hover:enabled:not([data-pending="true"])': {
+          backgroundColor: action.hover,
+          borderColor: action.borderStrong,
+        },
+        // Keyboard presses also need the strong border, even without hover.
+        '&:active:enabled:not([data-pending="true"])': {
+          backgroundColor: action.pressed,
+          borderColor: action.borderStrong,
+        },
       },
     },
-  },
-  ghost: {
-    backgroundColor: "transparent",
-    color: colorVars.text.primary,
-    selectors: {
-      '&:hover:enabled:not([data-pending="true"])': { backgroundColor: colorVars.action.hover },
-      '&:active:enabled:not([data-pending="true"])': { backgroundColor: colorVars.action.pressed },
+    ghost: {
+      backgroundColor: "transparent",
+      color: action.text,
+      selectors: {
+        '&:hover:enabled:not([data-pending="true"])': { backgroundColor: action.hover },
+        '&:active:enabled:not([data-pending="true"])': { backgroundColor: action.pressed },
+      },
     },
-  },
-});
+  });
+}
+
+export const variants = {
+  neutral: createVariants({
+    fill: colorVars.action.fill,
+    fillHover: colorVars.action.fillHover,
+    fillPressed: colorVars.action.fillPressed,
+    onFill: colorVars.action.onFill,
+    text: colorVars.text.primary,
+    border: colorVars.line.control,
+    borderStrong: colorVars.line.strong,
+    hover: colorVars.action.hover,
+    pressed: colorVars.action.pressed,
+  }),
+  danger: createVariants(colorVars.action.danger),
+};
 
 // Button-owned running stitch, matching the existing UI without importing its motion catalog.
 const travel = keyframes({ to: { strokeDashoffset: -26 } });

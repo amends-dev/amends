@@ -2,7 +2,12 @@ import { For, createSignal, onCleanup, onMount, splitProps } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import Color from "colorjs.io";
-import { Button, type ButtonProps, type ButtonVariant } from "@amends/frontend/primitives/button";
+import {
+  Button,
+  type ButtonProps,
+  type ButtonVariant,
+  type ButtonTone,
+} from "@amends/frontend/primitives/button";
 import { Text } from "@amends/frontend/primitives/text";
 import { colors, type ColorTheme } from "@amends/frontend/foundations/color";
 import { colorThemes, colorVars } from "@amends/frontend/foundations/color/styles";
@@ -15,12 +20,13 @@ const labels = { cotton: "Cotton", soot: "Soot" } as const;
 const variants = ["primary", "secondary", "ghost"] as const;
 const actionLabels = { primary: "Publish reply", secondary: "Save draft", ghost: "Change email" };
 
-function ThemeSpecimen(props: { theme: ColorTheme; pending?: boolean }) {
+function ThemeSpecimen(props: { theme: ColorTheme; pending?: boolean; tone?: ButtonTone }) {
   const [count, setCount] = createSignal(0);
   return (
     <article
       class={`${colorThemes[props.theme]} ${s.frame} ${s.stack}`}
       data-button-theme={props.theme}
+      data-button-tone={props.tone ?? "neutral"}
       aria-label={`${labels[props.theme]} buttons`}
     >
       <Text as="h2" variant="heading">
@@ -48,13 +54,15 @@ function ThemeSpecimen(props: { theme: ColorTheme; pending?: boolean }) {
                   <div class={s.row}>
                     <Button
                       variant={variant}
+                      tone={props.tone}
                       pending={props.pending}
                       onClick={() => setCount((count) => count + 1)}
                     >
-                      {actionLabels[variant]}
+                      {props.tone === "danger" ? "Delete thread" : actionLabels[variant]}
                     </Button>
                     <Button
                       variant={variant}
+                      tone={props.tone}
                       pending={props.pending}
                       disabled
                       onClick={() => setCount((count) => count + 1)}
@@ -75,11 +83,12 @@ function ThemeSpecimen(props: { theme: ColorTheme; pending?: boolean }) {
             {(variant) => (
               <Button
                 variant={variant}
+                tone={props.tone}
                 pending={props.pending}
                 data-button-variant={variant}
                 onClick={() => setCount((count) => count + 1)}
               >
-                {actionLabels[variant]}
+                {props.tone === "danger" ? "Delete thread" : actionLabels[variant]}
               </Button>
             )}
           </For>
@@ -214,11 +223,28 @@ function ReactiveFixture() {
   );
 }
 
-function PendingFixture(props: { variant: ButtonVariant }) {
+const pendingCopy = {
+  neutral: {
+    label: "Publish reply",
+    ready: "Ready to publish.",
+    busy: "Publishing…",
+    success: "Reply published.",
+    failure: "Could not publish. Try again.",
+  },
+  danger: {
+    label: "Delete thread",
+    ready: "Ready to delete.",
+    busy: "Deleting…",
+    success: "Thread deleted.",
+    failure: "Could not delete. Try again.",
+  },
+} as const;
+function PendingFixture(props: { variant: ButtonVariant; tone?: ButtonTone }) {
+  const copy = () => pendingCopy[props.tone ?? "neutral"];
   const [pending, setPending] = createSignal(false);
   const [attempts, setAttempts] = createSignal(0);
-  const [outcome, setOutcome] = createSignal("Ready to publish.");
-  const finish = (message: string) => {
+  const [outcome, setOutcome] = createSignal<"ready" | "success" | "failure">("ready");
+  const finish = (message: "success" | "failure") => {
     setPending(false);
     setOutcome(message);
   };
@@ -228,8 +254,7 @@ function PendingFixture(props: { variant: ButtonVariant }) {
         Pending and recovery
       </Text>
       <Text tone="secondary">
-        Publish a reply, then resolve the simulated operation. The form owns the work and the status
-        message.
+        Start and resolve the simulated operation. The form owns the work and the status message.
       </Text>
       <form
         class={s.stack}
@@ -242,37 +267,42 @@ function PendingFixture(props: { variant: ButtonVariant }) {
         }}
       >
         <label class={s.label}>
-          Reply title
+          Item title
           <input class={s.input} name="title" value="Proposal" />
         </label>
         <div>
           <Button
             variant={props.variant}
+            tone={props.tone}
             type="submit"
             pending={pending()}
             aria-describedby="publication-status"
           >
-            Publish reply
+            {copy().label}
           </Button>
         </div>
       </form>
-      <Text id="publication-status" role="status">
-        {pending() ? "Publishing…" : outcome()}
+      <Text
+        id="publication-status"
+        role="status"
+        tone={
+          pending()
+            ? "inherit"
+            : outcome() === "failure"
+              ? "danger"
+              : outcome() === "success"
+                ? "success"
+                : "secondary"
+        }
+      >
+        {pending() ? copy().busy : copy()[outcome()]}
       </Text>
       <Text>Attempts: {attempts()}</Text>
       <div class={s.row}>
-        <Button
-          variant="secondary"
-          disabled={!pending()}
-          onClick={() => finish("Reply published.")}
-        >
+        <Button variant="secondary" disabled={!pending()} onClick={() => finish("success")}>
           Complete successfully
         </Button>
-        <Button
-          variant="secondary"
-          disabled={!pending()}
-          onClick={() => finish("Could not publish. Try again.")}
-        >
+        <Button variant="secondary" disabled={!pending()} onClick={() => finish("failure")}>
           Simulate failure
         </Button>
       </div>
@@ -280,7 +310,7 @@ function PendingFixture(props: { variant: ButtonVariant }) {
   );
 }
 
-function LongLabelSpecimens(props: { pending?: boolean }) {
+function LongLabelSpecimens(props: { pending?: boolean; tone?: ButtonTone }) {
   return (
     <main class={s.comparison}>
       <For each={["cotton", "soot"] as const}>
@@ -299,18 +329,24 @@ function LongLabelSpecimens(props: { pending?: boolean }) {
                     {variant}
                   </Text>
                   <div>
-                    <Button variant={variant} pending={props.pending}>
-                      Publish this proposal and notify the group
+                    <Button variant={variant} tone={props.tone} pending={props.pending}>
+                      {props.tone === "danger"
+                        ? "Delete this thread and all of its messages"
+                        : "Publish this proposal and notify the group"}
                     </Button>
                   </div>
                   <div>
-                    <Button variant={variant} pending={props.pending}>
-                      Publish_reply_abcdefghijklmnopqrstuvwxyz_1234567890
+                    <Button variant={variant} tone={props.tone} pending={props.pending}>
+                      {props.tone === "danger"
+                        ? "Delete_thread_abcdefghijklmnopqrstuvwxyz_1234567890"
+                        : "Publish_reply_abcdefghijklmnopqrstuvwxyz_1234567890"}
                     </Button>
                   </div>
                   <div>
-                    <Button variant={variant} pending={props.pending} disabled>
-                      Publish this proposal and notify the group
+                    <Button variant={variant} tone={props.tone} pending={props.pending} disabled>
+                      {props.tone === "danger"
+                        ? "Delete this thread and all of its messages"
+                        : "Publish this proposal and notify the group"}
                     </Button>
                   </div>
                 </section>
@@ -323,7 +359,7 @@ function LongLabelSpecimens(props: { pending?: boolean }) {
   );
 }
 
-function EnlargedButtons(props: { pending?: boolean }) {
+function EnlargedButtons(props: { pending?: boolean; tone?: ButtonTone }) {
   onMount(() => {
     const root = document.documentElement.style;
     const previous = root.getPropertyValue("font-size");
@@ -334,7 +370,7 @@ function EnlargedButtons(props: { pending?: boolean }) {
       else root.removeProperty("font-size");
     });
   });
-  return <LongLabelSpecimens pending={props.pending} />;
+  return <LongLabelSpecimens pending={props.pending} tone={props.tone} />;
 }
 
 type Args = ButtonProps & { theme: ColorTheme };
@@ -352,6 +388,7 @@ const meta = {
   args: {
     theme: "cotton",
     variant: "primary",
+    tone: "neutral",
     children: "Publish reply",
     disabled: false,
     pending: false,
@@ -360,6 +397,7 @@ const meta = {
   argTypes: {
     theme: { control: "select", options: ["cotton", "soot"] },
     variant: { control: "select", options: variants },
+    tone: { control: "select", options: ["neutral", "danger"] },
     children: { control: "text" },
     disabled: { control: "boolean" },
     pending: { control: "boolean" },
@@ -368,7 +406,7 @@ const meta = {
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen" as const,
-    controls: { include: ["theme", "variant", "children", "disabled", "pending", "type"] },
+    controls: { include: ["theme", "variant", "tone", "children", "disabled", "pending", "type"] },
     docs: {
       description: {
         component:
@@ -381,10 +419,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Comparison = {
-  render: () => (
+  render: (props) => (
     <main class={s.comparison}>
-      <ThemeSpecimen theme="cotton" />
-      <ThemeSpecimen theme="soot" />
+      <ThemeSpecimen theme="cotton" tone={props.tone} />
+      <ThemeSpecimen theme="soot" tone={props.tone} />
     </main>
   ),
   parameters: { controls: { disable: true } },
@@ -401,6 +439,16 @@ export const Comparison = {
         const theme = button.closest<HTMLElement>("[data-button-theme]")!.dataset
           .buttonTheme as ColorTheme;
         const palette = colors[theme];
+        const tone = button.closest<HTMLElement>("[data-button-tone]")!.dataset.buttonTone;
+        const action =
+          tone === "danger"
+            ? palette.action.danger
+            : {
+                ...palette.action,
+                text: palette.text.primary,
+                border: palette.line.control,
+                borderStrong: palette.line.strong,
+              };
         const variant = button.closest<HTMLElement>("[data-button-variant]")!.dataset
           .buttonVariant as ButtonVariant;
         const disabled = button.matches(":disabled");
@@ -429,11 +477,11 @@ export const Comparison = {
           disabled
             ? palette.action.disabled
             : variant === "primary"
-              ? palette.action[active ? "fillPressed" : hover ? "fillHover" : "fill"]
+              ? action[active ? "fillPressed" : hover ? "fillHover" : "fill"]
               : active
-                ? palette.action.pressed
+                ? action.pressed
                 : hover
-                  ? palette.action.hover
+                  ? action.hover
                   : "transparent",
         );
         await expect(background.alpha).toBeCloseTo(expectedBackground.alpha, 6);
@@ -442,19 +490,15 @@ export const Comparison = {
         await expect(text.alpha).toBe(1);
         await expect(
           text.deltaEOK(
-            disabled
-              ? palette.text.disabled
-              : variant === "primary"
-                ? palette.action.onFill
-                : palette.text.primary,
+            disabled ? palette.text.disabled : variant === "primary" ? action.onFill : action.text,
           ),
         ).toBeLessThan(0.0001);
         const expectedBorder = new Color(
           disabled || variant !== "secondary"
             ? "transparent"
             : active || hover
-              ? palette.line.strong
-              : palette.line.control,
+              ? action.borderStrong
+              : action.border,
         );
         for (const side of ["Top", "Right", "Bottom", "Left"] as const) {
           const border = new Color(rendered[`border${side}Color`]);
@@ -577,10 +621,10 @@ export const EnlargedText = {
 
 export const PendingComparison = {
   ...Comparison,
-  render: () => (
+  render: (props) => (
     <main class={s.comparison}>
-      <ThemeSpecimen theme="cotton" pending />
-      <ThemeSpecimen theme="soot" pending />
+      <ThemeSpecimen theme="cotton" tone={props.tone} pending />
+      <ThemeSpecimen theme="soot" tone={props.tone} pending />
     </main>
   ),
 } satisfies Story;
@@ -623,18 +667,19 @@ export const PendingEnlargedText = {
 } satisfies Story;
 
 export const Pending = {
-  render: (props) => <PendingFixture variant={props.variant ?? "primary"} />,
+  render: (props) => <PendingFixture variant={props.variant ?? "primary"} tone={props.tone} />,
   parameters: { controls: { disable: true } },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
+    const copy = pendingCopy[args.tone ?? "neutral"];
     const canvas = within(canvasElement);
-    const button = canvas.getByRole("button", { name: "Publish reply" });
+    const button = canvas.getByRole("button", { name: copy.label });
     const status = canvas.getByRole("status");
     await userEvent.click(button);
     await expect(button).toHaveFocus();
     await expect(button).not.toBeDisabled();
     await expect(button).toHaveAttribute("aria-busy", "true");
     await expect(button).toHaveAttribute("aria-disabled", "true");
-    await expect(status).toHaveTextContent("Publishing…");
+    await expect(status).toHaveTextContent(copy.busy);
     await userEvent.click(button);
     await userEvent.keyboard("{Enter} ");
     await expect(canvas.getByText("Attempts: 1")).toBeInTheDocument();
@@ -644,19 +689,43 @@ export const Pending = {
     await userEvent.tab({ shift: true });
     await expect(button).toHaveFocus();
     await userEvent.click(canvas.getByRole("button", { name: "Complete successfully" }));
-    await expect(status).toHaveTextContent("Reply published.");
+    await expect(status).toHaveTextContent(copy.success);
     await expect(button).not.toHaveAttribute("aria-busy");
     await expect(button).not.toHaveAttribute("aria-disabled");
-    await expect(canvas.getByRole("button", { name: "Publish reply" })).toBe(button);
+    await expect(canvas.getByRole("button", { name: copy.label })).toBe(button);
     await userEvent.click(button);
     await expect(canvas.getByText("Attempts: 2")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Simulate failure" }));
-    await expect(status).toHaveTextContent("Could not publish. Try again.");
+    await expect(status).toHaveTextContent(copy.failure);
     await userEvent.click(button);
     await expect(canvas.getByText("Attempts: 3")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Complete successfully" }));
-    await expect(status).toHaveTextContent("Reply published.");
+    await expect(status).toHaveTextContent(copy.success);
   },
 } satisfies Story;
 export const SecondaryPending = { ...Pending, args: { variant: "secondary" } } satisfies Story;
 export const GhostPending = { ...Pending, args: { variant: "ghost" } } satisfies Story;
+export const DangerPending = { ...Pending, args: { tone: "danger" } } satisfies Story;
+export const DangerSecondaryPending = {
+  ...Pending,
+  args: { tone: "danger", variant: "secondary" },
+} satisfies Story;
+export const DangerGhostPending = {
+  ...Pending,
+  args: { tone: "danger", variant: "ghost" },
+} satisfies Story;
+
+export const DangerComparison = { ...Comparison, args: { tone: "danger" } } satisfies Story;
+export const DangerPendingComparison = {
+  ...PendingComparison,
+  args: { tone: "danger" },
+} satisfies Story;
+export const DangerLongLabels = {
+  ...LongLabels,
+  render: () => <LongLabelSpecimens tone="danger" />,
+} satisfies Story;
+export const DangerEnlargedText = {
+  ...EnlargedText,
+  render: () => <EnlargedButtons tone="danger" pending />,
+  play: ({ canvasElement }) => verifyPendingLayout(canvasElement),
+} satisfies Story;

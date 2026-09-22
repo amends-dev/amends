@@ -7,6 +7,26 @@ import type { TypographyRole } from "@amends/frontend/foundations/typography";
 
 afterEach(cleanup);
 
+it("changes semantic tone without replacing text or adding announcements", () => {
+  const [tone, setTone] = createSignal<TextTone>("success");
+  render(() => (
+    <Text tone={tone()} tabIndex={-1}>
+      Operation result
+    </Text>
+  ));
+  const text = screen.getByText("Operation result");
+  text.focus();
+  for (const tone of ["warning", "pending", "danger", "success"] as const) {
+    const previous = text.className;
+    setTone(tone);
+    expect(screen.getByText("Operation result")).toBe(text);
+    expect(text).toHaveFocus();
+    expect(text.className).not.toBe(previous);
+    for (const attribute of ["tone", "role", "aria-live"])
+      expect(text).not.toHaveAttribute(attribute);
+  }
+});
+
 it("renders a body paragraph without an extra wrapper or component attributes", () => {
   const { container } = render(() => <Text>Keep the context close.</Text>);
   const text = screen.getByText("Keep the context close.");

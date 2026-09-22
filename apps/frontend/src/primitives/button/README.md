@@ -15,6 +15,10 @@ import "@amends/frontend/foundations/typography/fonts";
   </Button>
   <Button variant="secondary">Save draft</Button>
   <Button variant="ghost">Change email</Button>
+  <Button tone="danger">Delete thread</Button>
+  <Button variant="secondary" tone="danger">
+    Remove member
+  </Button>
   <Button pending aria-describedby="publish-status">
     Publish reply
   </Button>
@@ -28,9 +32,10 @@ import "@amends/frontend/foundations/typography/fonts";
 ## Contract
 
 `ButtonProps` extends Solid's `JSX.ButtonHTMLAttributes<HTMLButtonElement>` with
-`variant?: "primary" | "secondary" | "ghost"` (also exported as `ButtonVariant`) and
-`pending?: boolean`. The variant defaults to
-`primary`; `variant` and `pending` are consumed by the component and are not forwarded as native attributes. Native attributes,
+`variant?: "primary" | "secondary" | "ghost"` (also exported as `ButtonVariant`),
+`tone?: "neutral" | "danger"` (also exported as `ButtonTone`), and `pending?: boolean`.
+The variant defaults to `primary` and tone to `neutral`. These props are consumed by the
+component and are not forwarded as native attributes. Native attributes,
 events (including Solid's bound handlers), styles, ARIA/data attributes, and the actual
 button ref are forwarded. Native types are `button`, `submit`, and `reset`; omitting `type`
 or setting it to `undefined` uses `button`. This prevents accidental form submission.
@@ -49,7 +54,7 @@ typography foundation directly on the button, so a Text wrapper is unnecessary.
 
 `class` and truthy `classList` entries merge reactively with the component classes using
 the same convention as Text. False entries do not remove a class supplied elsewhere.
-Variant, native props, content, and handlers update without replacing the element. Ordinary updates
+Variant, tone, native props, content, and handlers update without replacing the element. Ordinary updates
 preserve focus; disabling a focused button follows the browser's native behavior.
 
 ## Pending
@@ -72,12 +77,32 @@ blocks focus and activation. `data-pending` is reserved for Button's internal st
 
 The running stitch is a decorative, noninteractive SVG drawn inside the button in its text color.
 It does not reserve space or change the label. Pending retains the variant's resting colors,
-uses a progress cursor while natively enabled, and suppresses hover/pressed styling. Disabled
+including its chosen tone, uses a progress cursor while natively enabled, and suppresses hover/pressed styling. Disabled
 colors and cursor take precedence when pending and disabled coexist. Reduced motion freezes the
 stitch; the feature's textual status still communicates progress. Focus remains an independent
 outer outline.
 
 ## Appearance and sizing
+
+`tone="danger"` identifies destructive intent independently of visual hierarchy:
+
+- Primary uses a red fill with light text in Cotton and a lighter red fill with dark text in Soot.
+- Secondary uses red text and a dashed red border; hover/press strengthen the border and tint the background.
+- Ghost uses red text and the same hover/pressed tints without a visible border.
+
+These pairs come from `action.danger`, including dedicated hover and pressed fills. They use
+the same variant styling rules as neutral actions. Unlike the older UI, danger has a distinct
+pressed fill and an explicitly themed secondary border; it does not infer a complete action
+palette from one status swatch. Enabled labels meet 4.5:1 and meaningful secondary borders
+meet 3:1 on supported canvas/panel surfaces, including composited tints.
+
+Disabled danger buttons use the shared neutral disabled treatment, including when inherited
+from a fieldset. Focus remains the shared ink outline. Pending retains the chosen tone's
+resting colors and running stitch; it does not turn amber. Use explicit destructive labels
+such as “Delete thread” so color is not the only indication of meaning. Tone adds no confirmation
+dialog, permission check, live announcement, or operation; the consuming feature owns those.
+
+The following describes neutral appearance and geometry shared by both tones:
 
 - Primary uses the reviewed dark fill and light label in Cotton; Soot inverts the pairing.
 - Secondary uses primary text, a transparent background, and a 1px dashed `line.control`
@@ -108,7 +133,7 @@ dimension through a scoped resize observer; unlike the old percentage radius, th
 on tall wrapped buttons and keeps the stitch clear of the text. The observer disconnects when
 pending ends or the button unmounts.
 These remain private Button styles; no shared motion or stroke catalog is introduced. There are no
-hover transitions. Additional sizes and danger treatment remain future slices.
+hover transitions. Additional sizes remain a future slice.
 Named icon-only actions use the separate [IconButton](../icon-button/README.md) primitive.
 Unlike the older UI, secondary explicitly selects the strong border on press as well as hover,
 so keyboard activation uses the reviewed high-contrast pairing.
@@ -134,9 +159,14 @@ their own accessibility and layout review.
   variants, themes, surfaces, disabled controls, and wrapped labels.
 - **Pending / Secondary Pending / Ghost Pending:** blocked repeat activation, retained focus/tab
   order, success, failure, and retry through a caller-controlled form.
+- **Danger Comparison / Danger Pending Comparison:** all variants and disabled/fieldset states
+  on both surfaces and themes, using the same rendered-color checks as neutral buttons.
+- **Danger Pending / Danger Secondary Pending / Danger Ghost Pending:** simulated deletion,
+  blocked repeated submission, success/failure feedback through semantic Text, and recovery.
+- **Danger Long Labels / Danger Enlarged Text:** wrapping and pending stitch geometry.
 
 The activation, form, and pending-recovery stories for all three variants, plus Reactive Props, run the same play scenarios in Storybook and the
-Bun/Vitest portable-story suite. Focused DOM tests cover forwarding, native submission,
+Bun/Vitest portable-story suite, including danger recovery for all three variants. Focused DOM tests cover forwarding, native submission,
 disabled/pending activation, submit/reset cancellation and recovery, caller ARIA restoration,
 preventing default, reactive handlers/classes/types, refs, and element
 identity. Type examples reject unsupported tags, variants, and invalid native attributes.

@@ -14,6 +14,9 @@ import buttonMeta, {
   Pending,
   SecondaryPending,
   GhostPending,
+  DangerPending,
+  DangerSecondaryPending,
+  DangerGhostPending,
   ReactiveProps as ButtonReactiveProps,
 } from "../src/primitives/button/button.stories.tsx";
 
@@ -52,6 +55,7 @@ import selectMeta, {
 import gridMeta, { ResponsiveForm } from "../src/primitives/layout/grid.stories.tsx";
 import iconButtonMeta, {
   Interaction as iconButtonInteraction,
+  DangerInteraction as iconButtonDangerInteraction,
 } from "../src/primitives/icon-button/icon-button.stories.tsx";
 import tooltipMeta, {
   Keyboard as tooltipKeyboard,
@@ -189,6 +193,15 @@ it("keeps form values while changing the grid's available width", async () => {
 it("runs icon button activation", async () => {
   await iconButtonStories.story(iconButtonInteraction).run();
 });
+it("runs danger icon button activation", async () => {
+  await iconButtonStories.story(iconButtonDangerInteraction).run();
+});
+it.each([DangerPending, DangerSecondaryPending, DangerGhostPending])(
+  "runs danger button pending and recovery %#",
+  async (story) => {
+    await buttonStories.story(story).run();
+  },
+);
 it("runs tooltip keyboard behavior", async () => {
   await tooltipStories.story(tooltipKeyboard).run();
 });

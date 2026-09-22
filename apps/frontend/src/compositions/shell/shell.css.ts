@@ -51,7 +51,7 @@ export const sidebarFooter = style({
   flexShrink: 0,
   padding: space[2],
   paddingBottom: `max(${space[2]}, env(safe-area-inset-bottom))`,
-  borderTop: `1px dashed ${colorVars.line.control}`,
+  borderTop: `1px dashed ${colorVars.line.seam}`,
 });
 export const sidebarLabel = style({
   minWidth: 0,
@@ -92,7 +92,7 @@ export const main = style([
 export const footer = style({
   gridRow: 3,
   padding: space[3],
-  borderTop: `1px dashed ${colorVars.line.control}`,
+  borderTop: `1px dashed ${colorVars.line.seam}`,
 });
 export const skip = style([
   typographyStyles.body,

@@ -1,9 +1,43 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { createSignal, type JSX } from "solid-js";
-import { Button, type ButtonVariant } from "@amends/frontend/primitives/button";
+import { Button, type ButtonVariant, type ButtonTone } from "@amends/frontend/primitives/button";
+import { IconButton } from "@amends/frontend/primitives/icon-button";
 
 afterEach(cleanup);
+const buttonCases = (["neutral", "danger"] as const).flatMap((tone) =>
+  (["primary", "secondary", "ghost"] as const).map((variant) => ({ tone, variant })),
+);
+
+it("updates Button and IconButton tone independently of variant without replacing or blurring them", () => {
+  const [tone, setTone] = createSignal<ButtonTone | undefined>();
+  const click = vi.fn();
+  render(() => (
+    <>
+      <Button tone={tone()} variant="secondary" onClick={click}>
+        Delete thread
+      </Button>
+      <IconButton tone={tone()} variant="ghost" aria-label="Delete draft" onClick={click}>
+        ×
+      </IconButton>
+    </>
+  ));
+  const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
+  const original = buttons.map((button) => button.className);
+  buttons[0]!.focus();
+  setTone("danger");
+  expect(screen.getAllByRole("button")).toEqual(buttons);
+  expect(buttons[0]).toHaveFocus();
+  buttons.forEach((button, index) => {
+    expect(button.className).not.toBe(original[index]);
+    expect(button).not.toHaveAttribute("tone");
+    expect(button).not.toHaveAttribute("aria-live");
+    button.click();
+  });
+  expect(click).toHaveBeenCalledTimes(2);
+  setTone(undefined);
+  expect(buttons.map((button) => button.className)).toEqual(original);
+});
 
 it("renders one native button, defaults to a non-submitting type, and preserves inline content", () => {
   const { container } = render(() => (
@@ -61,13 +95,13 @@ it("forwards native attributes, styles, bound events, and the native element ref
   expect(clicked).toHaveBeenCalledWith("reply", expect.any(MouseEvent));
 });
 
-it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
-  "prevents %s activation when disabled and resumes when enabled",
-  (variant) => {
+it.each(buttonCases)(
+  "prevents $tone $variant activation when disabled and resumes when enabled",
+  ({ tone, variant }) => {
     const [disabled, setDisabled] = createSignal(true);
     const clicked = vi.fn();
     render(() => (
-      <Button variant={variant} disabled={disabled()} onClick={clicked}>
+      <Button variant={variant} tone={tone} disabled={disabled()} onClick={clicked}>
         Publish reply
       </Button>
     ));
@@ -82,9 +116,9 @@ it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
   },
 );
 
-it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
-  "submits %s only when explicitly requested and preserves the submitter",
-  (variant) => {
+it.each(buttonCases)(
+  "submits $tone $variant only when explicitly requested and preserves the submitter",
+  ({ tone, variant }) => {
     const submitted = vi.fn();
     render(() => (
       <form
@@ -93,11 +127,13 @@ it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
           submitted(event.submitter);
         }}
       >
-        <Button variant={variant}>Save draft</Button>
-        <Button variant={variant} type="submit" name="intent" value="publish">
+        <Button variant={variant} tone={tone}>
+          Save draft
+        </Button>
+        <Button variant={variant} tone={tone} type="submit" name="intent" value="publish">
           Publish reply
         </Button>
-        <Button variant={variant} type="submit" disabled>
+        <Button variant={variant} tone={tone} type="submit" disabled>
           Unavailable
         </Button>
       </form>
@@ -204,13 +240,13 @@ it("updates native props, content, classes, and handlers without replacing or bl
   expect(button).toHaveAttribute("type", "button");
 });
 
-it.each<ButtonVariant>(["primary", "secondary", "ghost"])(
-  "keeps the %s button focused and named while pending, blocks clicks, and recovers",
-  (variant) => {
+it.each(buttonCases)(
+  "keeps the $tone $variant button focused and named while pending, blocks clicks, and recovers",
+  ({ tone, variant }) => {
     const [pending, setPending] = createSignal(false);
     const clicked = vi.fn();
     render(() => (
-      <Button variant={variant} pending={pending()} onClick={[clicked, "publish"]}>
+      <Button variant={variant} tone={tone} pending={pending()} onClick={[clicked, "publish"]}>
         Publish reply
       </Button>
     ));

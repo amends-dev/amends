@@ -1,4 +1,5 @@
 const paths = {
+  trash: "M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7",
   home: "m3 10 9-7 9 7v10H3V10Zm6 10v-7h6v7",
   threads: "M4 4h16v12H9l-5 4V4Zm4 4h8M8 12h5",
   groups: "M3 8h18v12H3V8Zm3 0V4h5l2 4",

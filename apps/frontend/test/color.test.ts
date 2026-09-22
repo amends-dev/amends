@@ -29,14 +29,84 @@ it("rejects unresolved color channels", () => {
 
 for (const [theme, palette] of Object.entries(colors)) {
   describe(`${theme} color pairings`, () => {
+    it("keeps every color in sRGB and both themes on the same semantic contract", () => {
+      const leaves = (tree: object, path = ""): Record<string, string> =>
+        Object.fromEntries(
+          Object.entries(tree).flatMap(([key, value]) =>
+            typeof value === "string"
+              ? [[`${path}${key}`, value]]
+              : Object.entries(leaves(value, `${path}${key}.`)),
+          ),
+        );
+      const values = leaves(palette);
+      expect(Object.keys(values)).toEqual(Object.keys(leaves(colors.cotton)));
+      for (const [role, value] of Object.entries(values)) {
+        const color = new Color(value);
+        expect(color.inGamut("srgb"), role).toBe(true);
+        const translucent =
+          role.endsWith(".soft") ||
+          [
+            "action.hover",
+            "action.pressed",
+            "action.disabled",
+            "action.danger.hover",
+            "action.danger.pressed",
+          ].includes(role);
+        if (translucent) {
+          expect(color.alpha, role).toBeGreaterThan(0);
+          expect(color.alpha, role).toBeLessThan(1);
+        } else expect(color.alpha, role).toBe(1);
+      }
+    });
+    it("keeps validation and danger colors aligned", () => {
+      expect(palette.text.invalid).toBe(palette.status.danger.text);
+      expect(palette.line.invalid).toBe(palette.status.danger.indicator);
+    });
+    for (const state of ["fill", "fillHover", "fillPressed"] as const) {
+      it(`keeps danger action labels readable on ${state}`, () => {
+        const action = palette.action.danger;
+        expect(new Color(action.onFill).contrastWCAG21(action[state])).toBeGreaterThanOrEqual(4.5);
+      });
+    }
     for (const [surface, background] of Object.entries(palette.surface)) {
-      for (const [role, foreground] of Object.entries(palette.line)) {
+      for (const state of ["rest", "hover", "pressed"] as const) {
+        it(`keeps danger ${state} text, borders and focus readable on surface.${surface}`, () => {
+          const action = palette.action.danger;
+          const effective = compositeOnSurface(
+            state === "rest" ? "transparent" : action[state],
+            background,
+          );
+          const border = new Color(state === "rest" ? action.border : action.borderStrong);
+          expect(new Color(action.text).contrastWCAG21(effective)).toBeGreaterThanOrEqual(4.5);
+          expect(border.contrastWCAG21(effective)).toBeGreaterThanOrEqual(3);
+          expect(border.contrastWCAG21(background)).toBeGreaterThanOrEqual(3);
+          expect(new Color(palette.focus.ring).contrastWCAG21(effective)).toBeGreaterThanOrEqual(3);
+        });
+      }
+      // Decorative seams are intentionally excluded from control-boundary requirements.
+      for (const role of ["control", "strong", "invalid"] as const) {
         it(`keeps line.${role} identifiable on surface.${surface}`, () => {
-          const border = new Color(foreground);
+          const border = new Color(palette.line[role]);
           expect(border.alpha).toBe(1);
           expect(border.inGamut("srgb")).toBe(true);
           expect(border.contrastWCAG21(background)).toBeGreaterThanOrEqual(3);
         });
+      }
+      for (const [tone, status] of Object.entries(palette.status)) {
+        it(`keeps status.${tone} text and indicators readable on surface.${surface}`, () => {
+          expect(new Color(status.text).contrastWCAG21(background)).toBeGreaterThanOrEqual(4.5);
+          expect(new Color(status.indicator).contrastWCAG21(background)).toBeGreaterThanOrEqual(3);
+        });
+        if ("soft" in status) {
+          it(`keeps status.${tone} readable on its soft background over surface.${surface}`, () => {
+            const effective = compositeOnSurface(status.soft, background);
+            expect(new Color(status.text).contrastWCAG21(effective)).toBeGreaterThanOrEqual(4.5);
+            expect(new Color(status.indicator).contrastWCAG21(effective)).toBeGreaterThanOrEqual(3);
+            expect(new Color(palette.focus.ring).contrastWCAG21(effective)).toBeGreaterThanOrEqual(
+              3,
+            );
+          });
+        }
       }
       for (const state of ["hover", "pressed"] as const) {
         it(`keeps text and the strong border readable over action.${state} on surface.${surface}`, () => {

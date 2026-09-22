@@ -24,7 +24,7 @@ export const section = style({
   minWidth: 0,
   marginTop: space[4],
   paddingTop: space[3],
-  borderTop: `1px dashed ${colorVars.line.control}`,
+  borderTop: `1px dashed ${colorVars.line.seam}`,
 });
 export const sectionLabel = style([
   typographyStyles.mono,

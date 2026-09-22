@@ -2,8 +2,10 @@ import { Show, createSignal, onCleanup, onMount, splitProps, type JSX } from "so
 import * as s from "./button.css.ts";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost";
+export type ButtonTone = "neutral" | "danger";
 export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
+  tone?: ButtonTone;
   /** Blocks activation while preserving focus. The caller owns the operation and its outcome. */
   pending?: boolean;
 };
@@ -36,6 +38,7 @@ function PendingIndicator() {
 export function Button(props: ButtonProps): JSX.Element {
   const [local, native] = splitProps(props, [
     "variant",
+    "tone",
     "pending",
     "type",
     "class",
@@ -58,7 +61,7 @@ export function Button(props: ButtonProps): JSX.Element {
   const classes = () =>
     [
       s.root,
-      s.variants[local.variant ?? "primary"],
+      s.variants[local.tone ?? "neutral"][local.variant ?? "primary"],
       local.class,
       ...Object.entries(local.classList ?? {})
         .filter(([, enabled]) => enabled)

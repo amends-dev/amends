@@ -12,9 +12,12 @@ import { colorVars } from "../../foundations/color/theme.css.ts";
 
 /** Private bridge for a mounted subtree that moves between a dock and a native modal. */
 export const OverlayHostContext = createContext<Accessor<HTMLElement | undefined>>();
-const properties = Object.values(colorVars).flatMap((group) =>
-  Object.values(group).map((value) => value.slice(4, -1)),
-);
+type VariableTree = { readonly [key: string]: string | VariableTree };
+const leafVariables = (tree: VariableTree): string[] =>
+  Object.values(tree).flatMap((value) =>
+    typeof value === "string" ? [value.slice(4, -1)] : leafVariables(value),
+  );
+const properties = leafVariables(colorVars);
 export function createOverlayScope(anchor: Accessor<HTMLElement | undefined>) {
   const inheritedHost = useContext(OverlayHostContext);
   const mount = createMemo(

@@ -35,17 +35,28 @@ and nested scopes. Six neutral filled-action color roles add default, hover, pre
 and disabled specimens on both surfaces; enabled label contrast has automated checks.
 Control-border colors and translucent hover/pressed backgrounds have scoped specimens and
 contrast checks after compositing. The tinted specimens pair primary text with the strong border.
+Semantic status roles now include success, warning, pending, danger, idle, and running, with
+separate text and indicator colors; the colored roles also have soft tints. Warning and
+pending share amber but remain distinct meanings. Validation colors alias danger values.
+All tokens are tested for sRGB gamut, with WCAG 2.2 AA contrast targets for supported text
+and indicator pairings, including composited backgrounds. Status specimens include visible
+labels and shapes. Decorative `line.seam` dividers are separated from control borders in
+Shell, Navigation, and Drawer. These checks do not establish whole-app WCAG conformance.
 The focus foundation adds a themed 2px outline with 2px offset, applied through a reusable
 `:focus-visible` class. Storybook provides native controls for real keyboard review and
 browser checks of ring colors and clearance. The Button primitive provides primary filled,
 secondary outlined, and ghost actions in one regular size, native disabled/form behavior, and portable
 interaction stories. Controlled pending blocks repeated activation while preserving focus and layout,
-with a running stitch and reduced-motion treatment. Additional sizes and danger tone remain
-unimplemented in frontend. IconButton provides named square actions using Button's variants;
+with a running stitch and reduced-motion treatment. Danger tone supports all three variants
+through a tested `action.danger` palette, with dedicated hover/pressed fills and tinted states.
+Disabled appearance and focus remain shared across tones. Additional sizes remain
+unimplemented in frontend. IconButton provides named square actions using Button's variants and tones;
 Tooltip supplies supplemental hover/focus text.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.
+It also supports success, warning, danger, and pending text tones; announcements and visible
+status wording remain caller-owned.
 Spacing steps 0–6 are available as quarter-rem values, with browser-measured scale, padding,
 and gap specimens at normal and enlarged root text sizes.
 Square, medium (10px), and pill radius values have browser-verified corner specimens across sizes and themes.

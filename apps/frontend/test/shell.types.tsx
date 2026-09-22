@@ -5,6 +5,13 @@ import { IconButton } from "@amends/frontend/primitives/icon-button";
 import { Tooltip } from "@amends/frontend/primitives/tooltip";
 export function examples() {
   <IconButton aria-label="Open navigation">☰</IconButton>;
+  <IconButton tone="danger" variant="secondary" aria-label="Remove member">
+    ×
+  </IconButton>;
+  // @ts-expect-error IconButton supports the same action tones as Button.
+  <IconButton tone="warning" aria-label="Warning">
+    !
+  </IconButton>;
   <Tooltip.Root>
     <Tooltip.Trigger as={IconButton} aria-label="Search">
       s

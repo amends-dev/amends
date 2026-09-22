@@ -2,7 +2,7 @@
 
 The starting point for the shared Solid frontend intended for web and Tauri desktop.
 The [color foundation](src/foundations/color/README.md) defines reading, action, control-border,
-and focus colors for Cotton and Soot, with scoped theme styles and Storybook specimens. The
+decorative seam, focus, and semantic status colors for Cotton and Soot, with scoped theme styles and Storybook specimens. The
 [typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
 styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
 composes those foundations into native paragraphs, spans, headings, and inline code. The
@@ -48,6 +48,14 @@ play checks compare the actual CSS colors and an independent canvas blend. Neste
 theme controls, and enlarged-text stories support visual review. The secondary Button consumes
 these reviewed color pairings.
 
+**Foundations / Color / Status** adds success, warning, pending, danger, idle, and running
+roles, with separate text/indicator colors and soft backgrounds for the colored statuses.
+Warning and pending share amber but retain distinct meaning and labels. Tests target WCAG
+2.2 AA contrast for supported pairings, verify sRGB gamut, and keep validation aligned with
+danger. Browser stories check rendered colors, alpha blending, nested themes, portal theme
+switching, and enlarged text. Status meaning also uses visible words and shapes. Decorative
+`line.seam` divisions are separate from the high-contrast control borders.
+
 **Foundations / Typography** shows the three styles in both themes, a narrow container,
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
 and wrapping. These checks require a browser and are not part of the Happy DOM test suite.
@@ -55,6 +63,8 @@ and wrapping. These checks require a browser and are not part of the Happy DOM t
 **Primitives / Text** covers variants, tones, semantic elements, inline content, inheritance,
 and narrow layouts. Its Reactive Props story also runs through the portable-story test suite.
 Focused DOM and type checks verify the component's native-prop and reactivity contracts.
+Semantic Tones adds success, warning, danger, and pending text on plain and matching soft
+backgrounds. Tone changes preserve the element and add no announcement semantics.
 
 **Foundations / Spacing** uses Text for labels and measures all seven scale steps,
 four-sided padding, and horizontal/vertical gaps in both themes. Its enlarged-text story
@@ -78,6 +88,10 @@ coarse-pointer sizing, forced colors, enlarged text, pending layout stability, a
 Pending stories include both static specimens and caller-controlled success/failure/retry scenarios.
 Comparison also checks the rendered Button colors against the current palette, including
 native disabled states, so stale shared-style references fail visibly in Storybook.
+Button's independent `tone="danger"` supports all three variants with reviewed filled,
+outlined, and ghost states. Danger stories cover both themes, disabled fieldsets, pending
+recovery, long labels, and enlarged text. IconButton consumes the same tone/variant styling.
+**Foundations / Color / Danger actions** shows the supporting `action.danger` tokens.
 
 **Primitives / Input** provides native text, email, password, search, tel, and URL entry with
 empty/filled, read-only, disabled/fieldset, and invalid states. Editing and Forms run as

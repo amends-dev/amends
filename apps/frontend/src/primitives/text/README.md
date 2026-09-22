@@ -13,15 +13,19 @@ import { Text } from "@amends/frontend/primitives/text";
 <Text as="code" variant="mono" tone="secondary">
   thread_123
 </Text>;
+<Text tone="success" role="status">
+  Success: invitation sent.
+</Text>;
+<Text tone="danger">Error: this invitation could not be sent.</Text>;
 ```
 
 ## Contract
 
-| Prop      | Values                            | Default   |
-| --------- | --------------------------------- | --------- |
-| `as`      | `p`, `span`, `h1`–`h6`, `code`    | `p`       |
-| `variant` | `body`, `heading`, `mono`         | `body`    |
-| `tone`    | `inherit`, `primary`, `secondary` | `inherit` |
+| Prop      | Values                                                                       | Default   |
+| --------- | ---------------------------------------------------------------------------- | --------- |
+| `as`      | `p`, `span`, `h1`–`h6`, `code`                                               | `p`       |
+| `variant` | `body`, `heading`, `mono`                                                    | `body`    |
+| `tone`    | `inherit`, `primary`, `secondary`, `success`, `warning`, `danger`, `pending` | `inherit` |
 
 `as` determines semantics independently of appearance. A heading variant on a paragraph
 does not create a semantic heading. A code element still needs `variant="mono"` to select
@@ -43,6 +47,15 @@ or the component's foundation styles. Normal CSS cascade rules apply to custom s
 
 Changing appearance, content, or native attributes updates the existing element and preserves
 focus. Changing `as` creates the requested element and invokes the ref for that new node.
+
+Semantic tones use `status.<tone>.text`, not the indicator swatch. They support canvas,
+panel, and their own matching soft background with at least 4.5:1 contrast. A tone supplies
+only text color: it adds no background, icon, label prefix, `role`, or `aria-live` attribute.
+Include meaning in the message and choose an appropriate live region at the feature layer
+when an update needs announcing. Warning means caution; pending means waiting, even though
+they share amber. Nested Text with the default `inherit` tone retains its parent's tone.
+For labels inside a filled Button, leave Text inherited so it keeps the Button's contrasting
+foreground; a semantic tone on that fill is not a supported pairing.
 
 ## Fonts and themes
 
@@ -69,7 +82,9 @@ or transport dependencies.
 ## Verification
 
 **Primitives / Text** includes Comparison, Playground, Inline and Headings, Inheritance,
-Narrow, and Reactive Props. Comparison shows all three variants and tones in both themes.
+Narrow, and Reactive Props. Comparison shows all three variants and reading tones in both themes.
+Semantic Tones and Semantic Enlarged Text show the four status text tones on both surfaces
+and matching tints. Browser checks verify actual colors, contrast, and nested inheritance.
 Playground controls expose the native element, style, tone, content, and theme. The inheritance
 story puts default text inside a secondary-colored panel and demonstrates an explicit primary
 override. Narrow uses a 320px container with a container-owned long-word wrapping rule.

@@ -48,6 +48,13 @@ checks verify actual colors and alpha, compare text/border contrast after compos
 cross-check the blend against an sRGB canvas render. Review all Controls stories, including
 nested themes, theme switching, and narrow/enlarged layouts; these browser checks do not run
 under Happy DOM.
+Status tests cover text/indicator pairs on canvas, panel, and their own composited soft
+backgrounds, plus focus contrast on the tints. The full token tree is checked for sRGB gamut,
+opacity, matching theme keys, and validation/danger aliases. Decorative seams are deliberately
+excluded from control-boundary contrast assertions. Status story play checks verify rendered
+values and blending; Portal Themes checks nested status variables through Tooltip's portal.
+Review visible labels/shapes and forced colors as well as contrast, and rerun existing Button,
+Input, Select, and Shell browser specimens after changing the shared color contract.
 The [typography stories](../apps/frontend/src/foundations/typography/README.md) run browser
 play checks for real font loading, computed metrics, and wrapping. They are intentionally
 excluded from Happy DOM portable-story tests because that environment cannot verify font
@@ -57,6 +64,9 @@ The [Text primitive](../apps/frontend/src/primitives/text/README.md) has DOM tes
 native semantics, forwarding, refs, class merging, and reactive updates, plus compile-time
 usage checks. Its Reactive Props story also runs through the portable-story suite; actual
 colors, typography, margins, and wrapping are verified in the browser.
+Semantic Text stories check actual status colors and 4.5:1 contrast on plain and matching
+soft backgrounds, including nested inheritance. DOM/type tests verify semantic tone changes
+preserve the element and do not add live-region semantics.
 The [Button primitive](../apps/frontend/src/primitives/button/README.md) has DOM and type checks
 for native semantics, prop/ref/event forwarding, disabled activation, explicit form submission,
 preventing default, and reactive updates, including variant changes that preserve focus and the element. Activation
@@ -69,6 +79,10 @@ Button Comparison additionally checks all three variants' computed fills, text, 
 composited contrast against the current palette. Run it
 after shared color changes to catch stale dependent styles in the development server, even
 when the standalone color stories and production build pass.
+The same comparison checks cover danger variants, disabled fieldsets, and pending specimens.
+Danger recovery stories run as portable tests for all three variants; IconButton has its own
+danger activation story. Contrast tests cover the dedicated `action.danger` fill/tint/border
+pairings, and foundation stories display the tokens separately from the real Button consumers.
 The [Input primitive](../apps/frontend/src/primitives/input/README.md) has native-prop, ref/event,
 reactivity, selection, validity, form-data, reset-default, and type checks. Editing and Forms
 run as portable stories. Browser Comparison verifies actual themed colors, placeholders,

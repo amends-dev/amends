@@ -1,1 +1,1 @@
-export { Button, type ButtonProps, type ButtonVariant } from "./button.tsx";
+export { Button, type ButtonProps, type ButtonVariant, type ButtonTone } from "./button.tsx";

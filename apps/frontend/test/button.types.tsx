@@ -3,6 +3,11 @@ import { Button } from "@amends/frontend/primitives/button";
 // Type-checked examples; not rendered by the test runner.
 export function buttonTypeExamples() {
   <Button variant="ghost">Change email</Button>;
+  <Button variant="secondary" tone="danger">
+    Delete thread
+  </Button>;
+  // @ts-expect-error Status feedback is not an action tone.
+  <Button tone="success">Save</Button>;
   <Button variant="secondary" type="submit">
     Save draft
   </Button>;

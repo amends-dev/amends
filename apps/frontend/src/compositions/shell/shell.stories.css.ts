@@ -27,5 +27,5 @@ export const card = style({
 export const note = style({ padding: space[1], minWidth: 0 });
 export const entry = style({
   paddingBlock: space[4],
-  borderBottom: `1px dashed ${colorVars.line.control}`,
+  borderBottom: `1px dashed ${colorVars.line.seam}`,
 });

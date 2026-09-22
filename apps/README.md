@@ -16,6 +16,11 @@ This directory contains the existing Solid clients and a new frontend workshop:
   native-control specimens for keyboard review.
   IconButton and Tooltip support declarative Navigation, Drawer, and Shell compositions,
   including a desktop icon rail and mobile modal navigation.
+  Semantic status colors cover success, warning, pending, danger, idle, and running, with
+  tested text/indicator pairings and soft backgrounds. Decorative seams have a separate role
+  from control boundaries. Supported color pairings target WCAG 2.2 AA.
+  Text exposes semantic status tones; Button and IconButton support a danger tone independently
+  of primary/secondary/ghost variants, with shared disabled and focus behavior.
   Foundations and components will be introduced individually, with stories at every layer;
   existing packages remain in place.
 

@@ -73,7 +73,7 @@ export const footer = style({
   gap: space[3],
   padding: space[4],
   paddingBottom: `max(${space[4]}, env(safe-area-inset-bottom))`,
-  borderTop: `1px dashed ${colorVars.line.control}`,
+  borderTop: `1px dashed ${colorVars.line.seam}`,
 });
 export const title = style([
   typographyStyles.heading,

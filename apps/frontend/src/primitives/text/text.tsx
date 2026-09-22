@@ -5,7 +5,14 @@ import { typographyStyles } from "../../foundations/typography/styles.css.ts";
 import * as s from "./text.css.ts";
 
 export type TextElement = "p" | "span" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "code";
-export type TextTone = "inherit" | "primary" | "secondary";
+export type TextTone =
+  | "inherit"
+  | "primary"
+  | "secondary"
+  | "success"
+  | "warning"
+  | "danger"
+  | "pending";
 export type TextProps<T extends TextElement = "p"> = {
   as?: T;
   /** Appearance is independent of the selected HTML element. */
