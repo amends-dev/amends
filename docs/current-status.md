@@ -35,7 +35,9 @@ and nested scopes. Six neutral filled-action color roles add default, hover, pre
 and disabled specimens on both surfaces; enabled label contrast has automated checks.
 The focus foundation adds a themed 2px outline with 2px offset, applied through a reusable
 `:focus-visible` class. Storybook provides native controls for real keyboard review and
-browser checks of ring colors and clearance. The Button primitive remains unimplemented in frontend.
+browser checks of ring colors and clearance. The first Button primitive adds a primary filled
+action in one regular size, native disabled/form behavior, and portable interaction stories.
+Additional Button variants, pending behavior, and icon-only controls remain unimplemented in frontend.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.

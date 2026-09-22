@@ -51,6 +51,11 @@ The [Text primitive](../apps/frontend/src/primitives/text/README.md) has DOM tes
 native semantics, forwarding, refs, class merging, and reactive updates, plus compile-time
 usage checks. Its Reactive Props story also runs through the portable-story suite; actual
 colors, typography, margins, and wrapping are verified in the browser.
+The [Button primitive](../apps/frontend/src/primitives/button/README.md) has DOM and type checks
+for native semantics, prop/ref/event forwarding, disabled activation, explicit form submission,
+preventing default, and reactive updates. Activation, Forms, and Reactive Props run as portable
+stories. Real browser checks cover native Enter/Space/Tab input, actual state colors and outlines,
+inherited fieldset disabling, narrow/enlarged labels, coarse pointers, and forced colors.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

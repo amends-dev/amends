@@ -9,7 +9,8 @@ composes those foundations into native paragraphs, spans, headings, and inline c
 [spacing foundation](src/foundations/spacing/README.md) adds steps 0–6 as quarter-rem values.
 The [radius foundation](src/foundations/radius/README.md) adds square and pill corners.
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
-a reusable `:focus-visible` class. Neither
+a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
+composes these foundations into a primary action with native button behavior. Neither
 app consumes this package yet. The existing `ui`, `design-system`, and `web` packages remain in place.
 
 ## Run and verify
@@ -39,7 +40,7 @@ verifies the generated CSS and the accessibility addon checks the rendered speci
 both surfaces, with theme controls, nested scopes, and enlarged text. Six enabled pairings
 have contrast tests; browser play checks verify computed colors, transparency, and disabled
 semantics. Disabled readability is reviewed separately. These are static color specimens;
-Button behavior remains a future slice.
+The Button primitive has separate component and interaction stories.
 
 **Foundations / Typography** shows the three styles in both themes, a narrow container,
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
@@ -63,8 +64,14 @@ surfaces, themes, nested scopes, and enlarged text. Four ring/surface contrast t
 suite; browser play checks measure ring clearance without taking focus. Actual focus visibility,
 outline geometry, and clipping require real browser keyboard input and visual review.
 
+**Primitives / Button** covers the primary button on both surfaces and themes, native
+disabled/fieldset behavior, activation, form submission, reactive props, and long labels.
+Activation, Forms, and Reactive Props also run in the portable-story suite. Real browser
+checks establish actual hover/pressed/focus styles, native keyboard activation, wrapping,
+coarse-pointer sizing, forced colors, and enlarged text.
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations and Text primitive, separately from the workshop. Stories are discovered
+to the foundations and Text/Button primitives, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

@@ -27,7 +27,7 @@ The dimensions are plain CSS-ready values from `@amends/frontend/foundations/foc
 The class can also be composed into a vanilla-extract style with `style([focusVisible, …])`.
 It owns only the focus outline. Consumers own semantics, disabled behavior, sizing, colors,
 radius, and event handlers. Applying the class does not make a noninteractive element focusable.
-The Button primitive remains a later slice.
+The [Button primitive](../../primitives/button/README.md) composes this class with its other foundations.
 
 ## Visibility and layout
 

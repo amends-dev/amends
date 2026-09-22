@@ -81,7 +81,8 @@ directions. System fonts and specimen layout are workshop scaffolding.
 Text. Static state specimens compose Text, spacing, and radius with the exported action
 variables. Each theme shows default, hover, pressed, and disabled colors on both surfaces.
 The disabled specimen is a native disabled button; the other specimens are noninteractive
-color samples. Sizes belong to the workshop, not the future Button contract.
+color samples. Sizes belong to the workshop; the [Button primitive](../../primitives/button/README.md)
+has its own dimensions and behavior.
 
 The action stories' browser play checks compare computed text, fill, alpha, and containing
 surface colors against the tokens. They also check enabled contrast and native disabled
@@ -102,7 +103,7 @@ text must not be used for ordinary content. These checks do not establish readab
 arbitrary cross-theme combinations or other colors. Surface differences are decorative
 and are not control boundaries. Four focus-ring/surface pairings are separately checked
 against the 3:1 non-text threshold, with interactive specimens under Foundations / Focus.
-Full Button accessibility remains later work.
+Button semantics and interaction checks live with the primitive.
 
 Run `bun run --filter @amends/frontend test` and `bun run --filter @amends/frontend build`
 from the repository root, then inspect the stories in a real browser. Browser review

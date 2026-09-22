@@ -91,7 +91,7 @@ function ActionSpecimen(props: { theme: ColorTheme; children?: JSX.Element }) {
         {labels[props.theme]}
       </Text>
       <Text tone="secondary">
-        Neutral filled actions. Static color pairings for the future Button.
+        Neutral filled actions. Static pairings for reviewing the color foundation.
       </Text>
       <div>
         <Text variant="mono">action.onFill · {colors[props.theme].action.onFill}</Text>
@@ -191,7 +191,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Six neutral action color roles from the existing UI. Static default, hover, pressed, and disabled pairings on both surfaces. The disabled specimen uses a native disabled button; this is not the Button primitive or its interaction contract.",
+          "Six neutral action color roles from the existing UI. Static default, hover, pressed, and disabled pairings on both surfaces. The disabled specimen uses a native disabled button. The Button primitive has separate component and interaction stories.",
       },
     },
   },
