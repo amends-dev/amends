@@ -15,6 +15,7 @@ import {
 } from "solid-js";
 import { Row, Column } from "../../primitives/layout/index.ts";
 import { IconButton, type IconButtonProps } from "../../primitives/icon-button/index.ts";
+import { IconMenu, IconSidebarLeftOpen, IconSidebarLeftClose } from "@amends/icons";
 import { OverlayHostContext } from "../../primitives/overlay/scope.ts";
 import { classes, callHandler } from "../../primitives/internal/props.ts";
 import { colorThemes } from "../../foundations/color/theme.css.ts";
@@ -322,30 +323,16 @@ export function NavigationToggle(
           if (!event.defaultPrevented) shell.toggle();
         }}
       >
-        <svg
-          class={s.toggleIcon}
-          viewBox="0 0 24 24"
-          width="100%"
-          height="100%"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.7"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <Show
+          when={shell.mobile()}
+          fallback={
+            <Show when={shell.collapsed()} fallback={<IconSidebarLeftClose class={s.toggleIcon} />}>
+              <IconSidebarLeftOpen class={s.toggleIcon} />
+            </Show>
+          }
         >
-          <Show
-            when={shell.mobile()}
-            fallback={
-              <>
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <path d="M9 4v16" />
-                <path d={shell.collapsed() ? "m13 9 3 3-3 3" : "m16 9-3 3 3 3"} />
-              </>
-            }
-          >
-            <path d="M4 6h16M4 12h16M4 18h16" />
-          </Show>
-        </svg>
+          <IconMenu />
+        </Show>
       </IconButton>
     </Show>
   );

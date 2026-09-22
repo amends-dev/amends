@@ -72,6 +72,7 @@
       "name": "@amends/frontend",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/icons": "workspace:*",
         "@fontsource/ibm-plex-mono": "^5.3.0",
         "@fontsource/ibm-plex-sans": "^5.3.0",
         "@fontsource/instrument-serif": "^5.3.0",
@@ -88,6 +89,20 @@
         "solid-js": "^1.9.12",
         "storybook": "10.6.0",
         "storybook-solidjs-vite": "10.7.2",
+        "vite": "^7.0.0",
+        "vite-plugin-solid": "^2.11.14",
+      },
+      "peerDependencies": {
+        "solid-js": "^1.9.12",
+      },
+    },
+    "apps/icons": {
+      "name": "@amends/icons",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@solidjs/testing-library": "^0.8.9",
+        "happy-dom": "^20.10.6",
+        "solid-js": "^1.9.12",
         "vite": "^7.0.0",
         "vite-plugin-solid": "^2.11.14",
       },
@@ -233,6 +248,8 @@
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
+
+    "@amends/icons": ["@amends/icons@workspace:apps/icons"],
 
     "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
 

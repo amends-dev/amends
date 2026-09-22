@@ -54,6 +54,11 @@ unimplemented in frontend. IconButton provides named square actions using Button
 Tooltip supplies supplemental hover/focus text as a compact dark monospace label matching
 the Primitives v2 reference. Its dedicated surface/foreground pair stays dark/light in both
 themes, with top-start placement, viewport wrapping, and forced-colors treatment.
+The shared [icons package](../apps/icons/README.md) supplies 23 generated outline icons
+from canonical drawings, with Solid components, raw SVGs, and a separate metadata catalog.
+Select, Drawer, Shell, and workshop glyphs consume it. Compiler, reactivity, naming,
+generated-file, and consumer-bundle checks cover this slice. Tonal variants, sprites,
+automatic optical-balance reports, and the rest of Regen's drawing language are not implemented.
 Body, heading, and mono typography styles include their normal-weight
 Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
 primitive composes those foundations with semantic element selection and native attributes.

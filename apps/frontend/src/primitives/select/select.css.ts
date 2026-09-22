@@ -25,7 +25,7 @@ export const value = style({
     "&[data-placeholder-shown]:not([data-disabled])": { color: colorVars.text.secondary },
   },
 });
-export const icon = style({ flexShrink: 0, color: "inherit", fontSize: "0.75rem" });
+export const icon = style({ display: "inline-flex", flexShrink: 0, color: "inherit" });
 export const content = style({
   zIndex: 20,
   boxSizing: "border-box",

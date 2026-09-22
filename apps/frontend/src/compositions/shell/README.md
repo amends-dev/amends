@@ -86,6 +86,9 @@ remain application responsibilities.
 
 ## Review
 
+Navigation toggles use the shared `@amends/icons` menu and sidebar drawings. Sidebar
+glyphs retain the shell's RTL mirroring; the mobile menu is direction-neutral.
+
 **Compositions / Shell** includes responsive, desktop, collapsed, Soot, mobile closed/open,
 long-navigation, RTL, enlarged-text, and no-sidebar stories. Separate interaction stories
 exercise desktop state preservation and mobile navigation. The sample cards, draft form,

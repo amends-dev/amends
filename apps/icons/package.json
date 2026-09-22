@@ -1,0 +1,29 @@
+{
+  "name": "@amends/icons",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts",
+    "./svg/*": "./svg/*",
+    "./*": "./src/generated/*.tsx"
+  },
+  "scripts": {
+    "generate": "bun run scripts/generate.ts",
+    "check:generated": "bun run scripts/generate.ts --check",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.tools.json",
+    "test": "bun run --bun vitest run --config vite.config.ts"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.9",
+    "happy-dom": "^20.10.6",
+    "solid-js": "^1.9.12",
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.14"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.12"
+  }
+}

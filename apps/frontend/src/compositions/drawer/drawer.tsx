@@ -13,6 +13,7 @@ import {
 } from "solid-js";
 import { Button, type ButtonProps } from "../../primitives/button/index.ts";
 import { IconButton } from "../../primitives/icon-button/index.ts";
+import { IconX } from "@amends/icons";
 import { OverlayHostContext } from "../../primitives/overlay/scope.ts";
 import { callHandler, classes } from "../../primitives/internal/props.ts";
 import * as s from "./drawer.css.ts";
@@ -266,18 +267,7 @@ export function Close(props: Omit<ButtonProps, "pending">) {
         if (!event.defaultPrevented) state.setOpen(false);
       }}
     >
-      {local.children ?? (
-        <svg
-          viewBox="0 0 24 24"
-          width="100%"
-          height="100%"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.7"
-        >
-          <path d="m6 6 12 12M18 6 6 18" />
-        </svg>
-      )}
+      {local.children ?? <IconX />}
     </IconButton>
   );
 }

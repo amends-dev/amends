@@ -141,6 +141,11 @@ See the [Shell usage example](src/compositions/shell/README.md),
 [Navigation](src/compositions/navigation/README.md), [Drawer](src/compositions/drawer/README.md),
 [IconButton](src/primitives/icon-button/README.md), and [Tooltip](src/primitives/tooltip/README.md) contracts.
 
+The shared [icons package](../icons/README.md) supplies Select's chevron/check, Drawer close,
+Shell navigation toggles, and workshop glyphs. **Foundations / Icons** adds a searchable
+catalog, both-theme size/weight matrix, enlarged root text, and reactive accessibility
+specimens. The components import `@amends/icons`; catalog lookup stays in story code.
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
 to the foundations, primitives, and compositions, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.

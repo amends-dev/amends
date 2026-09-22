@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "types": ["bun"] },
+  "include": ["scripts", "test/*.test.ts", "vite.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

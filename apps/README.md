@@ -2,6 +2,8 @@
 
 This directory contains the existing Solid clients and a new frontend workshop:
 
+- [icons](icons/README.md) provides canonical drawings, generated Solid icons and SVGs,
+  and a separate searchable catalog. UI packages and apps import it through `@amends/icons`.
 - [ui](ui/README.md) provides components, tokens, styles, and layout without
   application or API imports.
 - [design-system](design-system/README.md) provides reusable product interactions and
@@ -32,7 +34,8 @@ The new frontend workshop also needs no backend: run
 
 Apps may depend on shared packages via `workspace:*` and use UI or platform
 dependencies appropriate to their target. UI source must remain independent of
-application contracts. Design-system runtime source also excludes transport, web, and
+application contracts; shared icons are allowed. The icons runtime depends only on Solid
+and its own source. Design-system runtime source also excludes transport, web, and
 Storybook imports; web endpoint construction belongs in `src/api/`.
 `bun run check:packages` enforces these source boundaries. Shared packages cannot import apps.
 

@@ -45,6 +45,7 @@ adapters/
 hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/
+  icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
   ui/                 @amends/ui: Solid components, tokens, and styles
   design-system/      @amends/design-system: shared feature UI and Storybook workshop
   frontend/           @amends/frontend: visual foundations, Text/Button primitives, and Storybook
@@ -89,16 +90,17 @@ The project pins TypeScript **7.0.2**, Oxlint **1.83.0**, Oxfmt **0.68.0**,
 `oxlint-tsgolint` **7.0.2001**, and `@effect/tsgo` **0.45.0**. The root
 `package.json` is the source of truth for these pins.
 
-| Command                  | Purpose                                                   |
-| ------------------------ | --------------------------------------------------------- |
-| `bun run typecheck`      | TypeScript 7 checks plus Effect diagnostics               |
-| `bun run lint`           | Oxlint with type-aware rules; warnings fail the check     |
-| `bun run lint:fix`       | Apply safe lint fixes                                     |
-| `bun run format`         | Format project files with Oxfmt                           |
-| `bun run format:check`   | Check formatting without writing files                    |
-| `bun run check`          | Validate dependencies, types, lint, and formatting        |
-| `bun run check:packages` | Validate shared-package dependency boundaries             |
-| `bun run test`           | Run backend, PostgreSQL, and all frontend workspace tests |
+| Command                  | Purpose                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| `bun run typecheck`      | TypeScript 7 checks plus Effect diagnostics                         |
+| `bun run lint`           | Oxlint with type-aware rules; warnings fail the check               |
+| `bun run lint:fix`       | Apply safe lint fixes                                               |
+| `bun run format`         | Format project files with Oxfmt                                     |
+| `bun run format:check`   | Check formatting without writing files                              |
+| `bun run check`          | Validate dependencies, generated icons, types, lint, and formatting |
+| `bun run check:icons`    | Verify generated icons without writing files                        |
+| `bun run check:packages` | Validate shared-package dependency boundaries                       |
+| `bun run test`           | Run backend, PostgreSQL, and all frontend workspace tests           |
 
 Following the [Effect devtools guide](https://effect.website/docs/v4/getting-started/devtools),
 `bun install` runs `effect-tsgo patch` via `prepare`. This patches the local
@@ -121,13 +123,13 @@ service. Vendored files under `repos/` are excluded from all project checks.
 
 ## Pre-commit checks
 
-[Lefthook](https://lefthook.dev/) **2.1.14** runs dependency boundary, type, lint,
+[Lefthook](https://lefthook.dev/) **2.1.14** runs dependency boundary, generated-icon, type, lint,
 and formatting checks in parallel before each commit, using `lefthook.yml`.
 `bun install` installs the Git hook through the project's `prepare` script,
 alongside the Effect TypeScript patch.
 
 The checks cover the current working tree, including unstaged changes, and keep
-the existing exclusions for `repos/` and generated files. They do not rewrite or
+the existing exclusions for `repos/` and build output. They do not rewrite or
 stage files. A failing check blocks the commit; use `bun run format` or
 `bun run lint:fix` for automatic fixes, then review and stage the changes.
 

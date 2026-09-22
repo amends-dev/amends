@@ -21,7 +21,7 @@ lint fixes.
 `bun install` runs `effect-tsgo patch` and `lefthook install` through the `prepare`
 script. This enables Effect diagnostics in the TypeScript compiler and workspace
 language server, and installs the Git hooks. Before each commit, Lefthook runs
-dependency boundary, type, lint, and formatting checks in parallel across the working tree.
+dependency boundary, generated-icon, type, lint, and formatting checks in parallel across the working tree.
 The hook checks files without modifying or staging them. Fix failures before
 committing; `bun run lefthook run pre-commit --force` runs the same checks manually,
 even when no files are staged.
@@ -55,7 +55,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may
   take a contract as a development dependency to act as a client.
-- `apps/*`: user-facing clients and shared UI. `ui` holds visual primitives, tokens,
+- `apps/*`: user-facing clients and shared UI. `icons` holds canonical drawings and generated
+  Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume it.
+  `ui` holds visual primitives, tokens,
   and styles; `design-system` holds reusable product interactions and their standalone
   Storybook workshop; `web` composes them and talks to a host only through
   the HTTP contract. `frontend` is a separate, incremental shared-frontend workshop:

@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["vite/client"]
+  },
+  "include": ["src", "test/**/*.tsx", "test/fixtures", "../../scripts/testing/jest-dom.ts"],
+  "exclude": ["node_modules", "dist"]
+}

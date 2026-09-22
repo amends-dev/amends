@@ -3,6 +3,10 @@ import { cleanup } from "@solidjs/testing-library";
 import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, { Rendering } from "../src/setup.stories.tsx";
+import iconsMeta, {
+  Gallery as IconsGallery,
+  ReactiveProps as IconsReactiveProps,
+} from "../src/foundations/icons/icons.stories.tsx";
 import textMeta, { ReactiveProps } from "../src/primitives/text/text.stories.tsx";
 import buttonMeta, {
   Activation,
@@ -82,9 +86,17 @@ const fieldStories = definePreview(preview).meta(fieldMeta);
 const inputStories = definePreview(preview).meta(inputMeta);
 
 const stories = definePreview(preview).meta(meta);
+const iconsStories = definePreview(preview).meta(iconsMeta);
 const textStories = definePreview(preview).meta(textMeta);
 const buttonStories = definePreview(preview).meta(buttonMeta);
 afterEach(cleanup);
+
+it("runs the icon gallery search story", async () => {
+  await iconsStories.story(IconsGallery).run();
+});
+it("runs the icon reactive accessibility story", async () => {
+  await iconsStories.story(IconsReactiveProps).run();
+});
 
 it("runs the Solid rendering and interaction story", async () => {
   await stories.story(Rendering).run();

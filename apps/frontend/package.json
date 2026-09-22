@@ -41,6 +41,7 @@
     "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
+    "@amends/icons": "workspace:*",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/instrument-serif": "^5.3.0",

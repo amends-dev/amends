@@ -44,7 +44,7 @@ for (const { path, manifest } of packages) {
 }
 
 // Keep endpoint construction in web/api and presentation independent of application contracts.
-for await (const path of new Bun.Glob("apps/{ui,design-system,web}/src/**/*.{ts,tsx}").scan({
+for await (const path of new Bun.Glob("apps/{icons,ui,design-system,web}/src/**/*.{ts,tsx}").scan({
   cwd: root,
 })) {
   const source = await Bun.file(`${root}/${path}`).text();
@@ -55,7 +55,20 @@ for await (const path of new Bun.Glob("apps/{ui,design-system,web}/src/**/*.{ts,
   const declarations = source.matchAll(
     /\b(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?(?:\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s+from\s*["']([^"']+)["']/g,
   );
-  const dependencies = new Set(imports.map((dependency) => dependency.path));
+  // Bun's JSX scanner includes synthetic React require calls, even with JSX auto-import
+  // disabled. Exclude those, then recover literal require calls from the actual source.
+  const dependencies = new Set(
+    imports
+      .filter(
+        (dependency) =>
+          dependency.kind !== "require-call" ||
+          !["react", "react/jsx-dev-runtime"].includes(dependency.path),
+      )
+      .map((dependency) => dependency.path),
+  );
+  for (const required of source.matchAll(/\brequire\s*\(\s*["']([^"']+)["']\s*\)/g)) {
+    if (required[1]) dependencies.add(required[1]);
+  }
   for (const declaration of declarations) {
     if (declaration[1]) dependencies.add(declaration[1]);
   }
@@ -63,9 +76,21 @@ for await (const path of new Bun.Glob("apps/{ui,design-system,web}/src/**/*.{ts,
     const target = dependency.startsWith(".")
       ? resolve(root, dirname(path), dependency)
       : dependency;
+    const iconImport = dependency === "@amends/icons" || dependency.startsWith("@amends/icons/");
+    if (
+      path.startsWith("apps/icons/") &&
+      !(
+        dependency === "solid-js" ||
+        dependency.startsWith("solid-js/") ||
+        (dependency.startsWith(".") && target.startsWith(resolve(root, "apps/icons/src") + "/"))
+      )
+    )
+      errors.push(
+        `${path}: icon runtime must depend only on Solid and its own source (${dependency}).`,
+      );
     if (
       path.startsWith("apps/ui/") &&
-      (dependency.startsWith("@amends/") ||
+      ((dependency.startsWith("@amends/") && !iconImport) ||
         (target.startsWith(resolve(root, "apps") + "/") &&
           !target.startsWith(resolve(root, "apps/ui") + "/")) ||
         target.startsWith(resolve(root, "packages") + "/") ||
@@ -75,7 +100,9 @@ for await (const path of new Bun.Glob("apps/{ui,design-system,web}/src/**/*.{ts,
       errors.push(`${path}: UI must not import application code or contracts (${dependency}).`);
     if (
       path.startsWith("apps/design-system/") &&
-      ((dependency.startsWith("@amends/") && !dependency.startsWith("@amends/ui/")) ||
+      ((dependency.startsWith("@amends/") &&
+        !dependency.startsWith("@amends/ui/") &&
+        !iconImport) ||
         dependency === "storybook" ||
         dependency.startsWith("storybook/") ||
         dependency.startsWith("storybook-") ||
@@ -106,6 +133,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and web/design-system/UI import boundaries.`,
+    `Checked ${packages.length} shared packages and icons/web/design-system/UI import boundaries.`,
   );
 }

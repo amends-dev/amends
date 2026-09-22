@@ -28,6 +28,9 @@ remaining gaps with links to their owning code.
 | [Design system](../apps/design-system/README.md)                                                        | Shared product components, Storybook states, portable interaction tests, and web integration.                       |
 | [Frontend](../apps/frontend/README.md)                                                                  | Shared frontend workshop, visual foundations, Text/Button primitives, and incremental component development.        |
 
+The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
+drawings, generation, and visual review in the frontend workshop.
+
 ## Design and historical references
 
 - [Core model](core-model.md) is living design intent. Workspace management is

@@ -31,11 +31,12 @@
     "typecheck": "tsc --noEmit && bun run --workspaces typecheck",
     "test": "bun run --bun vitest run",
     "check:packages": "bun run scripts/check-packages.ts",
+    "check:icons": "bun run --filter @amends/icons check:generated",
     "lint": "oxlint --disable-nested-config --deny-warnings .",
     "lint:fix": "oxlint --disable-nested-config --fix --deny-warnings .",
     "format": "oxfmt --config .oxfmtrc.json --write .",
     "format:check": "oxfmt --config .oxfmtrc.json --check .",
-    "check": "bun run check:packages && bun run typecheck && bun run lint && bun run format:check",
+    "check": "bun run check:packages && bun run check:icons && bun run typecheck && bun run lint && bun run format:check",
     "prepare": "effect-tsgo patch && lefthook install"
   },
   "devDependencies": {

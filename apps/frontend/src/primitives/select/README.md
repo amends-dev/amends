@@ -4,6 +4,7 @@ A single-choice Select matching the Primitives v2 reference: dashed trigger, car
 popup, highlighted options, and a checkmark beside the selected item. Kobalte supplies the
 listbox, keyboard navigation, typeahead, dismissal, focus management, and positioning. The
 frontend owns its appearance and public option/value contract.
+The chevron and selected-item check use decorative `@amends/icons` glyphs at `size="sm"`.
 
 ```tsx
 import { Select } from "@amends/frontend/primitives/select";

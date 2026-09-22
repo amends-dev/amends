@@ -25,6 +25,7 @@ export default defineConfig({
           include: ["adapters/storage-postgresql/test/**/*.test.ts"],
         },
       },
+      "apps/icons/vite.config.ts",
       "apps/ui/vite.config.ts",
       "apps/design-system/vite.config.ts",
       "apps/frontend/vite.config.ts",

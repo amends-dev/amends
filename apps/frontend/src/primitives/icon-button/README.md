@@ -5,11 +5,10 @@ native behavior, disabled treatment, and focus style.
 
 ```tsx
 import { IconButton } from "@amends/frontend/primitives/icon-button";
+import { IconMenu } from "@amends/icons";
 
 <IconButton aria-label="Open navigation" onClick={openNavigation}>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-    <path d="M4 6h16M4 12h16M4 18h16" />
-  </svg>
+  <IconMenu />
 </IconButton>;
 ```
 
@@ -23,9 +22,10 @@ can contain a decorative trash glyph. The accessible name must identify the acti
 alone is insufficient. Tone updates preserve the native button, focus, and event behavior.
 
 The 2.75rem square target, 1.25rem glyph, and reviewed medium radius scale with the root text
-size. These are local component dimensions; no new size catalog or icon set is introduced.
+size. The shared [icons package](../../../../icons/README.md) defaults to the same
+1.25rem glyph size and inherits the control's color.
 Pending is intentionally excluded from this API. Use the labelled Button for pending actions.
-The demo icons live only in story scaffolding.
+The story aliases select production icons from `@amends/icons`.
 
 **Primitives / IconButton** compares enabled/disabled variants in Cotton and Soot and tests
 click/Enter/Space. DOM/type checks cover naming, ref forwarding, native activation, disabled

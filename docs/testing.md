@@ -15,6 +15,7 @@ bun run test packages/core/test
 bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends/ui
+bun run test --project @amends/icons
 bun run test --project @amends/design-system
 bun run test --project @amends/frontend
 bun run test --project @amends/web
@@ -26,6 +27,15 @@ The root configuration discovers only application tests. The `backend` project
 covers shared packages, SQLite, and the local host. PostgreSQL has its own project
 and global setup. The UI, design-system, frontend, and web projects use their Solid/Vite transforms and
 Happy DOM environments. Vendored repositories are outside test discovery.
+
+The [icons package](../apps/icons/README.md) tests geometry validation, composition,
+Solid naming/prop reactivity, and consumer bundles. Its build tests run in the Node
+environment on Bun, invoke the generator with a timeout, and verify that individual
+icon imports exclude unrelated geometry and metadata-only imports exclude Solid.
+`bun run check:icons` verifies generated files without writing; it is included in
+`bun run check` and the pre-commit hook. The frontend's Foundations / Icons stories
+provide gallery search and reactive naming portable tests, plus browser review of
+sizes, weights, both themes, real controls, and enlarged root text.
 
 The [design-system workshop](../apps/design-system/README.md) has component tests plus portable
 tests that execute the same Storybook render/play scenarios. Test declarations use `@effect/vitest`;
