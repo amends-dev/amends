@@ -36,6 +36,7 @@ Latin fonts and browser checks for font loading, sizing, and wrapping. The first
 primitive composes those foundations with semantic element selection and native attributes.
 Spacing steps 0–6 are available as quarter-rem values, with browser-measured scale, padding,
 and gap specimens at normal and enlarged root text sizes.
+Square and pill radius values have browser-verified corner specimens across sizes and themes.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

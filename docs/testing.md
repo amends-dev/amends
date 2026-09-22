@@ -52,6 +52,9 @@ The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measur
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these
 geometry assertions are not run under Happy DOM.
+The [radius stories](../apps/frontend/src/foundations/radius/README.md) use the browser to
+check dimensions, all four corner values, and curved hit boundaries across specimen sizes.
+They also cover enlarged text and restore document scrolling after their checks.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin

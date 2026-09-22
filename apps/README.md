@@ -11,7 +11,7 @@ This directory contains the existing Solid clients and a new frontend workshop:
   domain pages remain placeholders.
 - [frontend](frontend/README.md) starts the shared frontend intended for web and Tauri
   desktop. It contains the first four surface/text color roles, scoped Cotton/Soot themes,
-  body/heading/mono typography, spacing steps 0–6, the Text primitive, and their Storybook
+  body/heading/mono typography, spacing steps 0–6, square/pill radii, the Text primitive, and their Storybook
   specimens alongside the setup verification story.
   Foundations and components will be introduced individually, with stories at every layer;
   existing packages remain in place.

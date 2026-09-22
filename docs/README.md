@@ -26,7 +26,7 @@ remaining gaps with links to their owning code.
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Implemented clients, queries, sessions, and routes.                                                                 |
 | [UI](../apps/ui/README.md)                                                                              | Component contracts, styles, accessibility, and composition patterns.                                               |
 | [Design system](../apps/design-system/README.md)                                                        | Shared product components, Storybook states, portable interaction tests, and web integration.                       |
-| [Frontend](../apps/frontend/README.md)                                                                  | Shared frontend workshop, color/typography/spacing foundations, Text primitive, and incremental development.        |
+| [Frontend](../apps/frontend/README.md)                                                                  | Shared frontend workshop, visual foundations, Text primitive, and incremental component development.                |
 
 ## Design and historical references
 
