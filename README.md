@@ -47,6 +47,7 @@ hosts/
 apps/
   ui/                 @amends/ui: Solid components, tokens, and styles
   design-system/      @amends/design-system: shared feature UI and Storybook workshop
+  frontend/           @amends/frontend: incremental shared frontend, starting with Storybook setup
   web/                @amends/web: Solid application over the HTTP contract
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff
@@ -88,16 +89,16 @@ The project pins TypeScript **7.0.2**, Oxlint **1.83.0**, Oxfmt **0.68.0**,
 `oxlint-tsgolint` **7.0.2001**, and `@effect/tsgo` **0.45.0**. The root
 `package.json` is the source of truth for these pins.
 
-| Command                  | Purpose                                               |
-| ------------------------ | ----------------------------------------------------- |
-| `bun run typecheck`      | TypeScript 7 checks plus Effect diagnostics           |
-| `bun run lint`           | Oxlint with type-aware rules; warnings fail the check |
-| `bun run lint:fix`       | Apply safe lint fixes                                 |
-| `bun run format`         | Format project files with Oxfmt                       |
-| `bun run format:check`   | Check formatting without writing files                |
-| `bun run check`          | Validate dependencies, types, lint, and formatting    |
-| `bun run check:packages` | Validate shared-package dependency boundaries         |
-| `bun run test`           | Run backend, PostgreSQL, UI, and web tests            |
+| Command                  | Purpose                                                   |
+| ------------------------ | --------------------------------------------------------- |
+| `bun run typecheck`      | TypeScript 7 checks plus Effect diagnostics               |
+| `bun run lint`           | Oxlint with type-aware rules; warnings fail the check     |
+| `bun run lint:fix`       | Apply safe lint fixes                                     |
+| `bun run format`         | Format project files with Oxfmt                           |
+| `bun run format:check`   | Check formatting without writing files                    |
+| `bun run check`          | Validate dependencies, types, lint, and formatting        |
+| `bun run check:packages` | Validate shared-package dependency boundaries             |
+| `bun run test`           | Run backend, PostgreSQL, and all frontend workspace tests |
 
 Following the [Effect devtools guide](https://effect.website/docs/v4/getting-started/devtools),
 `bun install` runs `effect-tsgo patch` via `prepare`. This patches the local

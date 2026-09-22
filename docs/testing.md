@@ -16,6 +16,7 @@ bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends/ui
 bun run test --project @amends/design-system
+bun run test --project @amends/frontend
 bun run test --project @amends/web
 bun run test --watch packages/core/test
 bun run check
@@ -23,7 +24,7 @@ bun run check
 
 The root configuration discovers only application tests. The `backend` project
 covers shared packages, SQLite, and the local host. PostgreSQL has its own project
-and global setup. The UI, design-system, and web projects use their Solid/Vite transforms and
+and global setup. The UI, design-system, frontend, and web projects use their Solid/Vite transforms and
 Happy DOM environments. Vendored repositories are outside test discovery.
 
 The [design-system workshop](../apps/design-system/README.md) has component tests plus portable
@@ -31,6 +32,10 @@ tests that execute the same Storybook render/play scenarios. Test declarations u
 browser-instrumented play functions use `storybook/test`. The Storybook Vitest addon is not installed
 because its current peer range excludes our Vitest 5 runner. The public Solid `/next` preview factory
 allows the portable scenarios to run in the existing suite.
+
+The new [frontend workshop](../apps/frontend/README.md) uses the same portable-story
+approach to verify its Solid rendering and interaction setup. Build it independently
+with `bun run --filter @amends/frontend build`; no existing UI is imported into this package.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin

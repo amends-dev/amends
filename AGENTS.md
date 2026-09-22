@@ -58,7 +58,9 @@ currently run through TypeScript. Check compatibility before changing this setup
 - `apps/*`: user-facing clients and shared UI. `ui` holds visual primitives, tokens,
   and styles; `design-system` holds reusable product interactions and their standalone
   Storybook workshop; `web` composes them and talks to a host only through
-  the HTTP contract. Apps may install UI dependencies and consume shared packages.
+  the HTTP contract. `frontend` is a separate, incremental shared-frontend workshop:
+  introduce and verify one foundation or component at a time, leaving existing packages
+  in place. Apps may install UI dependencies and consume shared packages.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no

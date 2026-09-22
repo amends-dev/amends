@@ -1,0 +1,22 @@
+# Frontend conventions
+
+Read [README.md](README.md) before changing this package.
+
+- Build incrementally. Introduce one needed foundation or component per reviewable
+  change. Existing packages stay in place; do not bulk-copy or re-export their catalogs.
+- Do not import `@amends/ui`, `@amends/design-system`, `@amends/web`, or platform
+  entry points. Compare relevant existing source and design references before introducing
+  a piece, and document intentional differences.
+- Add layers only as needed: foundations, primitives, compositions, features, and pages.
+  Lower layers must not depend on higher ones. Add public source exports only when
+  there is production code to consume; exclude stories, fixtures, and Storybook setup.
+- Give every introduced piece Storybook coverage, including tokens. Colocate stories
+  with source and render the same implementation consumers will use.
+- Verify relevant variants, themes, interaction, accessibility, and layout before
+  proceeding to another piece. Avoid importing unrelated tokens or helpers for convenience.
+- Declare tests through `@effect/vitest`. Story play functions use `storybook/test`;
+  run them through the public Solid portable-story API in the existing Bun/Vitest suite.
+- Storybook loads `vite.config.ts`; register the Solid plugin there only. Do not add
+  styling dependencies, global styles, or theme controls before their foundations exist.
+- Run `bun run check`, relevant tests, and the frontend Storybook build. Inspect the
+  story in a browser; passing interaction tests alone does not establish visual fidelity.

@@ -26,6 +26,7 @@ remaining gaps with links to their owning code.
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Implemented clients, queries, sessions, and routes.                                                                 |
 | [UI](../apps/ui/README.md)                                                                              | Component contracts, styles, accessibility, and composition patterns.                                               |
 | [Design system](../apps/design-system/README.md)                                                        | Shared product components, Storybook states, portable interaction tests, and web integration.                       |
+| [Frontend](../apps/frontend/README.md)                                                                  | New shared frontend workshop, setup verification, and the process for introducing one piece at a time.              |
 
 ## Design and historical references
 
@@ -48,6 +49,7 @@ remaining gaps with links to their owning code.
 
 [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
 lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md), [design-system](../apps/design-system/AGENTS.md),
+[frontend](../apps/frontend/AGENTS.md),
 [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
 the root guidance rather than maintaining a second copy.
 

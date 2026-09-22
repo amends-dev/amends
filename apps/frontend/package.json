@@ -1,0 +1,26 @@
+{
+  "name": "@amends/frontend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",
+    "build": "bun run typecheck && bun run --bun storybook build --output-dir dist --disable-telemetry",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun run --bun vitest run --config vite.config.ts"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.9",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-docs": "10.6.0",
+    "happy-dom": "^20.10.6",
+    "solid-js": "^1.9.12",
+    "storybook": "10.6.0",
+    "storybook-solidjs-vite": "10.7.2",
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.14"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.12"
+  }
+}

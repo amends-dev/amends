@@ -29,6 +29,11 @@ sequence-based pages. Separate reads and pages do not share a snapshot.
 
 ## Design-system coverage
 
+The new [frontend workshop](../apps/frontend/README.md) starts independently with an
+unstyled Solid rendering/interaction story. It has no production foundations or components
+yet. Each needed piece will be introduced and verified separately, with Storybook coverage
+at every layer. Existing packages stay in place; web and Tauri integration remain pending.
+
 The [Storybook workshop](../apps/design-system/README.md) runs independently of web and the
 backend. The invitation form is the first extracted feature; production web imports the same
 component used by its state and interaction stories. Representative UI foundations are also
