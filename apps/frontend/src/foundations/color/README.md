@@ -277,3 +277,8 @@ Run `bun run --filter @amends/frontend test` and `bun run --filter @amends/front
 from the repository root, then inspect the stories in a real browser. Browser review
 must also check actual CSS values, theme switching, scope inheritance, and narrow layouts;
 Happy DOM does not establish rendering fidelity.
+
+The `toast` group pairs a dark `surface` with light `text` and amber `action` in both themes.
+Use these together; ordinary status and action colors target canvas/panel instead. Toast's
+focus ring and close control use `toast.text`. **Foundations / Color / Toast** displays the
+actual tokens and contrast ratios; tests require at least 4.5:1 for text/action pairings.

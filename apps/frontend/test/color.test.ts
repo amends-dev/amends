@@ -73,6 +73,12 @@ for (const [theme, palette] of Object.entries(colors)) {
         new Color(palette.text.onTooltip).contrastWCAG21(palette.surface.tooltip),
       ).toBeGreaterThanOrEqual(4.5);
     });
+    it("keeps toast content, actions and focus readable on the dark toast surface", () => {
+      for (const role of ["text", "action"] as const)
+        expect(
+          new Color(palette.toast[role]).contrastWCAG21(palette.toast.surface),
+        ).toBeGreaterThanOrEqual(4.5);
+    });
     // Ordinary content uses canvas/panel. Tooltip has its own contrasting foreground.
     for (const surface of ["canvas", "panel"] as const) {
       const background = palette.surface[surface];

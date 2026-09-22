@@ -3,7 +3,7 @@ import { colorVars } from "../../foundations/color/theme.css.ts";
 import { typographyStyles } from "../../foundations/typography/styles.css.ts";
 import { space } from "../../foundations/spacing/tokens.ts";
 
-globalStyle("html:has(dialog[data-frontend-drawer][open])", { overflow: "hidden" });
+globalStyle("html:has(dialog[data-frontend-modal][open])", { overflow: "hidden" });
 const enter = keyframes({
   from: { transform: "translateX(-100%)" },
   to: { transform: "translateX(0)" },

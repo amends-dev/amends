@@ -32,6 +32,8 @@ export interface ActionToneColors {
 
 /** Semantic colors. Disabled text is only for inactive controls; seams are decorative. */
 export interface ColorTokens {
+  /** Toast is always dark, with its own readable text, action, and focus pairings. */
+  readonly toast: { readonly surface: string; readonly text: string; readonly action: string };
   readonly surface: {
     readonly canvas: string;
     readonly panel: string;
@@ -115,7 +117,14 @@ const sootStatus = {
   },
 } as const satisfies StatusPalette;
 
+const toastColors = {
+  surface: "oklch(0.2 0.008 84)",
+  text: "oklch(0.95 0.006 90)",
+  action: "oklch(0.82 0.09 60)",
+} as const;
+
 export const cotton = {
+  toast: toastColors,
   surface: {
     canvas: "oklch(0.955 0.012 88)",
     panel: "oklch(0.978 0.008 92)",
@@ -159,6 +168,7 @@ export const cotton = {
 } as const satisfies ColorTokens;
 
 export const soot = {
+  toast: toastColors,
   surface: {
     canvas: "oklch(0.185 0.008 84)",
     panel: "oklch(0.215 0.009 84)",

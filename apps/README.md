@@ -17,7 +17,8 @@ This directory contains the existing Solid clients and a new frontend workshop:
   specimens alongside the setup verification story. A shared `:focus-visible` style has
   native-control specimens for keyboard review.
   IconButton and Tooltip support declarative Navigation, Drawer, and Shell compositions,
-  including a desktop icon rail and mobile modal navigation.
+  including a desktop icon rail and mobile modal navigation. Dialog shares native modal behavior
+  with Drawer; Toast adds scoped feedback queues, declarative message/actions, and pausable timers.
   Semantic status colors cover success, warning, pending, danger, idle, and running, with
   tested text/indicator pairings and soft backgrounds. Decorative seams have a separate role
   from control boundaries. Supported color pairings target WCAG 2.2 AA.

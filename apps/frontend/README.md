@@ -141,6 +141,15 @@ See the [Shell usage example](src/compositions/shell/README.md),
 [Navigation](src/compositions/navigation/README.md), [Drawer](src/compositions/drawer/README.md),
 [IconButton](src/primitives/icon-button/README.md), and [Tooltip](src/primitives/tooltip/README.md) contracts.
 
+**Compositions / Dialog** adds a centered native modal with declarative Title, Description,
+Body, Footer, and Close parts. It shares modal behavior with Drawer and supports controlled
+forms, pending/error recovery, focus return, and nested popups. **Compositions / Toast**
+adds a scoped queue, composable messages/actions, timer pausing, and keyboard access.
+Both match the Primitives v2 references using the reviewed palette and controls.
+See the [Dialog](src/compositions/dialog/README.md) and [Toast](src/compositions/toast/README.md)
+contracts. **Foundations / Color / Toast** shows its dedicated dark surface, light text,
+and amber action pairings in both themes.
+
 The shared [icons package](../icons/README.md) supplies Select's chevron/check, Drawer close,
 Shell navigation toggles, and workshop glyphs. **Foundations / Icons** adds a searchable
 catalog, both-theme size/weight matrix, enlarged root text, and reactive accessibility

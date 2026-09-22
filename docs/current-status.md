@@ -87,7 +87,12 @@ desktop expanded sidebar/icon rail, and mobile modal navigation. The sidebar rem
 through viewport changes, preserving drafts and selection. Desktop collapse preference is
 independent of mobile open state. Native dialog behavior, modal-aware Select/Tooltip portals,
 focus return, reduced motion, and independent sidebar/main scroll regions are available.
-Routing, preference persistence, application integration, and Tauri validation remain pending.
+Centered Dialog shares the native modal implementation with Drawer and composes titles,
+descriptions, scrolling bodies, and actions. Controlled form recovery is demonstrated.
+Toast provides provider-scoped queues, polite feedback, persistent actions, paused timers,
+and keyboard access, with dedicated dark-surface color pairings. Modal feedback uses a
+viewport inside that modal. Neither component is integrated into product flows or backend
+notifications. Routing, preference persistence, application integration, and Tauri validation remain pending.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every

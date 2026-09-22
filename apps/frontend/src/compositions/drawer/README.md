@@ -57,3 +57,6 @@ accessible action name; callers can still supply another child glyph.
 **Compositions / Drawer** provides closed, open, and state-preservation stories. DOM/portable
 tests cover associations, closing, focus return, and retained drafts. Use a real browser for
 top-layer behavior, inertness, native keyboard navigation, animation, and backdrop hit testing.
+
+Drawer and [Dialog](../dialog/README.md) share the private native modal implementation.
+`dismissible={false}` gates Escape/backdrop dismissal; explicit buttons remain caller-owned.

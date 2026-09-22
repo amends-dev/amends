@@ -146,6 +146,12 @@ Tooltip's Reference and Comparison stories support checking the Primitives v2 la
 padding, corners, shadow, and start alignment. Check pointer movement into the popup, Escape,
 keyboard focus, narrow/long content, and enlarged text in the browser. The color tests verify
 the dedicated tooltip foreground/background pair independently from canvas/panel pairings.
+Dialog and Toast have focused DOM and portable-story tests for modal state/associations,
+drafts, pending/error recovery, toast queue isolation, remaining-time pauses, action persistence,
+and focus recovery. Timer tests use Vitest fake timers in these synchronous UI tests.
+Use their browser stories for native Tab containment, dismissal, nested Select and toast
+interaction inside a dialog, Alt+T, viewport overflow, enlarged text, forced colors, and reduced motion.
+Toast text/action colors have dedicated contrast tests and a foundation specimen.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these
