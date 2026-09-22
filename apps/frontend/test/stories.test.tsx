@@ -22,6 +22,11 @@ import fieldMeta, {
   ReactiveAssociations,
   Forms as FieldForms,
 } from "../src/compositions/field/field.stories.tsx";
+import radioMeta, {
+  Interaction as RadioInteraction,
+  Forms as RadioForms,
+} from "../src/primitives/radio/radio.stories.tsx";
+const radioStories = definePreview(preview).meta(radioMeta);
 const fieldStories = definePreview(preview).meta(fieldMeta);
 const inputStories = definePreview(preview).meta(inputMeta);
 
@@ -84,4 +89,11 @@ it("runs the Field association story", async () => {
 });
 it("runs the Field form story", async () => {
   await fieldStories.story(FieldForms).run();
+});
+
+it("runs the Radio interaction story", async () => {
+  await radioStories.story(RadioInteraction).run();
+});
+it("runs the Radio form story", async () => {
+  await radioStories.story(RadioForms).run();
 });

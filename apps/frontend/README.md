@@ -91,8 +91,13 @@ The form owns values and validation timing. Comparison, reactive-association, fo
 long/enlarged-text stories cover the composition; the two interaction stories also run as
 portable tests. See the [Field contract](src/compositions/field/README.md).
 
+**Primitives / Radio** introduces the visible circular native radio, with selected/unselected,
+focus, disabled, and inherited-disabled specimens in both themes. Interaction and form stories
+exercise native grouping and reset. Labels/fieldsets in the workshop are scaffolding; RadioGroup
+and card presentation remain future pieces. See the [Radio contract](src/primitives/radio/README.md).
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the foundations and Text/Button/Input primitives and Field composition, separately from the workshop. Stories are discovered
+to the foundations and Text/Button/Input/Radio primitives and Field composition, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

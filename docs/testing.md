@@ -82,6 +82,10 @@ wrapper props, required/disabled/error changes, and control identity/focus/selec
 Its reactive and form stories run as portable tests. Browser review verifies real label clicks,
 validation focus, native submission, disabled tab stops, narrow/enlarged message wrapping,
 forced colors, and error-text contrast. Four additional contrast tests cover `text.invalid`.
+The [Radio primitive](../apps/frontend/src/primitives/radio/README.md) has DOM/type tests for
+forwarding, reactive checked/disabled props, native grouping, form values/reset, and fieldset
+disabling. Interaction and Forms run as portable stories. Use Playwright for native Tab/arrows/
+Space, label activation, state colors, forced colors, and narrow/enlarged labels.
 The [spacing stories](../apps/frontend/src/foundations/spacing/README.md) measure every
 quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
 layout engine. Check all seven control values and the enlarged-root scenario; these

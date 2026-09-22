@@ -21,7 +21,8 @@
     "./primitives/text": "./src/primitives/text/index.ts",
     "./primitives/button": "./src/primitives/button/index.ts",
     "./primitives/input": "./src/primitives/input/index.ts",
-    "./compositions/field": "./src/compositions/field/index.ts"
+    "./compositions/field": "./src/compositions/field/index.ts",
+    "./primitives/radio": "./src/primitives/radio/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",

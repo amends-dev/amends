@@ -53,7 +53,8 @@ disabled, and caller-controlled invalid states. `line.invalid` supplies the revi
 border. The Field composition provides a label, required marker, help, and error text with explicit
 reactive association props; form state and validation timing stay with the consuming feature.
 `text.invalid` adds a verified error-text role. Textarea, grouped controls, and specialized
-input types remain future pieces.
+input types remain future pieces. The visible Radio primitive supports native selection and
+form semantics; RadioGroup and radio-card compositions remain unimplemented.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
