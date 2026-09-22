@@ -44,6 +44,10 @@ play checks for real font loading, computed metrics, and wrapping. They are inte
 excluded from Happy DOM portable-story tests because that environment cannot verify font
 rendering. Review their Interactions and Accessibility panels in Storybook, including the
 narrow and enlarged-text scenarios.
+The [Text primitive](../apps/frontend/src/primitives/text/README.md) has DOM tests for
+native semantics, forwarding, refs, class merging, and reactive updates, plus compile-time
+usage checks. Its Reactive Props story also runs through the portable-story suite; actual
+colors, typography, margins, and wrapping are verified in the browser.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin

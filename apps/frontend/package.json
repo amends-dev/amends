@@ -13,7 +13,8 @@
     "./foundations/color/styles": "./src/foundations/color/theme.css.ts",
     "./foundations/typography": "./src/foundations/typography/tokens.ts",
     "./foundations/typography/styles": "./src/foundations/typography/styles.css.ts",
-    "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts"
+    "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts",
+    "./primitives/text": "./src/primitives/text/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",

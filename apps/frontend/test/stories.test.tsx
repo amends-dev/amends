@@ -3,10 +3,16 @@ import { cleanup } from "@solidjs/testing-library";
 import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, { Rendering } from "../src/setup.stories.tsx";
+import textMeta, { ReactiveProps } from "../src/primitives/text/text.stories.tsx";
 
 const stories = definePreview(preview).meta(meta);
+const textStories = definePreview(preview).meta(textMeta);
 afterEach(cleanup);
 
 it("runs the Solid rendering and interaction story", async () => {
   await stories.story(Rendering).run();
+});
+
+it("runs the Text reactive-props story", async () => {
+  await textStories.story(ReactiveProps).run();
 });

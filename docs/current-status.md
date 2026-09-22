@@ -32,8 +32,10 @@ sequence-based pages. Separate reads and pages do not share a snapshot.
 The new [frontend workshop](../apps/frontend/README.md) contains four surface/text color
 roles for Cotton and Soot, scoped theme styles, and specimens for their supported pairings
 and nested scopes. Body, heading, and mono typography styles include their normal-weight
-Latin fonts and browser checks for font loading, sizing, and wrapping. Other foundations,
-additional font weights/subsets, and production components remain unimplemented.
+Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
+primitive composes those foundations with semantic element selection and native attributes.
+Other foundations, additional font weights/subsets, and other production components remain
+unimplemented in frontend.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
 layer. Existing packages stay in place; web and Tauri integration remain pending.
 

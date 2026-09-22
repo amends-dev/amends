@@ -4,9 +4,9 @@ The starting point for the shared Solid frontend intended for web and Tauri desk
 The first [color foundation](src/foundations/color/README.md) defines four surface/text
 roles for Cotton and Soot, with scoped theme styles and Storybook specimens. The
 [typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
-styles with explicit font loading. There are no production components yet, and neither app
-consumes this package. The existing `ui`,
-`design-system`, and `web` packages remain in place.
+styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
+composes those foundations into native paragraphs, spans, headings, and inline code. Neither
+app consumes this package yet. The existing `ui`, `design-system`, and `web` packages remain in place.
 
 ## Run and verify
 
@@ -35,8 +35,12 @@ verifies the generated CSS and the accessibility addon checks the rendered speci
 and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
 and wrapping. These checks require a browser and are not part of the Happy DOM test suite.
 
+**Primitives / Text** covers variants, tones, semantic elements, inline content, inheritance,
+and narrow layouts. Its Reactive Props story also runs through the portable-story test suite.
+Focused DOM and type checks verify the component's native-prop and reactivity contracts.
+
 The build produces a static workshop in `apps/frontend/dist`. Production exports point
-to the color and typography definitions, styles, and font entry, separately from the workshop. Stories are discovered
+to the foundations and Text primitive, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.

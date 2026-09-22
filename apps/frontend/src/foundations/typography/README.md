@@ -43,7 +43,8 @@ import { typographyStyles } from "@amends/frontend/foundations/typography/styles
 
 The styles set family, size, weight, style, line height, and letter spacing. They do not
 set color, margins, wrapping, truncation, or HTML heading levels. Consumers select semantic
-elements and compose the existing color foundation. There is no Text component yet.
+elements and compose the existing color foundation. The [Text primitive](../../primitives/text/README.md)
+combines these styles with the color tones and native-element selection.
 
 Fontsource packages supply local WOFF2 assets with WOFF fallbacks and `font-display: swap`.
 The font entry is marked as a package side effect so production builds retain it. Importing
