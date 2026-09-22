@@ -279,17 +279,49 @@ export const Comparison = {
         label = field.querySelector("label")!;
       await expect(label.htmlFor).toBe(input.id);
       await expect(input.labels?.length).toBe(1);
+      const rootSize = Number.parseFloat(getComputedStyle(doc.documentElement).fontSize);
+      const description = doc.getElementById(`${input.id}-description`);
+      const error = doc.getElementById(`${input.id}-error`);
+      await expect(getComputedStyle(label).fontFamily).toContain("IBM Plex Mono");
+      await expect(Number.parseFloat(getComputedStyle(label).fontSize)).toBeCloseTo(
+        (rootSize * 10.5) / 16,
+        2,
+      );
+      await expect(getComputedStyle(label).textTransform).toBe("uppercase");
+      if (description) {
+        await expect(getComputedStyle(description).fontFamily).toContain("IBM Plex Mono");
+        await expect(Number.parseFloat(getComputedStyle(description).fontSize)).toBeCloseTo(
+          (rootSize * 11) / 16,
+          2,
+        );
+      }
+      if (error) {
+        await expect(getComputedStyle(error).fontFamily).toContain("IBM Plex Sans");
+        await expect(Number.parseFloat(getComputedStyle(error).fontSize)).toBeCloseTo(
+          (rootSize * 12.5) / 16,
+          2,
+        );
+        await expect(error.firstElementChild).toHaveAttribute("aria-hidden", "true");
+      }
       for (const id of input.getAttribute("aria-describedby")?.split(" ") ?? [])
         await expect(doc.getElementById(id)).not.toBeNull();
       if (!doc.defaultView!.matchMedia("(forced-colors: active)").matches) {
         const theme = input.closest<HTMLElement>("[data-field-theme]")!.dataset
           .fieldTheme as ColorTheme;
         const surface = getComputedStyle(input.closest("[data-field-surface]")!).backgroundColor;
-        const error = doc.getElementById(`${input.id}-error`);
+        for (const text of [label, description].filter((node) => node !== null)) {
+          const color = new Color(getComputedStyle(text).color);
+          await expect(color.deltaEOK(colors[theme].text.secondary)).toBeLessThan(0.0001);
+          await expect(color.contrastWCAG21(surface)).toBeGreaterThanOrEqual(4.5);
+        }
         if (error) {
           const color = new Color(getComputedStyle(error).color);
           await expect(color.deltaEOK(colors[theme].text.invalid)).toBeLessThan(0.0001);
           await expect(color.contrastWCAG21(surface)).toBeGreaterThanOrEqual(4.5);
+          const dotColor = new Color(getComputedStyle(error.firstElementChild!).backgroundColor);
+          await expect(dotColor.deltaEOK(colors[theme].status.danger.indicator)).toBeLessThan(
+            0.0001,
+          );
         }
         await expect(getComputedStyle(field).rowGap).toBe("8px");
       }
@@ -297,6 +329,30 @@ export const Comparison = {
   },
 } satisfies Story;
 export const Playground = {} satisfies Story;
+export const Reference = {
+  parameters: { controls: { include: ["theme"] } },
+  render: (args) => (
+    <main class={`${colorThemes[args.theme]} ${s.frame}`}>
+      <section
+        class={`${s.surface} ${s.stack}`}
+        style={{ "max-width": "28rem", "background-color": colorVars.surface.panel }}
+      >
+        <Field label="Task title">
+          {(control) => <Input placeholder="What needs doing?" {...control} />}
+        </Field>
+        <Field label="Vault secret" description="last used 3h ago · never echoed">
+          {(control) => <Input type="password" value="example-token" readOnly {...control} />}
+        </Field>
+        <Field
+          label="Error · type anything but a date"
+          error="Not a date the workspace understands."
+        >
+          {(control) => <Input value="friday" {...control} />}
+        </Field>
+      </section>
+    </main>
+  ),
+} satisfies Story;
 export const ReactiveAssociations = {
   render: () => <ReactiveFixture />,
   parameters: { controls: { disable: true } },

@@ -100,6 +100,9 @@ radius, and inherited-disabled form-data exclusion (Happy DOM does not model tha
 Use Playwright for native typing/Enter/Tab, invalid focus, read-only selection, forced colors,
 long values, 320px layouts, and enlarged text. Radius specimens include the 10px medium token;
 Controls specimens include the invalid-border role independently of Input.
+Field Comparison also checks the mock-aligned label/help/error typography and semantic
+colors in both themes. Reference shows the compact field treatments; the error prefix stays
+in accessible descriptions while its decorative dot supplies the visible marker.
 The [Field composition](../apps/frontend/src/compositions/field/README.md) has DOM/type tests for
 unique identities, native label/description associations, external-description deduplication,
 wrapper props, required/disabled/error changes, and control identity/focus/selection retention.

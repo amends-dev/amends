@@ -56,8 +56,9 @@ The label uses native `for`; clicking it focuses an enabled control. Its explici
 `aria-labelledby` association also supports controls such as Select that include their
 selected value in the accessible name. The visible
 “(required)” marker is hidden from the accessible name because native `required` carries
-the state. Error text sets `aria-invalid`, with a visible “Error:” prefix and a distinct
-text color. Clearing the error removes its message and association. Descriptions remain
+the state. Error text sets `aria-invalid`, with a decorative leading dot and a distinct
+text color. An “Error:” prefix is visually hidden but retained in the associated description
+for assistive technology. Clearing the error removes its message and association. Descriptions remain
 present alongside errors. Field's state props own the corresponding control attributes;
 read-only behavior is passed directly to Input.
 
@@ -77,11 +78,17 @@ Field does not lower whole-wrapper opacity.
 
 ## Design
 
-The existing UI Field is the reference for label/help/error order and an 8px gap. This
-composition uses reviewed body typography rather than bringing over unreviewed small-label
-roles. Help uses `text.secondary`. Errors use `text.invalid`, preserving the old UI's
-`status.danger.text` values with a 4.5:1 contract on canvas and panel in both themes.
-The border role `line.invalid` stays separate. Text's general-purpose tone API is unchanged.
+Labels match the Primitives v2 treatment: 10.5px mono, uppercase, with 0.09em tracking.
+Supporting text is 11px mono. Error messages use 12.5px body text and a 6px dot aligned
+with the first line when the message wraps. These component sizes are expressed in rem;
+font families and line heights come from the typography foundation. The 8px field gap
+and native control sizing remain part of their existing contracts.
+
+Labels and help use the reviewed `text.secondary` role, giving them quieter emphasis
+while retaining the contrast contract on canvas/panel in Cotton and Soot. Error text uses
+Text's danger tone (the same value as `text.invalid`); its marker uses
+`status.danger.indicator`. The mock's literal colors are adapted to these reviewed roles.
+The border role `line.invalid` stays separate.
 
 The grid can shrink, and labels/help/errors wrap, including long unbroken references.
 The gap scales with the root text size. Field reserves no empty help/error rows; adjacent
@@ -89,7 +96,7 @@ content can move when messages appear, while the control itself remains mounted.
 
 ## Verification
 
-**Compositions / Field** offers Comparison, Playground, Reactive Associations, Forms,
+**Compositions / Field** offers Comparison, Playground, Reference, Reactive Associations, Forms,
 Long Content, and Enlarged Text. Comparison covers both themes/surfaces, required,
 disabled, error, and disabled-with-error combinations. Reactive Associations and Forms
 also run as portable stories. DOM/type checks cover unique IDs, wrapper/control identity,
@@ -98,7 +105,7 @@ and invalid API usage.
 
 **Foundations / Color / Controls** independently shows `text.invalid` with `line.invalid`;
 unit contrast tests cover the error text on both surfaces in both themes. Browser checks
-verify actual colors, accessible associations, native label activation and required-field
+verify actual font sizes/families, colors, accessible associations, native label activation and required-field
 focus, error recovery, disabled tab stops, 320px wrapping, enlarged text, and forced colors.
 Enlarged Text restores the previous root font size on disposal.
 

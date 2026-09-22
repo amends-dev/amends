@@ -90,13 +90,22 @@ export function Field(props: FieldProps): JSX.Element {
       </label>
       {content}
       <Show when={local.description}>
-        <Text id={`${control.id}-description`} tone="secondary">
+        <Text
+          id={`${control.id}-description`}
+          variant="mono"
+          tone="secondary"
+          class={s.description}
+        >
           {local.description}
         </Text>
       </Show>
       <Show when={local.error}>
-        <Text id={`${control.id}-error`} class={s.error}>
-          Error: {local.error}
+        <Text id={`${control.id}-error`} tone="danger" class={s.error}>
+          <span class={s.errorIndicator} aria-hidden="true" />
+          <span class={s.errorMessage}>
+            <span class={s.errorPrefix}>Error: </span>
+            {local.error}
+          </span>
         </Text>
       </Show>
     </div>

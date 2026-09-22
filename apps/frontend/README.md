@@ -101,7 +101,8 @@ control-color specimens and contrast tests. See the [Input contract](src/primiti
 
 **Compositions / Field** combines a label, required marker, help, and error text around one
 control. A render function supplies reactive associations without coupling Input to Field.
-The form owns values and validation timing. Comparison, reactive-association, form, and
+Labels use compact uppercase mono, supporting text uses smaller mono, and errors use
+body text with a decorative danger dot. The form owns values and validation timing. Comparison, reactive-association, form, and
 long/enlarged-text stories cover the composition; the two interaction stories also run as
 portable tests. See the [Field contract](src/compositions/field/README.md).
 
