@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/effect-postgres/migrator";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { fileURLToPath } from "node:url";
+import { PostgresAppends } from "./appends.ts";
 
 /** Migrations generated from the schema by `bun run generate`; applied during construction. */
 export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
@@ -19,6 +20,8 @@ export type DrizzleClient = Effect.Success<ReturnType<typeof PgDrizzle.makeWithD
 export interface Interface {
   readonly db: DrizzleClient;
   readonly sql: SqlClient.SqlClient;
+  /** Wakeups for readers waiting on a log, from one listener for this pool. */
+  readonly appends: PostgresAppends.Interface;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -26,7 +29,8 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 /**
- * Construct the database service over the caller's SQL client, applying pending migrations.
+ * Construct the database service over the caller's PostgreSQL client, applying pending
+ * migrations. Its append listener holds one of the pool's connections while readers wait.
  *
  * @category constructors
  */
@@ -34,7 +38,8 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const db = yield* PgDrizzle.makeWithDefaults();
   yield* migrate(db, { migrationsFolder });
-  return Service.of({ db, sql });
+  const appends = yield* PostgresAppends.make();
+  return Service.of({ db, sql, appends });
 });
 
 /**

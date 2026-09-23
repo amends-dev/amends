@@ -16,7 +16,10 @@ export interface Options {
    * reports contention. Writers to one workspace run one at a time.
    */
   readonly lockTimeout?: Duration.Input | undefined;
-  /** How often a waiting reader re-checks the log for committed batches. */
+  /**
+   * How often a waiting reader re-checks the log without a notification: the fallback when a
+   * notification is lost or `LISTEN` is unavailable, as behind a transaction-pooling proxy.
+   */
   readonly pollInterval?: Duration.Input | undefined;
 }
 
@@ -90,7 +93,7 @@ export const make = Effect.fn("Binding.make")(function* (
   const database = yield* PostgresDatabase.Service;
   const { sql } = database;
   const lockTimeout = Duration.fromInputUnsafe(options.lockTimeout ?? Duration.seconds(5));
-  const pollInterval = Duration.fromInputUnsafe(options.pollInterval ?? "100 millis");
+  const pollInterval = Duration.fromInputUnsafe(options.pollInterval ?? "5 seconds");
 
   const check = Effect.fnUntraced(function* (write: boolean) {
     const current = yield* Effect.serviceOption(CurrentTransaction);

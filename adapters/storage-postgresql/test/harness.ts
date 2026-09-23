@@ -38,10 +38,10 @@ export const harness: Harness = {
       return use({
         connect: (options) =>
           Layer.build(
-            layer({
-              pollInterval: "20 millis",
-              ...(options?.failFast === true ? { lockTimeout: "100 millis" } : {}),
-            }).pipe(Layer.provideMerge(database(url))),
+            // Waiting readers rely on notifications: the fallback poll is the default five seconds.
+            layer(options?.failFast === true ? { lockTimeout: "100 millis" } : {}).pipe(
+              Layer.provideMerge(database(url)),
+            ),
           ).pipe(Effect.orDie),
         discardProjections: maintain(
           Effect.flatMap(SqlClient.SqlClient, (sql) =>

@@ -193,7 +193,7 @@ evaluator on its supported Vite 7 line; verify the workshop build before changin
 - Use `it.effect` for Effect programs. Return the Effect from the callback; the
   runner owns its scope, interrupts it on timeout, and runs its finalizers.
 - Use `it.live` for integrations that need live clocks, such as HTTP servers and
-  PostgreSQL's cross-connection append polling.
+  PostgreSQL's cross-connection append notifications.
 - Use plain `it` for synchronous schemas and domain functions, DOM interactions,
   and tests of Promise-based subprocess fixtures. These APIs still come from
   `@effect/vitest`.

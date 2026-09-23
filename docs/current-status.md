@@ -179,9 +179,10 @@ Turn/task activity kinds remain design intent.
 The [change feed](../packages/core/README.md#change-feed) reads the journal, so it carries
 commits from every host over the same storage and resumes from a cursor. Its remaining gaps:
 
-- PostgreSQL's [`waitForAppend`](../adapters/storage-postgresql/src/journal.ts) polls every
-  100 milliseconds for each workspace a process follows. Wakeups through `LISTEN`/`NOTIFY`
-  remain to be done.
+- PostgreSQL wakes followers with `LISTEN`/`NOTIFY`. A commit that notifies takes a lock on the
+  notification queue that serializes such commits across the whole database, which matters only
+  at thousands of commits a second; a batched poll per process is the alternative then. Behind a
+  transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
 - Notifications are not delivered over the feed. A recipient learns of a new notification
   only by rereading the inbox, prompted by the thread events they can see.
 - A reader's cursor advances only with commits that carry something they may see. A reader

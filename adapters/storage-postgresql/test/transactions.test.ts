@@ -47,7 +47,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
               },
             });
             const storage = yield* views().pipe(
-              Effect.provideService(PostgresDatabase.Service, { db: real.db, sql: failing }),
+              Effect.provideService(PostgresDatabase.Service, {
+                db: real.db,
+                sql: failing,
+                appends: real.appends,
+              }),
             );
             const bound = yield* storage.forWorkspace(workspaceId);
             const failure = yield* Effect.flip(initialized(bound));

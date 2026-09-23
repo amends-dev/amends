@@ -200,7 +200,16 @@ included in that classification and currently becomes a failure. Reads outside a
 transaction see committed state. A statement PostgreSQL
 refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
-Waiting readers poll the log every `pollInterval` (100 milliseconds by default).
+A commit that appends to a log sends `pg_notify` on the `amends_log_appends` channel with the
+workspace and log, inside its transaction, so the notification arrives only if the commit
+succeeds. Each pool's listener, started by the first waiting reader and stopped 30 seconds after
+the last, holds one pooled connection on `LISTEN` and wakes that log's waiters in the process.
+A waiter takes its wakeup signal before checking the log, so an append between the check and the
+wait still wakes it; the log is the truth and the notification only says when to look again.
+When its connection fails, the listener listens again after a second and then wakes every waiter
+to re-check what it missed. Waiters also re-check every `pollInterval` (five seconds by default)
+without a notification. `LISTEN` needs a session connection, so behind a transaction-pooling proxy
+the adapter falls back to that interval.
 
 Ordinary application reads and SSE authorization do not open a transaction or take
 the workspace advisory lock. They use available pool connections to query committed
@@ -243,14 +252,16 @@ Construction tests cover both `make` and `layer`, including initialization of al
 stores and reopening without data loss.
 
 `test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md) over a
-database per test: another host is another pool, polling every 20 milliseconds, with a
-100-millisecond lock timeout when a test asks for prompt contention. Discarding projections
-truncates the projection tables, and the footprint counts the rows of every table. Each test file
+database per test: another host is another pool, woken by notifications with the default
+fallback interval, and with a 100-millisecond lock timeout when a test asks for prompt
+contention. Discarding projections truncates the projection tables, and the footprint counts the rows of every table. Each test file
 registers one suite. Beside the registrations, only what PostgreSQL stores or fails differently is
 tested here: `transactions.test.ts` injects a failed `COMMIT` to check `CommitUncertain`,
 `fact-metadata.test.ts` checks the fact columns, `invitations.test.ts` checks that a refused
 statement the program ignores still aborts its transaction, and `notifications.test.ts` checks that
-a malformed stored record fails reads. `database.test.ts` covers construction and access paths, and
-`scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
+a malformed stored record fails reads. `journal.test.ts` checks, with an hour-long fallback
+interval, that a waiting reader wakes on another pool's commit through its notification, and still
+wakes when an append lands while its listener reconnects. `database.test.ts` covers construction
+and access paths, and `scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
 project's global setup owns the shared test cluster, and individual tests own their temporary
 databases.

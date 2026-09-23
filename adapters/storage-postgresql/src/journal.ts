@@ -1,7 +1,8 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, inArray, sql } from "drizzle-orm";
-import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
+import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";
+import { PostgresAppends } from "./appends.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
@@ -198,6 +199,12 @@ export const make = Effect.fn("Journal.make")(function* () {
               Object.assign({ workspaceId, commitId: session.commit.id }, batch),
             ),
           );
+      // Delivered only if the transaction commits; repeats within it are delivered once.
+      for (const logId of new Set(batches.map((batch) => batch.logId)))
+        yield* database.sql.unsafe("SELECT pg_notify($1, $2)", [
+          PostgresAppends.channel,
+          PostgresAppends.payloadOf(workspaceId, logId),
+        ]);
       for (let start = 0; start < entries.length; start += insertChunk)
         yield* db.insert(logEntries).values(
           entries.slice(start, start + insertChunk).map((entry) =>
@@ -499,8 +506,7 @@ export const make = Effect.fn("Journal.make")(function* () {
           operation: "waitForAppend",
           cause: "Cannot wait inside a transaction",
         });
-      // Poll committed state so other processes and lost acknowledgments are visible.
-      yield* guard(
+      const appended = guard(
         db
           .select({ position: logBatches.position })
           .from(logBatches)
@@ -516,11 +522,19 @@ export const make = Effect.fn("Journal.make")(function* () {
           .limit(1),
       ).pipe(
         Effect.map((rows) => rows.length > 0),
-        Effect.repeat({
-          while: (available) => !available,
-          schedule: Schedule.spaced(pollInterval),
-        }),
         Effect.mapError(storeFailure(Store, "waitForAppend")),
+      );
+      // Committed state is the truth, so other processes and lost acknowledgments are visible;
+      // notifications only say when to look again, and the interval covers any that are lost.
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          yield* database.appends.listening;
+          while (true) {
+            const signal = database.appends.next(workspaceId, logId);
+            if (yield* appended) return;
+            yield* Deferred.await(signal).pipe(Effect.timeoutOption(pollInterval));
+          }
+        }),
       );
     }),
   });
