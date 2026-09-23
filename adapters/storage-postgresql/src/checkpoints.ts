@@ -3,10 +3,11 @@ import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
-import { checkpoints } from "./schema.ts";
+import { checkpoints, liveProjections } from "./schema.ts";
 
 /**
- * Each projection version's progress through one log, written with the projection's rows.
+ * Each projection version's progress through one log while it is rebuilt, written with the
+ * projection's rows, and the versions that are live.
  *
  * @category constructors
  */
@@ -74,6 +75,40 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
           }),
         true,
       ).pipe(Effect.mapError(storeError(Store, "checkpoint.set")));
+    }),
+    listLive: (logId) =>
+      guard(
+        db
+          .select({ name: liveProjections.name, version: liveProjections.version })
+          .from(liveProjections)
+          .where(
+            and(eq(liveProjections.workspaceId, workspaceId), eq(liveProjections.logId, logId)),
+          ),
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Checkpoint.LiveVersions)),
+        Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
+      ),
+    setLive: Effect.fn("Checkpoints.setLive")(function* (logId, input) {
+      yield* Store.Transaction;
+      const versions = yield* Schema.decodeEffect(Checkpoint.LiveVersions)(input).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.setLive")),
+      );
+      const clear = db
+        .delete(liveProjections)
+        .where(and(eq(liveProjections.workspaceId, workspaceId), eq(liveProjections.logId, logId)));
+      // Drizzle refuses to build an insert without rows, so an empty register only clears.
+      const replace =
+        versions.length === 0
+          ? clear
+          : Effect.andThen(
+              clear,
+              db
+                .insert(liveProjections)
+                .values(
+                  versions.map(({ name, version }) => ({ workspaceId, logId, name, version })),
+                ),
+            );
+      yield* guard(replace, true).pipe(Effect.mapError(storeError(Store, "checkpoint.setLive")));
     }),
   });
 });

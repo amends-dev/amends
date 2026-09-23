@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+
 import {
   Assignment,
   AssignmentFacts,
@@ -7,6 +8,7 @@ import {
   Role,
   RoleFacts,
 } from "@amends/core/authorization";
+
 import {
   Group,
   GroupApplication,
@@ -14,13 +16,14 @@ import {
   GroupMembershipApplication,
   GroupMembershipFacts,
   GroupMembershipPermissions,
-  GroupMembershipProjection,
   GroupMembershipStore,
   GroupPermissions,
   GroupStore,
 } from "@amends/core/group";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+
+import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -30,18 +33,25 @@ import {
   MemberPermissions,
   MemberStore,
 } from "@amends/core/workspace";
+
 import { Gateway } from "@amends/gateway";
+
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+
 import { TestClock } from "effect/testing";
+
 import {
   type Bound,
   boundTo,
+  failingLate,
+  journalLog,
   otherWorkspaceId,
   runHost,
   Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
+
 import type { Harness } from "./harness.ts";
 
 /** Group admission and departure: authority, workspace removal, concurrency, and replay. */
@@ -129,11 +139,6 @@ export const groupMemberships = (harness: Harness) => {
           }),
         ),
       );
-    const membershipCheckpoint = {
-      logId: journalId,
-      name: GroupMembershipProjection.definition.name,
-      version: GroupMembershipProjection.definition.version,
-    };
 
     const remove = (membership: GroupMembership.Record) =>
       Effect.flatMap(GroupMembershipApplication.Service, (service) =>
@@ -364,40 +369,27 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "checkpoint failure after admission projection rolls back its row, fact, and checkpoint",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, group, owner } = yield* prepare();
-              const before = yield* history(bound);
-              const checkpoint = yield* bound.checkpoints.get(membershipCheckpoint);
-              const failure = new Store.Failure({
-                operation: "checkpoint.set",
-                cause: "injected after admission insert",
-              });
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === membershipCheckpoint.name
-                      ? Effect.fail(failure)
-                      : bound.checkpoints.set(key, cursor),
-                }),
-              };
-              expect(yield* Effect.flip(run(broken, owner, add(group.id, humanId)))).toEqual(
-                failure,
-              );
-              expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([]);
-              expect(yield* bound.groups.get(group.id)).toEqual(Option.some(group));
-              expect(yield* history(bound)).toEqual(before);
-              expect(yield* bound.checkpoints.get(membershipCheckpoint)).toEqual(checkpoint);
-            }),
-          ),
+    it.effect("a failure after the admission projection rolls back its row and fact", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, group, owner } = yield* prepare();
+            const before = yield* history(bound);
+            const live = yield* bound.checkpoints.listLive(journalLog);
+            const failure = new Store.Failure({
+              operation: "commit",
+              cause: "injected late failure",
+            });
+            const broken = failingLate(bound, failure);
+            expect(yield* Effect.flip(run(broken, owner, add(group.id, humanId)))).toEqual(failure);
+            expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([]);
+            expect(yield* bound.groups.get(group.id)).toEqual(Option.some(group));
+            expect(yield* history(bound)).toEqual(before);
+            expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
+          }),
         ),
+      ),
     );
 
     it.effect("outer rollback and staged permission or member removal remain authoritative", () =>
@@ -1138,7 +1130,7 @@ export const groupMemberships = (harness: Harness) => {
     );
 
     it.effect(
-      "departure projection failure and outer rollback restore the admission, journal, and checkpoint",
+      "departure projection failure and outer rollback restore the admission and journal",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -1147,21 +1139,12 @@ export const groupMemberships = (harness: Harness) => {
               const { bound, group, owner } = yield* prepare();
               const membership = yield* run(bound, owner, add(group.id, humanId));
               const before = yield* history(bound);
-              const checkpoint = yield* bound.checkpoints.get(membershipCheckpoint);
+              const live = yield* bound.checkpoints.listLive(journalLog);
               const failure = new Store.Failure({
-                operation: "checkpoint.set",
-                cause: "after departure",
+                operation: "commit",
+                cause: "injected late failure",
               });
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === membershipCheckpoint.name
-                      ? Effect.fail(failure)
-                      : bound.checkpoints.set(key, cursor),
-                }),
-              };
+              const broken = failingLate(bound, failure);
               for (const operation of [remove, leave]) {
                 const actor = operation === remove ? owner : memberActor(humanId);
                 expect(yield* Effect.flip(run(broken, actor, operation(membership)))).toEqual(
@@ -1185,7 +1168,7 @@ export const groupMemberships = (harness: Harness) => {
                 Option.some(membership),
               );
               expect(yield* history(bound)).toEqual(before);
-              expect(yield* bound.checkpoints.get(membershipCheckpoint)).toEqual(checkpoint);
+              expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
             }),
           ),
         ),
@@ -1201,7 +1184,7 @@ export const groupMemberships = (harness: Harness) => {
             yield* run(bound, owner, add(otherGroup.id, humanId));
             const admissions = yield* bound.groupMemberships.listActiveByMember(humanId);
             const before = yield* history(bound);
-            const checkpoint = yield* bound.checkpoints.get(membershipCheckpoint);
+            const live = yield* bound.checkpoints.listLive(journalLog);
             const failure = new GroupMembershipStore.Failure({
               operation: "markRemoved",
               cause: "second departure",
@@ -1224,7 +1207,7 @@ export const groupMemberships = (harness: Harness) => {
             });
             expect(yield* bound.groupMemberships.listActiveByMember(humanId)).toEqual(admissions);
             expect(yield* history(bound)).toEqual(before);
-            expect(yield* bound.checkpoints.get(membershipCheckpoint)).toEqual(checkpoint);
+            expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
           }),
         ),
       ),

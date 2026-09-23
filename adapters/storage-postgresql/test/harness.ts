@@ -21,6 +21,7 @@ const projections = [
   "thread_messages",
   "thread_activities",
   "checkpoints",
+  "live_projections",
 ];
 
 const { available, withDatabase } = setup();

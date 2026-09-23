@@ -1,22 +1,25 @@
 import { AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Journal, Publication, Store } from "@amends/core/journal";
-import {
-  InvitationApplication,
-  InvitationProjection,
-  MemberApplication,
-  MemberProjection,
-} from "@amends/core/workspace";
+
+import { Journal, Publication, Store } from "@amends/core/journal";
+
+import { InvitationApplication, MemberApplication } from "@amends/core/workspace";
+
 import { describe, expect, it } from "@effect/vitest";
-import { Context, DateTime, Effect, Option } from "effect";
+
+import { DateTime, Effect, Option } from "effect";
+
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
+
 import {
   alice,
   at,
   bob,
   boundTo,
   charlie,
+  failingLate,
   future,
   journalLog,
   request,
@@ -30,7 +33,7 @@ export const invitationReplay = (harness: Harness) => {
   const { core, runGateway } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: invitation replay`, () => {
     it.effect(
-      "failed acceptance checkpoint rolls back membership, assignments, consumption, and journal together",
+      "a late acceptance failure rolls back membership, assignments, consumption, and journal together",
       () =>
         harness.withStorage((storage) =>
           runGateway(
@@ -46,19 +49,10 @@ export const invitationReplay = (harness: Harness) => {
               const before = yield* bound.store.read(journalLog, { limit: 20 });
               const footprint = yield* storage.footprint;
               const error = new Store.Failure({
-                operation: "checkpoint.set",
-                cause: "injected failure after consumption",
+                operation: "commit",
+                cause: "injected late failure",
               });
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === InvitationProjection.definition.name && cursor.index === 2
-                      ? Effect.fail(error)
-                      : bound.checkpoints.set(key, cursor),
-                }),
-              };
+              const broken = failingLate(bound, error);
               const failure = yield* Effect.flatMap(InvitationApplication.Service, (service) =>
                 service.accept(invitation.details.id, bob.id),
               ).pipe(Effect.provide(core(broken)), Effect.flip);
@@ -113,28 +107,13 @@ export const invitationReplay = (harness: Harness) => {
               );
               const bound = yield* boundTo(workspace.id);
               const before = yield* bound.store.read(journalLog, { limit: 20 });
-              const checkpointKeys = [
-                MemberProjection.definition,
-                InvitationProjection.definition,
-              ].map(({ name, version }) => ({ logId: journalLog, name, version }));
-              const checkpoints = yield* Effect.forEach(checkpointKeys, (key) =>
-                bound.checkpoints.get(key),
-              );
+              const live = yield* bound.checkpoints.listLive(journalLog);
               const grants = yield* bound.assignments.listActiveByMember(member.id);
               const error = new Store.Failure({
-                operation: "checkpoint.set",
-                cause: "failure after removal and pending invitation revocations",
+                operation: "commit",
+                cause: "injected late failure",
               });
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === InvitationProjection.definition.name && cursor.index === 2
-                      ? Effect.fail(error)
-                      : bound.checkpoints.set(key, cursor),
-                }),
-              };
+              const broken = failingLate(bound, error);
               const failure = yield* Effect.flatMap(MemberApplication.Service, (application) =>
                 application.remove(member.id),
               ).pipe(
@@ -153,9 +132,7 @@ export const invitationReplay = (harness: Harness) => {
                 expect(yield* bound.invitations.get(record.details.id)).toEqual(
                   Option.some(record),
                 );
-              expect(
-                yield* Effect.forEach(checkpointKeys, (key) => bound.checkpoints.get(key)),
-              ).toEqual(checkpoints);
+              expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
               // A member ID from another workspace cannot be addressed through this context.
               expect(
                 yield* Effect.flip(

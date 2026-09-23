@@ -55,7 +55,7 @@ its cause. Already ended admissions and other members are unchanged. Rejoining t
 does not restore old group admissions. See [group departures](group-workflows.md#workspace-member-removal).
 
 Authorization, the ownership check, the member/group removal and invitation revocation facts,
-projections, and checkpoints share one transaction. A failure rolls them back
+and projections share one transaction. A failure rolls them back
 together. Repeating a removal returns `MemberApplication.AlreadyRemoved` without
 publishing another fact; the caller must still be active and authorized.
 Missing members return `MemberApplication.NotFound` only after authorization.
@@ -156,7 +156,7 @@ Administrator to the previous owner and Owner to the recipient, and updates
 `ownerMemberId`. Direct grants and assignments scoped to specific resources remain
 unchanged. The workspace's name and `createdBy` remain unchanged. Core requires one
 matching active human Owner assignment before and after the change. Failures roll
-back metadata, assignments, facts, and checkpoints together.
+back metadata, assignments, and facts together.
 
 Workspace settings provide candidate selection and a review dialog naming the new
 owner and explaining the previous owner's Administrator access. Success refreshes
@@ -174,7 +174,7 @@ when permission declarations change rather than synchronizing stored role bundle
 The host allocates the workspace ID and binds its storage views. Core initialization
 then publishes six facts in one journal commit: workspace initialization, creator
 membership, three built-in roles, and one Owner role assignment. Projections persist
-the records and their checkpoints in that same transaction.
+the records in that same transaction, which also makes the new log's projections live.
 
 The creator is a human and is recorded as the initial owner. Creation attribution
 is retained separately from current ownership. The creator receives Owner at workspace
@@ -237,7 +237,7 @@ from current declarations.
 
 Initialization requires an absent workspace record. A repeated call returns
 `WorkspaceInitialization.AlreadyInitialized` without replacing ownership or
-granting more access. A failed projection or checkpoint rolls back the entire
+granting more access. A failed projection rolls back the entire
 initialization. Concurrent initializers serialize or receive a storage conflict.
 
 ## Development data

@@ -19,15 +19,16 @@ available application operations.
 - **Journal** binds a domain log to registered projections. Its public log view
   is read-only; fact writes go through `publish`.
 - **Projection** handles a decoded fact event and updates its domain store.
-  Definitions and handlers belong to domains. The shared runner dispatches fact
-  versions, applies batches, and tracks replay progress. Projections run in
-  registration order during publication and cannot append new log entries.
-- **Checkpoint** is the host-implemented progress store, keyed by log ID,
-  projection name, and projection version.
+  Definitions and handlers belong to domains. Live projections run inside each
+  publication, and only for facts they handle, in registration order; they cannot
+  append new log entries. The shared runner rebuilds a projection that is not live
+  from the log, in checkpointed batches.
+- **Checkpoint** is the host-implemented store for rebuild progress, keyed by log ID,
+  projection name, and projection version, and for each log's live projection versions.
 - **Transaction** coordinates implicit and explicit commits, nested calls,
   publication ordering, failure tracking, and transaction lifetime.
 - **Store** is the host-implemented persistence contract. It supplies a native
-  transaction and enlists log writes, domain projection stores, and checkpoints.
+  transaction and enlists log writes, domain projection stores, and checkpoint writes.
 
 The core imports Effect only. Hosts choose storage and provide `Store.Service`,
 `Checkpoint.Service`, and the domain store services used by projection handlers.
@@ -485,11 +486,34 @@ decode, and wait failures end it without automatic retries. Resume from the last
 successfully handled batch after recovery. The finite `stream` method continues
 to finish when it observes an empty page.
 
-## Projection replay
+## Live projections
 
-`journal.replay` catches up its registered projections. Call it when attaching a
-projection to existing history, before accepting publications with that registration.
-For example, using the host layer above:
+A projection version is **live** on a log when every commit since it went live applied it.
+Live projections are part of the write: each publication decodes its fact once and runs
+the handlers of the projections subscribed to that fact name, in registration order, in
+the same native transaction as the append. They record no progress, because nothing a
+crash could lose sits between the log and a projection that runs in the same commit.
+A subscribed fact name with an unregistered version fails with
+`Projection.UnsupportedFactVersion`; register every historical version a projection
+needs. Handlers and decoders must avoid external actions, and the runner rejects new log
+appends during projection execution.
+
+The checkpoint store keeps each log's live versions, at most one per projection name. A
+commit reads them once, before its first publication, and may publish only when they are
+exactly the journal's registered projections:
+
+- A registered projection that is not live fails with `Projection.Behind`, rolling back
+  the append. `journal.replay` rebuilds it; then retry the command as appropriate.
+- A live version the journal does not register fails with `Projection.Unregistered`: its
+  commits would skip that projection and leave it silently behind.
+- A log with no entries has nothing to rebuild, so its first commit makes every registered
+  projection live.
+
+`journal.replay` makes exactly the registered projections live before a host accepts
+publications. When they already are, it reads only the live versions. Otherwise it settles
+what needs no rebuild in one transaction: on an empty log every registered projection goes
+live, and live versions this journal does not register are retired. It then rebuilds each
+registered projection that is not live. For example, using the host layer above:
 
 ```ts
 const initialize = Effect.gen(function* () {
@@ -498,53 +522,46 @@ const initialize = Effect.gen(function* () {
 }).pipe(Effect.provide(JournalLive));
 ```
 
+Hosts that write one workspace must therefore register the same projections. During a
+deployment that adds or replaces a projection, hosts running the older set fail closed
+on commit until they are replaced; a host that boots with the older set retires the newer
+projections, which the newer hosts must then rebuild.
+
+## Rebuilding
+
 For individual control, `Projection.makeRunner({ definition, log: journal.log })` acquires
 the definition's dependencies and returns a runner with `step`, `replay`, and
-`checkpoint` effects. These effects have no remaining service requirements.
-`step` applies the next
-source batch and persists progress in the same native transaction as its domain
-updates. It returns `Some(cursor)` on progress or `None` when caught up. `replay`
-drains until a step observes no pending batch, then returns the latest checkpoint.
-Each step commits independently unless the caller wraps replay in an explicit
-commit. A failed or interrupted step rolls back that whole batch; earlier steps
-remain committed. Replay creates no source or execution-log entries.
+`checkpoint` effects. These effects have no remaining service requirements. `step`
+applies the next source batch and persists progress in the same native transaction as its
+domain updates, returning `Some(cursor)`. When no batch is pending, it marks the projection
+live in that same transaction and returns `None`; the workspace's writers take turns, so no
+commit can land between the last batch and going live. A projection that is already live
+returns `None` without applying anything. `replay` steps until the projection is live. Each
+step commits independently unless the caller wraps replay in an explicit commit. A failed
+or interrupted step rolls back that whole batch; earlier steps remain committed. Rebuilding
+creates no source or execution-log entries.
 
-Live publication uses the same checkpoint as replay. It checks that the new entry
-immediately follows the projection's progress, applies handlers, and advances the
-checkpoint within the publication's transaction. Publications within one commit are
-serialized, so progress that commit recorded at the preceding entry index confirms the
-new entry without reloading the open batch; other progress is validated against stored
-batches. Cause references are resolved by entry ID. A publication's cost therefore
-does not grow with the number of entries already in its commit. A backlog fails publication with
-`Projection.Behind`, rolling back the append; catch up with `journal.replay` and
-then retry the command as appropriate. Replaying an already updated projection
-does not apply its events again. A checkpoint includes an entry index to track
-multiple publications inside an open commit; externally visible progress always
-ends at a complete source batch. Missing entries or partial committed checkpoints
-fail with `Projection.InvalidCheckpoint`.
+A checkpoint includes an entry index to track progress inside an open commit; externally
+visible progress always ends at a complete source batch. Missing entries or partial
+committed checkpoints fail with `Projection.InvalidCheckpoint`. Unrelated fact names are
+skipped and still advance progress. Different projections rebuild independently: derive
+updates from event data and the projection's own state, without depending on another
+projection's progress.
 
-Unrelated fact names are skipped and still advance progress. A subscribed fact
-name with an unregistered version fails with `Projection.UnsupportedFactVersion`.
-Register every historical version needed by that projection. Persisted payloads
-are decoded with those versions' schemas before handlers run. Handler order within
-a definition is preserved. Different projections catch up independently: derive
-updates from event data and the projection's own state, without depending on
-another projection's progress. Handlers and decoders must avoid external actions;
-the runner rejects new log appends during projection execution.
+Checkpoint reads and writes must participate in the same host transaction as domain
+updates, including when no checkpoint exists yet, with competing writes serialized. This
+is the storage contract; PostgreSQL currently relies on a workspace advisory lock and does
+not explicitly select an isolation level. Competing runners must serialize or receive
+`Store.Conflict`; the core does not retry them. After `Store.CommitUncertain`, reconcile
+using persisted progress and domain state. A later step reads its checkpoint again before
+applying anything.
 
-Checkpoint reads and writes must participate in the same host transaction as
-domain updates, including when no checkpoint exists yet, with competing writes
-serialized. This is the storage contract; PostgreSQL currently relies on a
-workspace advisory lock and does not explicitly select an isolation level. Competing
-runners must serialize or receive `Store.Conflict`; the core does not retry them.
-After `Store.CommitUncertain`, reconcile using persisted progress and domain state.
-A later replay reads its checkpoint again before applying anything.
-
-A projection version identifies its read-model interpretation, separately from
-fact versions. A new version has a separate checkpoint and starts from the beginning.
-The domain and host must supply a fresh target store or perform a coordinated
-migration. Changing a version alone does not clear existing rows. This API does not
-reset stores, migrate schemas, or switch readers between projection versions.
+A projection version identifies its read-model interpretation, separately from fact
+versions. A new version rebuilds from the beginning with its own checkpoint, and going live
+replaces the previous version of that name. The domain and host must supply a fresh target
+store or perform a coordinated migration. Changing a version alone does not clear existing
+rows, and rebuilding a retired version over its old rows would apply history twice. This
+API does not reset stores, migrate schemas, or switch readers between projection versions.
 
 ## Verification
 
@@ -552,13 +569,14 @@ reset stores, migrate schemas, or switch readers between projection versions.
 memory adapter, including cross-log atomicity, rollback, nested and concurrent
 publication, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version
-routing, and transitions between replay and live publication. Service tests check
+routing, going live after a rebuild, the live-version checks on commit, and live
+publication that reads no batches or progress. Service tests check
 dependency inference across different projections, the stable consumer interface,
 active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit
 visibility, rollback, independent consumers, cancellation, and wait failures.
-Projection tests also confirm that a large commit's publications do not reload that commit,
-and that entries appended around a live runner inside one commit still fail with `Projection.Behind`.
+Projection tests also confirm that a large commit's publications read no batches or progress,
+and that a journal that does not run a live projection cannot publish to its log.
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
 staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The

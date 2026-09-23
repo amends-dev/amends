@@ -1,7 +1,7 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends/core/authorization";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
-import { Entry, Store } from "@amends/core/journal";
+import { Checkpoint, Entry, Store } from "@amends/core/journal";
 import { ThreadId } from "@amends/core/thread";
 import { Invitation, Member, MemberPermissions, Workspace } from "@amends/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
@@ -567,6 +567,80 @@ export const contracts = (harness: Harness) => {
             }),
           ),
         ),
+    );
+
+    it.effect("the live register keeps one version per projection name for each log", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const bound = yield* boundTo(workspaceId);
+            const other = yield* boundTo(otherWorkspaceId);
+            const logId = Entry.LogId.make("register-contract");
+            const otherLog = Entry.LogId.make("register-other");
+            const versions = [
+              { name: "first", version: 1 },
+              { name: "second", version: 2 },
+            ];
+            const sorted = (live: ReadonlyArray<Checkpoint.LiveVersion>) =>
+              live.toSorted((left, right) => (left.name < right.name ? -1 : 1));
+            expect(yield* bound.checkpoints.listLive(logId)).toEqual([]);
+            // Writes join the caller's transaction and never run without one.
+            expect(
+              yield* Effect.flip(
+                bound.checkpoints
+                  .setLive(logId, versions)
+                  .pipe(
+                    Effect.provide(
+                      yield* bound.store.transaction(Effect.context<Store.Transaction>()),
+                    ),
+                  ),
+              ),
+            ).toMatchObject({ _tag: "JournalStore.Failure" });
+            yield* bound.store.transaction(bound.checkpoints.setLive(logId, versions));
+            expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
+            expect(yield* bound.checkpoints.listLive(otherLog)).toEqual([]);
+            expect(yield* other.checkpoints.listLive(logId)).toEqual([]);
+            // Two versions of one name conflict before any change.
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  bound.checkpoints.setLive(logId, [
+                    { name: "first", version: 1 },
+                    { name: "first", version: 2 },
+                  ]),
+                ),
+              ),
+            ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.setLive" });
+            expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
+            // A set replaces the whole register, and a rolled-back one changes nothing.
+            yield* bound.store.transaction(
+              bound.checkpoints.setLive(logId, [{ name: "first", version: 2 }]),
+            );
+            expect(yield* bound.checkpoints.listLive(logId)).toEqual([
+              { name: "first", version: 2 },
+            ]);
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  Effect.andThen(bound.checkpoints.setLive(logId, []), Effect.fail("undo")),
+                ),
+              ),
+            ).toBe("undo");
+            expect(yield* bound.checkpoints.listLive(logId)).toEqual([
+              { name: "first", version: 2 },
+            ]);
+            // Staged changes are visible inside their transaction.
+            yield* bound.store.transaction(
+              Effect.gen(function* () {
+                yield* bound.checkpoints.setLive(logId, []);
+                expect(yield* bound.checkpoints.listLive(logId)).toEqual([]);
+              }),
+            );
+            expect(yield* bound.checkpoints.listLive(logId)).toEqual([]);
+          }),
+        ),
+      ),
     );
   });
 };

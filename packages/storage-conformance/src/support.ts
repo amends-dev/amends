@@ -65,6 +65,26 @@ export const boundTo = (id: Workspace.Id) =>
     Effect.map(bind),
   );
 
+/**
+ * The bound stores with each commit failing after its program completes, before it commits: a
+ * failure after every projection has written, as a late write in the commit would cause.
+ */
+export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
+  Object.assign({}, bound, {
+    context: Context.add(
+      bound.context,
+      Store.Service,
+      Store.Service.of(
+        Object.assign({}, bound.store, {
+          transaction: <A, E, R>(
+            program: Effect.Effect<A, E, R>,
+            options?: Store.TransactionOptions,
+          ) => bound.store.transaction(Effect.andThen(program, Effect.fail(failure)), options),
+        }),
+      ),
+    ),
+  });
+
 /** Run a program on a new host over the storage, which stays open for the enclosing scope. */
 export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => Effect.provide(program, host));

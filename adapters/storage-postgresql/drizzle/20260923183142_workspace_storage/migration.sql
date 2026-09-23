@@ -100,6 +100,14 @@ CREATE TABLE "invitations" (
 	CONSTRAINT "invitations_state_agrees" CHECK (("state" = 'Pending' AND "accepted_member_id" IS NULL AND "accepted_at" IS NULL AND "revoked_by_member_id" IS NULL AND "revoked_at" IS NULL) OR ("state" = 'Accepted' AND "accepted_member_id" IS NOT NULL AND "accepted_at" IS NOT NULL AND "revoked_by_member_id" IS NULL AND "revoked_at" IS NULL) OR ("state" = 'Revoked' AND "revoked_by_member_id" IS NOT NULL AND "revoked_at" IS NOT NULL AND "accepted_member_id" IS NULL AND "accepted_at" IS NULL))
 );
 --> statement-breakpoint
+CREATE TABLE "live_projections" (
+	"workspace_id" text,
+	"log_id" text,
+	"name" text,
+	"version" double precision NOT NULL,
+	CONSTRAINT "live_projections_pkey" PRIMARY KEY("workspace_id","log_id","name")
+);
+--> statement-breakpoint
 CREATE TABLE "log_append_keys" (
 	"workspace_id" text,
 	"log_id" text,

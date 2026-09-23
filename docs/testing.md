@@ -275,7 +275,7 @@ suite passes. Notification storage and inbox tests seed records; thread workflow
 opening and reply publication, participation admission, recipient selection, concurrent sequencing,
 quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on both adapters.
 Acknowledgment suites verify human ownership, stable repeat handling, source-access loss, caller
-transactions, projection/checkpoint rollback, concurrent requests, and replay after departure.
+transactions, projection and late-failure rollback, concurrent requests, and replay after departure.
 Core tests validate the acknowledgment codec and withholding its facts from the public change feed.
 
 Subprocess fixtures create an existing temporary database parent, so passing host

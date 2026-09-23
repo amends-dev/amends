@@ -9,11 +9,11 @@ and no host uses it yet.
 ## Model
 
 `MemoryDatabase` is the storage that every connected host shares. Each workspace has one
-`Space`: commits, log batches, keyed append slices, projected records with their checkpoints,
-and private read state. Records are stored as the JSON of their encoded form, keyed by ID, like
-the SQL adapters' record columns. Stored values never change: writes replace them, and every
-read decodes a fresh record. Journal entries are copied on the way in and out, so callers never
-share bytes with storage.
+`Space`: commits, log batches, keyed append slices, projected records with the live projection
+versions and rebuild checkpoints, and private read state. Records are stored as the JSON of
+their encoded form, keyed by ID, like the SQL adapters' record columns. Stored values never
+change: writes replace them, and every read decodes a fresh record. Journal entries are copied
+on the way in and out, so callers never share bytes with storage.
 
 Stores check what the SQL adapters enforce with keys, unique indexes, and foreign keys: reused
 IDs, one active membership per identity, one direct group per member set, one active follow per
@@ -44,6 +44,6 @@ host.
 ## Testing
 
 `test/harness.ts` supplies the conformance harness: new storage for each test,
-`discardProjections` clears projected records and checkpoints in every workspace, and
-`footprint` counts commits, batches, entries, append slices, records, and read state. Each test
-file registers one suite.
+`discardProjections` clears projected records, live versions, and checkpoints in every
+workspace, and `footprint` counts commits, batches, entries, append slices, records, and read
+state. Each test file registers one suite.

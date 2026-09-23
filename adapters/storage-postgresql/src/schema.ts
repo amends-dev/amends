@@ -521,6 +521,18 @@ export const checkpoints = pgTable(
   (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name, table.version] })],
 );
 
+/** The projection versions every commit to a log applies: at most one version per name. */
+export const liveProjections = pgTable(
+  "live_projections",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    logId: text("log_id").notNull(),
+    name: text("name").notNull(),
+    version: doublePrecision("version").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name] })],
+);
+
 export const threads = pgTable(
   "threads",
   {

@@ -1,12 +1,18 @@
 import { AssignmentApplication, BuiltinRoles, Role } from "@amends/core/authorization";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Log, Store } from "@amends/core/journal";
+
+import { Log, Store } from "@amends/core/journal";
+
 import type { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Option } from "effect";
+
+import { Effect, Option } from "effect";
+
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
-import { alice, bob, boundTo, charlie, future, request, Support } from "./support.ts";
+
+import { alice, bob, boundTo, charlie, failingLate, future, request, Support } from "./support.ts";
 
 /** Assigning, changing, and revoking access, and delegation limits. */
 
@@ -266,7 +272,7 @@ export const assignments = (harness: Harness) => {
         ),
     );
 
-    it.effect("a failed role-change checkpoint restores the previous assignments and journal", () =>
+    it.effect("a late role-change failure restores the previous assignments and journal", () =>
       harness.withStorage((storage) =>
         runGateway(
           storage,
@@ -275,17 +281,10 @@ export const assignments = (harness: Harness) => {
             const active = yield* bound.assignments.listActiveByMember(viewer.id);
             const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
             const failure = new Store.Failure({
-              operation: "checkpoint.set",
-              cause: "injected assignment checkpoint failure",
+              operation: "commit",
+              cause: "injected late failure",
             });
-            const broken = {
-              ...bound,
-              context: Context.add(bound.context, Checkpoint.Service, {
-                ...bound.checkpoints,
-                set: (key, cursor) =>
-                  cursor.index === 1 ? Effect.fail(failure) : bound.checkpoints.set(key, cursor),
-              }),
-            };
+            const broken = failingLate(bound, failure);
             const rejected = yield* Effect.flatMap(AssignmentApplication.Service, (service) =>
               service.change({
                 memberId: viewer.id,

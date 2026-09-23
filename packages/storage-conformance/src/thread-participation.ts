@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+
 import {
   Assignment,
   AssignmentFacts,
@@ -8,11 +9,16 @@ import {
   type Permission,
   type Target,
 } from "@amends/core/authorization";
+
 import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+
+import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+
 import { Notification, NotificationStore } from "@amends/core/notification";
+
 import {
   Thread,
   ThreadApplication,
@@ -32,18 +38,25 @@ import {
   ThreadParticipationStore,
   ThreadPermissions,
 } from "@amends/core/thread";
+
 import { Gateway } from "@amends/gateway";
+
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+
 import { TestClock } from "effect/testing";
+
 import {
   type Bound,
   boundTo,
+  failingLate,
+  journalLog,
   otherWorkspaceId,
   runHost,
   Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
+
 import type { Harness } from "./harness.ts";
 
 /** Following and unfollowing threads: quiet activity, stale departures, settlement, and replay. */
@@ -169,11 +182,7 @@ export const threadParticipation = (harness: Harness) => {
         activities: yield* bound.activities.listByThread(threadId),
         human: yield* notifications(bound, humanId),
         agent: yield* notifications(bound, agentId),
-        checkpoint: yield* bound.checkpoints.get({
-          logId: Log.Id.make("journal"),
-          name: "notifications",
-          version: 1,
-        }),
+        live: yield* bound.checkpoints.listLive(journalLog),
       };
     });
 
@@ -550,7 +559,7 @@ export const threadParticipation = (harness: Harness) => {
     );
 
     it.effect(
-      "follow and unfollow roll back participation, timeline, input cleanup, and checkpoints together",
+      "follow and unfollow roll back participation, timeline, and input cleanup together",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -559,15 +568,10 @@ export const threadParticipation = (harness: Harness) => {
               const { bound, first, human, agent } = yield* prepare();
               yield* grant(bound, humanId, ThreadParticipationPermissions.Follow);
               const before = yield* snapshot(bound, first.thread.id);
-              const failingCheckpoint = Context.add(bound.context, Checkpoint.Service, {
-                ...bound.checkpoints,
-                set: (key, cursor) =>
-                  key.name === "notifications"
-                    ? Effect.fail(
-                        new Store.Failure({ operation: "checkpoint.set", cause: "injected" }),
-                      )
-                    : bound.checkpoints.set(key, cursor),
-              });
+              const failingCommit = failingLate(
+                bound,
+                new Store.Failure({ operation: "commit", cause: "injected" }),
+              ).context;
               const failingActivity = Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,
                 insert: () =>
@@ -575,7 +579,7 @@ export const threadParticipation = (harness: Harness) => {
                     new ThreadActivityStore.Failure({ operation: "insert", cause: "injected" }),
                   ),
               });
-              for (const context of [failingCheckpoint, failingActivity]) {
+              for (const context of [failingCommit, failingActivity]) {
                 expect(
                   Exit.isFailure(
                     yield* Effect.exit(run({ ...bound, context }, human, follow(first.thread.id))),
@@ -594,7 +598,7 @@ export const threadParticipation = (harness: Harness) => {
                     new NotificationStore.Failure({ operation: "discard", cause: "injected" }),
                   ),
               });
-              for (const context of [failingCheckpoint, failingCleanup]) {
+              for (const context of [failingCommit, failingCleanup]) {
                 expect(
                   Exit.isFailure(
                     yield* Effect.exit(

@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Checkpoint } from "./checkpoint.ts";
 import { Codec } from "./codec.ts";
 import { Event } from "./event.ts";
 import { Fact } from "./fact.ts";
@@ -17,7 +18,11 @@ export interface Interface {
     options: Store.ReadFactsOptions,
   ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
   readonly commit: Transaction.Interface["run"];
-  /** Catch up registered projections before accepting new publications. */
+  /**
+   * Make exactly the registered projections live before accepting publications: rebuild any
+   * that are not live from the log, and retire live versions this journal does not run. When
+   * every registered projection is live, this reads nothing but the live versions.
+   */
   readonly replay: Effect.Effect<void, Projection.Error>;
   /**
    * Stamp trusted operation attribution and derive a key from the fact's occurrence rule.
@@ -65,6 +70,7 @@ export const make = Effect.fn("Journal.make")(function* <
 >(options: Options<Requirements>) {
   const logs = yield* Log.Service;
   const transaction = yield* Transaction.Service;
+  const checkpoints = yield* Checkpoint.Service;
   const log = logs.open({
     id: options.logId,
     schema: Event.Envelope,
@@ -111,6 +117,45 @@ export const make = Effect.fn("Journal.make")(function* <
     keys.set(definition.name, versions);
     runners.push(yield* Projection.makeRunner<unknown, Requirements[number]>({ definition, log }));
   }
+  // Each fact goes only to the projections that handle its name, in registration order.
+  const subscribers = new Map<string, ReadonlyArray<Projection.Runner>>();
+  for (const { fact } of subscriptions)
+    if (!subscribers.has(fact.name))
+      subscribers.set(
+        fact.name,
+        runners.filter((runner) => runner.subscribes(fact.name)),
+      );
+  const registeredVersions = runners.map(({ key }) => ({ name: key.name, version: key.version }));
+  const registered = (live: Checkpoint.LiveVersion) =>
+    runners.some((runner) => Projection.isVersion(runner.key)(live));
+  const keyOf = (live: Checkpoint.LiveVersion): Checkpoint.Key => ({
+    logId: log.id,
+    name: live.name,
+    version: live.version,
+  });
+
+  /**
+   * A commit applies exactly the live projections, so it may publish only when those are the
+   * registered ones. An empty log has nothing to rebuild, so its first commit makes them live.
+   * Checked once per native transaction, before its first publication.
+   */
+  const checked = new WeakSet<object>();
+  const requireLive = Effect.fnUntraced(function* () {
+    const native = yield* Store.Transaction;
+    if (checked.has(native)) return;
+    const live = yield* checkpoints.listLive(log.id);
+    const behind = runners.find((runner) => !live.some(Projection.isVersion(runner.key)));
+    const unknown = live.find((version) => !registered(version));
+    if (behind !== undefined || unknown !== undefined) {
+      if ((yield* log.read({ limit: 1 })).length > 0) {
+        if (behind !== undefined) return yield* new Projection.Behind({ key: behind.key });
+        if (unknown !== undefined)
+          return yield* new Projection.Unregistered({ key: keyOf(unknown) });
+      }
+      yield* checkpoints.setLive(log.id, registeredVersions);
+    }
+    checked.add(native);
+  });
 
   const publish = Effect.fn("Journal.publish")(function* <F extends Fact.Definition>(
     fact: F,
@@ -119,6 +164,7 @@ export const make = Effect.fn("Journal.make")(function* <
   ) {
     return yield* transaction.operation(
       Effect.gen(function* () {
+        yield* requireLive();
         const provenance = Event.snapshotProvenance(
           yield* validateProvenance(yield* Publication.Service),
         );
@@ -194,7 +240,7 @@ export const make = Effect.fn("Journal.make")(function* <
           appendOptions,
         );
         const event = yield* Event.decode(fact, entry);
-        for (const runner of runners) yield* runner.apply(entry, event);
+        for (const runner of subscribers.get(fact.name) ?? []) yield* runner.apply(entry, event);
         yield* transaction.recordEvent(event);
         return event;
       }),
@@ -211,9 +257,27 @@ export const make = Effect.fn("Journal.make")(function* <
     stream: log.stream,
     tail: log.tail,
   };
-  const replay = Effect.forEach(runners, (runner) => runner.replay, { discard: true }).pipe(
-    Effect.withSpan("Journal.replay"),
-  );
+  const replay = Effect.gen(function* () {
+    const live = yield* checkpoints.listLive(log.id);
+    const pending = runners.filter((runner) => !live.some(Projection.isVersion(runner.key)));
+    if (pending.length === 0 && live.every(registered)) return;
+    // One transaction settles what needs no rebuild: on an empty log every registered projection
+    // goes live, and live versions this journal does not run, which would stop its commits,
+    // are retired. Whoever runs a retired version again must rebuild it.
+    const settled = yield* transaction.run(
+      Effect.gen(function* () {
+        const current = yield* checkpoints.listLive(log.id);
+        if ((yield* log.read({ limit: 1 })).length === 0) {
+          yield* checkpoints.setLive(log.id, registeredVersions);
+          return true;
+        }
+        if (!current.every(registered))
+          yield* checkpoints.setLive(log.id, current.filter(registered));
+        return false;
+      }),
+    );
+    if (!settled) for (const runner of pending) yield* runner.replay;
+  }).pipe(Effect.withSpan("Journal.replay"));
 
   return Service.of({ log: reader, read: log.readFacts, commit: transaction.run, replay, publish });
 });

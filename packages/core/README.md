@@ -68,7 +68,7 @@ notification, under active membership with no action grant or source-access requ
 the record with `Acknowledged { outcome: { _tag: "Seen" }, acknowledgedAt }`, removes it from pending
 results, and preserves history. Repeats return the original timestamp without another fact.
 Agents receive `HumanRecipientRequired`; incompatible terminal states return `AlreadyHandled`.
-The operation and its projection/checkpoints share one commit, including any enclosing transaction.
+The operation and its projection share one commit, including any enclosing transaction.
 
 Internal `NotificationAcknowledgment.record(id, outcome)` requires the caller's transaction and
 publication context. It validates and records acknowledgment through `NotificationFacts.Acknowledged`
@@ -236,8 +236,8 @@ The thread module supplies opening-message and human-reply workflows described b
 membership, `thread.start` on the group, and `agent.use` on each mentioned agent member. A
 team-group thread starts with its author, mentioned members, and the group's followers; the rest of
 the group can read it without participating. A direct-group thread enrolls all its members. The
-thread, admissions, verbatim user text, sequence-1 `MessagePublished` activity, notifications, and
-checkpoints commit together.
+thread, admissions, verbatim user text, sequence-1 `MessagePublished` activity, and notifications
+commit together.
 
 `ThreadStart` is the internal start every workflow uses, excluded from `Core.Operations`: it
 creates the thread through `ThreadCreation`, admits the starting participants, and records the

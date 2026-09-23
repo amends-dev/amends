@@ -150,9 +150,11 @@ it.effect("reads, replay, and execution-log-only commits do not publish domain e
       expect(published).toHaveLength(1);
       yield* journal.commit(journal.log.read({ limit: 10 }));
       yield* journal.replay;
+      // Rebuilding a newly registered projection from history publishes nothing either.
       const replay = yield* Journal.make({
         logId: journal.log.id,
         projections: [
+          projection,
           Projection.make("new-projection", { version: 1 }).on(Changed, () => Effect.void),
         ],
       });
@@ -165,7 +167,7 @@ it.effect("reads, replay, and execution-log-only commits do not publish domain e
       });
       yield* logs.commit(
         Effect.gen(function* () {
-          yield* journal.publish(Changed, { amount: 2 });
+          yield* replay.publish(Changed, { amount: 2 });
           yield* turn.append("more progress");
           yield* secondJournal.publish(Changed, { amount: 3 });
         }),

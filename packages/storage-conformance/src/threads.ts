@@ -1,6 +1,8 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+
 import type * as Core from "@amends/core";
 import { AgentPermissions } from "@amends/core/agent";
+
 import {
   Assignment,
   AssignmentFacts,
@@ -8,6 +10,7 @@ import {
   Grant,
   RoleFacts,
 } from "@amends/core/authorization";
+
 import {
   Group,
   GroupApplication,
@@ -15,10 +18,14 @@ import {
   GroupMembershipApplication,
   GroupMembershipFacts,
 } from "@amends/core/group";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+
+import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+
 import { NotificationStore } from "@amends/core/notification";
+
 import {
   Thread,
   ThreadApplication,
@@ -30,18 +37,25 @@ import {
   ThreadParticipationStore,
   ThreadPermissions,
 } from "@amends/core/thread";
+
 import { Gateway } from "@amends/gateway";
+
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+
 import { TestClock } from "effect/testing";
+
 import {
   type Bound,
   boundTo,
+  failingLate,
+  journalLog,
   otherWorkspaceId,
   runHost,
   Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
+
 import type { Harness } from "./harness.ts";
 
 /** Thread starts in private groups: records, participation, activity, rollback, and replay. */
@@ -374,48 +388,46 @@ export const threads = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "notification failure after earlier inserts rolls back all thread records and checkpoints",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, owner, group } = yield* prepare();
-              const before = yield* history(bound);
-              const failure = new NotificationStore.Failure({
-                operation: "insert",
-                cause: "injected",
-              });
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, NotificationStore.Service, {
-                  ...bound.notifications,
-                  insertMany: (records) =>
-                    Effect.andThen(
-                      bound.notifications.insertMany(
-                        records.filter((record) => record.recipient._tag !== "Human"),
-                      ),
-                      records.some((record) => record.recipient._tag === "Human")
-                        ? Effect.fail(failure)
-                        : Effect.void,
+    it.effect("notification failure after earlier inserts rolls back all thread records", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, group } = yield* prepare();
+            const before = yield* history(bound);
+            const failure = new NotificationStore.Failure({
+              operation: "insert",
+              cause: "injected",
+            });
+            const broken = {
+              ...bound,
+              context: Context.add(bound.context, NotificationStore.Service, {
+                ...bound.notifications,
+                insertMany: (records) =>
+                  Effect.andThen(
+                    bound.notifications.insertMany(
+                      records.filter((record) => record.recipient._tag !== "Human"),
                     ),
-                }),
-              };
-              expect(
-                yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
-              ).toMatchObject({
-                _tag: "Projection.Failure",
-              });
-              expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
-              for (const identity of [owner.identity, humanIdentity, agentIdentity])
-                expect(yield* notifications(bound, identity)).toEqual([]);
-              expect(yield* history(bound)).toEqual(before);
-              // A subsequent valid operation can use the same connection and all projections.
-              yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
-            }),
-          ),
+                    records.some((record) => record.recipient._tag === "Human")
+                      ? Effect.fail(failure)
+                      : Effect.void,
+                  ),
+              }),
+            };
+            expect(
+              yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
+            ).toMatchObject({
+              _tag: "Projection.Failure",
+            });
+            expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
+            for (const identity of [owner.identity, humanIdentity, agentIdentity])
+              expect(yield* notifications(bound, identity)).toEqual([]);
+            expect(yield* history(bound)).toEqual(before);
+            // A subsequent valid operation can use the same connection and all projections.
+            yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
+          }),
         ),
+      ),
     );
 
     it.effect(
@@ -868,7 +880,7 @@ export const threads = (harness: Harness) => {
     );
 
     it.effect(
-      "checkpoint failure rolls back an opening, and group-departure failure restores input and participation",
+      "a late failure rolls back an opening, and group-departure failure restores input and participation",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -876,27 +888,18 @@ export const threads = (harness: Harness) => {
             Effect.gen(function* () {
               const { bound, owner, agent, group } = yield* prepare();
               const before = yield* history(bound);
-              const key = { logId: Log.Id.make("journal"), name: "notifications", version: 1 };
-              const checkpoint = yield* bound.checkpoints.get(key);
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === "notifications"
-                      ? Effect.fail(
-                          new Store.Failure({ operation: "checkpoint.set", cause: "injected" }),
-                        )
-                      : bound.checkpoints.set(key, cursor),
-                }),
-              };
+              const live = yield* bound.checkpoints.listLive(journalLog);
+              const broken = failingLate(
+                bound,
+                new Store.Failure({ operation: "commit", cause: "injected" }),
+              );
               expect(
                 yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
               ).toMatchObject({
                 _tag: "JournalStore.Failure",
               });
               expect(yield* history(bound)).toEqual(before);
-              expect(yield* bound.checkpoints.get(key)).toEqual(checkpoint);
+              expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
               const result = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
               const participation = result.participants.find(
                 (p) => ThreadParticipation.memberOf(p.participant) === agentId,

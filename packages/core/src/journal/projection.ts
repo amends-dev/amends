@@ -94,6 +94,10 @@ export const make = <const Name extends string, const Version extends number>(
 export class Behind extends Schema.TaggedError<Behind>()("Projection.Behind", {
   key: Checkpoint.Key,
 }) {}
+/** A version live on the log that this journal does not run, so its commits would skip it. */
+export class Unregistered extends Schema.TaggedError<Unregistered>()("Projection.Unregistered", {
+  key: Checkpoint.Key,
+}) {}
 export class InvalidCheckpoint extends Schema.TaggedError<InvalidCheckpoint>()(
   "Projection.InvalidCheckpoint",
   { key: Checkpoint.Key, message: Schema.String },
@@ -118,21 +122,36 @@ export type Error =
   | Schema.SchemaError
   | Event.FactMismatch
   | Behind
+  | Unregistered
   | InvalidCheckpoint
   | UnsupportedFactVersion
   | Failure;
 
+/** Whether a live version is this key's projection at this key's version. */
+export const isVersion = (key: Checkpoint.Key) => (live: Checkpoint.LiveVersion) =>
+  live.name === key.name && live.version === key.version;
+
 export interface Runner {
   readonly key: Checkpoint.Key;
+  /** Whether this projection handles facts of this name, at any version. */
+  readonly subscribes: (name: string) => boolean;
+  /** Rebuild progress: the last applied entry. None before a rebuild starts. */
   readonly checkpoint: Effect.Effect<
     Option.Option<Checkpoint.Cursor>,
     Store.Failure | Schema.SchemaError
   >;
-  /** Apply the next source batch and checkpoint it in one transaction. None means caught up. */
+  /**
+   * Rebuild one step: apply the next source batch and checkpoint it in one transaction. When
+   * no batch is pending, mark the projection live in that transaction instead and return None;
+   * a projection that is already live returns None without applying anything.
+   */
   readonly step: Effect.Effect<Option.Option<Checkpoint.Cursor>, Error>;
-  /** Drain until no pending batch is observed. Each step commits independently unless already in a commit. */
-  readonly replay: Effect.Effect<Option.Option<Checkpoint.Cursor>, Error>;
-  /** Journal integration: apply a newly appended, decoded event only when caught up. */
+  /** Rebuild until live. Each step commits independently unless already in a commit. */
+  readonly replay: Effect.Effect<void, Error>;
+  /**
+   * Live path: apply a newly appended, decoded event of the current commit. Records no
+   * progress; the journal applies only projections that are live.
+   */
   readonly apply: (
     entry: Log.Entry<Event.Envelope>,
     event: unknown,
@@ -254,27 +273,8 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
         Effect.gen(function* () {
           if (entry.logId !== log.id || entry.commitId !== native.id)
             return yield* new Transaction.Foreign({});
-          const previous = yield* checkpoint;
-          // Publications within one commit are serialized, so progress this commit recorded at
-          // the preceding index already identifies the prior entry. Reloading the open batch
-          // for every publication would make a commit's cost quadratic in its size.
-          const follows =
-            Option.isSome(previous) &&
-            previous.value.commitId === entry.commitId &&
-            previous.value.position === entry.position &&
-            previous.value.index + 1 === entry.index;
-          if (!follows) {
-            const pending = yield* next(previous);
-            if (
-              Option.isNone(pending) ||
-              pending.value.length !== 1 ||
-              pending.value[0]?.id !== entry.id
-            )
-              return yield* new Behind({ key });
-          }
           for (const handler of yield* handlersFor(entry))
             yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
-          yield* checkpoints.set(key, cursorOf(entry));
         }),
       ),
     );
@@ -283,8 +283,17 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
     .operation(
       withServices(
         Effect.gen(function* () {
+          const live = yield* checkpoints.listLive(log.id);
+          if (live.some(isVersion(key))) return Option.none<Checkpoint.Cursor>();
           const pending = yield* next(yield* checkpoint);
-          if (Option.isNone(pending)) return Option.none<Checkpoint.Cursor>();
+          if (Option.isNone(pending)) {
+            // Caught up with every commit: from this one on, commits apply the projection.
+            yield* checkpoints.setLive(log.id, [
+              ...live.filter(({ name }) => name !== key.name),
+              { name: key.name, version: key.version },
+            ]);
+            return Option.none<Checkpoint.Cursor>();
+          }
           for (const entry of pending.value) {
             const handlers = yield* handlersFor(entry);
             const first = Array.head(handlers);
@@ -308,13 +317,19 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
     )
     .pipe(Effect.withSpan("Projection.step"));
   const replay = Effect.gen(function* () {
-    while (true) {
-      const progress = yield* step;
-      if (Option.isNone(progress)) return yield* checkpoint;
+    while (Option.isSome(yield* step)) {
+      // Each step commits its batch and progress; the last marks the projection live.
     }
   }).pipe(Effect.withSpan("Projection.replay"));
 
-  const runner: Runner = { key, checkpoint, step, replay, apply };
+  const runner: Runner = {
+    key,
+    subscribes: (name) => byName.has(name),
+    checkpoint,
+    step,
+    replay,
+    apply,
+  };
   return runner;
 });
 

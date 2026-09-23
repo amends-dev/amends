@@ -75,7 +75,7 @@ const run = <A, E>(
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
   );
 it.effect(
-  "unrelated facts advance the notification checkpoint without reading or writing domain stores",
+  "facts without a notification handler rebuild and publish without reading or writing domain stores",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
@@ -89,29 +89,26 @@ it.effect(
             projections: [NotificationProjection.definition],
           });
           yield* journal.replay;
-          expect(yield* fixture.checkpoints.get(key)).toEqual(
-            Option.some({
-              position: historical.position,
-              commitId: historical.commitId,
-              index: historical.index,
-              entryId: historical.id,
-            }),
-          );
-          const last = yield* journal.commit(
+          const rebuilt = Option.some({
+            position: historical.position,
+            commitId: historical.commitId,
+            index: historical.index,
+            entryId: historical.id,
+          });
+          expect(yield* fixture.checkpoints.get(key)).toEqual(rebuilt);
+          expect(yield* fixture.checkpoints.listLive(logId)).toEqual([
+            { name: key.name, version: key.version },
+          ]);
+          yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(Source, "first in batch");
               return yield* journal.publish(Source, "last in batch");
             }),
           );
-          const expected = Option.some({
-            position: last.position,
-            commitId: last.commitId,
-            index: last.index,
-            entryId: last.id,
-          });
-          expect(yield* fixture.checkpoints.get(key)).toEqual(expected);
+          // Live commits record no progress, and a live projection is not rebuilt again.
+          expect(yield* fixture.checkpoints.get(key)).toEqual(rebuilt);
           yield* journal.replay;
-          expect(yield* fixture.checkpoints.get(key)).toEqual(expected);
+          expect(yield* fixture.checkpoints.get(key)).toEqual(rebuilt);
           const batches = yield* journal.log.read({ limit: 10 });
           expect(batches.map((batch) => batch.entries.length)).toEqual([1, 2]);
         }),
@@ -119,7 +116,7 @@ it.effect(
     }),
 );
 
-it.effect("participation domain facts advance the checkpoint without touching notifications", () =>
+it.effect("participation domain facts publish without touching notifications", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* run(
@@ -129,21 +126,14 @@ it.effect("participation domain facts advance the checkpoint without touching no
           logId,
           projections: [NotificationProjection.definition],
         });
-        const ended = yield* journal.publish(ThreadParticipationFacts.Ended, {
+        // The fixture defects on every participation or notification read/write.
+        yield* journal.publish(ThreadParticipationFacts.Ended, {
           workspaceId,
           threadId: Thread.Id.make("thread"),
           participationId: ThreadParticipation.Id.make("participation"),
           reason: "unfollowed",
         });
-        expect(yield* fixture.checkpoints.get(key)).toEqual(
-          Option.some({
-            position: ended.position,
-            commitId: ended.commitId,
-            index: ended.index,
-            entryId: ended.id,
-          }),
-        );
-        // The fixture defects on every participation or notification read/write.
+        expect(yield* fixture.checkpoints.get(key)).toEqual(Option.none());
         yield* journal.replay;
       }),
     );

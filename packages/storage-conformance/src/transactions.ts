@@ -1,13 +1,18 @@
 import { BuiltinRoles } from "@amends/core/authorization";
-import { Checkpoint, Journal, Store } from "@amends/core/journal";
+
+import { Journal, Store } from "@amends/core/journal";
+
 import { WorkspaceInitialization } from "@amends/core/workspace";
+
 import { describe, expect, it } from "@effect/vitest";
+
 import { Context, Deferred, Effect, Fiber, Option } from "effect";
+
 import type { Harness } from "./harness.ts";
 import {
   alice,
   bob,
-  type Bound,
+  failingLate,
   forWorkspace,
   journalLog,
   otherWorkspaceId,
@@ -44,23 +49,16 @@ export const transactions = (harness: Harness) => {
     );
 
     it.effect(
-      "a failed final checkpoint rolls back workspace, membership, roles, assignments, log, and all checkpoints",
+      "a late failure rolls back workspace, membership, roles, assignments, the log, and live projections",
       () =>
         harness.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const failure = new Store.Failure({
-              operation: "checkpoint.set",
-              cause: "injected disk failure",
+              operation: "commit",
+              cause: "injected late failure",
             });
-            const broken: Bound = {
-              ...bound,
-              context: Context.add(bound.context, Checkpoint.Service, {
-                ...bound.checkpoints,
-                set: (key, cursor) =>
-                  cursor.index === 5 ? Effect.fail(failure) : bound.checkpoints.set(key, cursor),
-              }),
-            };
+            const broken = failingLate(bound, failure);
             const footprint = yield* storage.footprint;
             expect(yield* Effect.flip(initialized(broken))).toBe(failure);
             expect(yield* bound.workspace.get).toEqual(Option.none());

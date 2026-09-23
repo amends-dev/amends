@@ -6,25 +6,32 @@ import {
   Grant,
   RoleFacts,
 } from "@amends/core/authorization";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Journal, Store, Publication } from "@amends/core/journal";
+
+import { Journal, Store, Publication } from "@amends/core/journal";
+
 import {
   Member,
   MemberFacts,
   MemberPermissions,
   OwnershipApplication,
   OwnershipPermissions,
-  WorkspaceProjection,
 } from "@amends/core/workspace";
+
 import { describe, expect, it } from "@effect/vitest";
+
 import { Context, Effect, Option } from "effect";
+
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
+
 import {
   alice,
   bob,
   boundTo,
   charlie,
+  failingLate,
   future,
   journalLog,
   request,
@@ -286,56 +293,45 @@ export const ownership = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "a failed final ownership checkpoint rolls back metadata, roles, assignments, and journal",
-      () =>
-        harness.withStorage((storage) =>
-          runGateway(
-            storage,
-            Effect.gen(function* () {
-              const { workspace, recipient, view, bound } = yield* setup;
-              const before = yield* bound.store.read(journalLog, { limit: 20 });
-              const previous = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
-              const next = yield* bound.assignments.listActiveByMember(recipient.id);
-              const failure = new Store.Failure({
-                operation: "checkpoint.set",
-                cause: "injected ownership checkpoint failure",
-              });
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === WorkspaceProjection.definition.name && cursor.index === 4
-                      ? Effect.fail(failure)
-                      : bound.checkpoints.set(key, cursor),
+    it.effect("a late ownership failure rolls back metadata, roles, assignments, and journal", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const { workspace, recipient, view, bound } = yield* setup;
+            const before = yield* bound.store.read(journalLog, { limit: 20 });
+            const previous = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
+            const next = yield* bound.assignments.listActiveByMember(recipient.id);
+            const failure = new Store.Failure({
+              operation: "commit",
+              cause: "injected late failure",
+            });
+            const broken = failingLate(bound, failure);
+            expect(
+              yield* Effect.flatMap(OwnershipApplication.Service, (service) =>
+                service.transfer({
+                  memberId: recipient.id,
+                  expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
-              };
-              expect(
-                yield* Effect.flatMap(OwnershipApplication.Service, (service) =>
-                  service.transfer({
-                    memberId: recipient.id,
-                    expectedOwnerAssignmentId: view.ownerAssignmentId,
-                  }),
-                ).pipe(
-                  Effect.provide(core(broken)),
-                  Effect.provideService(Actor.Service, {
-                    workspaceId: workspace.id,
-                    memberId: workspace.ownerMemberId,
-                    identity: alice,
-                  }),
-                  Effect.flip,
-                ),
-              ).toBe(failure);
-              expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
-              expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
-                previous,
-              );
-              expect(yield* bound.assignments.listActiveByMember(recipient.id)).toEqual(next);
-              expect(yield* bound.store.read(journalLog, { limit: 20 })).toEqual(before);
-            }),
-          ),
+              ).pipe(
+                Effect.provide(core(broken)),
+                Effect.provideService(Actor.Service, {
+                  workspaceId: workspace.id,
+                  memberId: workspace.ownerMemberId,
+                  identity: alice,
+                }),
+                Effect.flip,
+              ),
+            ).toBe(failure);
+            expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
+            expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
+              previous,
+            );
+            expect(yield* bound.assignments.listActiveByMember(recipient.id)).toEqual(next);
+            expect(yield* bound.store.read(journalLog, { limit: 20 })).toEqual(before);
+          }),
         ),
+      ),
     );
 
     it.effect(

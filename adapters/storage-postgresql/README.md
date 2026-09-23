@@ -175,6 +175,11 @@ replay. Participation lifecycle activity updates the development baseline: recre
 databases rather than applying an upgrade chain. See [thread
 workflows](../../docs/thread-workflows.md).
 
+`checkpoints` holds the progress of a projection being rebuilt, and `live_projections` the
+projection versions each log's commits apply, one row per name. Live commits write neither;
+going live replaces the log's rows in the rebuild's last step. See [live
+projections](../../docs/journal.md#live-projections).
+
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes
 return the original append slice, while conflicting bytes or count fail. The key,

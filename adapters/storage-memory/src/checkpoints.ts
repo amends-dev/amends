@@ -5,10 +5,13 @@ import { storeConflict, storeFailure } from "./errors.ts";
 import { keyOf, Rows } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Checkpoint.Cursor));
+/** A log's live versions, stored together as one row. */
+const liveRows = Rows.make(Schema.fromJsonString(Checkpoint.LiveVersions));
 const idOf = (key: Checkpoint.Key) => keyOf(key.logId, key.name, key.version);
 
 /**
- * Each projection version's progress through one log, written with the projection's rows.
+ * Each projection version's progress through one log while it is rebuilt, written with the
+ * projection's rows, and the versions that are live.
  *
  * @category constructors
  */
@@ -34,6 +37,24 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
         .encode(cursor)
         .pipe(Effect.mapError(storeFailure(Store, "checkpoint.set")));
       space.records.checkpoints.set(idOf(key), row);
+    }),
+    listLive: Effect.fn("Checkpoints.listLive")(
+      function* (logId) {
+        const live = yield* liveRows.get((yield* read).records.liveProjections, keyOf(logId));
+        return live._tag === "Some" ? live.value : [];
+      },
+      Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
+    ),
+    setLive: Effect.fn("Checkpoints.setLive")(function* (logId, input) {
+      yield* Store.Transaction;
+      const versions = yield* Schema.decodeEffect(Checkpoint.LiveVersions)(input).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.setLive")),
+      );
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Store, "checkpoint.setLive")));
+      const row = yield* liveRows
+        .encode(versions)
+        .pipe(Effect.mapError(storeFailure(Store, "checkpoint.setLive")));
+      space.records.liveProjections.set(keyOf(logId), row);
     }),
   });
 });

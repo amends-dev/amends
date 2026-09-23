@@ -429,22 +429,12 @@ it.effect(
     }),
 );
 
-it.effect("checkpoint failure after both projection writes rolls back the entire live commit", () =>
+it.effect("a failure after both projection writes rolls back the entire live commit", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const failure = new Store.Failure({ operation: "checkpoint.set", cause: "unavailable" });
-    const broken: Fixture = {
-      ...fixture,
-      checkpoints: Checkpoint.Service.of({
-        ...fixture.checkpoints,
-        set: (key, cursor) =>
-          key.name === AssignmentProjection.definition.name && cursor.index === 1
-            ? Effect.fail(failure)
-            : fixture.checkpoints.set(key, cursor),
-      }),
-    };
+    const failure = new Store.Failure({ operation: "later", cause: "unavailable" });
     yield* run(
-      broken,
+      fixture,
       Effect.gen(function* () {
         const journal = yield* setup;
         const before = yield* fixture.snapshot;
@@ -454,6 +444,8 @@ it.effect("checkpoint failure after both projection writes rolls back the entire
               Effect.gen(function* () {
                 yield* journal.publish(RoleFacts.Created, createdRole);
                 yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
+                // Both projections wrote; a later failure in the commit takes their writes with it.
+                return yield* failure;
               }),
             ),
           ),

@@ -153,8 +153,8 @@ Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`; ag
 `ThreadMessageApplication.HumanAuthorRequired`. The gateway preserves these errors and converts
 malformed input to `Gateway.InvalidInput`. Storage and consistency failures remain failures.
 
-Authorization, admission, message publication, next-sequence activity, notifications, and
-checkpoints share one journal commit. An outer transaction is honored, including earlier replies,
+Authorization, admission, message publication, next-sequence activity, and notifications
+share one journal commit. An outer transaction is honored, including earlier replies,
 grant changes, and group departures. Concurrent writers use the existing workspace transaction
 boundary; storage still rejects timeline gaps and duplicate positions. Contention can reject an
 attempt and does not trigger an automatic retry. Notification records remain pending input;
@@ -194,7 +194,7 @@ the same group admission. Unmentioned messages do not re-enroll an unfollowed me
 stays settled, and an old unfollow request cannot end a newer participation. Following and
 unfollowing are distinct from muting; mute preferences remain unimplemented.
 
-All checks, facts, projections, and checkpoints share the existing workspace transaction.
+All checks, facts, and projections share the existing workspace transaction.
 Concurrent publication and departure have a consistent order; an enclosing commit sees staged
 participation, permission, and membership changes. Failures roll back admission or departure
 along with their timeline and notification effects. No automatic retry is performed.
@@ -325,7 +325,7 @@ input acceptance, execution, and their transaction, calling this shared service 
 acknowledgment. Notifications do not create or run turns. `Seen` is the only implemented outcome;
 turn and delivery references will be added with their owning workflows.
 
-The acknowledgment fact and its projection update commit together with checkpoints. Failure or
+The acknowledgment fact and its projection update commit together. Failure or
 an enclosing rollback restores pending state. Replay preserves the recorded outcome and timestamp
 without checking current membership or time. Acknowledgment creates no thread activity and no
 new notifications. Its fact is withheld from the workspace-wide feed. The operation is implemented
@@ -413,8 +413,8 @@ audience checks between reads and replies without imposing a read grant on a wri
 internal services are excluded from `Core.Operations`. The opening message remains covered by
 `thread.start`; it does not call the public reply operation or require `thread.publish`.
 
-Thread creation, participation admissions, message publication, timeline activity, notification
-inserts, and checkpoints commit together. Any failure rolls back all of them. An enclosing caller
+Thread creation, participation admissions, message publication, timeline activity, and notification
+inserts commit together. Any failure rolls back all of them. An enclosing caller
 transaction is honored, including staged permission or admission changes. Concurrent starts and
 departures share the workspace transaction boundary. Storage contention can reject an attempt;
 operations do not retry automatically.
@@ -474,14 +474,14 @@ JSON record and needs no schema change for acknowledgment.
 
 The mirrored adapter suites cover author-only and mention routing, agent-use authority for
 mentioned agents only, custom
-scopes, inaccessible references, validation without partial writes, notification and checkpoint
+scopes, inaccessible references, validation without partial writes, notification and late
 failures, outer transactions, concurrent departure, readmission, reopening, replay, and direct
 store constraints. Read suites cover exact grants, nonparticipant and later-member access,
 pagination, private identity filtering, no-write reads, current revocation, outer transactions,
 and rejection of corrupt cross-thread references. Core tests verify withholding private thread facts from the public change feed.
 Reply suites cover scoped action grants, live access changes, initial and returning admissions,
 mention and unmentioned selection, agent use for mentioned agents only, concurrent sequencing and
-removal, projection/checkpoint failures,
+removal, projection and late failures,
 outer commits, reopening, and replay after grants or membership change.
 Read-state suites cover latest activity from messages only, forward-only positions and caught-up
 times, settling the inbox up to a position in one commit, writing no commit when nothing is
@@ -489,13 +489,13 @@ pending, positions past the timeline, human and access checks, and read-state st
 outside transactions.
 Participation suites verify quiet following, repeat calls, self-only unfollow, stale requests,
 notification retention/settlement, rejoining through follows and messages, concurrent publication,
-projection/checkpoint rollback, outer commits, replay, and historical follow reads.
+projection and late-failure rollback, outer commits, replay, and historical follow reads.
 Source-resolution suites cover human/agent ownership, current grant and audience revocation,
 historical reads after unfollow or readmission, discarded agent input, malformed references,
 message and participation subjects, direct entry lookup, read-only behavior, outer commits,
 reopening, and gateway outcomes on both adapters.
 Acknowledgment suites cover ownership, agent rejection, stable repeat handling, source-access loss,
-projection/checkpoint rollback, caller transactions, concurrent requests, direct-store validation,
+projection and late-failure rollback, caller transactions, concurrent requests, direct-store validation,
 reopening, and replay after departure. Core tests verify codec validation and change-feed privacy.
 They also exercise the common notification generator with nonempty recipient selections on
 non-message activity, ending activity for all departure paths, and rollback after a partial

@@ -1,6 +1,8 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+
 import type * as Core from "@amends/core";
 import { AgentPermissions } from "@amends/core/agent";
+
 import {
   Assignment,
   AssignmentFacts,
@@ -10,6 +12,7 @@ import {
   type Permission,
   type Target,
 } from "@amends/core/authorization";
+
 import {
   Group,
   GroupApplication,
@@ -17,10 +20,14 @@ import {
   GroupMembershipDeparture,
   GroupMembershipFacts,
 } from "@amends/core/group";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+
+import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+
 import { NotificationStore } from "@amends/core/notification";
+
 import {
   Thread,
   ThreadApplication,
@@ -39,18 +46,25 @@ import {
   ThreadPermissions,
   ThreadStore,
 } from "@amends/core/thread";
+
 import { Gateway } from "@amends/gateway";
+
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+
 import { TestClock } from "effect/testing";
+
 import {
   type Bound,
   boundTo,
+  failingLate,
+  journalLog,
   otherWorkspaceId,
   runHost,
   Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
+
 import type { Harness } from "./harness.ts";
 
 /** Replies: admission, recipients, concurrent sequencing, rollback, and replay. */
@@ -173,11 +187,7 @@ export const threadReplies = (harness: Harness) => {
         participants: yield* bound.participations.listByThread(threadId),
         human: yield* notifications(bound, humanId),
         agent: yield* notifications(bound, agentId),
-        checkpoint: yield* bound.checkpoints.get({
-          logId: Log.Id.make("journal"),
-          name: "notifications",
-          version: 1,
-        }),
+        live: yield* bound.checkpoints.listLive(journalLog),
       };
     });
 
@@ -591,7 +601,7 @@ export const threadReplies = (harness: Harness) => {
     );
 
     it.effect(
-      "projection and checkpoint failures roll back author admission, message, activity, and notifications",
+      "projection and late failures roll back author admission, message, activity, and notifications",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -622,15 +632,8 @@ export const threadReplies = (harness: Harness) => {
                       new NotificationStore.Failure({ operation: "insertMany", cause: "injected" }),
                     ),
                 }),
-                Context.add(bound.context, Checkpoint.Service, {
-                  ...bound.checkpoints,
-                  set: (key, cursor) =>
-                    key.name === "notifications"
-                      ? Effect.fail(
-                          new Store.Failure({ operation: "checkpoint.set", cause: "injected" }),
-                        )
-                      : bound.checkpoints.set(key, cursor),
-                }),
+                failingLate(bound, new Store.Failure({ operation: "commit", cause: "injected" }))
+                  .context,
               ];
               for (const context of contexts) {
                 const outcome = yield* Effect.exit(

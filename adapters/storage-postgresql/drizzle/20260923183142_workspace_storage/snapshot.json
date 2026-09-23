@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "02f94be9-134d-4073-86e2-1576f4f090ef",
+  "id": "4084c98f-dce5-4f5a-b7a9-4230cdd41bf6",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -51,6 +51,12 @@
     {
       "isRlsEnabled": false,
       "name": "invitations",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "live_projections",
       "entityType": "tables",
       "schema": "public"
     },
@@ -957,6 +963,58 @@
       "entityType": "columns",
       "schema": "public",
       "table": "invitations"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "live_projections"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "log_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "live_projections"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "live_projections"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "live_projections"
     },
     {
       "type": "text",
@@ -4015,6 +4073,18 @@
       "entityType": "pks",
       "schema": "public",
       "table": "invitations"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "log_id",
+        "name"
+      ],
+      "nameExplicit": false,
+      "name": "live_projections_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "live_projections"
     },
     {
       "columns": [

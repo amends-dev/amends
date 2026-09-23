@@ -54,40 +54,49 @@ const run = <A, E>(
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
   );
-it.effect("replay checkpoints a complete batch and resumes with a fresh runner", () =>
-  Effect.gen(function* () {
-    const fixture = yield* make();
-    yield* run(
-      fixture,
-      Effect.gen(function* () {
-        const journal = yield* source;
-        yield* journal.commit(
-          Effect.gen(function* () {
-            yield* journal.publish(Changed, { amount: 2 });
-            yield* journal.publish(Changed, { amount: 3 });
-          }),
-        );
-        yield* journal.publish(Unrelated, "ignored");
-        yield* journal.publish(Changed, { amount: 7 });
-        const first = yield* runner;
-        const cursor = yield* first.step;
-        expect(Option.isSome(cursor) && cursor.value.index).toBe(1);
-        expect(yield* (yield* Counter).get).toBe(5);
-        expect(yield* first.checkpoint).toEqual(cursor);
-      }),
-    );
-    yield* run(
-      fixture,
-      Effect.gen(function* () {
-        const resumed = yield* runner;
-        const cursor = yield* resumed.replay;
-        expect(Option.isSome(cursor) && cursor.value.position).toBe(Log.Position.make(2));
-        expect(yield* (yield* Counter).get).toBe(12);
-        expect(Option.isNone(yield* resumed.step)).toBe(true);
-        expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(3);
-      }),
-    );
-  }),
+it.effect(
+  "a rebuild checkpoints each complete batch, resumes with a fresh runner, and goes live",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* make();
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          const journal = yield* source;
+          yield* journal.commit(
+            Effect.gen(function* () {
+              yield* journal.publish(Changed, { amount: 2 });
+              yield* journal.publish(Changed, { amount: 3 });
+            }),
+          );
+          yield* journal.publish(Unrelated, "ignored");
+          yield* journal.publish(Changed, { amount: 7 });
+          const first = yield* runner;
+          const cursor = yield* first.step;
+          expect(Option.isSome(cursor) && cursor.value.index).toBe(1);
+          expect(yield* (yield* Counter).get).toBe(5);
+          expect(yield* first.checkpoint).toEqual(cursor);
+          expect(yield* fixture.checkpoints.listLive(logId)).toEqual([]);
+        }),
+      );
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          const resumed = yield* runner;
+          yield* resumed.replay;
+          const cursor = yield* resumed.checkpoint;
+          expect(Option.isSome(cursor) && cursor.value.position).toBe(Log.Position.make(2));
+          expect(yield* (yield* Counter).get).toBe(12);
+          expect(yield* fixture.checkpoints.listLive(logId)).toEqual([
+            { name: "counter", version: 1 },
+          ]);
+          // A live projection is never rebuilt again.
+          expect(Option.isNone(yield* resumed.step)).toBe(true);
+          expect(yield* (yield* Counter).get).toBe(12);
+          expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(3);
+        }),
+      );
+    }),
 );
 
 it.effect(
@@ -129,41 +138,66 @@ it.effect(
     }),
 );
 
-it.effect("checkpoint persistence failures roll back replay and live projection writes", () =>
-  Effect.gen(function* () {
-    const fixture = yield* make();
-    yield* run(
-      fixture,
-      Effect.gen(function* () {
-        yield* (yield* source).publish(Changed, { amount: 2 });
-      }),
-    );
-    const broken = {
-      ...fixture,
-      checkpoints: Checkpoint.Service.of({
-        ...fixture.checkpoints,
-        set: () =>
-          Effect.fail(new Store.Failure({ operation: "checkpoint.set", cause: "unavailable" })),
-      }),
-    };
-    yield* run(
-      broken,
-      Effect.gen(function* () {
-        const replay = yield* runner;
-        expect((yield* Effect.flip(replay.step))._tag).toBe("JournalStore.Failure");
-        const journal = yield* Journal.make({
-          logId: Log.Id.make("new-domain"),
-          projections: [definition],
-        });
-        expect((yield* Effect.flip(journal.publish(Changed, { amount: 5 })))._tag).toBe(
-          "JournalStore.Failure",
-        );
-        expect(yield* (yield* Counter).get).toBe(0);
-        expect((yield* fixture.snapshot).checkpoints.size).toBe(0);
-        expect((yield* fixture.snapshot).logs.size).toBe(1);
-      }),
-    );
-  }),
+it.effect(
+  "progress failures roll back a rebuild step, and live publication records no progress",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* make();
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          yield* (yield* source).publish(Changed, { amount: 2 });
+        }),
+      );
+      const unavailable = (operation: string) =>
+        Effect.fail(new Store.Failure({ operation, cause: "unavailable" }));
+      const broken = {
+        ...fixture,
+        checkpoints: Checkpoint.Service.of({
+          ...fixture.checkpoints,
+          set: () => unavailable("checkpoint.set"),
+          setLive: () => unavailable("checkpoint.setLive"),
+        }),
+      };
+      yield* run(
+        broken,
+        Effect.gen(function* () {
+          const replay = yield* runner;
+          expect((yield* Effect.flip(replay.step))._tag).toBe("JournalStore.Failure");
+          // The first commit to an empty log makes its projections live, so it fails with them.
+          const journal = yield* Journal.make({
+            logId: Log.Id.make("new-domain"),
+            projections: [definition],
+          });
+          expect((yield* Effect.flip(journal.publish(Changed, { amount: 5 })))._tag).toBe(
+            "JournalStore.Failure",
+          );
+          expect(yield* (yield* Counter).get).toBe(0);
+          expect((yield* fixture.snapshot).checkpoints.size).toBe(0);
+          expect((yield* fixture.snapshot).logs.size).toBe(1);
+        }),
+      );
+      const progressUnavailable = {
+        ...fixture,
+        checkpoints: Checkpoint.Service.of({
+          ...fixture.checkpoints,
+          set: () => unavailable("checkpoint.set"),
+        }),
+      };
+      yield* run(
+        progressUnavailable,
+        Effect.gen(function* () {
+          const journal = yield* Journal.make({
+            logId: Log.Id.make("new-domain"),
+            projections: [definition],
+          });
+          yield* journal.publish(Changed, { amount: 5 });
+          yield* journal.publish(Changed, { amount: 1 });
+          expect(yield* (yield* Counter).get).toBe(6);
+          expect((yield* fixture.snapshot).checkpoints.size).toBe(0);
+        }),
+      );
+    }),
 );
 
 it.effect(
@@ -189,7 +223,7 @@ it.effect(
 );
 
 it.effect(
-  "live publishing requires catch-up and shares replay checkpoints across nested commits",
+  "publishing requires a live projection, and live commits leave rebuild progress unchanged",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
@@ -197,7 +231,7 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const writer = yield* source;
-          yield* writer.publish(Changed, { amount: 1 });
+          const first = yield* writer.publish(Changed, { amount: 1 });
           const journal = yield* Journal.make({ logId, projections: [definition] });
           expect((yield* Effect.flip(journal.publish(Changed, { amount: 100 })))._tag).toBe(
             "Projection.Behind",
@@ -205,23 +239,23 @@ it.effect(
           expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(1);
           expect(yield* (yield* Counter).get).toBe(0);
           yield* journal.replay;
-          const last = yield* journal.commit(
+          yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(Changed, { amount: 2 });
               yield* journal.replay;
-              yield* journal.commit(journal.publish(Unrelated, "checkpoint this too"));
+              yield* journal.commit(journal.publish(Unrelated, "no progress recorded"));
               return yield* journal.publish(Changed, { amount: 3 });
             }),
           );
           yield* journal.replay;
           expect(yield* (yield* Counter).get).toBe(6);
-          const cursor = yield* (yield* runner).checkpoint;
-          expect(cursor).toEqual(
+          // Progress ends where the rebuild did; live commits need none.
+          expect(yield* (yield* runner).checkpoint).toEqual(
             Option.some({
-              position: last.position,
-              commitId: last.commitId,
-              index: 2,
-              entryId: last.id,
+              position: first.position,
+              commitId: first.commitId,
+              index: 0,
+              entryId: first.id,
             }),
           );
           expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(2);
@@ -230,26 +264,41 @@ it.effect(
     }),
 );
 
-it.effect("live publication checks progress without reloading its open commit", () =>
+it.effect("live publication reads no log batches or progress, and checks live versions once", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const loaded: Array<string> = [];
+    const reads: Array<string> = [];
     const store = Store.Service.of({
       ...fixture.store,
       get: (id, commitId) =>
         fixture.store
           .get(id, commitId)
-          .pipe(Effect.tap(() => Effect.sync(() => loaded.push(commitId)))),
+          .pipe(Effect.tap(() => Effect.sync(() => reads.push("get")))),
+      read: (id, options) =>
+        fixture.store
+          .read(id, options)
+          .pipe(Effect.tap(() => Effect.sync(() => reads.push("read")))),
+    });
+    const checkpoints = Checkpoint.Service.of({
+      ...fixture.checkpoints,
+      get: (key) =>
+        fixture.checkpoints
+          .get(key)
+          .pipe(Effect.tap(() => Effect.sync(() => reads.push("progress")))),
+      listLive: (id) =>
+        fixture.checkpoints
+          .listLive(id)
+          .pipe(Effect.tap(() => Effect.sync(() => reads.push("live")))),
     });
     const ignored = Projection.make("ignored", { version: 1 }).on(Unrelated, () => Effect.void);
     yield* run(
-      { ...fixture, store },
+      { ...fixture, store, checkpoints },
       Effect.gen(function* () {
         const journal = yield* Journal.make({ logId, projections: [definition, ignored] });
         yield* journal.publish(Changed, { amount: 1 });
         for (const size of [4, 16]) {
-          loaded.length = 0;
-          const events = yield* journal.commit(
+          reads.length = 0;
+          yield* journal.commit(
             Effect.gen(function* () {
               const published = [yield* journal.publish(Changed, { amount: 1 })];
               for (let index = 1; index < size; index++)
@@ -261,9 +310,7 @@ it.effect("live publication checks progress without reloading its open commit", 
               return published;
             }),
           );
-          // Each runner confirms the previous commit once; progress and causes never reload this one.
-          expect(loaded).toHaveLength(2);
-          expect(loaded).not.toContain(events[0]!.commitId);
+          expect(reads).toEqual(["live"]);
         }
         expect(yield* (yield* Counter).get).toBe(21);
       }),
@@ -271,7 +318,7 @@ it.effect("live publication checks progress without reloading its open commit", 
   }),
 );
 
-it.effect("entries appended around a live runner within one commit leave it behind", () =>
+it.effect("a journal that does not run a live projection cannot publish to its log", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* run(
@@ -289,7 +336,10 @@ it.effect("entries appended around a live runner within one commit leave it behi
             }),
           ),
         );
-        expect(failed._tag).toBe("Projection.Behind");
+        expect(failed).toMatchObject({
+          _tag: "Projection.Unregistered",
+          key: { logId, name: "counter", version: 1 },
+        });
         expect(yield* (yield* Counter).get).toBe(1);
         expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(1);
       }),

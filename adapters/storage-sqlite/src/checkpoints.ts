@@ -5,9 +5,11 @@ import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
 const cursorCodec = Schema.fromJsonString(Checkpoint.Cursor);
 const CheckpointRows = Schema.Array(Schema.Struct({ record: cursorCodec }));
+const decodeLive = Schema.decodeUnknownEffect(Checkpoint.LiveVersions);
 
 /**
- * Each projection version's progress through one log, written with the projection's rows.
+ * Each projection version's progress through one log while it is rebuilt, written with the
+ * projection's rows, and the versions that are live.
  *
  * @category constructors
  */
@@ -38,6 +40,24 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
         sql`INSERT INTO checkpoints VALUES (${workspaceId}, ${key.logId}, ${key.name}, ${key.version}, ${record}) ON CONFLICT(workspace_id, log_id, name, version) DO UPDATE SET record = excluded.record`,
         true,
       ).pipe(Effect.mapError(storeError(Store, "checkpoint.set")));
+    }),
+    listLive: (logId) =>
+      guard(
+        sql`SELECT name, version FROM live_projections WHERE workspace_id = ${workspaceId} AND log_id = ${logId}`,
+      ).pipe(
+        Effect.flatMap(decodeLive),
+        Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
+      ),
+    setLive: Effect.fn("Checkpoints.setLive")(function* (logId, input) {
+      yield* Store.Transaction;
+      const versions = yield* Schema.decodeEffect(Checkpoint.LiveVersions)(input).pipe(
+        Effect.mapError(storeConflict(Store, "checkpoint.setLive")),
+      );
+      const clear = sql`DELETE FROM live_projections WHERE workspace_id = ${workspaceId} AND log_id = ${logId}`;
+      const insert = sql`INSERT INTO live_projections (workspace_id, log_id, name, version) SELECT ${workspaceId}, ${logId}, json_extract(value, '$.name'), json_extract(value, '$.version') FROM json_each(${JSON.stringify(versions)})`;
+      yield* guard(versions.length === 0 ? clear : Effect.andThen(clear, insert), true).pipe(
+        Effect.mapError(storeError(Store, "checkpoint.setLive")),
+      );
     }),
   });
 });

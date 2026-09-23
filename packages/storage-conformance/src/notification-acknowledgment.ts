@@ -1,35 +1,47 @@
 import type * as Core from "@amends/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
+
 import { GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+
+import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import {
   Notification,
   NotificationAcknowledgment,
   NotificationApplication,
   NotificationFacts,
-  NotificationProjection,
   NotificationStore,
 } from "@amends/core/notification";
+
 import {
   ThreadApplication,
   ThreadParticipation,
   ThreadParticipationApplication,
 } from "@amends/core/thread";
+
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+
 import { Gateway } from "@amends/gateway";
+
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+
 import { TestClock } from "effect/testing";
+
 import {
   type Bound,
   boundTo,
+  failingLate,
+  journalLog,
   otherWorkspaceId,
   runHost,
   Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
+
 import type { Harness } from "./harness.ts";
 
 /** Acknowledging notifications: ownership, atomicity, repeats, concurrency, and replay. */
@@ -67,11 +79,6 @@ export const notificationAcknowledgment = (harness: Harness) => {
     const notes = (bound: Bound, identity: Notification.Recipient) =>
       bound.notifications.listByRecipient(identity, { limit: 100 });
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
-    const key = {
-      logId: Log.Id.make("journal"),
-      name: NotificationProjection.definition.name,
-      version: NotificationProjection.definition.version,
-    };
     const seen: Notification.Acknowledgment = {
       outcome: { _tag: "Seen" },
       acknowledgedAt: DateTime.makeUnsafe("2026-09-21T12:00:00.123Z"),
@@ -145,7 +152,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     const snapshot = Effect.fnUntraced(function* (p: Effect.Success<ReturnType<typeof prepare>>) {
       return {
         history: yield* history(p.bound),
-        checkpoint: yield* p.bound.checkpoints.get(key),
+        live: yield* p.bound.checkpoints.listLive(journalLog),
         human: yield* notes(p.bound, human.identity),
         agent: yield* notes(p.bound, agent.identity),
         owner: yield* notes(p.bound, p.owner.identity),
@@ -329,7 +336,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "projection and checkpoint failures roll back acknowledgment and permit a clean retry",
+      "projection and late failures roll back acknowledgment and permit a clean retry",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -344,11 +351,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
                     new NotificationStore.Failure({ operation: "acknowledge", cause: "injected" }),
                   ),
               });
-              const failingCheckpoint = Context.add(p.bound.context, Checkpoint.Service, {
-                ...p.bound.checkpoints,
-                set: () => Effect.fail(new Store.Failure({ operation: "set", cause: "injected" })),
-              });
-              for (const context of [failingStore, failingCheckpoint]) {
+              const failingCommit = failingLate(
+                p.bound,
+                new Store.Failure({ operation: "commit", cause: "injected" }),
+              ).context;
+              for (const context of [failingStore, failingCommit]) {
                 expect(
                   Exit.isFailure(
                     yield* Effect.exit(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
@@ -507,12 +514,12 @@ export const notificationAcknowledgment = (harness: Harness) => {
                       limit: 100,
                     }),
                   ).toEqual([]);
-                  const checkpoint = yield* bound.checkpoints.get(key);
+                  const live = yield* bound.checkpoints.listLive(journalLog);
                   yield* facts(
                     bound,
                     Effect.flatMap(Journal.Service, (j) => j.replay),
                   );
-                  expect(yield* bound.checkpoints.get(key)).toEqual(checkpoint);
+                  expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
                   expect(yield* history(bound)).toEqual(saved.history);
                 }),
               ),

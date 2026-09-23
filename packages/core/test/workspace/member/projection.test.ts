@@ -202,11 +202,22 @@ it.effect("workspace mismatches reject added and removed facts during publicatio
         ).toMatchObject(mismatch);
         expect((yield* fixture.snapshot).members).toEqual(before.members);
         expect((yield* fixture.snapshot).checkpoints).toEqual(before.checkpoints);
-        // Simulate history written without this projection, then attempt to replay it.
-        yield* (yield* source).publish(MemberFacts.Removed, foreignRemoval);
+      }),
+    );
+    // History written without this projection fails its rebuild at the foreign fact.
+    const history = yield* make();
+    yield* run(
+      history,
+      Effect.gen(function* () {
+        const writer = yield* source;
+        yield* writer.publish(MemberFacts.Added, added(firstId, human));
+        yield* writer.publish(MemberFacts.Removed, { memberId: firstId, workspaceId: foreign });
+        const journal = yield* setup;
         expect(yield* Effect.flip(journal.replay)).toMatchObject(mismatch);
-        expect((yield* fixture.snapshot).members).toEqual(before.members);
-        expect((yield* fixture.snapshot).checkpoints).toEqual(before.checkpoints);
+        // The step before the foreign fact committed; the rebuild stops there, not live.
+        const members = [...(yield* history.snapshot).members.values()];
+        expect(members.map(({ id, status }) => [id, status])).toEqual([[firstId, "active"]]);
+        expect(yield* history.checkpoints.listLive(logId)).toEqual([]);
       }),
     );
   }),
@@ -296,15 +307,15 @@ it.effect(
     }),
 );
 
-it.effect("membership changes roll back when the checkpoint cannot be persisted", () =>
+it.effect("membership changes roll back when the first commit cannot record live projections", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const failure = new Store.Failure({ operation: "checkpoint.set", cause: "unavailable" });
+    const failure = new Store.Failure({ operation: "checkpoint.setLive", cause: "unavailable" });
     const broken: Fixture = {
       ...fixture,
       checkpoints: Checkpoint.Service.of({
         ...fixture.checkpoints,
-        set: () => Effect.fail(failure),
+        setLive: () => Effect.fail(failure),
       }),
     };
     yield* run(

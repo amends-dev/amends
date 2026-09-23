@@ -103,18 +103,19 @@ operations check authorization inside their commit.
 Successful runtimes remain until the host scope closes, including while idle.
 Memory therefore grows with the workspaces acquired during that host lifetime.
 Host shutdown closes runtime resources and event subscriptions; a new host boots
-from persisted checkpoints again. A request cancellation does not cancel shared
+again, finding its projections live. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
 fails its waiting requests as a defect. A later acquisition can retry; no operation
 runs before successful boot.
 
 Workspace creation remains core's atomic initialization operation. A new workspace
-has no history to replay. After boot, commits persist events, projection records,
-and checkpoints together; `Projection.Behind` continues to reject writes against
-unprepared projections. Deliberate rebuilds run replay explicitly with fresh targets
-or a domain-managed migration, while dependent reads and writes are unavailable.
-The cross-workspace directory reads projection tables directly, so boot is not an
-online migration mechanism for those indexes.
+has no history to replay. After boot, commits persist events and projection records
+together; `Projection.Behind` rejects writes while a registered projection is not
+live, and `Projection.Unregistered` while one this host does not run is. Deliberate
+rebuilds run replay explicitly with fresh targets or a domain-managed migration,
+while dependent reads and writes are unavailable. The cross-workspace directory
+reads projection tables directly, so boot is not an online migration mechanism for
+those indexes.
 
 ## Host contracts beside the gateway
 

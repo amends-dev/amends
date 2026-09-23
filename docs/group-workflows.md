@@ -150,8 +150,8 @@ terminal change; the other operation sees `AlreadyRemoved` or a storage conflict
 Each departure publishes `group.membership.removed`, recording the admission, group, workspace
 member, and reason (`removed`, `left`, or `workspace-removed`). The event's provenance records
 who acted and when. The admission row retains its original fields with terminal status;
-departure attribution and reason remain in the journal. Checks, publication, projection,
-and checkpoint advancement share one commit and honor an enclosing transaction.
+departure attribution and reason remain in the journal. Checks, publication, and projection
+share one commit and honor an enclosing transaction.
 
 ## Workspace-member removal
 
@@ -196,7 +196,7 @@ channel threads will admit human followers only, when those workflows arrive.
 Authorization, input validation, membership checks, and publication run inside one journal
 commit. An existing caller commit is honored, including its staged permission or membership
 changes. Validation failures and later projection failures leave no partial group, admission,
-journal entry, or checkpoint.
+or journal entry.
 
 `group.created` records the group's ID, workspace, `Team` kind, `Private` visibility, name,
 creator membership, and creation time. Each `group.membership.added` records a fresh admission

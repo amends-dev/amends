@@ -79,7 +79,12 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
   ).pipe(
     Context.add(
       Checkpoint.Service,
-      Checkpoint.Service.of({ get: () => Effect.succeedNone, set: unexpected }),
+      Checkpoint.Service.of({
+        get: () => Effect.succeedNone,
+        set: unexpected,
+        listLive: () => Effect.succeed([]),
+        setLive: () => Effect.void,
+      }),
     ),
     Context.add(
       WorkspaceStore.Service,
@@ -489,11 +494,11 @@ it.effect("concurrent requests share boot and later requests do not replay or re
           yield* Deferred.succeed(resume, undefined);
           yield* Fiber.join(requests);
           expect(executed).toBe(20);
-          expect(reads).toBe(13); // One replay read per registered projection.
+          expect(reads).toBe(1); // Boot reads the log once, to find it empty.
           yield* gateway.asMember(workspaceId, alice, operation);
           yield* gateway.inWorkspace(workspaceId, operation);
           expect(bound).toBe(1);
-          expect(reads).toBe(13); // One replay read per registered projection.
+          expect(reads).toBe(1); // Later requests reuse the booted workspace.
           expect(executed).toBe(22);
         }).pipe(Effect.provide(host(storage)));
       }),

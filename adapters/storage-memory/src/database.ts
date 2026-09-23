@@ -22,7 +22,10 @@ export interface Append {
   readonly entryCount: number;
 }
 
-/** Projected records by kind, with the checkpoints that say how far projections have read. */
+/**
+ * Projected records by kind, with the progress of projections being rebuilt and the versions
+ * that are live.
+ */
 export const projections = [
   "workspace",
   "members",
@@ -40,6 +43,7 @@ export const projections = [
   "threadMessages",
   "threadActivities",
   "checkpoints",
+  "liveProjections",
 ] as const;
 export type Projection = (typeof projections)[number];
 

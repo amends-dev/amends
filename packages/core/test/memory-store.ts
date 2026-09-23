@@ -16,6 +16,7 @@ interface State {
   readonly logs: Map<Entry.LogId, Array<Store.Batch>>;
   readonly appends: Map<Entry.LogId, Map<Store.IdempotencyKey, Store.AppendReceipt>>;
   readonly checkpoints: Map<string, Checkpoint.Cursor>;
+  readonly live: Map<Entry.LogId, ReadonlyArray<Checkpoint.LiveVersion>>;
   readonly members: Map<string, Member.Record>;
   readonly roles: Map<string, Role.Record>;
   readonly assignments: Map<string, Assignment.Record>;
@@ -47,6 +48,12 @@ const cloneBatch = (batch: Store.Batch): Store.Batch =>
 const cloneState = (state: State): State => ({
   value: state.value,
   checkpoints: new Map([...state.checkpoints].map(([key, cursor]) => [key, cloneCursor(cursor)])),
+  live: new Map(
+    [...state.live].map(([logId, versions]) => [
+      logId,
+      versions.map(({ name, version }) => ({ name, version })),
+    ]),
+  ),
   logs: new Map([...state.logs].map(([id, batches]) => [id, batches.map(cloneBatch)])),
   appends: new Map(
     [...state.appends].map(([id, receipts]) => [
@@ -110,6 +117,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
     logs: new Map(),
     appends: new Map(),
     checkpoints: new Map(),
+    live: new Map(),
     members: new Map(),
     roles: new Map(),
     assignments: new Map(),
@@ -403,6 +411,34 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
         index: cursor.index,
         entryId: cursor.entryId,
       });
+    }),
+    listLive: Effect.fn("JournalTest.checkpoint.listLive")(function* (logId) {
+      return ((yield* view).live.get(logId) ?? []).map(({ name, version }) => ({ name, version }));
+    }),
+    setLive: Effect.fn("JournalTest.checkpoint.setLive")(function* (logId, input) {
+      const native = yield* Store.Transaction;
+      const current = yield* Effect.serviceOption(Current);
+      if (
+        Option.isNone(current) ||
+        current.value.owner !== owner ||
+        !current.value.active ||
+        native.id !== current.value.commit.id
+      ) {
+        return yield* new Store.Failure({
+          operation: "checkpoint.setLive",
+          cause: "missing transaction",
+        });
+      }
+      const versions = yield* Schema.decodeEffect(Checkpoint.LiveVersions)(input).pipe(
+        Effect.mapError(
+          (error) =>
+            new Store.Conflict({ operation: "checkpoint.setLive", message: error.message }),
+        ),
+      );
+      current.value.state.live.set(
+        logId,
+        versions.map(({ name, version }) => ({ name, version })),
+      );
     }),
   });
 

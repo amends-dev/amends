@@ -21,6 +21,7 @@ const projections = [
   "members",
   "workspaces",
   "checkpoints",
+  "live_projections",
 ];
 
 /** A temporary database file for each test; each connection is another host over it. */
