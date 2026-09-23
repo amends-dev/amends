@@ -6,9 +6,10 @@ import {
 import { AgentPermissions } from "@amends/core/agent";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
-import { Log } from "@amends/core/journal";
+import { Journal, Log, Publication } from "@amends/core/journal";
 import {
   InvitationPermissions,
+  MemberFacts,
   MemberPermissions,
   MemberProjection,
   OwnershipPermissions,
@@ -18,7 +19,17 @@ import { Effect, Option } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { GroupPermissions, GroupMembershipPermissions } from "@amends/core/group";
 import { Operations } from "./operations.ts";
-import { alice, bob, views, inDatabase, host, temporary, boundTo } from "./support.ts";
+import {
+  alice,
+  bob,
+  views,
+  inDatabase,
+  host,
+  temporary,
+  boundTo,
+  core,
+  testProvenance,
+} from "./support.ts";
 
 it.effect(
   "one host creates two isolated workspaces and uses each operation's authenticated identity",
@@ -194,4 +205,42 @@ it.effect(
         }).pipe(Effect.provide(host(filename)));
       }),
     ),
+);
+
+it.effect("the directory keeps a workspace whose members were all removed", () =>
+  temporary((filename) =>
+    Effect.gen(function* () {
+      const workspace = yield* (yield* Gateway.Service).createWorkspace(alice.id, {
+        name: "Archive",
+      });
+      // Applications keep an owner; a direct fact reaches the empty state the directory must list.
+      const bound = yield* boundTo(workspace.id);
+      yield* Effect.flatMap(Journal.Service, (journal) =>
+        journal.commit(
+          journal.publish(MemberFacts.Removed, {
+            workspaceId: workspace.id,
+            memberId: workspace.ownerMemberId,
+          }),
+        ),
+      ).pipe(
+        Effect.provideService(Publication.Service, testProvenance(workspace.id)),
+        Effect.provide(core(bound)),
+      );
+      expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
+        memberships: [
+          {
+            workspace,
+            member: {
+              id: workspace.ownerMemberId,
+              workspaceId: workspace.id,
+              identity: alice,
+              status: "removed",
+            },
+            activeMemberCount: 0,
+          },
+        ],
+        invitations: [],
+      });
+    }).pipe(Effect.provide(host(filename))),
+  ),
 );

@@ -225,6 +225,7 @@ CREATE INDEX "assignments_by_member" ON "assignments" ("workspace_id","member_id
 CREATE INDEX "assignments_by_role" ON "assignments" ("workspace_id","role_id","status");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_group_membership" ON "group_memberships" ("workspace_id","group_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "group_memberships_by_group" ON "group_memberships" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "group_memberships_by_member" ON "group_memberships" ("workspace_id","member_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "invitations_by_recipient" ON "invitations" ("workspace_id","recipient_id","state");--> statement-breakpoint
 CREATE INDEX "pending_invitations_by_recipient" ON "invitations" ("recipient_id") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE UNIQUE INDEX "log_batches_by_commit" ON "log_batches" ("workspace_id","log_id","commit_id");--> statement-breakpoint
@@ -233,6 +234,7 @@ CREATE INDEX "log_entries_by_commit" ON "log_entries" ("workspace_id","log_id","
 CREATE INDEX "log_entries_by_subject" ON "log_entries" ("workspace_id","log_id","subject","position","entry_index");--> statement-breakpoint
 CREATE INDEX "log_entries_by_fact" ON "log_entries" ("workspace_id","log_id","fact_name","position","entry_index");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_member_identity" ON "members" ("workspace_id","identity_kind","identity_id") WHERE "status" = 'active';--> statement-breakpoint
+CREATE INDEX "members_by_identity" ON "members" ("identity_kind","identity_id","workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "notifications_by_source_recipient" ON "notifications" ("workspace_id","source_log_id","source_entry_id","recipient_kind",coalesce("recipient_id", ''));--> statement-breakpoint
 CREATE INDEX "notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"recorded_at","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"recorded_at","id" COLLATE "C") WHERE "state" = 'Pending';--> statement-breakpoint
@@ -240,8 +242,9 @@ CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspac
 CREATE UNIQUE INDEX "thread_message_activity" ON "thread_activities" ("workspace_id","message_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_participation_activity" ON "thread_activities" ("workspace_id","participation_id","kind");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
-CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id");--> statement-breakpoint
-CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id");--> statement-breakpoint
+CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_role" FOREIGN KEY ("workspace_id","role_id") REFERENCES "roles"("workspace_id","id");--> statement-breakpoint

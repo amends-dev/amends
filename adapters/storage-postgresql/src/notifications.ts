@@ -1,7 +1,7 @@
 import { ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { and, asc, eq, gt, or, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -93,15 +93,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
               target._tag === "Triage" ? "" : target.id,
             ),
             pendingOnly ? eq(notifications.state, "Pending") : undefined,
+            // A row comparison bounds the index scan; the equivalent OR form only filters it.
             after === undefined
               ? undefined
-              : or(
-                  gt(notifications.recordedAt, DateTime.toDate(after.recordedAt)),
-                  and(
-                    eq(notifications.recordedAt, DateTime.toDate(after.recordedAt)),
-                    gt(orderedId, after.id),
-                  ),
-                ),
+              : sql`(${notifications.recordedAt}, ${orderedId}) > (${sql.param(DateTime.toDate(after.recordedAt), notifications.recordedAt)}, ${after.id})`,
           ),
         )
         .orderBy(asc(notifications.recordedAt), asc(orderedId))

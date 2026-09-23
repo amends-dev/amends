@@ -1,7 +1,8 @@
 import type { Identity } from "@amends/core/identity";
 import { Member, Workspace } from "@amends/core/workspace";
 import { WorkspaceDirectory } from "@amends/gateway";
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { PostgresDatabase } from "./database.ts";
 import { Invitations } from "./invitations.ts";
@@ -25,15 +26,12 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
   const list: WorkspaceDirectory.Interface["list"] = Effect.fn("PostgresDirectory.list")(function* (
     identity: Identity.MemberReference,
   ) {
-    const active = db
-      .select({
-        workspaceId: members.workspaceId,
-        activeMemberCount: count().as("activeMemberCount"),
-      })
-      .from(members)
-      .where(eq(members.status, "active"))
-      .groupBy(members.workspaceId)
-      .as("active");
+    // Count only the identity's workspaces; a workspace without active members still lists at zero.
+    const active = alias(members, "active_members");
+    const activeMemberCount = db
+      .select({ value: count() })
+      .from(active)
+      .where(and(eq(active.workspaceId, members.workspaceId), eq(active.status, "active")));
     const memberships = yield* db
       .select({
         workspace: {
@@ -44,13 +42,12 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
         },
         // Selections nest one level, so the identity union is nested below.
         member: members,
-        activeMemberCount: active.activeMemberCount,
+        activeMemberCount: sql<number>`(${activeMemberCount})`.mapWith(Number),
       })
       .from(members)
       .innerJoin(workspaces, eq(workspaces.workspaceId, members.workspaceId))
-      .innerJoin(active, eq(active.workspaceId, members.workspaceId))
       .where(and(eq(members.identityKind, identity._tag), eq(members.identityId, identity.id)))
-      .orderBy(asc(workspaces.workspaceId), asc(members.id))
+      .orderBy(asc(members.workspaceId), asc(members.id))
       .pipe(
         Effect.flatMap((rows) =>
           Schema.decodeEffect(Schema.Array(Membership))(

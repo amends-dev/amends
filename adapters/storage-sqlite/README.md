@@ -28,6 +28,17 @@ scanning the log or sorting a batch; appends read only the batch's highest index
 workspace, log, subject, position, and entry index. Fact subjects are required;
 generic execution entries leave the entire fact header null.
 
+`SqliteDatabase.make()` enables `PRAGMA foreign_keys` on its connection before migrating,
+so the declared references between workspace records are enforced as in PostgreSQL. A rejected
+reference is a constraint error and becomes the store's `Conflict`.
+
+`participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
+participant checks, and a member's group admissions in ID order without scanning the workspace.
+The directory reads across workspaces, so `members_by_identity` and `invitations_by_recipient`
+lead with the identity or recipient; the latter also serves one workspace's pending invitations.
+Plan tests check these access paths. Adding them replaced the development baseline; recreate
+local SQLite files, since an existing file keeps the old baseline without these indexes.
+
 `Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
 log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
 transaction, and opens none. This supports notification-source reads without scanning the log

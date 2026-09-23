@@ -19,12 +19,15 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 /**
- * Construct the database service over the caller's SQL client, applying pending migrations.
+ * Construct the database service over the caller's SQL client, enforcing foreign keys and
+ * applying pending migrations.
  *
  * @category constructors
  */
 export const make = Effect.fn("SqliteDatabase.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
+  // SQLite ignores declared foreign keys unless each connection enables them outside a transaction.
+  yield* sql`PRAGMA foreign_keys = ON`;
   yield* SqliteMigrator.run({ loader: Migrations.loader });
   return Service.of({ sql, health: { broken: false } });
 });

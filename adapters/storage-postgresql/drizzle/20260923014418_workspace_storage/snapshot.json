@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "6658b5d3-fc13-4e06-a4ac-439fbfb3f18f",
+  "id": "b9d0f042-3f73-4d61-977b-c297a4d10cce",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -2053,6 +2053,41 @@
           "opclass": null
         },
         {
+          "value": "member_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "group_memberships_by_member",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "recipient_id",
           "isExpression": false,
           "asc": true,
@@ -2354,6 +2389,48 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "identity_kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "identity_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "members_by_identity",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "members"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "workspace_id",
           "isExpression": false,
           "asc": true,
@@ -2641,8 +2718,50 @@
           "opclass": null
         },
         {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "participations_by_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "thread_participations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "group_membership_id",
           "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
           "asc": true,
           "nullsFirst": false,
           "opclass": null
@@ -2676,8 +2795,8 @@
           "opclass": null
         },
         {
-          "value": "id",
-          "isExpression": false,
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
           "asc": true,
           "nullsFirst": false,
           "opclass": null

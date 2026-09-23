@@ -13,6 +13,7 @@ it.effect.each(["make", "layer"] as const)(
         const program = Effect.gen(function* () {
           const database = yield* SqliteDatabase.Service;
           expect(database.sql).toBe(yield* SqlClient.SqlClient);
+          expect(yield* database.sql`PRAGMA foreign_keys`).toEqual([{ foreign_keys: 1 }]);
           const bound = yield* (yield* views).forWorkspace(workspaceId);
           const record = yield* initialized(bound);
           expect(yield* bound.invitations.list).toEqual([]);
@@ -57,6 +58,71 @@ it.effect(
         { count: 0 },
       ]);
     }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:", busyTimeout: 0 }))),
+);
+
+it.effect("declared foreign keys reject rows that reference missing records", () =>
+  temporary((filename) =>
+    inDatabase(
+      filename,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const bound = yield* (yield* views).forWorkspace(workspaceId);
+        const workspace = yield* initialized(bound);
+        const orphan = (createdBy: string) =>
+          sql`INSERT INTO groups (workspace_id, id, created_by, record) VALUES (${workspaceId}, ${`group-${createdBy}`}, ${createdBy}, '{}')`;
+        const rejected = yield* Effect.flip(orphan("missing-member"));
+        expect(rejected.reason._tag).toBe("ConstraintError");
+        expect(yield* sql`SELECT id FROM groups`).toEqual([]);
+        yield* orphan(workspace.ownerMemberId);
+        expect(yield* sql`PRAGMA foreign_key_check`).toEqual([]);
+      }),
+    ),
+  ),
+);
+
+it.effect("thread, membership, and directory lookups seek their indexes without sorting", () =>
+  temporary((filename) =>
+    inDatabase(
+      filename,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        // Each lookup must narrow by more than its workspace and return rows in query order.
+        const cases = [
+          {
+            access: "participations_by_thread (workspace_id=? AND thread_id=?)",
+            query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${"thread"} ORDER BY id COLLATE BINARY`,
+          },
+          {
+            access: "participations_by_thread (workspace_id=? AND thread_id=?)",
+            query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${"thread"} AND member_id = ${"member"}`,
+          },
+          {
+            access: "group_memberships_by_member (workspace_id=? AND member_id=?)",
+            query: sql`SELECT id FROM group_memberships WHERE workspace_id = ${workspaceId} AND member_id = ${"member"} AND json_extract(record, '$.status') = 'active' ORDER BY id COLLATE BINARY`,
+          },
+          {
+            access: "invitations_by_recipient (<expr>=? AND <expr>=? AND workspace_id=?)",
+            query: sql`SELECT record FROM invitations WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.details.recipientId') = ${"alice"} AND json_extract(record, '$.state._tag') = 'Pending' ORDER BY id`,
+          },
+          {
+            access: "invitations_by_recipient (<expr>=? AND <expr>=?)",
+            query: sql`SELECT record FROM invitations WHERE json_extract(record, '$.details.recipientId') = ${"alice"} AND json_extract(record, '$.state._tag') = 'Pending' ORDER BY workspace_id, id`,
+          },
+          {
+            access: "members_by_identity (<expr>=? AND <expr>=?)",
+            query: sql`SELECT w.record AS workspace, m.record AS member, (SELECT COUNT(*) FROM members p WHERE p.workspace_id = m.workspace_id AND json_extract(p.record, '$.status') = 'active') AS activeMemberCount FROM members m JOIN workspaces w ON w.workspace_id = m.workspace_id WHERE json_extract(m.record, '$.identity._tag') = ${"Human"} AND json_extract(m.record, '$.identity.id') = ${"alice"} ORDER BY m.workspace_id, m.id`,
+          },
+        ];
+        for (const { access, query } of cases) {
+          const details = (yield* sql<{ detail: string }>`EXPLAIN QUERY PLAN ${query}`).map(
+            (row) => row.detail,
+          );
+          expect(details.some((detail) => detail.endsWith(access))).toBe(true);
+          expect(details.some((detail) => detail.includes("TEMP B-TREE"))).toBe(false);
+        }
+      }),
+    ),
+  ),
 );
 
 it.effect("commit entry lookups seek within one batch and return index order without sorting", () =>

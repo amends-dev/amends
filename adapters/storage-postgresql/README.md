@@ -36,6 +36,17 @@ highest index, so a commit's cost does not grow with the entries it already hold
 a plan test checks that commit lookups use this index. Adding it replaced the
 development baseline; recreate disposable PostgreSQL databases when adopting it.
 
+`participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
+participant checks, and a member's group admissions; they and `threads_by_group` and
+`participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID
+order without a sort. Notification and fact pages compare `(recorded_at, id)` and
+`(position, entry_index)` cursors as rows, which bounds the index scan instead of filtering
+earlier rows. The directory reads across workspaces through `members_by_identity` and
+`pending_invitations_by_recipient`, and counts active members only for the identity's own
+workspaces; a workspace whose members were all removed still lists with a count of zero.
+A plan test checks these access paths with sequential scans and sorts disabled. These indexes
+replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
+
 `Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
 log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
 transaction, and opens none. This supports notification-source reads without scanning the log

@@ -1,5 +1,5 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
-import { and, asc, desc, eq, gt, gte, lt, inArray, max, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, lt, inArray, max, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";
 import { Binding } from "./binding.ts";
@@ -30,7 +30,7 @@ const AppendHeaderRows = Schema.Array(
  */
 export const make = Effect.fn("Journal.make")(function* () {
   const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Service;
-  const { db, sql } = database;
+  const { db } = database;
 
   const scoped = (logId: Entry.LogId) =>
     and(eq(logBatches.workspaceId, workspaceId), eq(logBatches.logId, logId));
@@ -272,7 +272,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         payload: content.payload.slice(),
       });
     }
-    yield* sql`UPDATE commits SET entry_count = entry_count + ${result.length} WHERE workspace_id = ${workspaceId} AND id = ${session.commit.id}`.pipe(
+    yield* database.sql`UPDATE commits SET entry_count = entry_count + ${result.length} WHERE workspace_id = ${workspaceId} AND id = ${session.commit.id}`.pipe(
       Effect.mapError(storeError(Store, "append")),
     );
     if (request.idempotencyKey !== undefined)
@@ -327,15 +327,10 @@ export const make = Effect.fn("Journal.make")(function* () {
                 options.version === undefined
                   ? undefined
                   : eq(logEntries.factVersion, options.version),
+                // A row comparison bounds the index scan; the equivalent OR form only filters it.
                 options.after === undefined
                   ? undefined
-                  : or(
-                      gt(logEntries.position, options.after.position),
-                      and(
-                        eq(logEntries.position, options.after.position),
-                        gt(logEntries.entryIndex, options.after.index),
-                      ),
-                    ),
+                  : sql`(${logEntries.position}, ${logEntries.entryIndex}) > (${options.after.position}, ${options.after.index})`,
               ),
             )
             .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))

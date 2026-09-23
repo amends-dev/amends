@@ -79,6 +79,13 @@ export const members = pgTable(
     uniqueIndex("active_member_identity")
       .on(table.workspaceId, table.identityKind, table.identityId)
       .where(sql`${table.status} = 'active'`),
+    // Directory reads cross workspaces, so this leads with the identity rather than the workspace.
+    index("members_by_identity").on(
+      table.identityKind,
+      table.identityId,
+      table.workspaceId,
+      table.id,
+    ),
   ],
 );
 
@@ -134,6 +141,11 @@ export const groupMemberships = pgTable(
     index("group_memberships_by_group").on(
       table.workspaceId,
       table.groupId,
+      sql`${table.id} COLLATE "C"`,
+    ),
+    index("group_memberships_by_member").on(
+      table.workspaceId,
+      table.memberId,
       sql`${table.id} COLLATE "C"`,
     ),
   ],
@@ -453,7 +465,7 @@ export const threads = pgTable(
       columns: [t.workspaceId, t.createdBy],
       foreignColumns: [members.workspaceId, members.id],
     }),
-    index("threads_by_group").on(t.workspaceId, t.groupId, t.id),
+    index("threads_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
   ],
 );
 export const threadParticipations = pgTable(
@@ -488,7 +500,12 @@ export const threadParticipations = pgTable(
     uniqueIndex("active_thread_participation")
       .on(t.workspaceId, t.threadId, t.memberId)
       .where(sql`${t.status} = 'active'`),
-    index("participations_by_admission").on(t.workspaceId, t.groupMembershipId),
+    index("participations_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
+    index("participations_by_admission").on(
+      t.workspaceId,
+      t.groupMembershipId,
+      sql`${t.id} COLLATE "C"`,
+    ),
     check(
       "participation_state",
       sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`,

@@ -7,10 +7,12 @@ import { AgentPermissions } from "@amends/core/agent";
 import { describe, it, expect } from "@effect/vitest";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
+import { Journal, Publication } from "@amends/core/journal";
 import { GroupPermissions, GroupMembershipPermissions } from "@amends/core/group";
 import {
   InvitationApplication,
   InvitationPermissions,
+  MemberFacts,
   OwnershipPermissions,
   MemberApplication,
   MemberPermissions,
@@ -18,7 +20,19 @@ import {
 } from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Option } from "effect";
-import { alice, bob, journalLog, views, inDatabase, host, future, setup } from "./support.ts";
+import {
+  alice,
+  bob,
+  boundTo,
+  core,
+  journalLog,
+  views,
+  inDatabase,
+  host,
+  future,
+  setup,
+  testProvenance,
+} from "./support.ts";
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
@@ -217,6 +231,44 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const listing = yield* (yield* WorkspaceDirectory.Service).list(alice);
         expect(listing.memberships.map((membership) => membership.workspace)).toEqual([workspace]);
       }).pipe(Effect.provide(host(location))),
+    ),
+  );
+
+  it.effect("the directory keeps a workspace whose members were all removed", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const workspace = yield* (yield* Gateway.Service).createWorkspace(alice.id, {
+          name: "Archive",
+        });
+        // Applications keep an owner; a direct fact reaches the empty state the directory must list.
+        const bound = yield* boundTo(workspace.id);
+        yield* Effect.flatMap(Journal.Service, (journal) =>
+          journal.commit(
+            journal.publish(MemberFacts.Removed, {
+              workspaceId: workspace.id,
+              memberId: workspace.ownerMemberId,
+            }),
+          ),
+        ).pipe(
+          Effect.provideService(Publication.Service, testProvenance(workspace.id)),
+          Effect.provide(core(bound)),
+        );
+        expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
+          memberships: [
+            {
+              workspace,
+              member: {
+                id: workspace.ownerMemberId,
+                workspaceId: workspace.id,
+                identity: alice,
+                status: "removed",
+              },
+              activeMemberCount: 0,
+            },
+          ],
+          invitations: [],
+        });
+      }).pipe(Effect.provide(host(url))),
     ),
   );
 });
