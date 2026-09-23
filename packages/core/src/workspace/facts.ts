@@ -1,9 +1,11 @@
 import { Subject } from "../journal/subject.ts";
+import { Audience } from "../journal/audience.ts";
 import { Fact } from "../journal/fact.ts";
 import { Workspace } from "./workspace.ts";
 import { Ownership } from "./ownership/ownership.ts";
 
 export const Initialized = Fact.make("workspace.initialized", {
+  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("workspace", payload.id),
   version: 1,
   payload: Workspace.Record,
@@ -11,6 +13,7 @@ export const Initialized = Fact.make("workspace.initialized", {
 });
 
 export const OwnershipTransferred = Fact.make("workspace.ownership-transferred", {
+  audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("workspace", payload.workspaceId),
   version: 1,
   payload: Ownership.Change,

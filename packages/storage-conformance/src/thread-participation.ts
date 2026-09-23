@@ -14,7 +14,7 @@ import { Group, GroupApplication, GroupMembershipApplication } from "@amends/cor
 
 import { Actor, Identity } from "@amends/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+import { Event, Fact, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 
 import { Notification, NotificationStore } from "@amends/core/notification";
@@ -23,6 +23,7 @@ import {
   Thread,
   ThreadApplication,
   ThreadActivity,
+  ThreadFacts,
   ThreadActivityFacts,
   ThreadActivityRecording,
   ThreadActivityStore,
@@ -185,6 +186,89 @@ export const threadParticipation = (harness: Harness) => {
         live: yield* bound.checkpoints.listLive(journalLog),
       };
     });
+
+    it.effect("every thread fact carries its own thread's group, which is its audience", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, group, first, human } = yield* prepare();
+            // A second group's thread, so a fixed or crossed group would show.
+            const other = yield* run(bound, owner, create([owner.memberId, humanId]));
+            const second = yield* run(bound, owner, start(other.id, [humanId]));
+            yield* run(bound, owner, reply(second.thread.id, [], "Second reply"));
+            yield* grant(
+              bound,
+              humanId,
+              ThreadParticipationPermissions.Follow,
+              threadTarget(first.thread.id),
+            );
+            const followed = yield* run(bound, human, follow(first.thread.id));
+            yield* run(bound, human, unfollow(first.thread.id, followed.id));
+            const expected = new Map([
+              [first.thread.id, group.id],
+              [second.thread.id, other.id],
+            ]);
+            const collect = <F extends Fact.Definition>(
+              fact: F,
+              locate: (payload: Fact.Payload<F>) => { threadId: Thread.Id; groupId: Group.Id },
+            ) =>
+              facts(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.read({ name: fact.name, limit: 100 }),
+                ),
+              ).pipe(
+                Effect.flatMap((entries) =>
+                  Effect.forEach(entries, (entry) =>
+                    Effect.gen(function* () {
+                      const { payload } = yield* Event.decode(fact, entry);
+                      const { threadId, groupId } = locate(payload);
+                      return {
+                        name: fact.name,
+                        threadId,
+                        groupId,
+                        audience: yield* Fact.makeAudience(fact, payload),
+                      };
+                    }),
+                  ),
+                ),
+              );
+            const found = [
+              ...(yield* collect(ThreadFacts.Created, (p) => ({
+                threadId: p.id,
+                groupId: p.groupId,
+              }))),
+              ...(yield* collect(ThreadMessageFacts.Published, (p) => p)),
+              ...(yield* collect(ThreadActivityFacts.Recorded, (p) => ({
+                threadId: p.activity.threadId,
+                groupId: p.groupId,
+              }))),
+              ...(yield* collect(ThreadParticipationFacts.Added, (p) => p)),
+              ...(yield* collect(ThreadParticipationFacts.Ended, (p) => p)),
+            ];
+            expect(new Set(found.map((f) => f.name))).toEqual(
+              new Set([
+                ThreadFacts.Created.name,
+                ThreadMessageFacts.Published.name,
+                ThreadActivityFacts.Recorded.name,
+                ThreadParticipationFacts.Added.name,
+                ThreadParticipationFacts.Ended.name,
+              ]),
+            );
+            expect(new Set(found.map((f) => f.threadId))).toEqual(new Set(expected.keys()));
+            for (const fact of found) {
+              const groupId = expected.get(fact.threadId);
+              expect({ name: fact.name, groupId: fact.groupId }).toEqual({
+                name: fact.name,
+                groupId,
+              });
+              expect(fact.audience).toEqual([Group.audienceOf(fact.groupId)]);
+            }
+          }),
+        ),
+      ),
+    );
 
     it.effect(
       "following records a quiet timeline boundary and returns only a public summary; repeated follow is a no-op",
@@ -1044,6 +1128,7 @@ export const threadParticipation = (harness: Harness) => {
                       const ended = yield* journal
                         .publish(ThreadParticipationFacts.Ended, {
                           workspaceId,
+                          groupId: first.thread.groupId,
                           threadId: first.thread.id,
                           participationId: participant.id,
                           reason: "unfollowed",
@@ -1253,6 +1338,7 @@ export const threadParticipation = (harness: Harness) => {
                       const ended = yield* journal
                         .publish(ThreadParticipationFacts.Ended, {
                           workspaceId,
+                          groupId: first.thread.groupId,
                           threadId: first.thread.id,
                           participationId: participant.id,
                           reason: "unfollowed",
@@ -1348,10 +1434,21 @@ export const threadParticipation = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
-                      yield* journal.publish(ThreadParticipationFacts.Added, contact);
-                      yield* journal.publish(ThreadParticipationFacts.Added, triage);
-                      yield* journal.publish(ThreadMessageFacts.Published, message);
+                      const groupId = first.thread.groupId;
+                      yield* journal.publish(
+                        ThreadParticipationFacts.Added,
+                        Object.assign({ groupId }, contact),
+                      );
+                      yield* journal.publish(
+                        ThreadParticipationFacts.Added,
+                        Object.assign({ groupId }, triage),
+                      );
+                      yield* journal.publish(
+                        ThreadMessageFacts.Published,
+                        Object.assign({ groupId }, message),
+                      );
                       yield* journal.publish(ThreadActivityFacts.Recorded, {
+                        groupId,
                         activity: {
                           id: ThreadActivity.Id.make("contact-activity"),
                           workspaceId,

@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { Audience } from "../../journal/audience.ts";
 import { Identity } from "../../identity/identity.ts";
 import { WorkspaceId } from "../id.ts";
 import { MemberId } from "./id.ts";
@@ -18,5 +19,8 @@ export const Record = Schema.Struct({
   status: Status,
 }).annotate({ identifier: "WorkspaceMember" });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
+
+/** One workspace membership alone. */
+export const audienceOf = (memberId: Id): Audience.Scope => Audience.make("member", memberId);
 
 export * as Member from "./member.ts";

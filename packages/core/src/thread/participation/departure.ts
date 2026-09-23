@@ -48,6 +48,17 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
     });
   const invalid = (cause: Schema.SchemaError) =>
     new InvalidReference({ message: `Invalid departure reference: ${cause.message}` });
+  const threadOf = Effect.fnUntraced(function* (participant: ThreadParticipation.Record) {
+    const found = yield* threads.get(participant.threadId);
+    if (Option.isNone(found))
+      return yield* new InvalidReference({ message: "Participation thread is missing" });
+    const thread = yield* Schema.decodeEffect(Schema.toType(Thread.Record))(found.value).pipe(
+      Effect.mapError(invalid),
+    );
+    if (thread.id !== participant.threadId || thread.workspaceId !== workspaceId)
+      return yield* new InvalidReference({ message: "Participation belongs to another thread" });
+    return thread;
+  });
   const end = Effect.fn("ThreadParticipationDeparture.end")(function* (
     input: ThreadParticipation.Departure,
     reason: ThreadParticipation.EndReason,
@@ -71,9 +82,10 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
       return yield* new InvalidReference({
         message: "Departure participation is inconsistent or already ended",
       });
+    const thread = yield* threadOf(participant);
     const sequence = yield* recording.nextSequence(participant.threadId);
     const ended = yield* journal
-      .publish(ThreadParticipationFacts.Ended, { ...departure, reason })
+      .publish(ThreadParticipationFacts.Ended, { ...departure, groupId: thread.groupId, reason })
       .pipe(Publication.withOccurredAt(occurredAt));
     yield* recording
       .record({
@@ -111,17 +123,8 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
         });
       seen.add(participant.id);
       if (participant.status === "ended") continue;
-      const found = yield* threads.get(participant.threadId);
-      if (Option.isNone(found))
-        return yield* new InvalidReference({ message: "Participation thread is missing" });
-      const thread = yield* Schema.decodeEffect(Schema.toType(Thread.Record))(found.value).pipe(
-        Effect.mapError(invalid),
-      );
-      if (
-        thread.id !== participant.threadId ||
-        thread.workspaceId !== workspaceId ||
-        thread.groupId !== membership.groupId
-      )
+      const thread = yield* threadOf(participant);
+      if (thread.groupId !== membership.groupId)
         return yield* new InvalidReference({
           message: "Participation belongs to another group or thread",
         });

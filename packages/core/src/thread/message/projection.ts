@@ -5,7 +5,9 @@ import { ThreadMessageStore } from "./store.ts";
 
 export const definition = Projection.make("thread.message", { version: 1 }).on(
   ThreadMessageFacts.Published,
-  Effect.fn("ThreadMessageProjection.published")(function* ({ payload }) {
+  Effect.fn("ThreadMessageProjection.published")(function* ({
+    payload: { groupId: _group, ...payload },
+  }) {
     const store = yield* ThreadMessageStore.Service;
     if (store.workspaceId !== payload.workspaceId)
       return yield* new ThreadMessageStore.Conflict({

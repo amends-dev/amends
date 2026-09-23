@@ -3,6 +3,7 @@ import { Subject } from "../journal/subject.ts";
 import { Group } from "./group.ts";
 
 export const Created = Fact.make("group.created", {
+  audience: (payload) => [Group.audienceOf(payload.id)],
   version: 1,
   subject: (payload) => Subject.make("group", payload.id),
   occurrence: (payload) => [payload.id],

@@ -17,7 +17,9 @@ export const definition = Projection.make("thread.participation", { version: 1 }
   )
   .on(
     ThreadParticipationFacts.Added,
-    Effect.fn("ThreadParticipationProjection.added")(function* ({ payload }) {
+    Effect.fn("ThreadParticipationProjection.added")(function* ({
+      payload: { groupId: _group, ...payload },
+    }) {
       const store = yield* ThreadParticipationStore.Service;
       if (store.workspaceId !== payload.workspaceId)
         return yield* new ThreadParticipationStore.Conflict({

@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { Audience } from "./audience.ts";
 import { Occurrence } from "./occurrence.ts";
 import { Subject } from "./subject.ts";
 
@@ -15,6 +16,11 @@ export interface Definition<
   subject(payload: PayloadSchema["Type"]): Subject.Value;
   /** Pure, deterministic identity of this occurrence; null leaves this payload repeatable. */
   occurrence?(payload: PayloadSchema["Type"]): ReadonlyArray<string> | null;
+  /**
+   * Pure, deterministic delivery scopes of this payload: who may learn of the fact beyond the
+   * projections that apply it. Omitted, the fact stays internal.
+   */
+  audience?(payload: PayloadSchema["Type"]): ReadonlyArray<Audience.Scope>;
 }
 
 /** The payload accepted when publishing this fact. */
@@ -36,6 +42,7 @@ export const make = <
     readonly payload: PayloadSchema;
     readonly subject: (payload: NoInfer<PayloadSchema["Type"]>) => Subject.Value;
     readonly occurrence?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<string> | null;
+    readonly audience?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<Audience.Scope>;
   },
 ): Readonly<Definition<Name, Version, PayloadSchema>> =>
   Object.freeze({
@@ -44,6 +51,7 @@ export const make = <
     payload: options.payload,
     subject: options.subject,
     ...(options.occurrence === undefined ? {} : { occurrence: options.occurrence }),
+    ...(options.audience === undefined ? {} : { audience: options.audience }),
   });
 
 /**
@@ -66,6 +74,19 @@ export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends De
 ) {
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
   return yield* Schema.decodeEffect(Subject.Value)(fact.subject(validated));
+});
+
+/**
+ * Validate the payload and its declared audience; a fact that declares none is internal.
+ * @category constructors
+ */
+export const makeAudience = Effect.fn("Fact.makeAudience")(function* <F extends Definition>(
+  fact: F,
+  payload: Payload<NoInfer<F>>,
+) {
+  if (fact.audience === undefined) return Audience.internal;
+  const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
+  return yield* Schema.decodeEffect(Audience.Value)(fact.audience(validated));
 });
 
 export * as Fact from "./fact.ts";

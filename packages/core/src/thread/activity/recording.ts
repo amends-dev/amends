@@ -61,10 +61,7 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
     });
   const invalid = (cause: Schema.SchemaError) =>
     new InvalidReference({ message: `Invalid activity reference: ${cause.message}` });
-  const nextSequence = Effect.fn("ThreadActivityRecording.nextSequence")(function* (
-    threadId: ThreadId.Id,
-  ) {
-    yield* Store.Transaction;
+  const loadThread = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
     const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
     const found = yield* threads.get(id);
     if (Option.isNone(found)) return yield* new InvalidReference({ message: "Thread is missing" });
@@ -73,6 +70,10 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
     );
     if (thread.id !== id || thread.workspaceId !== workspaceId)
       return yield* new InvalidReference({ message: "Thread belongs to another workspace or ID" });
+    return thread;
+  });
+  const sequenceAfter = Effect.fnUntraced(function* (thread: Thread.Record) {
+    const id = thread.id;
     const latest = yield* activities.latest(id);
     if (Option.isNone(latest)) return 1;
     const record = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(
@@ -88,10 +89,17 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
       });
     return record.sequence + 1;
   });
+  const nextSequence = Effect.fn("ThreadActivityRecording.nextSequence")(function* (
+    threadId: ThreadId.Id,
+  ) {
+    yield* Store.Transaction;
+    return yield* sequenceAfter(yield* loadThread(threadId));
+  });
   const record = Effect.fn("ThreadActivityRecording.record")(function* (input: Input) {
     yield* Store.Transaction;
     const request = yield* Schema.decodeEffect(Schema.toType(Input))(input);
-    if (request.sequence !== (yield* nextSequence(request.threadId)))
+    const thread = yield* loadThread(request.threadId);
+    if (request.sequence !== (yield* sequenceAfter(thread)))
       return yield* new InvalidReference({ message: "Activity position changed before recording" });
     const activity = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))({
       ...request.subject,
@@ -102,7 +110,11 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
       occurredAt: request.occurredAt,
     });
     return yield* journal
-      .publish(ThreadActivityFacts.Recorded, { activity, recipients: request.recipients })
+      .publish(ThreadActivityFacts.Recorded, {
+        groupId: thread.groupId,
+        activity,
+        recipients: request.recipients,
+      })
       .pipe(Publication.withOccurredAt(request.occurredAt));
   });
   return Service.of({ workspaceId, nextSequence, record });

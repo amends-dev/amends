@@ -264,6 +264,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
           yield* journal.publish(ThreadParticipationFacts.Added, {
             id: participationId,
             workspaceId,
+            groupId: group.id,
             threadId,
             participant: {
               _tag: "Member",
@@ -279,10 +280,12 @@ it.effect("private group commits are withheld and mixed commits retain only publ
           yield* journal.publish(ThreadParticipationFacts.Ended, {
             reason: "unfollowed",
             workspaceId,
+            groupId: group.id,
             threadId,
             participationId,
           });
           yield* journal.publish(ThreadActivityFacts.Recorded, {
+            groupId: group.id,
             recipients: [],
             activity: {
               id: ThreadActivity.Id.make("private-follow"),
@@ -303,6 +306,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
           yield* journal.publish(ThreadMessageFacts.Published, {
             id: messageId,
             workspaceId,
+            groupId: group.id,
             threadId,
             author: { _tag: "Member", memberId: actor.memberId },
             kind: "User",
@@ -311,6 +315,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             publishedAt: group.createdAt,
           });
           yield* journal.publish(ThreadActivityFacts.Recorded, {
+            groupId: group.id,
             activity: {
               id: ThreadActivity.Id.make("private-activity"),
               workspaceId,

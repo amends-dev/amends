@@ -668,6 +668,7 @@ export const notificationSources = (harness: Harness) => {
                       yield* journal
                         .publish(ThreadParticipationFacts.Ended, {
                           workspaceId,
+                          groupId: first.thread.groupId,
                           threadId: first.thread.id,
                           participationId: participant.id,
                           reason: "unfollowed",

@@ -208,14 +208,21 @@ export const threadReads = (harness: Harness) => {
                 messageId: message.id,
                 occurredAt: time,
               };
-              yield* journal.publish(ThreadMessageFacts.Published, message);
+              yield* journal.publish(
+                ThreadMessageFacts.Published,
+                Object.assign({ groupId: thread.groupId }, message),
+              );
               const recipients = (yield* bound.participations.listByThread(thread.id))
                 .filter((p) => p.status === "active")
                 .map((p) => ({
                   participationId: p.id,
                   recipient: ThreadParticipation.recipientOf(p.participant),
                 }));
-              yield* journal.publish(ThreadActivityFacts.Recorded, { activity, recipients });
+              yield* journal.publish(ThreadActivityFacts.Recorded, {
+                groupId: thread.groupId,
+                activity,
+                recipients,
+              });
               return { activity, message };
             }),
           ),
@@ -647,8 +654,12 @@ export const threadReads = (harness: Harness) => {
                       mentions: [],
                       publishedAt: first.message.publishedAt,
                     };
-                    yield* journal.publish(ThreadMessageFacts.Published, message);
+                    yield* journal.publish(
+                      ThreadMessageFacts.Published,
+                      Object.assign({ groupId: first.thread.groupId }, message),
+                    );
                     yield* journal.publish(ThreadActivityFacts.Recorded, {
+                      groupId: first.thread.groupId,
                       activity: {
                         id: ThreadActivity.Id.make("staged-activity"),
                         workspaceId,

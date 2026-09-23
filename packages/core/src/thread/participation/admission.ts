@@ -271,7 +271,12 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
         status: "active",
         endedAt: null,
       });
-      added.push(yield* journal.publish(ThreadParticipationFacts.Added, admitted));
+      added.push(
+        yield* journal.publish(ThreadParticipationFacts.Added, {
+          ...admitted,
+          groupId: thread.groupId,
+        }),
+      );
       result.push(admitted);
     }
     return { participants: result, added };

@@ -109,7 +109,7 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       publishedAt: request.occurredAt,
     };
     const published = yield* journal
-      .publish(ThreadMessageFacts.Published, message)
+      .publish(ThreadMessageFacts.Published, Object.assign({ groupId: thread.groupId }, message))
       .pipe(Publication.withOccurredAt(request.occurredAt));
     // Mentions address members; without them the message reaches every selected participant.
     // A message never notifies its own author.

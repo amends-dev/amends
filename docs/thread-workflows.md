@@ -467,7 +467,10 @@ apply only to fresh workspace initialization unless stored roles are explicitly 
 Activity rows reference either a message or a participation lifecycle occurrence. Existing stored roles do not automatically gain
 `thread.read`, `thread.publish`, or `thread.follow`; assign explicit grants or update those roles before using the new operations.
 Human acknowledgment adds outcome and timestamp columns to PostgreSQL's development baseline;
-recreate disposable PostgreSQL databases when adopting it.
+recreate disposable PostgreSQL databases when adopting it. Message, activity, and participation
+facts carry their thread's `groupId`, which decides their [audience](journal.md#fact-audiences);
+facts recorded before that change do not decode, so recreate development databases that hold
+threads.
 
 ## Verification
 

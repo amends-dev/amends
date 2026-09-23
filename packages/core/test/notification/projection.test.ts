@@ -16,6 +16,7 @@ import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
+import { Group } from "../../src/group/group.ts";
 import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { NotificationProjection } from "../../src/notification/projection.ts";
@@ -129,6 +130,7 @@ it.effect("participation domain facts publish without touching notifications", (
         // The fixture defects on every participation or notification read/write.
         yield* journal.publish(ThreadParticipationFacts.Ended, {
           workspaceId,
+          groupId: Group.Id.make("group"),
           threadId: Thread.Id.make("thread"),
           participationId: ThreadParticipation.Id.make("participation"),
           reason: "unfollowed",

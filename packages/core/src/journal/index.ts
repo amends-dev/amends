@@ -3,6 +3,7 @@
  * coordinator. Hosts implement Store and Checkpoint; domains define facts and
  * projections and publish through Journal.
  */
+export { Audience } from "./audience.ts";
 export { Checkpoint } from "./checkpoint.ts";
 export { Codec } from "./codec.ts";
 export { Commit } from "./commit.ts";

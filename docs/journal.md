@@ -11,7 +11,7 @@ available application operations.
 ## Ownership
 
 - **Fact** defines a domain statement's name, version, payload schema, required
-  subject rule, and optional occurrence identity.
+  subject rule, optional occurrence identity, and optional audience.
 - **Log** provides typed appends, lookup, paged reads, finite streams, and live tails
   for a log ID.
   Opening a handle performs no storage operation; the first append creates the
@@ -114,6 +114,30 @@ bounded and ordered by that cursor. Use `Event.decode(fact, entry)` for payloads
 Filtered entry pages do not replace complete-batch replay or its checkpoints.
 A fact subject also does not establish thread activity, participant access, or a
 thread-specific sequence; those remain responsibilities of the thread domain.
+
+## Fact audiences
+
+A fact may declare a pure `audience(payload)` function: the delivery scopes whose readers may
+learn of the fact beyond the projections that apply it. `Audience.workspace` reaches every
+member; `Audience.make(kind, id)` builds a `kind:id` scope with the same rules as subjects.
+Owning domains name their kinds once, through `Group.audienceOf`, `Member.audienceOf`, and
+`Identity.audienceOf`, so facts and the consumers that grant scopes use the same keys.
+`Fact.makeAudience(fact, payload)` validates the payload and returns the scopes, which must be
+distinct. A fact that declares no audience is internal: nothing outside its projections
+learns of it.
+
+Audiences are derived when a consumer decodes an event, not stored with the entry, so
+correcting a rule also corrects delivery of earlier history. The declaration must therefore
+depend only on the payload. Thread message, activity, and participation facts carry their
+thread's `groupId` for this reason, since a thread belongs to exactly one group.
+
+| Facts                                                                  | Audience                                      |
+| ---------------------------------------------------------------------- | --------------------------------------------- |
+| Workspace, member, invitation, role, assignment, and ownership facts   | The workspace                                 |
+| Group creation; thread creation, messages, activity, and participation | The group                                     |
+| Group admission and removal                                            | The group and the admitted member             |
+| Group follow started and ended                                         | The following member                          |
+| Notification acknowledgment                                            | The human or agent recipient; others internal |
 
 ## Idempotent publication and append
 
