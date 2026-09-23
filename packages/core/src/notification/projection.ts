@@ -89,16 +89,7 @@ export const definition = Projection.make("notifications", { version: 1 })
             operation: "project",
             message: "Recipient participation is inconsistent",
           });
-        records.push({
-          id: Notification.Id.make(JSON.stringify([event.logId, event.id, participant.id])),
-          workspaceId: activity.workspaceId,
-          source: { logId: event.logId, entryId: event.id },
-          participationId: participant.id,
-          thread: { threadId: activity.threadId, sequence: activity.sequence },
-          recipient: recipient.recipient,
-          recordedAt: event.recordedAt,
-          state: { _tag: "Pending" },
-        });
+        records.push(Notification.generated(event, activity, recipient));
       }
       yield* notifications.insertMany(records);
     }),

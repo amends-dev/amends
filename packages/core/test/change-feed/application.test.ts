@@ -524,6 +524,71 @@ it.effect(
     ),
 );
 
+/** Activity in the group that selects Alice and Bob as recipients. */
+const notifying = publish(ThreadActivityFacts.Recorded, {
+  groupId,
+  activity: {
+    id: ThreadActivity.Id.make("reply-activity"),
+    workspaceId,
+    threadId,
+    sequence: 3,
+    kind: "MessagePublished",
+    messageId: ThreadMessage.Id.make("reply"),
+    occurredAt: at,
+  },
+  recipients: [
+    { participationId: ThreadParticipation.Id.make("alice-participation"), recipient: alice },
+    {
+      participationId: ThreadParticipation.Id.make("bob-participation"),
+      recipient: { _tag: "Human", id: Identity.HumanId.make("bob") },
+    },
+    { participationId: ThreadParticipation.Id.make("triage"), recipient: { _tag: "Triage" } },
+  ],
+});
+
+it.effect("the notifications a commit creates reach their recipient alone, with the activity", () =>
+  run(({ admitted }) =>
+    Effect.gen(function* () {
+      admitted.add(groupId);
+      const feed = yield* listen();
+      yield* feed.next;
+      yield* commit(notifying);
+      const received = committed(yield* feed.next);
+      const [activity] = received.events;
+      expect(activity?.name).toBe(ThreadActivityFacts.Recorded.name);
+      expect(received.notifications).toEqual([
+        {
+          id: JSON.stringify(["journal", activity?.id, "alice-participation"]),
+          workspaceId,
+          source: { logId: "journal", entryId: activity?.id },
+          participationId: "alice-participation",
+          thread: { threadId, sequence: 3 },
+          recipient: alice,
+          recordedAt: activity?.recordedAt,
+          state: { _tag: "Pending" },
+        },
+      ]);
+    }),
+  ),
+);
+
+it.effect("a recipient without read access still receives their notification alone", () =>
+  run(
+    () =>
+      Effect.gen(function* () {
+        const feed = yield* listen();
+        yield* feed.next;
+        yield* commit(notifying);
+        const received = committed(yield* feed.next);
+        expect(received.events).toEqual([]);
+        expect(received.notifications.map((n) => n.participationId)).toEqual([
+          "alice-participation",
+        ]);
+      }),
+    { grants: [] },
+  ),
+);
+
 it.effect("internal facts are skipped, and a commit of only internal facts sends nothing", () =>
   run(() =>
     Effect.gen(function* () {

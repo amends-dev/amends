@@ -183,8 +183,9 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   notification queue that serializes such commits across the whole database, which matters only
   at thousands of commits a second; a batched poll per process is the alternative then. Behind a
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
-- Notifications are not delivered over the feed. A recipient learns of a new notification
-  only by rereading the inbox, prompted by the thread events they can see.
+- New notifications reach their recipients over the feed, but later state changes other than
+  acknowledgment do not: an agent's pending notifications discarded when its participation ends
+  are visible only through the participation-ended activity and the inbox.
 - A reader's cursor advances only with commits that carry something they may see. A reader
   who sees little of a busy workspace can fall more than 500 commits behind while
   disconnected and then reset instead of resuming.

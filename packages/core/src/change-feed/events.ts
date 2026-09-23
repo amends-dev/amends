@@ -11,7 +11,9 @@ import type { Audience } from "../journal/audience.ts";
 import { Event } from "../journal/event.ts";
 import { Fact } from "../journal/fact.ts";
 import type { Log } from "../journal/log.ts";
+import { Identity } from "../identity/identity.ts";
 import { NotificationFacts } from "../notification/facts.ts";
+import { Notification } from "../notification/notification.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import type { ThreadId } from "../thread/id.ts";
 import { ThreadFacts } from "../thread/facts.ts";
@@ -35,6 +37,12 @@ export type Access =
   | { readonly _tag: "Grants"; readonly memberId: Member.Id | undefined }
   | { readonly _tag: "Removed"; readonly memberId: Member.Id };
 
+/** A notification the event created, for the reader holding its recipient's scope. */
+export interface Addressed {
+  readonly scope: Audience.Scope;
+  readonly record: Notification.Record;
+}
+
 /** One decoded event, ready to filter for each reader. */
 export interface Prepared {
   readonly event: ChangeFeed.Event;
@@ -42,6 +50,7 @@ export interface Prepared {
   /** The read permission a reader also needs, beyond holding one of the audience's scopes. */
   readonly requirement: Requirement.Value | undefined;
   readonly access: Access | undefined;
+  readonly notifications: ReadonlyArray<Addressed>;
 }
 
 /** A published fact's name recorded with a version this host does not know. */
@@ -79,6 +88,10 @@ const register = <F extends Standalone, View extends Schema.Constraint = F["payl
       readonly from: (payload: Fact.Payload<F>) => View["Type"];
     };
     readonly access?: (payload: Fact.Payload<F>) => Access | undefined;
+    /** The notifications the fact's projection creates, as their recipients' inboxes list them. */
+    readonly notifications?: (
+      event: Event.Metadata & { readonly payload: Fact.Payload<F> },
+    ) => ReadonlyArray<Addressed>;
   } = {},
 ): Registered => {
   // Domain payload schemas need no services, so the JSON codec runs without context.
@@ -108,6 +121,7 @@ const register = <F extends Standalone, View extends Schema.Constraint = F["payl
         audience: yield* Fact.makeAudience(fact, payload),
         requirement: options.requirement?.(payload, workspaceId),
         access: options.access?.(payload),
+        notifications: options.notifications?.(Object.assign({}, event, { payload })) ?? [],
       };
     }),
   };
@@ -164,9 +178,21 @@ const registry: ReadonlyArray<Registered> = [
   register(ThreadMessageFacts.Published, {
     requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
   }),
-  // Readers see the timeline item; who it notified stays with the notification projection.
+  // Readers see the timeline item without whom it notified; each human or agent recipient
+  // receives the notification it created for them, which needs no thread read permission.
   register(ThreadActivityFacts.Recorded, {
     requirement: ({ activity }, workspaceId) => readThread(activity.threadId, workspaceId),
+    notifications: (event) =>
+      event.payload.recipients.flatMap((selected) =>
+        selected.recipient._tag === "Human" || selected.recipient._tag === "Agent"
+          ? [
+              {
+                scope: Identity.audienceOf(selected.recipient),
+                record: Notification.generated(event, event.payload.activity, selected),
+              },
+            ]
+          : [],
+      ),
     view: {
       schema: Schema.Struct({
         groupId: ThreadActivityFacts.Recorded.payload.fields.groupId,

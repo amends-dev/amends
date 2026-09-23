@@ -430,8 +430,12 @@ participation omits routing identities and admissions. Facts outside the registr
 such as test facts, are internal; a registered name with an unknown version stops
 the follower, and its subscribers see `ChangeFeed.Unavailable`.
 
-A commit whose visible events are all withheld sends nothing, so a reader's cursor only
-advances with commits it sees. The HTTP contract reuses these message schemas.
+Recorded thread activity also carries the notifications its projection creates. Each
+recipient's arrives in the same `Committed` message's `notifications`, derived with
+`Notification.generated` exactly as the projection stores it, so it equals what the inbox
+lists; human and agent recipients receive their own, whether or not they may read the thread,
+and nobody else sees them. A commit with no visible events and no notifications for the reader
+sends nothing, so a reader's cursor only advances with commits it sees. The HTTP contract reuses these message schemas.
 Frontend query dependencies belong in the client.
 
 ## Module dependencies and exports

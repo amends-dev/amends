@@ -454,8 +454,9 @@ Thread creation, participation, message, and activity facts reach the thread's g
 with `thread.read` for that thread over the [change feed](../packages/core/README.md#change-feed).
 Messages carry their full text, so clients render them without a refetch. Activity events omit
 their notification recipients, and participation events omit routing identities and admissions.
-Notification acknowledgments reach only their recipient. Notifications themselves are not yet
-delivered over the feed.
+Each notification an activity creates reaches its human or agent recipient in the same commit
+message, as their inbox lists it, with or without read access to the thread; acknowledgments
+also reach only their recipient.
 Notifications expose source references, not continuing authority to read the source conversation.
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not

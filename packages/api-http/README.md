@@ -86,8 +86,10 @@ sent after the subscription registers. With `reset: false`, the commits after th
 cursor follow, then live ones. With `reset: true` (no cursor, an unknown one, or one more
 than 500 commits behind) delivery starts at the head and the client must refresh the views
 it keeps; `cursor` is null only for an empty workspace. Later messages contain
-`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, and an ordered nonempty `events`
-array. Each event contains `id`, `name`, `version`, `recordedAt` (UTC ISO string),
+`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, and a
+`notifications` array; at least one of the two is nonempty. `notifications` holds the
+notifications the commit created for the caller, with the same fields the inbox list returns,
+so clients can update an inbox or badge without a refetch. Each event contains `id`, `name`, `version`, `recordedAt` (UTC ISO string),
 `provenance`, and its JSON-encoded `payload`. Provenance includes the workspace, performer,
 immediate cause, correlation ID, and occurrence time; public request bodies cannot choose
 that attribution. The server sends no query keys; clients choose which queries to update or
@@ -97,8 +99,8 @@ Events reach the readers in their fact's audience with the matching read permiss
 workspace facts reach every member, group and thread facts the group's members with
 `group.read` or `thread.read`, and follows and acknowledgments only their owner. Message
 events carry the full message, so clients can render it without a refetch; activity and
-participation events carry their public views. A commit with nothing the caller may see
-sends no message. The commit that removes the caller from the workspace is delivered,
+participation events carry their public views. A commit with nothing the caller may see and
+no notification for them sends no message. The commit that removes the caller from the workspace is delivered,
 then the stream ends; reconnecting returns 403.
 
 The feed follows the journal, so commits from every host over the same database arrive.

@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import type { DateTime } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { Entry } from "../journal/entry.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -77,5 +78,29 @@ export const Record = Schema.Struct({
   ),
 );
 export interface Record extends Schema.Schema.Type<typeof Record> {}
+
+/**
+ * The notification that recorded thread activity generates for one selected recipient, pending.
+ * Everything comes from the activity's journal entry, so replay and the change feed reproduce the
+ * record exactly: its ID is the entry and the recipient's participation.
+ */
+export const generated = (
+  entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },
+  activity: {
+    readonly workspaceId: WorkspaceId.Id;
+    readonly threadId: ThreadId.Id;
+    readonly sequence: number;
+  },
+  selected: { readonly participationId: ThreadParticipationId.Id; readonly recipient: Recipient },
+): Record => ({
+  id: Id.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
+  workspaceId: activity.workspaceId,
+  source: { logId: entry.logId, entryId: entry.id },
+  participationId: selected.participationId,
+  thread: { threadId: activity.threadId, sequence: activity.sequence },
+  recipient: selected.recipient,
+  recordedAt: entry.recordedAt,
+  state: { _tag: "Pending" },
+});
 
 export * as Notification from "./notification.ts";

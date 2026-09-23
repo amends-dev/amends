@@ -3,6 +3,7 @@ import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
 import { GroupApplication, GroupFacts } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
+import { NotificationApplication } from "@amends/core/notification";
 import { ThreadApplication, ThreadMessageFacts } from "@amends/core/thread";
 import {
   InvitationApplication,
@@ -239,6 +240,68 @@ export const changeFeed = (harness: Harness) => {
               expect(committed(yield* next).events.map((e) => e.name)).toEqual([
                 InvitationFacts.Issued.name,
               ]);
+          }),
+        ),
+      ),
+    );
+
+    it.live("a mention's notification reaches its recipient as their inbox lists it", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const bound = yield* boundTo(workspaceId);
+            const workspace = yield* initialized(bound);
+            const owner = Actor.Value.make({
+              workspaceId,
+              memberId: workspace.ownerMemberId,
+              identity: alice,
+            });
+            const mentioned = memberActor("mentioned");
+            const bystander = memberActor("bystander");
+            yield* seed(bound, [mentioned, bystander], [mentioned, bystander]);
+            const services = yield* Layer.build(core(bound));
+            const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+              program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(services));
+            const group = yield* as(
+              owner,
+              Effect.flatMap(GroupApplication.Service, (groups) =>
+                groups.createPrivateTeam({
+                  name: "Team",
+                  memberIds: [owner.memberId, mentioned.memberId, bystander.memberId],
+                }),
+              ),
+            );
+            const [mentionedFeed, bystanderFeed] = yield* Effect.forEach(
+              [mentioned, bystander],
+              (actor) => as(actor, listen(watch())),
+            );
+            if (!mentionedFeed || !bystanderFeed) return yield* Effect.die("Expected two feeds");
+            for (const next of [mentionedFeed, bystanderFeed]) yield* next;
+            yield* as(
+              owner,
+              Effect.flatMap(ThreadApplication.Service, (threads) =>
+                threads.startInGroup({
+                  groupId: group.id,
+                  mentions: [mentioned.memberId],
+                  text: "Can you look?",
+                }),
+              ),
+            );
+            const started = committed(yield* mentionedFeed);
+            const inbox = yield* as(
+              mentioned,
+              Effect.flatMap(NotificationApplication.Service, (notifications) =>
+                notifications.list({ limit: 10 }),
+              ),
+            );
+            expect(inbox).toHaveLength(1);
+            expect(started.notifications).toEqual(inbox);
+            // The bystander sees the conversation, but nothing addressed to someone else.
+            const seen = committed(yield* bystanderFeed);
+            expect(seen.cursor).toBe(started.cursor);
+            expect(seen.events.map((e) => e.name)).toContain(ThreadMessageFacts.Published.name);
+            expect(seen.notifications).toEqual([]);
           }),
         ),
       ),

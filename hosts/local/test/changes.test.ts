@@ -84,7 +84,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* second.next).toEqual(received);
           if (received._tag !== "Committed") return yield* Effect.die("Expected commit");
           expect(received.events).toHaveLength(1);
+          expect(received.notifications).toEqual([]);
           const issued = received.events[0];
+          if (issued === undefined) return yield* Effect.die("Expected an event");
           expect(issued.name).toBe(InvitationFacts.Issued.name);
           expect(DateTime.isDateTime(issued.recordedAt)).toBe(true);
           const payload = yield* Schema.decodeUnknownEffect(InvitationFacts.Issued.payload)(

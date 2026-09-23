@@ -1,4 +1,4 @@
-import { Array, Context, Effect, Layer, Option, Schema, Stream } from "effect";
+import { Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import type { Grant } from "../authorization/grant.ts";
@@ -110,16 +110,21 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
             // Reload first, so a commit that admits the reader also delivers what it admits.
             if (delivery.events.some(changes(actor))) access = yield* load(actor);
             const events = delivery.events.filter(visible(access)).map((p) => p.event);
-            const message = Array.isArrayNonEmpty(events)
-              ? Stream.make(
-                  ChangeFeed.Message.cases.Committed.make({
-                    workspaceId,
-                    cursor: ChangeFeed.cursorOf(delivery.position),
-                    commitId: delivery.commitId,
-                    events,
-                  }),
-                )
-              : Stream.empty;
+            const notifications = delivery.events.flatMap((p) =>
+              p.notifications.flatMap((n) => (access.scopes.has(n.scope) ? [n.record] : [])),
+            );
+            const message =
+              events.length + notifications.length > 0
+                ? Stream.make(
+                    ChangeFeed.Message.cases.Committed.make({
+                      workspaceId,
+                      cursor: ChangeFeed.cursorOf(delivery.position),
+                      commitId: delivery.commitId,
+                      events,
+                      notifications,
+                    }),
+                  )
+                : Stream.empty;
             const removed = delivery.events.some(
               (p) => p.access?._tag === "Removed" && p.access.memberId === actor.memberId,
             );
