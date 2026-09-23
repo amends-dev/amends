@@ -62,6 +62,13 @@ export const directKey = (memberIds: ReadonlyArray<string>): string =>
   JSON.stringify(directMembers(memberIds));
 
 /** The creator is admitted only when explicitly included. Empty groups are allowed. */
+/** When any of a group's threads last had content activity. */
+export const Latest = Schema.Struct({
+  groupId: GroupId.Id,
+  occurredAt: Schema.DateTimeUtcFromString,
+});
+export interface Latest extends Schema.Schema.Type<typeof Latest> {}
+
 export const CreatePrivateTeamInput = Schema.Struct({
   name: Name,
   memberIds: Schema.UniqueArray(MemberId.Id),

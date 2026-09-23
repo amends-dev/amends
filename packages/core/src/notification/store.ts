@@ -3,6 +3,7 @@ import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
+import type { ThreadId } from "../thread/id.ts";
 import type { ThreadParticipationId } from "../thread/participation/id.ts";
 
 /** Exclusive keyset boundary for listing; not a journal position or live delivery cursor. */
@@ -54,6 +55,16 @@ export interface Interface {
   readonly listPendingByRecipient: (
     recipient: Notification.Recipient,
     options: ReadOptions,
+  ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+
+  /**
+   * The recipient's pending notifications from one thread's activity at or before a timeline
+   * position, ordered by that position, then ID in binary lexical order.
+   */
+  readonly listPendingByThread: (
+    recipient: Notification.Recipient,
+    threadId: ThreadId.Id,
+    throughSequence: number,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
 
   /**

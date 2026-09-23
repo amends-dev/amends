@@ -5,6 +5,7 @@ import {
   ThreadActivityStore,
 } from "@amends/core/thread";
 import * as Core from "@amends/core";
+import { ReadStateStore } from "@amends/core/attention";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity, Performer } from "@amends/core/identity";
 import { Event, Checkpoint, CommittedEvents, Store } from "@amends/core/journal";
@@ -48,6 +49,7 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
   groups: Context.get(context, GroupStore.Service),
   groupMemberships: Context.get(context, GroupMembershipStore.Service),
   groupFollows: Context.get(context, GroupFollowStore.Service),
+  readStates: Context.get(context, ReadStateStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 export const views = Effect.map(SqliteStorage.make(), (service) => ({

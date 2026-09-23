@@ -17,6 +17,16 @@ export const Record = Schema.Struct({
   createdAt: Schema.DateTimeUtcFromString,
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
+/**
+ * A thread's latest content activity: the timeline position and time of its latest message.
+ * Quiet participation changes do not count, so they never make a thread unread.
+ */
+export const Latest = Schema.Struct({
+  threadId: ThreadId.Id,
+  sequence: Schema.Int.check(Schema.isGreaterThan(0)),
+  occurredAt: Schema.DateTimeUtcFromString,
+});
+export interface Latest extends Schema.Schema.Type<typeof Latest> {}
 export const StartInGroupInput = Schema.Struct({
   groupId: GroupId.Id,
   text: ThreadMessage.Text,

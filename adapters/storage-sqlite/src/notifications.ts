@@ -1,4 +1,4 @@
-import { ThreadParticipation } from "@amends/core/thread";
+import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -100,6 +100,17 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listByRecipient: Effect.fn("Notifications.listByRecipient")(
       (recipient, options) => list(recipient, options, false),
       Effect.mapError(storeFailure(NotificationStore, "listByRecipient")),
+    ),
+    listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
+      function* (recipient, threadInput, throughSequence) {
+        const target = yield* validateRecipient(recipient);
+        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const through = yield* Schema.decodeEffect(Schema.Int)(throughSequence);
+        return yield* guard(
+          sql`SELECT ${columns} FROM notifications WHERE workspace_id = ${workspaceId} AND json_extract(record, '$.recipient._tag') = ${target._tag} AND coalesce(json_extract(record, '$.recipient.id'), '') = ${target._tag === "Triage" ? "" : target.id} AND json_extract(record, '$.thread.threadId') = ${threadId} AND json_extract(record, '$.thread.sequence') <= ${through} AND json_extract(record, '$.state._tag') = 'Pending' ORDER BY json_extract(record, '$.thread.sequence'), id COLLATE BINARY`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(NotificationStore, "listPendingByThread")),
     ),
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       (recipient, options) => list(recipient, options, true),

@@ -71,8 +71,8 @@ with `startInGroup`. Direct-group membership is fixed; see [group workflows](gro
 These rules follow the agreed
 [attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient). A team-group
 post is not a broadcast: it admits the group's [followers](group-workflows.md#following-a-group),
-and the rest of the group can read the thread without participating. The read positions that show
-unread activity are not implemented yet.
+and the rest of the group can read the thread without participating.
+[Read positions](#marking-conversations-read) are recorded; unread reads are not implemented yet.
 
 | Opening message                        | Initial participants                                          | Notification recipients                 |
 | -------------------------------------- | ------------------------------------------------------------- | --------------------------------------- |
@@ -326,6 +326,34 @@ without checking current membership or time. Acknowledgment creates no thread ac
 new notifications. Its fact is withheld from the workspace-wide feed. The operation is implemented
 through core and the gateway on both adapters; its HTTP route and client action remain pending.
 
+## Marking conversations read
+
+`ReadStateApplication.markThreadRead({ threadId, throughSequence })` records that the acting
+person has read a thread through a timeline position. It requires a human actor, the thread's
+current group access, and `thread.read`, like any thread read; missing and inaccessible threads
+return `ReadStateApplication.ThreadNotFound`, an agent returns `HumanRequired`, and a position past
+the thread's latest activity returns `BeyondTimeline`. The position only moves forward: marking an
+earlier position changes nothing. The reader's pending notifications from that thread's activity
+up to the position are acknowledged as `Seen` in the same commit. With none pending, only the
+position is written, without a journal commit. Reading a timeline does not mark it read; clients
+call this operation for what they have shown.
+
+`markGroupRead({ groupId })` records that the acting person caught up with a group now. It needs
+current group membership and `group.read`, and returns `GroupNotFound` otherwise; the caught-up
+time also only moves forward.
+
+Read positions and caught-up times are private state in `ReadStateStore`, outside the journal: they
+are not facts, the change feed carries nothing for them, and rebuilding projections does not
+restore them. A write outside a journal commit runs on its own, so reading does not wait for the
+workspace's conversation writes.
+
+Each thread records the sequence and time of its latest message, and each group the time of its
+latest message in any thread; quiet participation activity does not count. The thread activity
+projection maintains both, and `ThreadStore.getLatest` and `GroupStore.getLatest` read them in
+batches. Notifications from thread activity carry their thread and sequence, so reading a thread
+settles exactly its notifications. Unread state and thread lists ordered by latest activity use
+these records and are not implemented yet.
+
 ## Recorded changes and replay
 
 Every timeline item uses `ThreadActivityFacts.Recorded` with the same `{ activity, recipients }`
@@ -441,6 +469,10 @@ Reply suites cover scoped action grants, live access changes, initial and return
 mention and unmentioned selection, agent use for mentioned agents only, concurrent sequencing and
 removal, projection/checkpoint failures,
 outer commits, reopening, and replay after grants or membership change.
+Read-state suites cover latest activity from messages only, forward-only positions and caught-up
+times, settling the inbox up to a position in one commit, writing no commit when nothing is
+pending, positions past the timeline, human and access checks, and read-state storage inside and
+outside transactions.
 Participation suites verify quiet following, repeat calls, self-only unfollow, stale requests,
 notification retention/settlement, rejoining through follows and messages, concurrent publication,
 projection/checkpoint rollback, outer commits, replay, and historical follow reads.

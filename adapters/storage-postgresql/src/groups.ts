@@ -1,8 +1,9 @@
 import { Group, GroupStore } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { groups, members } from "./schema.ts";
 
@@ -22,8 +23,18 @@ const decode = (rows: ReadonlyArray<unknown>) =>
   );
 
 type Row = typeof groups.$inferSelect;
+const decodeLatest = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ ...Group.Latest.fields, occurredAt: Schema.DateTimeUtcFromDate })),
+);
 /** Each kind reads only its own columns; the schema constraint rejects rows mixing them. */
-const toRecord = ({ memberIds, directKey, visibility, name, ...common }: Row) =>
+const toRecord = ({
+  memberIds,
+  directKey,
+  visibility,
+  name,
+  latestActivityAt: _latest,
+  ...common
+}: Row) =>
   common.kind === "Direct"
     ? directKey === (memberIds === null ? null : Group.directKey(memberIds))
       ? { ...common, memberIds }
@@ -83,6 +94,60 @@ export const make = Effect.fn("Groups.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupStore, "findDirect")),
     ),
+    getLatest: Effect.fn("Groups.getLatest")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select({ groupId: groups.id, occurredAt: groups.latestActivityAt })
+            .from(groups)
+            .where(
+              and(
+                eq(groups.workspaceId, workspaceId),
+                inIds(groups.id, ids),
+                isNotNull(groups.latestActivityAt),
+              ),
+            ),
+        ).pipe(Effect.flatMap(decodeLatest));
+      },
+      Effect.mapError(storeFailure(GroupStore, "getLatest")),
+    ),
+    recordLatest: Effect.fn("Groups.recordLatest")(function* (input) {
+      yield* Store.Transaction;
+      const latest = yield* Schema.decodeEffect(Schema.toType(Group.Latest))(input).pipe(
+        Effect.mapError(storeConflict(GroupStore, "recordLatest")),
+      );
+      const at = DateTime.toDate(latest.occurredAt);
+      const advanced = yield* guard(
+        db
+          .update(groups)
+          .set({ latestActivityAt: at })
+          .where(
+            and(
+              eq(groups.workspaceId, workspaceId),
+              eq(groups.id, latest.groupId),
+              or(isNull(groups.latestActivityAt), lt(groups.latestActivityAt, at)),
+            ),
+          )
+          .returning({ id: groups.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(GroupStore, "recordLatest")));
+      if (advanced.length > 0) return;
+      // Nothing advanced: an earlier time changes nothing, but the group must exist.
+      const found = yield* guard(
+        db
+          .select({ id: groups.id })
+          .from(groups)
+          .where(and(eq(groups.workspaceId, workspaceId), eq(groups.id, latest.groupId))),
+        true,
+      ).pipe(Effect.mapError(storeError(GroupStore, "recordLatest")));
+      if (found.length === 0)
+        return yield* new GroupStore.Conflict({
+          operation: "recordLatest",
+          message: "Group is missing",
+        });
+    }),
     insert: Effect.fn("Groups.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validateRecord(input).pipe(

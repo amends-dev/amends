@@ -2,9 +2,10 @@ import { Thread, ThreadStore } from "@amends/core/thread";
 import { Group } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
 import { threads, groups, members } from "./schema.ts";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
 const decode = Schema.decodeUnknownEffect(
@@ -12,7 +13,14 @@ const decode = Schema.decodeUnknownEffect(
 );
 type Row = typeof threads.$inferSelect;
 /** Each creator kind reads only its own column; the table constraint rejects mixed rows. */
-const toRecord = ({ createdByKind, createdByMemberId, createdByContactId, ...row }: Row) => ({
+const toRecord = ({
+  createdByKind,
+  createdByMemberId,
+  createdByContactId,
+  latestSequence: _sequence,
+  latestActivityAt: _at,
+  ...row
+}: Row) => ({
   ...row,
   createdBy:
     createdByKind === "Member"
@@ -28,6 +36,9 @@ const creatorColumns = (
   creator._tag === "Member"
     ? { createdByKind: "Member", createdByMemberId: creator.memberId, createdByContactId: null }
     : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId };
+const decodeLatest = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ ...Thread.Latest.fields, occurredAt: Schema.DateTimeUtcFromDate })),
+);
 const decodeRows = (rows: ReadonlyArray<Row>) =>
   decode(rows.map(toRecord)).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
@@ -64,6 +75,60 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "listByGroup")),
     ),
+    getLatest: Effect.fn("Threads.getLatest")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select({
+              threadId: threads.id,
+              sequence: threads.latestSequence,
+              occurredAt: threads.latestActivityAt,
+            })
+            .from(threads)
+            .where(and(inWorkspace, inIds(threads.id, ids), isNotNull(threads.latestSequence))),
+        ).pipe(Effect.flatMap(decodeLatest));
+      },
+      Effect.mapError(storeFailure(ThreadStore, "getLatest")),
+    ),
+    recordLatest: Effect.fn("Threads.recordLatest")(function* (input) {
+      yield* Store.Transaction;
+      const latest = yield* Schema.decodeEffect(Schema.toType(Thread.Latest))(input).pipe(
+        Effect.mapError(storeConflict(ThreadStore, "recordLatest")),
+      );
+      const advanced = yield* guard(
+        db
+          .update(threads)
+          .set({
+            latestSequence: latest.sequence,
+            latestActivityAt: DateTime.toDate(latest.occurredAt),
+          })
+          .where(
+            and(
+              inWorkspace,
+              eq(threads.id, latest.threadId),
+              or(isNull(threads.latestSequence), lt(threads.latestSequence, latest.sequence)),
+            ),
+          )
+          .returning({ id: threads.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadStore, "recordLatest")));
+      if (advanced.length > 0) return;
+      // Nothing advanced: an earlier position changes nothing, but the thread must exist.
+      const found = yield* guard(
+        db
+          .select({ id: threads.id })
+          .from(threads)
+          .where(and(inWorkspace, eq(threads.id, latest.threadId))),
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadStore, "recordLatest")));
+      if (found.length === 0)
+        return yield* new ThreadStore.Conflict({
+          operation: "recordLatest",
+          message: "Thread is missing",
+        });
+    }),
     insert: Effect.fn("Threads.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validate(input).pipe(

@@ -104,6 +104,8 @@ export const groups = pgTable(
     directKey: text("direct_key"),
     createdBy: text("created_by").notNull(),
     createdAt: instant("created_at").notNull(),
+    // When any of the group's threads last had content activity.
+    latestActivityAt: instant("latest_activity_at"),
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
@@ -314,6 +316,9 @@ export const notifications = pgTable(
     recipientId: text("recipient_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
+    // The thread and timeline position of thread-activity notifications.
+    threadId: text("thread_id"),
+    threadSequence: integer("thread_sequence"),
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
@@ -348,6 +353,20 @@ export const notifications = pgTable(
         sql`coalesce(${table.recipientId}, '')`,
         table.recordedAt,
         sql`${table.id} COLLATE "C"`,
+      )
+      .where(sql`${table.state} = 'Pending'`),
+    check(
+      "notification_thread",
+      sql`(${table.threadId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadSequence} > 0)`,
+    ),
+    // A reader's pending notifications from one thread, settled when they read it.
+    index("pending_notifications_by_thread")
+      .on(
+        table.workspaceId,
+        table.recipientKind,
+        sql`coalesce(${table.recipientId}, '')`,
+        table.threadId,
+        table.threadSequence,
       )
       .where(sql`${table.state} = 'Pending'`),
     check(
@@ -509,6 +528,9 @@ export const threads = pgTable(
     createdByMemberId: text("created_by_member_id"),
     createdByContactId: text("created_by_contact_id"),
     createdAt: instant("created_at").notNull(),
+    // The thread's latest content activity, maintained from its timeline.
+    latestSequence: integer("latest_sequence"),
+    latestActivityAt: instant("latest_activity_at"),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
@@ -525,6 +547,56 @@ export const threads = pgTable(
       sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
     ),
     index("threads_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
+    check(
+      "thread_latest",
+      sql`(${t.latestSequence} IS NULL AND ${t.latestActivityAt} IS NULL) OR (${t.latestSequence} > 0 AND ${t.latestActivityAt} IS NOT NULL)`,
+    ),
+  ],
+);
+/** Private read state; written outside journal commits, so replay does not rebuild it. */
+export const threadReadPositions = pgTable(
+  "thread_read_positions",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    memberId: text("member_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    readThrough: integer("read_through").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.memberId, t.threadId] }),
+    foreignKey({
+      columns: [t.workspaceId, t.memberId],
+      foreignColumns: [members.workspaceId, members.id],
+      name: "thread_read_positions_member",
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.threadId],
+      foreignColumns: [threads.workspaceId, threads.id],
+      name: "thread_read_positions_thread",
+    }),
+    check("thread_read_position", sql`${t.readThrough} > 0`),
+  ],
+);
+export const groupReadTimes = pgTable(
+  "group_read_times",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    memberId: text("member_id").notNull(),
+    groupId: text("group_id").notNull(),
+    caughtUpAt: instant("caught_up_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.memberId, t.groupId] }),
+    foreignKey({
+      columns: [t.workspaceId, t.memberId],
+      foreignColumns: [members.workspaceId, members.id],
+      name: "group_read_times_member",
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.groupId],
+      foreignColumns: [groups.workspaceId, groups.id],
+      name: "group_read_times_group",
+    }),
   ],
 );
 export const threadParticipations = pgTable(

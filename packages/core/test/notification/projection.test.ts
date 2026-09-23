@@ -53,6 +53,7 @@ const run = <A, E>(
       get: () => Effect.die("Unexpected notification read"),
       listByRecipient: () => Effect.die("Unexpected notification read"),
       listPendingByRecipient: () => Effect.die("Unexpected notification read"),
+      listPendingByThread: () => Effect.die("Unexpected notification read"),
       insert: () => Effect.die("Unexpected notification write"),
       insertMany: () => Effect.die("Unexpected notification write"),
       discardPendingForParticipation: () => Effect.die("Unexpected notification write"),

@@ -1,7 +1,7 @@
-import { ThreadParticipation } from "@amends/core/thread";
+import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -44,6 +44,9 @@ const toEncodedRecord = (row: NotificationRow) => ({
       : { _tag: row.recipientKind, id: row.recipientId },
   recordedAt: row.recordedAt,
   ...(row.participationId === null ? {} : { participationId: row.participationId }),
+  ...(row.threadId === null
+    ? {}
+    : { thread: { threadId: row.threadId, sequence: row.threadSequence } }),
   state:
     row.state === "Acknowledged"
       ? row.discardReason === null
@@ -126,6 +129,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
         sourceLogId: record.source.logId,
         sourceEntryId: record.source.entryId,
         participationId: record.participationId ?? null,
+        threadId: record.thread?.threadId ?? null,
+        threadSequence: record.thread?.sequence ?? null,
         discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
         acknowledgmentOutcome:
           record.state._tag === "Acknowledged" ? record.state.outcome._tag : null,
@@ -165,6 +170,33 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listByRecipient: Effect.fn("Notifications.listByRecipient")(
       (recipient, options) => list(recipient, options, false),
       Effect.mapError(storeFailure(NotificationStore, "listByRecipient")),
+    ),
+    listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
+      function* (recipient, threadInput, throughSequence) {
+        const target = yield* validateRecipient(recipient);
+        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const through = yield* Schema.decodeEffect(Schema.Int)(throughSequence);
+        return yield* guard(
+          db
+            .select()
+            .from(notifications)
+            .where(
+              and(
+                inWorkspace,
+                eq(notifications.recipientKind, target._tag),
+                eq(
+                  sql`coalesce(${notifications.recipientId}, '')`,
+                  target._tag === "Triage" ? "" : target.id,
+                ),
+                eq(notifications.threadId, threadId),
+                lte(notifications.threadSequence, through),
+                eq(notifications.state, "Pending"),
+              ),
+            )
+            .orderBy(asc(notifications.threadSequence), asc(orderedId)),
+        ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
+      },
+      Effect.mapError(storeFailure(NotificationStore, "listPendingByThread")),
     ),
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       (recipient, options) => list(recipient, options, true),

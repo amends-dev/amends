@@ -85,6 +85,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     get: (id) => Effect.succeed(Option.fromUndefinedOr(records.find((value) => value.id === id))),
     listByRecipient: list,
     listPendingByRecipient: list,
+    listPendingByThread: unexpected,
     insert: unexpected,
     insertMany: unexpected,
     discardPendingForParticipation: unexpected,

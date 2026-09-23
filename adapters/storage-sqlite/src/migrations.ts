@@ -9,7 +9,7 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE TABLE workspaces (workspace_id TEXT PRIMARY KEY, record TEXT NOT NULL CHECK(json_valid(record)))`;
     yield* sql`CREATE TABLE members (workspace_id TEXT NOT NULL, id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id))`;
     yield* sql`CREATE UNIQUE INDEX active_member_identity ON members(workspace_id, json_extract(record, '$.identity._tag'), json_extract(record, '$.identity.id')) WHERE json_extract(record, '$.status') = 'active'`;
-    yield* sql`CREATE TABLE groups (workspace_id TEXT NOT NULL, id TEXT NOT NULL, created_by TEXT NOT NULL, direct_key TEXT, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id), FOREIGN KEY(workspace_id, created_by) REFERENCES members(workspace_id, id))`;
+    yield* sql`CREATE TABLE groups (workspace_id TEXT NOT NULL, id TEXT NOT NULL, created_by TEXT NOT NULL, direct_key TEXT, latest_activity_at INTEGER, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id), FOREIGN KEY(workspace_id, created_by) REFERENCES members(workspace_id, id))`;
     // One direct group per exact member set; team groups carry no key.
     yield* sql`CREATE UNIQUE INDEX direct_groups_by_members ON groups(workspace_id, direct_key) WHERE direct_key IS NOT NULL`;
     yield* sql`CREATE TABLE group_memberships (workspace_id TEXT NOT NULL, id TEXT NOT NULL, group_id TEXT NOT NULL, member_id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id), FOREIGN KEY(workspace_id, group_id) REFERENCES groups(workspace_id, id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id))`;
@@ -19,7 +19,7 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE TABLE group_follows (workspace_id TEXT NOT NULL, id TEXT NOT NULL, group_id TEXT NOT NULL, member_id TEXT NOT NULL, group_membership_id TEXT NOT NULL, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id, id), FOREIGN KEY(workspace_id, group_id) REFERENCES groups(workspace_id, id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id), FOREIGN KEY(workspace_id, group_membership_id) REFERENCES group_memberships(workspace_id, id))`;
     yield* sql`CREATE UNIQUE INDEX active_group_follow ON group_follows(workspace_id, group_membership_id) WHERE json_extract(record, '$.status') = 'active'`;
     yield* sql`CREATE INDEX group_follows_by_group ON group_follows(workspace_id, group_id, id COLLATE BINARY)`;
-    yield* sql`CREATE TABLE threads (workspace_id TEXT NOT NULL, id TEXT NOT NULL, group_id TEXT NOT NULL, created_by TEXT, record TEXT NOT NULL CHECK(json_valid(record)), PRIMARY KEY(workspace_id,id), FOREIGN KEY(workspace_id,group_id) REFERENCES groups(workspace_id,id), FOREIGN KEY(workspace_id,created_by) REFERENCES members(workspace_id,id))`;
+    yield* sql`CREATE TABLE threads (workspace_id TEXT NOT NULL, id TEXT NOT NULL, group_id TEXT NOT NULL, created_by TEXT, latest_sequence INTEGER CHECK(latest_sequence > 0), latest_activity_at INTEGER, record TEXT NOT NULL CHECK(json_valid(record)), CHECK((latest_sequence IS NULL) = (latest_activity_at IS NULL)), PRIMARY KEY(workspace_id,id), FOREIGN KEY(workspace_id,group_id) REFERENCES groups(workspace_id,id), FOREIGN KEY(workspace_id,created_by) REFERENCES members(workspace_id,id))`;
     yield* sql`CREATE INDEX threads_by_group ON threads(workspace_id,group_id,id COLLATE BINARY)`;
     yield* sql`CREATE TABLE thread_participations (workspace_id TEXT NOT NULL,id TEXT NOT NULL,thread_id TEXT NOT NULL,member_id TEXT,group_membership_id TEXT,participant_key TEXT NOT NULL,record TEXT NOT NULL CHECK(json_valid(record)),PRIMARY KEY(workspace_id,id),FOREIGN KEY(workspace_id,thread_id) REFERENCES threads(workspace_id,id),FOREIGN KEY(workspace_id,member_id) REFERENCES members(workspace_id,id),FOREIGN KEY(workspace_id,group_membership_id) REFERENCES group_memberships(workspace_id,id))`;
     yield* sql`CREATE UNIQUE INDEX active_thread_participation ON thread_participations(workspace_id,thread_id,participant_key) WHERE json_extract(record,'$.status') = 'active'`;
@@ -50,6 +50,11 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE INDEX log_entries_by_commit ON log_entries(workspace_id, log_id, commit_id, entry_index)`;
     yield* sql`CREATE INDEX log_entries_by_subject ON log_entries(workspace_id, log_id, subject, position, entry_index)`;
     yield* sql`CREATE INDEX log_entries_by_fact ON log_entries(workspace_id, log_id, fact_name, position, entry_index)`;
+    // A reader's pending notifications from one thread, settled when they read it.
+    yield* sql`CREATE INDEX pending_notifications_by_thread ON notifications(workspace_id, json_extract(record, '$.recipient._tag'), coalesce(json_extract(record, '$.recipient.id'), ''), json_extract(record, '$.thread.threadId'), json_extract(record, '$.thread.sequence')) WHERE json_extract(record, '$.state._tag') = 'Pending'`;
+    // Private read state; written outside journal commits, so not rebuilt by replay.
+    yield* sql`CREATE TABLE thread_read_positions (workspace_id TEXT NOT NULL, member_id TEXT NOT NULL, thread_id TEXT NOT NULL, read_through INTEGER NOT NULL CHECK(read_through > 0), PRIMARY KEY(workspace_id, member_id, thread_id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id), FOREIGN KEY(workspace_id, thread_id) REFERENCES threads(workspace_id, id))`;
+    yield* sql`CREATE TABLE group_read_times (workspace_id TEXT NOT NULL, member_id TEXT NOT NULL, group_id TEXT NOT NULL, caught_up_at INTEGER NOT NULL, PRIMARY KEY(workspace_id, member_id, group_id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id), FOREIGN KEY(workspace_id, group_id) REFERENCES groups(workspace_id, id))`;
   }),
 });
 

@@ -1,9 +1,10 @@
 import { Thread, ThreadStore } from "@amends/core/thread";
 import { Group } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
-import { Array, Effect, Layer, Schema } from "effect";
+import { Array, DateTime, Effect, Layer, Schema } from "effect";
 
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
 const codec = Schema.fromJsonString(Thread.Record);
@@ -33,6 +34,11 @@ const decode = Schema.decodeUnknownEffect(
 );
 const records = (rows: ReadonlyArray<{ readonly record: Thread.Record }>) =>
   rows.map((row) => row.record);
+const decodeLatest = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({ ...Thread.Latest.fields, occurredAt: Schema.DateTimeUtcFromMillis }),
+  ),
+);
 /** Workspace-bound threads projection storage. @category constructors */
 export const make = Effect.fn("Threads.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
@@ -58,6 +64,37 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "listByGroup")),
     ),
+    getLatest: Effect.fn("Threads.getLatest")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          sql`SELECT id AS threadId, latest_sequence AS sequence, latest_activity_at AS occurredAt FROM threads WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)} AND latest_sequence IS NOT NULL`,
+        ).pipe(Effect.flatMap(decodeLatest));
+      },
+      Effect.mapError(storeFailure(ThreadStore, "getLatest")),
+    ),
+    recordLatest: Effect.fn("Threads.recordLatest")(function* (input) {
+      yield* Store.Transaction;
+      const latest = yield* Schema.decodeEffect(Schema.toType(Thread.Latest))(input).pipe(
+        Effect.mapError(storeConflict(ThreadStore, "recordLatest")),
+      );
+      const advanced = yield* guard(
+        sql`UPDATE threads SET latest_sequence = ${latest.sequence}, latest_activity_at = ${DateTime.toEpochMillis(latest.occurredAt)} WHERE workspace_id = ${workspaceId} AND id = ${latest.threadId} AND (latest_sequence IS NULL OR latest_sequence < ${latest.sequence}) RETURNING id`,
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadStore, "recordLatest")));
+      if (advanced.length > 0) return;
+      // Nothing advanced: an earlier position changes nothing, but the thread must exist.
+      const found = yield* guard(
+        sql`SELECT id FROM threads WHERE workspace_id = ${workspaceId} AND id = ${latest.threadId}`,
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadStore, "recordLatest")));
+      if (found.length === 0)
+        return yield* new ThreadStore.Conflict({
+          operation: "recordLatest",
+          message: "Thread is missing",
+        });
+    }),
     insert: Effect.fn("Threads.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validate(input).pipe(

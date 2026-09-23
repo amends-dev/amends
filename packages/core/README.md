@@ -187,6 +187,14 @@ afterwards; it belongs to their admission and ends when the admission does, whic
 host binding. Direct groups return `NotFollowable`. See
 [following a group](../../docs/group-workflows.md#following-a-group).
 
+`@amends/core/attention` holds private read state. `ReadStateApplication.markThreadRead` records
+how far a person has read a thread and acknowledges their pending notifications from it up to that
+position; `markGroupRead` records when they caught up with a group. Both only move forward.
+`ReadStateStore` is a required host binding, kept outside the journal. Thread activity maintains
+each thread's and group's latest message through `ThreadStore.recordLatest` and
+`GroupStore.recordLatest`, and notifications from thread activity carry their thread and sequence.
+See [marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
+
 `GroupAudience.require` checks active workspace and group membership without checking any
 action permission or allowing a management bypass. It returns the current admission and
 requires only the actor at operation time. Core provides this policy internally to application
@@ -615,6 +623,7 @@ meaning rather than using it as a synonym for a constructor.
 | Private team creation     | `GroupApplication.make()`                     | `GroupApplication.Service`               |
 | Group membership          | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`     |
 | Group following           | `GroupFollowApplication.make()`               | `GroupFollowApplication.Service`         |
+| Read state                | `ReadStateApplication.make()`                 | `ReadStateApplication.Service`           |
 | Group audience policy     | `GroupAudience.make()`                        | `GroupAudience.Service`                  |
 | Assignment operations     | `AssignmentApplication.make()`                | `AssignmentApplication.Service`          |
 | Delegation policy         | `Delegation.make()`                           | `Delegation.Service`                     |

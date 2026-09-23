@@ -29,6 +29,20 @@ export interface Interface {
   readonly insert: (
     record: Group.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * Latest content activity of several groups in one read. Groups without any, and absent IDs,
+   * are omitted; order is unspecified.
+   */
+  readonly getLatest: (
+    ids: ReadonlyArray<Group.Id>,
+  ) => Effect.Effect<ReadonlyArray<Group.Latest>, Failure>;
+  /**
+   * Projection write that advances a group's latest activity time. A time at or before the recorded
+   * one changes nothing; a missing, foreign, or malformed group conflicts.
+   */
+  readonly recordLatest: (
+    latest: Group.Latest,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(

@@ -23,6 +23,7 @@ import {
   OwnershipApplication,
   Workspace,
 } from "@amends/core/workspace";
+import { ReadStateApplication } from "@amends/core/attention";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -105,6 +106,10 @@ export const PublicError = Schema.Union([
   GroupFollowApplication.NotFollowable,
   GroupFollowApplication.MemberUnavailable,
   GroupFollowApplication.AgentRequired,
+  ReadStateApplication.HumanRequired,
+  ReadStateApplication.ThreadNotFound,
+  ReadStateApplication.GroupNotFound,
+  ReadStateApplication.BeyondTimeline,
   InvitationApplication.NotFound,
   InvitationApplication.NotRecipient,
   InvitationApplication.AlreadyMember,

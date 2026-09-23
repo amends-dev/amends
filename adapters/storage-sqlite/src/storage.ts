@@ -9,6 +9,7 @@ import { Assignments } from "./assignments.ts";
 import { Groups } from "./groups.ts";
 import { GroupMemberships } from "./group-memberships.ts";
 import { GroupFollows } from "./group-follows.ts";
+import { ReadStates } from "./read-states.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { SqliteDatabase } from "./database.ts";
@@ -41,6 +42,7 @@ const layerStores = Layer.mergeAll(
   ThreadParticipations.layer,
   ThreadMessages.layer,
   ThreadActivities.layer,
+  ReadStates.layer,
 );
 
 /**

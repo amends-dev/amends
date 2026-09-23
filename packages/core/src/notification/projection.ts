@@ -94,6 +94,7 @@ export const definition = Projection.make("notifications", { version: 1 })
           workspaceId: activity.workspaceId,
           source: { logId: event.logId, entryId: event.id },
           participationId: participant.id,
+          thread: { threadId: activity.threadId, sequence: activity.sequence },
           recipient: recipient.recipient,
           recordedAt: event.recordedAt,
           state: { _tag: "Pending" },

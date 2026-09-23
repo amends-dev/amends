@@ -2648,12 +2648,12 @@ Each human member has a read position per thread: the timeline sequence they hav
 It only moves forward; a lower position is ignored, so several devices cannot move it back.
 Members set only their own position, and only for threads they can read.
 
-A thread is unread for a member when its latest sequence is past their read position. A thread
-they have never read counts only when it has activity after they joined the group, so joining a
-group with many older threads does not mark them all unread. Each thread keeps its latest sequence
-and activity time, and each group its latest activity time. A member's caught-up time for a group,
-set when they view or mark the group read, shows whether the group has newer activity. Thread lists
-order by latest activity.
+A thread is unread for a member when its latest sequence is past their read position. A thread they
+have never read counts only when it has activity after they joined the group, so joining a group
+with many older threads does not mark them all unread. Each thread keeps the sequence and time of
+its latest message, and each group the time of its latest message in any thread; quiet participation
+changes do not count. A member's caught-up time for a group, set when they view or mark the group
+read, shows whether the group has newer activity. Thread lists order by latest activity.
 
 Marking a thread read through a sequence also records `Seen` for the member's pending
 notifications from that thread's activity up to it, in the same operation. Those acknowledgments

@@ -22,6 +22,20 @@ export interface Interface {
   readonly insert: (
     record: Thread.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * Latest content activity of several threads in one read. Threads without any, and absent IDs,
+   * are omitted; order is unspecified.
+   */
+  readonly getLatest: (
+    ids: ReadonlyArray<Thread.Id>,
+  ) => Effect.Effect<ReadonlyArray<Thread.Latest>, Failure>;
+  /**
+   * Projection write that advances a thread's latest content activity. A position at or before the
+   * recorded one changes nothing; a missing, foreign, or malformed thread conflicts.
+   */
+  readonly recordLatest: (
+    latest: Thread.Latest,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/store/Service",

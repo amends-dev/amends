@@ -5,6 +5,7 @@ import {
   ThreadActivityStore,
 } from "@amends/core/thread";
 import { expect, it } from "@effect/vitest";
+import { ReadStateStore } from "@amends/core/attention";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
@@ -129,6 +130,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         listByRecipient: unexpected,
         listPendingByRecipient: unexpected,
+        listPendingByThread: unexpected,
         insert: unexpected,
         insertMany: unexpected,
       }),
@@ -138,6 +140,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       get: unexpected,
       listByGroup: unexpected,
       insert: unexpected,
+      getLatest: unexpected,
+      recordLatest: unexpected,
     }),
     Context.add(ThreadParticipationStore.Service, {
       workspaceId: boundWorkspaceId,
@@ -169,6 +173,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         get: unexpected,
         findDirect: unexpected,
         insert: unexpected,
+        getLatest: unexpected,
+        recordLatest: unexpected,
       }),
     ),
     Context.add(
@@ -182,6 +188,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listActiveByMember: unexpected,
         insert: unexpected,
         markRemoved: unexpected,
+      }),
+    ),
+    Context.add(
+      ReadStateStore.Service,
+      ReadStateStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        getThreadPositions: unexpected,
+        advanceThread: unexpected,
+        getGroupsCaughtUp: unexpected,
+        advanceGroup: unexpected,
       }),
     ),
     Context.add(

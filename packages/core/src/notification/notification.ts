@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { Entry } from "../journal/entry.ts";
 import { WorkspaceId } from "../workspace/id.ts";
+import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationId } from "../thread/participation/id.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
@@ -13,6 +14,13 @@ export const Source = Schema.Struct({
   entryId: Entry.Id,
 });
 export interface Source extends Schema.Schema.Type<typeof Source> {}
+
+/** The thread and timeline position of a notification's source activity. */
+export const ThreadReference = Schema.Struct({
+  threadId: ThreadId.Id,
+  sequence: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ThreadReference extends Schema.Schema.Type<typeof ThreadReference> {}
 
 /** Triage is one workspace-local recipient; people and agents retain their identity kind. */
 export const Recipient = Schema.TaggedUnion({
@@ -55,6 +63,8 @@ export const Record = Schema.Struct({
   source: Source,
   /** Present for thread-generated member notifications; ties pending work to one participation. */
   participationId: Schema.optionalKey(ThreadParticipationId.Id),
+  /** Present for thread-activity notifications; lets reading a thread settle its notifications. */
+  thread: Schema.optionalKey(ThreadReference),
   recipient: Recipient,
   recordedAt: Schema.DateTimeUtcFromString,
   state: State,

@@ -3,44 +3,43 @@
 This page records implementation gaps, not completed fixes. Keep each item aligned
 with its owning code and guide when changing the behavior.
 
-Workspace creation, membership, required-role invitations, assignment management,
-and ownership transfer are implemented through core, the gateway, and HTTP. SQLite and PostgreSQL persist their journal and projections. See
-[workspace workflows](workspace-workflows.md) for the available operations.
-Core and both adapters implement [private group creation and membership lifecycle](group-workflows.md),
-including permission-based addition/removal, self-leave, ordinary group reads, and management
-inspection of known groups. Direct groups (DMs and group DMs) are established and reused by
-member set when their first thread starts; their membership is fixed. Public groups and group
-HTTP/UI workflows remain unimplemented.
-[Starting a private-group thread](thread-workflows.md) with a human text message, initial
-participation, timeline activity, and notifications is implemented in core and both adapters.
-Authorized thread discovery, metadata, sequence-paginated timelines, and current-participant
-summaries and human replies are also implemented. Replies admit their author and eligible mentions,
-record the next timeline activity, and generate notifications atomically. Explicit self-follow/unfollow
-is implemented, including quiet follow/ending activity and pending agent-input cleanup. Managing other
-participants, muting, turns, agent execution, triage,
-and channel delivery remain future work.
-The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
-include implemented group-inherited read access. Every thread belongs to one group. All thread
-starts use one internal thread start, and stores, facts, and notifications support member,
-contact, and triage participants and member or contact authors. Replies without mentions reach
-every current participant. Only member workflows exist today: the task and channel workflows that
-admit contacts and triage remain unimplemented, and general participation management remains
-incomplete. Group departure ends its associated thread participations and
-discards their pending agent input; workspace-member removal uses the same cleanup.
-Thread starts, reads, replies, and follow/unfollow use the shared group-audience check.
-Group and thread discovery and current-participant lists are unpaginated; timelines have
-sequence-based pages. Separate reads and pages do not share a snapshot.
-Group creation, starts, replies, and timeline pages read members, admissions, participations,
-and referenced messages in batches, so their store reads do not grow with group size or page
-length. A start still publishes one participation fact per starting participant, and every fact
-reads and writes each projection's checkpoint and journal bookkeeping, so a start's storage
-work still grows with its participants.
-The agreed [attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is
-partly implemented: a team post starts with its author, mentioned members, and the group's
-followers, and only mentioned agents need `agent.use`. Read positions, latest-activity ordering,
-and unread state do not exist yet, so members who do not follow a team hear about an unmentioned
-post only by reading the group. Task and channel workflows, which will admit human followers,
-remain unimplemented.
+Workspace creation, membership, required-role invitations, assignment management, and ownership
+transfer are implemented through core, the gateway, and HTTP. SQLite and PostgreSQL persist their
+journal and projections. See [workspace workflows](workspace-workflows.md) for the available
+operations. Core and both adapters implement [private group creation and membership
+lifecycle](group-workflows.md), including permission-based addition/removal, self-leave, ordinary
+group reads, and management inspection of known groups. Direct groups (DMs and group DMs) are
+established and reused by member set when their first thread starts; their membership is fixed.
+Public groups and group HTTP/UI workflows remain unimplemented. [Starting a private-group
+thread](thread-workflows.md) with a human text message, initial participation, timeline activity,
+and notifications is implemented in core and both adapters. Authorized thread discovery, metadata,
+sequence-paginated timelines, and current-participant summaries and human replies are also
+implemented. Replies admit their author and eligible mentions, record the next timeline activity,
+and generate notifications atomically. Explicit self-follow/unfollow is implemented, including quiet
+follow/ending activity and pending agent-input cleanup. Managing other participants, muting, turns,
+agent execution, triage, and channel delivery remain future work. The [group and audience
+rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads) include implemented
+group-inherited read access. Every thread belongs to one group. All thread starts use one internal
+thread start, and stores, facts, and notifications support member, contact, and triage participants
+and member or contact authors. Replies without mentions reach every current participant. Only member
+workflows exist today: the task and channel workflows that admit contacts and triage remain
+unimplemented, and general participation management remains incomplete. Group departure ends its
+associated thread participations and discards their pending agent input; workspace-member removal
+uses the same cleanup. Thread starts, reads, replies, and follow/unfollow use the shared
+group-audience check. Group and thread discovery and current-participant lists are unpaginated;
+timelines have sequence-based pages. Separate reads and pages do not share a snapshot. Group
+creation, starts, replies, and timeline pages read members, admissions, participations, and
+referenced messages in batches, so their store reads do not grow with group size or page length. A
+start still publishes one participation fact per starting participant, and every fact reads and
+writes each projection's checkpoint and journal bookkeeping, so a start's storage work still grows
+with its participants. The agreed [attention
+model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is partly implemented: a team
+post starts with its author, mentioned members, and the group's followers, and only mentioned agents
+need `agent.use`. Read positions, group caught-up times, and latest activity are recorded, and
+marking a thread read settles its notifications. Reads that report unread threads or list threads by
+latest activity do not exist yet, so members who do not follow a team hear about an unmentioned post
+only by browsing the group. Task and channel workflows, which will admit human followers, remain
+unimplemented.
 
 ## Design-system coverage
 

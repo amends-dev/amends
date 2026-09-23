@@ -34,6 +34,7 @@ import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
 import { GroupFollowApplication } from "./group/follow/application.ts";
 import { GroupFollowProjection } from "./group/follow/projection.ts";
+import { ReadStateApplication } from "./attention/application.ts";
 import { GroupMembershipApplication } from "./group/membership/application.ts";
 import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
@@ -132,6 +133,7 @@ const operations = Layer.mergeAll(
   GroupMembershipApplication.layer,
   GroupFollowApplication.layer,
   ThreadApplication.layer,
+  ReadStateApplication.layer,
   ThreadMessageApplication.layer,
   ThreadParticipationApplication.layer,
 ).pipe(

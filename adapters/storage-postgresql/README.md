@@ -41,6 +41,13 @@ development baseline; recreate disposable PostgreSQL databases when adopting it.
 per admission, and `group_follows_by_group` serves a group's active followers at thread start in
 binary ID order. Adding it replaced the development baseline.
 
+Threads keep `latest_sequence` and `latest_activity_at` for their latest message, constrained by
+`thread_latest`, and groups `latest_activity_at`; updates only move them forward. Notifications
+carry `thread_id` and `thread_sequence` for thread activity, and `pending_notifications_by_thread`
+serves a reader's pending notifications from one thread. `thread_read_positions` and
+`group_read_times` hold private read state; their upserts keep the later value with `greatest` and
+run on their own, without the workspace lock, when the caller has no transaction.
+
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions; they and `threads_by_group` and
 `participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID
@@ -72,13 +79,14 @@ backfills, or legacy envelope formats. See the
 One module per store, each exporting `make` and a `layer` for the core service it implements:
 `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`, `roles.ts`, `assignments.ts`,
 `invitations.ts`, `notifications.ts`, `groups.ts`, and `group-memberships.ts`, `group-follows.ts`,
-`threads.ts`, `thread-participations.ts`, `thread-messages.ts`, and `thread-activities.ts`. They
-share `binding.ts`, which is one workspace's view of the database: its identity, the transaction
-boundary, and the guard each statement runs under. `storage.ts` exports `layerWorkspace(workspaceId,
-options)` to compose the store layers over a binding for the requested workspace. Its private
-`layerStores` merge registers each store. `database.ts` prepares an existing SQL client in `make`
-and acquires the pool in `layer`; `directory.ts` reads across workspaces, and `schema.ts` holds the
-tables. Bindings and raw tables are internal to the adapter's public package surface.
+`read-states.ts`, `threads.ts`, `thread-participations.ts`, `thread-messages.ts`, and
+`thread-activities.ts`. They share `binding.ts`, which is one workspace's view of the database: its
+identity, the transaction boundary, and the guard each statement runs under. `storage.ts` exports
+`layerWorkspace(workspaceId, options)` to compose the store layers over a binding for the requested
+workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing
+SQL client in `make` and acquires the pool in `layer`; `directory.ts` reads across workspaces, and
+`schema.ts` holds the tables. Bindings and raw tables are internal to the adapter's public package
+surface.
 
 Follow the [adapter naming and validation conventions](../README.md).
 `PostgresDatabase.Interface` holds the `DrizzleClient` and the Effect SQL client.
@@ -239,4 +247,5 @@ concurrent requests, source-access loss, direct-store validation, reopening, and
 `thread-starts.test.ts` mirrors SQLite's check that group creation, starts, replies, and timeline
 pages make the same store reads at any group size.
 `group-follows.test.ts` mirrors SQLite's group-following, permission, admission-ending, replay, and
-storage-constraint checks.
+storage-constraint checks. `read-state.test.ts` mirrors SQLite's latest-activity, read-state, and
+inbox-settling checks.

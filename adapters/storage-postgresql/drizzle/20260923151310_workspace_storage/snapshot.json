@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "039ce892-fdc7-4eed-9196-45304cf56680",
+  "id": "d2199819-c6ac-4fe4-9cb0-785b269dedd7",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -33,6 +33,12 @@
     {
       "isRlsEnabled": false,
       "name": "group_memberships",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "group_read_times",
       "entityType": "tables",
       "schema": "public"
     },
@@ -99,6 +105,12 @@
     {
       "isRlsEnabled": false,
       "name": "thread_participations",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "thread_read_positions",
       "entityType": "tables",
       "schema": "public"
     },
@@ -619,6 +631,58 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
+      "table": "group_read_times"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_read_times"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_read_times"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "caught_up_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_read_times"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
       "table": "groups"
     },
     {
@@ -721,6 +785,19 @@
       "generated": null,
       "identity": null,
       "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "latest_activity_at",
       "entityType": "columns",
       "schema": "public",
       "table": "groups"
@@ -1508,6 +1585,32 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_sequence",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -1971,6 +2074,58 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "read_through",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
       "table": "threads"
     },
     {
@@ -2047,6 +2202,32 @@
       "generated": null,
       "identity": null,
       "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "latest_sequence",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "latest_activity_at",
       "entityType": "columns",
       "schema": "public",
       "table": "threads"
@@ -2877,6 +3058,55 @@
           "opclass": null
         },
         {
+          "value": "recipient_kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "coalesce(\"recipient_id\", '')",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "thread_sequence",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"state\" = 'Pending'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pending_notifications_by_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "thread_id",
           "isExpression": false,
           "asc": true,
@@ -3265,6 +3495,44 @@
       "nameExplicit": true,
       "columns": [
         "workspace_id",
+        "member_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "members",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_read_times_member",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_read_times"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "group_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "groups",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_read_times_group",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_read_times"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
         "created_by"
       ],
       "schemaTo": "public",
@@ -3581,6 +3849,44 @@
       "table": "thread_participations"
     },
     {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "member_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "members",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "thread_read_positions_member",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "thread_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "threads",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "thread_read_positions_thread",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "workspace_id",
@@ -3674,6 +3980,18 @@
       "entityType": "pks",
       "schema": "public",
       "table": "group_memberships"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "member_id",
+        "group_id"
+      ],
+      "nameExplicit": false,
+      "name": "group_read_times_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "group_read_times"
     },
     {
       "columns": [
@@ -3801,6 +4119,18 @@
     {
       "columns": [
         "workspace_id",
+        "member_id",
+        "thread_id"
+      ],
+      "nameExplicit": false,
+      "name": "thread_read_positions_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
+      "columns": [
+        "workspace_id",
         "id"
       ],
       "nameExplicit": false,
@@ -3911,6 +4241,13 @@
       "table": "notifications"
     },
     {
+      "value": "(\"thread_id\" IS NULL AND \"thread_sequence\" IS NULL) OR (\"thread_id\" IS NOT NULL AND \"thread_sequence\" > 0)",
+      "name": "notification_thread",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
       "value": "(\"recipient_kind\" = 'Triage' AND \"recipient_id\" IS NULL) OR (\"recipient_kind\" IN ('Human', 'Agent', 'Contact') AND \"recipient_id\" IS NOT NULL AND \"recipient_id\" <> '')",
       "name": "notifications_recipient_kind",
       "entityType": "checks",
@@ -3953,8 +4290,22 @@
       "table": "thread_participations"
     },
     {
+      "value": "\"read_through\" > 0",
+      "name": "thread_read_position",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "thread_read_positions"
+    },
+    {
       "value": "(\"created_by_kind\" = 'Member' AND \"created_by_member_id\" IS NOT NULL AND \"created_by_contact_id\" IS NULL) OR (\"created_by_kind\" = 'Contact' AND \"created_by_member_id\" IS NULL AND \"created_by_contact_id\" IS NOT NULL)",
       "name": "thread_creator",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "value": "(\"latest_sequence\" IS NULL AND \"latest_activity_at\" IS NULL) OR (\"latest_sequence\" > 0 AND \"latest_activity_at\" IS NOT NULL)",
+      "name": "thread_latest",
       "entityType": "checks",
       "schema": "public",
       "table": "threads"

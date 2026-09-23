@@ -1,12 +1,16 @@
 import { Group, GroupStore } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
-import { Array, Effect, Layer, Option, Schema } from "effect";
+import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
 const codec = Schema.fromJsonString(Group.Record);
 const encode = Schema.encodeEffect(codec);
+const decodeLatest = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ ...Group.Latest.fields, occurredAt: Schema.DateTimeUtcFromMillis })),
+);
 /** Only a direct group has a member-set key. */
 const keyOf = (record: Group.Record) =>
   record.kind === "Direct" ? Group.directKey(record.memberIds) : null;
@@ -62,6 +66,38 @@ export const make = Effect.fn("Groups.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupStore, "findDirect")),
     ),
+    getLatest: Effect.fn("Groups.getLatest")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          sql`SELECT id AS groupId, latest_activity_at AS occurredAt FROM groups WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)} AND latest_activity_at IS NOT NULL`,
+        ).pipe(Effect.flatMap(decodeLatest));
+      },
+      Effect.mapError(storeFailure(GroupStore, "getLatest")),
+    ),
+    recordLatest: Effect.fn("Groups.recordLatest")(function* (input) {
+      yield* Store.Transaction;
+      const latest = yield* Schema.decodeEffect(Schema.toType(Group.Latest))(input).pipe(
+        Effect.mapError(storeConflict(GroupStore, "recordLatest")),
+      );
+      const at = DateTime.toEpochMillis(latest.occurredAt);
+      const advanced = yield* guard(
+        sql`UPDATE groups SET latest_activity_at = ${at} WHERE workspace_id = ${workspaceId} AND id = ${latest.groupId} AND (latest_activity_at IS NULL OR latest_activity_at < ${at}) RETURNING id`,
+        true,
+      ).pipe(Effect.mapError(storeError(GroupStore, "recordLatest")));
+      if (advanced.length > 0) return;
+      // Nothing advanced: an earlier time changes nothing, but the group must exist.
+      const found = yield* guard(
+        sql`SELECT id FROM groups WHERE workspace_id = ${workspaceId} AND id = ${latest.groupId}`,
+        true,
+      ).pipe(Effect.mapError(storeError(GroupStore, "recordLatest")));
+      if (found.length === 0)
+        return yield* new GroupStore.Conflict({
+          operation: "recordLatest",
+          message: "Group is missing",
+        });
+    }),
     insert: Effect.fn("Groups.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validateRecord(input).pipe(
