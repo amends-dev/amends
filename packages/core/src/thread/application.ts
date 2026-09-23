@@ -18,6 +18,9 @@ import { ThreadStore } from "./store.ts";
 import { ThreadStart } from "./start.ts";
 import { GroupStore } from "../group/store.ts";
 import { DirectGroups } from "../group/direct.ts";
+import { GroupFollow } from "../group/follow/follow.ts";
+import { GroupFollowStore } from "../group/follow/store.ts";
+import type { GroupMembership } from "../group/membership/membership.ts";
 import { ThreadAccess } from "./access.ts";
 import { ThreadParticipationAdmission } from "./participation/admission.ts";
 import { ThreadMessagePublication } from "./message/publication.ts";
@@ -59,6 +62,7 @@ export type Error =
   | Exclude<DirectGroups.Error, DirectGroups.Unavailable>
   | GroupStore.Failure
   | GroupMembershipStore.Failure
+  | GroupFollowStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
   | PlatformError.PlatformError
@@ -85,10 +89,10 @@ export type ReadError =
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
   /**
-   * Start a thread in a group the author belongs to. A team thread starts with its author and
-   * mentioned members; the rest of the group can read it without participating. A direct-group
-   * thread enrolls all of its members, and mentions only narrow who is notified. Only mentioned
-   * agents need the author's agent-use authority.
+   * Start a thread in a group the author belongs to. A team thread starts with its author,
+   * mentioned members, and the group's followers; the rest of the group can read it without
+   * participating. A direct-group thread enrolls all of its members, and mentions only narrow who
+   * is notified. Only mentioned agents need the author's agent-use authority.
    */
   readonly startInGroup: (
     input: Thread.StartInGroupInput,
@@ -130,6 +134,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const starts = yield* ThreadStart.Service;
   const groups = yield* GroupStore.Service;
   const directGroups = yield* DirectGroups.Service;
+  const follows = yield* GroupFollowStore.Service;
   const access = yield* ThreadAccess.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
   const publication = yield* ThreadMessagePublication.Service;
@@ -144,6 +149,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       starts.workspaceId,
       groups.workspaceId,
       directGroups.workspaceId,
+      follows.workspaceId,
       access.workspaceId,
       admissions.workspaceId,
       publication.workspaceId,
@@ -154,6 +160,38 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     return yield* new InvalidResponse({
       message: "Thread services belong to different workspaces",
     });
+  /** Members whose current admission follows the group, in stable order. */
+  const followersOf = Effect.fnUntraced(function* (
+    groupId: Group.Id,
+    eligible: ReadonlyMap<Member.Id, ThreadParticipationAdmission.Eligible>,
+  ) {
+    const seen = new Set<GroupFollow.Id>();
+    const admissions = new Set<GroupMembership.Id>();
+    const followers: Array<Member.Id> = [];
+    for (const row of yield* follows.listActiveByGroup(groupId)) {
+      const follow = yield* Schema.decodeEffect(Schema.toType(GroupFollow.Record))(row).pipe(
+        Effect.mapError(
+          (cause) => new InvalidResponse({ message: `Invalid group follow: ${cause.message}` }),
+        ),
+      );
+      if (
+        follow.workspaceId !== workspaceId ||
+        follow.groupId !== groupId ||
+        follow.status !== "active" ||
+        seen.has(follow.id) ||
+        admissions.has(follow.groupMembershipId)
+      )
+        return yield* new InvalidResponse({
+          message: "Follow store returned an inconsistent group listing",
+        });
+      seen.add(follow.id);
+      admissions.add(follow.groupMembershipId);
+      // A follow counts only through the member's current admission.
+      if (eligible.get(follow.memberId)?.admission.id === follow.groupMembershipId)
+        followers.push(follow.memberId);
+    }
+    return followers.sort();
+  });
   /**
    * Check the starting participants, authorize the agents the author names, then open the thread
    * through the shared start. Agents that take part without being named need no agent-use grant.
@@ -269,12 +307,19 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       const foundGroup = yield* groups.get(request.groupId);
       if (Option.isNone(foundGroup))
         return yield* new InvalidResponse({ message: "Audience group is missing" });
-      // A direct group's members all take part; a team thread starts with its author and the
-      // members its opening message mentions, and the rest of the group sees it as unread.
+      // A direct group's members all take part; a team thread starts with its author, the
+      // members its opening message mentions, and the group's followers. The rest of the group
+      // sees it as unread.
       const selected =
         foundGroup.value.kind === "Direct"
           ? [...eligible.keys()].sort()
-          : [actor.memberId, ...request.mentions.filter((id) => id !== actor.memberId)];
+          : [
+              ...new Set([
+                actor.memberId,
+                ...request.mentions,
+                ...(yield* followersOf(request.groupId, eligible)),
+              ]),
+            ];
       const missing = request.mentions.find((id) => !eligible.has(id));
       if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
       return yield* begin(request.groupId, selected, request.mentions, eligible, request);

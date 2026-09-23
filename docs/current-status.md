@@ -36,10 +36,11 @@ length. A start still publishes one participation fact per starting participant,
 reads and writes each projection's checkpoint and journal bookkeeping, so a start's storage
 work still grows with its participants.
 The agreed [attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is
-partly implemented: a team post starts with its author and mentioned members, and only mentioned
-agents need `agent.use`. Group following, read positions, latest-activity ordering, and unread
-state do not exist yet, so members of a team hear about an unmentioned post only by reading
-the group.
+partly implemented: a team post starts with its author, mentioned members, and the group's
+followers, and only mentioned agents need `agent.use`. Read positions, latest-activity ordering,
+and unread state do not exist yet, so members who do not follow a team hear about an unmentioned
+post only by reading the group. Task and channel workflows, which will admit human followers,
+remain unimplemented.
 
 ## Design-system coverage
 
@@ -182,8 +183,9 @@ cross-process fan-out, or replay on the public SSE endpoint. A missed publicatio
 or another process's commit can leave a connected client's view stale.
 
 [ChangeFeedApplication.watch](../packages/core/src/change-feed/application.ts) checks
-membership at subscription time and forwards supported workspace-management events.
-Private group, thread, and notification acknowledgment facts are withheld, including message text, recipients, and provenance;
+membership at subscription time and forwards the workspace-management events it registers.
+Every other fact, including private group, follow, thread, and notification acknowledgment facts,
+is withheld, with its message text, recipients, and provenance;
 group-only commits produce no public change until audience-aware group delivery exists.
 It does not filter fields or events by permission, or continuously recheck membership.
 Removal therefore does not itself close an existing subscription. Reconnecting

@@ -12,4 +12,10 @@ export const Read = Permission.make("group.read", {
   builtinTier: "viewer",
 });
 
+/** Following a team group for oneself; making an agent follow needs agent use instead. */
+export const Follow = Permission.make("group.follow", {
+  targetKind: "Group",
+  builtinTier: "viewer",
+});
+
 export * as GroupPermissions from "./permissions.ts";

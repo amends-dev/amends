@@ -35,6 +35,10 @@ process-wide `Database.MAX_QUERY_CACHE_SIZE` to `SqliteDatabase.preparedStatemen
 smaller. The client prepares statements through that cache, which holds 20 SQL strings by
 default; the stores issue more, and an uncached statement is compiled again on every execution.
 
+`group_follows` keeps each follow's group, member, and admission as referenced columns beside its
+JSON record. `active_group_follow` allows one active follow per admission, and
+`group_follows_by_group` serves a group's active followers at thread start in ID order.
+
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions in ID order without scanning the workspace.
 The directory reads across workspaces, so `members_by_identity` and `invitations_by_recipient`
@@ -59,17 +63,16 @@ backfills, or legacy envelope formats. See the
 
 ## Layout
 
-One module per store, each exporting `make` and a `layer` for the core service
-it implements: `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`,
-`roles.ts`, `assignments.ts`, `invitations.ts`, `notifications.ts`, `groups.ts`, and
-`group-memberships.ts`, `threads.ts`, `thread-participations.ts`, `thread-messages.ts`, and
-`thread-activities.ts`. They share `binding.ts`,
-which is one workspace's view of the database: its identity, the transaction
+One module per store, each exporting `make` and a `layer` for the core service it implements:
+`journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`, `roles.ts`, `assignments.ts`,
+`invitations.ts`, `notifications.ts`, `groups.ts`, and `group-memberships.ts`, `group-follows.ts`,
+`threads.ts`, `thread-participations.ts`, `thread-messages.ts`, and `thread-activities.ts`. They
+share `binding.ts`, which is one workspace's view of the database: its identity, the transaction
 boundary, and the guard each statement runs under. `storage.ts` exports
-`layerWorkspace(workspaceId)` to compose the store layers over a binding for the
-requested workspace. Its private `layerStores` merge registers each store.
-`directory.ts` reads across workspaces. The package root exposes the database,
-storage, directory, and composed layer; binding internals stay private.
+`layerWorkspace(workspaceId)` to compose the store layers over a binding for the requested
+workspace. Its private `layerStores` merge registers each store. `directory.ts` reads across
+workspaces. The package root exposes the database, storage, directory, and composed layer; binding
+internals stay private.
 
 Follow the [adapter naming and validation conventions](../README.md). Records
 are validated before JSON encoding, edited fields use their core schemas, and
@@ -213,4 +216,6 @@ staged visibility, rollback, reopening, and gateway outcomes. `notification-ackn
 mirrors PostgreSQL's ownership, atomicity, repeat handling, concurrent requests, source-access loss,
 direct-store validation, reopening, and replay checks. `thread-starts.test.ts` counts the store
 reads of group creation, a start mentioning every member, a reply, and a timeline page, and requires
-the same counts for a two-member and an eleven-member group.
+the same counts for a two-member and an eleven-member group. `group-follows.test.ts` covers
+following for oneself and for agents, permission checks, joining later threads, ending with the
+admission, replay, and follow storage constraints.

@@ -9,7 +9,7 @@ import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity, Performer } from "@amends/core/identity";
 import { Event, Checkpoint, CommittedEvents, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
-import { GroupStore, GroupMembershipStore } from "@amends/core/group";
+import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import {
   InvitationStore,
   MemberStore,
@@ -47,6 +47,7 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
   notifications: Context.get(context, NotificationStore.Service),
   groups: Context.get(context, GroupStore.Service),
   groupMemberships: Context.get(context, GroupMembershipStore.Service),
+  groupFollows: Context.get(context, GroupFollowStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 export const views = Effect.map(SqliteStorage.make(), (service) => ({

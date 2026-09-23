@@ -1,0 +1,238 @@
+import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import type { PlatformError } from "effect";
+import { AgentPermissions } from "../../agent/permissions.ts";
+import { Authorization } from "../../authorization/authorization.ts";
+import { Requirement } from "../../authorization/requirement.ts";
+import { Actor } from "../../identity/actor.ts";
+import { Journal } from "../../journal/journal.ts";
+import type { Log } from "../../journal/log.ts";
+import type { Projection } from "../../journal/projection.ts";
+import { Publication } from "../../journal/publication.ts";
+import { WorkspaceId } from "../../workspace/id.ts";
+import { Member } from "../../workspace/member/member.ts";
+import { MemberStore } from "../../workspace/member/store.ts";
+import { Group } from "../group.ts";
+import { GroupAudience } from "../audience.ts";
+import { GroupPermissions } from "../permissions.ts";
+import { GroupStore } from "../store.ts";
+import { GroupMembership } from "../membership/membership.ts";
+import { GroupMembershipStore } from "../membership/store.ts";
+import { GroupFollow } from "./follow.ts";
+import { GroupFollowFacts } from "./facts.ts";
+import { GroupFollowStore } from "./store.ts";
+
+/** Missing, foreign, and groups the actor does not belong to share this outcome. */
+export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
+  "GroupFollowApplication.GroupNotFound",
+  { groupId: Group.Id },
+) {}
+/** A direct group's members already take part in all of its threads. */
+export class NotFollowable extends Schema.TaggedError<NotFollowable>()(
+  "GroupFollowApplication.NotFollowable",
+  { groupId: Group.Id },
+) {}
+/** The named member is missing, inactive, or not a current member of the group. */
+export class MemberUnavailable extends Schema.TaggedError<MemberUnavailable>()(
+  "GroupFollowApplication.MemberUnavailable",
+  { memberId: Member.Id },
+) {}
+/** Only an agent can be made to follow by another member; people follow for themselves. */
+export class AgentRequired extends Schema.TaggedError<AgentRequired>()(
+  "GroupFollowApplication.AgentRequired",
+  { memberId: Member.Id },
+) {}
+export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
+  "GroupFollowApplication.InvalidResponse",
+  { message: Schema.String },
+) {}
+export type Error =
+  | Authorization.Error
+  | GroupAudience.InvalidResponse
+  | GroupStore.Failure
+  | GroupMembershipStore.Failure
+  | MemberStore.Failure
+  | GroupFollowStore.Failure
+  | Schema.SchemaError
+  | PlatformError.PlatformError
+  | Log.WriteError
+  | Projection.Error
+  | GroupNotFound
+  | NotFollowable
+  | MemberUnavailable
+  | AgentRequired
+  | InvalidResponse;
+export interface Interface {
+  readonly workspaceId: WorkspaceId.Id;
+  /**
+   * Follow a team group, so that threads started there afterwards admit the member. Members follow
+   * for themselves under `group.follow`; making an agent member follow needs `agent.use` for it.
+   * The actor must belong to the group. Following again while following changes nothing.
+   */
+  readonly follow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Service>;
+  /**
+   * Stop following a team group; current thread participation is unchanged. Members unfollow for
+   * themselves without an action grant; an agent member needs `agent.use` for it. Unfollowing
+   * while not following changes nothing.
+   */
+  readonly unfollow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Service>;
+}
+export class Service extends Context.Service<Service, Interface>()(
+  "@amends/core/group/follow/application/Service",
+) {}
+
+const invalidRecord = (cause: Schema.SchemaError) =>
+  new InvalidResponse({ message: `Group storage returned invalid data: ${cause.message}` });
+
+/** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
+export const make = Effect.fn("GroupFollowApplication.make")(function* () {
+  const authorization = yield* Authorization.Service;
+  const audience = yield* GroupAudience.Service;
+  const groups = yield* GroupStore.Service;
+  const memberships = yield* GroupMembershipStore.Service;
+  const members = yield* MemberStore.Service;
+  const follows = yield* GroupFollowStore.Service;
+  const journal = yield* Journal.Service;
+  const crypto = yield* Crypto.Crypto;
+  const workspaceId = authorization.workspaceId;
+  if (
+    [
+      audience.workspaceId,
+      groups.workspaceId,
+      memberships.workspaceId,
+      members.workspaceId,
+      follows.workspaceId,
+    ].some((id) => id !== workspaceId)
+  )
+    return yield* new InvalidResponse({
+      message: "Group follow services belong to different workspaces",
+    });
+
+  /** The admission whose follow changes, after the checks that apply to the actor and target. */
+  const resolve = Effect.fnUntraced(function* (input: GroupFollow.Input, following: boolean) {
+    const request = yield* Schema.decodeEffect(GroupFollow.Input)(input);
+    const own = yield* audience
+      .require(request.groupId)
+      .pipe(
+        Effect.catchTag("GroupAudience.NotMember", () =>
+          Effect.fail(new GroupNotFound({ groupId: request.groupId })),
+        ),
+      );
+    const foundGroup = yield* groups.get(request.groupId);
+    if (Option.isNone(foundGroup))
+      return yield* new InvalidResponse({ message: "Audience group is missing" });
+    const group = yield* Schema.decodeEffect(Schema.toType(Group.Record))(foundGroup.value).pipe(
+      Effect.mapError(invalidRecord),
+    );
+    if (group.workspaceId !== workspaceId || group.id !== request.groupId)
+      return yield* new InvalidResponse({
+        message: "Group store returned another group or workspace",
+      });
+    if (group.kind === "Direct") return yield* new NotFollowable({ groupId: group.id });
+    const actor = yield* Actor.Service;
+    if (request.memberId === actor.memberId) {
+      // People follow for themselves under group.follow; unfollowing needs no grant.
+      if (following)
+        yield* authorization.require([
+          Requirement.make(GroupPermissions.Follow, {
+            _tag: "Group",
+            workspaceId,
+            groupId: group.id,
+          }),
+        ]);
+      return own;
+    }
+    const foundAdmission = yield* memberships.findActive(group.id, request.memberId);
+    if (Option.isNone(foundAdmission))
+      return yield* new MemberUnavailable({ memberId: request.memberId });
+    const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
+      foundAdmission.value,
+    ).pipe(Effect.mapError(invalidRecord));
+    const foundMember = yield* members.get(request.memberId);
+    if (Option.isNone(foundMember))
+      return yield* new MemberUnavailable({ memberId: request.memberId });
+    const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value).pipe(
+      Effect.mapError(invalidRecord),
+    );
+    if (
+      admission.workspaceId !== workspaceId ||
+      admission.groupId !== group.id ||
+      admission.memberId !== request.memberId ||
+      admission.status !== "active" ||
+      member.workspaceId !== workspaceId ||
+      member.id !== request.memberId
+    )
+      return yield* new InvalidResponse({
+        message: "Group storage returned another admission, member, or workspace",
+      });
+    if (member.status !== "active")
+      return yield* new MemberUnavailable({ memberId: request.memberId });
+    if (member.identity._tag !== "Agent")
+      return yield* new AgentRequired({ memberId: request.memberId });
+    // Directing an agent's attention is using it, in either direction.
+    yield* authorization.require([
+      Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId: member.id }),
+    ]);
+    return admission;
+  });
+  const current = Effect.fnUntraced(function* (admission: GroupMembership.Record) {
+    const found = yield* follows.findActive(admission.id);
+    if (Option.isNone(found)) return Option.none<GroupFollow.Record>();
+    const follow = yield* Schema.decodeEffect(Schema.toType(GroupFollow.Record))(found.value).pipe(
+      Effect.mapError(invalidRecord),
+    );
+    if (
+      follow.workspaceId !== workspaceId ||
+      follow.groupId !== admission.groupId ||
+      follow.memberId !== admission.memberId ||
+      follow.groupMembershipId !== admission.id ||
+      follow.status !== "active"
+    )
+      return yield* new InvalidResponse({
+        message: "Follow store returned another admission's follow",
+      });
+    return Option.some(follow);
+  });
+
+  const follow = Effect.fn("GroupFollowApplication.follow")(
+    function* (input: GroupFollow.Input) {
+      const admission = yield* resolve(input, true);
+      if (Option.isSome(yield* current(admission))) return;
+      const followedAt = yield* DateTime.now;
+      yield* journal
+        .publish(GroupFollowFacts.Started, {
+          id: GroupFollow.Id.make(yield* crypto.randomUUIDv4),
+          workspaceId,
+          groupId: admission.groupId,
+          memberId: admission.memberId,
+          groupMembershipId: admission.id,
+          followedAt,
+          status: "active",
+          endedAt: null,
+        })
+        .pipe(Publication.withOccurredAt(followedAt));
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  const unfollow = Effect.fn("GroupFollowApplication.unfollow")(
+    function* (input: GroupFollow.Input) {
+      const admission = yield* resolve(input, false);
+      const existing = yield* current(admission);
+      if (Option.isNone(existing)) return;
+      yield* journal.publish(GroupFollowFacts.Ended, {
+        workspaceId,
+        groupId: existing.value.groupId,
+        followId: existing.value.id,
+        memberId: existing.value.memberId,
+      });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  return Service.of({ workspaceId, follow, unfollow });
+});
+/** @category layers */
+export const layer = Layer.effect(Service, make());
+export * as GroupFollowApplication from "./application.ts";

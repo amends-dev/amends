@@ -2360,7 +2360,7 @@ groups for one channel remain possible later.
 | Add a member to an existing group                  | Members with the required membership-management permission for the group. |
 | Remove another member from a group                 | Members with the required membership-management permission for the group. |
 | Leave one's own team-group membership              | Any current team-group member with active workspace membership.           |
-| Follow a team group, joining its new threads       | Any current group member who may follow its threads, for themselves.      |
+| Follow a team group, joining its new threads       | Any current group member with `group.follow`, for themselves.             |
 | Make an agent follow a team group                  | A current group member with agent-use authority for that agent.           |
 
 Application operations check the required permission and its workspace or group target;
@@ -2638,8 +2638,8 @@ Unfollowing a thread leaves that thread only. Unfollowing the group stops joinin
 threads without ending current participation. Leaving the group or the workspace ends following.
 Direct groups need no following: all their members participate in every thread.
 
-A member follows a group for themselves when they may follow its threads. Making an agent follow
-a group requires group membership and authority to use that agent; posting in the group does not.
+A member follows a group for themselves under `group.follow`. Making an agent follow a group
+requires group membership and authority to use that agent; posting in the group does not.
 Following changes who is admitted, so it is recorded as a journal fact.
 
 ### Read positions make ambient activity visible

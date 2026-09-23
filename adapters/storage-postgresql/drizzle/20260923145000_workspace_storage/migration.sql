@@ -36,6 +36,19 @@ CREATE TABLE "commits" (
 	CONSTRAINT "commits_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
+CREATE TABLE "group_follows" (
+	"workspace_id" text,
+	"id" text,
+	"group_id" text NOT NULL,
+	"member_id" text NOT NULL,
+	"group_membership_id" text NOT NULL,
+	"followed_at" timestamp with time zone NOT NULL,
+	"status" text NOT NULL,
+	"ended_at" timestamp with time zone,
+	CONSTRAINT "group_follows_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "group_follow_state" CHECK (("status" = 'active' AND "ended_at" IS NULL) OR ("status" = 'ended' AND "ended_at" IS NOT NULL))
+);
+--> statement-breakpoint
 CREATE TABLE "group_memberships" (
 	"workspace_id" text,
 	"id" text,
@@ -231,6 +244,8 @@ CREATE TABLE "workspaces" (
 --> statement-breakpoint
 CREATE INDEX "assignments_by_member" ON "assignments" ("workspace_id","member_id","status");--> statement-breakpoint
 CREATE INDEX "assignments_by_role" ON "assignments" ("workspace_id","role_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "active_group_follow" ON "group_follows" ("workspace_id","group_membership_id") WHERE "status" = 'active';--> statement-breakpoint
+CREATE INDEX "group_follows_by_group" ON "group_follows" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_group_membership" ON "group_memberships" ("workspace_id","group_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "group_memberships_by_group" ON "group_memberships" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "group_memberships_by_member" ON "group_memberships" ("workspace_id","member_id","id" COLLATE "C");--> statement-breakpoint
@@ -257,6 +272,9 @@ CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COL
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_role" FOREIGN KEY ("workspace_id","role_id") REFERENCES "roles"("workspace_id","id");--> statement-breakpoint
+ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_group" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
+ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
+ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_admission" FOREIGN KEY ("workspace_id","group_membership_id") REFERENCES "group_memberships"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_group" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "groups" ADD CONSTRAINT "groups_creator" FOREIGN KEY ("workspace_id","created_by") REFERENCES "members"("workspace_id","id");--> statement-breakpoint

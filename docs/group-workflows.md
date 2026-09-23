@@ -1,8 +1,9 @@
 # Group workflows
 
-Core implements private team-group creation, authorized reads, member addition, removal, and self-leave over
-SQLite and PostgreSQL. These operations are available through `GroupApplication.Service`
-and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
+Core implements private team-group creation, authorized reads, member addition, removal, self-leave,
+and following over SQLite and PostgreSQL. These operations are available through
+`GroupApplication.Service`, `GroupMembershipApplication.Service`, and
+`GroupFollowApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
 broader design; public groups remain future work. Direct groups (DMs and group DMs) start with
@@ -159,6 +160,29 @@ An addition that commits first is included in cleanup; after removal, an additio
 because its recipient is inactive. Storage contention can reject an attempt without applying it.
 A later workspace readmission has a new member ID and inherits no prior group admissions.
 
+## Following a group
+
+`GroupFollowApplication.follow({ groupId, memberId })` makes a team-group member follow the group:
+each thread a member starts there afterwards admits them at its first sequence, so the thread's
+unmentioned activity notifies them. Threads that already exist are not joined. `unfollow` with the
+same input stops joining future threads and leaves current thread participation unchanged. Both
+return no value; following while following, or unfollowing while not, records nothing.
+
+The actor must be a current member of the group; otherwise, as for a missing group, the result is
+`GroupFollowApplication.GroupNotFound`. Members follow for themselves under `group.follow` on the
+Group target, which new Viewer and higher-tier bundles include; unfollowing oneself needs no grant.
+Another member can be made to follow, or unfollow, only when it is an agent in the group and the
+actor holds `agent.use` for it; a person returns `AgentRequired`, and a member outside the group or
+inactive returns `MemberUnavailable`. Posting in the group then reaches the agent without the
+poster's `agent.use`, as the [attention
+model](core-model.md#agreed-attention-is-directed-followed-or-ambient) agrees. Direct groups return
+`NotFollowable`: all their members already take part in every thread.
+
+A follow belongs to the member's group admission. `group.follow.started` and `group.follow.ended`
+record its lifecycle with a fresh ID each time; leaving the group or the workspace ends it through
+the admission's removal, without another fact, so rejoining starts with no follow. Task and
+channel threads will admit human followers only, when those workflows arrive.
+
 ## Atomic changes and recorded history
 
 Authorization, input validation, membership checks, and publication run inside one journal
@@ -189,15 +213,16 @@ idempotency contract yet. An uncertain commit must be reconciled before another 
 
 ## Integration and current limits
 
-`@amends/core/group` exports the models, applications, facts, projections, permissions, and
-store contracts. Core requires `GroupStore` and `GroupMembershipStore`; both adapters compose
-them over the same workspace transaction. Authorization targets now include `Group`, and
+`@amends/core/group` exports the models, applications, facts, projections, permissions, and store
+contracts. Core requires `GroupStore`, `GroupMembershipStore`, and `GroupFollowStore`; both adapters
+compose them over the same workspace transaction. Authorization targets now include `Group`, and
 both adapters preserve exact group scopes in grants. Target support alone does not implement
-thread-audience authorization. The read operations and shared group audience policy above
-are implemented; thread starts, reads, and replies use that policy.
+thread-audience authorization. The read operations and shared group audience policy above are
+implemented; thread starts, reads, and replies use that policy.
 
-Private group, admission, and departure facts remain on the internal committed-event bus but are
-withheld from the workspace-wide change feed. A commit containing only those facts emits
+Private group, admission, departure, and follow facts remain on the internal committed-event bus
+but are withheld from the workspace-wide change feed, which publishes only the workspace facts it
+registers. A commit containing only those facts emits
 no public change; a mixed commit retains its other supported events in order. Group discovery
 and live delivery will need their own audience-aware HTTP/UI contract. Group creation generates no notifications. Opening and reply message activity generates notifications
 through the [thread workflow](thread-workflows.md).
@@ -232,5 +257,8 @@ concurrent departure and admission/removal races, and conditional storage transi
 Read suites cover ordinary versus management access, exact and custom-role grants, stale actors,
 departure and readmission, private-ID outcomes, current roster filtering, corrupt storage,
 and reads both outside and inside an existing transaction.
+Follow suites cover following and unfollowing for oneself and for agents, `group.follow` and
+`agent.use` checks, repeat calls, joining only later threads, mentions alongside followers, direct
+groups, ending with the admission, replay, and follow storage constraints.
 Core tests cover schema boundaries, exact group scopes, and withholding private group facts
 from the public change feed. Run `bun run check` and `bun run test` from the repository root.

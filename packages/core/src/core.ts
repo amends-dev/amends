@@ -32,6 +32,8 @@ import { GroupApplication } from "./group/application.ts";
 import { GroupAudience } from "./group/audience.ts";
 import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
+import { GroupFollowApplication } from "./group/follow/application.ts";
+import { GroupFollowProjection } from "./group/follow/projection.ts";
 import { GroupMembershipApplication } from "./group/membership/application.ts";
 import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
@@ -66,6 +68,7 @@ const projections = [
   InvitationProjection.definition,
   GroupProjection.definition,
   GroupMembershipProjection.definition,
+  GroupFollowProjection.definition,
   ThreadProjection.definition,
   ThreadParticipationProjection.definition,
   ThreadMessageProjection.definition,
@@ -83,6 +86,7 @@ const permissions = [
   OwnershipPermissions.Transfer,
   GroupPermissions.Create,
   GroupPermissions.Read,
+  GroupPermissions.Follow,
   GroupMembershipPermissions.Manage,
   ThreadPermissions.Start,
   ThreadPermissions.Read,
@@ -126,6 +130,7 @@ const operations = Layer.mergeAll(
   ChangeFeedApplication.layer,
   GroupApplication.layer,
   GroupMembershipApplication.layer,
+  GroupFollowApplication.layer,
   ThreadApplication.layer,
   ThreadMessageApplication.layer,
   ThreadParticipationApplication.layer,

@@ -7,7 +7,7 @@ import {
 import { expect, it } from "@effect/vitest";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
-import { GroupStore, GroupMembershipStore } from "@amends/core/group";
+import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import { Checkpoint, Commit, CommittedEvents, Store } from "@amends/core/journal";
 import {
   Notification,
@@ -182,6 +182,17 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listActiveByMember: unexpected,
         insert: unexpected,
         markRemoved: unexpected,
+      }),
+    ),
+    Context.add(
+      GroupFollowStore.Service,
+      GroupFollowStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        get: unexpected,
+        findActive: unexpected,
+        listActiveByGroup: unexpected,
+        insert: unexpected,
+        end: unexpected,
       }),
     ),
     Context.add(
@@ -457,11 +468,11 @@ it.effect("concurrent requests share boot and later requests do not replay or re
           yield* Deferred.succeed(resume, undefined);
           yield* Fiber.join(requests);
           expect(executed).toBe(20);
-          expect(reads).toBe(12); // One replay read per registered projection.
+          expect(reads).toBe(13); // One replay read per registered projection.
           yield* gateway.asMember(workspaceId, alice, operation);
           yield* gateway.inWorkspace(workspaceId, operation);
           expect(bound).toBe(1);
-          expect(reads).toBe(12); // One replay read per registered projection.
+          expect(reads).toBe(13); // One replay read per registered projection.
           expect(executed).toBe(22);
         }).pipe(Effect.provide(host(storage)));
       }),

@@ -8,6 +8,7 @@ import { Effect, Layer } from "effect";
 import { Assignments } from "./assignments.ts";
 import { Groups } from "./groups.ts";
 import { GroupMemberships } from "./group-memberships.ts";
+import { GroupFollows } from "./group-follows.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { PostgresDatabase } from "./database.ts";
@@ -37,6 +38,7 @@ const layerStores = Layer.mergeAll(
   Notifications.layer,
   Groups.layer,
   GroupMemberships.layer,
+  GroupFollows.layer,
   Threads.layer,
   ThreadParticipations.layer,
   ThreadMessages.layer,

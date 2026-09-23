@@ -179,6 +179,14 @@ conversation access. Current rosters expose admission records, not member profil
 historical admissions. Reads open no transaction, honor staged changes in a caller's commit,
 and do not promise a shared snapshot. See [group reads](../../docs/group-workflows.md#reading-groups-and-their-current-members).
 
+`GroupFollowApplication.follow({ groupId, memberId })` and `unfollow` let a team-group member follow
+the group for themselves under `GroupPermissions.Follow` (`group.follow`), or make an agent member
+follow under `agent.use` for it. A follow admits the member to threads started in the group
+afterwards; it belongs to their admission and ends when the admission does, which the
+`GroupFollowProjection` records from the admission's removal. `GroupFollowStore` is a required
+host binding. Direct groups return `NotFollowable`. See
+[following a group](../../docs/group-workflows.md#following-a-group).
+
 `GroupAudience.require` checks active workspace and group membership without checking any
 action permission or allowing a management bypass. It returns the current admission and
 requires only the actor at operation time. Core provides this policy internally to application
@@ -209,10 +217,10 @@ The thread module supplies opening-message and human-reply workflows described b
 
 `ThreadApplication.startInGroup({ groupId, text, mentions })` requires a human actor, current group
 membership, `thread.start` on the group, and `agent.use` on each mentioned agent member. A
-team-group thread starts with its author and mentioned members; the rest of the group can read it
-without participating. A direct-group thread enrolls all its members. The thread, admissions,
-verbatim user text, sequence-1 `MessagePublished` activity, notifications, and checkpoints commit
-together.
+team-group thread starts with its author, mentioned members, and the group's followers; the rest of
+the group can read it without participating. A direct-group thread enrolls all its members. The
+thread, admissions, verbatim user text, sequence-1 `MessagePublished` activity, notifications, and
+checkpoints commit together.
 
 `ThreadStart` is the internal start every workflow uses, excluded from `Core.Operations`: it
 creates the thread through `ThreadCreation`, admits the starting participants, and records the
@@ -606,6 +614,7 @@ meaning rather than using it as a synonym for a constructor.
 | Notification reads        | `NotificationApplication.make()`              | `NotificationApplication.Service`        |
 | Private team creation     | `GroupApplication.make()`                     | `GroupApplication.Service`               |
 | Group membership          | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`     |
+| Group following           | `GroupFollowApplication.make()`               | `GroupFollowApplication.Service`         |
 | Group audience policy     | `GroupAudience.make()`                        | `GroupAudience.Service`                  |
 | Assignment operations     | `AssignmentApplication.make()`                | `AssignmentApplication.Service`          |
 | Delegation policy         | `Delegation.make()`                           | `Delegation.Service`                     |

@@ -162,6 +162,47 @@ export const groupMemberships = pgTable(
   ],
 );
 
+/** A follow belongs to one admission; each admission follows its group at most once at a time. */
+export const groupFollows = pgTable(
+  "group_follows",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    groupId: text("group_id").notNull(),
+    memberId: text("member_id").notNull(),
+    groupMembershipId: text("group_membership_id").notNull(),
+    followedAt: instant("followed_at").notNull(),
+    status: text("status", { enum: ["active", "ended"] }).notNull(),
+    endedAt: instant("ended_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    foreignKey({
+      columns: [t.workspaceId, t.groupId],
+      foreignColumns: [groups.workspaceId, groups.id],
+      name: "group_follows_group",
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.memberId],
+      foreignColumns: [members.workspaceId, members.id],
+      name: "group_follows_member",
+    }),
+    foreignKey({
+      columns: [t.workspaceId, t.groupMembershipId],
+      foreignColumns: [groupMemberships.workspaceId, groupMemberships.id],
+      name: "group_follows_admission",
+    }),
+    uniqueIndex("active_group_follow")
+      .on(t.workspaceId, t.groupMembershipId)
+      .where(sql`${t.status} = 'active'`),
+    index("group_follows_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
+    check(
+      "group_follow_state",
+      sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
 export const roles = pgTable(
   "roles",
   {

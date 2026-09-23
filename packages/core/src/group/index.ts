@@ -13,3 +13,8 @@ export { GroupMembershipPermissions } from "./membership/permissions.ts";
 export { GroupMembershipFacts } from "./membership/facts.ts";
 export { GroupMembershipProjection } from "./membership/projection.ts";
 export { GroupMembershipStore } from "./membership/store.ts";
+export { GroupFollow } from "./follow/follow.ts";
+export { GroupFollowApplication } from "./follow/application.ts";
+export { GroupFollowFacts } from "./follow/facts.ts";
+export { GroupFollowProjection } from "./follow/projection.ts";
+export { GroupFollowStore } from "./follow/store.ts";

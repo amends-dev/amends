@@ -70,15 +70,15 @@ with `startInGroup`. Direct-group membership is fixed; see [group workflows](gro
 
 These rules follow the agreed
 [attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient). A team-group
-post is not a broadcast: the rest of the group can read the thread without participating. Group
-following, which will also enroll the group's followers, and the read positions that show
+post is not a broadcast: it admits the group's [followers](group-workflows.md#following-a-group),
+and the rest of the group can read the thread without participating. The read positions that show
 unread activity are not implemented yet.
 
-| Opening message                        | Initial participants                           | Notification recipients                 |
-| -------------------------------------- | ---------------------------------------------- | --------------------------------------- |
-| Team group, no explicit mentions       | The author                                     | The author                              |
-| Team group, explicit mentions          | The author plus the mentioned eligible members | The explicitly mentioned participants   |
-| Direct group, with or without mentions | All members of the direct group                | All participants, or the mentioned ones |
+| Opening message                        | Initial participants                                          | Notification recipients                 |
+| -------------------------------------- | ------------------------------------------------------------- | --------------------------------------- |
+| Team group, no explicit mentions       | The author and the group's followers                          | All those participants                  |
+| Team group, explicit mentions          | The author, the mentioned eligible members, and the followers | The explicitly mentioned participants   |
+| Direct group, with or without mentions | All members of the direct group                               | All participants, or the mentioned ones |
 
 Every start runs through the internal `ThreadStart` service. It creates the thread, admits the
 starting participants at sequence 1, and records the first message activity with its recipients

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "e83800a0-07f9-4243-8541-2a6c4be4f83c",
+  "id": "039ce892-fdc7-4eed-9196-45304cf56680",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -21,6 +21,12 @@
     {
       "isRlsEnabled": false,
       "name": "commits",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "group_follows",
       "entityType": "tables",
       "schema": "public"
     },
@@ -419,6 +425,110 @@
       "entityType": "columns",
       "schema": "public",
       "table": "commits"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_membership_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "followed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_follows"
     },
     {
       "type": "text",
@@ -2074,6 +2184,69 @@
           "opclass": null
         },
         {
+          "value": "group_membership_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"status\" = 'active'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "active_group_follow",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "group_follows_by_group",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "group_id",
           "isExpression": false,
           "asc": true,
@@ -3007,6 +3180,63 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "name": "group_follows_group",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "member_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "members",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_follows_member",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "group_membership_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "group_memberships",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_follows_admission",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "workspace_id",
+        "group_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "groups",
+      "columnsTo": [
+        "workspace_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
       "name": "group_memberships_group",
       "entityType": "fks",
       "schema": "public",
@@ -3429,6 +3659,17 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "group_follows_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "group_follows"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "group_memberships_pkey",
       "entityType": "pks",
       "schema": "public",
@@ -3591,6 +3832,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "assignments"
+    },
+    {
+      "value": "(\"status\" = 'active' AND \"ended_at\" IS NULL) OR (\"status\" = 'ended' AND \"ended_at\" IS NOT NULL)",
+      "name": "group_follow_state",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "group_follows"
     },
     {
       "value": "\"status\" IN ('active', 'removed')",
