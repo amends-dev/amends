@@ -35,6 +35,10 @@ and referenced messages in batches, so their store reads do not grow with group 
 length. A start still publishes one participation fact per starting participant, and every fact
 reads and writes each projection's checkpoint and journal bookkeeping, so a broadcast start's
 storage work still grows with the group.
+The agreed [attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is
+not implemented yet. A team post without mentions still enrolls and notifies every current group
+member, starts and replies still require `agent.use` for every selected agent, and group
+following, read positions, latest-activity ordering, and unread state do not exist.
 
 ## Design-system coverage
 

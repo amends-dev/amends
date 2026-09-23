@@ -36,7 +36,9 @@ implementation status.
 
 Groups provide lasting spaces for multiple conversations. Every thread belongs to exactly
 one group, and that group's membership is its access audience; action permissions still apply.
-Participation decides who is involved and notified, never who can see the thread. Tasks and
+Participation decides who is involved and notified, never who can see the thread. Members
+who are neither addressed nor following see a thread's new activity as unread through their
+own read position. Tasks and
 channel conversations use the same model: a task's working thread and a channel's conversation
 threads live in groups. The thread holds the conversation and its ordered activity.
 That timeline is the sole source of notifications. Thread participants supply the possible
@@ -130,7 +132,8 @@ flowchart TB
 - **Group:** a lasting conversation space within a workspace, with an access audience and
   multiple threads. A team group has managed membership. A direct group has a fixed set of
   two or more human or agent members: a DM has two, a group DM three or more. Group membership
-  does not automatically establish participation or request agent work in its threads.
+  does not automatically establish participation or request agent work in its threads; members
+  can follow a team group to join its new threads.
 - **Thread:** one conversation in exactly one group, with participants and a
   sequenced timeline of typed activity, including published messages, turn lifecycle events,
   and task updates. It owns their order without taking over the underlying domains' state
@@ -145,6 +148,8 @@ flowchart TB
   reference resources they use. A sandbox file is not automatically an amends resource.
 - **Notification:** references a thread activity and the participant to inform. Its
   acknowledgment records the recipient's handling outcome.
+- **Read position:** how far a human member has read a thread, by timeline sequence. It is
+  private per-member state that shows unread activity without recording anything per message.
 - **Triage:** evaluates a versioned workspace policy when a task enters triage. Rules match
   task conditions and select assignment, hold, dismissal, or agent consultation. Triage
   participates in the task's thread without group access and assigns only within that group.
@@ -204,11 +209,11 @@ A group holds multiple threads, and every thread belongs to exactly one group; t
 standalone threads. A team group has managed membership. A direct group has a fixed set of two
 or more members, with all of them participating initially in each new thread: a DM is a direct
 group of two, and a group DM has three or more. A team group's threads inherit the group's
-access audience, while an unmentioned opening message includes all current group members as
-participants. Explicit mentions narrow initial participation to the author and mentioned
-eligible members. A narrower or different audience uses another group, typically a direct group.
+access audience. A member's new team-group thread starts with its author, the members its opening
+message mentions, and the members who follow the group; the rest of the group sees it as unread.
+A narrower or different audience uses another group, typically a direct group.
 
-Four layers answer different questions about the same thread:
+Five layers answer different questions about the same thread:
 
 | Layer            | Question it answers                              | Who belongs to it                                              |
 | ---------------- | ------------------------------------------------ | -------------------------------------------------------------- |
@@ -216,6 +221,7 @@ Four layers answer different questions about the same thread:
 | Participation    | Who is involved in the thread and gets notified? | Some group members, plus contacts and triage where applicable. |
 | Task assignment  | What is the objective, and who is responsible?   | One current assignee, who must be a participant.               |
 | Turn             | Which agent attempt is running?                  | One agent on one thread.                                       |
+| Read position    | What has each member already seen?               | Each human member, privately, per thread.                      |
 
 Assigning a task adds its assignee as a participant and notifies them; it neither creates nor
 changes a group. Several people or agents share work on one task by participating and being
@@ -231,8 +237,9 @@ check permissions and preserve the group's audience rules.
 
 For human and agent operations, active workspace membership, inclusion in the thread's
 access audience, and the required action permissions must all hold. Group members can
-read a thread without participating when permitted. Reading does not subscribe them or
-request agent work. Replying, explicitly following, or an authorized mention can establish
+read a thread without participating when permitted. Reading advances only their own read
+position; it does not subscribe them or request agent work. Replying, explicitly following, an
+authorized mention, or following the group before the thread starts can establish
 participation. Threads do not admit members from outside their group through participation.
 Contacts and triage participate without becoming group members or gaining group access.
 
@@ -243,18 +250,19 @@ See [groups and thread audiences](#agreed-groups-provide-a-shared-home-for-threa
 
 ### Thread participants, addressing, and history
 
-- A new thread in a direct group starts with all its members as participants. A new thread
-  in a team group starts with all current group members when there are no explicit mentions,
-  or with its author and explicitly mentioned eligible members when mentions narrow the message.
-  A task's working thread starts with its creator and triage, or with its creator and assignee
-  when assigned at creation. A new channel conversation starts with its contacts and triage.
-  Group membership does not enroll members in task or channel threads.
+- A new thread in a direct group starts with all its members as participants. A member's new
+  thread in a team group starts with its author, its explicitly mentioned eligible members, and
+  the group's followers. A task's working thread starts with its creator and triage, or with its
+  creator and assignee when assigned at creation. A new channel conversation starts with its
+  contacts and triage. The group's human followers also join task and channel threads; its agent
+  followers do not. Group membership alone enrolls no one.
   Later mentions can add participants under the thread's audience and admission rules.
 - External people participate as separate contacts, preserving the actual author of each
   incoming message. Several contacts can belong to the same thread and external conversation.
 - Committed thread activity is the sole source of notifications. Participants at that
   activity's position supply the possible recipients; activity-specific rules narrow them.
-  Other members with access to the thread are not automatically notified.
+  Other members with access to the thread are not notified; they see its activity as unread
+  through their read positions.
 - For message-publication activity, notify explicitly mentioned participants, or all current
   participants when there are no mentions. This applies equally to user and assistant messages.
 - Humans acknowledge notifications. Agents accept work from relevant user messages and
@@ -551,6 +559,7 @@ and relationships; detailed schemas and lifecycle rules remain open where stated
 | Task             | An objective with one current assignee, worked on across turns. Each task references its own unique working thread, placed in a group when the task is created.                                                                       | Gives work an objective, assignment, and lifecycle beyond one attempt.                                                |
 | Resource         | An amends entity produced or used during work. A resource created during a turn explicitly references that turn. Its detailed content and revision contracts remain open.                                                             | Gives an output or input an application identity that survives an execution environment, with a record of its origin. |
 | Notification     | A reference to a committed thread activity and the participant selected to receive it, with an acknowledgment outcome.                                                                                                                | Separates informing participants from deciding whether and how to act.                                                |
+| Read position    | How far a human member has read a thread, by timeline sequence.                                                                                                                                                                       | Shows unread activity privately without recording anything per message for each member.                               |
 | Triage           | One versioned workspace policy of conditional rules, evaluated when a task enters triage.                                                                                                                                             | Decides task disposition and assignment, optionally with agent consultation.                                          |
 | Channel          | A configured external communication point, implemented through a channel adapter using a connection with channel support. Its conversations become threads in one destination group.                                                  | Receives and sends messages while keeping transport details outside the core work model.                              |
 | Contact          | An external person's identity that can be a thread participant and message author.                                                                                                                                                    | Preserves individual participation and routes notification handling through external communication.                   |
@@ -2351,6 +2360,8 @@ groups for one channel remain possible later.
 | Add a member to an existing group                  | Members with the required membership-management permission for the group. |
 | Remove another member from a group                 | Members with the required membership-management permission for the group. |
 | Leave one's own team-group membership              | Any current team-group member with active workspace membership.           |
+| Follow a team group, joining its new threads       | Any current group member who may follow its threads, for themselves.      |
+| Make an agent follow a team group                  | A current group member with agent-use authority for that agent.           |
 
 Application operations check the required permission and its workspace or group target;
 they do not compare role names. Team-group creation uses `group.create` on the workspace.
@@ -2464,13 +2475,14 @@ and [source resolution](thread-workflows.md#resolving-a-notification-source).
 
 ### Threads inherit their group's access audience
 
-| Group kind   | Access audience for workspace members | Initial participants                                                                                                              |
-| ------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Direct group | Its fixed members.                    | All its members.                                                                                                                  |
-| Team group   | Current group members.                | All current members without mentions; otherwise the author and mentioned eligible members. Task and channel threads differ below. |
+| Group kind   | Access audience for workspace members | Initial participants                                                                                          |
+| ------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Direct group | Its fixed members.                    | All its members.                                                                                              |
+| Team group   | Current group members.                | The author, the mentioned eligible members, and the group's followers. Task and channel threads differ below. |
 
 All threads in a group inherit its audience. A member with read permission can browse and
-read its threads without participating, including their earlier history. Private subsets
+read its threads without participating, including their earlier history. Activity they have not
+read shows as unread. Private subsets
 within a group and individual-thread sharing with group outsiders are outside the policy.
 For a narrower or different audience, use a separate group, typically a direct group.
 
@@ -2484,13 +2496,15 @@ thread link or knowing its ID grants nothing, and following requires group acces
 ### Access, participation, and recipient selection have separate effects
 
 Reading a thread does not establish participation. An eligible member can become
-a participant by replying, explicitly following, or being added through an authorized
-mention or workflow. Validate participation changes consistently with the activity that
-introduces them. Following is involvement in the conversation, not a work request by itself.
+a participant by replying, explicitly following, following the group before a thread starts,
+or being added through an authorized mention or workflow. Validate participation changes
+consistently with the activity that introduces them. Following is involvement in the
+conversation, not a work request by itself.
 
 For example, Alice, Bob, and Reviewer belong to Engineering. Alice starts a thread with a
-message addressed to Reviewer. Alice and Reviewer participate. Bob can read the thread
-without receiving its activity notifications; replying adds Bob as a participant. Reviewer
+message addressed to Reviewer. Alice and Reviewer participate. Bob sees the thread as unread
+and can read it without receiving its activity notifications; replying adds Bob as a participant.
+Had Bob followed Engineering, Bob would have joined when Alice started the thread. Reviewer
 is asked to work by Alice's addressed message, not by its membership in Engineering.
 
 Thread participants supply possible notification recipients. Activity selects among them
@@ -2526,7 +2540,9 @@ inspection and a reusable audience check. Starting a private-group thread with a
 message, initial participation, and notifications is implemented, as is starting a direct group;
 task and channel thread starts, group/thread HTTP/UI, assistant publication and subscriptions
 remain future work. Human replies require current group access and
-`thread.publish`, with `agent.use` for selected agent recipients. Their required participation and publication
+`thread.publish`; the implementation also requires `agent.use` for every selected agent
+recipient, which the [attention model](#agreed-attention-is-directed-followed-or-ambient)
+narrows to bringing an agent into the conversation. Their required participation and publication
 steps share internal services with starts; starting does not additionally require `thread.publish`.
 Thread reads now require current
 group access and `thread.read`, with no participation side effects.
@@ -2551,34 +2567,40 @@ individual contacts. Task workflows also involve a triage participant, which tak
 without group access. A new thread in a direct group starts with all its members
 participating. A human-to-human direct group does not invoke an agent.
 
-A thread in a team group begins with all current active group members when its opening message
-has no explicit mentions. With explicit mentions, it begins with the author and those eligible
-mentioned members. An unmentioned message is addressed to the group, including its agents.
-That broadcast rule belongs to a member talking to their group. Task and channel threads start
-with the people and policies responsible for the work instead, so that new work does not notify
-the whole group or start a turn for every agent in it:
+A thread that a member starts in a team group begins with its author, the eligible members its
+opening message mentions, and the group's followers. Group membership alone lets a member read
+and join a thread without making them a participant: an unmentioned post reaches the group's
+followers, and the rest of the group sees it as unread. Task and channel threads start with the
+people and policies responsible for the work, plus the group's human followers, so that new work
+does not start a turn for every agent that follows the group:
 
-| How the thread starts                           | Starting participants                                                              |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
-| A member posts in a team group without mentions | All current group members.                                                         |
-| A member posts in a team group with mentions    | The author and the mentioned eligible members.                                     |
-| A member posts in a direct group                | All its members.                                                                   |
-| A member creates a task                         | The creator and triage, or the creator and the assignee when assigned at creation. |
-| A new conversation arrives through a channel    | Its contacts and triage.                                                           |
-| Triage assigns the task                         | Adds the assignee.                                                                 |
+| How the thread starts                        | Starting participants                                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| A member posts in a team group               | The author, the mentioned eligible members, and the group's followers.                                               |
+| A member posts in a direct group             | All its members.                                                                                                     |
+| A member creates a task                      | The creator and triage, or the creator and the assignee when assigned at creation, plus the group's human followers. |
+| A new conversation arrives through a channel | Its contacts and triage, plus the group's human followers.                                                           |
+| Triage assigns the task                      | Adds the assignee.                                                                                                   |
 
 Members of the group can still read task and channel threads and join by replying or following.
 Later mentions can add participants under the
 [audience and admission rules](#threads-inherit-their-groups-access-audience).
 
-Group membership seeds participation only when the thread starts. Later unmentioned messages
-address the thread's current participants; they do not re-enroll the group or restore someone
-who left. Later group additions grant eligible access without joining every existing thread.
+Following a group seeds participation only when a thread starts. Later unmentioned messages
+address the thread's current participants; they do not re-enroll followers or restore someone
+who left. Joining or following a group later grants access or future enrollment without joining
+its existing threads.
 
 These are thread participation rules. The initiating application operation must authorize
 the requested conversation and participant changes. Adding a thread participant does not create
 a workspace membership or confer unrelated workspace permissions. Access to use an agent
 is separate from that agent's permissions when executing the requested work.
+
+Authority to use an agent (`agent.use`) is required to bring it into a conversation: mentioning
+it, assigning it, sending it an explicit work request, starting a direct group with it, or making
+it follow a group. It is not required to reply in a thread where the agent already participates
+or to post in a group it follows. The member who brought the agent in, or made it follow the
+group, authorized it to handle that conversation; it still executes with its own permissions.
 
 Thread participants supply the possible notification recipients for every activity. The
 activity narrows those recipients according to its type and addressing. For a published
@@ -2591,6 +2613,70 @@ Addressing does not limit which messages can be supplied as conversational histo
 Ordinary agent responses contribute to the conversation; agent recipients discard the
 corresponding notifications without invoking a turn. Deliberate collaboration uses explicit
 work-request and result activity, described below.
+
+## Agreed: attention is directed, followed, or ambient
+
+Groups of a hundred or more members make it impractical to enroll and notify every member for
+every post. Attention therefore has three kinds, and only the first two record anything per member:
+
+| Kind     | What it means                                                                                                 | What is recorded                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Directed | Someone asked for this member: a mention, a direct group, an assignment, triage, or an explicit work request. | Notifications from the thread's activity.                   |
+| Followed | The member is involved: they replied, followed, were mentioned or assigned, or follow the group.              | Participation, so later unmentioned activity notifies them. |
+| Ambient  | The member can see the thread because they belong to its group.                                               | Nothing per message; unread comes from their read position. |
+
+Notifications are still generated only from thread activity and selected from its participants.
+A human's inbox is their pending notifications; an agent's are its work queue. Ambient activity
+never becomes notifications or agent input.
+
+### Following a group joins its new threads
+
+A member can follow a team group. Each thread started in the group afterwards admits them at its
+first sequence, as if they had followed it themselves, so its unmentioned activity notifies them.
+Following is per member and per group, and off by default: a new group member is reached only
+when addressed. Human followers join every new thread in the group, including task threads and
+channel conversations. Agent followers join threads that members start; task and channel work
+reaches agents through triage, assignment, or a mention.
+
+Unfollowing a thread leaves that thread only. Unfollowing the group stops joining its future
+threads without ending current participation. Leaving the group or the workspace ends following.
+Direct groups need no following: all their members participate in every thread.
+
+A member follows a group for themselves when they may follow its threads. Making an agent follow
+a group requires group membership and authority to use that agent; posting in the group does not.
+Following changes who is admitted, so it is recorded as a journal fact.
+
+### Read positions make ambient activity visible
+
+Each human member has a read position per thread: the timeline sequence they have read through.
+It only moves forward; a lower position is ignored, so several devices cannot move it back.
+Members set only their own position, and only for threads they can read.
+
+A thread is unread for a member when its latest sequence is past their read position. A thread
+they have never read counts only when it has activity after they joined the group, so joining a
+group with many older threads does not mark them all unread. Each thread keeps its latest sequence
+and activity time, and each group its latest activity time. A member's caught-up time for a group,
+set when they view or mark the group read, shows whether the group has newer activity. Thread lists
+order by latest activity.
+
+Marking a thread read through a sequence also records `Seen` for the member's pending
+notifications from that thread's activity up to it, in the same operation. Those acknowledgments
+remain journal facts; with nothing pending, marking read writes only the position. Agents have
+no read positions: turns track their input progress.
+
+Read positions and caught-up times are private, per-member state rather than journal facts. They
+change on every view, carry no audit value, and must not compete with conversation writes for the
+workspace's write order. Rebuilding projections from the journal does not restore them. Their
+store contract needs only keyed records, batch reads, and a forward-only update.
+
+### Effect at scale
+
+A post in a 200-member team records one participation plus one per follower, and no notifications
+for members who are neither addressed nor following. A reply notifies the thread's current
+participants: the people who engaged, rather than the whole group.
+
+A mention that notifies a whole group once without enrolling it, for announcements, is deferred.
+It would be the only activity whose recipients do not come from the thread's participants.
 
 ## Agreed: leaving ends participation without erasing prior work
 
@@ -2613,12 +2699,13 @@ reassignment workflow so the task is not left assigned to someone outside its th
 
 ### Unfollowing, leaving, and muting have different access effects
 
-| Action                                | Access effect                                           | Participation and notification effect                                                        |
-| ------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Unfollow a thread                     | Inherited group access remains, subject to permissions. | Ends participation and future recipient selection until an authorized rejoin.                |
-| Leave or be removed from a team group | Removes inherited access to all its threads.            | Ends participation in those threads; the agent departure rules apply where relevant.         |
-| Lose workspace membership             | Removes access to its groups and threads.               | Ends the corresponding active participation; the agent departure rules apply where relevant. |
-| Mute a thread as a human              | Access remains.                                         | Participation and durable notifications remain; presentation can suppress alerts.            |
+| Action                                | Access effect                                           | Participation and notification effect                                                                           |
+| ------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Unfollow a thread                     | Inherited group access remains, subject to permissions. | Ends participation and future recipient selection until an authorized rejoin.                                   |
+| Unfollow a team group                 | Access remains.                                         | Stops joining its new threads; current participation is unchanged.                                              |
+| Leave or be removed from a team group | Removes inherited access to all its threads.            | Ends participation in those threads and following of the group; the agent departure rules apply where relevant. |
+| Lose workspace membership             | Removes access to its groups and threads.               | Ends the corresponding active participation; the agent departure rules apply where relevant.                    |
+| Mute a thread as a human              | Access remains.                                         | Participation and durable notifications remain; presentation can suppress alerts.                               |
 
 Group or workspace removal must stop new recipient selection for the affected member
 consistently with the access change. Historical contributions and previously selected
@@ -2747,7 +2834,8 @@ triage triggers evaluation even when triage already participates in the thread.
 Receiving a notification is not itself an instruction to invoke a harness. The handler
 uses the activity type and its recorded meaning to decide what to do.
 
-For a human-authored broadcast, agents selected as participants may take a turn to evaluate
+For an unmentioned human message, agent participants, including agents that joined by following
+the group, may take a turn to evaluate
 relevance, ask a question, do work, respond, or finish silently. Responsibility for relevance
 sits with the recipient. Explicit mentions make a request direct and increase the expectation
 of handling it, but do not require a meaningless visible reply. A completed relevance evaluation
@@ -3061,7 +3149,7 @@ recipients must not be recomputed using only current participants or current tas
 ### Publication checks consider input for the particular agent
 
 A user message addressed only to A prevents A from closing before incorporation, but does
-not impose the same requirement on B. A broadcast user message addresses all current agent
+not impose the same requirement on B. An unmentioned user message addresses all current agent
 participants, so their relevant attempts must account for it.
 
 A task assignment or other actionable task change follows the same rule for the agent
@@ -3266,9 +3354,9 @@ For task intake through a channel:
 
 An incoming reply does not automatically create another task or thread. The adapter and
 intake operation must preserve the correspondence with the external conversation. Detailed
-grouping rules for each provider remain to be defined. An optional channel setting that also
-notifies the destination group's human members of each new conversation remains open; it would
-be off by default and would never enroll agents, which join through triage or a mention.
+grouping rules for each provider remain to be defined. Human members who follow the destination
+group join each new conversation; agents that follow it do not, and join through triage,
+assignment, or a mention.
 
 ### Contact handlers deliver published replies
 

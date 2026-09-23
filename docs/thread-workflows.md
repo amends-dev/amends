@@ -66,6 +66,12 @@ with `startInGroup`. Direct-group membership is fixed; see [group workflows](gro
 
 ## Initial participation and recipient selection
 
+This section describes the current implementation. The agreed
+[attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient) replaces the
+team-group broadcast rule: a member's post starts with its author, its mentioned members, and the
+group's followers, and the rest of the group sees it as unread. It also requires `agent.use` only
+to bring an agent into a conversation. Until that is implemented, the rules below apply.
+
 | Opening message                        | Initial participants                                              | Notification recipients                 |
 | -------------------------------------- | ----------------------------------------------------------------- | --------------------------------------- |
 | Team group, no explicit mentions       | All current active group members, including the author and agents | All those participants                  |
