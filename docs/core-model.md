@@ -2655,7 +2655,9 @@ have never read counts only when it has activity after they joined the group, so
 with many older threads does not mark them all unread. Each thread keeps the sequence and time of
 its latest message, and each group the time of its latest message in any thread; quiet participation
 changes do not count. A member's caught-up time for a group, set when they view or mark the group
-read, shows whether the group has newer activity. Thread lists order by latest activity.
+read, shows whether the group has newer activity. Thread lists order by latest activity. Beside
+that, a group counts the member's pending notifications from its threads: activity addressed to
+them rather than merely unseen, as a badge beside a bold group in a sidebar.
 
 Posting a message reads the thread through it for its author, settling their earlier notifications
 from it the same way; a message never notifies its own author.

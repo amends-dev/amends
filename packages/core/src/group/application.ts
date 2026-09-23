@@ -22,6 +22,7 @@ import { GroupMembershipStore } from "./membership/store.ts";
 import { GroupFollow } from "./follow/follow.ts";
 import { GroupFollowStore } from "./follow/store.ts";
 import { ReadStateStore } from "../attention/store.ts";
+import { NotificationStore } from "../notification/store.ts";
 
 /** Missing groups and groups outside the caller's audience share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("GroupApplication.NotFound", {
@@ -64,6 +65,7 @@ export type ReadError =
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
   | ReadStateStore.Failure
+  | NotificationStore.Failure
   | Schema.SchemaError
   | GroupAudience.InvalidResponse
   | NotFound
@@ -109,6 +111,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   const audience = yield* GroupAudience.Service;
   const follows = yield* GroupFollowStore.Service;
   const readStates = yield* ReadStateStore.Service;
+  const notifications = yield* NotificationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -120,6 +123,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       audience.workspaceId,
       follows.workspaceId,
       readStates.workspaceId,
+      notifications.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({ message: "Group services belong to different workspaces" });
@@ -228,9 +232,10 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     invalidList(`Group storage returned invalid data: ${cause.message}`);
   /** Describe one page of the actor's admissions, keyed by group, in a fixed number of reads. */
   const describe = Effect.fnUntraced(function* (
-    memberId: GroupMembership.Record["memberId"],
+    actor: Actor.Value,
     admissions: ReadonlyMap<Group.Id, GroupMembership.Record>,
   ) {
+    const memberId = actor.memberId;
     // One grant resolution and one read per kind of record for the page.
     const candidates = [...admissions.keys()];
     const allowed = yield* authorization.permitted(
@@ -283,6 +288,15 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         return yield* invalidList("Follow store returned another member's or admission's follow");
       following.add(follow.groupMembershipId);
     }
+    const pending = new Map<Group.Id, number>();
+    for (const found of yield* notifications.countPendingByGroup(actor.identity, ids)) {
+      const value = yield* Schema.decodeEffect(NotificationStore.PendingCount)(found).pipe(
+        Effect.mapError(decodeFailure),
+      );
+      if (!records.has(value.groupId) || pending.has(value.groupId))
+        return yield* invalidList("Notification store counted another group");
+      pending.set(value.groupId, value.count);
+    }
     const items: Array<Group.ListItem> = [];
     for (const groupId of ids.toSorted((left, right) =>
       left < right ? -1 : left > right ? 1 : 0,
@@ -301,6 +315,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
           latestActivityAt !== null &&
           DateTime.isGreaterThan(latestActivityAt, caughtUpAt ?? admission.admittedAt),
         following: following.has(admission.id),
+        pending: pending.get(groupId) ?? 0,
       });
     }
     return items;
@@ -341,7 +356,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         admissions.set(membership.groupId, membership);
       }
       if (admissions.size === 0) break;
-      for (const item of yield* describe(actor.memberId, admissions))
+      for (const item of yield* describe(actor, admissions))
         if (items.length < options.limit) items.push(item);
       after = [...admissions.keys()].at(-1);
       if (admissions.size < options.limit) break;

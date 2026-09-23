@@ -188,7 +188,11 @@ const registry: ReadonlyArray<Registered> = [
           ? [
               {
                 scope: Identity.audienceOf(selected.recipient),
-                record: Notification.generated(event, event.payload.activity, selected),
+                record: Notification.generated(
+                  event,
+                  Object.assign({ groupId: event.payload.groupId }, event.payload.activity),
+                  selected,
+                ),
               },
             ]
           : [],

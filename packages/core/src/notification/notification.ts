@@ -3,6 +3,7 @@ import type { DateTime } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { Entry } from "../journal/entry.ts";
 import { WorkspaceId } from "../workspace/id.ts";
+import { GroupId } from "../group/id.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationId } from "../thread/participation/id.ts";
 
@@ -16,9 +17,13 @@ export const Source = Schema.Struct({
 });
 export interface Source extends Schema.Schema.Type<typeof Source> {}
 
-/** The thread and timeline position of a notification's source activity. */
+/**
+ * The thread and timeline position of a notification's source activity, with the thread's group,
+ * by which a reader's pending notifications are counted.
+ */
 export const ThreadReference = Schema.Struct({
   threadId: ThreadId.Id,
+  groupId: GroupId.Id,
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
 });
 export interface ThreadReference extends Schema.Schema.Type<typeof ThreadReference> {}
@@ -88,6 +93,7 @@ export const generated = (
   entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },
   activity: {
     readonly workspaceId: WorkspaceId.Id;
+    readonly groupId: GroupId.Id;
     readonly threadId: ThreadId.Id;
     readonly sequence: number;
   },
@@ -97,7 +103,7 @@ export const generated = (
   workspaceId: activity.workspaceId,
   source: { logId: entry.logId, entryId: entry.id },
   participationId: selected.participationId,
-  thread: { threadId: activity.threadId, sequence: activity.sequence },
+  thread: { threadId: activity.threadId, groupId: activity.groupId, sequence: activity.sequence },
   recipient: selected.recipient,
   recordedAt: entry.recordedAt,
   state: { _tag: "Pending" },

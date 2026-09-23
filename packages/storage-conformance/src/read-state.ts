@@ -480,67 +480,83 @@ export const readState = (harness: Harness) => {
       ),
     );
 
-    it.effect("group lists report latest activity, catching up, and following", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const { bound, owner, team } = yield* prepare();
-            const human = actorFor(humanId);
-            const mine = (actor: Actor.Value) =>
-              run(
+    it.effect(
+      "group lists report latest activity, catching up, following, and pending counts",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, team } = yield* prepare();
+              const human = actorFor(humanId);
+              const mine = (actor: Actor.Value) =>
+                run(
+                  bound,
+                  actor,
+                  Effect.flatMap(GroupApplication.Service, (s) => s.listMine({ limit: 100 })),
+                );
+              const quiet = yield* run(
                 bound,
-                actor,
-                Effect.flatMap(GroupApplication.Service, (s) => s.listMine({ limit: 100 })),
+                owner,
+                Effect.flatMap(GroupApplication.Service, (s) =>
+                  s.createPrivateTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
+                ),
               );
-            const quiet = yield* run(
-              bound,
-              owner,
-              Effect.flatMap(GroupApplication.Service, (s) =>
-                s.createPrivateTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
-              ),
-            );
-            const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>
-              items.find((item) => item.group.id === groupId);
-            yield* TestClock.adjust("1 minute");
-            yield* run(bound, owner, start(team.id, []));
-            const posted = yield* DateTime.now;
-            const listed = yield* mine(human);
-            expect(listed.map((item) => item.group.id)).toEqual(
-              [team.id, quiet.id].toSorted((a, b) => (a < b ? -1 : 1)),
-            );
-            expect(itemOf(listed, team.id)).toMatchObject({
-              latestActivityAt: posted,
-              caughtUpAt: null,
-              newActivity: true,
-              following: false,
-            });
-            expect(itemOf(listed, quiet.id)).toMatchObject({
-              latestActivityAt: null,
-              newActivity: false,
-            });
-            yield* TestClock.adjust("1 minute");
-            yield* run(bound, human, markGroupRead(team.id));
-            yield* run(
-              bound,
-              human,
-              Effect.flatMap(GroupFollowApplication.Service, (s) =>
-                s.follow({ groupId: team.id, memberId: humanId }),
-              ),
-            );
-            expect(itemOf(yield* mine(human), team.id)).toMatchObject({
-              caughtUpAt: yield* DateTime.now,
-              newActivity: false,
-              following: true,
-            });
-            yield* TestClock.adjust("1 minute");
-            yield* run(bound, owner, start(team.id, []));
-            expect(itemOf(yield* mine(human), team.id)).toMatchObject({ newActivity: true });
-            // Groups outside the reader's group.read grants are left out.
-            expect(yield* mine(actorFor(plainId))).toEqual([]);
-          }),
+              const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>
+                items.find((item) => item.group.id === groupId);
+              yield* TestClock.adjust("1 minute");
+              yield* run(bound, owner, start(team.id, []));
+              const posted = yield* DateTime.now;
+              const listed = yield* mine(human);
+              expect(listed.map((item) => item.group.id)).toEqual(
+                [team.id, quiet.id].toSorted((a, b) => (a < b ? -1 : 1)),
+              );
+              // Unread activity that addressed nobody leaves nothing pending.
+              expect(itemOf(listed, team.id)).toMatchObject({
+                latestActivityAt: posted,
+                caughtUpAt: null,
+                newActivity: true,
+                following: false,
+                pending: 0,
+              });
+              expect(itemOf(listed, quiet.id)).toMatchObject({
+                latestActivityAt: null,
+                newActivity: false,
+              });
+              yield* TestClock.adjust("1 minute");
+              yield* run(bound, human, markGroupRead(team.id));
+              yield* run(
+                bound,
+                human,
+                Effect.flatMap(GroupFollowApplication.Service, (s) =>
+                  s.follow({ groupId: team.id, memberId: humanId }),
+                ),
+              );
+              expect(itemOf(yield* mine(human), team.id)).toMatchObject({
+                caughtUpAt: yield* DateTime.now,
+                newActivity: false,
+                following: true,
+              });
+              yield* TestClock.adjust("1 minute");
+              // Following joins the new thread, so its opening and a reply notify the reader.
+              const followed = yield* run(bound, owner, start(team.id, []));
+              yield* run(bound, owner, reply(followed.thread.id, []));
+              yield* run(bound, owner, start(quiet.id, [humanId]));
+              expect(itemOf(yield* mine(human), team.id)).toMatchObject({
+                newActivity: true,
+                pending: 2,
+              });
+              expect(itemOf(yield* mine(human), quiet.id)).toMatchObject({ pending: 1 });
+              // Reading the thread settles its notifications; the other group's stay pending.
+              yield* run(bound, human, markRead(followed.thread.id, 2));
+              expect(itemOf(yield* mine(human), team.id)).toMatchObject({ pending: 0 });
+              expect(itemOf(yield* mine(human), quiet.id)).toMatchObject({ pending: 1 });
+              expect(itemOf(yield* mine(owner), team.id)).toMatchObject({ pending: 0 });
+              // Groups outside the reader's group.read grants are left out.
+              expect(yield* mine(actorFor(plainId))).toEqual([]);
+            }),
+          ),
         ),
-      ),
     );
 
     it.effect(

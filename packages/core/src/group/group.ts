@@ -78,8 +78,10 @@ export const ListOptions = Schema.Struct({
 export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 
 /**
- * One of the reader's groups with its activity. `newActivity` holds when its latest message came
- * after the reader last caught up with it or, if they never have, after they joined.
+ * One of the reader's groups with its activity: a sidebar row. `newActivity` holds when its
+ * latest message came after the reader last caught up with it or, if they never have, after they
+ * joined. `pending` counts the reader's pending notifications from the group's threads: the
+ * activity addressed to them, as opposed to activity they merely have not seen.
  */
 export const ListItem = Schema.Struct({
   group: Record,
@@ -87,6 +89,7 @@ export const ListItem = Schema.Struct({
   caughtUpAt: Schema.NullOr(Latest.fields.occurredAt),
   newActivity: Schema.Boolean,
   following: Schema.Boolean,
+  pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
 

@@ -6,7 +6,8 @@ import {
   NotificationApplication,
   NotificationStore,
 } from "@amends/core/notification";
-import { ThreadParticipation } from "@amends/core/thread";
+import { Group } from "@amends/core/group";
+import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Context, DateTime, Effect, Option } from "effect";
@@ -92,6 +93,68 @@ export const notifications = (harness: Harness) => {
               ),
             );
           }),
+        ),
+    );
+
+    it.effect(
+      "pending counts per group include only the recipient's pending thread notifications",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const bound = yield* boundTo(workspaceId);
+              yield* initialized(bound);
+              const [red, blue, green] = ["red", "blue", "green"].map((id) => Group.Id.make(id));
+              if (!red || !blue || !green) return yield* Effect.die("Expected three groups");
+              const inGroup = (groupId: Group.Id, sequence = 1) => ({
+                thread: { threadId: Thread.Id.make(`thread-${groupId}`), groupId, sequence },
+              });
+              const acknowledgedAt = recordedAt;
+              yield* bound.store.transaction(
+                bound.notifications.insertMany([
+                  record("red-1", inGroup(red, 1)),
+                  record("red-2", inGroup(red, 2)),
+                  record("blue-1", inGroup(blue)),
+                  record("green-1", inGroup(green)),
+                  // Settled, someone else's, or not from a thread: none of these count.
+                  record("red-seen", {
+                    ...inGroup(red, 3),
+                    state: { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt },
+                  }),
+                  record("red-other", { ...inGroup(red), recipient: another }),
+                  record("red-agent", { ...inGroup(red), recipient: agent }),
+                  record("unthreaded"),
+                ]),
+              );
+              const counts = yield* bound.notifications.countPendingByGroup(human, [red, blue]);
+              expect(counts.toSorted((a, b) => (a.groupId < b.groupId ? -1 : 1))).toEqual([
+                { groupId: blue, count: 1 },
+                { groupId: red, count: 2 },
+              ]);
+              expect(yield* bound.notifications.countPendingByGroup(agent, [red, green])).toEqual([
+                { groupId: red, count: 1 },
+              ]);
+              expect(
+                yield* bound.notifications.countPendingByGroup(human, [Group.Id.make("empty")]),
+              ).toEqual([]);
+              expect(yield* bound.notifications.countPendingByGroup(human, [])).toEqual([]);
+              yield* bound.store.transaction(
+                bound.notifications.acknowledge(Notification.Id.make("red-1"), {
+                  outcome: { _tag: "Seen" },
+                  acknowledgedAt,
+                }),
+              );
+              expect(yield* bound.notifications.countPendingByGroup(human, [red])).toEqual([
+                { groupId: red, count: 1 },
+              ]);
+              expect(
+                yield* (yield* boundTo(otherWorkspaceId)).notifications.countPendingByGroup(human, [
+                  red,
+                ]),
+              ).toEqual([]);
+            }),
+          ),
         ),
     );
 

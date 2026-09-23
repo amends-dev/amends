@@ -562,7 +562,7 @@ it.effect("the notifications a commit creates reach their recipient alone, with 
           workspaceId,
           source: { logId: "journal", entryId: activity?.id },
           participationId: "alice-participation",
-          thread: { threadId, sequence: 3 },
+          thread: { threadId, groupId, sequence: 3 },
           recipient: alice,
           recordedAt: activity?.recordedAt,
           state: { _tag: "Pending" },

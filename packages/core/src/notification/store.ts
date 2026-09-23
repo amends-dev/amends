@@ -3,6 +3,7 @@ import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
+import type { GroupId } from "../group/id.ts";
 import type { ThreadId } from "../thread/id.ts";
 import type { ThreadParticipationId } from "../thread/participation/id.ts";
 
@@ -19,6 +20,13 @@ export const ReadOptions = Schema.Struct({
 });
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
+/** A recipient's pending notifications from one group's thread activity. */
+export const PendingCount = Schema.Struct({
+  groupId: Notification.ThreadReference.fields.groupId,
+  count: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface PendingCount extends Schema.Schema.Type<typeof PendingCount> {}
+
 export class Failure extends Schema.TaggedError<Failure>()("NotificationStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
@@ -33,7 +41,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * Workspace-bound notification read model. Reads use the current transaction
  * when present, otherwise committed state, and return isolated records. These
  * internal reads do not authorize callers; application operations must do so.
- * Both storage adapters implement this contract.
+ * Every storage adapter implements this contract.
  */
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -66,6 +74,15 @@ export interface Interface {
     threadId: ThreadId.Id,
     throughSequence: number,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+
+  /**
+   * How many pending notifications the recipient has from thread activity in each of these
+   * groups, for groups with any. Read one page of groups at a time.
+   */
+  readonly countPendingByGroup: (
+    recipient: Notification.Recipient,
+    groupIds: ReadonlyArray<GroupId.Id>,
+  ) => Effect.Effect<ReadonlyArray<PendingCount>, Failure>;
 
   /**
    * Projection write, enlisted with the source activity and checkpoint.

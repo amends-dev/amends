@@ -85,6 +85,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     listByRecipient: list,
     listPendingByRecipient: list,
     listPendingByThread: unexpected,
+    countPendingByGroup: unexpected,
     insert: unexpected,
     insertMany: unexpected,
     discardPendingForParticipation: unexpected,

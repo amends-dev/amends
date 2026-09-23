@@ -171,8 +171,8 @@ records its reason and uses journal provenance for actor and time. See
 [departures](../../docs/group-workflows.md#removing-a-member-or-leaving).
 
 `GroupApplication.listMine({ limit, after? })` returns a page of `Group.ListItem` values with each
-group's latest activity, the caller's caught-up time, `newActivity`, and `following`, from a fixed
-number of reads. `ThreadApplication.listInGroup(groupId, { limit, before? })` pages a group's
+group's latest activity, the caller's caught-up time, `newActivity`, `following`, and `pending`,
+the caller's pending notifications from the group's threads, from a fixed number of reads. `ThreadApplication.listInGroup(groupId, { limit, before? })` pages a group's
 readable threads by latest activity as `Thread.ListItem` values with the caller's read position and
 `unread`. `Authorization.permitted` checks many requirements with one grant resolution and reports
 each, so lists skip items instead of failing. Starting and replying read the thread through the

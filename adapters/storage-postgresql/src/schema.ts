@@ -320,8 +320,9 @@ export const notifications = pgTable(
     recipientId: text("recipient_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
-    // The thread and timeline position of thread-activity notifications.
+    // The thread, its group, and the timeline position of thread-activity notifications.
     threadId: text("thread_id"),
+    threadGroupId: text("thread_group_id"),
     threadSequence: integer("thread_sequence"),
   },
   (table) => [
@@ -361,8 +362,17 @@ export const notifications = pgTable(
       .where(sql`${table.state} = 'Pending'`),
     check(
       "notification_thread",
-      sql`(${table.threadId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadSequence} > 0)`,
+      sql`(${table.threadId} IS NULL AND ${table.threadGroupId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadGroupId} IS NOT NULL AND ${table.threadSequence} > 0)`,
     ),
+    // A reader's pending notifications per group, counted for their sidebar.
+    index("pending_notifications_by_group")
+      .on(
+        table.workspaceId,
+        table.recipientKind,
+        sql`coalesce(${table.recipientId}, '')`,
+        table.threadGroupId,
+      )
+      .where(sql`${table.state} = 'Pending'`),
     // A reader's pending notifications from one thread, settled when they read it.
     index("pending_notifications_by_thread")
       .on(

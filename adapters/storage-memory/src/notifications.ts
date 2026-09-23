@@ -1,4 +1,5 @@
 import { Store } from "@amends/core/journal";
+import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -134,6 +135,23 @@ export const make = Effect.fn("Notifications.make")(function* () {
           );
       },
       Effect.mapError(storeFailure(NotificationStore, "listPendingByThread")),
+    ),
+    countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
+      function* (recipient, groupInput) {
+        const target = recipientKey(yield* validateRecipient(recipient));
+        const groupIds = new Set(yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput));
+        const counts = new Map<Group.Id, number>();
+        for (const record of yield* rows.all((yield* read).records.notifications))
+          if (
+            recipientKey(record.recipient) === target &&
+            record.state._tag === "Pending" &&
+            record.thread !== undefined &&
+            groupIds.has(record.thread.groupId)
+          )
+            counts.set(record.thread.groupId, (counts.get(record.thread.groupId) ?? 0) + 1);
+        return [...counts].map(([groupId, count]) => ({ groupId, count }));
+      },
+      Effect.mapError(storeFailure(NotificationStore, "countPendingByGroup")),
     ),
     acknowledge: Effect.fn("Notifications.acknowledge")(function* (input, value) {
       yield* Store.Transaction;

@@ -89,7 +89,13 @@ export const definition = Projection.make("notifications", { version: 1 })
             operation: "project",
             message: "Recipient participation is inconsistent",
           });
-        records.push(Notification.generated(event, activity, recipient));
+        records.push(
+          Notification.generated(
+            event,
+            Object.assign({ groupId: event.payload.groupId }, activity),
+            recipient,
+          ),
+        );
       }
       yield* notifications.insertMany(records);
     }),

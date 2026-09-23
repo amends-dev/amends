@@ -1,7 +1,8 @@
 import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
+import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -46,7 +47,13 @@ const toEncodedRecord = (row: NotificationRow) => ({
   ...(row.participationId === null ? {} : { participationId: row.participationId }),
   ...(row.threadId === null
     ? {}
-    : { thread: { threadId: row.threadId, sequence: row.threadSequence } }),
+    : {
+        thread: {
+          threadId: row.threadId,
+          groupId: row.threadGroupId,
+          sequence: row.threadSequence,
+        },
+      }),
   state:
     row.state === "Acknowledged"
       ? row.discardReason === null
@@ -130,6 +137,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         sourceEntryId: record.source.entryId,
         participationId: record.participationId ?? null,
         threadId: record.thread?.threadId ?? null,
+        threadGroupId: record.thread?.groupId ?? null,
         threadSequence: record.thread?.sequence ?? null,
         discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
         acknowledgmentOutcome:
@@ -170,6 +178,35 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listByRecipient: Effect.fn("Notifications.listByRecipient")(
       (recipient, options) => list(recipient, options, false),
       Effect.mapError(storeFailure(NotificationStore, "listByRecipient")),
+    ),
+    countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
+      function* (recipient, groupInput) {
+        const target = yield* validateRecipient(recipient);
+        const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
+        if (groupIds.length === 0) return [];
+        const rows = yield* guard(
+          db
+            .select({ groupId: notifications.threadGroupId, count: sql<number>`count(*)::int` })
+            .from(notifications)
+            .where(
+              and(
+                inWorkspace,
+                eq(notifications.recipientKind, target._tag),
+                eq(
+                  sql`coalesce(${notifications.recipientId}, '')`,
+                  target._tag === "Triage" ? "" : target.id,
+                ),
+                eq(notifications.state, "Pending"),
+                inArray(notifications.threadGroupId, [...groupIds]),
+              ),
+            )
+            .groupBy(notifications.threadGroupId),
+        );
+        return yield* Schema.decodeUnknownEffect(Schema.Array(NotificationStore.PendingCount))(
+          rows,
+        );
+      },
+      Effect.mapError(storeFailure(NotificationStore, "countPendingByGroup")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (recipient, threadInput, throughSequence) {

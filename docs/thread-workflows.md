@@ -473,7 +473,8 @@ Human acknowledgment adds outcome and timestamp columns to PostgreSQL's developm
 recreate disposable PostgreSQL databases when adopting it. Message, activity, and participation
 facts carry their thread's `groupId`, which decides their [audience](journal.md#fact-audiences);
 facts recorded before that change do not decode, so recreate development databases that hold
-threads.
+threads. Notifications also record their thread's group, which added `thread_group_id` to
+PostgreSQL's development baseline.
 
 ## Verification
 

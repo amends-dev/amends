@@ -49,9 +49,13 @@ Group lists and rosters take an exclusive `after` ID cursor and a `limit`, and k
 the page is full: groups outside the caller's `group.read` grants, and admissions whose workspace
 member left, are skipped. Each page of `listMine` reads a fixed number of times, however large:
 their admissions, one `group.read` check for all of them, the groups, their latest activity, the
-caller's caught-up times, and their follows. A group has `newActivity` when its latest message came
-after the caller last caught up with it through `ReadStateApplication.markGroupRead`, or after they
-joined when they never have.
+caller's caught-up times, their follows, and their pending notification counts. A group has
+`newActivity` when its latest message came after the caller last caught up with it through
+`ReadStateApplication.markGroupRead`, or after they joined when they never have. `pending` counts
+the caller's pending notifications from the group's threads: the activity addressed to them, as a
+sidebar badge shows it beside the bold of `newActivity`. Reading a thread settles its
+notifications and so lowers the count. Each notification records its thread's group, and the
+change feed delivers new ones to their recipient, so a client can keep the badge current.
 
 Management reads require neither group membership nor `group.read`. They expose only the
 group record and current admission records needed to manage that group. They do not join
