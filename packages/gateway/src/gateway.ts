@@ -88,18 +88,22 @@ const expose = <A, E, R>(
     return Effect.die(error);
   });
 
+export type Options = WorkspaceRuntime.Options;
+
 /**
  * Construct one gateway and its workspace runtimes in the host scope. Identities come
  * from a trusted ingress; the gateway never accepts client-asserted actors or member IDs.
  *
  * @category constructors
  */
-export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("Gateway.make")(function* (
+  options: Options = {},
+): Effect.fn.Return<
   Interface,
   never,
   WorkspaceStorage.Service | WorkspaceEvents.Service | Crypto.Crypto | Scope.Scope
 > {
-  const runtimes = yield* WorkspaceRuntime.make();
+  const runtimes = yield* WorkspaceRuntime.make(options);
   const cryptography = yield* Crypto.Crypto;
 
   const bind = Effect.fn("Gateway.bind")(function* <A, E>(
@@ -161,6 +165,6 @@ export const make = Effect.fn("Gateway.make")(function* (): Effect.fn.Return<
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
+export const layer = (options?: Options) => Layer.effect(Service, make(options));
 
 export * as Gateway from "./gateway.ts";

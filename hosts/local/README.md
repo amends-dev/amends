@@ -66,9 +66,10 @@ by gateway requests and internal consumers. Acquiring a workspace bus and its
 subscription requires holding their scope open; commits publish canonical event
 batches only after storage confirms success. `GET /workspaces/:workspaceId/changes`
 exposes the core change feed through authenticated SSE. The gateway lazily boots
-each workspace once, replaying before it serves operations and retaining the prepared
-services and bus lease until host shutdown. Request scopes own operation resources;
-a stream keeps its subscription open until disconnect.
+each workspace, replaying before it serves operations. It keeps the prepared services and
+bus lease while requests or streams use them and for five idle minutes afterwards, then
+releases them; the next request boots the workspace again. Request scopes own operation
+resources; a stream keeps its subscription and workspace open until disconnect.
 Delivery is process-local, with no cross-process recovery in this version.
 The host sets no application request-body limit or SSE connection/admission limit.
 It relies on runtime defaults; these are not an explicit edge resource policy.

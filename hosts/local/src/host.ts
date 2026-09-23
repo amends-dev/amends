@@ -16,7 +16,7 @@ export type HostLayer = Layer.Layer<
  * @category layers
  */
 export const layer = (url: Redacted.Redacted<string>): HostLayer =>
-  Gateway.layer.pipe(
+  Gateway.layer().pipe(
     Layer.provideMerge(WorkspaceEvents.layer()),
     Layer.provideMerge(postgres()),
     Layer.provide(Layer.mergeAll(PostgresDatabase.layer({ url }), BunCrypto.layer)),

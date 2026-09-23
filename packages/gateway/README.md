@@ -11,7 +11,7 @@ call core directly, so nothing is declared twice.
 
 The gateway implementation and its host contracts remain focused leaf modules.
 `gateway.ts` owns workspace entry, `storage.ts` binds workspace stores,
-`workspace-runtime.ts` owns prepared workspace services for the host lifetime,
+`workspace-runtime.ts` owns prepared workspace services while they are in use,
 `directory.ts` describes cross-workspace discovery, and `sign-in.ts` and
 `credentials.ts` describe token issuance and resolution. Add a feature directory
 when one of these concepts needs related modules.
@@ -29,11 +29,12 @@ and `WorkspaceDirectoryListing` for public API documentation.
 
 ## Construction
 
-`Gateway.make()` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
+`Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
 `WorkspaceEvents.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
-without opening a workspace or resolving an actor. `Gateway.layer` delegates to
-that constructor and provides `Gateway.Service`, owning the registry's scope.
+without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
+long an unused workspace stays prepared; it defaults to five minutes. `Gateway.layer(options?)`
+delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
 `WorkspaceStorage`, `Credentials`, `SignIn`, and `WorkspaceDirectory` declare
@@ -60,7 +61,7 @@ decisions. A runtime's lease can remain open while no request is active.
 
 This service is internal infrastructure, not a core application operation or an
 authorized subscription endpoint. A prepared workspace runtime holds a bus lease
-until host shutdown and injects it alongside workspace storage. Both local host compositions provide
+for as long as it stays prepared and injects it alongside workspace storage. Both local host compositions provide
 one shared registry. Journal commits publish to that bus after the adapter confirms
 success. The change-feed application consumes the bus; cross-process recovery
 remains separate work.
@@ -100,10 +101,12 @@ context rather than inheriting the first request's actor or transaction. Ordinar
 reads and SSE setup check authorization without opening a transaction; write
 operations check authorization inside their commit.
 
-Successful runtimes remain until the host scope closes, including while idle.
-Memory therefore grows with the workspaces acquired during that host lifetime.
-Host shutdown closes runtime resources and event subscriptions; a new host boots
-again, finding its projections live. A request cancellation does not cancel shared
+Each request, and each open response stream, holds a lease on its workspace runtime. A
+successful runtime stays prepared while any lease is open and for the idle time-to-live after
+the last one closes. It is then released with its services and bus lease, and the next
+request boots it again, finding its projections live. Memory therefore follows the workspaces
+in recent use rather than every workspace acquired since startup. Host shutdown closes
+runtime resources and event subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
 fails its waiting requests as a defect. A later acquisition can retry; no operation
 runs before successful boot.
@@ -154,8 +157,9 @@ construction APIs. Error tags such as `Gateway.NotMember` remain stable.
 ## Testing
 
 `test/gateway.test.ts` exercises public error mapping, preservation of defects
-and interruption, shared workspace boot, retry after failed boot, context isolation,
-host shutdown, and actor resolution for each call. Its explicit host stubs have empty journals and reject
+and interruption, shared workspace boot, retry after failed boot, release after the idle
+time-to-live and retention while a lease is open, context isolation, host shutdown, and actor
+resolution for each call. Its explicit host stubs have empty journals and reject
 unexpected writes. Adapter and host tests cover persistence and transactional
 workflows. `test/contracts.test.ts` checks saved-session compatibility, directory
 encoding, and nonnegative member counts. The root `bun run test` and

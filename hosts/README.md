@@ -43,9 +43,10 @@ and code validation happen during operations. Construction issues no token or co
 
 `LocalHost` and `LocalServer` are composition modules, so they expose layers without
 additional `make` wrappers. `LocalHost.layer` composes the gateway, directory,
-PostgreSQL adapter, cryptography, and a shared `WorkspaceEvents` registry. The gateway owns prepared workspace runtimes in its host scope. Each
-runtime boots lazily, replays once, and holds its bus lease until host shutdown;
-requests resolve identity and open operation scopes over the prepared services.
+PostgreSQL adapter, cryptography, and a shared `WorkspaceEvents` registry. The gateway
+owns prepared workspace runtimes in its host scope. Each runtime boots lazily, replays, and
+holds its bus lease while in use and for an idle period afterwards; requests resolve
+identity and open operation scopes over the prepared services.
 `LocalServer.layerRoutes`
 registers the API and documentation; `LocalServer.layer` adds sign-in, credentials,
 and the Bun HTTP server. `LocalHost.HostLayer` names the layer supplied to the

@@ -8,21 +8,30 @@ import { WorkspaceEvents } from "./workspace-events.ts";
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
 
+export interface Options {
+  /**
+   * How long a workspace stays prepared after its last lease closes. A later request boots it
+   * again from storage. Defaults to five minutes.
+   */
+  readonly idleTimeToLive?: Duration.Input | undefined;
+}
+
 export interface Interface {
-  /** Share a prepared workspace until the owning host scope closes. */
+  /** Share a prepared workspace for the caller's scope; it stays prepared while any lease is open. */
   readonly forWorkspace: (
     workspaceId: Workspace.Id,
   ) => Effect.Effect<Context.Context<Provided>, never, Scope.Scope>;
 }
 
 /**
- * Lazily boot each workspace once in the host scope. Concurrent callers await the
- * same boot; successful runtimes retain their services and bus lease until shutdown.
- * Request identity and transaction context must never enter service construction.
+ * Lazily boot each workspace in the host scope. Concurrent callers await the same boot, and
+ * a successful runtime keeps its services and bus lease while leases are open and for the idle
+ * time-to-live after the last one closes; then it is released, and the next request boots it
+ * again. Request identity and transaction context must never enter service construction.
  *
  * @category constructors
  */
-export const make = Effect.fn("WorkspaceRuntime.make")(function* () {
+export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const storage = yield* WorkspaceStorage.Service;
   const events = yield* WorkspaceEvents.Service;
   const cryptography = yield* Crypto.Crypto;
@@ -70,7 +79,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* () {
           );
         }),
       ),
-    { idleTimeToLive: Duration.infinity },
+    { idleTimeToLive: options.idleTimeToLive ?? Duration.minutes(5) },
   );
 
   const forWorkspace = Effect.fn("WorkspaceRuntime.forWorkspace")(function* (

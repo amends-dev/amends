@@ -98,7 +98,7 @@ export const make = (harness: Harness) => {
     );
   /** A gateway, with its workspace event bus, over a host. */
   const gateway = (host: Context.Context<Host>) =>
-    Gateway.layer.pipe(
+    Gateway.layer().pipe(
       Layer.provideMerge(WorkspaceEvents.layer()),
       Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), harness.crypto)),
     );
