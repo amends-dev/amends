@@ -62,7 +62,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       const author = record.author;
       const related = yield* guard(
         author._tag === "Member"
-          ? sql`SELECT p.id FROM thread_participations p JOIN members m ON m.workspace_id=p.workspace_id AND m.id=p.member_id WHERE p.workspace_id = ${workspaceId} AND p.thread_id = ${record.threadId} AND p.member_id = ${author.memberId} AND json_extract(m.record,'$.identity._tag') = 'Human'`
+          ? sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${record.threadId} AND member_id = ${author.memberId}`
           : sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${record.threadId} AND participant_key = ${ThreadParticipation.keyOf({ _tag: "Contact", contactId: author.contactId })}`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));

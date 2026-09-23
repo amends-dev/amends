@@ -12,7 +12,8 @@ export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
-  createdBy: MemberId.Id,
+  /** Who started the conversation: a member, or the contact whose message a channel received. */
+  createdBy: ThreadMessage.Author,
   createdAt: Schema.DateTimeUtcFromString,
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
@@ -22,6 +23,13 @@ export const StartInGroupInput = Schema.Struct({
   mentions: Schema.UniqueArray(MemberId.Id),
 });
 export interface StartInGroupInput extends Schema.Schema.Type<typeof StartInGroupInput> {}
+/** The other members of a direct group; the author always belongs to it. */
+export const StartDirectInput = Schema.Struct({
+  memberIds: Schema.UniqueArray(MemberId.Id).check(Schema.isMinLength(1)),
+  text: ThreadMessage.Text,
+  mentions: Schema.UniqueArray(MemberId.Id),
+});
+export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectInput> {}
 export const Started = Schema.Struct({
   thread: Record,
   message: ThreadMessage.Record,

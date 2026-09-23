@@ -632,7 +632,7 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
                     const sequence = yield* recorder.nextSequence(first.thread.id);
                     const admitted = yield* admissions.ensure(
                       first.thread,
-                      [humanId],
+                      [{ _tag: "Member", memberId: humanId }],
                       sequence,
                       occurredAt,
                     );

@@ -463,7 +463,10 @@ export const threads = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     groupId: text("group_id").notNull(),
-    createdBy: text("created_by").notNull(),
+    // A member starts a conversation in the app; a contact starts one a channel receives.
+    createdByKind: text("created_by_kind", { enum: ["Member", "Contact"] }).notNull(),
+    createdByMemberId: text("created_by_member_id"),
+    createdByContactId: text("created_by_contact_id"),
     createdAt: instant("created_at").notNull(),
   },
   (t) => [
@@ -473,9 +476,13 @@ export const threads = pgTable(
       foreignColumns: [groups.workspaceId, groups.id],
     }),
     foreignKey({
-      columns: [t.workspaceId, t.createdBy],
+      columns: [t.workspaceId, t.createdByMemberId],
       foreignColumns: [members.workspaceId, members.id],
     }),
+    check(
+      "thread_creator",
+      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
+    ),
     index("threads_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
   ],
 );

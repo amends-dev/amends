@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "493868c3-be73-4a0c-b5f9-bcf22ac4c0f1",
+  "id": "e83800a0-07f9-4243-8541-2a6c4be4f83c",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1897,7 +1897,33 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "created_by",
+      "name": "created_by_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_contact_id",
       "entityType": "columns",
       "schema": "public",
       "table": "threads"
@@ -3347,7 +3373,7 @@
       "nameExplicit": false,
       "columns": [
         "workspace_id",
-        "created_by"
+        "created_by_member_id"
       ],
       "schemaTo": "public",
       "tableTo": "members",
@@ -3357,7 +3383,7 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "threads_workspace_id_created_by_members_workspace_id_id_fkey",
+      "name": "threads_ndK7bl58RVVt_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "threads"
@@ -3677,6 +3703,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "thread_participations"
+    },
+    {
+      "value": "(\"created_by_kind\" = 'Member' AND \"created_by_member_id\" IS NOT NULL AND \"created_by_contact_id\" IS NULL) OR (\"created_by_kind\" = 'Contact' AND \"created_by_member_id\" IS NULL AND \"created_by_contact_id\" IS NOT NULL)",
+      "name": "thread_creator",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "threads"
     }
   ],
   "renames": []

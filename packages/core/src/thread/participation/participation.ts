@@ -30,12 +30,12 @@ export const recipientOf = (participant: Participant): Notification.Recipient =>
     Triage: (): Notification.Recipient => ({ _tag: "Triage" }),
   });
 /** Active participation is unique per member, contact, or the thread's triage participant. */
-export const keyOf = (participant: Participant): string =>
-  Participant.match(participant, {
-    Member: ({ memberId }) => `Member:${memberId}`,
-    Contact: ({ contactId }) => `Contact:${contactId}`,
-    Triage: () => "Triage",
-  });
+export const keyOf = (participant: Participant | Reference): string =>
+  participant._tag === "Member"
+    ? `Member:${participant.memberId}`
+    : participant._tag === "Contact"
+      ? `Contact:${participant.contactId}`
+      : "Triage";
 
 export const Record = Schema.Struct({
   id: Id,
@@ -59,22 +59,31 @@ export const Admission = Schema.Struct({
   status: Schema.Literal("active"),
   endedAt: Schema.Null,
 });
-/** Public participant reference. Routing identities and admission linkage remain internal. */
-export const PublicParticipant = Schema.TaggedUnion({
+/**
+ * A participant without routing identities or admission linkage: the public view of who takes
+ * part, and how a workflow names the participants to admit.
+ */
+export const Reference = Schema.TaggedUnion({
   Member: { memberId: MemberId.Id },
   Contact: { contactId: Identity.ContactId },
   Triage: {},
 });
-export type PublicParticipant = typeof PublicParticipant.Type;
-/** The member behind a participant or its public reference, when it is one. */
-export const memberOf = (participant: Participant | PublicParticipant): MemberId.Id | undefined =>
+export type Reference = typeof Reference.Type;
+/** The member behind a participant or its reference, when it is one. */
+export const memberOf = (participant: Participant | Reference): MemberId.Id | undefined =>
   participant._tag === "Member" ? participant.memberId : undefined;
+export const referenceOf = (participant: Participant): Reference =>
+  Participant.match(participant, {
+    Member: ({ memberId }): Reference => ({ _tag: "Member", memberId }),
+    Contact: ({ contactId }): Reference => ({ _tag: "Contact", contactId }),
+    Triage: (): Reference => ({ _tag: "Triage" }),
+  });
 /** Public current-participant view. */
 export const Summary = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
-  participant: PublicParticipant,
+  participant: Reference,
   joinedAt: Record.fields.joinedAt,
   joinedAtSequence: Record.fields.joinedAtSequence,
 });
@@ -83,11 +92,7 @@ export const toSummary = (record: Record): Summary => ({
   id: record.id,
   workspaceId: record.workspaceId,
   threadId: record.threadId,
-  participant: Participant.match(record.participant, {
-    Member: ({ memberId }): PublicParticipant => ({ _tag: "Member", memberId }),
-    Contact: ({ contactId }): PublicParticipant => ({ _tag: "Contact", contactId }),
-    Triage: (): PublicParticipant => ({ _tag: "Triage" }),
-  }),
+  participant: referenceOf(record.participant),
   joinedAt: record.joinedAt,
   joinedAtSequence: record.joinedAtSequence,
 });

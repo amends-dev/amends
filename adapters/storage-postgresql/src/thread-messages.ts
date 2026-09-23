@@ -3,7 +3,7 @@ import { ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq } from "drizzle-orm";
-import { threadMessages, threadParticipations, members } from "./schema.ts";
+import { threadMessages, threadParticipations } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
@@ -60,7 +60,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
-      // A member author must be a human participant; a contact author, a contact participant.
+      // An author must participate in the thread; which authors may publish is a workflow rule.
       const author = record.author;
       const related = yield* guard(
         author._tag === "Contact"
@@ -78,19 +78,11 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           : db
               .select({ id: threadParticipations.id })
               .from(threadParticipations)
-              .innerJoin(
-                members,
-                and(
-                  eq(members.workspaceId, threadParticipations.workspaceId),
-                  eq(members.id, threadParticipations.memberId),
-                ),
-              )
               .where(
                 and(
                   eq(threadParticipations.workspaceId, workspaceId),
                   eq(threadParticipations.threadId, record.threadId),
                   eq(threadParticipations.memberId, author.memberId),
-                  eq(members.identityKind, "Human"),
                 ),
               ),
         true,

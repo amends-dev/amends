@@ -57,10 +57,14 @@ export interface Interface {
   readonly current: (
     thread: Thread.Record,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ReadError>;
-  /** Required admission steps of an authorized workflow. Never opens or captures a transaction. */
+  /**
+   * Required admission steps of an authorized workflow. Members need a current group admission;
+   * contacts and triage take part without one. Current participants are reused. Never opens or
+   * captures a transaction.
+   */
   readonly ensure: (
     thread: Thread.Record,
-    memberIds: ReadonlyArray<Member.Id>,
+    references: ReadonlyArray<ThreadParticipation.Reference>,
     sequence: number,
     occurredAt: DateTime.Utc,
   ) => Effect.Effect<Ensured, Error, Store.Transaction | Publication.Service>;
@@ -183,28 +187,43 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
   });
   const ensure = Effect.fn("ThreadParticipationAdmission.ensure")(function* (
     thread: Thread.Record,
-    memberIds: ReadonlyArray<Member.Id>,
+    references: ReadonlyArray<ThreadParticipation.Reference>,
     sequence: number,
     occurredAt: DateTime.Utc,
   ) {
     yield* Store.Transaction;
-    const ids = yield* Schema.decodeEffect(Schema.UniqueArray(Member.Id))(memberIds);
-    const candidates = yield* eligible(thread.groupId);
+    const requested = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Reference))(
+      references,
+    );
+    if (new Set(requested.map(ThreadParticipation.keyOf)).size !== requested.length)
+      return yield* new InvalidResponse({ message: "Participants must be distinct" });
+    const candidates = requested.some((reference) => reference._tag === "Member")
+      ? yield* eligible(thread.groupId)
+      : new Map<Member.Id, Eligible>();
     const existing = new Map(
-      (yield* current(thread)).flatMap((p) =>
-        p.participant._tag === "Member" ? [[p.participant.memberId, p] as const] : [],
-      ),
+      (yield* current(thread)).map((p) => [ThreadParticipation.keyOf(p.participant), p] as const),
     );
     const result: Array<ThreadParticipation.Record> = [];
     const added: Array<Event.Type<typeof ThreadParticipationFacts.Added>> = [];
-    for (const memberId of ids) {
-      const candidate = candidates.get(memberId);
-      if (candidate === undefined) return yield* new Unavailable({ memberId });
-      const previous = existing.get(memberId);
+    for (const reference of requested) {
+      let participant: ThreadParticipation.Participant;
+      if (reference._tag === "Member") {
+        const candidate = candidates.get(reference.memberId);
+        if (candidate === undefined)
+          return yield* new Unavailable({ memberId: reference.memberId });
+        participant = {
+          _tag: "Member",
+          memberId: reference.memberId,
+          groupMembershipId: candidate.admission.id,
+          identity: candidate.member.identity,
+        };
+      } else participant = reference;
+      const previous = existing.get(ThreadParticipation.keyOf(reference));
       if (previous !== undefined) {
         if (
-          previous.participant._tag !== "Member" ||
-          previous.participant.groupMembershipId !== candidate.admission.id ||
+          (participant._tag === "Member" &&
+            (previous.participant._tag !== "Member" ||
+              previous.participant.groupMembershipId !== participant.groupMembershipId)) ||
           previous.joinedAtSequence > sequence
         )
           return yield* new InvalidResponse({
@@ -213,23 +232,18 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
         result.push(previous);
         continue;
       }
-      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Admission))({
+      const admitted = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Admission))({
         id: ThreadParticipation.Id.make(yield* crypto.randomUUIDv4),
         workspaceId,
         threadId: thread.id,
-        participant: {
-          _tag: "Member",
-          memberId,
-          groupMembershipId: candidate.admission.id,
-          identity: candidate.member.identity,
-        },
+        participant,
         joinedAt: occurredAt,
         joinedAtSequence: sequence,
         status: "active",
         endedAt: null,
       });
-      added.push(yield* journal.publish(ThreadParticipationFacts.Added, participant));
-      result.push(participant);
+      added.push(yield* journal.publish(ThreadParticipationFacts.Added, admitted));
+      result.push(admitted);
     }
     return { participants: result, added };
   });

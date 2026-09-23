@@ -258,7 +258,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             id: threadId,
             workspaceId,
             groupId: group.id,
-            createdBy: actor.memberId,
+            createdBy: { _tag: "Member", memberId: actor.memberId },
             createdAt: group.createdAt,
           });
           yield* journal.publish(ThreadParticipationFacts.Added, {

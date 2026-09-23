@@ -155,7 +155,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
             expect(result.thread).toMatchObject({
               groupId: group.id,
               workspaceId,
-              createdBy: owner.memberId,
+              createdBy: { _tag: "Member", memberId: owner.memberId },
             });
             expect(result.message.text).toBe("  Here's the proposal\n");
             expect(result.message.mentions).toEqual([]);

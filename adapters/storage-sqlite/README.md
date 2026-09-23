@@ -112,8 +112,9 @@ narrow the initial set. A participant is a member, a contact, or triage. Member 
 references the exact group admission through `member_id` and `group_membership_id`; contacts and
 triage leave those columns null and reference only the thread. `participant_key` makes active
 participation unique per member, contact, or triage. A message author is a member or a contact;
-`author_member_id` is null for contacts, whose author must be a contact participant of the
-thread. Departure ends a participation and discards pending agent input. Activity facts preserve recipient selection for replay.
+`author_member_id` is null for contacts; every author must participate in the thread, while which
+authors may publish is a core workflow rule. Threads keep a member creator in `created_by`, null
+when a contact started the conversation. Departure ends a participation and discards pending agent input. Activity facts preserve recipient selection for replay.
 Thread reads enforce audience and action permissions in core. Timeline paging uses the existing
 workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema
 is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged

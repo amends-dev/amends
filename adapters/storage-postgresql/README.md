@@ -126,8 +126,9 @@ narrow the initial set. A participant is a member, a contact, or triage, stored 
 `participant_kind` with its own columns: members fill `member_id`, `group_membership_id`, and their
 identity; contacts fill a `Contact` identity; triage fills none. `participation_participant`
 rejects mixed rows, and `active_thread_participation` keeps one active participation per member,
-contact, or triage in a thread. Message authors use `author_kind` with a member or contact column;
-a contact author must be a contact participant of the thread. Departure ends a participation and
+contact, or triage in a thread. Message authors use `author_kind` with a member or contact column, and thread creators
+`created_by_kind` likewise; every author must participate in the thread, while which authors may
+publish is a core workflow rule. Departure ends a participation and
 discards pending agent input. Activity facts preserve recipient selection for replay.
 Thread reads enforce audience and action permissions in core. Timeline paging uses the existing
 workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema

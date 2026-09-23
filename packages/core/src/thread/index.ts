@@ -27,4 +27,5 @@ export { ThreadActivityReading } from "./activity/reading.ts";
 export { ThreadParticipationDeparture } from "./participation/departure.ts";
 export { ThreadApplication } from "./application.ts";
 export { ThreadCreation } from "./creation.ts";
+export { ThreadStart } from "./start.ts";
 export { ThreadPermissions } from "./permissions.ts";

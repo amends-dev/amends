@@ -178,7 +178,7 @@ const append = (bound: Bound, thread: Thread.Record, sequence: number) =>
             id: ThreadMessage.Id.make(`${thread.id}-message-${sequence}`),
             workspaceId: thread.workspaceId,
             threadId: thread.id,
-            author: { _tag: "Member", memberId: thread.createdBy },
+            author: thread.createdBy,
             kind: "User",
             text: `Message ${sequence}`,
             mentions: [],

@@ -1,6 +1,7 @@
 export { Group } from "./group.ts";
 export { GroupApplication } from "./application.ts";
 export { GroupAudience } from "./audience.ts";
+export { DirectGroups } from "./direct.ts";
 export { GroupFacts } from "./facts.ts";
 export { GroupPermissions } from "./permissions.ts";
 export { GroupProjection } from "./projection.ts";

@@ -8,13 +8,16 @@ import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
 const codec = Schema.fromJsonString(Thread.Record);
 const encode = Schema.encodeEffect(codec);
+/** Member creators keep their workspace member as a referenced column; contacts have none. */
+const creatorMemberOf = (record: Thread.Record) =>
+  record.createdBy._tag === "Member" ? record.createdBy.memberId : null;
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       workspaceId: Thread.Record.fields.workspaceId,
       id: Thread.Id,
       groupId: Thread.Record.fields.groupId,
-      createdBy: Thread.Record.fields.createdBy,
+      createdBy: Schema.NullOr(Schema.String),
       record: codec,
     }).check(
       Schema.makeFilter(
@@ -22,7 +25,7 @@ const decode = Schema.decodeUnknownEffect(
           (row.workspaceId === row.record.workspaceId &&
             row.id === row.record.id &&
             row.groupId === row.record.groupId &&
-            row.createdBy === row.record.createdBy) ||
+            row.createdBy === creatorMemberOf(row.record)) ||
           "Columns must match the stored record",
       ),
     ),
@@ -65,8 +68,11 @@ export const make = Effect.fn("Threads.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
+      const creator = record.createdBy;
       const related = yield* guard(
-        sql`SELECT t.id FROM groups t JOIN members m ON m.workspace_id=t.workspace_id WHERE t.workspace_id = ${workspaceId} AND t.id = ${record.groupId} AND m.id = ${record.createdBy}`,
+        creator._tag === "Member"
+          ? sql`SELECT t.id FROM groups t JOIN members m ON m.workspace_id=t.workspace_id WHERE t.workspace_id = ${workspaceId} AND t.id = ${record.groupId} AND m.id = ${creator.memberId}`
+          : sql`SELECT id FROM groups WHERE workspace_id = ${workspaceId} AND id = ${record.groupId}`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadStore, "insert")));
       if (related.length === 0)
@@ -76,7 +82,7 @@ export const make = Effect.fn("Threads.make")(function* () {
         });
       const data = yield* encode(record).pipe(Effect.mapError(storeFailure(ThreadStore, "insert")));
       yield* guard(
-        sql`INSERT INTO threads (workspace_id,id,group_id,created_by,record) VALUES (${workspaceId},${record.id},${record.groupId},${record.createdBy},${data})`,
+        sql`INSERT INTO threads (workspace_id,id,group_id,created_by,record) VALUES (${workspaceId},${record.id},${record.groupId},${creatorMemberOf(record)},${data})`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadStore, "insert")));
     }),

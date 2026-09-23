@@ -15,7 +15,9 @@ import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Thread } from "./thread.ts";
 import { ThreadStore } from "./store.ts";
-import { ThreadCreation } from "./creation.ts";
+import { ThreadStart } from "./start.ts";
+import { GroupStore } from "../group/store.ts";
+import { DirectGroups } from "../group/direct.ts";
 import { ThreadAccess } from "./access.ts";
 import { ThreadParticipationAdmission } from "./participation/admission.ts";
 import { ThreadMessagePublication } from "./message/publication.ts";
@@ -41,6 +43,11 @@ export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>
   "ThreadApplication.HumanAuthorRequired",
   { memberId: Member.Id },
 ) {}
+/** A direct group needs the author and at least one other member. */
+export class DirectMembersRequired extends Schema.TaggedError<DirectMembersRequired>()(
+  "ThreadApplication.DirectMembersRequired",
+  {},
+) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "ThreadApplication.InvalidResponse",
   { message: Schema.String },
@@ -48,8 +55,9 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 export type Error =
   | Authorization.Error
   | GroupAudience.InvalidResponse
-  | ThreadCreation.Error
-  | Exclude<ThreadMessagePublication.Error, ThreadParticipationAdmission.Unavailable>
+  | Exclude<ThreadStart.Error, ThreadParticipationAdmission.Unavailable>
+  | Exclude<DirectGroups.Error, DirectGroups.Unavailable>
+  | GroupStore.Failure
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
@@ -59,6 +67,7 @@ export type Error =
   | GroupNotFound
   | ParticipantUnavailable
   | HumanAuthorRequired
+  | DirectMembersRequired
   | InvalidResponse;
 export type ReadError =
   | Authorization.Error
@@ -75,8 +84,21 @@ export type ReadError =
   | InvalidResponse;
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
+  /**
+   * Start a thread in a group the author belongs to. A team thread enrolls every current member
+   * without mentions, or the author and mentioned members; a direct-group thread enrolls all of
+   * its members, and mentions only narrow who is notified.
+   */
   readonly startInGroup: (
     input: Thread.StartInGroupInput,
+  ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
+  /**
+   * Establish or reuse the direct group for the author and the given members, then start a
+   * thread with all of them. Needs active membership, agent use for selected agents, and
+   * thread.start on the direct group; no group-management permission.
+   */
+  readonly startDirect: (
+    input: Thread.StartDirectInput,
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
   /** Current group audience plus thread.read. Reading creates no participation or acknowledgment. */
   readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Service>;
@@ -104,7 +126,9 @@ const decodeThread = Schema.decodeEffect(Schema.toType(Thread.Record));
 export const make = Effect.fn("ThreadApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const audience = yield* GroupAudience.Service;
-  const creation = yield* ThreadCreation.Service;
+  const starts = yield* ThreadStart.Service;
+  const groups = yield* GroupStore.Service;
+  const directGroups = yield* DirectGroups.Service;
   const access = yield* ThreadAccess.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
   const publication = yield* ThreadMessagePublication.Service;
@@ -116,7 +140,9 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   if (
     [
       audience.workspaceId,
-      creation.workspaceId,
+      starts.workspaceId,
+      groups.workspaceId,
+      directGroups.workspaceId,
       access.workspaceId,
       admissions.workspaceId,
       publication.workspaceId,
@@ -127,6 +153,81 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     return yield* new InvalidResponse({
       message: "Thread services belong to different workspaces",
     });
+  /** Authorize selected agents, then open the thread through the shared start. */
+  const begin = Effect.fnUntraced(function* (
+    groupId: Group.Id,
+    selected: ReadonlyArray<Member.Id>,
+    eligible: ReadonlyMap<Member.Id, ThreadParticipationAdmission.Eligible>,
+    message: {
+      readonly text: Thread.StartInGroupInput["text"];
+      readonly mentions: ReadonlyArray<Member.Id>;
+    },
+  ) {
+    const actor = yield* Actor.Service;
+    for (const memberId of selected) {
+      const member = eligible.get(memberId)?.member;
+      if (member === undefined) return yield* new ParticipantUnavailable({ memberId });
+      if (member.identity._tag === "Agent")
+        yield* authorization.require([
+          Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
+        ]);
+    }
+    return yield* starts
+      .start({
+        groupId,
+        participants: selected.map((memberId) => ({ _tag: "Member" as const, memberId })),
+        first: {
+          _tag: "Message",
+          author: { _tag: "Member", memberId: actor.memberId },
+          text: message.text,
+          mentions: message.mentions,
+        },
+        occurredAt: yield* DateTime.now,
+      })
+      .pipe(
+        Effect.catchTag("ThreadParticipationAdmission.Unavailable", (error) =>
+          Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
+        ),
+      );
+  });
+  const startDirect = Effect.fn("ThreadApplication.startDirect")(
+    function* (input: Thread.StartDirectInput) {
+      const request = yield* Schema.decodeEffect(Thread.StartDirectInput)(input);
+      yield* authorization.require([]);
+      const actor = yield* Actor.Service;
+      if (actor.identity._tag !== "Human")
+        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+      const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
+      if (memberIds.length < 2) return yield* new DirectMembersRequired({});
+      const missing = request.mentions.find((id) => !memberIds.includes(id));
+      if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
+      const group = yield* directGroups
+        .establish(memberIds, actor.memberId, yield* DateTime.now)
+        .pipe(
+          Effect.catchTag("DirectGroups.Unavailable", (error) =>
+            Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
+          ),
+        );
+      yield* authorization.require([
+        Requirement.make(ThreadPermissions.Start, {
+          _tag: "Group",
+          workspaceId,
+          groupId: group.id,
+        }),
+      ]);
+      const eligible = yield* admissions
+        .eligible(group.id)
+        .pipe(
+          Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
+            Effect.fail(new InvalidResponse({ message: error.message })),
+          ),
+        );
+      return yield* begin(group.id, memberIds, eligible, request);
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
   const startInGroup = Effect.fn("ThreadApplication.startInGroup")(
     function* (input: Thread.StartInGroupInput) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input);
@@ -158,45 +259,16 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         return yield* new InvalidResponse({
           message: "Group listing omitted the author's current admission",
         });
+      const foundGroup = yield* groups.get(request.groupId);
+      if (Option.isNone(foundGroup))
+        return yield* new InvalidResponse({ message: "Audience group is missing" });
       const selected =
-        request.mentions.length === 0
+        foundGroup.value.kind === "Direct" || request.mentions.length === 0
           ? [...eligible.keys()].sort()
           : [actor.memberId, ...request.mentions.filter((id) => id !== actor.memberId)];
-      for (const memberId of selected) {
-        const member = eligible.get(memberId)?.member;
-        if (member === undefined) return yield* new ParticipantUnavailable({ memberId });
-        if (member.identity._tag === "Agent")
-          yield* authorization.require([
-            Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
-          ]);
-      }
-      const occurredAt = yield* DateTime.now;
-      const created = yield* creation.create({
-        groupId: request.groupId,
-        createdBy: actor.memberId,
-        createdAt: occurredAt,
-      });
-      const thread = created.payload;
-      const published = yield* publication
-        .publish({
-          threadId: thread.id,
-          authorMemberId: actor.memberId,
-          text: request.text,
-          mentions: request.mentions,
-          participantIds: selected,
-          occurredAt,
-        })
-        .pipe(
-          Publication.withCause(created, occurredAt),
-          Effect.catchTag("ThreadParticipationAdmission.Unavailable", (error) =>
-            Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
-          ),
-        );
-      return {
-        thread,
-        message: published.message,
-        activity: published.activity,
-      } satisfies Thread.Started;
+      const missing = request.mentions.find((id) => !eligible.has(id));
+      if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
+      return yield* begin(request.groupId, selected, eligible, request);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -289,6 +361,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   return Service.of({
     workspaceId,
     startInGroup,
+    startDirect,
     get,
     listInGroup,
     readTimeline,

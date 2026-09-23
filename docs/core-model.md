@@ -14,17 +14,20 @@ and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
 and process-local live changes are implemented. Core and both adapters also implement
 private team-group creation, membership admission/departure, workspace-removal cleanup,
-authorized group reads, and a shared group-audience check. Human opening messages in private
-groups now create threads, initial participation, ordered message activity, and pending notifications
-atomically; see [thread workflows](thread-workflows.md). Authorized group-thread discovery,
+authorized group reads, and a shared group-audience check. Direct groups (DMs and group DMs) are
+established and reused by member set, with their first thread, through `ThreadApplication.startDirect`.
+Every thread opens through one internal thread start that creates the thread, admits its starting
+participants, and records its first message activity and pending notifications atomically; see
+[thread workflows](thread-workflows.md). Participants and message authors can be members,
+contacts, or triage. Authorized group-thread discovery,
 metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
 `ThreadMessageApplication`, admitting the author and eligible mentions in the same commit.
 `ThreadParticipationApplication` implements self-follow/unfollow, quiet follow activity, and pending
 agent-input settlement. `NotificationApplication.resolveSource` resolves owned notifications under
 current thread access, without acknowledgment or participation changes. Human acknowledgment is
 implemented through `NotificationApplication.acknowledge` and a shared internal acknowledgment
-service. Other participation management, direct groups (DMs and group DMs), contact and triage
-participants, task and channel thread starts, public groups, group/thread HTTP/UI, turns, execution,
+service. Other participation management, the task and channel workflows that admit contacts and
+triage, public groups, group/thread HTTP/UI, turns, execution,
 agent/contact/triage acknowledgment, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
 implementation status.
@@ -851,12 +854,12 @@ group, creating a task's working thread, and receiving a new channel conversatio
 internal thread-start implementation. Creating or selecting a group is a separate responsibility
 from creating one of its threads.
 
-| Requested operation                         | Authorization concerns                                                                      | Required internal work                                                                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Start a thread in a group                   | Group access, starting a thread, and its requested participants.                            | Start the thread with the author and its selected participants, and publish the first message.                                 |
-| Start a direct group with its first message | Active workspace membership, the selected members, and agent-use authority when applicable. | Establish or reuse the direct group for that member set, start the thread with all its members, and publish the first message. |
-| Create a task                               | Creating that task, its thread's group, and any assignee chosen at creation.                | Start the working thread with the creator and triage or the assignee, record the task activity, and create the task.           |
-| Receive a new conversation on a channel     | The channel's configuration and destination group; no member actor performs it.             | Start the thread in the destination group with its contacts and triage, publish the incoming message, and create the task.     |
+| Requested operation                         | Authorization concerns                                                                                                          | Required internal work                                                                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Start a thread in a group                   | Group access, starting a thread, and its requested participants.                                                                | Start the thread with the author and its selected participants, and publish the first message.                                 |
+| Start a direct group with its first message | Active workspace membership, the selected members, agent-use authority when applicable, and `thread.start` on the direct group. | Establish or reuse the direct group for that member set, start the thread with all its members, and publish the first message. |
+| Create a task                               | Creating that task, its thread's group, and any assignee chosen at creation.                                                    | Start the working thread with the creator and triage or the assignee, record the task activity, and create the task.           |
+| Receive a new conversation on a channel     | The channel's configuration and destination group; no member actor performs it.                                                 | Start the thread in the destination group with its contacts and triage, publish the incoming message, and create the task.     |
 
 Each requested operation owns its authorization, its rule for choosing the starting
 participants, and its first timeline activity. The shared internal start does the rest in the
@@ -2372,7 +2375,9 @@ agent also requires authority to use that agent. The authorized workflow covers 
 or reusing the group for that exact member set; it does not require the permission to create
 team groups or manage arbitrary group memberships. The group domain still owns creation
 and validates its invariants when called from that workflow. Nothing authorizes changing an
-existing direct group's members.
+existing direct group's members. Establishing the group needs no permission; opening its thread
+requires `thread.start` on it, as every thread start does, and the default Viewer bundle grants
+that across the workspace.
 
 Leaving is a self-service operation bounded to the acting member's own current team-group
 membership. It requires no membership-management authority or separate read
@@ -2518,9 +2523,9 @@ through `group.create`, and member addition/removal through `group.membership.ma
 Self-leave and group cleanup during workspace-member removal are also implemented.
 Private-group reads use `group.read` plus audience membership, with separate management
 inspection and a reusable audience check. Starting a private-group thread with a human text
-message, initial participation, and notifications is implemented; direct groups, task and
-channel thread starts, group/thread HTTP/UI, assistant publication and subscriptions remain
-future work. Human replies require current group access and
+message, initial participation, and notifications is implemented, as is starting a direct group;
+task and channel thread starts, group/thread HTTP/UI, assistant publication and subscriptions
+remain future work. Human replies require current group access and
 `thread.publish`, with `agent.use` for selected agent recipients. Their required participation and publication
 steps share internal services with starts; starting does not additionally require `thread.publish`.
 Thread reads now require current

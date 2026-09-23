@@ -214,9 +214,12 @@ CREATE TABLE "threads" (
 	"workspace_id" text,
 	"id" text,
 	"group_id" text NOT NULL,
-	"created_by" text NOT NULL,
+	"created_by_kind" text NOT NULL,
+	"created_by_member_id" text,
+	"created_by_contact_id" text,
 	"created_at" timestamp with time zone NOT NULL,
-	CONSTRAINT "threads_pkey" PRIMARY KEY("workspace_id","id")
+	CONSTRAINT "threads_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "thread_creator" CHECK (("created_by_kind" = 'Member' AND "created_by_member_id" IS NOT NULL AND "created_by_contact_id" IS NULL) OR ("created_by_kind" = 'Contact' AND "created_by_member_id" IS NULL AND "created_by_contact_id" IS NOT NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "workspaces" (
@@ -274,4 +277,4 @@ ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_WEmntE
 ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_8KVJdQYMqP4s_fkey" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_6EfsFG5kMyiA_fkey" FOREIGN KEY ("workspace_id","group_membership_id") REFERENCES "group_memberships"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "threads" ADD CONSTRAINT "threads_workspace_id_group_id_groups_workspace_id_id_fkey" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "threads" ADD CONSTRAINT "threads_workspace_id_created_by_members_workspace_id_id_fkey" FOREIGN KEY ("workspace_id","created_by") REFERENCES "members"("workspace_id","id");
+ALTER TABLE "threads" ADD CONSTRAINT "threads_ndK7bl58RVVt_fkey" FOREIGN KEY ("workspace_id","created_by_member_id") REFERENCES "members"("workspace_id","id");

@@ -90,31 +90,40 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const current = yield* admissions.current(thread);
+      // Without mentions a reply addresses every current participant, including contacts and triage.
+      const author: ThreadParticipation.Reference = { _tag: "Member", memberId: actor.memberId };
+      const addressed: ReadonlyArray<ThreadParticipation.Reference> =
+        request.mentions.length === 0
+          ? current.map((p) => ThreadParticipation.referenceOf(p.participant))
+          : request.mentions.map((memberId) => ({ _tag: "Member" as const, memberId }));
       const selected = [
-        ...new Set([
-          actor.memberId,
-          ...(request.mentions.length === 0
-            ? current.flatMap((p) => {
-                const memberId = ThreadParticipation.memberOf(p.participant);
-                return memberId === undefined ? [] : [memberId];
-              })
-            : request.mentions),
-        ]),
+        ...new Map(
+          [author, ...addressed].map((reference) => [
+            ThreadParticipation.keyOf(reference),
+            reference,
+          ]),
+        ).values(),
       ];
       const eligible = yield* admissions.eligible(thread.groupId);
-      for (const memberId of selected) {
-        const entry = eligible.get(memberId);
-        if (entry === undefined) return yield* new ParticipantUnavailable({ memberId });
+      for (const reference of selected) {
+        if (reference._tag !== "Member") continue;
+        const entry = eligible.get(reference.memberId);
+        if (entry === undefined)
+          return yield* new ParticipantUnavailable({ memberId: reference.memberId });
         if (entry.member.identity._tag === "Agent")
           yield* authorization.require([
-            Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
+            Requirement.make(AgentPermissions.Use, {
+              _tag: "Member",
+              workspaceId,
+              memberId: reference.memberId,
+            }),
           ]);
       }
       return yield* publication
         .publish({
           ...request,
-          authorMemberId: actor.memberId,
-          participantIds: selected,
+          author: { _tag: "Member", memberId: actor.memberId },
+          participants: selected,
           occurredAt: yield* DateTime.now,
         })
         .pipe(

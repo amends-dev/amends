@@ -147,8 +147,9 @@ own ID and workspace-membership reference. `Group.Record` is a team or direct gr
 group has a fixed set of two or more members in `Group.directMembers` order, including its
 creator, and `Group.directKey` identifies that set. `GroupStore.findDirect` resolves a member set
 in any order. `GroupMembershipApplication` adds, removes, and lets members leave team groups
-only; a direct group returns `GroupMembershipApplication.FixedMembership`. Starting direct groups,
-public groups, and HTTP/UI workflows remain separate work. See
+only; a direct group returns `GroupMembershipApplication.FixedMembership`. The internal
+`DirectGroups.establish` finds or creates a direct group with one admission per member for
+`ThreadApplication.startDirect`. Public groups and HTTP/UI workflows remain separate work. See
 [group creation](../../docs/group-workflows.md) for the current contract and verification.
 
 `GroupMembershipApplication.add({ groupId, memberId })` requires
@@ -212,14 +213,16 @@ An empty mention array enrolls all current active group members; explicit mentio
 author and mentioned members. The thread, admissions, verbatim user text, sequence-1
 `MessagePublished` activity, notifications, and checkpoints commit together.
 
-`ThreadCreation` is the internal reusable creation service, excluded from `Core.Operations`.
-The authorized workflow calls it within its transaction; it does not repeat a separate action
-permission check. Four store contracts persist threads, participations, messages, and timeline
+`ThreadStart` is the internal start every workflow uses, excluded from `Core.Operations`: it
+creates the thread through `ThreadCreation`, admits the starting participants, and records the
+first message activity in the caller's commit, without repeating an action permission check.
+`startDirect` starts a direct group's thread, and `startInGroup` enrolls every member of a direct
+group. Four store contracts persist threads, participations, messages, and timeline
 activity. `ThreadParticipation.Participant` is a member, a contact, or triage: member
 participation references the exact group admission, while contacts and triage take part without
 group access. `ThreadMessage.Author` is a member or a contact, and activity recipients record a
-`Notification.Recipient`. The current start and reply workflows admit members only; contact and
-triage participants await the task and channel workflows. Group departure ends member
+`Notification.Recipient`. Member workflows admit members; replies without mentions reach every
+current participant, and contact and triage participants arrive with the task and channel workflows. Group departure ends member
 participation and discards pending agent input. Replay uses recorded recipients and stable
 notification IDs.
 

@@ -1,11 +1,11 @@
 # Thread workflows
 
-Core and both storage adapters implement human opening messages, replies, following/unfollowing,
-and authorized reads in private team groups, with source resolution and human notification acknowledgment.
+Core and both storage adapters implement human opening messages in team and direct groups,
+starting direct groups, replies, following/unfollowing, and authorized reads, with source
+resolution and human notification acknowledgment. Every start uses one internal thread start.
 Call the application services through
-`Gateway.asMember` or a trusted workspace context. HTTP/UI, direct groups (DMs and group DMs),
-contact and triage participants, task and channel thread starts, attachments, and agent
-execution remain separate implementation steps.
+`Gateway.asMember` or a trusted workspace context. HTTP/UI, the task and channel workflows that
+admit contacts and triage, attachments, and agent execution remain separate implementation steps.
 
 ## Starting a conversation
 
@@ -50,12 +50,34 @@ not updated automatically. Starting needs no additional `group.read`, `group.cre
 membership-management grant. Missing and inaccessible groups share `ThreadApplication.GroupNotFound`.
 The gateway preserves these outcomes and maps malformed input to `Gateway.InvalidInput`.
 
+## Starting a direct group
+
+`ThreadApplication.startDirect({ memberIds, text, mentions })` starts a thread in the direct group
+of the author and `memberIds`. The same members, in any order and whether or not the author is
+listed, always reuse one direct group; a different set of members gets a different group. The
+first start establishes the group and one admission per member in the same commit. The caller
+needs active workspace membership, a human identity, `agent.use` for each agent member, and
+`thread.start` on the direct group; no group-creation or membership-management grant is needed.
+Every member participates in the thread, and mentions, which must name members, only narrow
+notification. Fewer than two distinct members returns `ThreadApplication.DirectMembersRequired`;
+a missing or inactive member, or a mention outside the group, returns
+`ThreadApplication.ParticipantUnavailable`. Later threads in the same direct group can also start
+with `startInGroup`. Direct-group membership is fixed; see [group workflows](group-workflows.md).
+
 ## Initial participation and recipient selection
 
-| Opening message      | Initial participants                                              | Notification recipients               |
-| -------------------- | ----------------------------------------------------------------- | ------------------------------------- |
-| No explicit mentions | All current active group members, including the author and agents | All those participants                |
-| Explicit mentions    | The author plus the mentioned eligible members                    | The explicitly mentioned participants |
+| Opening message                        | Initial participants                                              | Notification recipients                 |
+| -------------------------------------- | ----------------------------------------------------------------- | --------------------------------------- |
+| Team group, no explicit mentions       | All current active group members, including the author and agents | All those participants                  |
+| Team group, explicit mentions          | The author plus the mentioned eligible members                    | The explicitly mentioned participants   |
+| Direct group, with or without mentions | All members of the direct group                                   | All participants, or the mentioned ones |
+
+Every start runs through the internal `ThreadStart` service. It creates the thread, admits the
+starting participants at sequence 1, and records the first message activity with its recipients
+in the caller's commit. A thread's `createdBy` is a member or, for a conversation a channel
+receives, a contact. Future task and channel workflows call the same start with their own
+authorization and starting participants: a task's creator and triage, or a conversation's contacts
+and triage, without enrolling the group.
 
 An author mentioned explicitly appears only once. There is no implicit sender exclusion:
 broadcast includes the author; a narrowed message not mentioning its author does not notify them.
@@ -105,10 +127,10 @@ boundary; a returning member whose prior participation ended receives a fresh pa
 to their current group admission. Its `joinedAtSequence` is the introducing message's sequence.
 Earlier messages remain history, without retroactive notifications.
 
-| Reply addressing  | Notification recipients                                                     |
-| ----------------- | --------------------------------------------------------------------------- |
-| No mentions       | Current active thread participants, including the replying author.          |
-| Explicit mentions | Only the mentioned eligible members, admitted in the same commit if needed. |
+| Reply addressing  | Notification recipients                                                         |
+| ----------------- | ------------------------------------------------------------------------------- |
+| No mentions       | Every current participant, including contacts, triage, and the replying author. |
+| Explicit mentions | Only the mentioned eligible members, admitted in the same commit if needed.     |
 
 Mentions do not remove existing participants. Group members outside the thread are not enrolled
 by an unmentioned reply, including members added to the group after the thread started. There

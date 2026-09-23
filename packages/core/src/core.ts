@@ -1,6 +1,8 @@
 import { AgentPermissions } from "./agent/permissions.ts";
 import { ThreadApplication } from "./thread/application.ts";
 import { ThreadCreation } from "./thread/creation.ts";
+import { ThreadStart } from "./thread/start.ts";
+import { DirectGroups } from "./group/direct.ts";
 import { ThreadAccess } from "./thread/access.ts";
 import { ThreadMessageApplication } from "./thread/message/application.ts";
 import { ThreadMessagePublication } from "./thread/message/publication.ts";
@@ -104,6 +106,9 @@ const groupDeparture = GroupMembershipDeparture.layer.pipe(Layer.provide(departu
 const messagePublication = ThreadMessagePublication.layer.pipe(
   Layer.provide(Layer.mergeAll(admissions, recording)),
 );
+const threadStart = ThreadStart.layer.pipe(
+  Layer.provide(Layer.mergeAll(ThreadCreation.layer, messagePublication)),
+);
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
 const activityReading = ThreadActivityReading.layer.pipe(Layer.provide(threadAccess));
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
@@ -129,7 +134,8 @@ const operations = Layer.mergeAll(
     Layer.mergeAll(
       Delegation.layer,
       GroupAudience.layer,
-      ThreadCreation.layer,
+      DirectGroups.layer,
+      threadStart,
       threadAccess,
       activityReading,
       notificationSource,

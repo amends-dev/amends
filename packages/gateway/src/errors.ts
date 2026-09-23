@@ -80,6 +80,7 @@ export const PublicError = Schema.Union([
   ThreadApplication.NotFound,
   ThreadApplication.ParticipantUnavailable,
   ThreadApplication.HumanAuthorRequired,
+  ThreadApplication.DirectMembersRequired,
   ThreadMessageApplication.NotFound,
   ThreadMessageApplication.ParticipantUnavailable,
   ThreadMessageApplication.HumanAuthorRequired,

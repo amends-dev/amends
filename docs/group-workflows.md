@@ -5,7 +5,8 @@ SQLite and PostgreSQL. These operations are available through `GroupApplication.
 and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
-broader design; direct groups (DMs and group DMs) and public groups remain future work.
+broader design; public groups remain future work. Direct groups (DMs and group DMs) start with
+their first thread.
 [Thread workflows](thread-workflows.md) cover starting and reading conversations in private groups.
 
 ## Permission and input
@@ -127,8 +128,9 @@ existence after authorization and returns `GroupNotFound` when it is missing.
 
 Direct groups have fixed membership. Adding to, removing from, or leaving a direct group
 returns `GroupMembershipApplication.FixedMembership` without another fact; including someone
-else requires another direct group. The store and record contracts for direct groups are
-implemented, while the workflow that starts them remains future work.
+else requires another direct group. `ThreadApplication.startDirect` establishes or reuses a
+direct group through the internal `DirectGroups` service; see
+[starting a direct group](thread-workflows.md#starting-a-direct-group).
 
 Repeating a departure of the same admission returns `AlreadyRemoved` without another fact.
 Authorized addition after departure creates a fresh admission ID; neither an old removal nor

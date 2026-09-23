@@ -19,7 +19,7 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
 ) {}
 export const Input = Schema.Struct({
   groupId: Group.Id,
-  createdBy: Member.Id,
+  createdBy: Thread.Record.fields.createdBy,
   createdAt: Schema.DateTimeUtcFromString,
 });
 export interface Input extends Schema.Schema.Type<typeof Input> {}
@@ -60,27 +60,33 @@ export const make = Effect.fn("ThreadCreation.make")(function* () {
     yield* Store.Transaction;
     const checked = yield* Schema.decodeEffect(Schema.toType(Input))(input);
     const foundGroup = yield* groups.get(checked.groupId);
-    const foundMember = yield* members.get(checked.createdBy);
-    if (Option.isNone(foundGroup) || Option.isNone(foundMember))
-      return yield* new InvalidReference({ message: "Thread group or creator is missing" });
+    if (Option.isNone(foundGroup))
+      return yield* new InvalidReference({ message: "Thread group is missing" });
     const group = yield* Schema.decodeEffect(Schema.toType(Group.Record))(foundGroup.value);
-    const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value);
-    if (
-      group.workspaceId !== workspaceId ||
-      group.id !== checked.groupId ||
-      member.workspaceId !== workspaceId ||
-      member.id !== checked.createdBy ||
-      member.status !== "active"
-    )
-      return yield* new InvalidReference({
-        message: "Thread group or creator is inconsistent or inactive",
-      });
+    if (group.workspaceId !== workspaceId || group.id !== checked.groupId)
+      return yield* new InvalidReference({ message: "Thread group is inconsistent" });
+    // A member creator must be active here; a contact creator is identified by its channel.
+    const creator = checked.createdBy;
+    if (creator._tag === "Member") {
+      const foundMember = yield* members.get(creator.memberId);
+      if (Option.isNone(foundMember))
+        return yield* new InvalidReference({ message: "Thread creator is missing" });
+      const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value);
+      if (
+        member.workspaceId !== workspaceId ||
+        member.id !== creator.memberId ||
+        member.status !== "active"
+      )
+        return yield* new InvalidReference({
+          message: "Thread creator is inconsistent or inactive",
+        });
+    }
     return yield* journal
       .publish(ThreadFacts.Created, {
         id: Thread.Id.make(yield* crypto.randomUUIDv4),
         workspaceId,
         groupId: group.id,
-        createdBy: member.id,
+        createdBy: creator,
         createdAt: checked.createdAt,
       })
       .pipe(Publication.withOccurredAt(checked.createdAt));

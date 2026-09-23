@@ -106,7 +106,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
       const sequence = yield* recording.nextSequence(thread.id);
       const occurredAt = yield* DateTime.now;
       const admitted = yield* admissions
-        .ensure(thread, [actor.memberId], sequence, occurredAt)
+        .ensure(thread, [{ _tag: "Member", memberId: actor.memberId }], sequence, occurredAt)
         .pipe(Publication.withOccurredAt(occurredAt));
       const participant = admitted.participants[0];
       const added = admitted.added[0];

@@ -8,8 +8,9 @@ and ownership transfer are implemented through core, the gateway, and HTTP. SQLi
 [workspace workflows](workspace-workflows.md) for the available operations.
 Core and both adapters implement [private group creation and membership lifecycle](group-workflows.md),
 including permission-based addition/removal, self-leave, ordinary group reads, and management
-inspection of known groups. Direct groups (DMs and group DMs), public groups,
-and group HTTP/UI workflows remain unimplemented.
+inspection of known groups. Direct groups (DMs and group DMs) are established and reused by
+member set when their first thread starts; their membership is fixed. Public groups and group
+HTTP/UI workflows remain unimplemented.
 [Starting a private-group thread](thread-workflows.md) with a human text message, initial
 participation, timeline activity, and notifications is implemented in core and both adapters.
 Authorized thread discovery, metadata, sequence-paginated timelines, and current-participant
@@ -19,11 +20,12 @@ is implemented, including quiet follow/ending activity and pending agent-input c
 participants, muting, turns, agent execution, triage,
 and channel delivery remain future work.
 The [group and audience rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads)
-include implemented group-inherited read access. Every thread belongs to one group in the design;
-the implemented thread records already require a group. Participation is implemented for group
-members only: contact and triage participants, task and channel thread starts, and the shared
-internal thread start they use remain unimplemented, and general participation management
-remains incomplete. Group departure ends its associated thread participations and
+include implemented group-inherited read access. Every thread belongs to one group. All thread
+starts use one internal thread start, and stores, facts, and notifications support member,
+contact, and triage participants and member or contact authors. Replies without mentions reach
+every current participant. Only member workflows exist today: the task and channel workflows that
+admit contacts and triage remain unimplemented, and general participation management remains
+incomplete. Group departure ends its associated thread participations and
 discards their pending agent input; workspace-member removal uses the same cleanup.
 Thread starts, reads, replies, and follow/unfollow use the shared group-audience check.
 Group and thread discovery and current-participant lists are unpaginated; timelines have
