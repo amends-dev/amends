@@ -224,14 +224,13 @@ and rollback of failed schema initialization before an explicit retry.
 over a temporary file per test: another host is another connection to the file, discarding
 projections deletes the projection tables' rows, and the footprint counts the rows of every
 table. The journal, transaction, commit-publication, idempotency, fact-metadata, provenance,
-and read files register those suites. Beside them, `transactions.test.ts` injects a failed
-`COMMIT` to check `CommitUncertain`, and `fact-metadata.test.ts` checks the fact columns.
+read, store-contract, assignment, ownership, invitation, invitation-policy, invitation-replay,
+authorization, and gateway files register those suites. Beside them, `transactions.test.ts`
+injects a failed `COMMIT` to check `CommitUncertain`, and `fact-metadata.test.ts` checks the
+fact columns.
 
-The remaining suites separate database construction, authorization, gateway workflows, and
-invitation lifecycle, policy, and replay. `contracts.test.ts` runs the same
-direct-store rejection and round-trip scenarios as PostgreSQL, including invalid role edits, foreign
-grant scopes, invalid expiry, checkpoint validation, and rollback. Fixtures are in `support.ts` and
-`invitation-support.ts`. `notification-sources.test.ts` mirrors PostgreSQL coverage for current
+The remaining tests cover database construction, groups, threads, notifications, and read
+state. Fixtures are in `support.ts`. `notification-sources.test.ts` mirrors PostgreSQL coverage for current
 source authorization, historical recipient integrity, direct entry lookup, no-write resolution,
 staged visibility, rollback, reopening, and gateway outcomes. `notification-acknowledgment.test.ts`
 mirrors PostgreSQL's ownership, atomicity, repeat handling, concurrent requests, source-access loss,

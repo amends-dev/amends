@@ -242,17 +242,16 @@ stores and reopening without data loss.
 over a database per test: another host is another pool, polling every 20 milliseconds, with a
 100-millisecond lock timeout when a test asks for prompt contention. Discarding projections
 truncates the projection tables, and the footprint counts the rows of every table. The journal,
-transaction, commit-publication, idempotency, fact-metadata, provenance, and read files register
-those suites. Beside them, `transactions.test.ts` injects a failed `COMMIT` to check
-`CommitUncertain`, and `fact-metadata.test.ts` checks the fact columns.
+transaction, commit-publication, idempotency, fact-metadata, provenance, read, store-contract,
+assignment, ownership, invitation, invitation-policy, invitation-replay, authorization, and
+gateway files register those suites. Beside them, `transactions.test.ts` injects a failed
+`COMMIT` to check `CommitUncertain`, `fact-metadata.test.ts` checks the fact columns, and
+`invitations.test.ts` checks that a refused statement the program ignores still aborts its
+transaction.
 
-The remaining suites separate database construction, authorization, gateway workflows, and
-invitations. Each file creates its fixture through `support.ts`. The PostgreSQL
-Vitest project's global setup owns the shared test cluster; individual tests own their temporary
-databases. `contracts.test.ts` runs the same direct-store rejection and round-trip scenarios as
-SQLite, including role validation, every foreign scope shape, missing or blank invitation roles,
-invalid invitation expiry, checkpoint validation, and rollback. Engine-specific locking and
-aborted-transaction tests remain separate from these shared contract expectations.
+The remaining tests cover database construction, groups, threads, notifications, and read
+state. Each file creates its fixture through `support.ts`. The PostgreSQL Vitest project's global
+setup owns the shared test cluster; individual tests own their temporary databases.
 `notification-sources.test.ts` mirrors SQLite coverage for current source authorization, historical
 recipient integrity, direct entry lookup, no-write resolution, staged visibility, rollback,
 reopening, and gateway outcomes. `notification-acknowledgment.test.ts` mirrors SQLite's ownership,

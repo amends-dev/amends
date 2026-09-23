@@ -21,8 +21,8 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Gateway, WorkspaceEvents, WorkspaceStorage } from "@amends/gateway";
-import { Context, DateTime, Effect, Layer, type Option } from "effect";
-import type { Harness, Host } from "./harness.ts";
+import { Clock, Context, DateTime, Effect, Layer, type Option } from "effect";
+import type { Harness, Host, Storage } from "./harness.ts";
 
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
@@ -65,6 +65,10 @@ export const boundTo = (id: Workspace.Id) =>
     Effect.map(bind),
   );
 
+/** Run a program on a new host over the storage, which stays open for the enclosing scope. */
+export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+  Effect.flatMap(storage.connect(), (host) => Effect.provide(program, host));
+
 /** Cores and gateways over the harness's hosts. */
 export const make = (harness: Harness) => {
   const core = (bound: Bound) =>
@@ -72,19 +76,23 @@ export const make = (harness: Harness) => {
       Layer.provideMerge(CommittedEvents.layer(bound.workspace.workspaceId)),
       Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), harness.crypto)),
     );
+  /** A gateway, with its workspace event bus, over a host. */
+  const gateway = (host: Context.Context<Host>) =>
+    Gateway.layer.pipe(
+      Layer.provideMerge(WorkspaceEvents.layer()),
+      Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), harness.crypto)),
+    );
   return {
     core,
+    gateway,
     /** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
     initialized: (bound: Bound, creator = alice.id) =>
       WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
         Effect.provide(core(bound)),
       ),
-    /** A gateway, with its workspace event bus, over a host. */
-    gateway: (host: Context.Context<Host>) =>
-      Gateway.layer.pipe(
-        Layer.provideMerge(WorkspaceEvents.layer()),
-        Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), harness.crypto)),
-      ),
+    /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
+    runGateway: <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+      Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host)))),
   };
 };
 
@@ -98,6 +106,22 @@ export const testProvenance = (id = workspaceId): Event.Provenance => ({
 });
 
 export const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
+
+/** Run a program with the clock reading a fixed time; sleeping still uses the real clock. */
+export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>) =>
+  Effect.clockWith((clock) =>
+    program.pipe(
+      Effect.provideService(Clock.Clock, {
+        currentTimeMillis: Effect.succeed(DateTime.toEpochMillis(time)),
+        currentTimeMillisUnsafe: () => DateTime.toEpochMillis(time),
+        currentTimeNanos: Effect.succeed(BigInt(DateTime.toEpochMillis(time)) * 1_000_000n),
+        currentTimeNanosUnsafe: () => BigInt(DateTime.toEpochMillis(time)) * 1_000_000n,
+        monotonicTimeNanos: clock.monotonicTimeNanos,
+        monotonicTimeNanosUnsafe: () => clock.monotonicTimeNanosUnsafe(),
+        sleep: (duration) => clock.sleep(duration),
+      }),
+    ),
+  );
 
 export const request = (
   expiresAt: DateTime.Utc,

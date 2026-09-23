@@ -130,12 +130,11 @@ operation. Constructors do not create workspaces or cache an actor or transactio
 Every adapter runs the [conformance suites](../packages/storage-conformance/README.md)
 through a harness in `test/harness.ts`, one suite per test file. Behavior core relies on
 belongs in those suites; an adapter's own tests keep what only it has, such as columns,
-query plans, and driver failure injection. The remaining tests are grouped by database
-construction, authorization, gateway workflows, invitations, groups, and threads, and
+query plans, and driver failure injection. The store-contract suite calls stores directly,
+so core's application validation cannot hide an adapter's missing checks. The remaining
+tests cover database construction, groups, threads, notifications, and read state, and
 move into the suites in later changes. Each SQL adapter owns its database fixtures in
-`test/support.ts`. Keep the scenarios in both `test/contracts.test.ts` files aligned. They
-exercise direct store calls, so core's application validation cannot hide an adapter's
-missing checks.
+`test/support.ts`.
 
 During local development, keep one initial schema baseline per adapter. SQLite's
 initializer lives in `src/migrations.ts`; PostgreSQL's generated baseline lives in

@@ -44,10 +44,18 @@ registration.
 | `factMetadata`      | Fact headers across reopening, filtered and paged fact and subject reads, and retries that compare metadata.                                                     |
 | `provenance`        | Attribution of bootstrap, invitations, acceptance, and removal.                                                                                                  |
 | `reads`             | Workspace reads and change-feed opening while another host holds the writer.                                                                                     |
+| `contracts`         | Direct store calls: validation and rejection without partial writes, one active membership per identity, and IDs never reused.                                   |
+| `authorization`     | Stored role edits and assignment revocations as authorization reads them.                                                                                        |
+| `assignments`       | Assigning, changing, and revoking access, delegation limits, competing changes, and rollback.                                                                    |
+| `ownership`         | Transfer authority and recipients, competing transfers, rollback, and replay.                                                                                    |
+| `invitations`       | Acceptance, repeat and competing acceptance, revocation, and stored settlement.                                                                                  |
+| `invitationPolicy`  | Recipient and workspace binding, expiry, delegated roles, and rechecks at acceptance.                                                                            |
+| `invitationReplay`  | Rollback of acceptance and removal, and replay of invitation records.                                                                                            |
+| `gateway`           | Workspace creation and isolation, the membership workflow, cold boot, and the directory.                                                                         |
 
-The suites cover the journal and transaction contracts. Store-contract, authorization, group,
-and thread tests still live in each SQL adapter and move here in later changes.
+Group, thread, notification, and read-state tests still live in each SQL adapter and move here
+in later changes.
 
-`Support` holds the fixtures the suites share: identities, bound stores by name, and cores and
-gateways over a harness's hosts. `Operations` runs single application operations through a
+`Support` holds the fixtures the suites share: identities, bound stores by name, a fixed
+clock, and cores, hosts, and gateways over a harness's storage. `Operations` runs single application operations through a
 gateway, the way a protocol handler does.

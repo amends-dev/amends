@@ -259,8 +259,10 @@ and a count of stored records for rollback checks. A test file registers one sui
 differently. The memory adapter runs the same suites as the reference implementation; its
 tests run in the `backend` project.
 
-The suites cover the journal and transaction contracts. Store-contract, authorization,
-group, and thread tests still live in each SQL adapter until they move into the suites.
+The suites cover the journal and transactions, direct store contracts for workspaces,
+members, roles, assignments, invitations, and checkpoints, and the workspace, access,
+invitation, and gateway workflows. Group, thread, notification, and read-state tests still
+live in each SQL adapter until they move into the suites.
 
 ## Limits of current coverage
 

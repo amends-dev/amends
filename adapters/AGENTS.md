@@ -7,8 +7,8 @@ conversion. Rejected writes are conflicts; malformed stored rows and infrastruct
 errors are failures. Preserve transaction guards and validate before any SQL write
 or conversion that drops domain information. Put behavior every adapter must share in
 the `@amends/storage-conformance` suites, which each adapter runs through its harness.
-Keep the direct store-contract tests not yet moved there aligned across SQLite and
-PostgreSQL, including rejection without partial writes. Change the memory adapter with
+Keep the tests not yet moved there aligned across SQLite and PostgreSQL, including
+rejection without partial writes. Change the memory adapter with
 any contract change: it is the reference implementation.
 Applied migrations, serialized fields, and service keys remain stable through
 source reorganizations. Keep bindings and raw table schemas internal.
