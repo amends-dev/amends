@@ -1,5 +1,5 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
-import { and, asc, count, desc, eq, gt, gte, lt, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, lt, inArray, max, or } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";
 import { Binding } from "./binding.ts";
@@ -207,9 +207,10 @@ export const make = Effect.fn("Journal.make")(function* () {
     const position = Entry.Position.make(
       Option.isNone(last) ? 0 : last.value.position + (extending ? 0 : 1),
     );
+    // Seek the batch's next index through log_entries_by_commit instead of counting its entries.
     const written = extending
       ? yield* db
-          .select({ count: count() })
+          .select({ highest: max(logEntries.entryIndex) })
           .from(logEntries)
           .where(
             and(
@@ -219,7 +220,10 @@ export const make = Effect.fn("Journal.make")(function* () {
             ),
           )
           .pipe(
-            Effect.map((rows) => rows[0]?.count ?? 0),
+            Effect.map((rows) => {
+              const highest = rows[0]?.highest;
+              return highest === null || highest === undefined ? 0 : highest + 1;
+            }),
             Effect.mapError(storeError(Store, "append")),
           )
       : 0;

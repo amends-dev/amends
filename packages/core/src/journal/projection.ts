@@ -184,9 +184,8 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   const checkpoint = checkpoints
     .get(key)
     .pipe(Effect.flatMap(Schema.decodeEffect(Schema.Option(Checkpoint.Cursor))));
-  const next = Effect.fnUntraced(function* () {
+  const next = Effect.fnUntraced(function* (previous: Option.Option<Checkpoint.Cursor>) {
     const native = yield* Store.Transaction;
-    const previous = yield* checkpoint;
     if (Option.isSome(previous)) {
       const cursor = previous.value;
       const batch = yield* log.get(cursor.commitId);
@@ -255,13 +254,24 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
         Effect.gen(function* () {
           if (entry.logId !== log.id || entry.commitId !== native.id)
             return yield* new Transaction.Foreign({});
-          const pending = yield* next();
-          if (
-            Option.isNone(pending) ||
-            pending.value.length !== 1 ||
-            pending.value[0]?.id !== entry.id
-          )
-            return yield* new Behind({ key });
+          const previous = yield* checkpoint;
+          // Publications within one commit are serialized, so progress this commit recorded at
+          // the preceding index already identifies the prior entry. Reloading the open batch
+          // for every publication would make a commit's cost quadratic in its size.
+          const follows =
+            Option.isSome(previous) &&
+            previous.value.commitId === entry.commitId &&
+            previous.value.position === entry.position &&
+            previous.value.index + 1 === entry.index;
+          if (!follows) {
+            const pending = yield* next(previous);
+            if (
+              Option.isNone(pending) ||
+              pending.value.length !== 1 ||
+              pending.value[0]?.id !== entry.id
+            )
+              return yield* new Behind({ key });
+          }
           for (const handler of yield* handlersFor(entry))
             yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
           yield* checkpoints.set(key, cursorOf(entry));
@@ -273,7 +283,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
     .operation(
       withServices(
         Effect.gen(function* () {
-          const pending = yield* next();
+          const pending = yield* next(yield* checkpoint);
           if (Option.isNone(pending)) return Option.none<Checkpoint.Cursor>();
           for (const entry of pending.value) {
             const handlers = yield* handlersFor(entry);

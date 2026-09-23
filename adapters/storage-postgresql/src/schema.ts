@@ -356,6 +356,13 @@ export const logEntries = pgTable(
       table.position,
       table.entryIndex,
     ),
+    // Appends and keyed receipts address an open or committed batch by its commit.
+    index("log_entries_by_commit").on(
+      table.workspaceId,
+      table.logId,
+      table.commitId,
+      table.entryIndex,
+    ),
     index("log_entries_by_subject").on(
       table.workspaceId,
       table.logId,

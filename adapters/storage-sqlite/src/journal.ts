@@ -150,10 +150,15 @@ export const make = Effect.fn("Journal.make")(function* () {
     const position = Entry.Position.make(
       Option.isNone(last) ? 0 : last.value.position + (extending ? 0 : 1),
     );
+    // Seek the batch's next index through log_entries_by_commit instead of loading its entries.
     const written = extending
-      ? (yield* entries(request.logId, session.commit.id).pipe(
+      ? yield* sql`SELECT COALESCE(MAX(entry_index) + 1, 0) AS written FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${request.logId} AND commit_id = ${session.commit.id}`.pipe(
+          Effect.flatMap(
+            Schema.decodeUnknownEffect(Schema.Tuple([Schema.Struct({ written: Schema.Int })])),
+          ),
+          Effect.map(([row]) => row.written),
           Effect.mapError(storeFailure(Store, "append")),
-        )).length
+        )
       : 0;
     const recordedAt = yield* DateTime.now;
     yield* sql`INSERT INTO commits (workspace_id, id, recorded_at, entry_count) VALUES (${workspaceId}, ${session.commit.id}, ${DateTime.formatIso(session.commit.recordedAt)}, 0) ON CONFLICT DO NOTHING`.pipe(

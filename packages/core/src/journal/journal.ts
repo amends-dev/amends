@@ -169,10 +169,12 @@ export const make = Effect.fn("Journal.make")(function* <
             schema: Event.Envelope,
             storageCodec: Event.storageCodec,
           });
-          const batch = yield* source.get(cause.commitId);
-          const parent = Option.isSome(batch)
-            ? batch.value.entries.find((entry) => entry.id === cause.id)
-            : undefined;
+          // Look up the one cause entry; loading its batch would rescan an open commit per cause.
+          const found = yield* source.getEntry(cause.id);
+          const parent =
+            Option.isSome(found) && found.value.commitId === cause.commitId
+              ? found.value
+              : undefined;
           const parentEnvelope = yield* Schema.decodeUnknownEffect(Schema.toType(Event.Envelope))(
             parent?.payload,
           );

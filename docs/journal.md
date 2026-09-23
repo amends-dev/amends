@@ -511,7 +511,11 @@ remain committed. Replay creates no source or execution-log entries.
 
 Live publication uses the same checkpoint as replay. It checks that the new entry
 immediately follows the projection's progress, applies handlers, and advances the
-checkpoint within the publication's transaction. A backlog fails publication with
+checkpoint within the publication's transaction. Publications within one commit are
+serialized, so progress that commit recorded at the preceding entry index confirms the
+new entry without reloading the open batch; other progress is validated against stored
+batches. Cause references are resolved by entry ID. A publication's cost therefore
+does not grow with the number of entries already in its commit. A backlog fails publication with
 `Projection.Behind`, rolling back the append; catch up with `journal.replay` and
 then retry the command as appropriate. Replaying an already updated projection
 does not apply its events again. A checkpoint includes an entry index to track
@@ -553,6 +557,8 @@ dependency inference across different projections, the stable consumer interface
 active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit
 visibility, rollback, independent consumers, cancellation, and wait failures.
+Projection tests also confirm that a large commit's publications do not reload that commit,
+and that entries appended around a live runner inside one commit still fail with `Projection.Behind`.
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
 staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The

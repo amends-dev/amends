@@ -230,6 +230,73 @@ it.effect(
     }),
 );
 
+it.effect("live publication checks progress without reloading its open commit", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const loaded: Array<string> = [];
+    const store = Store.Service.of({
+      ...fixture.store,
+      get: (id, commitId) =>
+        fixture.store
+          .get(id, commitId)
+          .pipe(Effect.tap(() => Effect.sync(() => loaded.push(commitId)))),
+    });
+    const ignored = Projection.make("ignored", { version: 1 }).on(Unrelated, () => Effect.void);
+    yield* run(
+      { ...fixture, store },
+      Effect.gen(function* () {
+        const journal = yield* Journal.make({ logId, projections: [definition, ignored] });
+        yield* journal.publish(Changed, { amount: 1 });
+        for (const size of [4, 16]) {
+          loaded.length = 0;
+          const events = yield* journal.commit(
+            Effect.gen(function* () {
+              const published = [yield* journal.publish(Changed, { amount: 1 })];
+              for (let index = 1; index < size; index++)
+                published.push(
+                  yield* journal
+                    .publish(Changed, { amount: 1 })
+                    .pipe(Publication.withCause(published[index - 1]!)),
+                );
+              return published;
+            }),
+          );
+          // Each runner confirms the previous commit once; progress and causes never reload this one.
+          expect(loaded).toHaveLength(2);
+          expect(loaded).not.toContain(events[0]!.commitId);
+        }
+        expect(yield* (yield* Counter).get).toBe(21);
+      }),
+    );
+  }),
+);
+
+it.effect("entries appended around a live runner within one commit leave it behind", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const writer = yield* source;
+        const journal = yield* Journal.make({ logId, projections: [definition] });
+        yield* journal.publish(Changed, { amount: 1 });
+        const failed = yield* Effect.flip(
+          journal.commit(
+            Effect.gen(function* () {
+              yield* journal.publish(Changed, { amount: 2 });
+              yield* writer.publish(Changed, { amount: 100 });
+              yield* journal.publish(Changed, { amount: 3 });
+            }),
+          ),
+        );
+        expect(failed._tag).toBe("Projection.Behind");
+        expect(yield* (yield* Counter).get).toBe(1);
+        expect((yield* fixture.snapshot).logs.get(logId)).toHaveLength(1);
+      }),
+    );
+  }),
+);
+
 it.effect(
   "unrelated facts advance progress but unsupported versions fail without skipping history",
   () =>

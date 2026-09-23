@@ -30,6 +30,12 @@ filtered entry pages remain separate from complete-batch replay reads.
 workspace, log, subject, position, and entry index. Fact subjects are required;
 generic execution entries leave the entire fact header null.
 
+`log_entries_by_commit` supports keyed append receipts and the next entry index of an
+open batch by workspace, log, commit, and entry index. Appends read only the batch's
+highest index, so a commit's cost does not grow with the entries it already holds;
+a plan test checks that commit lookups use this index. Adding it replaced the
+development baseline; recreate disposable PostgreSQL databases when adopting it.
+
 `Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
 log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
 transaction, and opens none. This supports notification-source reads without scanning the log
