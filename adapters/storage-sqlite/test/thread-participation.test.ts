@@ -293,7 +293,11 @@ it.effect(
         location,
         Effect.gen(function* () {
           const { bound, owner, group, first, agent } = yield* prepare();
-          const other = yield* run(bound, owner, start(group.id));
+          const other = yield* run(
+            bound,
+            owner,
+            start(group.id, [owner.memberId, humanId, agentId]),
+          );
           const initial = (yield* bound.participations.listByThread(first.thread.id)).find(
             (p) => ThreadParticipation.memberOf(p.participant) === agentId,
           );
@@ -475,7 +479,11 @@ it.effect(
             );
           yield* grant(bound, humanId, ThreadParticipationPermissions.Follow);
           const own = yield* run(bound, human, follow(first.thread.id));
-          const second = yield* run(bound, owner, start(group.id));
+          const second = yield* run(
+            bound,
+            owner,
+            start(group.id, [owner.memberId, humanId, agentId]),
+          );
           for (const [threadId, id] of [
             [second.thread.id, own.id],
             [first.thread.id, ThreadParticipation.Id.make("missing")],
@@ -841,7 +849,11 @@ it.effect("gateway returns public participation summaries and opaque self-servic
         owner,
         create([workspace.ownerMemberId, humanId]),
       );
-      const first = yield* gateway.asMember(workspace.id, owner, start(group.id));
+      const first = yield* gateway.asMember(
+        workspace.id,
+        owner,
+        start(group.id, [workspace.ownerMemberId, humanId]),
+      );
       const result = yield* gateway.asMember(workspace.id, owner, follow(first.thread.id));
       expect(Object.keys(result).sort()).toEqual([
         "id",
@@ -1066,9 +1078,13 @@ it.effect(
         location,
         Effect.gen(function* () {
           const { bound, owner, group, first, agent } = yield* prepare();
-          const second = yield* run(bound, owner, start(group.id));
+          const second = yield* run(
+            bound,
+            owner,
+            start(group.id, [owner.memberId, humanId, agentId]),
+          );
           const otherGroup = yield* run(bound, owner, create([owner.memberId, agentId]));
-          const third = yield* run(bound, owner, start(otherGroup.id));
+          const third = yield* run(bound, owner, start(otherGroup.id, [owner.memberId, agentId]));
           const threads = [first.thread.id, second.thread.id, third.thread.id];
           const before = yield* Effect.forEach(threads, (id) => snapshot(bound, id));
           let endings = 0;

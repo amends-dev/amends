@@ -204,11 +204,12 @@ when the caller has current group access. It is included in new Viewer and highe
 existing role records retain their stored grants.
 
 `thread.start` authorizes starting a conversation in a group where the actor is a current
-member. `agent.use` authorizes addressing the selected agent membership. Both are included
+member. `agent.use` authorizes mentioning, and so bringing in, the selected agent membership;
+posting where an agent already takes part needs no grant for it. Both are included
 in newly initialized Viewer and higher-tier bundles. See [thread workflows](thread-workflows.md).
 
 `thread.publish` authorizes human replies on a Thread target, with current group access and
-`agent.use` for selected agent recipients. `ThreadMessagePermissions.Publish` declares it with
+`agent.use` for mentioned agents. `ThreadMessagePermissions.Publish` declares it with
 a Viewer default tier. Publication needs no separate read or start grant; existing stored roles
 need an explicit grant or role update. Starting includes its opening publication under `thread.start`.
 

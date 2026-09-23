@@ -207,11 +207,12 @@ The thread module supplies opening-message and human-reply workflows described b
 
 ## Starting a thread in a private group
 
-`ThreadApplication.startInGroup({ groupId, text, mentions })` requires a human actor, current
-group membership, `thread.start` on the group, and `agent.use` on each selected agent member.
-An empty mention array enrolls all current active group members; explicit mentions select the
-author and mentioned members. The thread, admissions, verbatim user text, sequence-1
-`MessagePublished` activity, notifications, and checkpoints commit together.
+`ThreadApplication.startInGroup({ groupId, text, mentions })` requires a human actor, current group
+membership, `thread.start` on the group, and `agent.use` on each mentioned agent member. A
+team-group thread starts with its author and mentioned members; the rest of the group can read it
+without participating. A direct-group thread enrolls all its members. The thread, admissions,
+verbatim user text, sequence-1 `MessagePublished` activity, notifications, and checkpoints commit
+together.
 
 `ThreadStart` is the internal start every workflow uses, excluded from `Core.Operations`: it
 creates the thread through `ThreadCreation`, admits the starting participants, and records the
@@ -250,7 +251,8 @@ New Viewer bundles include the permission; stored role records are unchanged. Se
 `ThreadMessageApplication.publish({ threadId, text, mentions })` publishes a human reply under
 current group access and `ThreadMessagePermissions.Publish` (`thread.publish`) on the Thread target.
 The author and eligible mentions join when necessary; unmentioned replies address current thread
-participants plus the author. Each selected agent requires `agent.use`. The result contains only
+participants plus the author. Each mentioned agent requires `agent.use`; agents already
+participating are reached without it. The result contains only
 `message` and `activity`. New Viewer and higher-tier bundles include publish permission, while
 existing roles keep their stored grants. See [human replies](../../docs/thread-workflows.md#replying-to-a-conversation).
 

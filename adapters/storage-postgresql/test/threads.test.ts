@@ -138,10 +138,12 @@ const notifications = (bound: Bound, identity: Identity.MemberReference) =>
   bound.notifications.listByRecipient(identity, { limit: 100 });
 const sorted = (values: ReadonlyArray<ThreadParticipation.Record>) =>
   values.toSorted((a, b) => (a.id < b.id ? -1 : 1));
+/** Mentioning every member of the fixture group, the author included, enrolls and notifies them all. */
+const everyone = (ownerId: Member.Id) => [ownerId, humanId, agentId];
 
 describe.skipIf(!available)("PostgreSQL threads", () => {
   it.effect(
-    "broadcast opening atomically enrolls current members and records ordered activity and historical notifications",
+    "an unmentioned team opening enrolls and notifies only its author, atomically and in order",
     () =>
       withDatabase((location) =>
         inDatabase(
@@ -169,7 +171,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
               result.participants
                 .flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? [])
                 .sort(),
-            ).toEqual([owner.memberId, humanId, agentId].sort());
+            ).toEqual([owner.memberId]);
             expect(yield* bound.threads.get(result.thread.id)).toEqual(Option.some(result.thread));
             expect(yield* bound.messages.get(result.message.id)).toEqual(
               Option.some(result.message),
@@ -197,7 +199,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
             const event = events[0];
             if (event === undefined) return yield* Effect.die("Missing opening activity");
             expect(event.provenance.performedBy).toMatchObject({ memberId: owner.memberId });
-            expect(event.payload.recipients).toHaveLength(3);
+            expect(event.payload.recipients).toHaveLength(1);
             for (const participant of result.participants) {
               const rows = yield* notifications(bound, memberParticipant(participant).identity);
               expect(rows).toHaveLength(1);
@@ -208,9 +210,12 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
                 state: { _tag: "Pending" },
               });
             }
+            // The rest of the group is neither enrolled nor notified.
+            for (const identity of [humanIdentity, agentIdentity])
+              expect(yield* notifications(bound, identity)).toEqual([]);
             const after = yield* history(bound);
             expect(after).toHaveLength(before.length + 1);
-            expect(after.at(-1)?.entries).toHaveLength(6);
+            expect(after.at(-1)?.entries).toHaveLength(4);
             expect((yield* run(bound, owner, start(group.id, [humanId]))).thread.id).not.toBe(
               result.thread.id,
             );
@@ -259,7 +264,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
   );
 
   it.effect(
-    "starting requires current audience, scoped start permission, and agent-use authority for selected agents",
+    "starting requires current audience, scoped start permission, and agent-use authority for mentioned agents",
     () =>
       withDatabase((location) =>
         inDatabase(
@@ -295,13 +300,17 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
                 }),
               ),
             );
-            expect(yield* Effect.flip(run(bound, human, start(group.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: {
-                permission: { name: AgentPermissions.Use.name },
-                target: { memberId: agentId },
+            // An unmentioned post names no agent, so it needs no agent-use authority.
+            yield* run(bound, human, start(group.id));
+            expect(yield* Effect.flip(run(bound, human, start(group.id, [agentId])))).toMatchObject(
+              {
+                _tag: "Authorization.Denied",
+                requirement: {
+                  permission: { name: AgentPermissions.Use.name },
+                  target: { memberId: agentId },
+                },
               },
-            });
+            );
             // A narrowed human-only message does not need authority over unselected agents or group.read.
             yield* run(bound, human, start(group.id, [owner.memberId]));
             yield* publish(
@@ -321,7 +330,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
                 }),
               ),
             );
-            yield* run(bound, human, start(group.id));
+            yield* run(bound, human, start(group.id, [agentId]));
             yield* publish(
               bound,
               Effect.flatMap(Journal.Service, (journal) =>
@@ -385,7 +394,9 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
                   ),
               }),
             };
-            expect(yield* Effect.flip(run(broken, owner, start(group.id)))).toMatchObject({
+            expect(
+              yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
+            ).toMatchObject({
               _tag: "Projection.Failure",
             });
             expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
@@ -393,7 +404,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
               expect(yield* notifications(bound, identity)).toEqual([]);
             expect(yield* history(bound)).toEqual(before);
             // A subsequent valid operation can use the same connection and all projections.
-            yield* run(bound, owner, start(group.id));
+            yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
           }),
         ),
       ),
@@ -407,7 +418,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
           location,
           Effect.gen(function* () {
             const { bound, owner, agent, group } = yield* prepare();
-            const result = yield* run(bound, owner, start(group.id));
+            const result = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
             const participant = result.participants.find(
               (p) => ThreadParticipation.memberOf(p.participant) === agentId,
             );
@@ -444,7 +455,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
               value: { status: "ended" },
             });
             expect((yield* notifications(bound, agentIdentity))[0]?.state._tag).toBe("Discarded");
-            const next = yield* run(bound, owner, start(group.id));
+            const next = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
             expect(
               next.participants
                 .filter((p) => ThreadParticipation.memberOf(p.participant) === agentId)
@@ -483,7 +494,11 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
           const { bound, owner, group } = yield* prepare();
           const before = yield* history(bound);
           const outer = Effect.flatMap(Journal.Service, (journal) =>
-            journal.commit(start(group.id).pipe(Effect.andThen(Effect.fail("rollback")))),
+            journal.commit(
+              start(group.id, everyone(owner.memberId)).pipe(
+                Effect.andThen(Effect.fail("rollback")),
+              ),
+            ),
           );
           expect(yield* Effect.flip(run(bound, owner, outer))).toBe("rollback");
           expect(
@@ -499,7 +514,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
                         roleId: BuiltinRoles.OwnerId,
                         permissions: [],
                       });
-                      return yield* start(group.id);
+                      return yield* start(group.id, everyone(owner.memberId));
                     }).pipe(Publication.withActor),
                   ),
                 ),
@@ -547,7 +562,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
             location,
             Effect.gen(function* () {
               const { bound, owner, group } = yield* prepare();
-              const started = yield* run(bound, owner, start(group.id));
+              const started = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
               yield* run(
                 bound,
                 owner,
@@ -642,7 +657,11 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
             owner,
             create([workspace.ownerMemberId, humanId, agentId]),
           );
-          const result = yield* gateway.asMember(workspace.id, owner, startOnly(group.id));
+          const result = yield* gateway.asMember(
+            workspace.id,
+            owner,
+            startOnly(group.id, [workspace.ownerMemberId, humanId, agentId]),
+          );
           expect(Object.keys(result).sort()).toEqual(["activity", "message", "thread"]);
           expect(yield* bound.participations.listByThread(result.thread.id)).toHaveLength(3);
           expect(
@@ -665,7 +684,7 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
           location,
           Effect.gen(function* () {
             const { bound, owner, group, hidden } = yield* prepare();
-            const first = yield* run(bound, owner, start(group.id));
+            const first = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
             const second = yield* run(bound, owner, start(group.id, [humanId]));
             const participation = first.participants.find(
               (participant) => ThreadParticipation.memberOf(participant.participant) === agentId,
@@ -841,12 +860,14 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
                     : bound.checkpoints.set(key, cursor),
               }),
             };
-            expect(yield* Effect.flip(run(broken, owner, start(group.id)))).toMatchObject({
+            expect(
+              yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
+            ).toMatchObject({
               _tag: "JournalStore.Failure",
             });
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.checkpoints.get(key)).toEqual(checkpoint);
-            const result = yield* run(bound, owner, start(group.id));
+            const result = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
             const participation = result.participants.find(
               (p) => ThreadParticipation.memberOf(p.participant) === agentId,
             );

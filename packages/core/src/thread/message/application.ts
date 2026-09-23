@@ -45,7 +45,10 @@ export type Error =
   | InvalidResponse;
 export interface Interface {
   readonly workspaceId: ThreadMessage.Record["workspaceId"];
-  /** Publish a human reply; join its author and eligible mentions, recording recipients atomically. */
+  /**
+   * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
+   * Mentioned agents need the author's agent-use authority; agents already taking part do not.
+   */
   readonly publish: (
     input: ThreadMessage.PublishInput,
   ) => Effect.Effect<ThreadMessage.Published, Error, Actor.Service>;
@@ -110,7 +113,8 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
         const entry = eligible.get(reference.memberId);
         if (entry === undefined)
           return yield* new ParticipantUnavailable({ memberId: reference.memberId });
-        if (entry.member.identity._tag === "Agent")
+        // Mentioning an agent directs it; replying where it already takes part does not.
+        if (entry.member.identity._tag === "Agent" && request.mentions.includes(reference.memberId))
           yield* authorization.require([
             Requirement.make(AgentPermissions.Use, {
               _tag: "Member",

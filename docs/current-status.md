@@ -33,12 +33,13 @@ sequence-based pages. Separate reads and pages do not share a snapshot.
 Group creation, starts, replies, and timeline pages read members, admissions, participations,
 and referenced messages in batches, so their store reads do not grow with group size or page
 length. A start still publishes one participation fact per starting participant, and every fact
-reads and writes each projection's checkpoint and journal bookkeeping, so a broadcast start's
-storage work still grows with the group.
+reads and writes each projection's checkpoint and journal bookkeeping, so a start's storage
+work still grows with its participants.
 The agreed [attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is
-not implemented yet. A team post without mentions still enrolls and notifies every current group
-member, starts and replies still require `agent.use` for every selected agent, and group
-following, read positions, latest-activity ordering, and unread state do not exist.
+partly implemented: a team post starts with its author and mentioned members, and only mentioned
+agents need `agent.use`. Group following, read positions, latest-activity ordering, and unread
+state do not exist yet, so members of a team hear about an unmentioned post only by reading
+the group.
 
 ## Design-system coverage
 

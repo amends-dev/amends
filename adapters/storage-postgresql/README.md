@@ -126,35 +126,36 @@ The read suite verifies permission and audience separation, current rosters, sta
 revocation, and reads without opening transactions. New role bundles include `group.read`;
 existing stored roles are unchanged.
 
-Thread opening persists the thread, its initial participants, a text message, ordered activity,
-and notifications in one workspace commit. Broadcast enrolls current group members; mentions
-narrow the initial set. A participant is a member, a contact, or triage, stored in
-`participant_kind` with its own columns: members fill `member_id`, `group_membership_id`, and their
-identity; contacts fill a `Contact` identity; triage fills none. `participation_participant`
-rejects mixed rows, and `active_thread_participation` keeps one active participation per member,
-contact, or triage in a thread. Message authors use `author_kind` with a member or contact column, and thread creators
-`created_by_kind` likewise; every author must participate in the thread, while which authors may
-publish is a core workflow rule. Departure ends a participation and
-discards pending agent input. Activity facts preserve recipient selection for replay.
-Thread reads enforce audience and action permissions in core. Timeline paging uses the existing
-workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema
-is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged
-activity, current grants and admission state, and rejection of inconsistent references.
-Human replies use the same tables and transaction boundary. The latest-activity lookup uses
-the workspace/thread/sequence index; insertion still rejects duplicate positions and gaps.
-Reply tests cover scoped publishing grants, new and returning participants, addressing, concurrent
-replies/departures, rollback, reopening, and replay.
-Self-follow records a quiet activity referencing its participation, with no message or notifications.
-Activity rows keep nullable message and participation references with their foreign keys, at
-most one activity per message, and at most one per participation and lifecycle kind. Core
-validates each activity kind; the table has no per-kind constraint, so a new kind adds nullable
-reference columns rather than rewriting one. Ending activity validates the participation’s terminal state
-and departure time and preserves its reason. Unfollow, group departure, and workspace removal
-record the same per-participation ending facts and activity; pending agent input is discarded
-in the same commit. Every kind uses the common activity-recorded fact and notification generator. The participation suite covers scoped grants, quiet follows,
-rejoining, stale requests, concurrent publication, rollback, historical reads, and replay.
-Participation lifecycle activity updates the development baseline: recreate
-disposable databases rather than applying an upgrade chain. See [thread workflows](../../docs/thread-workflows.md).
+Thread opening persists the thread, its initial participants, a text message, ordered activity, and
+notifications in one workspace commit. A team-group opening enrolls its author and mentioned
+members; a direct-group opening enrolls all its members. A participant is a member, a contact, or
+triage, stored in `participant_kind` with its own columns: members fill `member_id`,
+`group_membership_id`, and their identity; contacts fill a `Contact` identity; triage fills none.
+`participation_participant` rejects mixed rows, and `active_thread_participation` keeps one active
+participation per member, contact, or triage in a thread. Message authors use `author_kind` with a
+member or contact column, and thread creators `created_by_kind` likewise; every author must
+participate in the thread, while which authors may publish is a core workflow rule. Departure ends a
+participation and discards pending agent input. Activity facts preserve recipient selection for
+replay. Thread reads enforce audience and action permissions in core. Timeline paging uses the
+existing workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new
+schema is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation,
+staged activity, current grants and admission state, and rejection of inconsistent references. Human
+replies use the same tables and transaction boundary. The latest-activity lookup uses the
+workspace/thread/sequence index; insertion still rejects duplicate positions and gaps. Reply tests
+cover scoped publishing grants, new and returning participants, addressing, concurrent
+replies/departures, rollback, reopening, and replay. Self-follow records a quiet activity
+referencing its participation, with no message or notifications. Activity rows keep nullable message
+and participation references with their foreign keys, at most one activity per message, and at most
+one per participation and lifecycle kind. Core validates each activity kind; the table has no
+per-kind constraint, so a new kind adds nullable reference columns rather than rewriting one. Ending
+activity validates the participation’s terminal state and departure time and preserves its reason.
+Unfollow, group departure, and workspace removal record the same per-participation ending facts and
+activity; pending agent input is discarded in the same commit. Every kind uses the common
+activity-recorded fact and notification generator. The participation suite covers scoped grants,
+quiet follows, rejoining, stale requests, concurrent publication, rollback, historical reads, and
+replay. Participation lifecycle activity updates the development baseline: recreate disposable
+databases rather than applying an upgrade chain. See [thread
+workflows](../../docs/thread-workflows.md).
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

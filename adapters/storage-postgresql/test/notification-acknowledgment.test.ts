@@ -105,7 +105,12 @@ const prepare = Effect.fnUntraced(function* () {
     bound,
     owner,
     Effect.flatMap(ThreadApplication.Service, (s) =>
-      s.startInGroup({ groupId: group.id, mentions: [], text: "Proposal" }),
+      // Mentioning everyone, the author included, enrolls and notifies all three.
+      s.startInGroup({
+        groupId: group.id,
+        mentions: [owner.memberId, human.memberId, agent.memberId],
+        text: "Proposal",
+      }),
     ),
   );
   const humanNote = (yield* notes(bound, human.identity))[0];

@@ -144,7 +144,8 @@ const prepare = Effect.fnUntraced(function* () {
   });
   yield* seed(bound);
   const group = yield* run(bound, owner, create([owner.memberId, humanId, agentId]));
-  const first = yield* run(bound, owner, start(group.id));
+  // Mentioning everyone, the author included, enrolls and notifies all three.
+  const first = yield* run(bound, owner, start(group.id, [owner.memberId, humanId, agentId]));
   return { bound, owner, group, first, human: actorFor(humanId), agent: actorFor(agentId) };
 });
 

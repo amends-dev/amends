@@ -332,11 +332,15 @@ it.effect(
               (p) => ThreadParticipation.memberOf(p.participant) === humanId,
             ),
           ).toHaveLength(1);
+          // Mentioning an agent directs it and needs agent-use authority; nothing is recorded without it.
           const before = yield* snapshot(bound, first.thread.id);
-          expect(yield* Effect.flip(run(bound, human, reply(first.thread.id)))).toMatchObject({
-            _tag: "Authorization.Denied",
-          });
+          expect(
+            yield* Effect.flip(run(bound, human, reply(first.thread.id, [agentId]))),
+          ).toMatchObject({ _tag: "Authorization.Denied" });
           expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
+          // Replying where the agent already takes part reaches it without that authority.
+          yield* run(bound, human, reply(first.thread.id));
+          expect(yield* notifications(bound, agentId)).toHaveLength(2);
         }),
       ),
     ),
@@ -831,7 +835,11 @@ it.effect("gateway exposes human reply outcomes without internal participation s
         identity,
         create([workspace.ownerMemberId, humanId]),
       );
-      const first = yield* gateway.asMember(workspace.id, identity, start(group.id));
+      const first = yield* gateway.asMember(
+        workspace.id,
+        identity,
+        start(group.id, [workspace.ownerMemberId, humanId]),
+      );
       const result = yield* gateway.asMember(workspace.id, identity, reply(first.thread.id));
       expect(Object.keys(result).sort()).toEqual(["activity", "message"]);
       expect(result.activity.sequence).toBe(2);

@@ -148,7 +148,12 @@ const prepare = Effect.fnUntraced(function* () {
   const group = yield* run(bound, owner, create([owner.memberId, readerId, otherId, agentId]));
   const hidden = yield* run(bound, owner, create([otherId], "Private"));
   const first = yield* run(bound, owner, start(group.id, [otherId]));
-  const second = yield* run(bound, owner, start(group.id));
+  // Mentioning every member, the author included, enrolls and notifies them all.
+  const second = yield* run(
+    bound,
+    owner,
+    start(group.id, [owner.memberId, readerId, otherId, agentId]),
+  );
   yield* grant(bound, otherId, ThreadPermissions.Start, {
     _tag: "Group",
     workspaceId,

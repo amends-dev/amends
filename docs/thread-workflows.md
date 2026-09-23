@@ -28,15 +28,17 @@ const start = (groupId: Group.Id) =>
 The result contains `thread`, `message`, and `activity`. Internal participation identity snapshots
 are not returned; authorized participant reads provide public summaries instead. The operation accepts
 non-whitespace text and preserves it verbatim, including indentation and newlines. `mentions`
-is an explicit array of distinct workspace-member IDs. An empty array means broadcast;
-text such as `@Reviewer` does not itself create structured addressing.
+is an explicit array of distinct workspace-member IDs. In a team group, an empty array starts
+the thread with its author alone; text such as `@Reviewer` does not itself create structured
+addressing.
 
 Authorization and validation run in the same journal commit as creation and publication:
 
 - The caller must have active workspace and group membership and `thread.start` on that Group.
-- Each selected agent requires `agent.use` on that agent's workspace-member target, whether
-  selected through broadcast or an explicit mention. Narrowed messages need no authority over
-  unselected agents. Missing authority rejects the whole operation; recipients are not silently dropped.
+- Each mentioned agent requires `agent.use` on that agent's workspace-member target. Agents that are
+  not mentioned need no authority, including the agents of a direct group started with
+  `startInGroup`. Missing authority rejects the whole operation; recipients are not silently
+  dropped.
 - Mentioned members must currently belong to this group and have active workspace membership.
   A mention cannot admit an outsider to the group. Missing, foreign, inactive, and outside-group
   mention targets return `ThreadApplication.ParticipantUnavailable`.
@@ -66,17 +68,17 @@ with `startInGroup`. Direct-group membership is fixed; see [group workflows](gro
 
 ## Initial participation and recipient selection
 
-This section describes the current implementation. The agreed
-[attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient) replaces the
-team-group broadcast rule: a member's post starts with its author, its mentioned members, and the
-group's followers, and the rest of the group sees it as unread. It also requires `agent.use` only
-to bring an agent into a conversation. Until that is implemented, the rules below apply.
+These rules follow the agreed
+[attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient). A team-group
+post is not a broadcast: the rest of the group can read the thread without participating. Group
+following, which will also enroll the group's followers, and the read positions that show
+unread activity are not implemented yet.
 
-| Opening message                        | Initial participants                                              | Notification recipients                 |
-| -------------------------------------- | ----------------------------------------------------------------- | --------------------------------------- |
-| Team group, no explicit mentions       | All current active group members, including the author and agents | All those participants                  |
-| Team group, explicit mentions          | The author plus the mentioned eligible members                    | The explicitly mentioned participants   |
-| Direct group, with or without mentions | All members of the direct group                                   | All participants, or the mentioned ones |
+| Opening message                        | Initial participants                           | Notification recipients                 |
+| -------------------------------------- | ---------------------------------------------- | --------------------------------------- |
+| Team group, no explicit mentions       | The author                                     | The author                              |
+| Team group, explicit mentions          | The author plus the mentioned eligible members | The explicitly mentioned participants   |
+| Direct group, with or without mentions | All members of the direct group                | All participants, or the mentioned ones |
 
 Every start runs through the internal `ThreadStart` service. It creates the thread, admits the
 starting participants at sequence 1, and records the first message activity with its recipients
@@ -85,18 +87,19 @@ receives, a contact. Future task and channel workflows call the same start with 
 authorization and starting participants: a task's creator and triage, or a conversation's contacts
 and triage, without enrolling the group.
 
-An author mentioned explicitly appears only once. There is no implicit sender exclusion:
-broadcast includes the author; a narrowed message not mentioning its author does not notify them.
+An author mentioned explicitly appears only once. There is no implicit sender exclusion: an
+unmentioned opening notifies its author; a message not mentioning its author does not notify them.
 Participation and notification selection are separate recorded decisions. Other group members
-remain in the inherited access audience when mentions narrow participation and can read
-the thread when they hold `thread.read`. Reading does not enroll them.
+remain in the inherited access audience and can read the thread when they hold `thread.read`.
+Reading does not enroll them.
 
 A later group addition does not enroll that member in existing threads or create retroactive
 notifications. Unmentioned replies address that thread's current participants plus their author,
-without enrolling the whole group again. Members can also follow explicitly without posting.
+without enrolling the group. Members can also follow explicitly without posting.
 
-Broadcast agent notifications represent input for recipient evaluation. The agreed design allows
-an agent to ask a question, perform work, reply, or finish silently after evaluating relevance.
+Unmentioned messages reaching agent participants represent input for recipient evaluation. The
+agreed design allows an agent to ask a question, perform work, reply, or finish silently after
+evaluating relevance.
 An explicit mention makes the request direct; it does not require a meaningless visible response.
 Ordinary assistant replies remain informational to other agents; explicit work requests can
 ask them to act. These handling rules remain design intent: this slice creates durable pending
@@ -140,10 +143,11 @@ Earlier messages remain history, without retroactive notifications.
 
 Mentions do not remove existing participants. Group members outside the thread are not enrolled
 by an unmentioned reply, including members added to the group after the thread started. There
-is no sender exclusion: an author receives their broadcast, or a message mentioning themselves.
-Each selected agent requires `agent.use` on its Member target. A broadcast therefore requires
-authority over participating agents; a message addressed only to humans does not. Missing agent
-authority rejects the whole publication instead of silently dropping recipients.
+is no sender exclusion: an author receives their unmentioned reply, or a message mentioning
+themselves. Each mentioned agent requires `agent.use` on its Member target. An unmentioned reply
+reaches agents already participating without that authority: whoever brought them into the
+thread authorized them to handle it. Missing agent authority rejects the whole publication
+instead of silently dropping recipients.
 
 Missing, foreign, and outside-audience thread IDs share `ThreadMessageApplication.NotFound`.
 Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`; agent callers get
@@ -426,14 +430,16 @@ JSON record and needs no schema change for acknowledgment.
 
 ## Verification
 
-The mirrored adapter suites cover broadcast and mention routing, agent-use authority, custom
+The mirrored adapter suites cover author-only and mention routing, agent-use authority for
+mentioned agents only, custom
 scopes, inaccessible references, validation without partial writes, notification and checkpoint
 failures, outer transactions, concurrent departure, readmission, reopening, replay, and direct
 store constraints. Read suites cover exact grants, nonparticipant and later-member access,
 pagination, private identity filtering, no-write reads, current revocation, outer transactions,
 and rejection of corrupt cross-thread references. Core tests verify withholding private thread facts from the public change feed.
 Reply suites cover scoped action grants, live access changes, initial and returning admissions,
-mention and broadcast selection, concurrent sequencing and removal, projection/checkpoint failures,
+mention and unmentioned selection, agent use for mentioned agents only, concurrent sequencing and
+removal, projection/checkpoint failures,
 outer commits, reopening, and replay after grants or membership change.
 Participation suites verify quiet following, repeat calls, self-only unfollow, stale requests,
 notification retention/settlement, rejoining through follows and messages, concurrent publication,

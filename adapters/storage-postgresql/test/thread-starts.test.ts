@@ -344,7 +344,12 @@ describe.skipIf(!available)("PostgreSQL thread starts", () => {
                 counted.bound,
                 owner,
                 Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.startInGroup({ groupId: team.id, text: "Hello", mentions: [] }),
+                  // Mentioning the members enrolls them, so the participants grow with the group.
+                  s.startInGroup({
+                    groupId: team.id,
+                    text: "Hello",
+                    mentions: extra.slice(0, size),
+                  }),
                 ),
               );
               const start = counted.take();

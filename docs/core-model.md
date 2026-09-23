@@ -2529,28 +2529,24 @@ membership is never inferred from contact or triage participation.
 ### Remaining group and audience contract details
 
 The group/thread relationship (every thread in exactly one group), team and direct groups,
-direct-group reuse by exact member set, inherited audience, channel destination groups,
-separation from notification selection, permission-based team-group management, and
-self-service team-group departure are agreed. Any active workspace member can start a direct
-group. Private team-group creation is implemented
-through `group.create`, and member addition/removal through `group.membership.manage`.
-Self-leave and group cleanup during workspace-member removal are also implemented.
-Private-group reads use `group.read` plus audience membership, with separate management
-inspection and a reusable audience check. Starting a private-group thread with a human text
-message, initial participation, and notifications is implemented, as is starting a direct group;
-task and channel thread starts, group/thread HTTP/UI, assistant publication and subscriptions
-remain future work. Human replies require current group access and
-`thread.publish`; the implementation also requires `agent.use` for every selected agent
-recipient, which the [attention model](#agreed-attention-is-directed-followed-or-ambient)
-narrows to bringing an agent into the conversation. Their required participation and publication
-steps share internal services with starts; starting does not additionally require `thread.publish`.
-Thread reads now require current
-group access and `thread.read`, with no participation side effects.
-Default role placement does not limit future grants or roles.
-Other group operations, their permission declarations, broader group schemas, and admission
-UI remain contract work. Public-group discovery, group lifecycle, and moving existing threads
-between groups remain open. Moving or copying existing conversation content requires an
-explicit audience decision; an origin link does not perform it.
+direct-group reuse by exact member set, inherited audience, channel destination groups, separation
+from notification selection, permission-based team-group management, and self-service team-group
+departure are agreed. Any active workspace member can start a direct group. Private team-group
+creation is implemented through `group.create`, and member addition/removal through
+`group.membership.manage`. Self-leave and group cleanup during workspace-member removal are also
+implemented. Private-group reads use `group.read` plus audience membership, with separate management
+inspection and a reusable audience check. Starting a private-group thread with a human text message,
+initial participation, and notifications is implemented, as is starting a direct group; task and
+channel thread starts, group/thread HTTP/UI, assistant publication and subscriptions remain future
+work. Human replies require current group access and `thread.publish`, and `agent.use` only for
+mentioned agents, as the [attention model](#agreed-attention-is-directed-followed-or-ambient)
+agrees. Their required participation and publication steps share internal services with starts;
+starting does not additionally require `thread.publish`. Thread reads now require current group
+access and `thread.read`, with no participation side effects. Default role placement does not limit
+future grants or roles. Other group operations, their permission declarations, broader group
+schemas, and admission UI remain contract work. Public-group discovery, group lifecycle, and moving
+existing threads between groups remain open. Moving or copying existing conversation content
+requires an explicit audience decision; an origin link does not perform it.
 
 A proposed contract for moving a thread, discussed for triage routing and not yet agreed,
 treats the move as an explicit audience change recorded on the thread's timeline. Access

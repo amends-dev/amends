@@ -115,33 +115,35 @@ The read suite verifies permission and audience separation, current rosters, sta
 revocation, and reads without opening transactions. New role bundles include `group.read`;
 existing stored roles are unchanged.
 
-Thread opening persists the thread, its initial participants, a text message, ordered activity,
-and notifications in one workspace commit. Broadcast enrolls current group members; mentions
-narrow the initial set. A participant is a member, a contact, or triage. Member participation
-references the exact group admission through `member_id` and `group_membership_id`; contacts and
-triage leave those columns null and reference only the thread. `participant_key` makes active
-participation unique per member, contact, or triage. A message author is a member or a contact;
-`author_member_id` is null for contacts; every author must participate in the thread, while which
-authors may publish is a core workflow rule. Threads keep a member creator in `created_by`, null
-when a contact started the conversation. Departure ends a participation and discards pending agent input. Activity facts preserve recipient selection for replay.
-Thread reads enforce audience and action permissions in core. Timeline paging uses the existing
-workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema
-is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged
-activity, current grants and admission state, and rejection of inconsistent references.
-Human replies use the same tables and transaction boundary. The latest-activity lookup uses
-the workspace/thread/sequence index; insertion still rejects duplicate positions and gaps.
-Reply tests cover scoped publishing grants, new and returning participants, addressing, concurrent
-replies/departures, rollback, reopening, and replay.
-Self-follow records a quiet activity referencing its participation, with no message or notifications.
-Activity rows keep nullable message and participation references with their keys, at most one
-activity per message, and at most one per participation and lifecycle kind. Core validates each
-activity kind, so the table has no per-kind constraint and a new kind needs no table rebuild. Ending activity validates the participation’s terminal state
-and departure time and preserves its reason. Unfollow, group departure, and workspace removal
-record the same per-participation ending facts and activity; pending agent input is discarded
-in the same commit. Every kind uses the common activity-recorded fact and notification generator. The participation suite covers scoped grants, quiet follows,
-rejoining, stale requests, concurrent publication, rollback, historical reads, and replay.
-Participation lifecycle activity updates the development baseline: recreate
-disposable databases rather than applying an upgrade chain. See [thread workflows](../../docs/thread-workflows.md).
+Thread opening persists the thread, its initial participants, a text message, ordered activity, and
+notifications in one workspace commit. A team-group opening enrolls its author and mentioned
+members; a direct-group opening enrolls all its members. A participant is a member, a contact, or
+triage. Member participation references the exact group admission through `member_id` and
+`group_membership_id`; contacts and triage leave those columns null and reference only the thread.
+`participant_key` makes active participation unique per member, contact, or triage. A message author
+is a member or a contact; `author_member_id` is null for contacts; every author must participate in
+the thread, while which authors may publish is a core workflow rule. Threads keep a member creator
+in `created_by`, null when a contact started the conversation. Departure ends a participation and
+discards pending agent input. Activity facts preserve recipient selection for replay. Thread reads
+enforce audience and action permissions in core. Timeline paging uses the existing
+workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema is
+needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged
+activity, current grants and admission state, and rejection of inconsistent references. Human
+replies use the same tables and transaction boundary. The latest-activity lookup uses the
+workspace/thread/sequence index; insertion still rejects duplicate positions and gaps. Reply tests
+cover scoped publishing grants, new and returning participants, addressing, concurrent
+replies/departures, rollback, reopening, and replay. Self-follow records a quiet activity
+referencing its participation, with no message or notifications. Activity rows keep nullable message
+and participation references with their keys, at most one activity per message, and at most one per
+participation and lifecycle kind. Core validates each activity kind, so the table has no per-kind
+constraint and a new kind needs no table rebuild. Ending activity validates the participation’s
+terminal state and departure time and preserves its reason. Unfollow, group departure, and workspace
+removal record the same per-participation ending facts and activity; pending agent input is
+discarded in the same commit. Every kind uses the common activity-recorded fact and notification
+generator. The participation suite covers scoped grants, quiet follows, rejoining, stale requests,
+concurrent publication, rollback, historical reads, and replay. Participation lifecycle activity
+updates the development baseline: recreate disposable databases rather than applying an upgrade
+chain. See [thread workflows](../../docs/thread-workflows.md).
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes
@@ -201,16 +203,14 @@ Each test opens its own file in a temporary directory and removes it afterwards.
 Construction tests cover both `make` and `layer`, reopening without data loss,
 and rollback of failed schema initialization before an explicit retry.
 
-The suites separate database construction, transactions, journal behavior,
-authorization, gateway workflows, and invitation lifecycle, policy, and replay.
-`contracts.test.ts` runs the same direct-store rejection and round-trip scenarios
-as PostgreSQL, including invalid role edits, foreign grant scopes, invalid expiry,
-checkpoint validation, and rollback. Fixtures are in `support.ts` and
-`invitation-support.ts`.
-`notification-sources.test.ts` mirrors PostgreSQL coverage for current source authorization,
-historical recipient integrity, direct entry lookup, no-write resolution, staged visibility,
-rollback, reopening, and gateway outcomes.
-`notification-acknowledgment.test.ts` mirrors PostgreSQL's ownership, atomicity, repeat handling,
-concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.
-`thread-starts.test.ts` counts the store reads of group creation, a broadcast start, a reply, and a
-timeline page, and requires the same counts for a two-member and an eleven-member group.
+The suites separate database construction, transactions, journal behavior, authorization, gateway
+workflows, and invitation lifecycle, policy, and replay. `contracts.test.ts` runs the same
+direct-store rejection and round-trip scenarios as PostgreSQL, including invalid role edits, foreign
+grant scopes, invalid expiry, checkpoint validation, and rollback. Fixtures are in `support.ts` and
+`invitation-support.ts`. `notification-sources.test.ts` mirrors PostgreSQL coverage for current
+source authorization, historical recipient integrity, direct entry lookup, no-write resolution,
+staged visibility, rollback, reopening, and gateway outcomes. `notification-acknowledgment.test.ts`
+mirrors PostgreSQL's ownership, atomicity, repeat handling, concurrent requests, source-access loss,
+direct-store validation, reopening, and replay checks. `thread-starts.test.ts` counts the store
+reads of group creation, a start mentioning every member, a reply, and a timeline page, and requires
+the same counts for a two-member and an eleven-member group.

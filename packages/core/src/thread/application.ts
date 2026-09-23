@@ -85,16 +85,17 @@ export type ReadError =
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
   /**
-   * Start a thread in a group the author belongs to. A team thread enrolls every current member
-   * without mentions, or the author and mentioned members; a direct-group thread enrolls all of
-   * its members, and mentions only narrow who is notified.
+   * Start a thread in a group the author belongs to. A team thread starts with its author and
+   * mentioned members; the rest of the group can read it without participating. A direct-group
+   * thread enrolls all of its members, and mentions only narrow who is notified. Only mentioned
+   * agents need the author's agent-use authority.
    */
   readonly startInGroup: (
     input: Thread.StartInGroupInput,
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
   /**
    * Establish or reuse the direct group for the author and the given members, then start a
-   * thread with all of them. Needs active membership, agent use for selected agents, and
+   * thread with all of them. Needs active membership, agent use for every named agent, and
    * thread.start on the direct group; no group-management permission.
    */
   readonly startDirect: (
@@ -153,10 +154,14 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     return yield* new InvalidResponse({
       message: "Thread services belong to different workspaces",
     });
-  /** Authorize selected agents, then open the thread through the shared start. */
+  /**
+   * Check the starting participants, authorize the agents the author names, then open the thread
+   * through the shared start. Agents that take part without being named need no agent-use grant.
+   */
   const begin = Effect.fnUntraced(function* (
     groupId: Group.Id,
     selected: ReadonlyArray<Member.Id>,
+    named: ReadonlyArray<Member.Id>,
     eligible: ReadonlyMap<Member.Id, ThreadParticipationAdmission.Eligible>,
     message: {
       readonly text: Thread.StartInGroupInput["text"];
@@ -164,7 +169,9 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     },
   ) {
     const actor = yield* Actor.Service;
-    for (const memberId of selected) {
+    for (const memberId of selected)
+      if (!eligible.has(memberId)) return yield* new ParticipantUnavailable({ memberId });
+    for (const memberId of named) {
       const member = eligible.get(memberId)?.member;
       if (member === undefined) return yield* new ParticipantUnavailable({ memberId });
       if (member.identity._tag === "Agent")
@@ -222,7 +229,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
             Effect.fail(new InvalidResponse({ message: error.message })),
           ),
         );
-      return yield* begin(group.id, memberIds, eligible, request);
+      return yield* begin(group.id, memberIds, memberIds, eligible, request);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -262,13 +269,15 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       const foundGroup = yield* groups.get(request.groupId);
       if (Option.isNone(foundGroup))
         return yield* new InvalidResponse({ message: "Audience group is missing" });
+      // A direct group's members all take part; a team thread starts with its author and the
+      // members its opening message mentions, and the rest of the group sees it as unread.
       const selected =
-        foundGroup.value.kind === "Direct" || request.mentions.length === 0
+        foundGroup.value.kind === "Direct"
           ? [...eligible.keys()].sort()
           : [actor.memberId, ...request.mentions.filter((id) => id !== actor.memberId)];
       const missing = request.mentions.find((id) => !eligible.has(id));
       if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
-      return yield* begin(request.groupId, selected, eligible, request);
+      return yield* begin(request.groupId, selected, request.mentions, eligible, request);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
