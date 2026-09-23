@@ -5,7 +5,7 @@ SQLite and PostgreSQL. These operations are available through `GroupApplication.
 and `GroupMembershipApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
-broader design; DMs and public groups remain future work.
+broader design; direct groups (DMs and group DMs) and public groups remain future work.
 [Thread workflows](thread-workflows.md) cover starting and reading conversations in private groups.
 
 ## Permission and input
@@ -195,7 +195,7 @@ no public change; a mixed commit retains its other supported events in order. Gr
 and live delivery will need their own audience-aware HTTP/UI contract. Group creation generates no notifications. Opening and reply message activity generates notifications
 through the [thread workflow](thread-workflows.md).
 
-DMs, public-group joining/discovery, further thread workflows, and group/thread HTTP/UI workflows
+Direct groups (DMs and group DMs), public-group joining/discovery, further thread workflows, and group/thread HTTP/UI workflows
 remain separate implementation steps. See [known limitations](current-status.md).
 Opening messages establish thread participation and notifications. Group departures end those
 participations and discard pending agent input. Every affected thread records a participation-ended

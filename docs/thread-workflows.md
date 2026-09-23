@@ -3,8 +3,9 @@
 Core and both storage adapters implement human opening messages, replies, following/unfollowing,
 and authorized reads in private team groups, with source resolution and human notification acknowledgment.
 Call the application services through
-`Gateway.asMember` or a trusted workspace context. HTTP/UI, DMs,
-standalone threads, attachments, and agent execution remain separate implementation steps.
+`Gateway.asMember` or a trusted workspace context. HTTP/UI, direct groups (DMs and group DMs),
+contact and triage participants, task and channel thread starts, attachments, and agent
+execution remain separate implementation steps.
 
 ## Starting a conversation
 
@@ -377,8 +378,8 @@ Notifications expose source references, not continuing authority to read the sou
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
 authorized thread APIs. Managing other participants, agent/contact/triage acknowledgment,
-silent agent completion, turn execution, task activity, DMs, and standalone threads
-remain unimplemented. The [core model](core-model.md) describes the broader intent.
+silent agent completion, turn execution, task activity, direct groups, and task or channel
+thread starts remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
 Opening messages and participation activity updated both development schema baselines. Recreate disposable
 development databases when adopting that baseline; no upgrade chain or automatic data reset is provided. New permission bundles also

@@ -143,7 +143,7 @@ it; their names play no part in authorization.
 
 Initial members are explicit and may be empty. The creator is admitted only if included.
 `GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
-own ID and workspace-membership reference. DMs,
+own ID and workspace-membership reference. Direct groups (DMs and group DMs),
 public groups, threads, and HTTP/UI workflows remain separate work. See
 [group creation](../../docs/group-workflows.md) for the current contract and verification.
 
@@ -194,10 +194,10 @@ not grant authority, and a contact identity does not select an external reply de
 scopes compare the workspace, kind, and ID; a workspace scope covers targets in
 that workspace. Adding a Thread target supplies scoped grant storage. The
 [planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
-also requires group access or standalone participation alongside action permissions.
+also requires group access alongside action permissions; every thread belongs to one group.
 Group creation, reads, admission/departure, and the shared group-audience policy are implemented.
-Group-thread reads enforce audience membership and `thread.read`; standalone threads and
-subscription enforcement remain future work.
+Group-thread reads enforce audience membership and `thread.read`; subscription enforcement
+remains future work.
 The thread module supplies opening-message and human-reply workflows described below.
 
 ## Starting a thread in a private group
