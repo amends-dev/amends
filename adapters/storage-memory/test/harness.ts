@@ -23,7 +23,8 @@ export const harness: Harness = {
             let total = 0;
             for (const space of database.spaces.values()) {
               total += space.commits.size + space.appends.size;
-              total += space.threadPositions.size + space.groupTimes.size;
+              total +=
+                space.threadPositions.size + space.groupTimes.size + space.notificationsSeen.size;
               for (const batches of space.logs.values())
                 for (const batch of batches) total += 1 + batch.entries.length;
               for (const name of MemoryDatabase.projections) total += space.records[name].size;

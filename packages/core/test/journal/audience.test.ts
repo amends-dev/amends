@@ -7,7 +7,6 @@ import {
   GroupMembershipFacts,
 } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
-import { Notification, NotificationFacts } from "@amends/core/notification";
 import { Member, MemberFacts, Workspace } from "@amends/core/workspace";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Schema } from "effect";
@@ -65,7 +64,7 @@ it.effect("a declared audience is validated with its payload", () =>
 );
 
 it.effect(
-  "group admissions reach the group and the admitted member; follows and acknowledgments only their owner",
+  "group admissions reach the group and the admitted member; follows only the follower",
   () =>
     Effect.gen(function* () {
       const group = Group.audienceOf(groupId);
@@ -102,14 +101,6 @@ it.effect(
         }),
       ).toEqual([member]);
       const human: Identity.MemberReference = { _tag: "Human", id: Identity.HumanId.make("alice") };
-      expect(
-        yield* Fact.makeAudience(NotificationFacts.Acknowledged, {
-          workspaceId,
-          notificationId: Notification.Id.make("notification"),
-          recipient: human,
-          acknowledgment: { outcome: { _tag: "Seen" }, acknowledgedAt: at },
-        }),
-      ).toEqual([Identity.audienceOf(human)]);
       expect(Identity.audienceOf(human)).toBe("human:alice");
       expect(Identity.audienceOf({ _tag: "Agent", id: Identity.AgentId.make("alice") })).toBe(
         "agent:alice",

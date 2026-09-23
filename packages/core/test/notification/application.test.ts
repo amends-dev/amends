@@ -1,5 +1,4 @@
 import { NotificationSource } from "../../src/notification/source.ts";
-import { NotificationAcknowledgment } from "../../src/notification/acknowledgment.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
@@ -89,7 +88,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     insert: unexpected,
     insertMany: unexpected,
     discardPendingForParticipation: unexpected,
-    acknowledge: unexpected,
+    markSeen: unexpected,
     ...overrides,
   });
   const host = Layer.mergeAll(
@@ -108,9 +107,6 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provide(host))),
     Layer.provide(notifications),
     Layer.provide(Layer.succeed(NotificationSource.Service, { workspaceId, resolve: unexpected })),
-    Layer.provide(
-      Layer.succeed(NotificationAcknowledgment.Service, { workspaceId, record: unexpected }),
-    ),
     Layer.provide(
       Layer.succeed(
         Crypto.Crypto,
@@ -138,12 +134,7 @@ it.effect(
   () =>
     Effect.gen(function* () {
       expectTypeOf<Layer.Services<typeof NotificationApplication.layer>>().toEqualTypeOf<
-        | NotificationStore.Service
-        | Authorization.Service
-        | NotificationSource.Service
-        | NotificationAcknowledgment.Service
-        | Journal.Service
-        | Crypto.Crypto
+        NotificationStore.Service | Authorization.Service | NotificationSource.Service
       >();
       expectTypeOf<
         Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>

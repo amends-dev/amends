@@ -233,13 +233,12 @@ export const readState = (harness: Harness) => {
               yield* run(bound, human, markRead(threadId, 2));
               expect(yield* positionOf(bound, humanId, threadId)).toEqual([2]);
               expect(yield* pending(bound, humanId)).toEqual([3]);
-              // Two acknowledgments, committed together with the position.
-              expect((yield* history(bound)).length).toBe(before.length + 1);
-              // An earlier position changes nothing and, with nothing to settle, writes no commit.
-              const settled = yield* history(bound);
+              // Seen and the position are private state: reading writes nothing to the journal.
+              expect(yield* history(bound)).toEqual(before);
+              // An earlier position changes nothing.
               yield* run(bound, human, markRead(threadId, 1));
               expect(yield* positionOf(bound, humanId, threadId)).toEqual([2]);
-              expect(yield* history(bound)).toEqual(settled);
+              expect(yield* pending(bound, humanId)).toEqual([3]);
               expect(yield* Effect.flip(run(bound, human, markRead(threadId, 4)))).toEqual(
                 new ReadStateApplication.BeyondTimeline({
                   threadId,

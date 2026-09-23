@@ -1,5 +1,5 @@
 import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import type { DateTime, Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
@@ -42,6 +42,11 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * when present, otherwise committed state, and return isolated records. These
  * internal reads do not authorize callers; application operations must do so.
  * Every storage adapter implements this contract.
+ *
+ * The journal settles notifications as Pending or Discarded. A human recipient's Seen is private
+ * state beside them, written by markSeen and kept when projections are rebuilt: reads show a
+ * seen pending notification as Acknowledged with outcome Seen and its time, and pending reads and
+ * counts leave it out.
  */
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -88,8 +93,9 @@ export interface Interface {
    * Projection write, enlisted with the source activity and checkpoint.
    * Validate before writing. Invalid records, foreign workspaces, reused IDs,
    * and duplicate (source log, source entry, recipient kind, recipient ID)
-   * associations conflict atomically. Never upsert or retry internally; reject
-   * missing, foreign, or expired transaction handles.
+   * associations conflict atomically, and so does an Acknowledged record: Seen is recorded with
+   * markSeen. Never upsert or retry internally; reject missing, foreign, or expired transaction
+   * handles.
    */
   readonly insert: (
     record: Notification.Record,
@@ -102,11 +108,16 @@ export interface Interface {
   readonly insertMany: (
     records: ReadonlyArray<Notification.Record>,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Pending-only projection write. Preserve source/history; reject missing, terminal, or incompatible records. */
-  readonly acknowledge: (
-    id: Notification.Id,
-    acknowledgment: Notification.Acknowledgment,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * Record that their human recipients have seen these notifications, outside the journal. Each
+   * must be a human's notification in this workspace that is pending or already seen; otherwise
+   * the call conflicts and writes nothing. A notification seen before keeps its first time. The
+   * write joins the caller's transaction when there is one and is atomic on its own otherwise.
+   */
+  readonly markSeen: (
+    ids: ReadonlyArray<Notification.Id>,
+    seenAt: DateTime.Utc,
+  ) => Effect.Effect<void, Failure | Conflict>;
   /** Settle pending agent input for this ended participation, preserving source and recipient history. */
   readonly discardPendingForParticipation: (
     id: ThreadParticipationId.Id,

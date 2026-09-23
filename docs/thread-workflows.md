@@ -305,31 +305,33 @@ client integration remain future work.
 
 `NotificationApplication.acknowledge(notificationId)` records that the acting human saw their
 notification and returns the updated `Notification.Record`. It requires active workspace
-membership and ownership, checked inside the journal commit. It needs no action grant or thread
-access: a person can clear an old notification after leaving its group or losing `thread.read`.
+membership and ownership, checked on every call. It needs no action grant or thread access: a
+person can clear an old notification after leaving its group or losing `thread.read`.
 Acknowledgment does not resolve the source, rejoin participation, or mark conversation content read.
 
 The state becomes `{ _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt }`, with the
 server's current time. The notification keeps its ID, source, recipient, participation reference,
-and original recorded time. It remains in inbox history and disappears from pending results.
-Repeating the same acknowledgment returns its original state and timestamp without another fact
-or checkpoint change. Missing and other recipients' IDs return `NotificationApplication.NotFound`.
+and original recorded time. It remains in inbox history and disappears from pending results and
+pending counts. Repeating the acknowledgment returns its original state and timestamp; when two
+devices acknowledge at once, both succeed and return the first time stored. Missing and other recipients' IDs return `NotificationApplication.NotFound`.
 An owned agent notification returns `HumanRecipientRequired`; an incompatible terminal state
 returns `AlreadyHandled`. Removed or identity-mismatched actors fail the current membership check.
 
-Internal `NotificationAcknowledgment.record(id, outcome)` owns acknowledgment validation,
-repeat handling, and publication of `NotificationFacts.Acknowledged`. It requires an existing
-`Store.Transaction` and `Publication.Service` and is excluded from `Core.Operations`. The human
-application owns authorization and the commit. Future agent/turn workflows will own turn creation,
-input acceptance, execution, and their transaction, calling this shared service to record the
-acknowledgment. Notifications do not create or run turns. `Seen` is the only implemented outcome;
-turn and delivery references will be added with their owning workflows.
+A human's `Seen` is private state beside the notification, recorded by `NotificationStore.markSeen`
+outside the journal, like read positions: it takes no journal commit and no place in the
+workspace's write order, since people read far more often than they write. The store keeps the
+first time. The journal settles a notification only as `Pending` or `Discarded`; reads show a seen
+pending notification as `Acknowledged`. `markSeen` accepts only pending notifications of human
+recipients in its workspace, all or none of a call, and joins the caller's transaction when there
+is one, so an enclosing rollback restores pending state. Rebuilding projections keeps it: the seen
+records reference notifications by ID, and the rebuilt notifications read as seen again.
 
-The acknowledgment fact and its projection update commit together. Failure or
-an enclosing rollback restores pending state. Replay preserves the recorded outcome and timestamp
-without checking current membership or time. Acknowledgment creates no thread activity and no
-new notifications. Its fact is withheld from the workspace-wide feed. The operation is implemented
-through core and the gateway on every storage adapter; its HTTP route and client action remain pending.
+Acknowledgment creates no thread activity, no new notifications, and nothing in the change feed;
+a person's other devices learn of it when they reread the inbox. Handoffs of work, such as an
+agent's turn accepting input or a channel delivery accepting a reply, will be journal facts that
+their owning workflows record in the same commit as the turn or delivery. The operation is
+implemented through core and the gateway on every storage adapter; its HTTP route and client
+action remain pending.
 
 ## Marking conversations read
 
@@ -339,17 +341,16 @@ current group access, and `thread.read`, like any thread read; missing and inacc
 return `ReadStateApplication.ThreadNotFound`, an agent returns `HumanRequired`, and a position past
 the thread's latest activity returns `BeyondTimeline`. The position only moves forward: marking an
 earlier position changes nothing. The reader's pending notifications from that thread's activity
-up to the position are acknowledged as `Seen` in the same commit. With none pending, only the
-position is written, without a journal commit. Reading a timeline does not mark it read; clients
+up to the position are marked `Seen`. Both are private state written without a journal commit. Reading a timeline does not mark it read; clients
 call this operation for what they have shown.
 
 `markGroupRead({ groupId })` records that the acting person caught up with a group now. It needs
 current group membership and `group.read`, and returns `GroupNotFound` otherwise; the caught-up
 time also only moves forward.
 
-Read positions and caught-up times are private state in `ReadStateStore`, outside the journal: they
-are not facts, the change feed carries nothing for them, and rebuilding projections does not
-restore them. A write outside a journal commit runs on its own, so reading does not wait for the
+Read positions and caught-up times are private state in `ReadStateStore`, outside the journal, as is
+human `Seen` beside the notifications: they are not facts, the change feed carries nothing for
+them, and rebuilding projections keeps them. A write outside a journal commit runs on its own, so reading does not wait for the
 workspace's conversation writes.
 
 Each thread records the sequence and time of its latest message, and each group the time of its
@@ -359,8 +360,8 @@ batches. Notifications from thread activity carry their thread and sequence, so 
 settles exactly its notifications.
 
 Starting a thread or replying reads it through the author's message in the same commit: their
-position advances, and their pending notifications from the thread up to it are acknowledged as
-`Seen`. The message itself never notifies its author. [Thread lists](#reading-conversations) and
+position advances, and their pending notifications from the thread up to it are marked `Seen`,
+both joining that commit. The message itself never notifies its author. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups-and-their-current-members) report unread state
 from these records.
 
@@ -386,7 +387,6 @@ is the projection's sole input for generation and departure settlement: for `Par
 pending input for that agent participation, then runs the common recipient-generation step.
 An empty recipient list suppresses new notifications without suppressing cleanup. Participation
 domain facts update participation state; they do not directly change notifications.
-Notification-owned acknowledgment facts separately record recipient handling in that projection.
 
 The workflow records, in order, a thread, its initial participations, a user message, and one
 `MessagePublished` activity at sequence 1. The timeline has an increasing sequence per thread;
@@ -455,8 +455,7 @@ with `thread.read` for that thread over the [change feed](../packages/core/READM
 Messages carry their full text, so clients render them without a refetch. Activity events omit
 their notification recipients, and participation events omit routing identities and admissions.
 Each notification an activity creates reaches its human or agent recipient in the same commit
-message, as their inbox lists it, with or without read access to the thread; acknowledgments
-also reach only their recipient.
+message, as their inbox lists it, with or without read access to the thread.
 Notifications expose source references, not continuing authority to read the source conversation.
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
@@ -469,8 +468,9 @@ development databases when adopting that baseline; no upgrade chain or automatic
 apply only to fresh workspace initialization unless stored roles are explicitly updated.
 Activity rows reference either a message or a participation lifecycle occurrence. Existing stored roles do not automatically gain
 `thread.read`, `thread.publish`, or `thread.follow`; assign explicit grants or update those roles before using the new operations.
-Human acknowledgment adds outcome and timestamp columns to PostgreSQL's development baseline;
-recreate disposable PostgreSQL databases when adopting it. Message, activity, and participation
+Human `Seen` lives in PostgreSQL's `notification_seen` table, which replaced the notification's
+acknowledgment columns in the development baseline; recreate disposable PostgreSQL databases when
+adopting it. Message, activity, and participation
 facts carry their thread's `groupId`, which decides their [audience](journal.md#fact-audiences);
 facts recorded before that change do not decode, so recreate development databases that hold
 threads. Notifications also record their thread's group, which added `thread_group_id` to
@@ -500,10 +500,9 @@ Source-resolution suites cover human/agent ownership, current grant and audience
 historical reads after unfollow or readmission, discarded agent input, malformed references,
 message and participation subjects, direct entry lookup, read-only behavior, outer commits,
 reopening, and gateway outcomes on every storage adapter.
-Acknowledgment suites cover ownership, agent rejection, stable repeat handling, source-access loss,
-projection and late-failure rollback, caller transactions, concurrent requests, direct-store validation,
-reopening, and replay after departure. Core tests verify codec validation and that the change feed delivers acknowledgments only to
-their recipient.
+Acknowledgment suites cover ownership, agent rejection, the first time kept on repeats, no journal
+writes, source-access loss, failed writes, caller transactions, concurrent requests from two hosts,
+direct-store validation, and `Seen` surviving reopening, projection rebuilds, and departure.
 They also exercise the common notification generator with nonempty recipient selections on
 non-message activity, ending activity for all departure paths, and rollback after a partial
 multi-thread departure cascade.

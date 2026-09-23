@@ -25,8 +25,8 @@ metadata, timeline pages, and current-participant summaries are also implemented
 `ThreadParticipationApplication` implements self-follow/unfollow, quiet follow activity, and pending
 agent-input settlement. `NotificationApplication.resolveSource` resolves owned notifications under
 current thread access, without acknowledgment or participation changes. Human acknowledgment is
-implemented through `NotificationApplication.acknowledge` and a shared internal acknowledgment
-service. Other participation management, the task and channel workflows that admit contacts and
+implemented through `NotificationApplication.acknowledge`, as private `Seen` state outside the
+journal. Other participation management, the task and channel workflows that admit contacts and
 triage, public groups, group/thread HTTP/UI, turns, execution,
 agent/contact/triage acknowledgment, and channel
 delivery below remain design intent. “Agreed” records a design decision, not its
@@ -2663,9 +2663,10 @@ Posting a message reads the thread through it for its author, settling their ear
 from it the same way; a message never notifies its own author.
 
 Marking a thread read through a sequence also records `Seen` for the member's pending
-notifications from that thread's activity up to it, in the same operation. Those acknowledgments
-remain journal facts; with nothing pending, marking read writes only the position. Agents have
-no read positions: turns track their input progress.
+notifications from that thread's activity up to it, in the same operation. A human's `Seen` is
+private state like the position, not a journal fact: reading never takes the workspace's write
+order, and rebuilding projections keeps both. Agents have no read positions: turns track their
+input progress.
 
 Read positions and caught-up times are private, per-member state rather than journal facts. They
 change on every view, carry no audit value, and must not compete with conversation writes for the
@@ -2905,14 +2906,15 @@ available as history without retroactive work notifications.
 
 Recording thread activity must durably establish the notifications to create. Retried
 notification processing must not accidentally create competing turns or duplicate input.
-Human acknowledgment now records a notification-owned fact and updates its state in one commit;
-repeated calls preserve the original timestamp. Active membership and ownership are required, with
-no thread-access requirement. `NotificationAcknowledgment` provides the shared internal recording
-operation, requiring its caller's transaction. Agent/turn workflows own creating turns, accepting
-input, and execution; they will call this service to record acknowledgment in the same commit.
-The notification domain owns acknowledgment only and does not orchestrate that work. The human
-operation is available through core and the gateway, with HTTP/UI actions still pending. See
-[acknowledgment](thread-workflows.md#acknowledging-a-notification).
+A human's acknowledgment records private `Seen` state beside the notification, outside the
+journal, like a read position: seeing one's inbox has no audit value and must not compete with
+conversation writes for the workspace's write order. Repeated calls preserve the first time, and
+rebuilding projections keeps it. Active membership and ownership are required, with no
+thread-access requirement. Acknowledgments that hand off work, a turn accepting input or a channel
+delivery accepting a reply, will be journal facts recorded in the same commit as the turn or
+delivery by the workflows that own them; the notification domain does not orchestrate that work.
+The human operation is available through core and the gateway, with HTTP/UI actions still pending.
+See [acknowledgment](thread-workflows.md#acknowledging-a-notification).
 
 Other recipients' storage, acknowledgment fields, and retry mechanics remain open. For discarded or
 informational notifications, recording acknowledgment with no work is a proposed

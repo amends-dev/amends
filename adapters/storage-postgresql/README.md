@@ -111,11 +111,13 @@ Notification IDs and source/recipient associations are unique within the workspa
 Inserts join the journal transaction; source existence and recipient selection
 remain generation responsibilities. The notification projection generates opening and reply message notifications from recorded thread activity
 and discards pending agent input when its participation ends.
-`NotificationStore.acknowledge` conditionally changes a pending notification to `Acknowledged`,
-preserving source and recipient fields. It validates the outcome against the recipient and requires
-the active transaction. Human `Seen` uses `acknowledgment_outcome` and `acknowledged_at` columns;
-the state constraint rejects missing fields, inconsistent variants, and nonhuman Seen records.
-This replaces the development baseline. Recreate disposable PostgreSQL databases when adopting it.
+The row's `state` holds what the journal settles, `Pending` or `Discarded`. A human's `Seen` lives
+in `notification_seen`, keyed by workspace and notification with the first `seen_at`, which is not
+a projection table: it has no foreign key to `notifications`, so truncating and rebuilding them keeps
+it. Reads join it to show a seen pending notification as `Acknowledged`, and pending reads and
+counts leave it out. `markSeen` checks every notification in one query, then inserts all of them,
+keeping existing times, in the caller's transaction or on its own. This replaces the development
+baseline. Recreate disposable PostgreSQL databases when adopting it.
 
 ## Transactions
 

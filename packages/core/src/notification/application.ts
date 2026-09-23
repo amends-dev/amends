@@ -1,5 +1,4 @@
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Actor } from "../identity/actor.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -7,9 +6,6 @@ import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationSource } from "./source.ts";
 import type { Thread } from "../thread/thread.ts";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { NotificationAcknowledgment } from "./acknowledgment.ts";
 
 /** Missing and other recipients' notifications deliberately share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("NotificationApplication.NotFound", {
@@ -55,21 +51,18 @@ export type ResolveError =
     >
   | SourceUnavailable;
 export type AcknowledgeError =
-  | PlatformError.PlatformError
   | Error
-  | Exclude<
-      NotificationAcknowledgment.Error,
-      NotificationAcknowledgment.AlreadyHandled | NotificationAcknowledgment.InvalidReference
-    >
+  | NotificationStore.Conflict
   | HumanRecipientRequired
   | AlreadyHandled;
 
 /**
  * Read the acting identity's inbox and acknowledge human receipt within one workspace. Active membership is
  * required; owning a role does not grant access to another recipient's inbox.
- * Reads use current state without opening a transaction. Acknowledgment checks
- * authority inside its commit; an existing caller transaction is honored by both.
- * Reading a notification neither acknowledges it nor grants access to its source.
+ * Reads use current state without opening a transaction. Acknowledgment records private Seen
+ * state outside the journal, without the workspace's write order; an existing caller
+ * transaction is honored by both. Reading a notification neither acknowledges it nor grants
+ * access to its source.
  */
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -117,23 +110,14 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
-  | NotificationStore.Service
-  | Authorization.Service
-  | NotificationSource.Service
-  | NotificationAcknowledgment.Service
-  | Journal.Service
-  | Crypto.Crypto
+  NotificationStore.Service | Authorization.Service | NotificationSource.Service
 > {
   const notifications = yield* NotificationStore.Service;
   const authorization = yield* Authorization.Service;
   const source = yield* NotificationSource.Service;
-  const acknowledgment = yield* NotificationAcknowledgment.Service;
-  const journal = yield* Journal.Service;
-  const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, notifications.workspaceId);
   yield* requireWorkspace(workspaceId, source.workspaceId);
-  yield* requireWorkspace(workspaceId, acknowledgment.workspaceId);
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
@@ -206,23 +190,21 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       }),
     );
   });
-  const acknowledge = Effect.fn("NotificationApplication.acknowledge")(
-    function* (notificationId: Notification.Id) {
-      const notification = yield* get(notificationId);
-      if (notification.recipient._tag !== "Human") return yield* new HumanRecipientRequired({});
-      return yield* acknowledgment.record(notification.id, { _tag: "Seen" }).pipe(
-        Effect.catchTags({
-          "NotificationAcknowledgment.AlreadyHandled": (error) =>
-            Effect.fail(new AlreadyHandled({ notificationId: error.notificationId })),
-          "NotificationAcknowledgment.InvalidReference": (error) =>
-            Effect.fail(new InvalidResponse({ message: error.message })),
-        }),
-      );
-    },
-    Publication.withActor,
-    Effect.provideService(Crypto.Crypto, crypto),
-    journal.commit,
-  );
+  const acknowledge = Effect.fn("NotificationApplication.acknowledge")(function* (
+    notificationId: Notification.Id,
+  ) {
+    const notification = yield* get(notificationId);
+    if (notification.recipient._tag !== "Human") return yield* new HumanRecipientRequired({});
+    if (notification.state._tag === "Acknowledged") return notification;
+    if (notification.state._tag !== "Pending")
+      return yield* new AlreadyHandled({ notificationId: notification.id });
+    yield* notifications.markSeen([notification.id], yield* DateTime.now);
+    // Another device may have seen it first; the stored time is the one that holds.
+    const seen = yield* get(notification.id);
+    if (seen.state._tag !== "Acknowledged")
+      return yield* new InvalidResponse({ message: "Seen notification still reads as unseen" });
+    return seen;
+  });
   return Service.of({ workspaceId, get, list, listPending, resolveSource, acknowledge });
 });
 

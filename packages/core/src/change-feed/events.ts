@@ -12,7 +12,6 @@ import { Event } from "../journal/event.ts";
 import { Fact } from "../journal/fact.ts";
 import type { Log } from "../journal/log.ts";
 import { Identity } from "../identity/identity.ts";
-import { NotificationFacts } from "../notification/facts.ts";
 import { Notification } from "../notification/notification.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import type { ThreadId } from "../thread/id.ts";
@@ -220,7 +219,6 @@ const registry: ReadonlyArray<Registered> = [
   register(ThreadParticipationFacts.Ended, {
     requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
   }),
-  register(NotificationFacts.Acknowledged),
 ];
 
 const byName = new Map<string, Map<number, Registered>>();

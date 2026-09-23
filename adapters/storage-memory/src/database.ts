@@ -64,6 +64,8 @@ export interface Space {
   readonly threadPositions: Map<string, number>;
   /** Private read state by member and group: when they caught up, in epoch milliseconds. */
   readonly groupTimes: Map<string, number>;
+  /** Private Seen by notification ID: when its human recipient first saw it. Kept through rebuilds. */
+  readonly notificationsSeen: Map<string, number>;
 }
 
 export interface Interface {
@@ -92,6 +94,7 @@ export const empty = (): Space => ({
   records: Object.fromEntries(projections.map((name) => [name, new Map()])) as Space["records"],
   threadPositions: new Map(),
   groupTimes: new Map(),
+  notificationsSeen: new Map(),
 });
 
 /** An isolated snapshot: every map is copied, and the values they hold never change. */
@@ -104,6 +107,7 @@ export const copy = (space: Space): Space => ({
   ) as Space["records"],
   threadPositions: new Map(space.threadPositions),
   groupTimes: new Map(space.groupTimes),
+  notificationsSeen: new Map(space.notificationsSeen),
 });
 
 /** Committed state of one workspace, without creating any. */
@@ -126,10 +130,17 @@ const later = (current: Map<string, number>, staged: Map<string, number>) => {
   return merged;
 };
 
+/** Keep the earlier of two values for each key: a first time. */
+const earlier = (current: Map<string, number>, staged: Map<string, number>) => {
+  const merged = new Map(current);
+  for (const [key, value] of staged) merged.set(key, Math.min(value, merged.get(key) ?? value));
+  return merged;
+};
+
 /**
  * Make a transaction's staged state the workspace's committed state. Only this transaction
  * wrote the journal and projections meanwhile, but read state may have advanced outside it,
- * so read state keeps the later of the two values.
+ * so read state keeps the later of the two values, and Seen the earlier time.
  */
 export const commit = (database: Interface, workspaceId: Workspace.Id, staged: Space) => {
   const current = committed(database, workspaceId);
@@ -137,6 +148,7 @@ export const commit = (database: Interface, workspaceId: Workspace.Id, staged: S
     ...staged,
     threadPositions: later(current.threadPositions, staged.threadPositions),
     groupTimes: later(current.groupTimes, staged.groupTimes),
+    notificationsSeen: earlier(current.notificationsSeen, staged.notificationsSeen),
   });
 };
 

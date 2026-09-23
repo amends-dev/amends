@@ -51,7 +51,7 @@ sees `ParticipationEnded`, then generates notifications for the recorded recipie
 workspace departures record that activity through the internal lifecycle service. Participation
 domain facts change participation state only; notification generation and departure settlement
 subscribe to recorded activity. The projection preserves historical recipient selection and
-references the originating participation. Notification-owned facts record acknowledgment separately.
+references the originating participation. A human's `Seen` is private state beside it.
 Agent/contact/triage processing and delivery remain deferred.
 
 `NotificationApplication.resolveSource(notificationId)` first establishes notification ownership,
@@ -66,16 +66,17 @@ See [source resolution](../../docs/thread-workflows.md#resolving-a-notification-
 `NotificationApplication.acknowledge(notificationId)` records `Seen` for the acting human's own
 notification, under active membership with no action grant or source-access requirement. It returns
 the record with `Acknowledged { outcome: { _tag: "Seen" }, acknowledgedAt }`, removes it from pending
-results, and preserves history. Repeats return the original timestamp without another fact.
-Agents receive `HumanRecipientRequired`; incompatible terminal states return `AlreadyHandled`.
-The operation and its projection share one commit, including any enclosing transaction.
+results and counts, and preserves history. Repeats, and concurrent calls from other devices, return
+the first time stored. Agents receive `HumanRecipientRequired`; discarded notifications return
+`AlreadyHandled`.
 
-Internal `NotificationAcknowledgment.record(id, outcome)` requires the caller's transaction and
-publication context. It validates and records acknowledgment through `NotificationFacts.Acknowledged`
-and is excluded from `Core.Operations`. Future turn/delivery workflows own their durable handoff and
-call this service in the same commit. Notifications never create turns, accept their input, or execute
-work. Only the `Seen` outcome is currently implemented. Acknowledgment facts generate no activity or
-notifications and are withheld from the workspace-wide change feed. HTTP/UI actions remain pending.
+`Seen` is private state written by `NotificationStore.markSeen` outside the journal, like a read
+position: no journal commit, no place in the workspace's write order, and kept when projections are
+rebuilt. The journal settles notifications only as `Pending` or `Discarded`. The write joins an
+enclosing transaction when there is one. Acknowledgment creates no activity or notifications and
+does not appear in the change feed. Handoffs of work, a turn accepting input or a channel delivery
+accepting a reply, will be journal facts their owning workflows record; notifications never create
+turns, accept their input, or execute work. HTTP/UI actions remain pending.
 See [human acknowledgment](../../docs/thread-workflows.md#acknowledging-a-notification).
 
 Membership demonstrates the feature layout:
@@ -197,8 +198,8 @@ host binding. Direct groups return `NotFollowable`. See
 [following a group](../../docs/group-workflows.md#following-a-group).
 
 `@amends/core/attention` holds private read state. `ReadStateApplication.markThreadRead` records
-how far a person has read a thread and acknowledges their pending notifications from it up to that
-position; `markGroupRead` records when they caught up with a group. Both only move forward.
+how far a person has read a thread and marks their pending notifications from it up to that
+position `Seen`; `markGroupRead` records when they caught up with a group. Both only move forward.
 `ReadStateStore` is a required host binding, kept outside the journal. Thread activity maintains
 each thread's and group's latest message through `ThreadStore.recordLatest` and
 `GroupStore.recordLatest`, and notifications from thread activity carry their thread and sequence.

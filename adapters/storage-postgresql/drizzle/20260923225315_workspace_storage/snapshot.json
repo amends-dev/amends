@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "ef2f830b-1d15-4eb5-ab2f-bf2f851c7e50",
+  "id": "9bacad41-160b-41fa-855c-c9219216e311",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -81,6 +81,12 @@
     {
       "isRlsEnabled": false,
       "name": "members",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "notification_seen",
       "entityType": "tables",
       "schema": "public"
     },
@@ -1495,6 +1501,45 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
+      "table": "notification_seen"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "notification_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notification_seen"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "seen_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notification_seen"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
       "table": "notifications"
     },
     {
@@ -1558,32 +1603,6 @@
       "generated": null,
       "identity": null,
       "name": "discard_reason",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "notifications"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "acknowledgment_outcome",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "notifications"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "acknowledged_at",
       "entityType": "columns",
       "schema": "public",
       "table": "notifications"
@@ -4190,6 +4209,17 @@
     {
       "columns": [
         "workspace_id",
+        "notification_id"
+      ],
+      "nameExplicit": false,
+      "name": "notification_seen_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "notification_seen"
+    },
+    {
+      "columns": [
+        "workspace_id",
         "id"
       ],
       "nameExplicit": false,
@@ -4360,7 +4390,7 @@
       "table": "members"
     },
     {
-      "value": "(\"state\" = 'Pending' AND \"discard_reason\" IS NULL AND \"acknowledgment_outcome\" IS NULL AND \"acknowledged_at\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" IS NOT NULL AND \"discard_reason\" = 'participation-ended' AND \"acknowledgment_outcome\" IS NULL AND \"acknowledged_at\" IS NULL) OR (\"state\" = 'Acknowledged' AND \"discard_reason\" IS NULL AND \"acknowledgment_outcome\" IS NOT NULL AND \"acknowledgment_outcome\" = 'Seen' AND \"acknowledged_at\" IS NOT NULL AND \"recipient_kind\" = 'Human')",
+      "value": "(\"state\" = 'Pending' AND \"discard_reason\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" = 'participation-ended')",
       "name": "notification_state",
       "entityType": "checks",
       "schema": "public",

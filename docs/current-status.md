@@ -147,7 +147,8 @@ and cross-platform installer verification are pending.
 The [notification schema](../packages/core/src/notification/notification.ts) supports
 Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending`,
 `Discarded { reason: "participation-ended" }`, and `Acknowledged` states. The implemented
-acknowledgment outcome is human `Seen`, with an `acknowledgedAt` timestamp.
+acknowledgment outcome is human `Seen`, with an `acknowledgedAt` timestamp, kept as private state
+outside the journal.
 The storage adapters store these variants and enforce source/recipient
 uniqueness. The [application](../packages/core/src/notification/application.ts) exposes
 only the acting human or agent's inbox, with active membership required. Contact
@@ -166,9 +167,8 @@ Follow and participation endings currently select no recipients. Ending activity
 agent input before the same handler generates notifications for selected recipients. Participation
 domain facts do not directly change notifications. Group and workspace departures record ending
 activity for each affected thread through the same internal lifecycle service. Human acknowledgment
-is implemented through core and the gateway using notification-owned acknowledgment facts. The shared
-internal service records outcomes within the caller's transaction; future turn workflows own turn
-creation, input acceptance, and execution. Agent/contact/triage handling, silent completion, and
+is implemented through core and the gateway as private `Seen` state; future turn workflows own turn
+creation, input acceptance, and execution, and will record their handoffs as journal facts. Agent/contact/triage handling, silent completion, and
 delivery remain unimplemented. Acknowledgment HTTP/UI actions are also pending; see
 [human acknowledgment](thread-workflows.md#acknowledging-a-notification). Existing tests also seed
 notifications for storage and inbox contracts. Quiet participation activity creates no notifications.
@@ -183,9 +183,10 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   notification queue that serializes such commits across the whole database, which matters only
   at thousands of commits a second; a batched poll per process is the alternative then. Behind a
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
-- New notifications reach their recipients over the feed, but later state changes other than
-  acknowledgment do not: an agent's pending notifications discarded when its participation ends
-  are visible only through the participation-ended activity and the inbox.
+- New notifications reach their recipients over the feed, but later state changes do not. A
+  human's `Seen` is private state, so their other devices learn of it only by rereading the inbox
+  and counts; an agent's pending notifications discarded when its participation ends show only
+  through the participation-ended activity and the inbox.
 - A reader's cursor advances only with commits that carry something they may see. A reader
   who sees little of a busy workspace can fall more than 500 commits behind while
   disconnected and then reset instead of resuming.

@@ -37,7 +37,8 @@ export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
 export const targetKinds = ["Workspace", "Member", "Thread", "Group"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
-export const notificationStates = ["Pending", "Discarded", "Acknowledged"] as const;
+/** What the journal settles; a human recipient's Seen is private state in notification_seen. */
+export const notificationStates = ["Pending", "Discarded"] as const;
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -314,8 +315,6 @@ export const notifications = pgTable(
     sourceEntryId: text("source_entry_id").notNull(),
     participationId: text("participation_id"),
     discardReason: text("discard_reason", { enum: ["participation-ended"] }),
-    acknowledgmentOutcome: text("acknowledgment_outcome", { enum: ["Seen"] }),
-    acknowledgedAt: instant("acknowledged_at"),
     recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
     recipientId: text("recipient_id"),
     recordedAt: instant("recorded_at").notNull(),
@@ -334,7 +333,7 @@ export const notifications = pgTable(
     }).onDelete("cascade"),
     check(
       "notification_state",
-      sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL AND ${table.acknowledgmentOutcome} IS NULL AND ${table.acknowledgedAt} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} IS NOT NULL AND ${table.discardReason} = 'participation-ended' AND ${table.acknowledgmentOutcome} IS NULL AND ${table.acknowledgedAt} IS NULL) OR (${table.state} = 'Acknowledged' AND ${table.discardReason} IS NULL AND ${table.acknowledgmentOutcome} IS NOT NULL AND ${table.acknowledgmentOutcome} = 'Seen' AND ${table.acknowledgedAt} IS NOT NULL AND ${table.recipientKind} = 'Human')`,
+      sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
     ),
     // Source existence and recipient selection belong to notification generation.
     uniqueIndex("notifications_by_source_recipient").on(
@@ -602,6 +601,19 @@ export const threadReadPositions = pgTable(
     primaryKey({ columns: [t.workspaceId, t.memberId, t.threadId] }),
     check("thread_read_position", sql`${t.readThrough} > 0`),
   ],
+);
+/**
+ * When a human recipient first saw each notification: private state outside the journal, kept
+ * when projections are rebuilt, so it references notifications by ID without a foreign key.
+ */
+export const notificationSeen = pgTable(
+  "notification_seen",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    notificationId: text("notification_id").notNull(),
+    seenAt: instant("seen_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.notificationId] })],
 );
 export const groupReadTimes = pgTable(
   "group_read_times",

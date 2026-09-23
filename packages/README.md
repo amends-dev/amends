@@ -110,9 +110,8 @@ Notification reads derive the recipient from the current actor and require activ
 `NotificationApplication.resolveSource` returns a typed timeline item after ownership, historical
 reference validation, and current group access plus `thread.read` checks. It makes no state changes;
 its HTTP/UI integration remains pending. `NotificationApplication.acknowledge` records human `Seen`
-through the internal `NotificationAcknowledgment` service within one commit. Future turn workflows
-own turn creation and input acceptance and reuse that service to record acknowledgment. Its HTTP/UI
-action and other recipient outcomes remain pending. Member and invitation operations include listing: members you
+as private state outside the journal. Its HTTP/UI action and other recipients' outcomes remain
+pending. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 
 `@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one

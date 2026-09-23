@@ -275,10 +275,9 @@ These [known limitations](current-status.md) remain open even when the existing
 suite passes. Notification storage and inbox tests seed records; thread workflow tests verify
 opening and reply publication, participation admission, recipient selection, concurrent sequencing,
 quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on every adapter.
-Acknowledgment suites verify human ownership, stable repeat handling, source-access loss, caller
-transactions, projection and late-failure rollback, concurrent requests, and replay after departure.
-Core tests validate the acknowledgment codec and its delivery only to the recipient over the change
-feed. The `changeFeed` conformance suite runs the feed on each adapter: commits from another host,
+Acknowledgment suites verify human ownership, the first time kept on repeats, source-access loss,
+caller transactions, failed writes, concurrent requests from two hosts, and that `Seen` writes
+nothing to the journal and survives rebuilding projections. The `changeFeed` conformance suite runs the feed on each adapter: commits from another host,
 resuming on another host, and thread activity reaching only the group's readers.
 
 Subprocess fixtures create each database before starting the host, so passing host

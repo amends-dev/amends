@@ -5,125 +5,97 @@ import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
-import { NotificationFacts } from "./facts.ts";
 const sameRecipient = Schema.toEquivalence(Notification.Recipient);
-/** Activity generates notifications and settles departure; notification facts record recipient acknowledgment. */
-export const definition = Projection.make("notifications", { version: 1 })
-  .on(
-    ThreadActivityFacts.Recorded,
-    Effect.fn("NotificationProjection.activity")(function* (event) {
-      const notifications = yield* NotificationStore.Service;
-      const participations = yield* ThreadParticipationStore.Service;
-      const { activity, recipients } = event.payload;
+/** Activity generates notifications and settles departure; human Seen is private state, outside the journal. */
+export const definition = Projection.make("notifications", { version: 1 }).on(
+  ThreadActivityFacts.Recorded,
+  Effect.fn("NotificationProjection.activity")(function* (event) {
+    const notifications = yield* NotificationStore.Service;
+    const participations = yield* ThreadParticipationStore.Service;
+    const { activity, recipients } = event.payload;
+    if (
+      [notifications.workspaceId, participations.workspaceId].some(
+        (id) => id !== activity.workspaceId,
+      )
+    )
+      return yield* new NotificationStore.Conflict({
+        operation: "project",
+        message: "Activity belongs to another workspace",
+      });
+    // Settlement is driven by the activity itself, even when no new recipients are selected.
+    if (activity.kind === "ParticipationEnded") {
+      const found = yield* participations.get(activity.participationId);
+      if (Option.isNone(found))
+        return yield* new NotificationStore.Conflict({
+          operation: "project",
+          message: "Ending activity participation is missing",
+        });
+      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
+        found.value,
+      );
       if (
-        [notifications.workspaceId, participations.workspaceId].some(
-          (id) => id !== activity.workspaceId,
+        participant.id !== activity.participationId ||
+        participant.workspaceId !== activity.workspaceId ||
+        participant.threadId !== activity.threadId ||
+        participant.joinedAtSequence >= activity.sequence ||
+        participant.status !== "ended" ||
+        participant.endedAt === null ||
+        DateTime.formatIso(participant.endedAt) !== DateTime.formatIso(activity.occurredAt)
+      )
+        return yield* new NotificationStore.Conflict({
+          operation: "project",
+          message: "Ending activity participation is inconsistent",
+        });
+      if (
+        participant.participant._tag === "Member" &&
+        participant.participant.identity._tag === "Agent"
+      )
+        yield* notifications.discardPendingForParticipation(participant.id);
+    }
+    // One read for every recipient's participation and one write for their notifications.
+    const requested = new Set(recipients.map((recipient) => recipient.participationId));
+    const found = new Map<ThreadParticipation.Id, ThreadParticipation.Record>();
+    for (const row of yield* participations.getMany([...requested])) {
+      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
+        row,
+      );
+      if (!requested.has(participant.id) || found.has(participant.id))
+        return yield* new NotificationStore.Conflict({
+          operation: "project",
+          message: "Recipient participation is inconsistent",
+        });
+      found.set(participant.id, participant);
+    }
+    const records: Array<Notification.Record> = [];
+    for (const recipient of recipients) {
+      const participant = found.get(recipient.participationId);
+      if (participant === undefined)
+        return yield* new NotificationStore.Conflict({
+          operation: "project",
+          message: "Recipient participation is missing",
+        });
+      if (
+        participant.workspaceId !== activity.workspaceId ||
+        participant.threadId !== activity.threadId ||
+        participant.joinedAtSequence > activity.sequence ||
+        !sameRecipient(
+          ThreadParticipation.recipientOf(participant.participant),
+          recipient.recipient,
         )
       )
         return yield* new NotificationStore.Conflict({
           operation: "project",
-          message: "Activity belongs to another workspace",
+          message: "Recipient participation is inconsistent",
         });
-      // Settlement is driven by the activity itself, even when no new recipients are selected.
-      if (activity.kind === "ParticipationEnded") {
-        const found = yield* participations.get(activity.participationId);
-        if (Option.isNone(found))
-          return yield* new NotificationStore.Conflict({
-            operation: "project",
-            message: "Ending activity participation is missing",
-          });
-        const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-          found.value,
-        );
-        if (
-          participant.id !== activity.participationId ||
-          participant.workspaceId !== activity.workspaceId ||
-          participant.threadId !== activity.threadId ||
-          participant.joinedAtSequence >= activity.sequence ||
-          participant.status !== "ended" ||
-          participant.endedAt === null ||
-          DateTime.formatIso(participant.endedAt) !== DateTime.formatIso(activity.occurredAt)
-        )
-          return yield* new NotificationStore.Conflict({
-            operation: "project",
-            message: "Ending activity participation is inconsistent",
-          });
-        if (
-          participant.participant._tag === "Member" &&
-          participant.participant.identity._tag === "Agent"
-        )
-          yield* notifications.discardPendingForParticipation(participant.id);
-      }
-      // One read for every recipient's participation and one write for their notifications.
-      const requested = new Set(recipients.map((recipient) => recipient.participationId));
-      const found = new Map<ThreadParticipation.Id, ThreadParticipation.Record>();
-      for (const row of yield* participations.getMany([...requested])) {
-        const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-          row,
-        );
-        if (!requested.has(participant.id) || found.has(participant.id))
-          return yield* new NotificationStore.Conflict({
-            operation: "project",
-            message: "Recipient participation is inconsistent",
-          });
-        found.set(participant.id, participant);
-      }
-      const records: Array<Notification.Record> = [];
-      for (const recipient of recipients) {
-        const participant = found.get(recipient.participationId);
-        if (participant === undefined)
-          return yield* new NotificationStore.Conflict({
-            operation: "project",
-            message: "Recipient participation is missing",
-          });
-        if (
-          participant.workspaceId !== activity.workspaceId ||
-          participant.threadId !== activity.threadId ||
-          participant.joinedAtSequence > activity.sequence ||
-          !sameRecipient(
-            ThreadParticipation.recipientOf(participant.participant),
-            recipient.recipient,
-          )
-        )
-          return yield* new NotificationStore.Conflict({
-            operation: "project",
-            message: "Recipient participation is inconsistent",
-          });
-        records.push(
-          Notification.generated(
-            event,
-            Object.assign({ groupId: event.payload.groupId }, activity),
-            recipient,
-          ),
-        );
-      }
-      yield* notifications.insertMany(records);
-    }),
-  )
-  .on(
-    NotificationFacts.Acknowledged,
-    Effect.fn("NotificationProjection.acknowledged")(function* ({ payload }) {
-      const notifications = yield* NotificationStore.Service;
-      const found = yield* notifications.get(payload.notificationId);
-      if (Option.isNone(found))
-        return yield* new NotificationStore.Conflict({
-          operation: "acknowledge",
-          message: "Notification is missing",
-        });
-      const notification = yield* Schema.decodeEffect(Schema.toType(Notification.Record))(
-        found.value,
+      records.push(
+        Notification.generated(
+          event,
+          Object.assign({ groupId: event.payload.groupId }, activity),
+          recipient,
+        ),
       );
-      if (
-        payload.workspaceId !== notifications.workspaceId ||
-        notification.workspaceId !== payload.workspaceId ||
-        notification.id !== payload.notificationId ||
-        !Schema.toEquivalence(Notification.Recipient)(notification.recipient, payload.recipient)
-      )
-        return yield* new NotificationStore.Conflict({
-          operation: "acknowledge",
-          message: "Acknowledgment references another notification or recipient",
-        });
-      yield* notifications.acknowledge(notification.id, payload.acknowledgment);
-    }),
-  );
+    }
+    yield* notifications.insertMany(records);
+  }),
+);
 export * as NotificationProjection from "./projection.ts";

@@ -14,7 +14,6 @@ import { ThreadParticipationDeparture } from "./thread/participation/departure.t
 import { ThreadActivityRecording } from "./thread/activity/recording.ts";
 import { ThreadActivityReading } from "./thread/activity/reading.ts";
 import { NotificationSource } from "./notification/source.ts";
-import { NotificationAcknowledgment } from "./notification/acknowledgment.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
@@ -119,7 +118,7 @@ const threadStart = ThreadStart.layer.pipe(
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
 const activityReading = ThreadActivityReading.layer.pipe(Layer.provide(threadAccess));
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
-const threadReading = ThreadReading.layer.pipe(Layer.provide(NotificationAcknowledgment.layer));
+const threadReading = ThreadReading.layer;
 /** One journal follower per workspace runtime, shared by its change-feed subscribers. */
 const changeFeed = ChangeFeedApplication.layer.pipe(
   Layer.provide(Layer.mergeAll(ChangeFeedSource.layer(), GrantResolver.layer)),
@@ -153,7 +152,6 @@ const operations = Layer.mergeAll(
       threadAccess,
       activityReading,
       notificationSource,
-      NotificationAcknowledgment.layer,
       threadReading,
       admissions,
       recording,

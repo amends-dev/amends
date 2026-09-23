@@ -480,9 +480,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         ),
       ).pipe(
         Effect.flatMap((rows) =>
-          Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ position: Entry.Position })))(
-            rows,
-          ),
+          Schema.decodeEffect(Schema.Array(Schema.Struct({ position: Entry.Position })))(rows),
         ),
         Effect.map((rows) => Option.map(Array.head(rows), (row) => row.position)),
         Effect.mapError(storeFailure(Store, "head")),

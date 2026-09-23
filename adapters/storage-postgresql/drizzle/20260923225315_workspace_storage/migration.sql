@@ -166,6 +166,13 @@ CREATE TABLE "members" (
 	CONSTRAINT "members_identity_kind" CHECK ("identity_kind" IN ('Human', 'Agent'))
 );
 --> statement-breakpoint
+CREATE TABLE "notification_seen" (
+	"workspace_id" text,
+	"notification_id" text,
+	"seen_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "notification_seen_pkey" PRIMARY KEY("workspace_id","notification_id")
+);
+--> statement-breakpoint
 CREATE TABLE "notifications" (
 	"workspace_id" text,
 	"id" text,
@@ -173,8 +180,6 @@ CREATE TABLE "notifications" (
 	"source_entry_id" text NOT NULL,
 	"participation_id" text,
 	"discard_reason" text,
-	"acknowledgment_outcome" text,
-	"acknowledged_at" timestamp with time zone,
 	"recipient_kind" text NOT NULL,
 	"recipient_id" text,
 	"recorded_at" timestamp with time zone NOT NULL,
@@ -183,7 +188,7 @@ CREATE TABLE "notifications" (
 	"thread_group_id" text,
 	"thread_sequence" integer,
 	CONSTRAINT "notifications_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "notification_state" CHECK (("state" = 'Pending' AND "discard_reason" IS NULL AND "acknowledgment_outcome" IS NULL AND "acknowledged_at" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" IS NOT NULL AND "discard_reason" = 'participation-ended' AND "acknowledgment_outcome" IS NULL AND "acknowledged_at" IS NULL) OR ("state" = 'Acknowledged' AND "discard_reason" IS NULL AND "acknowledgment_outcome" IS NOT NULL AND "acknowledgment_outcome" = 'Seen' AND "acknowledged_at" IS NOT NULL AND "recipient_kind" = 'Human')),
+	CONSTRAINT "notification_state" CHECK (("state" = 'Pending' AND "discard_reason" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" = 'participation-ended')),
 	CONSTRAINT "notification_thread" CHECK (("thread_id" IS NULL AND "thread_group_id" IS NULL AND "thread_sequence" IS NULL) OR ("thread_id" IS NOT NULL AND "thread_group_id" IS NOT NULL AND "thread_sequence" > 0)),
 	CONSTRAINT "notifications_recipient_kind" CHECK (("recipient_kind" = 'Triage' AND "recipient_id" IS NULL) OR ("recipient_kind" IN ('Human', 'Agent', 'Contact') AND "recipient_id" IS NOT NULL AND "recipient_id" <> ''))
 );

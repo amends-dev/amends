@@ -1,4 +1,3 @@
-import { Notification, NotificationFacts } from "@amends/core/notification";
 import {
   Thread,
   ThreadFacts,
@@ -418,110 +417,96 @@ it.effect("thread events also need the reader's thread.read grant for that threa
   ),
 );
 
-it.effect(
-  "personal facts reach only their owner, and thread views hide recipients and routing",
-  () =>
-    run(({ admitted }) =>
-      Effect.gen(function* () {
-        admitted.add(groupId);
-        const feed = yield* listen();
-        yield* feed.next;
-        const follow = (memberId: Member.Id) => ({
-          id: GroupFollow.Id.make(`follow-${memberId}`),
-          workspaceId,
-          groupId,
-          memberId,
-          groupMembershipId: admission(groupId, memberId).id,
-          followedAt: at,
-          status: "active" as const,
-          endedAt: null,
-        });
-        const acknowledged = (recipient: Identity.MemberReference, id: string) => ({
-          workspaceId,
-          notificationId: Notification.Id.make(id),
-          recipient,
-          acknowledgment: { outcome: { _tag: "Seen" as const }, acknowledgedAt: at },
-        });
-        const bob: Identity.MemberReference = { _tag: "Human", id: Identity.HumanId.make("bob") };
-        yield* commit(
-          Effect.gen(function* () {
-            yield* publish(GroupFollowFacts.Started, follow(bobMember));
-            yield* publish(GroupFollowFacts.Started, follow(actor.memberId));
-            yield* publish(NotificationFacts.Acknowledged, acknowledged(bob, "bobs"));
-            yield* publish(NotificationFacts.Acknowledged, acknowledged(alice, "alices"));
-            yield* publish(ThreadParticipationFacts.Added, {
-              id: ThreadParticipation.Id.make("participation"),
-              workspaceId,
-              groupId,
-              threadId,
-              participant: {
-                _tag: "Member",
-                memberId: bobMember,
-                groupMembershipId: admission(groupId, bobMember).id,
-                identity: bob,
-              },
-              joinedAt: at,
-              joinedAtSequence: 1,
-              status: "active",
-              endedAt: null,
-            });
-            yield* publish(ThreadActivityFacts.Recorded, {
-              groupId,
-              activity: {
-                id: ThreadActivity.Id.make("activity"),
-                workspaceId,
-                threadId,
-                sequence: 1,
-                kind: "MessagePublished",
-                messageId: ThreadMessage.Id.make("message"),
-                occurredAt: at,
-              },
-              recipients: [
-                {
-                  participationId: ThreadParticipation.Id.make("participation"),
-                  recipient: bob,
-                },
-              ],
-            });
-          }),
-        );
-        const received = committed(yield* feed.next);
-        expect(received.events.map((e) => [e.name, e.payload])).toEqual([
-          [GroupFollowFacts.Started.name, expect.objectContaining({ memberId: actor.memberId })],
-          [
-            NotificationFacts.Acknowledged.name,
-            expect.objectContaining({ notificationId: "alices" }),
-          ],
-          [
-            ThreadParticipationFacts.Added.name,
-            {
-              id: "participation",
-              workspaceId,
-              groupId,
-              threadId,
-              participant: { _tag: "Member", memberId: bobMember },
-              joinedAt: "2026-09-20T12:00:00.123Z",
-              joinedAtSequence: 1,
+it.effect("follows reach only their owner, and thread views hide recipients and routing", () =>
+  run(({ admitted }) =>
+    Effect.gen(function* () {
+      admitted.add(groupId);
+      const feed = yield* listen();
+      yield* feed.next;
+      const follow = (memberId: Member.Id) => ({
+        id: GroupFollow.Id.make(`follow-${memberId}`),
+        workspaceId,
+        groupId,
+        memberId,
+        groupMembershipId: admission(groupId, memberId).id,
+        followedAt: at,
+        status: "active" as const,
+        endedAt: null,
+      });
+      const bob: Identity.MemberReference = { _tag: "Human", id: Identity.HumanId.make("bob") };
+      yield* commit(
+        Effect.gen(function* () {
+          yield* publish(GroupFollowFacts.Started, follow(bobMember));
+          yield* publish(GroupFollowFacts.Started, follow(actor.memberId));
+          yield* publish(ThreadParticipationFacts.Added, {
+            id: ThreadParticipation.Id.make("participation"),
+            workspaceId,
+            groupId,
+            threadId,
+            participant: {
+              _tag: "Member",
+              memberId: bobMember,
+              groupMembershipId: admission(groupId, bobMember).id,
+              identity: bob,
             },
-          ],
-          [
-            ThreadActivityFacts.Recorded.name,
-            {
-              groupId,
-              activity: {
-                id: "activity",
-                workspaceId,
-                threadId,
-                sequence: 1,
-                kind: "MessagePublished",
-                messageId: "message",
-                occurredAt: "2026-09-20T12:00:00.123Z",
-              },
+            joinedAt: at,
+            joinedAtSequence: 1,
+            status: "active",
+            endedAt: null,
+          });
+          yield* publish(ThreadActivityFacts.Recorded, {
+            groupId,
+            activity: {
+              id: ThreadActivity.Id.make("activity"),
+              workspaceId,
+              threadId,
+              sequence: 1,
+              kind: "MessagePublished",
+              messageId: ThreadMessage.Id.make("message"),
+              occurredAt: at,
             },
-          ],
-        ]);
-      }),
-    ),
+            recipients: [
+              {
+                participationId: ThreadParticipation.Id.make("participation"),
+                recipient: bob,
+              },
+            ],
+          });
+        }),
+      );
+      const received = committed(yield* feed.next);
+      expect(received.events.map((e) => [e.name, e.payload])).toEqual([
+        [GroupFollowFacts.Started.name, expect.objectContaining({ memberId: actor.memberId })],
+        [
+          ThreadParticipationFacts.Added.name,
+          {
+            id: "participation",
+            workspaceId,
+            groupId,
+            threadId,
+            participant: { _tag: "Member", memberId: bobMember },
+            joinedAt: "2026-09-20T12:00:00.123Z",
+            joinedAtSequence: 1,
+          },
+        ],
+        [
+          ThreadActivityFacts.Recorded.name,
+          {
+            groupId,
+            activity: {
+              id: "activity",
+              workspaceId,
+              threadId,
+              sequence: 1,
+              kind: "MessagePublished",
+              messageId: "message",
+              occurredAt: "2026-09-20T12:00:00.123Z",
+            },
+          },
+        ],
+      ]);
+    }),
+  ),
 );
 
 /** Activity in the group that selects Alice and Bob as recipients. */

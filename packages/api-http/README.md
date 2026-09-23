@@ -97,7 +97,7 @@ invalidate for each commit.
 
 Events reach the readers in their fact's audience with the matching read permission:
 workspace facts reach every member, group and thread facts the group's members with
-`group.read` or `thread.read`, and follows and acknowledgments only their owner. Message
+`group.read` or `thread.read`, and follows only the follower. Message
 events carry the full message, so clients can render it without a refetch; activity and
 participation events carry their public views. A commit with nothing the caller may see and
 no notification for them sends no message. The commit that removes the caller from the workspace is delivered,

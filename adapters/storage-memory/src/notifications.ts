@@ -4,6 +4,7 @@ import { Notification, NotificationStore } from "@amends/core/notification";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import type { MemoryDatabase } from "./database.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
 import { compareBinary, keyOf, Rows } from "./rows.ts";
 
@@ -24,13 +25,31 @@ const byRecorded = (left: Notification.Record, right: Notification.Record) =>
 const isAfter = (record: Notification.Record, cursor: NotificationStore.Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) > 0;
 
+/** A record as reads show it: a pending notification its human recipient saw reads as Seen. */
+const withSeen = (space: MemoryDatabase.Space) => (record: Notification.Record) => {
+  const seen = space.notificationsSeen.get(record.id);
+  return seen === undefined || record.state._tag !== "Pending"
+    ? record
+    : Object.assign({}, record, {
+        state: Notification.State.cases.Acknowledged.make({
+          outcome: { _tag: "Seen" },
+          acknowledgedAt: DateTime.makeUnsafe(seen),
+        }),
+      });
+};
+
 /**
- * Notification records and recipient reads over the workspace transaction.
+ * Notification records and recipient reads over the workspace transaction, with each human
+ * recipient's private Seen kept beside them.
  *
  * @category constructors
  */
 export const make = Effect.fn("Notifications.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write, join } = yield* Binding.Service;
+  /** Every record as reads show it. */
+  const all = Effect.flatMap(read, (space) =>
+    Effect.map(rows.all(space.records.notifications), (records) => records.map(withSeen(space))),
+  );
 
   const list = Effect.fnUntraced(function* (
     recipient: Notification.Recipient,
@@ -40,7 +59,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
     const target = recipientKey(yield* validateRecipient(recipient));
     const request = yield* validateOptions(options);
     const after = request.after;
-    const records = yield* rows.all((yield* read).records.notifications);
+    const records = yield* all;
     return records
       .filter(
         (record) =>
@@ -67,6 +86,11 @@ export const make = Effect.fn("Notifications.make")(function* () {
         return yield* new NotificationStore.Conflict({
           operation,
           message: "Expected a notification in this workspace",
+        });
+      if (record.state._tag === "Acknowledged")
+        return yield* new NotificationStore.Conflict({
+          operation,
+          message: "Seen is recorded with markSeen",
         });
       records.push(record);
     }
@@ -101,7 +125,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
     get: Effect.fn("Notifications.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Notification.Id)(input);
-        return yield* rows.get((yield* read).records.notifications, id);
+        const space = yield* read;
+        return Option.map(yield* rows.get(space.records.notifications, id), withSeen(space));
       },
       Effect.mapError(storeFailure(NotificationStore, "get")),
     ),
@@ -118,7 +143,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         const target = recipientKey(yield* validateRecipient(recipient));
         const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
         const through = yield* Schema.decodeEffect(Schema.Int)(throughSequence);
-        const records = yield* rows.all((yield* read).records.notifications);
+        const records = yield* all;
         return records
           .filter(
             (record) =>
@@ -141,7 +166,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         const target = recipientKey(yield* validateRecipient(recipient));
         const groupIds = new Set(yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput));
         const counts = new Map<Group.Id, number>();
-        for (const record of yield* rows.all((yield* read).records.notifications))
+        for (const record of yield* all)
           if (
             recipientKey(record.recipient) === target &&
             record.state._tag === "Pending" &&
@@ -153,33 +178,32 @@ export const make = Effect.fn("Notifications.make")(function* () {
       },
       Effect.mapError(storeFailure(NotificationStore, "countPendingByGroup")),
     ),
-    acknowledge: Effect.fn("Notifications.acknowledge")(function* (input, value) {
-      yield* Store.Transaction;
-      const id = yield* Schema.decodeEffect(Notification.Id)(input).pipe(
-        Effect.mapError(storeConflict(NotificationStore, "acknowledge")),
+    markSeen: Effect.fn("Notifications.markSeen")(function* (input, at) {
+      const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(input).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "markSeen")),
       );
-      const acknowledgment = yield* Schema.decodeEffect(Schema.toType(Notification.Acknowledgment))(
-        value,
-      ).pipe(Effect.mapError(storeConflict(NotificationStore, "acknowledge")));
-      const space = yield* write.pipe(
-        Effect.mapError(storeFailure(NotificationStore, "acknowledge")),
-      );
-      const current = yield* rows
-        .get(space.records.notifications, id)
-        .pipe(Effect.mapError(storeFailure(NotificationStore, "acknowledge")));
-      if (Option.isNone(current) || current.value.state._tag !== "Pending")
-        return yield* new NotificationStore.Conflict({
-          operation: "acknowledge",
-          message: "Expected a pending notification",
-        });
-      const record = yield* validateRecord({
-        ...current.value,
-        state: { _tag: "Acknowledged", ...acknowledgment },
-      }).pipe(Effect.mapError(storeConflict(NotificationStore, "acknowledge")));
-      const row = yield* rows
-        .encode(record)
-        .pipe(Effect.mapError(storeFailure(NotificationStore, "acknowledge")));
-      space.records.notifications.set(id, row);
+      const seenAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
+        at,
+      ).pipe(Effect.mapError(storeConflict(NotificationStore, "markSeen")));
+      const space = yield* join.pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
+      // Check every notification before recording any of them.
+      for (const id of ids) {
+        const found = yield* rows
+          .get(space.records.notifications, id)
+          .pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
+        if (
+          Option.isNone(found) ||
+          found.value.recipient._tag !== "Human" ||
+          found.value.state._tag !== "Pending"
+        )
+          return yield* new NotificationStore.Conflict({
+            operation: "markSeen",
+            message: "Expected a pending notification of a human recipient",
+          });
+      }
+      for (const id of ids)
+        if (!space.notificationsSeen.has(id))
+          space.notificationsSeen.set(id, DateTime.toEpochMillis(seenAt));
     }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (input) {

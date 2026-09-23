@@ -110,23 +110,20 @@ export const notifications = (harness: Harness) => {
               const inGroup = (groupId: Group.Id, sequence = 1) => ({
                 thread: { threadId: Thread.Id.make(`thread-${groupId}`), groupId, sequence },
               });
-              const acknowledgedAt = recordedAt;
               yield* bound.store.transaction(
                 bound.notifications.insertMany([
                   record("red-1", inGroup(red, 1)),
                   record("red-2", inGroup(red, 2)),
                   record("blue-1", inGroup(blue)),
                   record("green-1", inGroup(green)),
-                  // Settled, someone else's, or not from a thread: none of these count.
-                  record("red-seen", {
-                    ...inGroup(red, 3),
-                    state: { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt },
-                  }),
+                  // Seen, someone else's, or not from a thread: none of these count.
+                  record("red-seen", inGroup(red, 3)),
                   record("red-other", { ...inGroup(red), recipient: another }),
                   record("red-agent", { ...inGroup(red), recipient: agent }),
                   record("unthreaded"),
                 ]),
               );
+              yield* bound.notifications.markSeen([Notification.Id.make("red-seen")], recordedAt);
               const counts = yield* bound.notifications.countPendingByGroup(human, [red, blue]);
               expect(counts.toSorted((a, b) => (a.groupId < b.groupId ? -1 : 1))).toEqual([
                 { groupId: blue, count: 1 },
@@ -139,12 +136,7 @@ export const notifications = (harness: Harness) => {
                 yield* bound.notifications.countPendingByGroup(human, [Group.Id.make("empty")]),
               ).toEqual([]);
               expect(yield* bound.notifications.countPendingByGroup(human, [])).toEqual([]);
-              yield* bound.store.transaction(
-                bound.notifications.acknowledge(Notification.Id.make("red-1"), {
-                  outcome: { _tag: "Seen" },
-                  acknowledgedAt,
-                }),
-              );
+              yield* bound.notifications.markSeen([Notification.Id.make("red-1")], recordedAt);
               expect(yield* bound.notifications.countPendingByGroup(human, [red])).toEqual([
                 { groupId: red, count: 1 },
               ]);

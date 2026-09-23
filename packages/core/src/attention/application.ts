@@ -1,15 +1,10 @@
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { GroupAudience } from "../group/audience.ts";
 import { GroupId } from "../group/id.ts";
 import { GroupPermissions } from "../group/permissions.ts";
 import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadActivity } from "../thread/activity/activity.ts";
 import { ThreadActivityStore } from "../thread/activity/store.ts";
@@ -54,9 +49,6 @@ export type Error =
   | ReadStateStore.Failure
   | ReadStateStore.Conflict
   | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error
   | HumanRequired
   | ThreadNotFound
   | GroupNotFound
@@ -90,8 +82,6 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const activities = yield* ThreadActivityStore.Service;
   const reading = yield* ThreadReading.Service;
   const readStates = yield* ReadStateStore.Service;
-  const journal = yield* Journal.Service;
-  const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   if (
     [
@@ -152,13 +142,9 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       threadId: thread.id,
       readThrough: request.throughSequence,
     };
-    // Reading settles the inbox up to the position; without anything to settle, the position is
-    // private state written outside the workspace's write order.
-    const pending = yield* reading.pending(reader, thread, request.throughSequence);
-    if (pending.length === 0) return yield* readStates.advanceThread(position);
-    yield* journal
-      .commit(reading.markRead(reader, thread, request.throughSequence).pipe(Publication.withActor))
-      .pipe(Effect.provideService(Crypto.Crypto, crypto));
+    // Reading settles the inbox up to the position. Both are private state, written outside the
+    // workspace's write order.
+    yield* reading.markRead(reader, thread, position.readThrough);
   });
 
   const markGroupRead = Effect.fn("ReadStateApplication.markGroupRead")(function* (

@@ -131,13 +131,12 @@ correcting a rule also corrects delivery of earlier history. The declaration mus
 depend only on the payload. Thread message, activity, and participation facts carry their
 thread's `groupId` for this reason, since a thread belongs to exactly one group.
 
-| Facts                                                                  | Audience                                      |
-| ---------------------------------------------------------------------- | --------------------------------------------- |
-| Workspace, member, invitation, role, assignment, and ownership facts   | The workspace                                 |
-| Group creation; thread creation, messages, activity, and participation | The group                                     |
-| Group admission and removal                                            | The group and the admitted member             |
-| Group follow started and ended                                         | The following member                          |
-| Notification acknowledgment                                            | The human or agent recipient; others internal |
+| Facts                                                                  | Audience                          |
+| ---------------------------------------------------------------------- | --------------------------------- |
+| Workspace, member, invitation, role, assignment, and ownership facts   | The workspace                     |
+| Group creation; thread creation, messages, activity, and participation | The group                         |
+| Group admission and removal                                            | The group and the admitted member |
+| Group follow started and ended                                         | The following member              |
 
 ## Idempotent publication and append
 

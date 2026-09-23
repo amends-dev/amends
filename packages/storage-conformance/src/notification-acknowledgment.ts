@@ -1,5 +1,4 @@
-import type * as Core from "@amends/core";
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
 
@@ -7,12 +6,10 @@ import { GroupApplication, GroupMembershipApplication } from "@amends/core/group
 
 import { Actor, Identity } from "@amends/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+import { Journal, Log, Publication, Store } from "@amends/core/journal";
 import {
   Notification,
-  NotificationAcknowledgment,
   NotificationApplication,
-  NotificationFacts,
   NotificationStore,
 } from "@amends/core/notification";
 
@@ -26,14 +23,13 @@ import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 
 import { Gateway } from "@amends/gateway";
 
-import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+import { Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
 
 import { TestClock } from "effect/testing";
 
 import {
   type Bound,
   boundTo,
-  failingLate,
   journalLog,
   otherWorkspaceId,
   runHost,
@@ -44,7 +40,10 @@ import {
 
 import type { Harness } from "./harness.ts";
 
-/** Acknowledging notifications: ownership, atomicity, repeats, concurrency, and replay. */
+/**
+ * Acknowledging notifications: a human's Seen is private state outside the journal. Ownership,
+ * repeats, transactions, concurrency, and survival through rebuilds.
+ */
 
 export const notificationAcknowledgment = (harness: Harness) => {
   const { core, initialized, runGateway } = Support.make(harness);
@@ -79,10 +78,9 @@ export const notificationAcknowledgment = (harness: Harness) => {
     const notes = (bound: Bound, identity: Notification.Recipient) =>
       bound.notifications.listByRecipient(identity, { limit: 100 });
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
-    const seen: Notification.Acknowledgment = {
-      outcome: { _tag: "Seen" },
-      acknowledgedAt: DateTime.makeUnsafe("2026-09-21T12:00:00.123Z"),
-    };
+    const seenAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z");
+    const seenState = (acknowledgedAt: DateTime.Utc): Notification.State =>
+      Notification.State.cases.Acknowledged.make({ outcome: { _tag: "Seen" }, acknowledgedAt });
     const changed = <A extends object>(record: A, changes: Partial<A>): A =>
       Object.assign({}, record, changes);
     const prepare = Effect.fnUntraced(function* () {
@@ -162,63 +160,25 @@ export const notificationAcknowledgment = (harness: Harness) => {
     });
 
     it.effect(
-      "human acknowledgment records one fact and stable timestamp, preserves history, and never creates activity",
+      "human acknowledgment records Seen privately with a stable time, and writes nothing to the journal",
       () =>
         harness.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
-              expectTypeOf<
-                Extract<Core.Operations, NotificationAcknowledgment.Service>
-              >().toEqualTypeOf<never>();
-              expectTypeOf<
-                Effect.Services<ReturnType<NotificationAcknowledgment.Interface["record"]>>
-              >().toEqualTypeOf<Store.Transaction | Publication.Service>();
               const p = yield* prepare();
               const before = yield* snapshot(p);
-              const expected = { outcome: seen.outcome, acknowledgedAt: yield* DateTime.now };
+              const now = yield* DateTime.now;
               const result = yield* run(p.bound, human, ack(p.humanNote.id));
-              expect(result).toEqual(
-                changed(p.humanNote, {
-                  state: {
-                    _tag: "Acknowledged",
-                    outcome: seen.outcome,
-                    acknowledgedAt: expected.acknowledgedAt,
-                  },
-                }),
-              );
+              expect(result).toEqual(changed(p.humanNote, { state: seenState(now) }));
               expect(yield* p.bound.notifications.get(result.id)).toEqual(Option.some(result));
               expect(
                 yield* p.bound.notifications.listPendingByRecipient(human.identity, { limit: 100 }),
               ).toEqual([]);
               expect(yield* notes(p.bound, human.identity)).toEqual([result]);
               const after = yield* snapshot(p);
-              expect(after.activity).toEqual(before.activity);
-              expect(after.participation).toEqual(before.participation);
-              expect(after.agent).toEqual(before.agent);
-              expect(after.owner).toEqual(before.owner);
-              const events = yield* facts(
-                p.bound,
-                Effect.flatMap(Journal.Service, (j) =>
-                  j.read({ name: NotificationFacts.Acknowledged.name, limit: 10 }),
-                ),
-              );
-              expect(events).toHaveLength(1);
-              const entry = events[0];
-              if (!entry) return yield* Effect.die("Missing acknowledgment event");
-              const event = yield* Event.decode(NotificationFacts.Acknowledged, entry);
-              expect(event.payload).toEqual({
-                workspaceId,
-                notificationId: result.id,
-                recipient: human.identity,
-                acknowledgment: expected,
-              });
-              expect(event.provenance.performedBy).toEqual({
-                _tag: "Member",
-                memberId: human.memberId,
-                identity: human.identity,
-              });
-              expect(event.provenance.occurredAt).toEqual(expected.acknowledgedAt);
+              expect(after).toEqual(Object.assign({}, before, { human: [result] }));
+              // Seen again later keeps the first time.
               yield* TestClock.adjust("1 second");
               expect(yield* run(p.bound, human, ack(result.id))).toEqual(result);
               expect(yield* snapshot(p)).toEqual(after);
@@ -258,7 +218,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   _tag: tag,
                 });
               expect(yield* snapshot(p)).toEqual(before);
-              // A captured application still checks membership inside every commit.
+              // A captured application still checks membership on every call.
               yield* run(
                 p.bound,
                 human,
@@ -335,44 +295,36 @@ export const notificationAcknowledgment = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "projection and late failures roll back acknowledgment and permit a clean retry",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const p = yield* prepare();
-              const before = yield* snapshot(p);
-              const failingStore = Context.add(p.bound.context, NotificationStore.Service, {
-                ...p.bound.notifications,
-                acknowledge: () =>
-                  Effect.fail(
-                    new NotificationStore.Failure({ operation: "acknowledge", cause: "injected" }),
-                  ),
-              });
-              const failingCommit = failingLate(
-                p.bound,
-                new Store.Failure({ operation: "commit", cause: "injected" }),
-              ).context;
-              for (const context of [failingStore, failingCommit]) {
-                expect(
-                  Exit.isFailure(
-                    yield* Effect.exit(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
-                  ),
-                ).toBe(true);
-                expect(yield* snapshot(p)).toEqual(before);
-              }
-              expect((yield* run(p.bound, human, ack(p.humanNote.id))).state._tag).toBe(
-                "Acknowledged",
-              );
-            }),
-          ),
+    it.effect("a failed Seen write leaves the notification pending, and a retry records it", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const p = yield* prepare();
+            const before = yield* snapshot(p);
+            const context = Context.add(p.bound.context, NotificationStore.Service, {
+              ...p.bound.notifications,
+              markSeen: () =>
+                Effect.fail(
+                  new NotificationStore.Failure({ operation: "markSeen", cause: "injected" }),
+                ),
+            });
+            expect(
+              Exit.isFailure(
+                yield* Effect.exit(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
+              ),
+            ).toBe(true);
+            expect(yield* snapshot(p)).toEqual(before);
+            expect((yield* run(p.bound, human, ack(p.humanNote.id))).state._tag).toBe(
+              "Acknowledged",
+            );
+          }),
         ),
+      ),
     );
 
     it.effect(
-      "shared acknowledgment joins its caller's commit, observes staged records, and rolls back with the caller",
+      "Seen joins its caller's transaction, sees staged records, and rolls back with the caller",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -380,26 +332,19 @@ export const notificationAcknowledgment = (harness: Harness) => {
             Effect.gen(function* () {
               const p = yield* prepare();
               const before = yield* snapshot(p);
+              const staged = changed(p.humanNote, {
+                id: Notification.Id.make("staged"),
+                source: { logId: Log.Id.make("staged"), entryId: p.humanNote.source.entryId },
+              });
               const operation = facts(
                 p.bound,
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
-                      const acknowledgments = yield* NotificationAcknowledgment.make();
-                      const staged = changed(p.humanNote, {
-                        id: Notification.Id.make("staged"),
-                        source: {
-                          logId: Log.Id.make("staged"),
-                          entryId: p.humanNote.source.entryId,
-                        },
-                      });
                       yield* p.bound.notifications.insert(staged);
-                      const recorded = yield* acknowledgments.record(staged.id, { _tag: "Seen" });
+                      yield* p.bound.notifications.markSeen([staged.id], seenAt);
                       expect(yield* p.bound.notifications.get(staged.id)).toEqual(
-                        Option.some(recorded),
-                      );
-                      expect(yield* acknowledgments.record(staged.id, { _tag: "Seen" })).toEqual(
-                        recorded,
+                        Option.some(changed(staged, { state: seenState(seenAt) })),
                       );
                       yield* ack(p.humanNote.id).pipe(Effect.provideService(Actor.Service, human));
                       return yield* Effect.fail("rollback");
@@ -409,20 +354,10 @@ export const notificationAcknowledgment = (harness: Harness) => {
               );
               expect(yield* Effect.flip(operation)).toBe("rollback");
               expect(yield* snapshot(p)).toEqual(before);
-              expect(yield* p.bound.notifications.get(Notification.Id.make("staged"))).toEqual(
-                Option.none(),
-              );
-              yield* facts(
-                p.bound,
-                Effect.flatMap(Journal.Service, (journal) =>
-                  journal.commit(
-                    ack(p.humanNote.id).pipe(Effect.provideService(Actor.Service, human)),
-                  ),
-                ),
-              );
-              expect(
-                Option.getOrThrow(yield* p.bound.notifications.get(p.humanNote.id)).state._tag,
-              ).toBe("Acknowledged");
+              expect(yield* p.bound.notifications.get(staged.id)).toEqual(Option.none());
+              expect(yield* run(p.bound, human, ack(p.humanNote.id))).toMatchObject({
+                state: { _tag: "Acknowledged" },
+              });
             }),
           ),
         ),
@@ -461,7 +396,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "reopening and replay preserve acknowledgment after departure and never revive pending work",
+      "Seen survives reopening, rebuilding projections, and departure, and never revives pending work",
       () =>
         harness.withStorage((storage) =>
           Effect.gen(function* () {
@@ -529,7 +464,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "direct acknowledgment writes validate outcomes, reject terminal and foreign records, and preserve atomicity",
+      "direct Seen writes accept only pending human notifications here, keep the first time, and are atomic",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -544,66 +479,54 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 state: { _tag: "Discarded", reason: "participation-ended" },
               });
               yield* p.bound.store.transaction(p.bound.notifications.insert(discarded));
-              for (const id of [Notification.Id.make("missing"), p.agentNote.id, discarded.id])
-                expect(
-                  yield* Effect.flip(
-                    p.bound.store.transaction(p.bound.notifications.acknowledge(id, seen)),
-                  ),
-                ).toMatchObject({ _tag: "NotificationStore.Conflict" });
-              expect(yield* Effect.flip(run(p.bound, human, ack(discarded.id)))).toMatchObject({
-                _tag: "NotificationApplication.AlreadyHandled",
-              });
-              expect(
-                yield* Effect.flip(
-                  foreign.store.transaction(
-                    foreign.notifications.acknowledge(p.humanNote.id, seen),
-                  ),
-                ),
-              ).toMatchObject({ _tag: "NotificationStore.Conflict" });
-              for (const field of ["outcome", "acknowledgedAt"] as const) {
-                const invalid = changed(seen, {});
-                Reflect.set(
-                  invalid,
-                  field,
-                  field === "outcome" ? { _tag: "TurnAccepted", turnId: "fake" } : "not-a-date",
-                );
-                expect(
-                  yield* Effect.flip(
-                    p.bound.store.transaction(
-                      p.bound.notifications.acknowledge(p.humanNote.id, invalid),
-                    ),
-                  ),
-                ).toMatchObject({ _tag: "NotificationStore.Conflict" });
-              }
-              yield* p.bound.store.transaction(
-                p.bound.notifications.acknowledge(p.humanNote.id, seen),
-              );
-              const result = yield* p.bound.notifications.get(p.humanNote.id);
-              expect(result).toEqual(
-                Option.some(
-                  changed(p.humanNote, {
-                    state: {
-                      _tag: "Acknowledged",
-                      outcome: seen.outcome,
-                      acknowledgedAt: seen.acknowledgedAt,
-                    },
-                  }),
-                ),
-              );
+              // Seen is never inserted; it is recorded only through markSeen.
               expect(
                 yield* Effect.flip(
                   p.bound.store.transaction(
-                    p.bound.notifications.acknowledge(p.humanNote.id, seen),
+                    p.bound.notifications.insert(
+                      changed(p.humanNote, {
+                        id: Notification.Id.make("inserted-seen"),
+                        source: { logId: Log.Id.make("seen"), entryId: p.humanNote.source.entryId },
+                        state: seenState(seenAt),
+                      }),
+                    ),
                   ),
                 ),
               ).toMatchObject({ _tag: "NotificationStore.Conflict" });
-              expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(result);
+              const before = yield* snapshot(p);
+              for (const id of [Notification.Id.make("missing"), p.agentNote.id, discarded.id])
+                // A valid ID in the same call is not recorded either.
+                expect(
+                  yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id, id], seenAt)),
+                ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+              expect(
+                yield* Effect.flip(foreign.notifications.markSeen([p.humanNote.id], seenAt)),
+              ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+              expect(yield* snapshot(p)).toEqual(before);
+              expect(yield* Effect.flip(run(p.bound, human, ack(discarded.id)))).toMatchObject({
+                _tag: "NotificationApplication.AlreadyHandled",
+              });
+              const invalid = { at: seenAt };
+              Reflect.set(invalid, "at", "not-a-date");
+              expect(
+                yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id], invalid.at)),
+              ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+              yield* p.bound.notifications.markSeen([], seenAt);
+              yield* p.bound.notifications.markSeen([p.humanNote.id, p.humanNote.id], seenAt);
+              const result = changed(p.humanNote, { state: seenState(seenAt) });
+              expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(Option.some(result));
+              yield* p.bound.notifications.markSeen(
+                [p.humanNote.id],
+                DateTime.add(seenAt, { hours: 1 }),
+              );
+              expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(Option.some(result));
+              // Within a transaction it rolls back with it, and an expired handle is refused.
               const id = p.ownerNote.id;
               expect(
                 yield* Effect.flip(
                   p.bound.store.transaction(
                     p.bound.notifications
-                      .acknowledge(id, seen)
+                      .markSeen([id], seenAt)
                       .pipe(Effect.andThen(Effect.fail("rollback"))),
                   ),
                 ),
@@ -614,7 +537,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 Exit.isFailure(
                   yield* Effect.exit(
                     p.bound.notifications
-                      .acknowledge(id, seen)
+                      .markSeen([id], seenAt)
                       .pipe(Effect.provideService(Store.Transaction, handle)),
                   ),
                 ),
@@ -626,14 +549,17 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "concurrent acknowledgments preserve one durable outcome and remain safe to retry after contention",
+      "concurrent acknowledgments from two hosts both succeed with the one stored time",
       () =>
         harness.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(runHost(storage, prepare()));
+            const journal = yield* Effect.scoped(
+              runHost(storage, Effect.flatMap(boundTo(workspaceId), history)),
+            );
             const gate = yield* Deferred.make<void>();
             const signals = [yield* Deferred.make<void>(), yield* Deferred.make<void>()];
-            const fibers = yield* Effect.forEach(signals, (signal) =>
+            const fibers = yield* Effect.forEach(signals, (signal, index) =>
               Effect.scoped(
                 runHost(
                   storage,
@@ -641,35 +567,27 @@ export const notificationAcknowledgment = (harness: Harness) => {
                     const bound = yield* boundTo(workspaceId);
                     yield* Deferred.succeed(signal, undefined);
                     yield* Deferred.await(gate);
+                    yield* TestClock.adjust(`${index + 1} seconds`);
                     return yield* run(bound, human, ack(saved.humanNote.id));
                   }),
                 ),
-              ).pipe(Effect.exit, Effect.forkChild),
+              ).pipe(Effect.forkChild),
             );
             yield* Effect.forEach(signals, Deferred.await);
             yield* Deferred.succeed(gate, undefined);
             const results = yield* Effect.forEach(fibers, Fiber.join);
-            expect(results.some(Exit.isSuccess)).toBe(true);
-            for (const result of results)
-              if (Exit.isFailure(result))
-                expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                  value: { _tag: "JournalStore.Conflict" },
-                });
             yield* Effect.scoped(
               runHost(
                 storage,
                 Effect.gen(function* () {
                   const bound = yield* boundTo(workspaceId);
-                  const result = yield* run(bound, human, ack(saved.humanNote.id));
-                  for (const outcome of results)
-                    if (Exit.isSuccess(outcome)) expect(outcome.value).toEqual(result);
-                  const events = yield* facts(
-                    bound,
-                    Effect.flatMap(Journal.Service, (j) =>
-                      j.read({ name: NotificationFacts.Acknowledged.name, limit: 100 }),
-                    ),
+                  const stored = Option.getOrThrow(
+                    yield* bound.notifications.get(saved.humanNote.id),
                   );
-                  expect(events).toHaveLength(1);
+                  expect(stored.state._tag).toBe("Acknowledged");
+                  for (const result of results) expect(result).toEqual(stored);
+                  // Seeing takes no journal commit.
+                  expect(yield* history(bound)).toEqual(journal);
                 }),
               ),
             );
@@ -677,71 +595,37 @@ export const notificationAcknowledgment = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "acknowledgment rejects inconsistent fact references and malformed internal records without writes",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const p = yield* prepare();
-              const before = yield* snapshot(p);
-              const payload = {
-                workspaceId,
-                notificationId: p.humanNote.id,
-                recipient: human.identity,
-                acknowledgment: seen,
-              };
-              for (const invalid of [
-                { ...payload, workspaceId: otherWorkspaceId },
-                { ...payload, notificationId: Notification.Id.make("missing") },
-                { ...payload, recipient: p.owner.identity },
-              ]) {
-                expect(
-                  Exit.isFailure(
-                    yield* Effect.exit(
-                      facts(
-                        p.bound,
-                        Effect.flatMap(Journal.Service, (j) =>
-                          j.publish(NotificationFacts.Acknowledged, invalid),
-                        ),
-                      ),
-                    ),
-                  ),
-                ).toBe(true);
-                expect(yield* snapshot(p)).toEqual(before);
-              }
-              for (const record of [
+    it.effect("acknowledgment rejects malformed internal records without writing", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const p = yield* prepare();
+            const before = yield* snapshot(p);
+            for (const [record, tag] of [
+              [
                 changed(p.humanNote, { id: Notification.Id.make("wrong") }),
+                "NotificationApplication.InvalidResponse",
+              ],
+              [
                 changed(p.humanNote, { workspaceId: otherWorkspaceId }),
-                p.agentNote,
-              ]) {
-                const context = Context.add(p.bound.context, NotificationStore.Service, {
-                  ...p.bound.notifications,
-                  get: () => Effect.succeedSome(record),
-                });
-                const operation = facts(
-                  { ...p.bound, context },
-                  Effect.flatMap(Journal.Service, (j) =>
-                    j.commit(
-                      Effect.gen(function* () {
-                        const acknowledgments = yield* NotificationAcknowledgment.make();
-                        return yield* acknowledgments.record(
-                          record === p.agentNote ? p.agentNote.id : p.humanNote.id,
-                          { _tag: "Seen" },
-                        );
-                      }),
-                    ),
-                  ),
-                );
-                expect(yield* Effect.flip(operation)).toMatchObject({
-                  _tag: "NotificationAcknowledgment.InvalidReference",
-                });
-                expect(yield* snapshot(p)).toEqual(before);
-              }
-            }),
-          ),
+                "NotificationApplication.WorkspaceMismatch",
+              ],
+              // Another recipient's notification under the requested ID reads as missing.
+              [changed(p.agentNote, { id: p.humanNote.id }), "NotificationApplication.NotFound"],
+            ] as const) {
+              const context = Context.add(p.bound.context, NotificationStore.Service, {
+                ...p.bound.notifications,
+                get: () => Effect.succeedSome(record),
+              });
+              expect(
+                yield* Effect.flip(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
+              ).toMatchObject({ _tag: tag });
+              expect(yield* snapshot(p)).toEqual(before);
+            }
+          }),
         ),
+      ),
     );
 
     it.effect(
