@@ -131,10 +131,8 @@ Every adapter runs the [conformance suites](../packages/storage-conformance/READ
 through a harness in `test/harness.ts`, one suite per test file. Behavior core relies on
 belongs in those suites; an adapter's own tests keep what only it has, such as columns,
 query plans, and driver failure injection. The store-contract suite calls stores directly,
-so core's application validation cannot hide an adapter's missing checks. The remaining
-tests cover database construction, threads, notifications, and read state, and
-move into the suites in later changes. Each SQL adapter owns its database fixtures in
-`test/support.ts`.
+so core's application validation cannot hide an adapter's missing checks. Each SQL adapter
+owns its database fixtures in `test/support.ts`.
 
 During local development, keep one initial schema baseline per adapter. SQLite's
 initializer lives in `src/migrations.ts`; PostgreSQL's generated baseline lives in

@@ -18,19 +18,17 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway, WorkspaceEvents, type WorkspaceStorage } from "@amends/gateway";
-import { layer, SqliteDatabase, SqliteStorage } from "../src/index.ts";
+import type { WorkspaceStorage } from "@amends/gateway";
+import { SqliteDatabase, SqliteStorage } from "../src/index.ts";
 import { BunCrypto } from "@effect/platform-bun";
-import { Context, DateTime, Effect, Layer, Option } from "effect";
+import { Context, DateTime, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
-export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
 export const workspaceId = Workspace.Id.make("workspace-one");
-export const otherWorkspaceId = Workspace.Id.make("workspace-two");
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
   context,
@@ -64,12 +62,6 @@ export const inDatabase = <A, E>(
   filename: string,
   program: Effect.Effect<A, E, SqliteDatabase.Service | SqlClient.SqlClient>,
 ) => program.pipe(Effect.provide(SqliteDatabase.layer(filename)));
-export const host = (filename: string) =>
-  Gateway.layer.pipe(
-    Layer.provideMerge(WorkspaceEvents.layer()),
-    Layer.provideMerge(layer),
-    Layer.provideMerge(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
-  );
 export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
     Effect.provide(core(bound)),
@@ -95,23 +87,4 @@ export const testProvenance = (id = workspaceId): Event.Provenance => ({
   causedBy: null,
   correlationId: Event.CorrelationId.make("test-operation"),
   occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
-});
-
-/**
- * Replace what a store's by-ID reads return for one ID, in both single and batch reads;
- * `Option.none()` hides the record. Other IDs read through to the store.
- */
-export const replacing = <Id, A, E>(
-  store: {
-    readonly get: (id: Id) => Effect.Effect<Option.Option<A>, E>;
-    readonly getMany: (ids: ReadonlyArray<Id>) => Effect.Effect<ReadonlyArray<A>, E>;
-  },
-  id: Id,
-  replacement: Option.Option<A>,
-) => ({
-  get: (requested: Id) => (requested === id ? Effect.succeed(replacement) : store.get(requested)),
-  getMany: (ids: ReadonlyArray<Id>) =>
-    Effect.map(store.getMany(ids.filter((requested) => requested !== id)), (rows) =>
-      ids.includes(id) ? [...rows, ...Option.toArray(replacement)] : rows,
-    ),
 });

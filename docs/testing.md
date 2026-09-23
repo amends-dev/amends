@@ -259,11 +259,10 @@ and a count of stored records for rollback checks. A test file registers one sui
 differently. The memory adapter runs the same suites as the reference implementation; its
 tests run in the `backend` project.
 
-The suites cover the journal and transactions, direct store contracts for workspaces,
-members, roles, assignments, invitations, and checkpoints, and the workspace, access,
-invitation, and gateway workflows, and groups: creation, membership, reads, follows, and
-latest activity. Thread, notification, and read-state tests still live in each SQL adapter
-until they move into the suites.
+The suites cover the journal and transactions, direct store contracts, and every workflow the
+stores serve: workspaces, access, invitations, the gateway, groups, threads, notifications, and
+read state. Each adapter's own tests cover only construction, access paths, and what it stores or
+fails differently.
 
 ## Limits of current coverage
 

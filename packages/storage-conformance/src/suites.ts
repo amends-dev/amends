@@ -17,9 +17,18 @@ export { invitationPolicy } from "./invitation-policy.ts";
 export { invitationReplay } from "./invitation-replay.ts";
 export { invitations } from "./invitations.ts";
 export { journal } from "./journal.ts";
+export { notificationAcknowledgment } from "./notification-acknowledgment.ts";
+export { notificationSources } from "./notification-sources.ts";
+export { notifications } from "./notifications.ts";
 export { ownership } from "./ownership.ts";
 export { provenance } from "./provenance.ts";
+export { readState } from "./read-state.ts";
 export { reads } from "./reads.ts";
+export { threadParticipation } from "./thread-participation.ts";
+export { threadReads } from "./thread-reads.ts";
+export { threadReplies } from "./thread-replies.ts";
+export { threadStarts } from "./thread-starts.ts";
+export { threads } from "./threads.ts";
 export { transactions } from "./transactions.ts";
 
 export * as Suites from "./suites.ts";

@@ -19,11 +19,11 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway, WorkspaceEvents, type WorkspaceStorage } from "@amends/gateway";
+import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
-import { Context, DateTime, Effect, Layer, Option, Redacted } from "effect";
+import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
-import { layer, PostgresDatabase, PostgresStorage } from "../src/index.ts";
+import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { temporary } from "./postgres.ts";
 
 export const setup = () => {
@@ -39,7 +39,6 @@ export const setup = () => {
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
 export const workspaceId = Workspace.Id.make("workspace-one");
-export const otherWorkspaceId = Workspace.Id.make("workspace-two");
 export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
@@ -83,14 +82,6 @@ export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
     Effect.provide(core(bound)),
   );
-export const host = (url: string, options: PostgresStorage.Options = {}) =>
-  Gateway.layer.pipe(
-    Layer.provideMerge(WorkspaceEvents.layer()),
-    Layer.provideMerge(layer(options)),
-    Layer.provideMerge(Layer.mergeAll(database(url), BunCrypto.layer)),
-  );
-export const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
-
 export const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   return yield* (yield* views()).forWorkspace(workspaceId);
 });
@@ -102,23 +93,4 @@ export const testProvenance = (id = workspaceId): Event.Provenance => ({
   causedBy: null,
   correlationId: Event.CorrelationId.make("test-operation"),
   occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
-});
-
-/**
- * Replace what a store's by-ID reads return for one ID, in both single and batch reads;
- * `Option.none()` hides the record. Other IDs read through to the store.
- */
-export const replacing = <Id, A, E>(
-  store: {
-    readonly get: (id: Id) => Effect.Effect<Option.Option<A>, E>;
-    readonly getMany: (ids: ReadonlyArray<Id>) => Effect.Effect<ReadonlyArray<A>, E>;
-  },
-  id: Id,
-  replacement: Option.Option<A>,
-) => ({
-  get: (requested: Id) => (requested === id ? Effect.succeed(replacement) : store.get(requested)),
-  getMany: (ids: ReadonlyArray<Id>) =>
-    Effect.map(store.getMany(ids.filter((requested) => requested !== id)), (rows) =>
-      ids.includes(id) ? [...rows, ...Option.toArray(replacement)] : rows,
-    ),
 });

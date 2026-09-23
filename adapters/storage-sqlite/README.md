@@ -220,22 +220,11 @@ Each test opens its own file in a temporary directory and removes it afterwards.
 Construction tests cover both `make` and `layer`, reopening without data loss,
 and rollback of failed schema initialization before an explicit retry.
 
-`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md) over a
-temporary file per test: another host is another connection to the file, discarding projections
-deletes the projection tables' rows, and the footprint counts the rows of every table. The journal,
-transaction, commit-publication, idempotency, fact-metadata, provenance, read, store-contract,
-assignment, ownership, invitation, invitation-policy, invitation-replay, authorization, gateway,
-group, group-membership, group-read, and group-follow files register those suites. Beside them,
-`transactions.test.ts` injects a failed `COMMIT` to check `CommitUncertain`, and
-`fact-metadata.test.ts` checks the fact columns.
-
-The remaining tests cover database construction, threads, notifications, and read state. Fixtures
-are in `support.ts`. `notification-sources.test.ts` mirrors PostgreSQL coverage for current source
-authorization, historical recipient integrity, direct entry lookup, no-write resolution, staged
-visibility, rollback, reopening, and gateway outcomes. `notification-acknowledgment.test.ts` mirrors
-PostgreSQL's ownership, atomicity, repeat handling, concurrent requests, source-access loss,
-direct-store validation, reopening, and replay checks. `thread-starts.test.ts` counts the store
-reads of group creation, a start mentioning every member, a reply, and a timeline page, and requires
-the same counts for a two-member and an eleven-member group. `read-state.test.ts` covers group
-thread and group lists with unread state, latest activity, forward-only read state, and settling the
-inbox when reading.
+`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md)
+over a temporary file per test: another host is another connection to the file, discarding
+projections deletes the projection tables' rows, and the footprint counts the rows of every table.
+Each test file registers one suite. Beside the registrations, only what SQLite stores or fails
+differently is tested here: `transactions.test.ts` injects a failed `COMMIT` to check
+`CommitUncertain`, `fact-metadata.test.ts` checks the fact columns, and `notifications.test.ts`
+checks that a malformed stored record fails reads. `database.test.ts` covers construction and
+access paths. Fixtures are in `support.ts`.
