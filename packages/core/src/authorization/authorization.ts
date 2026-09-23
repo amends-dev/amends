@@ -4,6 +4,7 @@ import { Identity } from "../identity/identity.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
+import type { Grant } from "./grant.ts";
 import { GrantResolver } from "./grant-resolver.ts";
 import { PermissionCatalog } from "./permission-catalog.ts";
 import { Requirement } from "./requirement.ts";
@@ -49,6 +50,14 @@ export interface Interface {
   readonly require: (
     requirements: ReadonlyArray<Requirement.Value>,
   ) => Effect.Effect<void, Error, Actor.Service>;
+  /**
+   * The same actor check, then whether a current grant covers each requirement, in order, from
+   * one grant resolution. Lists use it to keep only permitted items instead of failing on the
+   * first; an invalid actor still fails.
+   */
+  readonly permitted: (
+    requirements: ReadonlyArray<Requirement.Value>,
+  ) => Effect.Effect<ReadonlyArray<boolean>, Exclude<Error, Denied>, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -85,9 +94,8 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   const workspaceId = resolver.workspaceId;
   yield* requireWorkspace(workspaceId, members.workspaceId);
 
-  const requirePermissions = Effect.fn("Authorization.require")(function* (
-    requirements: ReadonlyArray<Requirement.Value>,
-  ) {
+  /** Validate the actor and each requirement's permission and workspace. */
+  const check = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Value>) {
     const actor = yield* decodeActor(yield* Actor.Service);
     yield* requireWorkspace(workspaceId, actor.workspaceId);
     const found = yield* members.get(actor.memberId);
@@ -117,23 +125,35 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
       }
       checked.push(yield* decodeRequirement({ permission, target: requirement.target }));
     }
-    if (checked.length === 0) return;
+    return { actor, checked };
+  });
+  const covered = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
+    grants.some(
+      (grant) =>
+        grant.permission === requirement.permission.name &&
+        Scope.covers(grant.scope, requirement.target),
+    );
 
+  const requirePermissions = Effect.fn("Authorization.require")(function* (
+    requirements: ReadonlyArray<Requirement.Value>,
+  ) {
+    const { actor, checked } = yield* check(requirements);
+    if (checked.length === 0) return;
     const grants = yield* resolver.resolve(actor.memberId);
-    for (const requirement of checked) {
-      if (
-        !grants.some(
-          (grant) =>
-            grant.permission === requirement.permission.name &&
-            Scope.covers(grant.scope, requirement.target),
-        )
-      ) {
+    for (const requirement of checked)
+      if (!covered(grants, requirement))
         return yield* new Denied({ memberId: actor.memberId, requirement });
-      }
-    }
+  });
+  const permitted = Effect.fn("Authorization.permitted")(function* (
+    requirements: ReadonlyArray<Requirement.Value>,
+  ) {
+    const { actor, checked } = yield* check(requirements);
+    if (checked.length === 0) return [];
+    const grants = yield* resolver.resolve(actor.memberId);
+    return checked.map((requirement) => covered(grants, requirement));
   });
 
-  return Service.of({ workspaceId, require: requirePermissions });
+  return Service.of({ workspaceId, require: requirePermissions, permitted });
 });
 
 /**

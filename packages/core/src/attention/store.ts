@@ -16,11 +16,12 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ReadStateStore.Con
 }) {}
 
 /**
- * Private per-member read state, kept outside the journal: rebuilding projections does not restore
- * it. Reads honor the caller's transaction. Writes join the caller's transaction when there is one
- * and otherwise run on their own, without the workspace's write order; each is atomic. Advancing
- * keeps the later of the stored and requested value. A missing member, thread, or group, or a
- * record for another workspace, conflicts.
+ * Private per-member read state, kept outside the journal: rebuilding projections neither restores
+ * nor removes it, so it holds no references a rebuild could break. Reads honor the caller's
+ * transaction. Writes join the caller's transaction when there is one and otherwise run on their
+ * own, without the workspace's write order; each is atomic. Advancing keeps the later of the stored
+ * and requested value. A record for another workspace conflicts; callers write only for members,
+ * threads, and groups they have checked.
  */
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;

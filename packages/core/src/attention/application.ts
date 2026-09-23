@@ -10,19 +10,16 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
-import { Notification } from "../notification/notification.ts";
-import { NotificationAcknowledgment } from "../notification/acknowledgment.ts";
-import { NotificationStore } from "../notification/store.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadActivity } from "../thread/activity/activity.ts";
 import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
-import type { Thread } from "../thread/thread.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
+import { ThreadReading } from "./reading.ts";
 
 /** Only people keep read state; agents' turns track their input progress. */
 export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
@@ -53,8 +50,7 @@ export type Error =
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound | ThreadAccess.InvalidResponse>
   | Exclude<GroupAudience.Error, GroupAudience.NotMember>
   | ThreadActivityStore.Failure
-  | NotificationStore.Failure
-  | NotificationAcknowledgment.Error
+  | ThreadReading.Error
   | ReadStateStore.Failure
   | ReadStateStore.Conflict
   | Schema.SchemaError
@@ -92,8 +88,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const access = yield* ThreadAccess.Service;
   const audience = yield* GroupAudience.Service;
   const activities = yield* ThreadActivityStore.Service;
-  const notifications = yield* NotificationStore.Service;
-  const acknowledgment = yield* NotificationAcknowledgment.Service;
+  const reading = yield* ThreadReading.Service;
   const readStates = yield* ReadStateStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -103,8 +98,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       access.workspaceId,
       audience.workspaceId,
       activities.workspaceId,
-      notifications.workspaceId,
-      acknowledgment.workspaceId,
+      reading.workspaceId,
       readStates.workspaceId,
     ].some((id) => id !== workspaceId)
   )
@@ -118,42 +112,8 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     const actor = yield* Actor.Service;
     if (actor.identity._tag !== "Human")
       return yield* new HumanRequired({ memberId: actor.memberId });
-    return { memberId: actor.memberId, recipient: actor.identity };
+    return { memberId: actor.memberId, recipient: actor.identity } satisfies ThreadReading.Reader;
   });
-  /** The reader's pending notifications from this thread up to the position, validated. */
-  const pendingThrough = Effect.fnUntraced(function* (
-    recipient: Notification.Recipient,
-    thread: Thread.Record,
-    throughSequence: number,
-  ) {
-    const pending: Array<Notification.Record> = [];
-    for (const row of yield* notifications.listPendingByThread(
-      recipient,
-      thread.id,
-      throughSequence,
-    )) {
-      const note = yield* Schema.decodeEffect(Schema.toType(Notification.Record))(row).pipe(
-        Effect.mapError(invalid),
-      );
-      if (
-        note.workspaceId !== workspaceId ||
-        note.recipient._tag !== recipient._tag ||
-        (note.recipient._tag !== "Triage" &&
-          recipient._tag !== "Triage" &&
-          note.recipient.id !== recipient.id) ||
-        note.thread === undefined ||
-        note.thread.threadId !== thread.id ||
-        note.thread.sequence > throughSequence ||
-        note.state._tag !== "Pending"
-      )
-        return yield* new InvalidResponse({
-          message: "Notification store returned another recipient, thread, or state",
-        });
-      pending.push(note);
-    }
-    return pending;
-  });
-
   const markThreadRead = Effect.fn("ReadStateApplication.markThreadRead")(function* (
     input: ReadState.MarkThreadReadInput,
   ) {
@@ -194,20 +154,10 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     };
     // Reading settles the inbox up to the position; without anything to settle, the position is
     // private state written outside the workspace's write order.
-    const pending = yield* pendingThrough(reader.recipient, thread, request.throughSequence);
+    const pending = yield* reading.pending(reader, thread, request.throughSequence);
     if (pending.length === 0) return yield* readStates.advanceThread(position);
     yield* journal
-      .commit(
-        Effect.gen(function* () {
-          for (const note of yield* pendingThrough(
-            reader.recipient,
-            thread,
-            request.throughSequence,
-          ))
-            yield* acknowledgment.record(note.id, { _tag: "Seen" });
-          yield* readStates.advanceThread(position);
-        }).pipe(Publication.withActor),
-      )
+      .commit(reading.markRead(reader, thread, request.throughSequence).pipe(Publication.withActor))
       .pipe(Effect.provideService(Crypto.Crypto, crypto));
   });
 

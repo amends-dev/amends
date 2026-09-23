@@ -547,13 +547,23 @@ export const threads = pgTable(
       sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
     ),
     index("threads_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
+    // A group's threads by latest activity, newest first.
+    index("threads_by_latest").on(
+      t.workspaceId,
+      t.groupId,
+      t.latestActivityAt,
+      sql`${t.id} COLLATE "C"`,
+    ),
     check(
       "thread_latest",
       sql`(${t.latestSequence} IS NULL AND ${t.latestActivityAt} IS NULL) OR (${t.latestSequence} > 0 AND ${t.latestActivityAt} IS NOT NULL)`,
     ),
   ],
 );
-/** Private read state; written outside journal commits, so replay does not rebuild it. */
+/**
+ * Private read state, outside the journal. It references no projection tables, so rebuilding
+ * projections from the journal leaves it intact.
+ */
 export const threadReadPositions = pgTable(
   "thread_read_positions",
   {
@@ -564,16 +574,6 @@ export const threadReadPositions = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.memberId, t.threadId] }),
-    foreignKey({
-      columns: [t.workspaceId, t.memberId],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "thread_read_positions_member",
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.threadId],
-      foreignColumns: [threads.workspaceId, threads.id],
-      name: "thread_read_positions_thread",
-    }),
     check("thread_read_position", sql`${t.readThrough} > 0`),
   ],
 );
@@ -585,19 +585,7 @@ export const groupReadTimes = pgTable(
     groupId: text("group_id").notNull(),
     caughtUpAt: instant("caught_up_at").notNull(),
   },
-  (t) => [
-    primaryKey({ columns: [t.workspaceId, t.memberId, t.groupId] }),
-    foreignKey({
-      columns: [t.workspaceId, t.memberId],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "group_read_times_member",
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.groupId],
-      foreignColumns: [groups.workspaceId, groups.id],
-      name: "group_read_times_group",
-    }),
-  ],
+  (t) => [primaryKey({ columns: [t.workspaceId, t.memberId, t.groupId] })],
 );
 export const threadParticipations = pgTable(
   "thread_participations",

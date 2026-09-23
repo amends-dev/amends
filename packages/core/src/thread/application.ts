@@ -30,6 +30,7 @@ import { ThreadParticipation } from "./participation/participation.ts";
 import { ThreadParticipationStore } from "./participation/store.ts";
 import { ThreadActivityReading } from "./activity/reading.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
+import { ReadStateStore } from "../attention/store.ts";
 /** Missing, foreign, and outside-audience threads share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadApplication.NotFound", {
   threadId: Thread.Id,
@@ -63,6 +64,8 @@ export type Error =
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
+  | ReadStateStore.Failure
+  | ReadStateStore.Conflict
   | MemberStore.Failure
   | Schema.SchemaError
   | PlatformError.PlatformError
@@ -74,6 +77,7 @@ export type Error =
   | DirectMembersRequired
   | InvalidResponse;
 export type ReadError =
+  | ReadStateStore.Failure
   | Authorization.Error
   | GroupAudience.InvalidResponse
   | GroupMembershipStore.Failure
@@ -107,10 +111,15 @@ export interface Interface {
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
   /** Current group audience plus thread.read. Reading creates no participation or acknowledgment. */
   readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Service>;
-  /** Current readable threads only, in stable ID order. This list is unpaginated. */
+  /**
+   * One page of a group's threads the actor can read, newest latest activity first, each with the
+   * actor's read position and unread state. Requires current group membership; `thread.read` is
+   * checked for the whole page at once, and threads it does not cover are skipped.
+   */
   readonly listInGroup: (
     groupId: Group.Id,
-  ) => Effect.Effect<ReadonlyArray<Thread.Record>, ReadError, Actor.Service>;
+    options: Thread.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Service>;
   /** Bounded activity page with resolved subjects, ordered by sequence. The cursor is exclusive. */
   readonly readTimeline: (
     threadId: Thread.Id,
@@ -140,6 +149,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const publication = yield* ThreadMessagePublication.Service;
   const threads = yield* ThreadStore.Service;
   const reading = yield* ThreadActivityReading.Service;
+  const readStates = yield* ReadStateStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -155,6 +165,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       publication.workspaceId,
       threads.workspaceId,
       reading.workspaceId,
+      readStates.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -217,7 +228,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
         ]);
     }
-    return yield* starts
+    const started = yield* starts
       .start({
         groupId,
         participants: selected.map((memberId) => ({ _tag: "Member" as const, memberId })),
@@ -234,6 +245,14 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
         ),
       );
+    // Posting reads the thread through the author's own message; their notifications are unchanged.
+    yield* readStates.advanceThread({
+      workspaceId,
+      memberId: actor.memberId,
+      threadId: started.thread.id,
+      readThrough: started.activity.sequence,
+    });
+    return started;
   });
   const startDirect = Effect.fn("ThreadApplication.startDirect")(
     function* (input: Thread.StartDirectInput) {
@@ -347,42 +366,90 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     ]);
     return thread;
   });
-  const listInGroup = Effect.fn("ThreadApplication.listInGroup")(function* (groupId: Group.Id) {
+  const listInGroup = Effect.fn("ThreadApplication.listInGroup")(function* (
+    groupId: Group.Id,
+    input: Thread.ListOptions,
+  ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* audience
+    const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
+    const admission = yield* audience
       .require(id)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
           Effect.fail(new GroupNotFound({ groupId: id })),
         ),
       );
+    const actor = yield* Actor.Service;
     const seen = new Set<Thread.Id>();
-    const readable: Array<Thread.Record> = [];
-    for (const found of yield* threads.listByGroup(id)) {
-      const candidate = yield* decodeThread(found).pipe(Effect.mapError(invalidReadRecord));
-      if (
-        candidate.workspaceId !== workspaceId ||
-        candidate.groupId !== id ||
-        seen.has(candidate.id)
-      )
-        return yield* new InvalidResponse({
-          message: "Thread store returned an inconsistent group listing",
-        });
-      seen.add(candidate.id);
-      const current = yield* get(candidate.id).pipe(
-        Effect.asSome,
-        Effect.catchTag(
-          ["ThreadApplication.NotFound", "Authorization.Denied"],
-          () => Effect.succeedNone,
+    const items: Array<Thread.ListItem> = [];
+    let before = options.before;
+    // Fill the page with readable threads, reading further when grants skip some.
+    while (items.length < options.limit) {
+      const page: Array<Thread.Record> = [];
+      for (const found of yield* threads.listByLatest(
+        id,
+        before === undefined ? { limit: options.limit } : { before, limit: options.limit },
+      )) {
+        const thread = yield* decodeThread(found).pipe(Effect.mapError(invalidReadRecord));
+        if (thread.workspaceId !== workspaceId || thread.groupId !== id || seen.has(thread.id))
+          return yield* new InvalidResponse({
+            message: "Thread store returned an inconsistent group listing",
+          });
+        seen.add(thread.id);
+        page.push(thread);
+      }
+      if (page.length === 0) break;
+      const ids = page.map((thread) => thread.id);
+      const latest = new Map<Thread.Id, Thread.Latest>();
+      for (const row of yield* threads.getLatest(ids)) {
+        const value = yield* Schema.decodeEffect(Schema.toType(Thread.Latest))(row).pipe(
+          Effect.mapError(invalidReadRecord),
+        );
+        if (!seen.has(value.threadId) || latest.has(value.threadId))
+          return yield* new InvalidResponse({
+            message: "Thread store returned activity for another thread",
+          });
+        latest.set(value.threadId, value);
+      }
+      const allowed = yield* authorization.permitted(
+        ids.map((threadId) =>
+          Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId }),
         ),
       );
-      if (Option.isSome(current)) {
-        if (current.value.groupId !== id)
-          return yield* new InvalidResponse({ message: "Thread lookup returned another group" });
-        readable.push(current.value);
+      const readableIds = ids.filter((_, index) => allowed[index] === true);
+      const positions = new Map<Thread.Id, number>();
+      for (const position of yield* readStates.getThreadPositions(actor.memberId, readableIds)) {
+        if (
+          position.workspaceId !== workspaceId ||
+          position.memberId !== actor.memberId ||
+          !readableIds.includes(position.threadId)
+        )
+          return yield* new InvalidResponse({
+            message: "Read-state store returned another member's or thread's position",
+          });
+        positions.set(position.threadId, position.readThrough);
       }
+      for (const [index, thread] of page.entries()) {
+        const current = latest.get(thread.id);
+        if (current === undefined)
+          return yield* new InvalidResponse({ message: "Listed thread has no recorded activity" });
+        before = { latestActivityAt: current.occurredAt, threadId: thread.id };
+        if (allowed[index] !== true || items.length === options.limit) continue;
+        const readThrough = positions.get(thread.id) ?? null;
+        items.push({
+          thread,
+          latest: current,
+          readThrough,
+          // A thread never read is new only if its latest message came after the reader joined.
+          unread:
+            readThrough === null
+              ? DateTime.isGreaterThan(current.occurredAt, admission.admittedAt)
+              : current.sequence > readThrough,
+        });
+      }
+      if (page.length < options.limit) break;
     }
-    return readable;
+    return items;
   });
   const readTimeline = Effect.fn("ThreadApplication.readTimeline")(
     (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>

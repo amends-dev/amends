@@ -64,6 +64,20 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "listByGroup")),
     ),
+    listByLatest: Effect.fn("Threads.listByLatest")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
+        const before =
+          options.before === undefined
+            ? sql``
+            : sql`AND (latest_activity_at, id) < (${DateTime.toEpochMillis(options.before.latestActivityAt)}, ${options.before.threadId})`;
+        return yield* guard(
+          sql`SELECT ${columns} FROM threads WHERE workspace_id = ${workspaceId} AND group_id = ${groupId} AND latest_activity_at IS NOT NULL ${before} ORDER BY latest_activity_at DESC, id COLLATE BINARY DESC LIMIT ${options.limit}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(ThreadStore, "listByLatest")),
+    ),
     getLatest: Effect.fn("Threads.getLatest")(
       function* (input) {
         const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);

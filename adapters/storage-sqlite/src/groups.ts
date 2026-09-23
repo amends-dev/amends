@@ -52,6 +52,17 @@ export const make = Effect.fn("Groups.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupStore, "get")),
     ),
+    getMany: Effect.fn("Groups.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+        if (ids.length === 0) return [];
+        const rows = yield* guard(
+          sql`SELECT ${columns} FROM groups WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)}`,
+        ).pipe(Effect.flatMap(decode));
+        return rows.map(({ record }) => record);
+      },
+      Effect.mapError(storeFailure(GroupStore, "getMany")),
+    ),
     findDirect: Effect.fn("Groups.findDirect")(
       function* (input) {
         const memberIds = yield* Schema.decodeEffect(Group.DirectMembers)(

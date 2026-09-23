@@ -139,6 +139,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       workspaceId: boundWorkspaceId,
       get: unexpected,
       listByGroup: unexpected,
+      listByLatest: unexpected,
       insert: unexpected,
       getLatest: unexpected,
       recordLatest: unexpected,
@@ -171,6 +172,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       GroupStore.Service.of({
         workspaceId: boundWorkspaceId,
         get: unexpected,
+        getMany: unexpected,
         findDirect: unexpected,
         insert: unexpected,
         getLatest: unexpected,
@@ -206,6 +208,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         workspaceId: boundWorkspaceId,
         get: unexpected,
         findActive: unexpected,
+        findActiveMany: unexpected,
         listActiveByGroup: unexpected,
         insert: unexpected,
         end: unexpected,

@@ -23,6 +23,10 @@ export interface Interface {
   readonly findActive: (
     groupMembershipId: GroupMembership.Id,
   ) => Effect.Effect<Option.Option<GroupFollow.Record>, Failure>;
+  /** The active follows of several admissions in one read; admissions without one are omitted. */
+  readonly findActiveMany: (
+    groupMembershipIds: ReadonlyArray<GroupMembership.Id>,
+  ) => Effect.Effect<ReadonlyArray<GroupFollow.Record>, Failure>;
   /** Active follows of a group, in stable ID order. */
   readonly listActiveByGroup: (
     groupId: GroupId.Id,

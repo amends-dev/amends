@@ -294,6 +294,7 @@ CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("w
 CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "threads_by_latest" ON "threads" ("workspace_id","group_id","latest_activity_at","id" COLLATE "C");--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "assignments" ADD CONSTRAINT "assignments_role" FOREIGN KEY ("workspace_id","role_id") REFERENCES "roles"("workspace_id","id");--> statement-breakpoint
@@ -302,8 +303,6 @@ ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_member" FOREIGN KEY ("
 ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_admission" FOREIGN KEY ("workspace_id","group_membership_id") REFERENCES "group_memberships"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_group" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_read_times" ADD CONSTRAINT "group_read_times_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_read_times" ADD CONSTRAINT "group_read_times_group" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "groups" ADD CONSTRAINT "groups_creator" FOREIGN KEY ("workspace_id","created_by") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "invitations" ADD CONSTRAINT "invitations_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "invitations" ADD CONSTRAINT "invitations_inviter" FOREIGN KEY ("workspace_id","inviter_member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
@@ -321,7 +320,5 @@ ALTER TABLE "thread_messages" ADD CONSTRAINT "thread_messages_VQN5uhaRX29u_fkey"
 ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_WEmntEwuURKU_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_8KVJdQYMqP4s_fkey" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_6EfsFG5kMyiA_fkey" FOREIGN KEY ("workspace_id","group_membership_id") REFERENCES "group_memberships"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_read_positions" ADD CONSTRAINT "thread_read_positions_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_read_positions" ADD CONSTRAINT "thread_read_positions_thread" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "threads" ADD CONSTRAINT "threads_workspace_id_group_id_groups_workspace_id_id_fkey" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "threads" ADD CONSTRAINT "threads_ndK7bl58RVVt_fkey" FOREIGN KEY ("workspace_id","created_by_member_id") REFERENCES "members"("workspace_id","id");

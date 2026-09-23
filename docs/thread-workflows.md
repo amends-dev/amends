@@ -209,12 +209,18 @@ for an exact thread. Membership, authorship, ownership, group management, `group
 `thread.start` do not replace the read grant. No additional `group.read`, `member.read`, or
 `agent.use` grant is required to read an accessible thread. Humans and agents follow the same policy.
 
-| Operation                                           | Result                                                                                                                |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `get(threadId)`                                     | The thread's metadata.                                                                                                |
-| `listInGroup(groupId)`                              | Current readable threads in that group, in stable thread-ID order. Threads without a covering read grant are omitted. |
-| `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject.                     |
-| `listParticipants(threadId)`                        | Current `ThreadParticipation.Summary` values in participation-ID order.                                               |
+| Operation                                           | Result                                                                                                                                                                                                       |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get(threadId)`                                     | The thread's metadata.                                                                                                                                                                                       |
+| `listInGroup(groupId, { limit, before? })`          | A page of `Thread.ListItem` values, newest latest activity first: each readable thread with its latest message, the caller's read position, and `unread`. Threads without a covering read grant are skipped. |
+| `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject.                                                                                                            |
+| `listParticipants(threadId)`                        | Current `ThreadParticipation.Summary` values in participation-ID order.                                                                                                                                      |
+
+`listInGroup` checks `thread.read` for each page of threads with one grant resolution and keeps
+reading until the page is full or the group has no older threads. Its exclusive `before` cursor
+is the last item's latest activity time and thread ID. A thread is `unread` when its latest
+message is past the caller's read position or, never read, came after the caller joined the group.
+The caller's own messages are read: posting advances the author's position to their message.
 
 A nonparticipant can read the complete earlier conversation when they have group access and
 the action grant. Reading neither creates participation nor acknowledges or generates notifications.
@@ -351,8 +357,18 @@ Each thread records the sequence and time of its latest message, and each group 
 latest message in any thread; quiet participation activity does not count. The thread activity
 projection maintains both, and `ThreadStore.getLatest` and `GroupStore.getLatest` read them in
 batches. Notifications from thread activity carry their thread and sequence, so reading a thread
-settles exactly its notifications. Unread state and thread lists ordered by latest activity use
-these records and are not implemented yet.
+settles exactly its notifications.
+
+Starting a thread or replying advances the author's read position to their message in the same
+commit. It does not settle notifications: the author of an unmentioned message is one of its
+recipients, since recipient selection has no sender exclusion, and that notification stays pending
+until they acknowledge it or mark the thread read. [Thread lists](#reading-conversations) and
+[group lists](group-workflows.md#reading-groups-and-their-current-members) report unread state
+from these records.
+
+Read-state tables reference no projection rows, so rebuilding projections from the journal keeps
+positions and caught-up times. Operations write read state only for threads and groups they have
+checked.
 
 ## Recorded changes and replay
 

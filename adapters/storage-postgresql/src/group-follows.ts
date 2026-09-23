@@ -3,6 +3,7 @@ import { Store } from "@amends/core/journal";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { groupFollows, groupMemberships } from "./schema.ts";
 
@@ -53,6 +54,25 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(GroupFollowStore, "findActive")),
+    ),
+    findActiveMany: Effect.fn("GroupFollows.findActiveMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select()
+            .from(groupFollows)
+            .where(
+              and(
+                inWorkspace,
+                inIds(groupFollows.groupMembershipId, ids),
+                eq(groupFollows.status, "active"),
+              ),
+            ),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(GroupFollowStore, "findActiveMany")),
     ),
     listActiveByGroup: Effect.fn("GroupFollows.listActiveByGroup")(
       function* (input) {

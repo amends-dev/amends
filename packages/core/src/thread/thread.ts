@@ -27,6 +27,29 @@ export const Latest = Schema.Struct({
   occurredAt: Schema.DateTimeUtcFromString,
 });
 export interface Latest extends Schema.Schema.Type<typeof Latest> {}
+
+/** Exclusive boundary for listing a group's threads by latest activity, newest first. */
+export const ListCursor = Schema.Struct({
+  latestActivityAt: Latest.fields.occurredAt,
+  threadId: ThreadId.Id,
+});
+export interface ListCursor extends Schema.Schema.Type<typeof ListCursor> {}
+export const ListOptions = Schema.Struct({
+  before: Schema.optionalKey(ListCursor),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
+/**
+ * A readable thread with its latest activity and the reader's position. `unread` holds when the
+ * latest message is past the position or, for a thread never read, came after the reader joined.
+ */
+export const ListItem = Schema.Struct({
+  thread: Record,
+  latest: Latest,
+  readThrough: Schema.NullOr(Latest.fields.sequence),
+  unread: Schema.Boolean,
+});
+export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
 export const StartInGroupInput = Schema.Struct({
   groupId: GroupId.Id,
   text: ThreadMessage.Text,

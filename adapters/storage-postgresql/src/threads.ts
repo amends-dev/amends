@@ -2,7 +2,7 @@ import { Thread, ThreadStore } from "@amends/core/thread";
 import { Group } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
 import { threads, groups, members } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
@@ -74,6 +74,32 @@ export const make = Effect.fn("Threads.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows));
       },
       Effect.mapError(storeFailure(ThreadStore, "listByGroup")),
+    ),
+    listByLatest: Effect.fn("Threads.listByLatest")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
+        const orderedId = sql`${threads.id} COLLATE "C"`;
+        return yield* guard(
+          db
+            .select()
+            .from(threads)
+            .where(
+              and(
+                inWorkspace,
+                eq(threads.groupId, groupId),
+                isNotNull(threads.latestActivityAt),
+                // A row comparison bounds the index scan; the equivalent OR form only filters it.
+                options.before === undefined
+                  ? undefined
+                  : sql`(${threads.latestActivityAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.latestActivityAt), threads.latestActivityAt)}, ${options.before.threadId})`,
+              ),
+            )
+            .orderBy(desc(threads.latestActivityAt), desc(orderedId))
+            .limit(options.limit),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadStore, "listByLatest")),
     ),
     getLatest: Effect.fn("Threads.getLatest")(
       function* (input) {

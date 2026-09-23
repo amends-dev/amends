@@ -18,6 +18,14 @@ export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
   readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+  /**
+   * A group's threads with recorded activity, newest latest activity first, then ID in descending
+   * binary order, after the exclusive `before` cursor and up to `limit`.
+   */
+  readonly listByLatest: (
+    id: GroupId.Id,
+    options: Thread.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
   /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
   readonly insert: (
     record: Thread.Record,

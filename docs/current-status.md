@@ -26,20 +26,20 @@ workflows exist today: the task and channel workflows that admit contacts and tr
 unimplemented, and general participation management remains incomplete. Group departure ends its
 associated thread participations and discards their pending agent input; workspace-member removal
 uses the same cleanup. Thread starts, reads, replies, and follow/unfollow use the shared
-group-audience check. Group and thread discovery and current-participant lists are unpaginated;
-timelines have sequence-based pages. Separate reads and pages do not share a snapshot. Group
+group-audience check. Group discovery and current-participant lists are unpaginated; group thread
+lists and timelines have cursor pages. Separate reads and pages do not share a snapshot. Group
 creation, starts, replies, and timeline pages read members, admissions, participations, and
 referenced messages in batches, so their store reads do not grow with group size or page length. A
 start still publishes one participation fact per starting participant, and every fact reads and
 writes each projection's checkpoint and journal bookkeeping, so a start's storage work still grows
 with its participants. The agreed [attention
-model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is partly implemented: a team
-post starts with its author, mentioned members, and the group's followers, and only mentioned agents
-need `agent.use`. Read positions, group caught-up times, and latest activity are recorded, and
-marking a thread read settles its notifications. Reads that report unread threads or list threads by
-latest activity do not exist yet, so members who do not follow a team hear about an unmentioned post
-only by browsing the group. Task and channel workflows, which will admit human followers, remain
-unimplemented.
+model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is implemented for member
+workflows: a team post starts with its author, mentioned members, and the group's followers; only
+mentioned agents need `agent.use`; group thread lists page by latest activity with unread state;
+group lists report new activity and following; and marking a thread read settles its notifications.
+Authors are still notified of their own unmentioned messages, as recipient selection has no sender
+exclusion; posting advances their read position but leaves that notification pending. Task and
+channel workflows, which will admit human followers, remain unimplemented.
 
 ## Design-system coverage
 

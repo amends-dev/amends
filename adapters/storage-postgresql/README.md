@@ -48,6 +48,10 @@ serves a reader's pending notifications from one thread. `thread_read_positions`
 `group_read_times` hold private read state; their upserts keep the later value with `greatest` and
 run on their own, without the workspace lock, when the caller has no transaction.
 
+Read-state tables reference no projection rows, so rebuilding projections keeps them.
+`threads_by_latest` serves a group's threads newest latest activity first, from an exclusive
+`(latest_activity_at, id)` cursor.
+
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions; they and `threads_by_group` and
 `participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID
@@ -231,21 +235,19 @@ and drops it when done.
 Construction tests cover both `make` and `layer`, including initialization of all
 stores and reopening without data loss.
 
-The suites separate database construction, transactions, journal behavior,
-authorization, gateway workflows, and invitations. Each file creates its fixture
-through `support.ts`. The PostgreSQL Vitest project's global setup owns the shared
-test cluster; individual tests own their temporary databases. `contracts.test.ts` runs
-the same direct-store rejection and round-trip scenarios as SQLite, including
-role validation, every foreign scope shape, missing or blank invitation roles, invalid invitation expiry, checkpoint
-validation, and rollback. Engine-specific locking and aborted-transaction tests
-remain separate from these shared contract expectations.
-`notification-sources.test.ts` mirrors SQLite coverage for current source authorization,
-historical recipient integrity, direct entry lookup, no-write resolution, staged visibility,
-rollback, reopening, and gateway outcomes.
-`notification-acknowledgment.test.ts` mirrors SQLite's ownership, atomicity, repeat handling,
-concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.
-`thread-starts.test.ts` mirrors SQLite's check that group creation, starts, replies, and timeline
-pages make the same store reads at any group size.
+The suites separate database construction, transactions, journal behavior, authorization, gateway
+workflows, and invitations. Each file creates its fixture through `support.ts`. The PostgreSQL
+Vitest project's global setup owns the shared test cluster; individual tests own their temporary
+databases. `contracts.test.ts` runs the same direct-store rejection and round-trip scenarios as
+SQLite, including role validation, every foreign scope shape, missing or blank invitation roles,
+invalid invitation expiry, checkpoint validation, and rollback. Engine-specific locking and
+aborted-transaction tests remain separate from these shared contract expectations.
+`notification-sources.test.ts` mirrors SQLite coverage for current source authorization, historical
+recipient integrity, direct entry lookup, no-write resolution, staged visibility, rollback,
+reopening, and gateway outcomes. `notification-acknowledgment.test.ts` mirrors SQLite's ownership,
+atomicity, repeat handling, concurrent requests, source-access loss, direct-store validation,
+reopening, and replay checks. `thread-starts.test.ts` mirrors SQLite's check that group creation,
+starts, replies, and timeline pages make the same store reads at any group size.
 `group-follows.test.ts` mirrors SQLite's group-following, permission, admission-ending, replay, and
-storage-constraint checks. `read-state.test.ts` mirrors SQLite's latest-activity, read-state, and
-inbox-settling checks.
+storage-constraint checks. `read-state.test.ts` mirrors SQLite's list, latest-activity, read-state,
+and inbox-settling checks.

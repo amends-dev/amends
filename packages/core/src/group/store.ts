@@ -18,6 +18,13 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflic
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
+  /**
+   * Find several groups in one read. Absent IDs are omitted and each found record appears once;
+   * order is unspecified, so callers index results by ID. An empty request reads nothing.
+   */
+  readonly getMany: (
+    ids: ReadonlyArray<Group.Id>,
+  ) => Effect.Effect<ReadonlyArray<Group.Record>, Failure>;
   /** The direct group with exactly these members, in any order. */
   readonly findDirect: (
     memberIds: ReadonlyArray<MemberId.Id>,

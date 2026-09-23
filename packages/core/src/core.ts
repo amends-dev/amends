@@ -35,6 +35,7 @@ import { GroupMembershipProjection } from "./group/membership/projection.ts";
 import { GroupFollowApplication } from "./group/follow/application.ts";
 import { GroupFollowProjection } from "./group/follow/projection.ts";
 import { ReadStateApplication } from "./attention/application.ts";
+import { ThreadReading } from "./attention/reading.ts";
 import { GroupMembershipApplication } from "./group/membership/application.ts";
 import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
@@ -117,6 +118,7 @@ const threadStart = ThreadStart.layer.pipe(
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
 const activityReading = ThreadActivityReading.layer.pipe(Layer.provide(threadAccess));
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
+const threadReading = ThreadReading.layer.pipe(Layer.provide(NotificationAcknowledgment.layer));
 
 /**
  * Application operations, sharing one journal and one authorization check. These
@@ -147,6 +149,7 @@ const operations = Layer.mergeAll(
       activityReading,
       notificationSource,
       NotificationAcknowledgment.layer,
+      threadReading,
       admissions,
       recording,
       departures,

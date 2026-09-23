@@ -274,6 +274,31 @@ it.effect("every requirement must be satisfied across role and direct assignment
   }),
 );
 
+it.effect("permitted reports each requirement in order without failing on denials", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* seed(
+      fixture,
+      [alice, bob],
+      [
+        direct("read-all", alice.memberId, MemberPermissions.Read),
+        direct("remove-bob", alice.memberId, MemberPermissions.Remove, bobScope),
+      ],
+    );
+    const permitted = (requirements: ReadonlyArray<Requirement.Value>) =>
+      Effect.flatMap(Authorization.Service, (service) => service.permitted(requirements));
+    expect(
+      yield* run(fixture, permitted([readBob, removeBob, removeCharlie, readCharlie])),
+    ).toEqual([true, true, false, true]);
+    expect(yield* run(fixture, permitted([]))).toEqual([]);
+    expect(yield* run(fixture, permitted([readBob]), bob)).toEqual([false]);
+    // The actor check still fails rather than reporting denials.
+    expect(yield* run(fixture, Effect.flip(permitted([readBob])), charlie)).toMatchObject({
+      _tag: "Authorization.InvalidActor",
+    });
+  }),
+);
+
 it.effect(
   "a built-in role's identity and permission tiers never bypass its stored permissions or scope",
   () =>

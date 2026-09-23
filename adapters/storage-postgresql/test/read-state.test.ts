@@ -1,7 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ReadState, ReadStateApplication } from "@amends/core/attention";
-import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
-import { Group, GroupApplication } from "@amends/core/group";
+import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
+import {
+  Group,
+  GroupApplication,
+  GroupFollowApplication,
+  GroupMembershipApplication,
+} from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Log, Publication } from "@amends/core/journal";
 import {
@@ -9,10 +14,12 @@ import {
   ThreadApplication,
   ThreadMessageApplication,
   ThreadParticipationApplication,
+  ThreadPermissions,
 } from "@amends/core/thread";
 import { Member, MemberFacts } from "@amends/core/workspace";
 import { DateTime, Effect } from "effect";
 import { TestClock } from "effect/testing";
+import { SqlClient } from "effect/unstable/sql";
 import {
   setup,
   boundTo,
@@ -324,29 +331,200 @@ describe.skipIf(!available)("PostgreSQL read state", () => {
             ),
           ).toBe("undo");
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([5]);
-          for (const bad of [
-            position(1, { workspaceId: otherWorkspaceId }),
-            position(1, { threadId: Thread.Id.make("missing") }),
-            position(1, { memberId: Member.Id.make("missing") }),
-          ])
-            expect(yield* Effect.flip(bound.readStates.advanceThread(bad))).toMatchObject({
-              _tag: "ReadStateStore.Conflict",
-            });
           expect(
             yield* Effect.flip(
-              bound.readStates.advanceGroup({
-                workspaceId,
-                memberId: humanId,
-                groupId: Group.Id.make("missing"),
-                caughtUpAt: yield* DateTime.now,
-              }),
+              bound.readStates.advanceThread(position(1, { workspaceId: otherWorkspaceId })),
             ),
           ).toMatchObject({ _tag: "ReadStateStore.Conflict" });
+          // Read state references no projection rows, so rebuilding threads from the journal keeps it.
+          const sql = yield* SqlClient.SqlClient;
+          yield* bound.store.transaction(
+            Effect.gen(function* () {
+              for (const table of [
+                "notifications",
+                "thread_activities",
+                "thread_messages",
+                "thread_participations",
+                "threads",
+              ])
+                yield* sql.unsafe(`DELETE FROM ${table}`);
+              yield* sql.unsafe(
+                "DELETE FROM checkpoints WHERE name IN ('threads','thread.participation','thread.message','thread.activity','notifications')",
+              );
+            }),
+          );
+          yield* trusted(
+            bound,
+            Effect.flatMap(Journal.Service, (journal) => journal.replay),
+          );
+          expect(yield* bound.threads.getLatest([threadId])).toMatchObject([{ sequence: 1 }]);
+          expect(yield* positionOf(bound, humanId, threadId)).toEqual([5]);
           // Positions are per member and per workspace.
           expect(yield* positionOf(bound, otherId, threadId)).toEqual([]);
           expect(yield* bound.readStates.getThreadPositions(humanId, [])).toEqual([]);
           const foreign = yield* boundTo(otherWorkspaceId);
           expect(yield* foreign.readStates.getThreadPositions(humanId, [threadId])).toEqual([]);
+        }),
+      ),
+    ),
+  );
+
+  it.effect("group thread lists page by latest activity with each reader's unread state", () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const { bound, owner, team } = yield* prepare();
+          const human = actorFor(humanId);
+          const listed = (actor: Actor.Value, options: Thread.ListOptions) =>
+            run(
+              bound,
+              actor,
+              Effect.flatMap(ThreadApplication.Service, (s) => s.listInGroup(team.id, options)),
+            );
+          yield* TestClock.adjust("1 minute");
+          const first = yield* run(bound, owner, start(team.id, []));
+          yield* TestClock.adjust("1 minute");
+          const second = yield* run(bound, owner, start(team.id, []));
+          yield* TestClock.adjust("1 minute");
+          // Posting reads the thread through the author's own message.
+          const own = yield* run(bound, human, start(team.id, []));
+          const page = yield* listed(human, { limit: 2 });
+          expect(page.map((item) => [item.thread.id, item.unread, item.readThrough])).toEqual([
+            [own.thread.id, false, 1],
+            [second.thread.id, true, null],
+          ]);
+          const last = page[1];
+          if (last === undefined) return yield* Effect.die("Missing page item");
+          const next = yield* listed(human, {
+            before: { latestActivityAt: last.latest.occurredAt, threadId: last.thread.id },
+            limit: 2,
+          });
+          expect(next.map((item) => item.thread.id)).toEqual([first.thread.id]);
+          // Reading clears unread; a later message moves the thread first and makes it unread again.
+          yield* run(bound, human, markRead(second.thread.id, 1));
+          yield* TestClock.adjust("1 minute");
+          yield* run(bound, owner, reply(first.thread.id, []));
+          expect(
+            (yield* listed(human, { limit: 10 })).map((item) => [item.thread.id, item.unread]),
+          ).toEqual([
+            [first.thread.id, true],
+            [own.thread.id, false],
+            [second.thread.id, false],
+          ]);
+          // A member who joins later sees earlier activity as read until something new arrives.
+          yield* TestClock.adjust("1 minute");
+          yield* run(
+            bound,
+            owner,
+            Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+              s.add({ groupId: team.id, memberId: outsiderId }),
+            ),
+          );
+          const outsider = actorFor(outsiderId);
+          expect((yield* listed(outsider, { limit: 10 })).some((item) => item.unread)).toBe(false);
+          yield* TestClock.adjust("1 minute");
+          yield* run(bound, owner, reply(second.thread.id, []));
+          expect(
+            (yield* listed(outsider, { limit: 10 })).filter((item) => item.unread).length,
+          ).toBe(1);
+          // Threads the reader's grants do not cover are skipped, and the page still fills.
+          const plain = actorFor(plainId);
+          expect(yield* listed(plain, { limit: 1 })).toEqual([]);
+          yield* trusted(
+            bound,
+            Effect.flatMap(Journal.Service, (journal) =>
+              journal.publish(AssignmentFacts.Created, {
+                workspaceId,
+                assignmentId: Assignment.Id.make("plain-reads-own"),
+                memberId: plainId,
+                source: {
+                  _tag: "Direct",
+                  grant: Grant.make(ThreadPermissions.Read, {
+                    _tag: "Target",
+                    target: { _tag: "Thread", workspaceId, threadId: own.thread.id },
+                  }),
+                },
+              }),
+            ),
+          );
+          expect((yield* listed(plain, { limit: 1 })).map((item) => item.thread.id)).toEqual([
+            own.thread.id,
+          ]);
+          expect(
+            yield* Effect.flip(
+              run(
+                bound,
+                actorFor(outsiderId),
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.listInGroup(Group.Id.make("missing"), { limit: 1 }),
+                ),
+              ),
+            ),
+          ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+        }),
+      ),
+    ),
+  );
+
+  it.effect("group lists report latest activity, catching up, and following", () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const { bound, owner, team } = yield* prepare();
+          const human = actorFor(humanId);
+          const mine = (actor: Actor.Value) =>
+            run(
+              bound,
+              actor,
+              Effect.flatMap(GroupApplication.Service, (s) => s.listMine),
+            );
+          const quiet = yield* run(
+            bound,
+            owner,
+            Effect.flatMap(GroupApplication.Service, (s) =>
+              s.createPrivateTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
+            ),
+          );
+          const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>
+            items.find((item) => item.group.id === groupId);
+          yield* TestClock.adjust("1 minute");
+          yield* run(bound, owner, start(team.id, []));
+          const posted = yield* DateTime.now;
+          const listed = yield* mine(human);
+          expect(listed.map((item) => item.group.id)).toEqual(
+            [team.id, quiet.id].toSorted((a, b) => (a < b ? -1 : 1)),
+          );
+          expect(itemOf(listed, team.id)).toMatchObject({
+            latestActivityAt: posted,
+            caughtUpAt: null,
+            newActivity: true,
+            following: false,
+          });
+          expect(itemOf(listed, quiet.id)).toMatchObject({
+            latestActivityAt: null,
+            newActivity: false,
+          });
+          yield* TestClock.adjust("1 minute");
+          yield* run(bound, human, markGroupRead(team.id));
+          yield* run(
+            bound,
+            human,
+            Effect.flatMap(GroupFollowApplication.Service, (s) =>
+              s.follow({ groupId: team.id, memberId: humanId }),
+            ),
+          );
+          expect(itemOf(yield* mine(human), team.id)).toMatchObject({
+            caughtUpAt: yield* DateTime.now,
+            newActivity: false,
+            following: true,
+          });
+          yield* TestClock.adjust("1 minute");
+          yield* run(bound, owner, start(team.id, []));
+          expect(itemOf(yield* mine(human), team.id)).toMatchObject({ newActivity: true });
+          // Groups outside the reader's group.read grants are left out.
+          expect(yield* mine(actorFor(plainId))).toEqual([]);
         }),
       ),
     ),

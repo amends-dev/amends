@@ -69,6 +69,19 @@ export const Latest = Schema.Struct({
 });
 export interface Latest extends Schema.Schema.Type<typeof Latest> {}
 
+/**
+ * One of the reader's groups with its activity. `newActivity` holds when its latest message came
+ * after the reader last caught up with it or, if they never have, after they joined.
+ */
+export const ListItem = Schema.Struct({
+  group: Record,
+  latestActivityAt: Schema.NullOr(Latest.fields.occurredAt),
+  caughtUpAt: Schema.NullOr(Latest.fields.occurredAt),
+  newActivity: Schema.Boolean,
+  following: Schema.Boolean,
+});
+export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
+
 export const CreatePrivateTeamInput = Schema.Struct({
   name: Name,
   memberIds: Schema.UniqueArray(MemberId.Id),

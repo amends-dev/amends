@@ -67,7 +67,10 @@ const get = (id: Group.Id) =>
   Effect.flatMap(GroupApplication.Service, (service) => service.get(id));
 const getForManagement = (id: Group.Id) =>
   Effect.flatMap(GroupApplication.Service, (service) => service.getForManagement(id));
-const mine = Effect.flatMap(GroupApplication.Service, (service) => service.listMine);
+/** The actor's readable groups as records; activity and following have their own tests. */
+const mine = Effect.flatMap(GroupApplication.Service, (service) =>
+  Effect.map(service.listMine, (items) => items.map((item) => item.group)),
+);
 const roster = (id: Group.Id) =>
   Effect.flatMap(GroupMembershipApplication.Service, (service) => service.listCurrent(id));
 const rosterForManagement = (id: Group.Id) =>
@@ -404,7 +407,7 @@ it.effect(
               const original = yield* audience.require(first.id);
               expect(yield* groups.get(first.id)).toEqual(first);
               yield* memberships.leave({ groupId: first.id, membershipId: original.id });
-              expect(yield* groups.listMine).toEqual([second]);
+              expect((yield* groups.listMine).map((item) => item.group)).toEqual([second]);
               expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
                 _tag: "GroupApplication.NotFound",
               });
@@ -429,7 +432,7 @@ it.effect(
                   })
                   .pipe(Publication.withActor);
               yield* asActor(permissions([]), owner);
-              expect(yield* groups.listMine).toEqual([]);
+              expect((yield* groups.listMine).map((item) => item.group)).toEqual([]);
               expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
                 _tag: "Authorization.Denied",
               });
@@ -782,6 +785,10 @@ it.effect(
               ...bound.groups,
               get: () =>
                 Effect.fail(new GroupStore.Failure({ operation: "get", cause: "failed storage" })),
+              getMany: () =>
+                Effect.fail(
+                  new GroupStore.Failure({ operation: "getMany", cause: "failed storage" }),
+                ),
             }),
           };
           expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({

@@ -46,6 +46,10 @@ pending notifications from one thread. `thread_read_positions` and `group_read_t
 read state in plain columns; their upserts keep the later value and run outside a transaction when
 the caller has none.
 
+Read-state tables reference no projection rows, so rebuilding projections keeps them.
+`threads_by_latest` serves a group's threads newest latest activity first, from an exclusive
+`(latest_activity_at, id)` cursor.
+
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions in ID order without scanning the workspace.
 The directory reads across workspaces, so `members_by_identity` and `invitations_by_recipient`
@@ -225,5 +229,6 @@ direct-store validation, reopening, and replay checks. `thread-starts.test.ts` c
 reads of group creation, a start mentioning every member, a reply, and a timeline page, and requires
 the same counts for a two-member and an eleven-member group. `group-follows.test.ts` covers
 following for oneself and for agents, permission checks, joining later threads, ending with the
-admission, replay, and follow storage constraints. `read-state.test.ts` covers latest activity,
-forward-only read state, and settling the inbox when reading.
+admission, replay, and follow storage constraints. `read-state.test.ts` covers group thread and
+group lists with unread state, latest activity, forward-only read state, and settling the inbox when
+reading.

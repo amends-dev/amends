@@ -2655,6 +2655,8 @@ its latest message, and each group the time of its latest message in any thread;
 changes do not count. A member's caught-up time for a group, set when they view or mark the group
 read, shows whether the group has newer activity. Thread lists order by latest activity.
 
+Posting a message reads the thread through it for its author.
+
 Marking a thread read through a sequence also records `Seen` for the member's pending
 notifications from that thread's activity up to it, in the same operation. Those acknowledgments
 remain journal facts; with nothing pending, marking read writes only the position. Agents have

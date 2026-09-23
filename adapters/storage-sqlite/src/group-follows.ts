@@ -3,6 +3,7 @@ import { Store } from "@amends/core/journal";
 import { Member } from "@amends/core/workspace";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
 const validate = Schema.decodeEffect(Schema.toType(GroupFollow.Record));
@@ -57,6 +58,16 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
         ).pipe(Effect.flatMap(decode), Effect.map(records), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(GroupFollowStore, "findActive")),
+    ),
+    findActiveMany: Effect.fn("GroupFollows.findActiveMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          sql`SELECT ${columns} FROM group_follows WHERE workspace_id = ${workspaceId} AND group_membership_id ${inIds(sql, ids)} AND json_extract(record, '$.status') = 'active'`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(GroupFollowStore, "findActiveMany")),
     ),
     listActiveByGroup: Effect.fn("GroupFollows.listActiveByGroup")(
       function* (input) {

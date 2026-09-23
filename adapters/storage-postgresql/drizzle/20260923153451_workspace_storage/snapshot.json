@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "d2199819-c6ac-4fe4-9cb0-785b269dedd7",
+  "id": "7548b904-68d0-4bf7-8232-300b413912f2",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -3344,6 +3344,48 @@
     {
       "nameExplicit": true,
       "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "latest_activity_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "threads_by_latest",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
         "workspace_id"
       ],
       "schemaTo": "public",
@@ -3490,44 +3532,6 @@
       "entityType": "fks",
       "schema": "public",
       "table": "group_memberships"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "workspace_id",
-        "member_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "members",
-      "columnsTo": [
-        "workspace_id",
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "group_read_times_member",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "group_read_times"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "workspace_id",
-        "group_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "groups",
-      "columnsTo": [
-        "workspace_id",
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "group_read_times_group",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "group_read_times"
     },
     {
       "nameExplicit": true,
@@ -3847,44 +3851,6 @@
       "entityType": "fks",
       "schema": "public",
       "table": "thread_participations"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "workspace_id",
-        "member_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "members",
-      "columnsTo": [
-        "workspace_id",
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "thread_read_positions_member",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "thread_read_positions"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "workspace_id",
-        "thread_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "threads",
-      "columnsTo": [
-        "workspace_id",
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "thread_read_positions_thread",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "thread_read_positions"
     },
     {
       "nameExplicit": false,

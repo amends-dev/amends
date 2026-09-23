@@ -21,6 +21,8 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE INDEX group_follows_by_group ON group_follows(workspace_id, group_id, id COLLATE BINARY)`;
     yield* sql`CREATE TABLE threads (workspace_id TEXT NOT NULL, id TEXT NOT NULL, group_id TEXT NOT NULL, created_by TEXT, latest_sequence INTEGER CHECK(latest_sequence > 0), latest_activity_at INTEGER, record TEXT NOT NULL CHECK(json_valid(record)), CHECK((latest_sequence IS NULL) = (latest_activity_at IS NULL)), PRIMARY KEY(workspace_id,id), FOREIGN KEY(workspace_id,group_id) REFERENCES groups(workspace_id,id), FOREIGN KEY(workspace_id,created_by) REFERENCES members(workspace_id,id))`;
     yield* sql`CREATE INDEX threads_by_group ON threads(workspace_id,group_id,id COLLATE BINARY)`;
+    // A group's threads by latest activity, newest first.
+    yield* sql`CREATE INDEX threads_by_latest ON threads(workspace_id,group_id,latest_activity_at,id COLLATE BINARY)`;
     yield* sql`CREATE TABLE thread_participations (workspace_id TEXT NOT NULL,id TEXT NOT NULL,thread_id TEXT NOT NULL,member_id TEXT,group_membership_id TEXT,participant_key TEXT NOT NULL,record TEXT NOT NULL CHECK(json_valid(record)),PRIMARY KEY(workspace_id,id),FOREIGN KEY(workspace_id,thread_id) REFERENCES threads(workspace_id,id),FOREIGN KEY(workspace_id,member_id) REFERENCES members(workspace_id,id),FOREIGN KEY(workspace_id,group_membership_id) REFERENCES group_memberships(workspace_id,id))`;
     yield* sql`CREATE UNIQUE INDEX active_thread_participation ON thread_participations(workspace_id,thread_id,participant_key) WHERE json_extract(record,'$.status') = 'active'`;
     yield* sql`CREATE INDEX participations_by_admission ON thread_participations(workspace_id,group_membership_id,id COLLATE BINARY)`;
@@ -52,9 +54,10 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE INDEX log_entries_by_fact ON log_entries(workspace_id, log_id, fact_name, position, entry_index)`;
     // A reader's pending notifications from one thread, settled when they read it.
     yield* sql`CREATE INDEX pending_notifications_by_thread ON notifications(workspace_id, json_extract(record, '$.recipient._tag'), coalesce(json_extract(record, '$.recipient.id'), ''), json_extract(record, '$.thread.threadId'), json_extract(record, '$.thread.sequence')) WHERE json_extract(record, '$.state._tag') = 'Pending'`;
-    // Private read state; written outside journal commits, so not rebuilt by replay.
-    yield* sql`CREATE TABLE thread_read_positions (workspace_id TEXT NOT NULL, member_id TEXT NOT NULL, thread_id TEXT NOT NULL, read_through INTEGER NOT NULL CHECK(read_through > 0), PRIMARY KEY(workspace_id, member_id, thread_id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id), FOREIGN KEY(workspace_id, thread_id) REFERENCES threads(workspace_id, id))`;
-    yield* sql`CREATE TABLE group_read_times (workspace_id TEXT NOT NULL, member_id TEXT NOT NULL, group_id TEXT NOT NULL, caught_up_at INTEGER NOT NULL, PRIMARY KEY(workspace_id, member_id, group_id), FOREIGN KEY(workspace_id, member_id) REFERENCES members(workspace_id, id), FOREIGN KEY(workspace_id, group_id) REFERENCES groups(workspace_id, id))`;
+    // Private read state, outside the journal: no references to projection tables, so
+    // rebuilding projections from the journal leaves it intact.
+    yield* sql`CREATE TABLE thread_read_positions (workspace_id TEXT NOT NULL, member_id TEXT NOT NULL, thread_id TEXT NOT NULL, read_through INTEGER NOT NULL CHECK(read_through > 0), PRIMARY KEY(workspace_id, member_id, thread_id))`;
+    yield* sql`CREATE TABLE group_read_times (workspace_id TEXT NOT NULL, member_id TEXT NOT NULL, group_id TEXT NOT NULL, caught_up_at INTEGER NOT NULL, PRIMARY KEY(workspace_id, member_id, group_id))`;
   }),
 });
 

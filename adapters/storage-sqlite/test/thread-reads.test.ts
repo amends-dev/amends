@@ -74,8 +74,13 @@ const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
 const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
 const get = (id: Thread.Id) =>
   Effect.flatMap(ThreadApplication.Service, (service) => service.get(id));
+/** Readable threads of a group as records in ID order; listing order has its own test. */
 const list = (id: Group.Id) =>
-  Effect.flatMap(ThreadApplication.Service, (service) => service.listInGroup(id));
+  Effect.flatMap(ThreadApplication.Service, (service) =>
+    Effect.map(service.listInGroup(id, { limit: 100 }), (items) =>
+      items.map((item) => item.thread).toSorted((a, b) => (a.id < b.id ? -1 : 1)),
+    ),
+  );
 const timeline = (id: Thread.Id, options: ThreadActivityStore.ReadOptions = { limit: 10 }) =>
   Effect.flatMap(ThreadApplication.Service, (service) => service.readTimeline(id, options));
 const participants = (id: Thread.Id) =>
@@ -459,7 +464,9 @@ it.effect(
               expect(yield* Effect.flip(service.get(first.thread.id))).toEqual(
                 new ThreadApplication.NotFound({ threadId: first.thread.id }),
               );
-              expect(yield* Effect.flip(service.listInGroup(group.id))).toMatchObject({
+              expect(
+                yield* Effect.flip(service.listInGroup(group.id, { limit: 100 })),
+              ).toMatchObject({
                 _tag: "ThreadApplication.GroupNotFound",
               });
               yield* asActor(
@@ -482,7 +489,7 @@ it.effect(
                 Effect.Effect<unknown, ThreadApplication.ReadError, Actor.Service>
               > = [
                 service.get(first.thread.id),
-                service.listInGroup(group.id),
+                service.listInGroup(group.id, { limit: 100 }),
                 service.readTimeline(first.thread.id, { limit: 10 }),
                 service.listParticipants(first.thread.id),
               ];
@@ -576,7 +583,7 @@ it.effect(
               expect(yield* Effect.flip(service.get(first.thread.id))).toMatchObject({
                 _tag: "Authorization.Denied",
               });
-              expect(yield* service.listInGroup(group.id)).toEqual([]);
+              expect(yield* service.listInGroup(group.id, { limit: 100 })).toEqual([]);
             }),
           );
         }),
@@ -988,7 +995,7 @@ it.effect("thread and participation reads reject inconsistent references and dup
             ...bound,
             context: Context.add(bound.context, ThreadStore.Service, {
               ...bound.threads,
-              listByGroup: () => Effect.succeed(rows),
+              listByLatest: () => Effect.succeed(rows),
             }),
           };
           expect(yield* Effect.flip(run(broken, owner, list(group.id)))).toMatchObject({
