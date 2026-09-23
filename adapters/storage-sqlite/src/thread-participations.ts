@@ -8,25 +8,34 @@ import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
 const codec = Schema.fromJsonString(ThreadParticipation.Record);
 const encode = Schema.encodeEffect(codec);
+/** Member participations keep their workspace member and group admission as referenced columns. */
+const memberColumns = (participant: ThreadParticipation.Participant) =>
+  participant._tag === "Member"
+    ? { memberId: participant.memberId, groupMembershipId: participant.groupMembershipId }
+    : { memberId: null, groupMembershipId: null };
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       workspaceId: ThreadParticipation.Record.fields.workspaceId,
       id: ThreadParticipation.Id,
       threadId: ThreadParticipation.Record.fields.threadId,
-      memberId: ThreadParticipation.Record.fields.memberId,
-      groupMembershipId: ThreadParticipation.Record.fields.groupMembershipId,
+      memberId: Schema.NullOr(Schema.String),
+      groupMembershipId: Schema.NullOr(Schema.String),
+      participantKey: Schema.String,
       record: codec,
     }).check(
-      Schema.makeFilter(
-        (row) =>
+      Schema.makeFilter((row) => {
+        const expected = memberColumns(row.record.participant);
+        return (
           (row.workspaceId === row.record.workspaceId &&
             row.id === row.record.id &&
             row.threadId === row.record.threadId &&
-            row.memberId === row.record.memberId &&
-            row.groupMembershipId === row.record.groupMembershipId) ||
-          "Columns must match the stored record",
-      ),
+            row.memberId === expected.memberId &&
+            row.groupMembershipId === expected.groupMembershipId &&
+            row.participantKey === ThreadParticipation.keyOf(row.record.participant)) ||
+          "Columns must match the stored record"
+        );
+      }),
     ),
   ),
 );
@@ -36,7 +45,7 @@ const records = (rows: ReadonlyArray<{ readonly record: ThreadParticipation.Reco
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
-  const columns = sql`workspace_id AS workspaceId, id, thread_id AS threadId, member_id AS memberId, group_membership_id AS groupMembershipId, record`;
+  const columns = sql`workspace_id AS workspaceId, id, thread_id AS threadId, member_id AS memberId, group_membership_id AS groupMembershipId, participant_key AS participantKey, record`;
   return ThreadParticipationStore.Service.of({
     workspaceId,
     get: Effect.fn("ThreadParticipations.get")(
@@ -80,7 +89,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           message: "Departure belongs to another workspace",
         });
       const rows = yield* guard(
-        sql`UPDATE thread_participations SET record = json_set(record, '$.status', 'ended', '$.endedAt', ${DateTime.formatIso(endedAt)}) WHERE workspace_id = ${workspaceId} AND id = ${departure.participationId} AND thread_id = ${departure.threadId} AND member_id = ${departure.memberId} AND json_extract(record,'$.status') = 'active' RETURNING id`,
+        sql`UPDATE thread_participations SET record = json_set(record, '$.status', 'ended', '$.endedAt', ${DateTime.formatIso(endedAt)}) WHERE workspace_id = ${workspaceId} AND id = ${departure.participationId} AND thread_id = ${departure.threadId} AND json_extract(record,'$.status') = 'active' RETURNING id`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "end")));
       if (rows.length !== 1)
@@ -103,8 +112,12 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
+      // A member's admission must belong to the thread's group; contacts and triage need only the thread.
+      const participant = record.participant;
       const related = yield* guard(
-        sql`SELECT t.id FROM threads t JOIN group_memberships g ON g.workspace_id=t.workspace_id AND g.group_id=t.group_id JOIN members m ON m.workspace_id=g.workspace_id AND m.id=g.member_id WHERE t.workspace_id = ${workspaceId} AND t.id = ${record.threadId} AND g.id = ${record.groupMembershipId} AND g.member_id = ${record.memberId} AND json_extract(m.record, '$.identity._tag') = ${record.identity._tag} AND json_extract(m.record, '$.identity.id') = ${record.identity.id}`,
+        participant._tag === "Member"
+          ? sql`SELECT t.id FROM threads t JOIN group_memberships g ON g.workspace_id=t.workspace_id AND g.group_id=t.group_id JOIN members m ON m.workspace_id=g.workspace_id AND m.id=g.member_id WHERE t.workspace_id = ${workspaceId} AND t.id = ${record.threadId} AND g.id = ${participant.groupMembershipId} AND g.member_id = ${participant.memberId} AND json_extract(m.record, '$.identity._tag') = ${participant.identity._tag} AND json_extract(m.record, '$.identity.id') = ${participant.identity.id}`
+          : sql`SELECT id FROM threads WHERE workspace_id = ${workspaceId} AND id = ${record.threadId}`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));
       if (related.length === 0)
@@ -115,8 +128,9 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       const data = yield* encode(record).pipe(
         Effect.mapError(storeFailure(ThreadParticipationStore, "insert")),
       );
+      const { memberId, groupMembershipId } = memberColumns(participant);
       yield* guard(
-        sql`INSERT INTO thread_participations (workspace_id,id,thread_id,member_id,group_membership_id,record) VALUES (${workspaceId},${record.id},${record.threadId},${record.memberId},${record.groupMembershipId},${data})`,
+        sql`INSERT INTO thread_participations (workspace_id,id,thread_id,member_id,group_membership_id,participant_key,record) VALUES (${workspaceId},${record.id},${record.threadId},${memberId},${groupMembershipId},${ThreadParticipation.keyOf(participant)},${data})`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));
     }),

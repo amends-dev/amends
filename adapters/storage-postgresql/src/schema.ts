@@ -30,6 +30,8 @@ export const memberIdentityKinds = ["Human", "Agent"] as const;
 export const identityKinds = [...memberIdentityKinds, "Contact"] as const;
 export const recipientKinds = [...identityKinds, "Triage"] as const;
 export const memberStatuses = ["active", "removed"] as const;
+export const groupKinds = ["Team", "Direct"] as const;
+export const participantKinds = ["Member", "Contact", "Triage"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
@@ -94,9 +96,12 @@ export const groups = pgTable(
   {
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
-    kind: text("kind", { enum: ["Team"] }).notNull(),
-    visibility: text("visibility", { enum: ["Private"] }).notNull(),
-    name: text("name").notNull(),
+    kind: text("kind", { enum: groupKinds }).notNull(),
+    // Team groups carry a visibility and name; direct groups carry their fixed members and key.
+    visibility: text("visibility", { enum: ["Private"] }),
+    name: text("name"),
+    memberIds: text("member_ids").array(),
+    directKey: text("direct_key"),
     createdBy: text("created_by").notNull(),
     createdAt: instant("created_at").notNull(),
   },
@@ -107,8 +112,14 @@ export const groups = pgTable(
       foreignColumns: [members.workspaceId, members.id],
       name: "groups_creator",
     }),
-    check("groups_kind", sql`${table.kind} = 'Team'`),
-    check("groups_visibility", sql`${table.visibility} = 'Private'`),
+    check(
+      "groups_kind",
+      sql`(${table.kind} = 'Team' AND ${table.visibility} = 'Private' AND ${table.name} IS NOT NULL AND ${table.memberIds} IS NULL AND ${table.directKey} IS NULL) OR (${table.kind} = 'Direct' AND ${table.visibility} IS NULL AND ${table.name} IS NULL AND cardinality(${table.memberIds}) >= 2 AND ${table.directKey} IS NOT NULL)`,
+    ),
+    // One direct group per exact member set.
+    uniqueIndex("direct_groups_by_members")
+      .on(table.workspaceId, table.directKey)
+      .where(sql`${table.directKey} IS NOT NULL`),
   ],
 );
 
@@ -474,10 +485,12 @@ export const threadParticipations = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     threadId: text("thread_id").notNull(),
-    memberId: text("member_id").notNull(),
-    groupMembershipId: text("group_membership_id").notNull(),
-    identityKind: text("identity_kind", { enum: memberIdentityKinds }).notNull(),
-    identityId: text("identity_id").notNull(),
+    // Members carry their admission and identity; contacts their contact ID; triage neither.
+    participantKind: text("participant_kind", { enum: participantKinds }).notNull(),
+    memberId: text("member_id"),
+    groupMembershipId: text("group_membership_id"),
+    identityKind: text("identity_kind", { enum: identityKinds }),
+    identityId: text("identity_id"),
     joinedAt: instant("joined_at").notNull(),
     joinedAtSequence: integer("joined_at_sequence").notNull(),
     status: text("status", { enum: ["active", "ended"] }).notNull(),
@@ -498,8 +511,17 @@ export const threadParticipations = pgTable(
       foreignColumns: [groupMemberships.workspaceId, groupMemberships.id],
     }),
     uniqueIndex("active_thread_participation")
-      .on(t.workspaceId, t.threadId, t.memberId)
+      .on(
+        t.workspaceId,
+        t.threadId,
+        t.participantKind,
+        sql`coalesce(${t.memberId}, ${t.identityId}, '')`,
+      )
       .where(sql`${t.status} = 'active'`),
+    check(
+      "participation_participant",
+      sql`(${t.participantKind} = 'Member' AND ${t.memberId} IS NOT NULL AND ${t.groupMembershipId} IS NOT NULL AND ${t.identityKind} IN ('Human', 'Agent') AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Contact' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} = 'Contact' AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Triage' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} IS NULL AND ${t.identityId} IS NULL)`,
+    ),
     index("participations_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
     index("participations_by_admission").on(
       t.workspaceId,
@@ -519,7 +541,10 @@ export const threadMessages = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     threadId: text("thread_id").notNull(),
-    authorMemberId: text("author_member_id").notNull(),
+    // Members author in the app; contacts author what a channel receives.
+    authorKind: text("author_kind", { enum: ["Member", "Contact"] }).notNull(),
+    authorMemberId: text("author_member_id"),
+    authorContactId: text("author_contact_id"),
     kind: text("kind", { enum: ["User"] }).notNull(),
     text: text("text").notNull(),
     mentions: text("mentions").array().notNull(),
@@ -535,8 +560,16 @@ export const threadMessages = pgTable(
       columns: [t.workspaceId, t.authorMemberId],
       foreignColumns: [members.workspaceId, members.id],
     }),
+    check(
+      "thread_message_author",
+      sql`(${t.authorKind} = 'Member' AND ${t.authorMemberId} IS NOT NULL AND ${t.authorContactId} IS NULL) OR (${t.authorKind} = 'Contact' AND ${t.authorMemberId} IS NULL AND ${t.authorContactId} IS NOT NULL)`,
+    ),
   ],
 );
+/**
+ * Core validates each activity kind. The table keeps typed references with their keys and
+ * uniqueness, so a new kind adds nullable reference columns rather than rewriting a constraint.
+ */
 export const threadActivities = pgTable(
   "thread_activities",
   {
@@ -571,10 +604,6 @@ export const threadActivities = pgTable(
       foreignColumns: [threadParticipations.workspaceId, threadParticipations.id],
     }),
     uniqueIndex("thread_participation_activity").on(t.workspaceId, t.participationId, t.kind),
-    check(
-      "thread_activity_subject",
-      sql`(${t.kind} = 'MessagePublished' AND ${t.messageId} IS NOT NULL AND ${t.participationId} IS NULL AND ${t.reason} IS NULL) OR (${t.kind} = 'ParticipationFollowed' AND ${t.messageId} IS NULL AND ${t.participationId} IS NOT NULL AND ${t.reason} IS NULL) OR (${t.kind} = 'ParticipationEnded' AND ${t.messageId} IS NULL AND ${t.participationId} IS NOT NULL AND ${t.reason} IS NOT NULL AND ${t.reason} IN ('unfollowed','group-left','group-removed','workspace-removed'))`,
-    ),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
   ],
 );

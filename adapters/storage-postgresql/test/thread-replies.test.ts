@@ -34,6 +34,7 @@ import {
   ThreadMessagePermissions,
   ThreadMessagePublication,
   ThreadMessageStore,
+  ThreadParticipation,
   ThreadParticipationAdmission,
   ThreadParticipationStore,
   ThreadPermissions,
@@ -55,6 +56,12 @@ import {
   otherWorkspaceId,
   testProvenance,
 } from "./support.ts";
+
+/** Narrow a stored participation to its member participant for assertions. */
+const memberParticipant = (record: ThreadParticipation.Record) => {
+  if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+  return record.participant;
+};
 
 const humanId = Member.Id.make("human");
 const otherId = Member.Id.make("other");
@@ -220,7 +227,7 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             expect(Object.keys(result).sort()).toEqual(["activity", "message"]);
             expect(result.message).toMatchObject({
               kind: "User",
-              authorMemberId: humanId,
+              author: { _tag: "Member", memberId: humanId },
               text: "  Reply\nverbatim  ",
               mentions: [],
               publishedAt: yield* DateTime.now,
@@ -231,10 +238,12 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
               sequence: 2,
             });
             const participants = yield* bound.participations.listByThread(first.thread.id);
-            expect(participants.map((p) => p.memberId).sort()).toEqual(
-              [owner.memberId, humanId, agentId].sort(),
+            expect(
+              participants.flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? []).sort(),
+            ).toEqual([owner.memberId, humanId, agentId].sort());
+            const introduced = participants.find(
+              (p) => ThreadParticipation.memberOf(p.participant) === humanId,
             );
-            const introduced = participants.find((p) => p.memberId === humanId);
             expect(introduced).toMatchObject({
               joinedAtSequence: 2,
               joinedAt: result.message.publishedAt,
@@ -318,7 +327,7 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             expect(result.activity.sequence).toBe(2);
             expect(
               (yield* bound.participations.listByThread(first.thread.id))
-                .map((p) => p.memberId)
+                .flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? [])
                 .sort(),
             ).toEqual([owner.memberId, humanId, otherId, agentId].sort());
             expect(yield* notifications(bound, otherId)).toHaveLength(1);
@@ -328,7 +337,7 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             expect(yield* notifications(bound, humanId)).toHaveLength(1);
             expect(
               (yield* bound.participations.listByThread(first.thread.id)).filter(
-                (p) => p.memberId === humanId,
+                (p) => ThreadParticipation.memberOf(p.participant) === humanId,
               ),
             ).toHaveLength(1);
             const before = yield* snapshot(bound, first.thread.id);
@@ -507,14 +516,17 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
           Effect.gen(function* () {
             const { bound, owner, group, first, agent } = yield* prepare();
             const old = (yield* bound.participations.listByThread(first.thread.id)).find(
-              (p) => p.memberId === agentId,
+              (p) => ThreadParticipation.memberOf(p.participant) === agentId,
             );
             if (old === undefined) return yield* Effect.die("Missing agent");
             yield* run(
               bound,
               agent,
               Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                s.leave({ groupId: group.id, membershipId: old.groupMembershipId }),
+                s.leave({
+                  groupId: group.id,
+                  membershipId: memberParticipant(old).groupMembershipId,
+                }),
               ),
             );
             yield* run(bound, owner, reply(first.thread.id));
@@ -535,14 +547,17 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             const addressed = yield* run(bound, owner, reply(first.thread.id, [agentId]));
             expect(addressed.activity.sequence).toBe(5);
             const current = (yield* bound.participations.listByThread(first.thread.id)).find(
-              (p) => p.memberId === agentId && p.status === "active",
+              (p) =>
+                ThreadParticipation.memberOf(p.participant) === agentId && p.status === "active",
             );
             expect(current).toMatchObject({
               joinedAtSequence: 5,
               joinedAt: addressed.message.publishedAt,
             });
             expect(current?.id).not.toBe(old.id);
-            expect(current?.groupMembershipId).not.toBe(old.groupMembershipId);
+            expect(
+              current === undefined ? undefined : memberParticipant(current).groupMembershipId,
+            ).not.toBe(memberParticipant(old).groupMembershipId);
             expect((yield* notifications(bound, agentId)).map((n) => n.state._tag).sort()).toEqual([
               "Discarded",
               "Pending",
@@ -550,7 +565,7 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             yield* run(bound, owner, reply(first.thread.id));
             expect(
               (yield* bound.participations.listByThread(first.thread.id)).filter(
-                (p) => p.memberId === agentId,
+                (p) => ThreadParticipation.memberOf(p.participant) === agentId,
               ),
             ).toHaveLength(2);
             expect(yield* notifications(bound, agentId)).toHaveLength(3);
@@ -735,7 +750,7 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
               );
               expect(
                 (yield* bound.participations.listByThread(saved.first.thread.id)).filter(
-                  (p) => p.memberId === humanId,
+                  (p) => ThreadParticipation.memberOf(p.participant) === humanId,
                 ),
               ).toHaveLength(1);
               expect(yield* notifications(bound, humanId)).toHaveLength(successful.length);
@@ -892,7 +907,10 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
               listByThread: () =>
                 Effect.succeed([
                   Object.assign({}, current, {
-                    identity: { _tag: "Human" as const, id: Identity.HumanId.make("wrong") },
+                    participant: {
+                      ...memberParticipant(current),
+                      identity: { _tag: "Human" as const, id: Identity.HumanId.make("wrong") },
+                    },
                   }),
                 ]),
             }),
@@ -929,14 +947,17 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             });
             yield* asActor(ownReply, human);
             const old = (yield* bound.participations.listByThread(first.thread.id)).find(
-              (p) => p.memberId === humanId,
+              (p) => ThreadParticipation.memberOf(p.participant) === humanId,
             );
             if (old === undefined) return yield* Effect.die("Missing author");
             yield* run(
               bound,
               human,
               Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                s.leave({ groupId: group.id, membershipId: old.groupMembershipId }),
+                s.leave({
+                  groupId: group.id,
+                  membershipId: memberParticipant(old).groupMembershipId,
+                }),
               ),
             );
             expect(yield* Effect.flip(asActor(ownReply, human))).toEqual(
@@ -953,10 +974,13 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
             expect(yield* notifications(bound, humanId)).toHaveLength(1);
             const returned = yield* asActor(ownReply, human);
             const current = (yield* bound.participations.listByThread(first.thread.id)).find(
-              (p) => p.memberId === humanId && p.status === "active",
+              (p) =>
+                ThreadParticipation.memberOf(p.participant) === humanId && p.status === "active",
             );
             expect(current?.id).not.toBe(old.id);
-            expect(current?.groupMembershipId).not.toBe(old.groupMembershipId);
+            expect(
+              current === undefined ? undefined : memberParticipant(current).groupMembershipId,
+            ).not.toBe(memberParticipant(old).groupMembershipId);
             expect(current?.joinedAtSequence).toBe(returned.activity.sequence);
             expect(yield* notifications(bound, humanId)).toHaveLength(2);
             expect(yield* bound.participations.get(old.id)).toMatchObject({
@@ -1018,7 +1042,7 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
                 );
               expect(
                 (yield* bound.participations.listByThread(saved.first.thread.id))
-                  .filter((p) => p.memberId === agentId)
+                  .filter((p) => ThreadParticipation.memberOf(p.participant) === agentId)
                   .every((p) => p.status === "ended"),
               ).toBe(true);
               expect(

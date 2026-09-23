@@ -160,7 +160,12 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     }),
     Context.add(
       GroupStore.Service,
-      GroupStore.Service.of({ workspaceId: boundWorkspaceId, get: unexpected, insert: unexpected }),
+      GroupStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        get: unexpected,
+        findDirect: unexpected,
+        insert: unexpected,
+      }),
     ),
     Context.add(
       GroupMembershipStore.Service,

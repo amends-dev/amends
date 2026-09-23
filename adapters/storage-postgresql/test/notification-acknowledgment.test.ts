@@ -11,7 +11,11 @@ import {
   NotificationProjection,
   NotificationStore,
 } from "@amends/core/notification";
-import { ThreadApplication, ThreadParticipationApplication } from "@amends/core/thread";
+import {
+  ThreadApplication,
+  ThreadParticipation,
+  ThreadParticipationApplication,
+} from "@amends/core/thread";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
@@ -422,7 +426,7 @@ describe.runIf(available)("PostgreSQL notification acknowledgment", () => {
               const result = yield* run(p.bound, human, ack(p.humanNote.id));
               const participant = (yield* p.bound.participations.listByThread(
                 p.first.thread.id,
-              )).find((p) => p.memberId === agent.memberId);
+              )).find((p) => ThreadParticipation.memberOf(p.participant) === agent.memberId);
               if (!participant) return yield* Effect.die("Missing agent participation");
               yield* run(
                 p.bound,

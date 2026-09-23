@@ -1,25 +1,30 @@
 import { Group, GroupStore } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
-import { Array, Effect, Layer, Schema } from "effect";
+import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
 const codec = Schema.fromJsonString(Group.Record);
 const encode = Schema.encodeEffect(codec);
+/** Only a direct group has a member-set key. */
+const keyOf = (record: Group.Record) =>
+  record.kind === "Direct" ? Group.directKey(record.memberIds) : null;
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      workspaceId: Group.Record.fields.workspaceId,
+      workspaceId: Group.TeamRecord.fields.workspaceId,
       id: Group.Id,
-      createdBy: Group.Record.fields.createdBy,
+      createdBy: Group.TeamRecord.fields.createdBy,
+      directKey: Schema.NullOr(Schema.String),
       record: codec,
     }).check(
       Schema.makeFilter(
         (row) =>
           (row.workspaceId === row.record.workspaceId &&
             row.id === row.record.id &&
-            row.createdBy === row.record.createdBy) ||
+            row.createdBy === row.record.createdBy &&
+            row.directKey === keyOf(row.record)) ||
           "Group columns must match the stored record",
       ),
     ),
@@ -30,17 +35,32 @@ const decode = Schema.decodeUnknownEffect(
 export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { sql } = database;
+  const columns = sql`workspace_id AS workspaceId, id, created_by AS createdBy, direct_key AS directKey, record`;
   return GroupStore.Service.of({
     workspaceId,
     get: Effect.fn("Groups.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Group.Id)(input);
         const rows = yield* guard(
-          sql`SELECT workspace_id AS workspaceId, id, created_by AS createdBy, record FROM groups WHERE workspace_id = ${workspaceId} AND id = ${id}`,
+          sql`SELECT ${columns} FROM groups WHERE workspace_id = ${workspaceId} AND id = ${id}`,
         ).pipe(Effect.flatMap(decode));
         return Array.head(rows.map(({ record }) => record));
       },
       Effect.mapError(storeFailure(GroupStore, "get")),
+    ),
+    findDirect: Effect.fn("Groups.findDirect")(
+      function* (input) {
+        const memberIds = yield* Schema.decodeEffect(Group.DirectMembers)(
+          Group.directMembers(input),
+        );
+        const rows = yield* guard(
+          sql`SELECT ${columns} FROM groups WHERE workspace_id = ${workspaceId} AND direct_key = ${Group.directKey(memberIds)}`,
+        ).pipe(Effect.flatMap(decode));
+        return Option.flatMap(Array.head(rows), ({ record }) =>
+          record.kind === "Direct" ? Option.some(record) : Option.none(),
+        );
+      },
+      Effect.mapError(storeFailure(GroupStore, "findDirect")),
     ),
     insert: Effect.fn("Groups.insert")(function* (input) {
       yield* Store.Transaction;
@@ -63,7 +83,7 @@ export const make = Effect.fn("Groups.make")(function* () {
         });
       const data = yield* encode(record).pipe(Effect.mapError(storeFailure(GroupStore, "insert")));
       yield* guard(
-        sql`INSERT INTO groups (workspace_id, id, created_by, record) VALUES (${workspaceId}, ${record.id}, ${record.createdBy}, ${data})`,
+        sql`INSERT INTO groups (workspace_id, id, created_by, direct_key, record) VALUES (${workspaceId}, ${record.id}, ${record.createdBy}, ${keyOf(record)}, ${data})`,
         true,
       ).pipe(Effect.mapError(storeError(GroupStore, "insert")));
     }),

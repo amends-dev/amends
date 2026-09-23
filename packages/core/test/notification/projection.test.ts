@@ -5,7 +5,6 @@ import {
   ThreadParticipationFacts,
   ThreadParticipationStore,
 } from "@amends/core/thread";
-import { Member } from "@amends/core/workspace";
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
@@ -131,7 +130,6 @@ it.effect("participation domain facts advance the checkpoint without touching no
           workspaceId,
           threadId: Thread.Id.make("thread"),
           participationId: ThreadParticipation.Id.make("participation"),
-          memberId: Member.Id.make("member"),
           reason: "unfollowed",
         });
         expect(yield* fixture.checkpoints.get(key)).toEqual(

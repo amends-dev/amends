@@ -1,6 +1,5 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
 import { Journal } from "../journal/journal.ts";
 import { Event } from "../journal/event.ts";
 import type { Log } from "../journal/log.ts";
@@ -36,7 +35,7 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/notification/source/Service",
 ) {}
-const sameIdentity = Schema.toEquivalence(Identity.MemberReference);
+const sameRecipient = Schema.toEquivalence(Notification.Recipient);
 const sameActivity = Schema.toEquivalence(ThreadActivity.Record);
 /** @category constructors */
 export const make = Effect.fn("NotificationSource.make")(function* () {
@@ -98,7 +97,7 @@ export const make = Effect.fn("NotificationSource.make")(function* () {
       !recipients.some(
         (recipient) =>
           recipient.participationId === notification.participationId &&
-          sameIdentity(recipient.identity, target),
+          sameRecipient(recipient.recipient, target),
       )
     )
       return yield* new InvalidReference({
@@ -115,7 +114,10 @@ export const make = Effect.fn("NotificationSource.make")(function* () {
       participant.workspaceId !== workspaceId ||
       participant.threadId !== activity.threadId ||
       participant.joinedAtSequence > activity.sequence ||
-      !sameIdentity(participant.identity, notification.recipient)
+      !sameRecipient(
+        ThreadParticipation.recipientOf(participant.participant),
+        notification.recipient,
+      )
     )
       return yield* new InvalidReference({
         message: "Notification participation does not match its source",

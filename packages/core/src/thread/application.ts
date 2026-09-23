@@ -284,15 +284,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           Effect.fail(new InvalidResponse({ message: error.message })),
         ),
       );
-    const current: Array<ThreadParticipation.Summary> = participants.map((participant) => ({
-      id: participant.id,
-      workspaceId,
-      threadId: thread.id,
-      memberId: participant.memberId,
-      joinedAt: participant.joinedAt,
-      joinedAtSequence: participant.joinedAtSequence,
-    }));
-    return current;
+    return participants.map(ThreadParticipation.toSummary);
   });
   return Service.of({
     workspaceId,

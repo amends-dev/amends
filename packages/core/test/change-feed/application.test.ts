@@ -265,9 +265,12 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             id: participationId,
             workspaceId,
             threadId,
-            memberId: actor.memberId,
-            groupMembershipId: GroupMembership.Id.make("private-membership"),
-            identity: actor.identity,
+            participant: {
+              _tag: "Member",
+              memberId: actor.memberId,
+              groupMembershipId: GroupMembership.Id.make("private-membership"),
+              identity: actor.identity,
+            },
             joinedAt: group.createdAt,
             joinedAtSequence: 1,
             status: "active",
@@ -278,7 +281,6 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             workspaceId,
             threadId,
             participationId,
-            memberId: actor.memberId,
           });
           yield* journal.publish(ThreadActivityFacts.Recorded, {
             recipients: [],
@@ -302,7 +304,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
             id: messageId,
             workspaceId,
             threadId,
-            authorMemberId: actor.memberId,
+            author: { _tag: "Member", memberId: actor.memberId },
             kind: "User",
             text: "Private proposal",
             mentions: [],
@@ -318,7 +320,7 @@ it.effect("private group commits are withheld and mixed commits retain only publ
               messageId,
               occurredAt: group.createdAt,
             },
-            recipients: [{ participationId, identity: actor.identity }],
+            recipients: [{ participationId, recipient: actor.identity }],
           });
           yield* journal.publish(GroupMembershipFacts.Removed, {
             workspaceId,

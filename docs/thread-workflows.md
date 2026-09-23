@@ -212,10 +212,12 @@ reply tests verify pages containing messages published through the application.
 
 ### Current participants and access loss
 
-Participant summaries contain `id`, `workspaceId`, `threadId`, `memberId`, `joinedAt`, and
-`joinedAtSequence`. They omit routing identities, group-admission linkage, and ended participation
-history. A record appears only while its participation, exact original group admission, and
-workspace membership are all active. Rejoining a group under a new admission cannot make an
+Participant summaries contain `id`, `workspaceId`, `threadId`, `participant`, `joinedAt`, and
+`joinedAtSequence`. `participant` is a public member (`memberId`), contact (`contactId`), or triage
+reference. Summaries omit routing identities, group-admission linkage, and ended participation
+history. A member appears only while its participation, exact original group admission, and
+workspace membership are all active; contacts and triage need only active participation. The
+current start and reply workflows admit members only. Rejoining a group under a new admission cannot make an
 old participation current again. Member profiles are read through their own authorized operations.
 
 Missing, foreign, and outside-audience thread IDs share `ThreadApplication.NotFound` for metadata,

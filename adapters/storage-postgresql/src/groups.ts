@@ -1,15 +1,44 @@
 import { Group, GroupStore } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { and, eq } from "drizzle-orm";
-import { Array, DateTime, Effect, Layer, Schema } from "effect";
+import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { groups, members } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
-const decode = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Group.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
+const decodeRows = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Union([
+      Schema.Struct({ ...Group.TeamRecord.fields, createdAt: Schema.DateTimeUtcFromDate }),
+      Schema.Struct({ ...Group.DirectRecord.fields, createdAt: Schema.DateTimeUtcFromDate }),
+    ]),
+  ),
 );
+/** Column decoding drops record-level checks, so each record is validated again. */
+const decode = (rows: ReadonlyArray<unknown>) =>
+  decodeRows(rows).pipe(
+    Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
+  );
+
+type Row = typeof groups.$inferSelect;
+/** Each kind reads only its own columns; the schema constraint rejects rows mixing them. */
+const toRecord = ({ memberIds, directKey, visibility, name, ...common }: Row) =>
+  common.kind === "Direct"
+    ? directKey === (memberIds === null ? null : Group.directKey(memberIds))
+      ? { ...common, memberIds }
+      : undefined
+    : { ...common, visibility, name };
+const toRow = (record: Group.Record): typeof groups.$inferInsert => ({
+  workspaceId: record.workspaceId,
+  id: record.id,
+  kind: record.kind,
+  createdBy: record.createdBy,
+  createdAt: DateTime.toDate(record.createdAt),
+  ...(record.kind === "Team"
+    ? { visibility: record.visibility, name: record.name }
+    : { memberIds: [...record.memberIds], directKey: Group.directKey(record.memberIds) }),
+});
 
 /** Group records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Groups.make")(function* () {
@@ -25,9 +54,34 @@ export const make = Effect.fn("Groups.make")(function* () {
             .select()
             .from(groups)
             .where(and(eq(groups.workspaceId, workspaceId), eq(groups.id, id))),
-        ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
+        ).pipe(
+          Effect.flatMap((rows) => decode(rows.map(toRecord))),
+          Effect.map(Array.head),
+        );
       },
       Effect.mapError(storeFailure(GroupStore, "get")),
+    ),
+    findDirect: Effect.fn("Groups.findDirect")(
+      function* (input) {
+        const memberIds = yield* Schema.decodeEffect(Group.DirectMembers)(
+          Group.directMembers(input),
+        );
+        const rows = yield* guard(
+          db
+            .select()
+            .from(groups)
+            .where(
+              and(
+                eq(groups.workspaceId, workspaceId),
+                eq(groups.directKey, Group.directKey(memberIds)),
+              ),
+            ),
+        ).pipe(Effect.flatMap((rows) => decode(rows.map(toRecord))));
+        return Option.flatMap(Array.head(rows), (record) =>
+          record.kind === "Direct" ? Option.some(record) : Option.none(),
+        );
+      },
+      Effect.mapError(storeFailure(GroupStore, "findDirect")),
     ),
     insert: Effect.fn("Groups.insert")(function* (input) {
       yield* Store.Transaction;
@@ -51,10 +105,9 @@ export const make = Effect.fn("Groups.make")(function* () {
           operation: "insert",
           message: "Creator membership is missing",
         });
-      yield* guard(
-        db.insert(groups).values({ ...record, createdAt: DateTime.toDate(record.createdAt) }),
-        true,
-      ).pipe(Effect.mapError(storeError(GroupStore, "insert")));
+      yield* guard(db.insert(groups).values(toRow(record)), true).pipe(
+        Effect.mapError(storeError(GroupStore, "insert")),
+      );
     }),
   });
 });

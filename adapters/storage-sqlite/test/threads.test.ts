@@ -45,6 +45,12 @@ import {
   otherWorkspaceId,
   testProvenance,
 } from "./support.ts";
+
+/** Narrow a stored participation to its member participant for assertions. */
+const memberParticipant = (record: ThreadParticipation.Record) => {
+  if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+  return record.participant;
+};
 const humanId = Member.Id.make("human");
 const otherId = Member.Id.make("other");
 const agentId = Member.Id.make("agent");
@@ -157,9 +163,11 @@ it.effect(
             sequence: 1,
             kind: "MessagePublished",
           });
-          expect(result.participants.map((p) => p.memberId).sort()).toEqual(
-            [owner.memberId, humanId, agentId].sort(),
-          );
+          expect(
+            result.participants
+              .flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? [])
+              .sort(),
+          ).toEqual([owner.memberId, humanId, agentId].sort());
           expect(yield* bound.threads.get(result.thread.id)).toEqual(Option.some(result.thread));
           expect(yield* bound.messages.get(result.message.id)).toEqual(Option.some(result.message));
           expect(yield* bound.participations.listByThread(result.thread.id)).toEqual(
@@ -185,12 +193,12 @@ it.effect(
           expect(event.provenance.performedBy).toMatchObject({ memberId: owner.memberId });
           expect(event.payload.recipients).toHaveLength(3);
           for (const participant of result.participants) {
-            const rows = yield* notifications(bound, participant.identity);
+            const rows = yield* notifications(bound, memberParticipant(participant).identity);
             expect(rows).toHaveLength(1);
             expect(rows[0]).toMatchObject({
               participationId: participant.id,
               source: { logId: event.logId, entryId: event.id },
-              recipient: participant.identity,
+              recipient: memberParticipant(participant).identity,
               state: { _tag: "Pending" },
             });
           }
@@ -212,9 +220,11 @@ it.effect("mentions narrow initial participation and recipients without admittin
       Effect.gen(function* () {
         const { bound, owner, group } = yield* prepare();
         const result = yield* run(bound, owner, start(group.id, [agentId]));
-        expect(result.participants.map((p) => p.memberId).sort()).toEqual(
-          [owner.memberId, agentId].sort(),
-        );
+        expect(
+          result.participants
+            .flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? [])
+            .sort(),
+        ).toEqual([owner.memberId, agentId].sort());
         expect(yield* notifications(bound, owner.identity)).toEqual([]);
         expect(yield* notifications(bound, humanIdentity)).toEqual([]);
         expect(yield* notifications(bound, agentIdentity)).toHaveLength(1);
@@ -378,14 +388,19 @@ it.effect(
         Effect.gen(function* () {
           const { bound, owner, agent, group } = yield* prepare();
           const result = yield* run(bound, owner, start(group.id));
-          const participant = result.participants.find((p) => p.memberId === agentId);
+          const participant = result.participants.find(
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
+          );
           if (participant === undefined) return yield* Effect.die("No agent participation");
           yield* TestClock.adjust("1 second");
           yield* run(
             bound,
             agent,
             Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-              service.leave({ groupId: group.id, membershipId: participant.groupMembershipId }),
+              service.leave({
+                groupId: group.id,
+                membershipId: memberParticipant(participant).groupMembershipId,
+              }),
             ),
           );
           expect(yield* bound.participations.get(participant.id)).toMatchObject({
@@ -410,9 +425,11 @@ it.effect(
           });
           expect((yield* notifications(bound, agentIdentity))[0]?.state._tag).toBe("Discarded");
           const next = yield* run(bound, owner, start(group.id));
-          expect(next.participants.find((p) => p.memberId === agentId)?.groupMembershipId).not.toBe(
-            participant.groupMembershipId,
-          );
+          expect(
+            next.participants
+              .filter((p) => ThreadParticipation.memberOf(p.participant) === agentId)
+              .map((p) => memberParticipant(p).groupMembershipId)[0],
+          ).not.toBe(memberParticipant(participant).groupMembershipId);
           yield* run(
             bound,
             owner,
@@ -425,7 +442,7 @@ it.effect(
           ).toBe(true);
           expect(
             (yield* bound.participations.listByThread(next.thread.id)).find(
-              (p) => p.memberId === agentId,
+              (p) => ThreadParticipation.memberOf(p.participant) === agentId,
             )?.status,
           ).toBe("ended");
           expect(
@@ -629,7 +646,7 @@ it.effect(
           const first = yield* run(bound, owner, start(group.id));
           const second = yield* run(bound, owner, start(group.id, [humanId]));
           const participation = first.participants.find(
-            (participant) => participant.memberId === agentId,
+            (participant) => ThreadParticipation.memberOf(participant.participant) === agentId,
           );
           if (participation === undefined) return yield* Effect.die("Missing participant");
           const foreign = yield* boundTo(otherWorkspaceId);
@@ -670,7 +687,7 @@ it.effect(
           for (const record of [
             Object.assign({}, first.message, {
               id: ThreadMessage.Id.make("missing-author"),
-              authorMemberId: otherId,
+              author: { _tag: "Member", memberId: otherId },
             }),
             Object.assign({}, first.message, {
               id: ThreadMessage.Id.make("outside-mention"),
@@ -767,7 +784,7 @@ it.effect(
             for (const thread of yield* bound.threads.listByGroup(saved.group.id))
               expect(
                 (yield* bound.participations.listByThread(thread.id))
-                  .filter((p) => p.memberId === agentId)
+                  .filter((p) => ThreadParticipation.memberOf(p.participant) === agentId)
                   .every((p) => p.status === "ended"),
               ).toBe(true);
             expect(
@@ -808,7 +825,9 @@ it.effect(
           expect(yield* history(bound)).toEqual(before);
           expect(yield* bound.checkpoints.get(key)).toEqual(checkpoint);
           const result = yield* run(bound, owner, start(group.id));
-          const participation = result.participants.find((p) => p.memberId === agentId);
+          const participation = result.participants.find(
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
+          );
           if (participation === undefined) return yield* Effect.die("Missing agent");
           const snapshot = yield* history(bound);
           const failing = {
@@ -832,7 +851,7 @@ it.effect(
                 Effect.flatMap(GroupMembershipApplication.Service, (service) =>
                   service.leave({
                     groupId: group.id,
-                    membershipId: participation.groupMembershipId,
+                    membershipId: memberParticipant(participation).groupMembershipId,
                   }),
                 ),
               ),

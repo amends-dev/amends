@@ -12,8 +12,23 @@ const decode = Schema.decodeUnknownEffect(
     Schema.Struct({ ...ThreadMessage.Record.fields, publishedAt: Schema.DateTimeUtcFromDate }),
   ),
 );
-const decodeRows = (rows: ReadonlyArray<typeof threadMessages.$inferSelect>) =>
-  decode(rows).pipe(
+type Row = typeof threadMessages.$inferSelect;
+/** Each author kind reads only its own column; the table constraint rejects mixed rows. */
+const toRecord = ({ authorKind, authorMemberId, authorContactId, ...row }: Row) => ({
+  ...row,
+  author:
+    authorKind === "Member"
+      ? { _tag: authorKind, memberId: authorMemberId }
+      : { _tag: authorKind, contactId: authorContactId },
+});
+const authorColumns = (
+  author: ThreadMessage.Author,
+): Pick<typeof threadMessages.$inferInsert, "authorKind" | "authorMemberId" | "authorContactId"> =>
+  author._tag === "Member"
+    ? { authorKind: "Member", authorMemberId: author.memberId, authorContactId: null }
+    : { authorKind: "Contact", authorMemberId: null, authorContactId: author.contactId };
+const decodeRows = (rows: ReadonlyArray<Row>) =>
+  decode(rows.map(toRecord)).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
   );
 /** Workspace-bound thread-messages projection storage. @category constructors */
@@ -45,25 +60,39 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
+      // A member author must be a human participant; a contact author, a contact participant.
+      const author = record.author;
       const related = yield* guard(
-        db
-          .select({ id: threadParticipations.id })
-          .from(threadParticipations)
-          .innerJoin(
-            members,
-            and(
-              eq(members.workspaceId, threadParticipations.workspaceId),
-              eq(members.id, threadParticipations.memberId),
-            ),
-          )
-          .where(
-            and(
-              eq(threadParticipations.workspaceId, workspaceId),
-              eq(threadParticipations.threadId, record.threadId),
-              eq(threadParticipations.memberId, record.authorMemberId),
-              eq(members.identityKind, "Human"),
-            ),
-          ),
+        author._tag === "Contact"
+          ? db
+              .select({ id: threadParticipations.id })
+              .from(threadParticipations)
+              .where(
+                and(
+                  eq(threadParticipations.workspaceId, workspaceId),
+                  eq(threadParticipations.threadId, record.threadId),
+                  eq(threadParticipations.participantKind, "Contact"),
+                  eq(threadParticipations.identityId, author.contactId),
+                ),
+              )
+          : db
+              .select({ id: threadParticipations.id })
+              .from(threadParticipations)
+              .innerJoin(
+                members,
+                and(
+                  eq(members.workspaceId, threadParticipations.workspaceId),
+                  eq(members.id, threadParticipations.memberId),
+                ),
+              )
+              .where(
+                and(
+                  eq(threadParticipations.workspaceId, workspaceId),
+                  eq(threadParticipations.threadId, record.threadId),
+                  eq(threadParticipations.memberId, author.memberId),
+                  eq(members.identityKind, "Human"),
+                ),
+              ),
         true,
       ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
       if (related.length === 0)
@@ -91,10 +120,11 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
             message: "Mention has no participation in this thread",
           });
       }
-
+      const { author: _, ...fields } = record;
       yield* guard(
         db.insert(threadMessages).values({
-          ...record,
+          ...fields,
+          ...authorColumns(author),
           publishedAt: DateTime.toDate(record.publishedAt),
           mentions: [...record.mentions],
         }),

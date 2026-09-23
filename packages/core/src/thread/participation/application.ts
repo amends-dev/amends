@@ -100,7 +100,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
       ]);
       const actor = yield* Actor.Service;
       const current = (yield* admissions.current(thread)).find(
-        (p) => p.memberId === actor.memberId,
+        (p) => ThreadParticipation.memberOf(p.participant) === actor.memberId,
       );
       if (current !== undefined) return ThreadParticipation.toSummary(current);
       const sequence = yield* recording.nextSequence(thread.id);
@@ -115,11 +115,12 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         admitted.added.length !== 1 ||
         added === undefined ||
         participant === undefined ||
-        participant.memberId !== actor.memberId ||
+        participant.participant._tag !== "Member" ||
+        participant.participant.memberId !== actor.memberId ||
         participant.threadId !== thread.id ||
         participant.workspaceId !== workspaceId ||
         participant.joinedAtSequence !== sequence ||
-        !sameIdentity(participant.identity, actor.identity)
+        !sameIdentity(participant.participant.identity, actor.identity)
       )
         return yield* new InvalidResponse({ message: "Admission returned another participation" });
       yield* recording
@@ -151,9 +152,14 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         return yield* new InvalidResponse({
           message: "Participation store returned another record or workspace",
         });
-      if (participant.threadId !== thread.id || participant.memberId !== actor.memberId)
+      const own = participant.participant;
+      if (
+        participant.threadId !== thread.id ||
+        own._tag !== "Member" ||
+        own.memberId !== actor.memberId
+      )
         return yield* new NotFound(request);
-      if (!sameIdentity(participant.identity, actor.identity))
+      if (!sameIdentity(own.identity, actor.identity))
         return yield* new InvalidResponse({ message: "Participation has another identity" });
       if (participant.status === "ended") return yield* new AlreadyEnded(request);
       const current = (yield* admissions.current(thread)).find((p) => p.id === participant.id);
@@ -161,11 +167,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         return yield* new InvalidResponse({
           message: "Participation no longer has a current group admission",
         });
-      yield* departures.end(
-        { ...request, workspaceId, memberId: actor.memberId },
-        "unfollowed",
-        yield* DateTime.now,
-      );
+      yield* departures.end({ ...request, workspaceId }, "unfollowed", yield* DateTime.now);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

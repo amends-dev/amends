@@ -177,7 +177,7 @@ const append = (bound: Bound, thread: Thread.Record, sequence: number) =>
             id: ThreadMessage.Id.make(`${thread.id}-message-${sequence}`),
             workspaceId: thread.workspaceId,
             threadId: thread.id,
-            authorMemberId: thread.createdBy,
+            author: { _tag: "Member", memberId: thread.createdBy },
             kind: "User",
             text: `Message ${sequence}`,
             mentions: [],
@@ -195,7 +195,10 @@ const append = (bound: Bound, thread: Thread.Record, sequence: number) =>
           yield* journal.publish(ThreadMessageFacts.Published, message);
           const recipients = (yield* bound.participations.listByThread(thread.id))
             .filter((p) => p.status === "active")
-            .map((p) => ({ participationId: p.id, identity: p.identity }));
+            .map((p) => ({
+              participationId: p.id,
+              recipient: ThreadParticipation.recipientOf(p.participant),
+            }));
           yield* journal.publish(ThreadActivityFacts.Recorded, { activity, recipients });
           return { activity, message };
         }),
@@ -231,7 +234,9 @@ it.effect(
           const beforeNotifications = yield* bound.notifications.listByRecipient(readerIdentity, {
             limit: 100,
           });
-          expect(beforeParts.some((p) => p.memberId === readerId)).toBe(false);
+          expect(
+            beforeParts.some((p) => ThreadParticipation.memberOf(p.participant) === readerId),
+          ).toBe(false);
           expect(yield* run(bound, reader, get(first.thread.id))).toEqual(first.thread);
           expect(yield* run(bound, reader, list(group.id))).toEqual(
             [first.thread, second.thread].toSorted((a, b) => (a.id < b.id ? -1 : 1)),
@@ -240,12 +245,21 @@ it.effect(
             { activity: first.activity, message: first.message },
           ]);
           const current = yield* run(bound, reader, participants(first.thread.id));
-          expect(current.map((p) => p.memberId).sort()).toEqual(
-            beforeParts.map((p) => p.memberId).sort(),
+          expect(
+            current.flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? []).sort(),
+          ).toEqual(
+            beforeParts.flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? []).sort(),
           );
           for (const p of current)
             expect(Object.keys(p).sort()).toEqual(
-              ["id", "workspaceId", "threadId", "memberId", "joinedAt", "joinedAtSequence"].sort(),
+              [
+                "id",
+                "workspaceId",
+                "threadId",
+                "participant",
+                "joinedAt",
+                "joinedAtSequence",
+              ].sort(),
             );
           expect(yield* bound.participations.listByThread(first.thread.id)).toEqual(beforeParts);
           expect(
@@ -450,7 +464,7 @@ it.effect(
               expect(yield* service.readTimeline(first.thread.id, { limit: 10 })).toHaveLength(1);
               expect(
                 (yield* service.listParticipants(second.thread.id)).some(
-                  (p) => p.memberId === readerId,
+                  (p) => ThreadParticipation.memberOf(p.participant) === readerId,
                 ),
               ).toBe(false);
               yield* asActor(
@@ -583,7 +597,7 @@ it.effect(
                   id: ThreadMessage.Id.make("staged-message"),
                   workspaceId,
                   threadId: first.thread.id,
-                  authorMemberId: owner.memberId,
+                  author: { _tag: "Member", memberId: owner.memberId },
                   kind: "User",
                   text: "Staged text",
                   mentions: [],
@@ -672,7 +686,7 @@ it.effect(
           expect(yield* run(bound, visitor, timeline(first.thread.id))).toHaveLength(1);
           expect(
             (yield* run(bound, visitor, participants(first.thread.id))).some(
-              (p) => p.memberId === memberId,
+              (p) => ThreadParticipation.memberOf(p.participant) === memberId,
             ),
           ).toBe(false);
           expect(yield* bound.notifications.listByRecipient(identity, { limit: 10 })).toEqual([]);
@@ -697,7 +711,7 @@ it.effect(
           );
           expect(
             (yield* run(bound, owner, participants(second.thread.id))).some(
-              (p) => p.memberId === agentId,
+              (p) => ThreadParticipation.memberOf(p.participant) === agentId,
             ),
           ).toBe(false);
           expect(
@@ -878,7 +892,7 @@ it.effect("thread and participation reads reject inconsistent references and dup
         const { bound, owner, group, first, second, secret } = yield* prepare();
         const before = yield* history(bound);
         const participant = (yield* bound.participations.listByThread(second.thread.id)).find(
-          (p) => p.memberId === agentId,
+          (p) => ThreadParticipation.memberOf(p.participant) === agentId,
         );
         if (participant === undefined) return yield* Effect.die("Missing participant");
         for (const record of [
@@ -971,7 +985,7 @@ it.effect("thread and participation reads reject inconsistent references and dup
         };
         expect(
           (yield* run(oldAdmission, owner, participants(second.thread.id))).some(
-            (p) => p.memberId === agentId,
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
           ),
         ).toBe(false);
         expect(yield* history(bound)).toEqual(before);

@@ -9,6 +9,7 @@ import { Publication } from "../../journal/publication.ts";
 import { ThreadId } from "../id.ts";
 import { ThreadAccess } from "../access.ts";
 import { ThreadParticipationAdmission } from "../participation/admission.ts";
+import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessagePermissions } from "./permissions.ts";
 import { ThreadMessagePublication } from "./publication.ts";
@@ -92,7 +93,12 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       const selected = [
         ...new Set([
           actor.memberId,
-          ...(request.mentions.length === 0 ? current.map((p) => p.memberId) : request.mentions),
+          ...(request.mentions.length === 0
+            ? current.flatMap((p) => {
+                const memberId = ThreadParticipation.memberOf(p.participant);
+                return memberId === undefined ? [] : [memberId];
+              })
+            : request.mentions),
         ]),
       ];
       const eligible = yield* admissions.eligible(thread.groupId);

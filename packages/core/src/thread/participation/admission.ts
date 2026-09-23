@@ -128,7 +128,7 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
       return yield* new InvalidResponse({ message: "Thread belongs to another workspace" });
     const result: Array<ThreadParticipation.Record> = [];
     const seen = new Set<ThreadParticipation.Id>();
-    const seenMembers = new Set<Member.Id>();
+    const seenParticipants = new Set<string>();
     for (const row of yield* participations.listByThread(thread.id)) {
       const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
         row,
@@ -143,11 +143,18 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
         });
       seen.add(participant.id);
       if (participant.status !== "active") continue;
-      if (seenMembers.has(participant.memberId))
+      const key = ThreadParticipation.keyOf(participant.participant);
+      if (seenParticipants.has(key))
         return yield* new InvalidResponse({ message: "Duplicate active thread participant" });
-      seenMembers.add(participant.memberId);
-      const foundAdmission = yield* memberships.get(participant.groupMembershipId);
-      const foundMember = yield* members.get(participant.memberId);
+      seenParticipants.add(key);
+      // Contacts and triage take part without group access; members need a current admission.
+      if (participant.participant._tag !== "Member") {
+        result.push(participant);
+        continue;
+      }
+      const joined = participant.participant;
+      const foundAdmission = yield* memberships.get(joined.groupMembershipId);
+      const foundMember = yield* members.get(joined.memberId);
       if (Option.isNone(foundAdmission) || Option.isNone(foundMember))
         return yield* new InvalidResponse({
           message: "Participation references a missing admission or workspace member",
@@ -159,13 +166,13 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
         Effect.mapError(invalidRecord),
       );
       if (
-        admission.id !== participant.groupMembershipId ||
+        admission.id !== joined.groupMembershipId ||
         admission.workspaceId !== workspaceId ||
         admission.groupId !== thread.groupId ||
-        admission.memberId !== participant.memberId ||
+        admission.memberId !== joined.memberId ||
         member.workspaceId !== workspaceId ||
-        member.id !== participant.memberId ||
-        !sameIdentity(member.identity, participant.identity)
+        member.id !== joined.memberId ||
+        !sameIdentity(member.identity, joined.identity)
       )
         return yield* new InvalidResponse({
           message: "Participation references another admission, group, member, or workspace",
@@ -183,7 +190,11 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     yield* Store.Transaction;
     const ids = yield* Schema.decodeEffect(Schema.UniqueArray(Member.Id))(memberIds);
     const candidates = yield* eligible(thread.groupId);
-    const existing = new Map((yield* current(thread)).map((p) => [p.memberId, p]));
+    const existing = new Map(
+      (yield* current(thread)).flatMap((p) =>
+        p.participant._tag === "Member" ? [[p.participant.memberId, p] as const] : [],
+      ),
+    );
     const result: Array<ThreadParticipation.Record> = [];
     const added: Array<Event.Type<typeof ThreadParticipationFacts.Added>> = [];
     for (const memberId of ids) {
@@ -192,7 +203,8 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
       const previous = existing.get(memberId);
       if (previous !== undefined) {
         if (
-          previous.groupMembershipId !== candidate.admission.id ||
+          previous.participant._tag !== "Member" ||
+          previous.participant.groupMembershipId !== candidate.admission.id ||
           previous.joinedAtSequence > sequence
         )
           return yield* new InvalidResponse({
@@ -205,9 +217,12 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
         id: ThreadParticipation.Id.make(yield* crypto.randomUUIDv4),
         workspaceId,
         threadId: thread.id,
-        memberId,
-        groupMembershipId: candidate.admission.id,
-        identity: candidate.member.identity,
+        participant: {
+          _tag: "Member",
+          memberId,
+          groupMembershipId: candidate.admission.id,
+          identity: candidate.member.identity,
+        },
         joinedAt: occurredAt,
         joinedAtSequence: sequence,
         status: "active",

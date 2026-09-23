@@ -4,7 +4,7 @@ import { ThreadMessageId } from "../message/id.ts";
 import { ThreadParticipationId } from "../participation/id.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
 import { WorkspaceId } from "../../workspace/id.ts";
-import { Identity } from "../../identity/identity.ts";
+import { Notification } from "../../notification/notification.ts";
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadActivityId"));
 export type Id = typeof Id.Type;
 export const Common = Schema.Struct({
@@ -55,7 +55,7 @@ export type Subject = typeof Subject.Type;
 /** Historical recipient selection, recorded with the activity rather than recomputed on replay. */
 export const Recipient = Schema.Struct({
   participationId: ThreadParticipationId.Id,
-  identity: Identity.MemberReference,
+  recipient: Notification.Recipient,
 });
 export interface Recipient extends Schema.Schema.Type<typeof Recipient> {}
 export * as ThreadActivity from "./activity.ts";

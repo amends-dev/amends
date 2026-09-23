@@ -12,6 +12,7 @@ import {
   GroupApplication,
   GroupFacts,
   GroupMembership,
+  GroupMembershipApplication,
   GroupMembershipFacts,
   GroupMembershipProjection,
   GroupMembershipStore,
@@ -522,4 +523,100 @@ it.effect(
         }),
       ),
     ),
+);
+
+it.effect("direct groups keep a fixed member set that resolves to one group", () =>
+  withDatabase((location) =>
+    inDatabase(
+      location,
+      Effect.gen(function* () {
+        const { bound, owner, actor } = yield* prepare();
+        const createdAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z");
+        const direct = {
+          id: Group.Id.make("direct-group"),
+          workspaceId,
+          kind: "Direct",
+          memberIds: Group.directMembers([memberId, owner.memberId]),
+          createdBy: owner.memberId,
+          createdAt,
+        } satisfies Group.Record;
+        const admissions = direct.memberIds.map((id) => ({
+          id: GroupMembership.Id.make(`direct-${id}`),
+          workspaceId,
+          groupId: direct.id,
+          memberId: id,
+          admittedAt: createdAt,
+          status: "active" as const,
+        }));
+        yield* bound.store.transaction(
+          Effect.gen(function* () {
+            for (const invalid of [
+              { ...direct, memberIds: [owner.memberId] },
+              { ...direct, memberIds: [...direct.memberIds].reverse() },
+              { ...direct, memberIds: [owner.memberId, owner.memberId] },
+              { ...direct, createdBy: agentId },
+            ])
+              expect(yield* Effect.flip(bound.groups.insert(invalid))).toMatchObject({
+                _tag: "GroupStore.Conflict",
+              });
+            yield* bound.groups.insert(direct);
+            for (const admission of admissions) yield* bound.groupMemberships.insert(admission);
+          }),
+        );
+        expect(yield* bound.groups.get(direct.id)).toEqual(Option.some(direct));
+        expect(yield* bound.groups.findDirect([owner.memberId, memberId, memberId])).toEqual(
+          Option.some(direct),
+        );
+        expect(yield* bound.groups.findDirect([owner.memberId, agentId])).toEqual(Option.none());
+        // The same members cannot name a second direct group; a team with them is unrelated.
+        expect(
+          yield* Effect.flip(
+            bound.store.transaction(
+              bound.groups.insert({ ...direct, id: Group.Id.make("second-direct") }),
+            ),
+          ),
+        ).toMatchObject({ _tag: "GroupStore.Conflict" });
+        const team = yield* asActor(create([owner.memberId, memberId]), owner).pipe(
+          Effect.provide(core(bound)),
+        );
+        expect(yield* bound.groups.findDirect([owner.memberId, memberId])).toEqual(
+          Option.some(direct),
+        );
+        expect(team.kind).toBe("Team");
+        const fixed = { _tag: "GroupMembershipApplication.FixedMembership", groupId: direct.id };
+        const memberships = (
+          program: (
+            service: GroupMembershipApplication.Interface,
+          ) => Effect.Effect<unknown, unknown, Actor.Service>,
+          as: Actor.Value,
+        ) =>
+          asActor(Effect.flatMap(GroupMembershipApplication.Service, program), as).pipe(
+            Effect.provide(core(bound)),
+            Effect.flip,
+          );
+        expect(
+          yield* memberships(
+            (service) => service.add({ groupId: direct.id, memberId: agentId }),
+            owner,
+          ),
+        ).toMatchObject(fixed);
+        expect(
+          yield* memberships(
+            (service) => service.remove({ groupId: direct.id, membershipId: admissions[0]!.id }),
+            owner,
+          ),
+        ).toMatchObject(fixed);
+        const own = admissions.find((admission) => admission.memberId === memberId)!;
+        expect(
+          yield* memberships(
+            (service) => service.leave({ groupId: direct.id, membershipId: own.id }),
+            actor,
+          ),
+        ).toMatchObject(fixed);
+        expect(yield* bound.groupMemberships.listByGroup(direct.id)).toEqual(
+          [...admissions].sort((left, right) => (left.id < right.id ? -1 : 1)),
+        );
+      }),
+    ),
+  ),
 );

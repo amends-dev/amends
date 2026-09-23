@@ -10,6 +10,7 @@ import { ThreadId } from "../id.ts";
 import { Thread } from "../thread.ts";
 import { ThreadStore } from "../store.ts";
 import { ThreadParticipationAdmission } from "../participation/admission.ts";
+import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadActivityRecording } from "../activity/recording.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessageFacts } from "./facts.ts";
@@ -86,7 +87,10 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       .ensure(thread, request.participantIds, sequence, request.occurredAt)
       .pipe(Publication.withOccurredAt(request.occurredAt));
     const participants = admitted.participants;
-    if (participants.find((p) => p.memberId === request.authorMemberId)?.identity._tag !== "Human")
+    const author = participants.find(
+      (p) => ThreadParticipation.memberOf(p.participant) === request.authorMemberId,
+    )?.participant;
+    if (author?._tag !== "Member" || author.identity._tag !== "Human")
       return yield* new InvalidReference({
         message: "Human message publication requires a human author",
       });
@@ -94,7 +98,7 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       id: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       threadId: thread.id,
-      authorMemberId: request.authorMemberId,
+      author: { _tag: "Member", memberId: request.authorMemberId },
       kind: "User",
       text: request.text,
       mentions: request.mentions,
@@ -104,8 +108,17 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       .publish(ThreadMessageFacts.Published, message)
       .pipe(Publication.withOccurredAt(request.occurredAt));
     const recipients = participants
-      .filter((p) => request.mentions.length === 0 || request.mentions.includes(p.memberId))
-      .map((p) => ({ participationId: p.id, identity: p.identity }));
+      .filter((p) => {
+        const memberId = ThreadParticipation.memberOf(p.participant);
+        return (
+          request.mentions.length === 0 ||
+          (memberId !== undefined && request.mentions.includes(memberId))
+        );
+      })
+      .map((p) => ({
+        participationId: p.id,
+        recipient: ThreadParticipation.recipientOf(p.participant),
+      }));
     const recorded = yield* recording
       .record({
         threadId: thread.id,

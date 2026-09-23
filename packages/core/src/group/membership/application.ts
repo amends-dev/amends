@@ -45,6 +45,11 @@ export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
   "GroupMembershipApplication.AlreadyRemoved",
   GroupMembership.RemoveInput.fields,
 ) {}
+/** A direct group's members never change; including someone else needs another direct group. */
+export class FixedMembership extends Schema.TaggedError<FixedMembership>()(
+  "GroupMembershipApplication.FixedMembership",
+  { groupId: Group.Id },
+) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupMembershipApplication.InvalidResponse",
   { message: Schema.String },
@@ -66,6 +71,7 @@ export type Error =
   | AlreadyMember
   | NotFound
   | AlreadyRemoved
+  | FixedMembership
   | InvalidResponse;
 
 export type ReadError =
@@ -84,15 +90,16 @@ export interface Interface {
    * Require group.membership.manage on this group, validate its active workspace member,
    * and publish a fresh admission in one commit. An active admission is rejected without
    * another fact. Management authority does not require the caller to belong to the group.
+   * Adding, removing, and leaving apply to team groups; direct groups reject them as fixed.
    */
   readonly add: (
     input: GroupMembership.AddInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /** End this admission after requiring group.membership.manage on its group. */
+  /** End this team-group admission after requiring group.membership.manage on its group. */
   readonly remove: (
     input: GroupMembership.RemoveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /** End only the actor's own admission; active workspace membership is sufficient. */
+  /** End only the actor's own team-group admission; active workspace membership is sufficient. */
   readonly leave: (
     input: GroupMembership.LeaveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
@@ -170,12 +177,17 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       });
     return group;
   });
+  const loadManagedGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+    const group = yield* loadGroup(groupId);
+    if (group.kind === "Direct") return yield* new FixedMembership({ groupId });
+    return group;
+  });
 
   const add = Effect.fn("GroupMembershipApplication.add")(
     function* (input: GroupMembership.AddInput) {
       const { groupId, memberId } = yield* decodeInput(input);
       yield* requireManagement(groupId);
-      yield* loadGroup(groupId);
+      yield* loadManagedGroup(groupId);
 
       const foundMember = yield* members.get(memberId);
       if (Option.isNone(foundMember)) return yield* new MemberNotFound({ memberId });
@@ -266,7 +278,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     function* (input: GroupMembership.RemoveInput) {
       const checked = yield* decodeRemovalInput(input);
       yield* requireManagement(checked.groupId);
-      yield* loadGroup(checked.groupId);
+      yield* loadManagedGroup(checked.groupId);
       return yield* depart(yield* loadMembership(checked), "removed");
     },
     Publication.withActor,
@@ -281,7 +293,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       const membership = yield* loadMembership(checked);
       // Do not disclose another member's admission or departure state through self-service.
       if (membership.memberId !== actor.memberId) return yield* new NotFound(checked);
-      yield* loadGroup(checked.groupId);
+      yield* loadManagedGroup(checked.groupId);
       return yield* depart(membership, "left");
     },
     Publication.withActor,

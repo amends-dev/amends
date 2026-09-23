@@ -1,13 +1,12 @@
 import { DateTime, Effect, Option, Schema } from "effect";
 import { Projection } from "../journal/projection.ts";
-import { Identity } from "../identity/identity.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationFacts } from "./facts.ts";
-const sameIdentity = Schema.toEquivalence(Identity.MemberReference);
+const sameRecipient = Schema.toEquivalence(Notification.Recipient);
 /** Activity generates notifications and settles departure; notification facts record recipient acknowledgment. */
 export const definition = Projection.make("notifications", { version: 1 })
   .on(
@@ -49,7 +48,10 @@ export const definition = Projection.make("notifications", { version: 1 })
             operation: "project",
             message: "Ending activity participation is inconsistent",
           });
-        if (participant.identity._tag === "Agent")
+        if (
+          participant.participant._tag === "Member" &&
+          participant.participant.identity._tag === "Agent"
+        )
           yield* notifications.discardPendingForParticipation(participant.id);
       }
       for (const recipient of recipients) {
@@ -67,7 +69,10 @@ export const definition = Projection.make("notifications", { version: 1 })
           participant.workspaceId !== activity.workspaceId ||
           participant.threadId !== activity.threadId ||
           participant.joinedAtSequence > activity.sequence ||
-          !sameIdentity(participant.identity, recipient.identity)
+          !sameRecipient(
+            ThreadParticipation.recipientOf(participant.participant),
+            recipient.recipient,
+          )
         )
           return yield* new NotificationStore.Conflict({
             operation: "project",
@@ -78,7 +83,7 @@ export const definition = Projection.make("notifications", { version: 1 })
           workspaceId: activity.workspaceId,
           source: { logId: event.logId, entryId: event.id },
           participationId: participant.id,
-          recipient: recipient.identity,
+          recipient: recipient.recipient,
           recordedAt: event.recordedAt,
           state: { _tag: "Pending" },
         });

@@ -125,6 +125,11 @@ admission IDs return `GroupMembershipApplication.NotFound`. Self-leave also retu
 for another member's admission, including one already ended. Managed removal checks group
 existence after authorization and returns `GroupNotFound` when it is missing.
 
+Direct groups have fixed membership. Adding to, removing from, or leaving a direct group
+returns `GroupMembershipApplication.FixedMembership` without another fact; including someone
+else requires another direct group. The store and record contracts for direct groups are
+implemented, while the workflow that starts them remains future work.
+
 Repeating a departure of the same admission returns `AlreadyRemoved` without another fact.
 Authorized addition after departure creates a fresh admission ID; neither an old removal nor
 an old leave request can end it. Leaving does not grant authority to add oneself back.

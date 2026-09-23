@@ -96,6 +96,10 @@ This replaces the development baseline. Recreate disposable PostgreSQL databases
 
 ## Transactions
 
+Groups are team or direct rows. Team groups fill `visibility` and `name`; direct groups fill
+`member_ids` and `direct_key`, derived from the ordered member set, and `groups_kind` rejects
+rows mixing them. `direct_groups_by_members` allows one direct group per member set, and
+`findDirect` resolves a set in any order.
 Private team creation records its group and explicit initial admissions in the shared
 workspace commit. Group admissions reference workspace memberships and have distinct IDs;
 a unique index prevents competing active admissions for the same group/member pair.
@@ -118,8 +122,13 @@ existing stored roles are unchanged.
 
 Thread opening persists the thread, its initial participants, a text message, ordered activity,
 and notifications in one workspace commit. Broadcast enrolls current group members; mentions
-narrow the initial set. Participation references the exact group admission; departure ends it
-and discards pending agent input. Activity facts preserve recipient selection for replay.
+narrow the initial set. A participant is a member, a contact, or triage, stored in
+`participant_kind` with its own columns: members fill `member_id`, `group_membership_id`, and their
+identity; contacts fill a `Contact` identity; triage fills none. `participation_participant`
+rejects mixed rows, and `active_thread_participation` keeps one active participation per member,
+contact, or triage in a thread. Message authors use `author_kind` with a member or contact column;
+a contact author must be a contact participant of the thread. Departure ends a participation and
+discards pending agent input. Activity facts preserve recipient selection for replay.
 Thread reads enforce audience and action permissions in core. Timeline paging uses the existing
 workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new schema
 is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation, staged
@@ -129,8 +138,10 @@ the workspace/thread/sequence index; insertion still rejects duplicate positions
 Reply tests cover scoped publishing grants, new and returning participants, addressing, concurrent
 replies/departures, rollback, reopening, and replay.
 Self-follow records a quiet activity referencing its participation, with no message or notifications.
-Activity rows enforce exactly one message or participation reference, with at most one activity
-per participation and lifecycle kind. Ending activity validates the participation’s terminal state
+Activity rows keep nullable message and participation references with their foreign keys, at
+most one activity per message, and at most one per participation and lifecycle kind. Core
+validates each activity kind; the table has no per-kind constraint, so a new kind adds nullable
+reference columns rather than rewriting one. Ending activity validates the participation’s terminal state
 and departure time and preserves its reason. Unfollow, group departure, and workspace removal
 record the same per-participation ending facts and activity; pending agent input is discarded
 in the same commit. Every kind uses the common activity-recorded fact and notification generator. The participation suite covers scoped grants, quiet follows,

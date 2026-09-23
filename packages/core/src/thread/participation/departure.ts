@@ -66,7 +66,6 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
       participant.workspaceId !== workspaceId ||
       participant.id !== departure.participationId ||
       participant.threadId !== departure.threadId ||
-      participant.memberId !== departure.memberId ||
       participant.status !== "active"
     )
       return yield* new InvalidReference({
@@ -102,8 +101,9 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
       ).pipe(Effect.mapError(invalid));
       if (
         participant.workspaceId !== workspaceId ||
-        participant.groupMembershipId !== membership.id ||
-        participant.memberId !== membership.memberId ||
+        participant.participant._tag !== "Member" ||
+        participant.participant.groupMembershipId !== membership.id ||
+        participant.participant.memberId !== membership.memberId ||
         seen.has(participant.id)
       )
         return yield* new InvalidReference({
@@ -126,12 +126,7 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
           message: "Participation belongs to another group or thread",
         });
       yield* end(
-        {
-          workspaceId,
-          threadId: participant.threadId,
-          participationId: participant.id,
-          memberId: participant.memberId,
-        },
+        { workspaceId, threadId: participant.threadId, participationId: participant.id },
         reason,
         occurredAt,
       );

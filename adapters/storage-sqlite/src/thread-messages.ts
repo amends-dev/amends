@@ -1,4 +1,4 @@
-import { ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
+import { ThreadMessage, ThreadMessageStore, ThreadParticipation } from "@amends/core/thread";
 
 import { Store } from "@amends/core/journal";
 import { Array, Effect, Layer, Schema } from "effect";
@@ -8,13 +8,16 @@ import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
 const codec = Schema.fromJsonString(ThreadMessage.Record);
 const encode = Schema.encodeEffect(codec);
+/** Member authors keep their workspace member as a referenced column; contacts have none. */
+const authorMemberOf = (author: ThreadMessage.Author) =>
+  author._tag === "Member" ? author.memberId : null;
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       workspaceId: ThreadMessage.Record.fields.workspaceId,
       id: ThreadMessage.Id,
       threadId: ThreadMessage.Record.fields.threadId,
-      authorMemberId: ThreadMessage.Record.fields.authorMemberId,
+      authorMemberId: Schema.NullOr(Schema.String),
       record: codec,
     }).check(
       Schema.makeFilter(
@@ -22,7 +25,7 @@ const decode = Schema.decodeUnknownEffect(
           (row.workspaceId === row.record.workspaceId &&
             row.id === row.record.id &&
             row.threadId === row.record.threadId &&
-            row.authorMemberId === row.record.authorMemberId) ||
+            row.authorMemberId === authorMemberOf(row.record.author)) ||
           "Columns must match the stored record",
       ),
     ),
@@ -56,8 +59,11 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
+      const author = record.author;
       const related = yield* guard(
-        sql`SELECT p.id FROM thread_participations p JOIN members m ON m.workspace_id=p.workspace_id AND m.id=p.member_id WHERE p.workspace_id = ${workspaceId} AND p.thread_id = ${record.threadId} AND p.member_id = ${record.authorMemberId} AND json_extract(m.record,'$.identity._tag') = 'Human'`,
+        author._tag === "Member"
+          ? sql`SELECT p.id FROM thread_participations p JOIN members m ON m.workspace_id=p.workspace_id AND m.id=p.member_id WHERE p.workspace_id = ${workspaceId} AND p.thread_id = ${record.threadId} AND p.member_id = ${author.memberId} AND json_extract(m.record,'$.identity._tag') = 'Human'`
+          : sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${record.threadId} AND participant_key = ${ThreadParticipation.keyOf({ _tag: "Contact", contactId: author.contactId })}`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
       if (related.length === 0)
@@ -80,7 +86,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         Effect.mapError(storeFailure(ThreadMessageStore, "insert")),
       );
       yield* guard(
-        sql`INSERT INTO thread_messages (workspace_id,id,thread_id,author_member_id,record) VALUES (${workspaceId},${record.id},${record.threadId},${record.authorMemberId},${data})`,
+        sql`INSERT INTO thread_messages (workspace_id,id,thread_id,author_member_id,record) VALUES (${workspaceId},${record.id},${record.threadId},${authorMemberOf(author)},${data})`,
         true,
       ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
     }),

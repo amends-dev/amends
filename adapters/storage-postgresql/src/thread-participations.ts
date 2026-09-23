@@ -16,13 +16,61 @@ const decode = Schema.decodeUnknownEffect(
     }),
   ),
 );
-const decodeRows = (rows: ReadonlyArray<typeof threadParticipations.$inferSelect>) =>
-  decode(
-    rows.map(({ identityKind, identityId, ...row }) => ({
-      ...row,
-      identity: { _tag: identityKind, id: identityId },
-    })),
-  ).pipe(Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))));
+type Row = typeof threadParticipations.$inferSelect;
+/** Each participant kind reads only its own columns; the table constraint rejects mixed rows. */
+const toRecord = ({
+  participantKind,
+  memberId,
+  groupMembershipId,
+  identityKind,
+  identityId,
+  ...row
+}: Row) => ({
+  ...row,
+  participant:
+    participantKind === "Member"
+      ? {
+          _tag: participantKind,
+          memberId,
+          groupMembershipId,
+          identity: { _tag: identityKind, id: identityId },
+        }
+      : participantKind === "Contact"
+        ? { _tag: participantKind, contactId: identityId }
+        : { _tag: participantKind },
+});
+type ParticipantColumns = Pick<
+  typeof threadParticipations.$inferInsert,
+  "participantKind" | "memberId" | "groupMembershipId" | "identityKind" | "identityId"
+>;
+const participantColumns = (participant: ThreadParticipation.Participant) =>
+  ThreadParticipation.Participant.match(participant, {
+    Member: ({ memberId, groupMembershipId, identity }): ParticipantColumns => ({
+      participantKind: "Member",
+      memberId,
+      groupMembershipId,
+      identityKind: identity._tag,
+      identityId: identity.id,
+    }),
+    Contact: ({ contactId }): ParticipantColumns => ({
+      participantKind: "Contact",
+      memberId: null,
+      groupMembershipId: null,
+      identityKind: "Contact",
+      identityId: contactId,
+    }),
+    Triage: (): ParticipantColumns => ({
+      participantKind: "Triage",
+      memberId: null,
+      groupMembershipId: null,
+      identityKind: null,
+      identityId: null,
+    }),
+  });
+const decodeRows = (rows: ReadonlyArray<Row>) =>
+  decode(rows.map(toRecord)).pipe(
+    Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
+  );
 /** Workspace-bound thread-participations projection storage. @category constructors */
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
@@ -90,7 +138,6 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
               inWorkspace,
               eq(threadParticipations.id, departure.participationId),
               eq(threadParticipations.threadId, departure.threadId),
-              eq(threadParticipations.memberId, departure.memberId),
               eq(threadParticipations.status, "active"),
             ),
           )
@@ -117,34 +164,41 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
+      // A member's admission must belong to the thread's group; contacts and triage need only the thread.
+      const participant = record.participant;
       const related = yield* guard(
-        db
-          .select({ id: threads.id })
-          .from(threads)
-          .innerJoin(
-            groupMemberships,
-            and(
-              eq(groupMemberships.workspaceId, threads.workspaceId),
-              eq(groupMemberships.groupId, threads.groupId),
-            ),
-          )
-          .innerJoin(
-            members,
-            and(
-              eq(members.workspaceId, groupMemberships.workspaceId),
-              eq(members.id, groupMemberships.memberId),
-            ),
-          )
-          .where(
-            and(
-              eq(threads.workspaceId, workspaceId),
-              eq(threads.id, record.threadId),
-              eq(groupMemberships.id, record.groupMembershipId),
-              eq(groupMemberships.memberId, record.memberId),
-              eq(members.identityKind, record.identity._tag),
-              eq(members.identityId, record.identity.id),
-            ),
-          ),
+        participant._tag !== "Member"
+          ? db
+              .select({ id: threads.id })
+              .from(threads)
+              .where(and(eq(threads.workspaceId, workspaceId), eq(threads.id, record.threadId)))
+          : db
+              .select({ id: threads.id })
+              .from(threads)
+              .innerJoin(
+                groupMemberships,
+                and(
+                  eq(groupMemberships.workspaceId, threads.workspaceId),
+                  eq(groupMemberships.groupId, threads.groupId),
+                ),
+              )
+              .innerJoin(
+                members,
+                and(
+                  eq(members.workspaceId, groupMemberships.workspaceId),
+                  eq(members.id, groupMemberships.memberId),
+                ),
+              )
+              .where(
+                and(
+                  eq(threads.workspaceId, workspaceId),
+                  eq(threads.id, record.threadId),
+                  eq(groupMemberships.id, participant.groupMembershipId),
+                  eq(groupMemberships.memberId, participant.memberId),
+                  eq(members.identityKind, participant.identity._tag),
+                  eq(members.identityId, participant.identity.id),
+                ),
+              ),
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));
       if (related.length === 0)
@@ -152,14 +206,13 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           operation: "insert",
           message: "Missing or inconsistent references",
         });
-      const { identity, ...fields } = record;
+      const { participant: _, ...fields } = record;
       yield* guard(
         db.insert(threadParticipations).values({
           ...fields,
+          ...participantColumns(participant),
           joinedAt: DateTime.toDate(record.joinedAt),
           endedAt: record.endedAt === null ? null : DateTime.toDate(record.endedAt),
-          identityKind: identity._tag,
-          identityId: identity.id,
         }),
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));

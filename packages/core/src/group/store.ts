@@ -2,6 +2,7 @@ import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
+import type { MemberId } from "../workspace/member/id.ts";
 import type { Group } from "./group.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("GroupStore.Failure", {
@@ -17,7 +18,14 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflic
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
-  /** Reject invalid/foreign records, missing creator membership, and reused IDs. Never upsert. */
+  /** The direct group with exactly these members, in any order. */
+  readonly findDirect: (
+    memberIds: ReadonlyArray<MemberId.Id>,
+  ) => Effect.Effect<Option.Option<Group.DirectRecord>, Failure>;
+  /**
+   * Reject invalid/foreign records, missing creator membership, reused IDs, and a second direct
+   * group for the same member set. Never upsert.
+   */
   readonly insert: (
     record: Group.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;

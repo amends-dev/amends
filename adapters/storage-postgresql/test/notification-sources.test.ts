@@ -48,6 +48,12 @@ import {
   testProvenance,
 } from "./support.ts";
 
+/** Narrow a stored participation to its member participant for assertions. */
+const memberParticipant = (record: ThreadParticipation.Record) => {
+  if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+  return record.participant;
+};
+
 const humanId = Member.Id.make("human");
 const otherId = Member.Id.make("other");
 const agentId = Member.Id.make("agent");
@@ -333,7 +339,10 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
               bound,
               human,
               Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                s.leave({ groupId: group.id, membershipId: part.groupMembershipId }),
+                s.leave({
+                  groupId: group.id,
+                  membershipId: memberParticipant(part).groupMembershipId,
+                }),
               ),
             );
             expect(yield* run(bound, human, inboxGet(note.id))).toEqual(note);
@@ -482,7 +491,9 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
             changed(original, { workspaceId: otherWorkspaceId }),
             changed(original, { threadId: Thread.Id.make("wrong") }),
             changed(original, { joinedAtSequence: 999 }),
-            changed(original, { identity: identityFor(agentId) }),
+            changed(original, {
+              participant: { ...memberParticipant(original), identity: identityFor(agentId) },
+            }),
           ]) {
             const context = Context.add(bound.context, ThreadParticipationStore.Service, {
               ...bound.participations,
@@ -607,7 +618,7 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
             const { bound, owner, group } = yield* prepare();
             const first = yield* run(bound, owner, start(group.id, [agentId]));
             const ownerPart = (yield* bound.participations.listByThread(first.thread.id)).find(
-              (p) => p.memberId === owner.memberId,
+              (p) => ThreadParticipation.memberOf(p.participant) === owner.memberId,
             );
             if (!ownerPart) return yield* Effect.die("Missing owner");
             const events = yield* facts(
@@ -628,7 +639,10 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
                     const participant = admitted.participants[0];
                     if (!participant) return yield* Effect.die("Missing participant");
                     const recipients = [
-                      { participationId: ownerPart.id, identity: ownerPart.identity },
+                      {
+                        participationId: ownerPart.id,
+                        recipient: ThreadParticipation.recipientOf(ownerPart.participant),
+                      },
                     ];
                     const followed = yield* recorder.record({
                       threadId: first.thread.id,
@@ -642,7 +656,6 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
                         workspaceId,
                         threadId: first.thread.id,
                         participationId: participant.id,
-                        memberId: humanId,
                         reason: "unfollowed",
                       })
                       .pipe(Publication.withOccurredAt(occurredAt));
@@ -684,9 +697,13 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
                 "id",
                 "joinedAt",
                 "joinedAtSequence",
-                "memberId",
+                "participant",
                 "threadId",
                 "workspaceId",
+              ]);
+              expect(Object.keys(result.participant.participant).sort()).toEqual([
+                "_tag",
+                "memberId",
               ]);
             }
           }),

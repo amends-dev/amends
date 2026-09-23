@@ -143,8 +143,12 @@ it; their names play no part in authorization.
 
 Initial members are explicit and may be empty. The creator is admitted only if included.
 `GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
-own ID and workspace-membership reference. Direct groups (DMs and group DMs),
-public groups, threads, and HTTP/UI workflows remain separate work. See
+own ID and workspace-membership reference. `Group.Record` is a team or direct group: a direct
+group has a fixed set of two or more members in `Group.directMembers` order, including its
+creator, and `Group.directKey` identifies that set. `GroupStore.findDirect` resolves a member set
+in any order. `GroupMembershipApplication` adds, removes, and lets members leave team groups
+only; a direct group returns `GroupMembershipApplication.FixedMembership`. Starting direct groups,
+public groups, and HTTP/UI workflows remain separate work. See
 [group creation](../../docs/group-workflows.md) for the current contract and verification.
 
 `GroupMembershipApplication.add({ groupId, memberId })` requires
@@ -211,8 +215,13 @@ author and mentioned members. The thread, admissions, verbatim user text, sequen
 `ThreadCreation` is the internal reusable creation service, excluded from `Core.Operations`.
 The authorized workflow calls it within its transaction; it does not repeat a separate action
 permission check. Four store contracts persist threads, participations, messages, and timeline
-activity. Participations reference the exact group admission; group departure ends them and
-discards pending agent input. Replay uses recorded recipients and stable notification IDs.
+activity. `ThreadParticipation.Participant` is a member, a contact, or triage: member
+participation references the exact group admission, while contacts and triage take part without
+group access. `ThreadMessage.Author` is a member or a contact, and activity recipients record a
+`Notification.Recipient`. The current start and reply workflows admit members only; contact and
+triage participants await the task and channel workflows. Group departure ends member
+participation and discards pending agent input. Replay uses recorded recipients and stable
+notification IDs.
 
 These operations reuse the existing workspace journal; the timeline is a read model of ordered
 activity, not an independent second event stream. Authorized reads now provide discovery,
@@ -225,7 +234,8 @@ omit threads outside the caller's grants. Participation is not required or creat
 Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional nonnegative
 `afterSequence`) and return typed timeline items in sequence order: message items contain
 `activity` and `message`, while participation items contain `activity` and a public `participant` joining summary. Current participants use
-`ThreadParticipation.Summary`, excluding internal identity snapshots and ended admissions.
+`ThreadParticipation.Summary`, whose `participant` is a public member, contact, or triage reference
+without internal identity snapshots or admission links, excluding ended participation.
 Reads honor caller transactions but open none, and make no notification or checkpoint changes.
 Internal `ThreadActivityReading` shares authorized subject resolution between timeline pages and
 notification-source reads. It and `NotificationSource` are excluded from `Core.Operations`.

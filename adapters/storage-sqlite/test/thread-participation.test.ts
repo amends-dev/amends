@@ -12,7 +12,7 @@ import { Group, GroupApplication, GroupMembershipApplication } from "@amends/cor
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
-import { NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
   ThreadApplication,
@@ -20,7 +20,9 @@ import {
   ThreadActivityFacts,
   ThreadActivityRecording,
   ThreadActivityStore,
+  ThreadMessage,
   ThreadMessageApplication,
+  ThreadMessageFacts,
   ThreadMessagePermissions,
   ThreadParticipation,
   ThreadParticipationAdmission,
@@ -46,6 +48,12 @@ import {
   otherWorkspaceId,
   testProvenance,
 } from "./support.ts";
+
+/** Narrow a stored participation to its member participant for assertions. */
+const memberParticipant = (record: ThreadParticipation.Record) => {
+  if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+  return record.participant;
+};
 
 const humanId = Member.Id.make("human");
 const otherId = Member.Id.make("other");
@@ -186,12 +194,13 @@ it.effect(
             "id",
             "joinedAt",
             "joinedAtSequence",
-            "memberId",
+            "participant",
             "threadId",
             "workspaceId",
           ]);
+          expect(Object.keys(result.participant).sort()).toEqual(["_tag", "memberId"]);
           expect(result).toMatchObject({
-            memberId: humanId,
+            participant: { _tag: "Member", memberId: humanId },
             threadId: first.thread.id,
             joinedAtSequence: 2,
             joinedAt: yield* DateTime.now,
@@ -252,7 +261,9 @@ it.effect(
           expect(returned.joinedAtSequence).toBe(6);
           const oldRecord = Option.getOrThrow(yield* bound.participations.get(initial.id));
           const newRecord = Option.getOrThrow(yield* bound.participations.get(returned.id));
-          expect(newRecord.groupMembershipId).toBe(oldRecord.groupMembershipId);
+          expect(memberParticipant(newRecord).groupMembershipId).toBe(
+            memberParticipant(oldRecord).groupMembershipId,
+          );
           expect(
             yield* Effect.flip(run(bound, human, unfollow(first.thread.id, initial.id))),
           ).toEqual(
@@ -284,7 +295,7 @@ it.effect(
           const { bound, owner, group, first, agent } = yield* prepare();
           const other = yield* run(bound, owner, start(group.id));
           const initial = (yield* bound.participations.listByThread(first.thread.id)).find(
-            (p) => p.memberId === agentId,
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
           );
           if (initial === undefined) return yield* Effect.die("Missing agent");
           // Agent has no read, follow, publish, management, or agent-use grants.
@@ -331,7 +342,7 @@ it.effect("replies and mentions can readmit an unfollowed member without a follo
         const { bound, owner, first, human } = yield* prepare();
         yield* run(bound, owner, reply(first.thread.id, [humanId]));
         const firstParticipation = (yield* bound.participations.listByThread(first.thread.id)).find(
-          (p) => p.memberId === humanId,
+          (p) => ThreadParticipation.memberOf(p.participant) === humanId,
         );
         if (firstParticipation === undefined) return yield* Effect.die("Missing human");
         yield* run(bound, human, unfollow(first.thread.id, firstParticipation.id));
@@ -339,7 +350,7 @@ it.effect("replies and mentions can readmit an unfollowed member without a follo
         expect(yield* notifications(bound, humanId)).toHaveLength(1);
         const mentioned = yield* run(bound, owner, reply(first.thread.id, [humanId]));
         const rejoined = (yield* bound.participations.listByThread(first.thread.id)).find(
-          (p) => p.memberId === humanId && p.status === "active",
+          (p) => ThreadParticipation.memberOf(p.participant) === humanId && p.status === "active",
         );
         if (rejoined === undefined) return yield* Effect.die("Missing readmission");
         expect(rejoined.id).not.toBe(firstParticipation.id);
@@ -349,7 +360,7 @@ it.effect("replies and mentions can readmit an unfollowed member without a follo
         const authored = yield* run(bound, human, reply(first.thread.id, [humanId]));
         expect(
           (yield* bound.participations.listByThread(first.thread.id)).find(
-            (p) => p.memberId === humanId && p.status === "active",
+            (p) => ThreadParticipation.memberOf(p.participant) === humanId && p.status === "active",
           )?.joinedAtSequence,
         ).toBe(authored.activity.sequence);
         expect(yield* notifications(bound, humanId)).toHaveLength(3);
@@ -450,7 +461,7 @@ it.effect(
         Effect.gen(function* () {
           const { bound, owner, group, first, human } = yield* prepare();
           const agentPart = (yield* bound.participations.listByThread(first.thread.id)).find(
-            (p) => p.memberId === agentId,
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
           );
           if (agentPart === undefined) return yield* Effect.die("Missing agent");
           for (const actor of [human, owner])
@@ -492,7 +503,10 @@ it.effect(
             bound,
             human,
             Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-              s.leave({ groupId: group.id, membershipId: record.groupMembershipId }),
+              s.leave({
+                groupId: group.id,
+                membershipId: memberParticipant(record).groupMembershipId,
+              }),
             ),
           );
           expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
@@ -546,7 +560,9 @@ it.effect(
             ).toBe(true);
             expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
           }
-          const agentPart = before.participants.find((p) => p.memberId === agentId);
+          const agentPart = before.participants.find(
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
+          );
           if (agentPart === undefined) return yield* Effect.die("Missing agent");
           const failingCleanup = Context.add(bound.context, NotificationStore.Service, {
             ...bound.notifications,
@@ -669,7 +685,7 @@ it.effect(
             expect(rows.filter((r) => r.kind === "ParticipationFollowed")).toHaveLength(1);
             expect(
               (yield* bound.participations.listByThread(saved.first.thread.id)).filter(
-                (p) => p.memberId === humanId,
+                (p) => ThreadParticipation.memberOf(p.participant) === humanId,
               ),
             ).toHaveLength(1);
             for (const n of yield* notifications(bound, humanId))
@@ -690,7 +706,7 @@ it.effect(
           Effect.gen(function* () {
             const p = yield* prepare();
             const part = (yield* p.bound.participations.listByThread(p.first.thread.id)).find(
-              (r) => r.memberId === agentId,
+              (r) => ThreadParticipation.memberOf(r.participant) === agentId,
             );
             if (!part) return yield* Effect.die("Missing agent");
             return { ...p, part };
@@ -751,7 +767,7 @@ it.effect(
           Effect.gen(function* () {
             const { bound, owner, first, agent } = yield* prepare();
             const old = (yield* bound.participations.listByThread(first.thread.id)).find(
-              (p) => p.memberId === agentId,
+              (p) => ThreadParticipation.memberOf(p.participant) === agentId,
             );
             if (!old) return yield* Effect.die("Missing agent");
             yield* run(bound, agent, unfollow(first.thread.id, old.id));
@@ -831,10 +847,11 @@ it.effect("gateway returns public participation summaries and opaque self-servic
         "id",
         "joinedAt",
         "joinedAtSequence",
-        "memberId",
+        "participant",
         "threadId",
         "workspaceId",
       ]);
+      expect(Object.keys(result.participant).sort()).toEqual(["_tag", "memberId"]);
       yield* gateway.asMember(workspace.id, owner, unfollow(first.thread.id, result.id));
       expect(
         yield* Effect.flip(
@@ -903,11 +920,10 @@ it.effect("stores and readers reject mismatched follow references and stale depa
           workspaceId,
           threadId: first.thread.id,
           participationId: participant.id,
-          memberId: humanId,
         };
         for (const bad of [
           { ...departure, workspaceId: otherWorkspaceId },
-          { ...departure, memberId: agentId },
+          { ...departure, participationId: ThreadParticipation.Id.make("missing") },
           { ...departure, threadId: Thread.Id.make("foreign") },
         ])
           expect(
@@ -942,7 +958,7 @@ it.effect(
         Effect.gen(function* () {
           const { bound, owner, first } = yield* prepare();
           const ownerPart = (yield* bound.participations.listByThread(first.thread.id)).find(
-            (p) => p.memberId === owner.memberId,
+            (p) => ThreadParticipation.memberOf(p.participant) === owner.memberId,
           );
           if (!ownerPart) return yield* Effect.die("Missing owner participation");
           const recorded = yield* facts(
@@ -963,7 +979,10 @@ it.effect(
                   const participant = admitted.participants[0];
                   if (!participant) return yield* Effect.die("Missing fixture participant");
                   const recipients = [
-                    { participationId: ownerPart.id, identity: ownerPart.identity },
+                    {
+                      participationId: ownerPart.id,
+                      recipient: ThreadParticipation.recipientOf(ownerPart.participant),
+                    },
                   ];
                   // Deliberately address non-message activity to exercise the generic generator.
                   // Production follow/unfollow workflows select an empty recipient list.
@@ -979,7 +998,6 @@ it.effect(
                       workspaceId,
                       threadId: first.thread.id,
                       participationId: participant.id,
-                      memberId: humanId,
                       reason: "unfollowed",
                     })
                     .pipe(Publication.withOccurredAt(occurredAt));
@@ -1165,7 +1183,7 @@ it.effect(
         Effect.gen(function* () {
           const { bound, first, agent } = yield* prepare();
           const participant = (yield* bound.participations.listByThread(first.thread.id)).find(
-            (p) => p.memberId === agentId,
+            (p) => ThreadParticipation.memberOf(p.participant) === agentId,
           );
           if (participant === undefined) return yield* Effect.die("Missing agent participation");
           const pending = yield* bound.notifications.listPendingByRecipient(agent.identity, {
@@ -1184,7 +1202,6 @@ it.effect(
                       workspaceId,
                       threadId: first.thread.id,
                       participationId: participant.id,
-                      memberId: agentId,
                       reason: "unfollowed",
                     })
                     .pipe(Publication.withOccurredAt(occurredAt));
@@ -1238,6 +1255,124 @@ it.effect(
             Effect.flatMap(Journal.Service, (j) => j.replay),
           );
           expect(yield* notifications(bound, agentId)).toEqual(settled);
+        }),
+      ),
+    ),
+);
+
+it.effect(
+  "contacts and triage participate without group admission, author messages, and receive notifications",
+  () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const { bound, owner, first } = yield* prepare();
+          const threadId = first.thread.id;
+          const at = first.message.publishedAt;
+          const contactId = Identity.ContactId.make("customer");
+          const contact = {
+            id: ThreadParticipation.Id.make("contact-participation"),
+            workspaceId,
+            threadId,
+            participant: { _tag: "Contact", contactId },
+            joinedAt: at,
+            joinedAtSequence: 2,
+            status: "active",
+            endedAt: null,
+          } satisfies ThreadParticipation.Record;
+          const triage = {
+            ...contact,
+            id: ThreadParticipation.Id.make("triage-participation"),
+            participant: { _tag: "Triage" },
+          } satisfies ThreadParticipation.Record;
+          const message = {
+            id: ThreadMessage.Id.make("contact-message"),
+            workspaceId,
+            threadId,
+            author: { _tag: "Contact", contactId },
+            kind: "User",
+            text: "Hello from outside",
+            mentions: [],
+            publishedAt: at,
+          } satisfies ThreadMessage.Record;
+          yield* facts(
+            bound,
+            Effect.flatMap(Journal.Service, (journal) =>
+              journal.commit(
+                Effect.gen(function* () {
+                  yield* journal.publish(ThreadParticipationFacts.Added, contact);
+                  yield* journal.publish(ThreadParticipationFacts.Added, triage);
+                  yield* journal.publish(ThreadMessageFacts.Published, message);
+                  yield* journal.publish(ThreadActivityFacts.Recorded, {
+                    activity: {
+                      id: ThreadActivity.Id.make("contact-activity"),
+                      workspaceId,
+                      threadId,
+                      sequence: 2,
+                      kind: "MessagePublished",
+                      messageId: message.id,
+                      occurredAt: at,
+                    },
+                    recipients: [
+                      {
+                        participationId: contact.id,
+                        recipient: { _tag: "Contact", id: contactId },
+                      },
+                      { participationId: triage.id, recipient: { _tag: "Triage" } },
+                    ],
+                  });
+                }),
+              ),
+            ),
+          );
+          expect(yield* bound.participations.get(contact.id)).toEqual(Option.some(contact));
+          expect(yield* bound.participations.get(triage.id)).toEqual(Option.some(triage));
+          expect(yield* bound.messages.get(message.id)).toEqual(Option.some(message));
+          const participants = yield* run(
+            bound,
+            owner,
+            Effect.flatMap(ThreadApplication.Service, (s) => s.listParticipants(threadId)),
+          );
+          expect(participants.map((p) => p.participant).filter((p) => p._tag !== "Member")).toEqual(
+            [{ _tag: "Contact", contactId }, { _tag: "Triage" }].sort((left, right) =>
+              left._tag < right._tag ? -1 : 1,
+            ),
+          );
+          for (const recipient of [
+            { _tag: "Contact", id: contactId },
+            { _tag: "Triage" },
+          ] satisfies ReadonlyArray<Notification.Recipient>)
+            expect(
+              (yield* bound.notifications.listByRecipient(recipient, { limit: 10 })).map((note) => [
+                note.participationId,
+                note.state._tag,
+              ]),
+            ).toEqual([[recipient._tag === "Triage" ? triage.id : contact.id, "Pending"]]);
+          // One active participation per contact and per thread's triage; references are enforced.
+          for (const invalid of [
+            { ...contact, id: ThreadParticipation.Id.make("contact-again") },
+            { ...triage, id: ThreadParticipation.Id.make("triage-again") },
+            {
+              ...contact,
+              id: ThreadParticipation.Id.make("elsewhere"),
+              threadId: Thread.Id.make("missing"),
+            },
+          ])
+            expect(
+              yield* Effect.flip(bound.store.transaction(bound.participations.insert(invalid))),
+            ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+          expect(
+            yield* Effect.flip(
+              bound.store.transaction(
+                bound.messages.insert({
+                  ...message,
+                  id: ThreadMessage.Id.make("stranger-message"),
+                  author: { _tag: "Contact", contactId: Identity.ContactId.make("stranger") },
+                }),
+              ),
+            ),
+          ).toMatchObject({ _tag: "ThreadMessageStore.Conflict" });
         }),
       ),
     ),

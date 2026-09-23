@@ -51,13 +51,14 @@ CREATE TABLE "groups" (
 	"workspace_id" text,
 	"id" text,
 	"kind" text NOT NULL,
-	"visibility" text NOT NULL,
-	"name" text NOT NULL,
+	"visibility" text,
+	"name" text,
+	"member_ids" text[],
+	"direct_key" text,
 	"created_by" text NOT NULL,
 	"created_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "groups_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "groups_kind" CHECK ("kind" = 'Team'),
-	CONSTRAINT "groups_visibility" CHECK ("visibility" = 'Private')
+	CONSTRAINT "groups_kind" CHECK (("kind" = 'Team' AND "visibility" = 'Private' AND "name" IS NOT NULL AND "member_ids" IS NULL AND "direct_key" IS NULL) OR ("kind" = 'Direct' AND "visibility" IS NULL AND "name" IS NULL AND cardinality("member_ids") >= 2 AND "direct_key" IS NOT NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "invitations" (
@@ -172,7 +173,6 @@ CREATE TABLE "thread_activities" (
 	"reason" text,
 	"occurred_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "thread_activities_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "thread_activity_subject" CHECK (("kind" = 'MessagePublished' AND "message_id" IS NOT NULL AND "participation_id" IS NULL AND "reason" IS NULL) OR ("kind" = 'ParticipationFollowed' AND "message_id" IS NULL AND "participation_id" IS NOT NULL AND "reason" IS NULL) OR ("kind" = 'ParticipationEnded' AND "message_id" IS NULL AND "participation_id" IS NOT NULL AND "reason" IS NOT NULL AND "reason" IN ('unfollowed','group-left','group-removed','workspace-removed'))),
 	CONSTRAINT "thread_activity_positive_sequence" CHECK ("sequence" > 0)
 );
 --> statement-breakpoint
@@ -180,27 +180,32 @@ CREATE TABLE "thread_messages" (
 	"workspace_id" text,
 	"id" text,
 	"thread_id" text NOT NULL,
-	"author_member_id" text NOT NULL,
+	"author_kind" text NOT NULL,
+	"author_member_id" text,
+	"author_contact_id" text,
 	"kind" text NOT NULL,
 	"text" text NOT NULL,
 	"mentions" text[] NOT NULL,
 	"published_at" timestamp with time zone NOT NULL,
-	CONSTRAINT "thread_messages_pkey" PRIMARY KEY("workspace_id","id")
+	CONSTRAINT "thread_messages_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "thread_message_author" CHECK (("author_kind" = 'Member' AND "author_member_id" IS NOT NULL AND "author_contact_id" IS NULL) OR ("author_kind" = 'Contact' AND "author_member_id" IS NULL AND "author_contact_id" IS NOT NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "thread_participations" (
 	"workspace_id" text,
 	"id" text,
 	"thread_id" text NOT NULL,
-	"member_id" text NOT NULL,
-	"group_membership_id" text NOT NULL,
-	"identity_kind" text NOT NULL,
-	"identity_id" text NOT NULL,
+	"participant_kind" text NOT NULL,
+	"member_id" text,
+	"group_membership_id" text,
+	"identity_kind" text,
+	"identity_id" text,
 	"joined_at" timestamp with time zone NOT NULL,
 	"joined_at_sequence" integer NOT NULL,
 	"status" text NOT NULL,
 	"ended_at" timestamp with time zone,
 	CONSTRAINT "thread_participations_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "participation_participant" CHECK (("participant_kind" = 'Member' AND "member_id" IS NOT NULL AND "group_membership_id" IS NOT NULL AND "identity_kind" IN ('Human', 'Agent') AND "identity_id" IS NOT NULL) OR ("participant_kind" = 'Contact' AND "member_id" IS NULL AND "group_membership_id" IS NULL AND "identity_kind" = 'Contact' AND "identity_id" IS NOT NULL) OR ("participant_kind" = 'Triage' AND "member_id" IS NULL AND "group_membership_id" IS NULL AND "identity_kind" IS NULL AND "identity_id" IS NULL)),
 	CONSTRAINT "participation_state" CHECK (("status" = 'active' AND "ended_at" IS NULL) OR ("status" = 'ended' AND "ended_at" IS NOT NULL)),
 	CONSTRAINT "participation_sequence" CHECK ("joined_at_sequence" > 0)
 );
@@ -226,6 +231,7 @@ CREATE INDEX "assignments_by_role" ON "assignments" ("workspace_id","role_id","s
 CREATE UNIQUE INDEX "active_group_membership" ON "group_memberships" ("workspace_id","group_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "group_memberships_by_group" ON "group_memberships" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "group_memberships_by_member" ON "group_memberships" ("workspace_id","member_id","id" COLLATE "C");--> statement-breakpoint
+CREATE UNIQUE INDEX "direct_groups_by_members" ON "groups" ("workspace_id","direct_key") WHERE "direct_key" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "invitations_by_recipient" ON "invitations" ("workspace_id","recipient_id","state");--> statement-breakpoint
 CREATE INDEX "pending_invitations_by_recipient" ON "invitations" ("recipient_id") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE UNIQUE INDEX "log_batches_by_commit" ON "log_batches" ("workspace_id","log_id","commit_id");--> statement-breakpoint
@@ -241,7 +247,7 @@ CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_message_activity" ON "thread_activities" ("workspace_id","message_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_participation_activity" ON "thread_activities" ("workspace_id","participation_id","kind");--> statement-breakpoint
-CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
+CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","participant_kind",coalesce("member_id", "identity_id", '')) WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
