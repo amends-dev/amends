@@ -20,7 +20,7 @@ only when requested through the API.
 
 Run `bun run --filter @amends/web dev` and open `http://127.0.0.1:4321/`, or run
 `bun run --filter @amends/desktop dev` to open the Tauri app after installing its
-[native prerequisites](apps/desktop/README.md#run-and-verify). Both use the shared client routes and session providers. Guests see the sign-in
+[native prerequisites](apps/desktop/README.md#run-and-verify). Both independently compose headless client state and UI components in their own route trees. Guests see the sign-in
 placeholder; restored sessions require the API. The sign-in page is the next step.
 The API independently exposes OpenAPI at `/openapi.json` and documentation at `/docs`;
 development sign-in prints the one-time code in the host terminal.
@@ -50,9 +50,9 @@ hosts/
 apps/
   icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
   ui/                 @amends/ui: shared Solid foundations, components, and Storybook
-  client/             @amends/client: shared routes, sessions, API access, and app composition
-  web/                @amends/web: browser entry point for the shared application
-  desktop/            @amends/desktop: Tauri 2 entry point for the shared application
+  client/             @amends/client: headless sessions, API/query state, and route helpers
+  web/                @amends/web: browser routes and client/UI composition
+  desktop/            @amends/desktop: Tauri 2 routes and client/UI composition
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff
 scripts/              repository tooling

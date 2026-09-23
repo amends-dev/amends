@@ -7,7 +7,8 @@
     "dev": "bun run --bun vite",
     "build": "bun run typecheck && bun run --bun vite build",
     "preview": "bun run --bun vite preview --host 127.0.0.1",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
     "@amends/client": "workspace:*",
@@ -16,7 +17,10 @@
     "solid-js": "^1.9.12"
   },
   "devDependencies": {
+    "@solidjs/testing-library": "^0.8.9",
     "@vanilla-extract/vite-plugin": "^5.2.6",
+    "effect": "catalog:",
+    "happy-dom": "^20.10.6",
     "vite": "^7.0.0",
     "vite-plugin-solid": "^2.11.14"
   }

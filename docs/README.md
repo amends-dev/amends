@@ -23,9 +23,9 @@ remaining gaps with links to their owning code.
 | [Adapters](../adapters/README.md)                                                                       | Store validation, construction, and migration conventions.                                                          |
 | [SQLite](../adapters/storage-sqlite/README.md) / [PostgreSQL](../adapters/storage-postgresql/README.md) | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md)                                    | Runtime composition, configuration, startup, and development identity.                                              |
-| [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Platform entry points for the shared application.                                                                   |
+| [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Platform-owned routing and composition of client and UI.                                                            |
 | [Desktop](../apps/desktop/README.md)                                                                    | Tauri prerequisites, host connection, and native verification.                                                      |
-| [Client](../apps/client/README.md)                                                                      | Shared routing, credential scopes, typed API access, and platform configuration.                                    |
+| [Client](../apps/client/README.md)                                                                      | Headless credential scopes, API/query state, and route helpers.                                                     |
 | [UI](../apps/ui/README.md)                                                                              | Shared UI workshop, foundations, primitives, and compositions.                                                      |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical

@@ -107,15 +107,16 @@ component-level Tauri validation remain pending.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in UI.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
-layer. Both app entry points load the shared client application and UI fonts.
+layer. Both apps compose headless client state and UI presentation independently.
 
 ## Shared client foundation
 
-[Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) share routes,
-session storage/lifetime, typed API access, and placeholder page states from
-[client](../apps/client/README.md). Web uses browser routing and
+[Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
+compose headless session/API state from [client](../apps/client/README.md) and
+presentation from [UI](../apps/ui/README.md). Each app owns its route tree and
+maps query state to placeholder pages, errors, and navigation. Web uses browser routing and
 an API proxy; Tauri uses hash routing and connects to the existing local host.
-UI is UI-only; client consumes its exports for application composition.
+Client and UI have no dependency on each other in source, tests, or manifests.
 Stored credentials are scoped by API URL and validated before protected content mounts.
 Changing credentials disposes the previous registry and requests. Session rejection,
 host failures, missing workspace access, and unknown routes have separate states.

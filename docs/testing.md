@@ -17,14 +17,16 @@ bun run test --project postgresql
 bun run test --project @amends/icons
 bun run test --project @amends/ui
 bun run test --project @amends/client
+bun run test --project @amends/web
+bun run test --project @amends/desktop
 bun run test --watch packages/core/test
 bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
 covers shared packages, SQLite, and the local host. PostgreSQL has its own project
-and global setup. UI and client use Solid/Vite transforms and Happy DOM. Web and desktop
-share route/session coverage in the client project; verify both frontend builds and desktop
+and global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
+headless state; web and desktop test their own route/UI integration; verify both frontend builds and desktop
 startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
 
 The [icons package](../apps/icons/README.md) tests geometry validation, composition,
@@ -267,12 +269,14 @@ tests do not prove that the default SQLite path works on a fresh clone. Follow t
 
 ## Application foundation
 
-`apps/client/test/application.test.tsx` covers session storage, identity changes,
-request cancellation, safe redirects, validation failures/retry, workspace access,
-and router navigation. The client `Setup / Application` sign-out story runs in its
-portable suite. Its integration workshop uses port 6008 (`bun run --filter @amends/client dev:storybook`);
-UI retains the independent UI workshop at port 6007. Build client stories with
-`bun run --filter @amends/client build:storybook`. These use isolated transports/stores and never require real credentials.
+Client's session and directory suites verify headless storage, scope lifetime, query
+state, authorization failure, and retry with isolated transports. They require no UI
+package or router. Web's application suite verifies safe redirects, route guards,
+workspace changes, and credential/request cleanup. Desktop's application suite tests
+its independent composition with the real hash router. UI's Compositions / Application
+stories verify presentation and caller-supplied actions in its existing workshop at
+port 6007; client has no Storybook dependency or workshop.
+
 The local host's HTTP tests exercise desktop CORS preflights and 401 response headers.
-After changing runtime setup, also perform the local-host temporary-port startup check
-and verify the desktop bundle against its own hash URL.
+After changing host runtime setup, also perform the temporary-port startup check.
+Verify both app builds and native hash navigation after changing app composition.

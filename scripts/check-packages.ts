@@ -64,19 +64,25 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
         );
       if (
         path === "apps/client/package.json" &&
-        ((name.startsWith("@amends/") &&
-          !["@amends/ui", "@amends/icons", "@amends/api-http", "@amends/gateway"].includes(name)) ||
-          name.startsWith("@tauri-apps/"))
+        ((name.startsWith("@amends/") && !["@amends/api-http", "@amends/gateway"].includes(name)) ||
+          name.startsWith("@tauri-apps/") ||
+          name === "@solidjs/router" ||
+          name.startsWith("@vanilla-extract/") ||
+          name === "storybook" ||
+          name.startsWith("@storybook/") ||
+          name.startsWith("storybook-"))
       )
         errors.push(
-          `${path}: client must not depend on platform or backend implementations (${section}.${name}).`,
+          `${path}: client must remain headless and independent of UI, routing presentation, and platform/backend implementations (${section}.${name}).`,
         );
     }
   }
 }
 
 // UI owns presentation; client/api owns shared client contract imports.
-for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/src/**/*.{ts,tsx}").scan({
+for await (const path of new Bun.Glob(
+  "apps/{icons,ui,client,web,desktop}/{src,test,.storybook}/**/*.{ts,tsx}",
+).scan({
   cwd: root,
 })) {
   const source = await Bun.file(`${root}/${path}`).text();
@@ -110,7 +116,7 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/src/**
       : dependency;
     const iconImport = dependency === "@amends/icons" || dependency.startsWith("@amends/icons/");
     if (
-      path.startsWith("apps/icons/") &&
+      path.startsWith("apps/icons/src/") &&
       !(
         dependency === "solid-js" ||
         dependency.startsWith("solid-js/") ||
@@ -155,12 +161,17 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/src/**
       );
     if (
       path.startsWith("apps/client/") &&
-      ((dependency.startsWith("@amends/") &&
-        !clientImport &&
-        !uiImport &&
-        !iconImport &&
-        !contractImport) ||
+      ((dependency.startsWith("@amends/") && !clientImport && !contractImport) ||
         dependency.startsWith("@tauri-apps/") ||
+        dependency === "@solidjs/router" ||
+        dependency.startsWith("@solidjs/router/") ||
+        dependency.startsWith("@vanilla-extract/") ||
+        dependency.endsWith(".css") ||
+        dependency.endsWith(".css.ts") ||
+        dependency === "storybook" ||
+        dependency.startsWith("storybook/") ||
+        dependency.startsWith("@storybook/") ||
+        dependency.startsWith("storybook-") ||
         (target.startsWith(resolve(root, "apps") + "/") &&
           !target.startsWith(resolve(root, "apps/client") + "/")) ||
         target.startsWith(resolve(root, "packages") + "/") ||
@@ -168,7 +179,7 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/src/**
         target.startsWith(resolve(root, "hosts") + "/"))
     )
       errors.push(
-        `${path}: use UI exports and named client API modules; platform/backend implementations stay outside client (${dependency}).`,
+        `${path}: client must remain headless; UI, styles, route rendering, and platform/backend implementations belong outside client (${dependency}).`,
       );
   }
 }

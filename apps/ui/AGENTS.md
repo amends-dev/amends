@@ -7,9 +7,10 @@ Read [README.md](README.md) before changing this package.
 - Do not use the former `@amends/frontend` name or the retired `@amends/design-system` package,
   `@amends/client`, `@amends/web`, `@amends/desktop`, API/backend packages, or platform entry points. Compare relevant existing source and design references before introducing
   a piece, and document intentional differences.
-- This package is UI-only. Routing, sessions, Effect client state, API access, and
-  application composition belong in `@amends/client`. Components receive presentation
-  data and callbacks instead of reading application providers or transport state.
+- This package is UI-only and independent of `@amends/client`. Client owns headless
+  session/API state; web and desktop own routing and application composition, importing
+  both packages independently. Components receive presentation data and callbacks
+  instead of reading application providers or transport state.
 - Add layers only as needed: foundations, primitives, compositions, features, and pages.
   Runtime lower layers must not depend on higher ones. Development-only stories may
   compose reviewed primitives to demonstrate foundations. Add public source exports only when

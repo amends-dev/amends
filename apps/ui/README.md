@@ -10,10 +10,13 @@ composes those foundations into native paragraphs, spans, headings, and inline c
 The [radius foundation](src/foundations/radius/README.md) adds square, medium (10px), and pill corners.
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
 a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
-composes these foundations into primary, secondary, and ghost actions with native button behavior. [Web](../web/README.md) and [desktop](../desktop/README.md) consume these UI components
-through the [client package](../client/README.md). Client owns routes, sessions, API
-access, and application composition. UI components receive
-presentation data and callbacks. This package was renamed from `@amends/frontend`;
+composes these foundations into primary, secondary, and ghost actions with native button behavior.
+[Web](../web/README.md) and [desktop](../desktop/README.md) import UI and the
+[client package](../client/README.md) independently. UI supplies presentation; client
+supplies headless session/API state. The apps own route trees and connect that state
+to UI props and actions. Neither library depends on the other.
+The [application composition](src/compositions/application/README.md) supplies the
+minimal frame/page presentation, and `@amends/ui/styles` supplies an opt-in document reset. This package was renamed from `@amends/frontend`;
 it replaces the removed legacy UI implementation. The `design-system` package remains retired.
 
 ## Run and verify

@@ -40,7 +40,9 @@
     "./compositions/popover": "./src/compositions/popover/index.ts",
     "./compositions/toast": "./src/compositions/toast/index.ts",
     "./compositions/drawer": "./src/compositions/drawer/index.ts",
-    "./compositions/shell": "./src/compositions/shell/index.ts"
+    "./compositions/shell": "./src/compositions/shell/index.ts",
+    "./compositions/application": "./src/compositions/application/index.ts",
+    "./styles": "./src/styles.css.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",

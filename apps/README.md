@@ -4,17 +4,17 @@
   and a separate metadata catalog through `@amends/icons`.
 - [UI](ui/README.md) provides the shared Solid foundations, primitives,
   and compositions, verified in its standalone Storybook workshop.
-- [client](client/README.md) owns shared routing, sessions, API access, and application
-  composition using UI components. It has its own integration stories and tests.
-- [web](web/README.md) runs the shared application with browser routing on port 4321.
-- [desktop](desktop/README.md) runs the shared application in Tauri 2 with hash routing and a
+- [client](client/README.md) owns headless sessions, API/query state, and pure route
+  helpers. It has no dependency on UI, styling, router libraries, or Storybook.
+- [web](web/README.md) composes client and UI with browser routing on port 4321.
+- [desktop](desktop/README.md) composes client and UI in Tauri 2 with hash routing and a
   Solid/Vite webview on development port 1420.
 
 The legacy UI implementation and `design-system` workspace were removed. The current
 `ui` workspace is the renamed `frontend` workshop. The old web
 screens, routes, sessions, API integrations, and their tests were removed with
-that reset. Both entry apps now consume the shared application foundation, including
-routing, session lifecycle, API access, and placeholder page states. The sign-in page
+that reset. Both apps compose the independent client and UI packages. They own route
+trees and placeholder-page wiring, while client owns session/API state. The sign-in page
 is the next slice; the full product workflows remain backend-only.
 
 ## Development
@@ -25,25 +25,24 @@ From the repository root after `bun install`:
 bun run --filter @amends/web dev
 bun run --filter @amends/desktop dev
 bun run --filter @amends/ui dev
-bun run --filter @amends/client dev:storybook
 ```
 
 Run each in its own terminal. The UI workshop serves at
-`http://127.0.0.1:6007/`; client integration stories serve at port 6008.
+`http://127.0.0.1:6007/`. Client has no workshop.
 Desktop requires [native tools](desktop/README.md#run-and-verify); web and Storybook
 need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
 
 ## Client and UI boundaries
 
-`@amends/client` owns routes, the credential-scoped Effect atom registry,
-session validation, and typed API access. Its [guide](client/README.md)
-describes the route and lifecycle contracts. Client routes connect UI components to these
-providers. UI components receive data and callbacks and have no dependency on client.
+`client` and `ui` are independent libraries. Client supplies providers, hooks, and
+operations. UI supplies presentation components, styles, and fonts. Neither imports
+the other in source, tests, or manifests; dependency checks enforce both directions.
 
-Web supplies browser routing and defaults to `/api` through its development proxy.
-Desktop supplies hash routing and connects to the existing Bun host at port 8787.
-Both supply endpoint-scoped web-storage adapters. Platform APIs stay in the entry apps;
-UI cannot import client, routing/session state, or API code.
+Web and desktop each own a route tree and application composition, importing both
+libraries through public exports. They map client state to UI props and actions. Web
+uses browser routing and an API proxy; desktop uses hash routing and the existing Bun
+host at port 8787. Platform APIs remain in these apps. Shared path helpers live in
+client, but client does not decide what a route renders.
 
 Apps may consume shared packages through `workspace:*`. Shared packages cannot
 import apps. `bun run check:packages` enforces shared-package declarations,

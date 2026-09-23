@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import solid from "vite-plugin-solid";
 
@@ -14,4 +15,10 @@ export default defineConfig({
   },
   // Use a WebKit-compatible baseline for the native webview.
   build: { target: "safari13" },
+  test: {
+    name: "@amends/desktop",
+    environment: "happy-dom",
+    setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
+    include: ["test/**/*.test.{ts,tsx}"],
+  },
 });

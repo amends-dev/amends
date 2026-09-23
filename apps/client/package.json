@@ -3,37 +3,23 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "sideEffects": [
-    "**/*.css.ts"
-  ],
   "exports": {
-    ".": "./src/index.ts",
-    "./styles": "./src/global.css.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "bun run --bun vitest run --config vite.config.ts",
-    "build:storybook": "bun run typecheck && bun run --bun storybook build --output-dir dist --disable-telemetry",
-    "dev:storybook": "bun run --bun storybook dev --host 127.0.0.1 --port 6008 --no-open --disable-telemetry"
+    "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
     "@amends/api-http": "workspace:*",
     "@amends/gateway": "workspace:*",
-    "@amends/ui": "workspace:*",
     "@effect/atom-solid": "catalog:",
-    "@solidjs/router": "catalog:",
-    "@vanilla-extract/css": "^1.21.2",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.9",
-    "@storybook/addon-a11y": "10.6.0",
-    "@storybook/addon-docs": "10.6.0",
-    "@vanilla-extract/vite-plugin": "^5.2.6",
     "happy-dom": "^20.10.6",
     "solid-js": "^1.9.12",
-    "storybook": "10.6.0",
-    "storybook-solidjs-vite": "10.7.2",
     "vite": "^7.0.0",
     "vite-plugin-solid": "^2.11.14"
   },

@@ -6,6 +6,6 @@
     "jsxImportSource": "solid-js",
     "types": ["vite/client"]
   },
-  "include": ["src", "vite.config.ts"],
+  "include": ["src", "test", "vite.config.ts", "../../scripts/testing/jest-dom.ts"],
   "exclude": ["node_modules", "dist"]
 }

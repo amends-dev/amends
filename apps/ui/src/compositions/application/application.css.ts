@@ -1,6 +1,6 @@
 import { style } from "@vanilla-extract/css";
-import { space } from "@amends/ui/foundations/spacing";
-import { typography } from "@amends/ui/foundations/typography";
+import { space } from "../../foundations/spacing/tokens.ts";
+import { typography } from "../../foundations/typography/tokens.ts";
 
 export const root = style({ minHeight: "100dvh", fontFamily: typography.body.fontFamily });
 export const page = style({ paddingBlock: space[6] });

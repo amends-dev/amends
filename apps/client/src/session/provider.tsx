@@ -60,6 +60,6 @@ export function SessionProvider(props: ParentProps<{ store: SessionStore }>) {
 }
 export function useSession(): SessionScope {
   const session = useContext(SessionContext);
-  if (!session) throw new Error("Session operations require the application provider.");
+  if (!session) throw new Error("Session operations require ClientProvider.");
   return session;
 }

@@ -1,5 +1,6 @@
 import { HashRouter } from "@solidjs/router";
-import { Application, createBrowserSessionStore, resolveApiBaseUrl } from "@amends/client";
+import { createBrowserSessionStore, resolveApiBaseUrl } from "@amends/client";
+import { Application } from "./application.tsx";
 
 export function App() {
   const apiBaseUrl = resolveApiBaseUrl(

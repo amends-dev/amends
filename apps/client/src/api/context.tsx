@@ -7,6 +7,6 @@ export function ApiProvider(props: ParentProps<{ client: ApiClient }>) {
 }
 export function useApiClient() {
   const client = useContext(ApiContext);
-  if (!client) throw new Error("API operations require the application provider.");
+  if (!client) throw new Error("API operations require ClientProvider.");
   return client;
 }

@@ -1,6 +1,7 @@
 # Amends desktop
 
-Tauri 2 desktop shell for the [shared application foundation](../client/README.md).
+Tauri 2 desktop application composing the independent [client](../client/README.md)
+and [UI](../ui/README.md) packages.
 It uses hash routing, webview session persistence, and the existing Bun host over HTTP.
 The sign-in/workspace routes are placeholders awaiting product pages. Desktop does not
 start a backend process or use native commands/plugins.
@@ -47,7 +48,7 @@ bun run test
 
 `dev:frontend` and `preview` run just the webview content in a browser. `typecheck`
 checks TypeScript only; root `check` includes it. Run `check:native` separately
-when changing Rust or Tauri configuration. Shared route/session tests run in client;
+when changing Rust or Tauri configuration. Client tests cover headless state; this app tests its own routes and hash-router integration;
 verify the native window as well as both frontend builds after changing startup.
 
 Native output goes to `src-tauri/target`, including `release/bundle` for installers.
@@ -62,10 +63,11 @@ The window currently has no native command permissions. Add capabilities only as
 features need them. The production content security policy permits bundled assets and the configured local
 API; development additionally permits the local Vite connection.
 
-`src/app.tsx` supplies `HashRouter` to the same shared `Application` used by web.
-Both build shared styles with vanilla-extract and load the UI fonts explicitly.
-Tauri dependencies stay in this app; `@amends/client` knows only its endpoint,
-router, and storage interfaces.
+`src/app.tsx` supplies `HashRouter` to this app's `src/application.tsx` composition.
+`src/routes.tsx` owns routes, guard presentations, and redirects. Both platform apps
+import `@amends/client` and `@amends/ui` independently: client supplies headless state,
+and UI supplies presentation. Each app loads UI fonts and `@amends/ui/styles` explicitly.
+Client has no router or UI dependency; Tauri dependencies stay in this app.
 
 The default API URL is `http://127.0.0.1:8787`. The content security policy permits
 that connection, and the local host allows the development and bundled Tauri origins.

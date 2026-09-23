@@ -1,6 +1,7 @@
 # Amends web
 
-Solid/Vite browser entry point for the [shared application foundation](../client/README.md).
+Solid/Vite browser application composing the independent [client](../client/README.md)
+and [UI](../ui/README.md) packages.
 It supplies browser-history routing, API configuration, and browser session persistence.
 The sign-in and workspace routes currently contain placeholders; their product pages
 will be introduced separately.
@@ -42,5 +43,8 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 
 `src/main.tsx` mounts Solid and loads shared fonts/global styles. `src/app.tsx` chooses
 `Router`, resolves the endpoint (default `/api`), and supplies the session store.
-Routes, session lifetime, typed API access, and application composition live in `client`, using UI components from `ui`.
+`src/application.tsx` connects the headless `ClientProvider` to UI's frame and the
+browser router. `src/routes.tsx` owns routes, redirects, guard presentations, and
+client-to-UI wiring. Client supplies session/API/query state; UI supplies presentation.
+Neither library imports the other. Route integration tests live in this app.
 Vite deduplicates Solid and compiles the shared vanilla-extract styles.

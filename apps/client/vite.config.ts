@@ -1,10 +1,9 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 import solid from "vite-plugin-solid";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 
 export default defineConfig({
-  plugins: [solid(), vanillaExtractPlugin()],
+  plugins: [solid()],
   resolve: { dedupe: ["solid-js"] },
   test: {
     name: "@amends/client",
