@@ -13,6 +13,7 @@ export default defineConfig({
           include: [
             "packages/*/test/**/*.test.ts",
             "adapters/storage-sqlite/test/**/*.test.ts",
+            "adapters/storage-memory/test/**/*.test.ts",
             "hosts/*/test/**/*.test.ts",
           ],
         },

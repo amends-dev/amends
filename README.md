@@ -42,9 +42,11 @@ packages/
   gateway/            @amends/gateway: workspace entry and host contracts
   api-http/           @amends/api-http: shared HTTP contract
   server-http/        @amends/server-http: HTTP handlers and authentication
+  storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
 adapters/
   storage-sqlite/      @amends/storage-sqlite: SQLite storage and directory
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
+  storage-memory/     @amends/storage-memory: in-memory reference storage and directory
 hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/
@@ -63,8 +65,9 @@ repos/effect/         upstream Effect reference source
 `packages/*`, `adapters/*`, `hosts/*`, and `apps/*`. Each workspace has its own manifest,
 TypeScript configuration, and scripts. One install and lockfile serve the repository.
 
-Shared packages may depend only on `effect` and other packages under `packages/`.
-Internal dependencies use `workspace:*`; Effect dependencies use `catalog:`.
+Shared packages may depend only on `effect`, `@effect/vitest` for test suites a package
+ships, and other packages under `packages/`. Internal dependencies use `workspace:*`;
+Effect dependencies use `catalog:`.
 The restriction covers dependencies, devDependencies, peerDependencies, and
 optionalDependencies. `bun run check:packages` validates these declarations.
 Keep shared-package development tooling at the root and external-system dependencies

@@ -17,6 +17,19 @@
         "vitest": "^5.0.1",
       },
     },
+    "adapters/storage-memory": {
+      "name": "@amends/storage-memory",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@amends/storage-conformance": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+      },
+    },
     "adapters/storage-postgresql": {
       "name": "@amends/storage-postgresql",
       "version": "0.0.0",
@@ -28,6 +41,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@amends/storage-conformance": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "drizzle-kit": "1.0.0-rc.5-5935859",
       },
@@ -42,6 +56,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@amends/storage-conformance": "workspace:*",
         "@effect/platform-bun": "catalog:",
       },
     },
@@ -194,6 +209,16 @@
         "effect": "catalog:",
       },
     },
+    "packages/storage-conformance": {
+      "name": "@amends/storage-conformance",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/core": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+    },
   },
   "overrides": {
     "vite-node": "5.0.0",
@@ -231,6 +256,10 @@
     "@amends/icons": ["@amends/icons@workspace:apps/icons"],
 
     "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
+
+    "@amends/storage-conformance": ["@amends/storage-conformance@workspace:packages/storage-conformance"],
+
+    "@amends/storage-memory": ["@amends/storage-memory@workspace:adapters/storage-memory"],
 
     "@amends/storage-postgresql": ["@amends/storage-postgresql@workspace:adapters/storage-postgresql"],
 

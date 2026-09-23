@@ -220,8 +220,15 @@ Each test opens its own file in a temporary directory and removes it afterwards.
 Construction tests cover both `make` and `layer`, reopening without data loss,
 and rollback of failed schema initialization before an explicit retry.
 
-The suites separate database construction, transactions, journal behavior, authorization, gateway
-workflows, and invitation lifecycle, policy, and replay. `contracts.test.ts` runs the same
+`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md)
+over a temporary file per test: another host is another connection to the file, discarding
+projections deletes the projection tables' rows, and the footprint counts the rows of every
+table. The journal, transaction, commit-publication, idempotency, fact-metadata, provenance,
+and read files register those suites. Beside them, `transactions.test.ts` injects a failed
+`COMMIT` to check `CommitUncertain`, and `fact-metadata.test.ts` checks the fact columns.
+
+The remaining suites separate database construction, authorization, gateway workflows, and
+invitation lifecycle, policy, and replay. `contracts.test.ts` runs the same
 direct-store rejection and round-trip scenarios as PostgreSQL, including invalid role edits, foreign
 grant scopes, invalid expiry, checkpoint validation, and rollback. Fixtures are in `support.ts` and
 `invitation-support.ts`. `notification-sources.test.ts` mirrors PostgreSQL coverage for current

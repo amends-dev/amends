@@ -31,7 +31,8 @@ currently run through TypeScript. Check compatibility before changing this setup
 
 ## Workspace layout
 
-- `packages/*`: portable shared packages. Effect is their only external dependency.
+- `packages/*`: portable shared packages. Effect is their only external dependency,
+  besides `@effect/vitest` for test suites a package ships from the root catalog.
   They may depend on other shared packages with `workspace:*`, but never hosts or
   apps. This applies to all dependency sections; development tools live at the root.
   `core` operates within one workspace with a trusted actor; its application
@@ -40,12 +41,17 @@ currently run through TypeScript. Check compatibility before changing this setup
   the host contracts for storage, sign-in, credential resolution, and the workspace
   directory. `api-http` is the HTTP contract shared by servers and clients, and
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
-  over the same gateway rather than new gateway methods.
+  over the same gateway rather than new gateway methods. `storage-conformance` holds
+  the test suites every storage adapter runs against itself through a harness; behavior
+  core relies on belongs there, and adapter tests keep only what one adapter stores or
+  fails differently.
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `storage-sqlite` implements workspace storage and the
   workspace directory over one SQLite file; `storage-postgresql` implements them over
-  PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field. Both
-  follow one shape: a module per store over a workspace binding, merged at the edge.
+  PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field;
+  `storage-memory` implements them in process memory as the reference implementation
+  of the storage contracts, with no dependencies. All follow one shape: a module per
+  store over a workspace binding, merged at the edge.
   Hosts compose adapters and implement no storage themselves; shared packages never
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves

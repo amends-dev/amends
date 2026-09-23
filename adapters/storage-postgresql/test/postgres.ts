@@ -105,7 +105,8 @@ export const temporary = Effect.fnUntraced(function* <A, E, R>(
       Effect.scoped,
       Effect.provide(maintenance),
     );
-  yield* Effect.acquireRelease(control(`CREATE DATABASE "${name}"`), () =>
+  // Setup failures are defects, never one of the test's own typed failures.
+  yield* Effect.acquireRelease(control(`CREATE DATABASE "${name}"`).pipe(Effect.orDie), () =>
     control(`DROP DATABASE "${name}" WITH (FORCE)`).pipe(Effect.orDie),
   );
   const url = new URL(serverUrl);

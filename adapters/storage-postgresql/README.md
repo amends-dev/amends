@@ -238,8 +238,16 @@ and drops it when done.
 Construction tests cover both `make` and `layer`, including initialization of all
 stores and reopening without data loss.
 
-The suites separate database construction, transactions, journal behavior, authorization, gateway
-workflows, and invitations. Each file creates its fixture through `support.ts`. The PostgreSQL
+`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md)
+over a database per test: another host is another pool, polling every 20 milliseconds, with a
+100-millisecond lock timeout when a test asks for prompt contention. Discarding projections
+truncates the projection tables, and the footprint counts the rows of every table. The journal,
+transaction, commit-publication, idempotency, fact-metadata, provenance, and read files register
+those suites. Beside them, `transactions.test.ts` injects a failed `COMMIT` to check
+`CommitUncertain`, and `fact-metadata.test.ts` checks the fact columns.
+
+The remaining suites separate database construction, authorization, gateway workflows, and
+invitations. Each file creates its fixture through `support.ts`. The PostgreSQL
 Vitest project's global setup owns the shared test cluster; individual tests own their temporary
 databases. `contracts.test.ts` runs the same direct-store rejection and round-trip scenarios as
 SQLite, including role validation, every foreign scope shape, missing or blank invitation roles,

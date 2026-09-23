@@ -17,6 +17,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@amends/storage-conformance": "workspace:*",
     "@effect/platform-bun": "catalog:"
   }
 }

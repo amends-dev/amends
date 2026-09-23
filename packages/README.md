@@ -2,8 +2,10 @@
 
 Each `packages/<name>/` directory is an independent Bun workspace containing
 portable application code. Effect is the only external dependency allowed in
-these packages. They may also depend on other workspaces in this directory using
-`workspace:*`. Host and app packages cannot be dependencies of shared packages.
+these packages, besides `@effect/vitest` for a package that ships test suites, such as
+`storage-conformance`; both use the root catalog. They may also depend on other workspaces
+in this directory using `workspace:*`. Host and app packages cannot be dependencies of
+shared packages.
 
 Keep development tooling at the repository root. The restriction applies to
 dependencies, devDependencies, peerDependencies, and optionalDependencies.
@@ -122,3 +124,7 @@ browser clients, and `@amends/server-http` implements it over the gateway,
 including the contract's bearer authentication over credential resolution.
 Additional protocols add their own contract and handler packages over the same
 gateway, adapting the same credential resolution to their own authentication.
+
+`@amends/storage-conformance` holds the [test suites](./storage-conformance/README.md)
+for the gateway's storage contracts. Each storage adapter supplies a harness and runs
+them against itself.

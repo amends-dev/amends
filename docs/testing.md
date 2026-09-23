@@ -24,7 +24,7 @@ bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
-covers shared packages, SQLite, and the local host. PostgreSQL has its own project
+covers shared packages, the memory and SQLite adapters, and the local host. PostgreSQL has its own project
 and global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
 headless state; web and desktop test their own route/UI integration; verify both frontend builds and desktop
 startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
@@ -248,6 +248,19 @@ Global teardown stops only the cluster started by the tests. A supplied URL must
 allow database creation and deletion. Without that URL or a local PostgreSQL
 installation, database suites are reported as skipped; pure PostgreSQL adapter
 tests still run. Startup and connection failures fail the run.
+
+## Storage conformance
+
+The [conformance suites](../packages/storage-conformance/README.md) specify storage
+behavior once and run it on every adapter. Each adapter's `test/harness.ts` supplies
+fresh storage per test, further hosts over it, a way to discard projections before replay,
+and a count of stored records for rollback checks. A test file registers one suite, such as
+`Suites.journal(harness)`, and adds tests only for what that adapter stores or fails
+differently. The memory adapter runs the same suites as the reference implementation; its
+tests run in the `backend` project.
+
+The suites cover the journal and transaction contracts. Store-contract, authorization,
+group, and thread tests still live in each SQL adapter until they move into the suites.
 
 ## Limits of current coverage
 

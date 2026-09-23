@@ -28,16 +28,18 @@ const errors: string[] = [];
 for (const { path, manifest } of packages) {
   for (const section of sections) {
     for (const [name, version] of Object.entries(manifest[section] ?? {})) {
-      if (name === "effect") {
+      if (name === "effect" || name === "@effect/vitest") {
         if (version !== "catalog:") {
-          errors.push(`${path}: ${section}.effect must use the root catalog (catalog:).`);
+          errors.push(`${path}: ${section}.${name} must use the root catalog (catalog:).`);
         }
       } else if (sharedNames.has(name)) {
         if (!version.startsWith("workspace:")) {
           errors.push(`${path}: ${section}.${name} must use the workspace: protocol.`);
         }
       } else {
-        errors.push(`${path}: ${section}.${name} is not Effect or a shared workspace package.`);
+        errors.push(
+          `${path}: ${section}.${name} is not Effect, @effect/vitest, or a shared workspace package.`,
+        );
       }
     }
   }

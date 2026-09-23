@@ -8,8 +8,10 @@ live outside `packages/`. Hosts compose them; shared packages never depend on th
 `storage-sqlite/` implements the gateway's workspace storage and workspace
 directory contracts over one SQLite file; it is the local host's default.
 `storage-postgresql/` implements the same contracts over PostgreSQL, with Drizzle
-over the Effect PostgreSQL client and one column per record field. Each README
-covers running and testing. Both adapters share one shape: one module per store
+over the Effect PostgreSQL client and one column per record field.
+`storage-memory/` implements them in process memory with no dependencies: it is the
+reference implementation of the storage contracts and no host uses it. Each README
+covers running and testing. The adapters share one shape: one module per store
 over a workspace binding that owns the transaction boundary, merged into the
 storage contract at the edge.
 
@@ -81,7 +83,7 @@ exports both, with one construction path. Constructors acquire stable dependenci
 inside their Effect and return the implemented contract's `Service.of(...)` value.
 They retain their acquisition errors and dependencies in the Effect type.
 
-Both storage adapters use the same construction boundaries:
+The SQL adapters use the same construction boundaries:
 
 | Module        | `make` constructs                                        | Dependencies                   |
 | ------------- | -------------------------------------------------------- | ------------------------------ |
@@ -96,6 +98,10 @@ or pool. `Database.layer(config)` supplies the driver's client layer and delegat
 initialization to `make`. It exposes the database and the underlying SQL client
 services, which refer to the same connection or pool. A schema-initialization failure prevents the database service from being returned.
 Reopening a database already using the current baseline preserves its data.
+
+The memory adapter keeps the same binding, store, storage, and directory modules. Its
+`MemoryDatabase.make()` constructs empty storage, and `MemoryConnection` stands for one
+host's connection over it, which the binding, storage, and directory depend on.
 
 Acquire the database once and share it across workspace views. Direct callers must
 keep the client's owning scope alive while using the database, bindings, or stores.
@@ -121,12 +127,15 @@ operation. Constructors do not create workspaces or cache an actor or transactio
 
 ## Testing and migrations
 
-Tests are grouped by database construction, transactions, journal behavior,
-authorization, gateway workflows, and invitations. Each adapter owns its database
-fixtures in `test/support.ts`; database-specific behavior stays in that adapter's
-tests. Keep the scenarios in both `test/contracts.test.ts` files aligned. They
-exercise direct store calls, so core's application validation cannot hide an
-adapter's missing checks.
+Every adapter runs the [conformance suites](../packages/storage-conformance/README.md)
+through a harness in `test/harness.ts`, one suite per test file. Behavior core relies on
+belongs in those suites; an adapter's own tests keep what only it has, such as columns,
+query plans, and driver failure injection. The remaining tests are grouped by database
+construction, authorization, gateway workflows, invitations, groups, and threads, and
+move into the suites in later changes. Each SQL adapter owns its database fixtures in
+`test/support.ts`. Keep the scenarios in both `test/contracts.test.ts` files aligned. They
+exercise direct store calls, so core's application validation cannot hide an adapter's
+missing checks.
 
 During local development, keep one initial schema baseline per adapter. SQLite's
 initializer lives in `src/migrations.ts`; PostgreSQL's generated baseline lives in

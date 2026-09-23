@@ -1,0 +1,179 @@
+/**
+ * One workspace's view of memory storage: its identity, the transaction boundary every commit
+ * runs inside, and the state each statement sees. Store modules require this service and
+ * nothing else of each other.
+ */
+import { Commit, Store } from "@amends/core/journal";
+import type { Workspace } from "@amends/core/workspace";
+import { Context, DateTime, Effect, Exit, Layer, Option } from "effect";
+import { MemoryConnection } from "./connection.ts";
+import { MemoryDatabase } from "./database.ts";
+
+/** The native handle a session exposes to core. */
+export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>;
+
+/** One open transaction: a snapshot of the workspace that its writes change until it commits. */
+export interface TransactionState {
+  readonly connection: MemoryConnection.Interface;
+  readonly workspaceId: Workspace.Id;
+  readonly commit: Commit.Record;
+  readonly space: MemoryDatabase.Space;
+  active: boolean;
+}
+
+/** The session a program runs under; statements check it against their own binding. */
+export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
+  "@amends/storage-memory/binding/Current",
+) {}
+
+export interface Interface {
+  readonly workspaceId: Workspace.Id;
+  readonly connection: MemoryConnection.Interface;
+  /**
+   * What a read sees: the live transaction of this workspace on this connection, or committed
+   * state outside any transaction. Any other transaction is a foreign or expired handle.
+   */
+  readonly read: Effect.Effect<MemoryDatabase.Space, Store.Failure>;
+  /** What a projection write changes: the caller's transaction, which it requires. */
+  readonly write: Effect.Effect<MemoryDatabase.Space, Store.Failure>;
+  /** What a write outside the journal changes: the caller's transaction, or committed state. */
+  readonly join: Effect.Effect<MemoryDatabase.Space, Store.Failure>;
+  /**
+   * The store's transaction primitive, given how to expose the native handle for the session
+   * it opens. See Store.Interface for the contract.
+   */
+  readonly transaction: <A, E, R>(
+    program: Effect.Effect<A, E, R>,
+    native: (session: TransactionState) => TransactionHandle,
+    options?: Store.TransactionOptions,
+  ) => Effect.Effect<
+    A,
+    E | Store.Failure | Store.Conflict | Store.CommitUncertain,
+    Exclude<R, Store.Transaction>
+  >;
+}
+
+export class Service extends Context.Service<Service, Interface>()(
+  "@amends/storage-memory/binding/Service",
+) {}
+
+/**
+ * Construct one workspace binding over the caller's connection.
+ *
+ * @category constructors
+ */
+export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.Id) {
+  const connection = yield* MemoryConnection.Service;
+  const { database, gate } = connection;
+
+  /** The caller's live transaction here, None outside any, or a failure for any other. */
+  const session = Effect.gen(function* () {
+    const current = yield* Effect.serviceOption(CurrentTransaction);
+    const native = yield* Effect.serviceOption(Store.Transaction);
+    if (Option.isNone(current) && Option.isNone(native)) return Option.none<TransactionState>();
+    if (
+      Option.isNone(current) ||
+      Option.isNone(native) ||
+      !current.value.active ||
+      current.value.connection !== connection ||
+      current.value.workspaceId !== workspaceId ||
+      current.value.commit.id !== native.value.id
+    )
+      return yield* new Store.Failure({
+        operation: "transaction",
+        cause: "Missing, closed, or foreign workspace transaction",
+      });
+    return current;
+  });
+  const read = Effect.map(session, (current) =>
+    Option.isSome(current) ? current.value.space : MemoryDatabase.committed(database, workspaceId),
+  );
+  const write = Effect.flatMap(session, (current) =>
+    Option.isSome(current)
+      ? Effect.succeed(current.value.space)
+      : Effect.fail(
+          new Store.Failure({
+            operation: "transaction",
+            cause: "Missing, closed, or foreign workspace transaction",
+          }),
+        ),
+  );
+  const join = Effect.map(session, (current) =>
+    Option.isSome(current) ? current.value.space : MemoryDatabase.writable(database, workspaceId),
+  );
+
+  const transaction: Interface["transaction"] = Effect.fn("Binding.transaction")(function* <
+    A,
+    E,
+    R,
+  >(
+    program: Effect.Effect<A, E, R>,
+    native: (session: TransactionState) => TransactionHandle,
+    options?: Store.TransactionOptions,
+  ) {
+    yield* read;
+    if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+      return yield* new Store.Failure({
+        operation: "transaction",
+        cause: "Native transactions cannot nest; use journal.commit",
+      });
+    return yield* Effect.uninterruptibleMask((restore) =>
+      Effect.gen(function* () {
+        // This host's writers wait for each other; another host's writer is contention.
+        yield* restore(gate.take(1));
+        if (database.writers.has(workspaceId)) {
+          yield* gate.release(1);
+          return yield* new Store.Conflict({
+            operation: "transaction",
+            message: "Another host is writing this workspace",
+          });
+        }
+        database.writers.set(workspaceId, connection);
+        const state: TransactionState = {
+          connection,
+          workspaceId,
+          active: true,
+          commit: {
+            id: Commit.Id.make(database.nextId("commit")),
+            recordedAt: yield* DateTime.now,
+            entryCount: 0,
+          },
+          space: MemoryDatabase.copy(MemoryDatabase.committed(database, workspaceId)),
+        };
+        const exit = yield* Effect.exit(
+          restore(
+            program.pipe(
+              Effect.updateContext((context: Context.Context<R>) =>
+                Context.add(context, CurrentTransaction, state),
+              ),
+              Effect.provideService(Store.Transaction, native(state)),
+            ),
+          ),
+        );
+        state.active = false;
+        // Committing replaces the workspace's state with the snapshot; rolling back drops it.
+        if (Exit.isSuccess(exit)) {
+          MemoryDatabase.commit(database, workspaceId, state.space);
+          if ((state.space.commits.get(state.commit.id)?.entryCount ?? 0) > 0)
+            MemoryDatabase.signalAppend(database);
+        }
+        database.writers.delete(workspaceId);
+        yield* gate.release(1);
+        if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
+        yield* Store.notifyCommit(state.commit.id, options);
+        return exit.value;
+      }),
+    );
+  });
+
+  return Service.of({ workspaceId, connection, read, write, join, transaction });
+});
+
+/**
+ * Provide Service using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
+export const layer = (workspaceId: Workspace.Id) => Layer.effect(Service, make(workspaceId));
+
+export * as Binding from "./binding.ts";
