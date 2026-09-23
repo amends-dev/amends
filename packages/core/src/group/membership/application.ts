@@ -103,13 +103,18 @@ export interface Interface {
   readonly leave: (
     input: GroupMembership.LeaveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /** Current admissions of active workspace members; require group.read and audience membership. */
+  /**
+   * A page of current admissions of active workspace members, in admission-ID order; require
+   * group.read and audience membership.
+   */
   readonly listCurrent: (
     groupId: Group.Id,
+    options: GroupMembership.ListOptions,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
-  /** Inspect a known group's current roster under group.membership.manage, without joining it. */
+  /** Page a known group's current roster under group.membership.manage, without joining it. */
   readonly listCurrentForManagement: (
     groupId: Group.Id,
+    options: GroupMembership.ListOptions,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
 }
 
@@ -301,51 +306,70 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     journal.commit,
   );
 
-  const current = Effect.fnUntraced(function* (groupId: Group.Id) {
+  /** Fill a page with admissions whose workspace member is still active, reading further as needed. */
+  const current = Effect.fnUntraced(function* (
+    groupId: Group.Id,
+    input: GroupMembership.ListOptions,
+  ) {
+    const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
     yield* loadGroup(groupId);
     const seenIds = new Set<GroupMembership.Id>();
-    const admitted = new Map<Member.Id, GroupMembership.Record>();
-    for (const found of yield* memberships.listByGroup(groupId)) {
-      const membership = yield* decodeMembership(found).pipe(Effect.mapError(invalidRecord));
-      if (
-        membership.workspaceId !== workspaceId ||
-        membership.groupId !== groupId ||
-        seenIds.has(membership.id)
-      )
-        return yield* new InvalidResponse({
-          message: "Membership store returned an inconsistent group listing",
-        });
-      seenIds.add(membership.id);
-      if (membership.status !== "active") continue;
-      if (admitted.has(membership.memberId))
-        return yield* new InvalidResponse({
-          message: "Membership store returned duplicate active admissions",
-        });
-      admitted.set(membership.memberId, membership);
-    }
-    // One read for every admitted member; only admissions of active members are current.
-    const found = new Map<Member.Id, Member.Record>();
-    for (const row of yield* members.getMany([...admitted.keys()])) {
-      const member = yield* decodeMember(row).pipe(Effect.mapError(invalidRecord));
-      if (member.workspaceId !== workspaceId || !admitted.has(member.id) || found.has(member.id))
-        return yield* new InvalidResponse({
-          message: "Member store returned another member or workspace",
-        });
-      found.set(member.id, member);
-    }
+    const seenMembers = new Set<Member.Id>();
     const active: Array<GroupMembership.Record> = [];
-    for (const [memberId, membership] of admitted) {
-      const member = found.get(memberId);
-      if (member === undefined)
-        return yield* new InvalidResponse({
-          message: "Group admission references a missing workspace member",
-        });
-      if (member.status === "active") active.push(membership);
+    let after = options.after;
+    while (active.length < options.limit) {
+      const page: Array<GroupMembership.Record> = [];
+      for (const found of yield* memberships.pageActiveByGroup(
+        groupId,
+        after === undefined ? { limit: options.limit } : { after, limit: options.limit },
+      )) {
+        const membership = yield* decodeMembership(found).pipe(Effect.mapError(invalidRecord));
+        if (
+          membership.workspaceId !== workspaceId ||
+          membership.groupId !== groupId ||
+          membership.status !== "active" ||
+          seenIds.has(membership.id) ||
+          (after !== undefined && membership.id <= after)
+        )
+          return yield* new InvalidResponse({
+            message: "Membership store returned an inconsistent group listing",
+          });
+        if (seenMembers.has(membership.memberId))
+          return yield* new InvalidResponse({
+            message: "Membership store returned duplicate active admissions",
+          });
+        seenIds.add(membership.id);
+        seenMembers.add(membership.memberId);
+        page.push(membership);
+      }
+      if (page.length === 0) break;
+      // One read for the page's members; only admissions of active members are current.
+      const requested = new Set(page.map((membership) => membership.memberId));
+      const found = new Map<Member.Id, Member.Record>();
+      for (const row of yield* members.getMany([...requested])) {
+        const member = yield* decodeMember(row).pipe(Effect.mapError(invalidRecord));
+        if (member.workspaceId !== workspaceId || !requested.has(member.id) || found.has(member.id))
+          return yield* new InvalidResponse({
+            message: "Member store returned another member or workspace",
+          });
+        found.set(member.id, member);
+      }
+      for (const membership of page) {
+        const member = found.get(membership.memberId);
+        if (member === undefined)
+          return yield* new InvalidResponse({
+            message: "Group admission references a missing workspace member",
+          });
+        after = membership.id;
+        if (member.status === "active" && active.length < options.limit) active.push(membership);
+      }
+      if (page.length < options.limit) break;
     }
     return active;
   });
   const listCurrent = Effect.fn("GroupMembershipApplication.listCurrent")(function* (
     groupId: Group.Id,
+    options: GroupMembership.ListOptions,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
     yield* audience
@@ -358,13 +382,13 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);
-    return yield* current(id);
+    return yield* current(id, options);
   });
   const listCurrentForManagement = Effect.fn("GroupMembershipApplication.listCurrentForManagement")(
-    function* (groupId: Group.Id) {
+    function* (groupId: Group.Id, options: GroupMembership.ListOptions) {
       const id = yield* Schema.decodeEffect(Group.Id)(groupId);
       yield* requireManagement(id);
-      return yield* current(id);
+      return yield* current(id, options);
     },
   );
 

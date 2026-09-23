@@ -19,6 +19,20 @@ export const Record = Schema.Struct({
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
+/** A page of a group's current admissions in admission-ID order, after the exclusive cursor. */
+export const ListOptions = Schema.Struct({
+  after: Schema.optionalKey(Id),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
+
+/** A page of a member's active admissions in group-ID order, after the exclusive group cursor. */
+export const ByMemberOptions = Schema.Struct({
+  afterGroupId: Schema.optionalKey(GroupId.Id),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ByMemberOptions extends Schema.Schema.Type<typeof ByMemberOptions> {}
+
 /** Add an active workspace member to an existing group in the bound workspace. */
 export const AddInput = Schema.Struct({
   groupId: GroupId.Id,

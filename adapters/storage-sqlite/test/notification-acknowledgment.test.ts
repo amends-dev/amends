@@ -1,5 +1,6 @@
 import type * as Core from "@amends/core";
 import { expect, expectTypeOf, it } from "@effect/vitest";
+import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
 import { GroupApplication, GroupMembershipApplication } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
@@ -44,6 +45,12 @@ const agent: Actor.Value = {
   memberId: Member.Id.make("agent"),
   identity: { _tag: "Agent", id: Identity.AgentId.make("recipient") },
 };
+/** Writes the opening message, so the others, including the owner, receive it. */
+const writer: Actor.Value = {
+  workspaceId,
+  memberId: Member.Id.make("writer"),
+  identity: { _tag: "Human", id: Identity.HumanId.make("writer") },
+};
 const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
 const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
@@ -81,12 +88,25 @@ const prepare = Effect.fnUntraced(function* () {
     bound,
     Effect.flatMap(Journal.Service, (journal) =>
       journal.commit(
-        Effect.forEach([human, agent], (actor) =>
+        Effect.forEach([human, agent, writer], (actor) =>
           journal.publish(MemberFacts.Added, {
             workspaceId,
             memberId: actor.memberId,
             identity: actor.identity,
           }),
+        ).pipe(
+          Effect.andThen(
+            journal.publish(AssignmentFacts.Created, {
+              workspaceId,
+              assignmentId: Assignment.Id.make("writer-viewer"),
+              memberId: writer.memberId,
+              source: {
+                _tag: "Role",
+                roleId: BuiltinRoles.ViewerId,
+                scope: { _tag: "Workspace", workspaceId },
+              },
+            }),
+          ),
         ),
       ),
     ),
@@ -97,15 +117,15 @@ const prepare = Effect.fnUntraced(function* () {
     Effect.flatMap(GroupApplication.Service, (s) =>
       s.createPrivateTeam({
         name: "Team",
-        memberIds: [owner.memberId, human.memberId, agent.memberId],
+        memberIds: [owner.memberId, human.memberId, agent.memberId, writer.memberId],
       }),
     ),
   );
   const first = yield* run(
     bound,
-    owner,
+    writer,
     Effect.flatMap(ThreadApplication.Service, (s) =>
-      // Mentioning everyone, the author included, enrolls and notifies all three.
+      // Mentioning the three others enrolls and notifies them; the writer is not notified.
       s.startInGroup({
         groupId: group.id,
         mentions: [owner.memberId, human.memberId, agent.memberId],

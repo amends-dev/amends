@@ -30,6 +30,7 @@ import { ThreadParticipation } from "./participation/participation.ts";
 import { ThreadParticipationStore } from "./participation/store.ts";
 import { ThreadActivityReading } from "./activity/reading.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
+import { ThreadReading } from "../attention/reading.ts";
 import { ReadStateStore } from "../attention/store.ts";
 /** Missing, foreign, and outside-audience threads share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadApplication.NotFound", {
@@ -64,8 +65,7 @@ export type Error =
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
+  | ThreadReading.Error
   | MemberStore.Failure
   | Schema.SchemaError
   | PlatformError.PlatformError
@@ -150,6 +150,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const threads = yield* ThreadStore.Service;
   const reading = yield* ThreadActivityReading.Service;
   const readStates = yield* ReadStateStore.Service;
+  const readings = yield* ThreadReading.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -166,6 +167,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       threads.workspaceId,
       reading.workspaceId,
       readStates.workspaceId,
+      readings.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -228,6 +230,8 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
         ]);
     }
+    if (actor.identity._tag !== "Human")
+      return yield* new HumanAuthorRequired({ memberId: actor.memberId });
     const started = yield* starts
       .start({
         groupId,
@@ -245,13 +249,12 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
         ),
       );
-    // Posting reads the thread through the author's own message; their notifications are unchanged.
-    yield* readStates.advanceThread({
-      workspaceId,
-      memberId: actor.memberId,
-      threadId: started.thread.id,
-      readThrough: started.activity.sequence,
-    });
+    // Posting reads the thread through the author's own message.
+    yield* readings.markRead(
+      { memberId: actor.memberId, recipient: actor.identity },
+      started.thread,
+      started.activity.sequence,
+    );
     return started;
   });
   const startDirect = Effect.fn("ThreadApplication.startDirect")(

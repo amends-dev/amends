@@ -37,18 +37,20 @@ initialized Viewer, Administrator, and Owner bundles. Any custom role or direct 
 supply it. Membership alone grants no read permission; a broad read or management grant,
 creator attribution, or workspace ownership does not make the caller part of the audience.
 
-| Operation                                                      | Result and authority                                                                                                                                                                                     |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GroupApplication.listMine`                                    | `Group.ListItem` values for the caller's current readable groups, ordered by group ID, with latest activity, caught-up time, `newActivity`, and `following`. Unreadable and unjoined groups are omitted. |
-| `GroupApplication.get(groupId)`                                | Group metadata, requiring audience membership and `group.read`.                                                                                                                                          |
-| `GroupMembershipApplication.listCurrent(groupId)`              | Current admissions under the same read policy, ordered by admission ID.                                                                                                                                  |
-| `GroupApplication.getForManagement(groupId)`                   | Metadata for a known group, requiring `group.membership.manage` on it.                                                                                                                                   |
-| `GroupMembershipApplication.listCurrentForManagement(groupId)` | The current roster for a known group under that management permission.                                                                                                                                   |
+| Operation                                                                         | Result and authority                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GroupApplication.listMine({ limit, after? })`                                    | A page of `Group.ListItem` values for the caller's current readable groups, ordered by group ID, with latest activity, caught-up time, `newActivity`, and `following`. Unreadable and unjoined groups are omitted. |
+| `GroupApplication.get(groupId)`                                                   | Group metadata, requiring audience membership and `group.read`.                                                                                                                                                    |
+| `GroupMembershipApplication.listCurrent(groupId, { limit, after? })`              | A page of current admissions under the same read policy, ordered by admission ID.                                                                                                                                  |
+| `GroupApplication.getForManagement(groupId)`                                      | Metadata for a known group, requiring `group.membership.manage` on it.                                                                                                                                             |
+| `GroupMembershipApplication.listCurrentForManagement(groupId, { limit, after? })` | A page of the current roster for a known group under that management permission.                                                                                                                                   |
 
-`listMine` reads a fixed number of times however many groups the caller belongs to: their
-admissions, one `group.read` check for all of them, the groups, their latest activity, the caller's
-caught-up times, and their follows. A group has `newActivity` when its latest message came after
-the caller last caught up with it through `ReadStateApplication.markGroupRead`, or after they
+Group lists and rosters take an exclusive `after` ID cursor and a `limit`, and keep reading until
+the page is full: groups outside the caller's `group.read` grants, and admissions whose workspace
+member left, are skipped. Each page of `listMine` reads a fixed number of times, however large:
+their admissions, one `group.read` check for all of them, the groups, their latest activity, the
+caller's caught-up times, and their follows. A group has `newActivity` when its latest message came
+after the caller last caught up with it through `ReadStateApplication.markGroupRead`, or after they
 joined when they never have.
 
 Management reads require neither group membership nor `group.read`. They expose only the
@@ -71,7 +73,7 @@ empty lists or missing groups.
 Reads query current state without opening a transaction, publishing facts, or advancing
 checkpoints. They honor an existing caller transaction, including staged admission, departure,
 and grant changes. Separate reads do not promise a shared snapshot: revocation affects later
-checks but does not cancel an already-authorized read. Group lists and rosters are unpaginated.
+checks but does not cancel an already-authorized read. Group lists and rosters are paginated by ID.
 
 ### Shared audience policy
 

@@ -77,6 +77,29 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
     ),
+    pageActiveByGroup: Effect.fn("GroupMemberships.pageActiveByGroup")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
+        const after = options.after === undefined ? sql`` : sql`AND id > ${options.after}`;
+        return yield* guard(
+          sql`SELECT ${columns} FROM group_memberships WHERE workspace_id = ${workspaceId} AND group_id = ${groupId} AND json_extract(record, '$.status') = 'active' ${after} ORDER BY id COLLATE BINARY LIMIT ${options.limit}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByGroup")),
+    ),
+    pageActiveByMember: Effect.fn("GroupMemberships.pageActiveByMember")(
+      function* (memberInput, input) {
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+        const options = yield* Schema.decodeEffect(GroupMembership.ByMemberOptions)(input);
+        const after =
+          options.afterGroupId === undefined ? sql`` : sql`AND group_id > ${options.afterGroupId}`;
+        return yield* guard(
+          sql`SELECT ${columns} FROM group_memberships WHERE workspace_id = ${workspaceId} AND member_id = ${memberId} AND json_extract(record, '$.status') = 'active' ${after} ORDER BY group_id COLLATE BINARY LIMIT ${options.limit}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByMember")),
+    ),
     listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
       function* (input) {
         const memberId = yield* Schema.decodeEffect(Member.Id)(input);

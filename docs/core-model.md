@@ -264,7 +264,8 @@ See [groups and thread audiences](#agreed-groups-provide-a-shared-home-for-threa
   Other members with access to the thread are not notified; they see its activity as unread
   through their read positions.
 - For message-publication activity, notify explicitly mentioned participants, or all current
-  participants when there are no mentions. This applies equally to user and assistant messages.
+  participants when there are no mentions, never the message's own author. This applies equally to
+  user and assistant messages.
 - Humans acknowledge notifications. Agents accept work from relevant user messages and
   actionable task changes, explicit retries, and explicit agent work requests and their
   results. They discard ordinary assistant-message notifications. Informational turn status
@@ -2601,7 +2602,8 @@ group, authorized it to handle that conversation; it still executes with its own
 Thread participants supply the possible notification recipients for every activity. The
 activity narrows those recipients according to its type and addressing. For a published
 message, explicit mentions select recipients; with no mentions, all current participants
-are notified. That message rule applies equally to user and assistant authors.
+are notified. A message never notifies its own author, even when it mentions them. That
+message rule applies equally to user and assistant authors.
 Other activity types have their own
 recipient rules, rather than being treated as synthetic user messages.
 
@@ -2655,7 +2657,8 @@ its latest message, and each group the time of its latest message in any thread;
 changes do not count. A member's caught-up time for a group, set when they view or mark the group
 read, shows whether the group has newer activity. Thread lists order by latest activity.
 
-Posting a message reads the thread through it for its author.
+Posting a message reads the thread through it for its author, settling their earlier notifications
+from it the same way; a message never notifies its own author.
 
 Marking a thread read through a sequence also records `Seen` for the member's pending
 notifications from that thread's activity up to it, in the same operation. Those acknowledgments
@@ -2812,16 +2815,16 @@ notifications preserve that selection; later participant changes do not change h
 recipients. A participant that should receive an assignment or triage notification must be
 present before or consistently with recording the activity that selects it.
 
-| Activity                                                           | Recipient rule                                                                                                                                |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Message published                                                  | Explicitly mentioned participants, or all current participants if there are no mentions. This applies equally to user and assistant messages. |
-| Turn created, started, completed, failed, or cancellation activity | All current thread participants.                                                                                                              |
-| Explicit retry requested                                           | The agent whose earlier attempt is referenced.                                                                                                |
-| Explicit agent work request                                        | The agent being asked to act.                                                                                                                 |
-| Result of an explicit agent work request                           | The requesting agent, through the request reference and current participation rules.                                                          |
-| Task entered triage                                                | The thread's triage participant.                                                                                                              |
-| Task assigned to a workspace member                                | The assignee, including when already participating in the thread.                                                                             |
-| Task requirement, bookkeeping, stop, or resumption changes         | All current thread participants; handling depends on the change's meaning and origin.                                                         |
+| Activity                                                           | Recipient rule                                                                                                                                                            |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Message published                                                  | Explicitly mentioned participants, or all current participants if there are no mentions, never including its author. This applies equally to user and assistant messages. |
+| Turn created, started, completed, failed, or cancellation activity | All current thread participants.                                                                                                                                          |
+| Explicit retry requested                                           | The agent whose earlier attempt is referenced.                                                                                                                            |
+| Explicit agent work request                                        | The agent being asked to act.                                                                                                                                             |
+| Result of an explicit agent work request                           | The requesting agent, through the request reference and current participation rules.                                                                                      |
+| Task entered triage                                                | The thread's triage participant.                                                                                                                                          |
+| Task assigned to a workspace member                                | The assignee, including when already participating in the thread.                                                                                                         |
+| Task requirement, bookkeeping, stop, or resumption changes         | All current thread participants; handling depends on the change's meaning and origin.                                                                                     |
 
 Task assignment is the work request. Adding the assignee to the thread can accompany it,
 but an assignment must still notify someone already participating in the thread. Likewise, entering

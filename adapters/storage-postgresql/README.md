@@ -52,6 +52,9 @@ Read-state tables reference no projection rows, so rebuilding projections keeps 
 `threads_by_latest` serves a group's threads newest latest activity first, from an exclusive
 `(latest_activity_at, id)` cursor.
 
+`active_group_memberships_by_member` pages a member's current groups in group-ID order for
+group lists; rosters page a group's active admissions by admission ID.
+
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions; they and `threads_by_group` and
 `participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID

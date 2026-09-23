@@ -69,6 +69,13 @@ export const Latest = Schema.Struct({
 });
 export interface Latest extends Schema.Schema.Type<typeof Latest> {}
 
+/** A page of the reader's groups in group-ID order, after the exclusive cursor. */
+export const ListOptions = Schema.Struct({
+  after: Schema.optionalKey(GroupId.Id),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
+
 /**
  * One of the reader's groups with its activity. `newActivity` holds when its latest message came
  * after the reader last caught up with it or, if they never have, after they joined.

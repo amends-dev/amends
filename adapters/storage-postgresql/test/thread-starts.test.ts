@@ -269,8 +269,9 @@ describe.skipIf(!available)("PostgreSQL thread starts", () => {
               expect.arrayContaining([{ _tag: "Contact", contactId }, { _tag: "Triage" }]),
             );
             expect(yield* participantsOf(bound, started.thread.id)).toHaveLength(2);
-            for (const recipient of [contact, { _tag: "Triage" } as const])
-              expect(yield* inbox(bound, recipient)).toHaveLength(1);
+            // The contact is not sent their own message; triage is notified.
+            expect(yield* inbox(bound, contact)).toEqual([]);
+            expect(yield* inbox(bound, { _tag: "Triage" })).toHaveLength(1);
             expect(yield* inbox(bound, owner.identity)).toEqual([]);
             // A member reply without mentions reaches every participant, including the contact.
             yield* run(
@@ -280,10 +281,9 @@ describe.skipIf(!available)("PostgreSQL thread starts", () => {
                 s.publish({ threadId: started.thread.id, text: "Looking into it", mentions: [] }),
               ),
             );
-            for (const recipient of [contact, { _tag: "Triage" } as const, owner.identity])
-              expect(yield* inbox(bound, recipient)).toHaveLength(
-                recipient._tag === "Human" ? 1 : 2,
-              );
+            expect(yield* inbox(bound, contact)).toHaveLength(1);
+            expect(yield* inbox(bound, { _tag: "Triage" })).toHaveLength(2);
+            expect(yield* inbox(bound, owner.identity)).toEqual([]);
             // Mentions narrow a reply to the mentioned members.
             yield* run(
               bound,
@@ -292,7 +292,7 @@ describe.skipIf(!available)("PostgreSQL thread starts", () => {
                 s.publish({ threadId: started.thread.id, text: "Bob?", mentions: [humanId] }),
               ),
             );
-            expect(yield* inbox(bound, contact)).toHaveLength(2);
+            expect(yield* inbox(bound, contact)).toHaveLength(1);
             expect(
               yield* inbox(bound, { _tag: "Human", id: Identity.HumanId.make(humanId) }),
             ).toHaveLength(1);

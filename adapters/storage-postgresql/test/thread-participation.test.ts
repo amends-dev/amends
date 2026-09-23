@@ -372,7 +372,8 @@ describe.runIf(available)("PostgreSQL thread participation", () => {
                 ThreadParticipation.memberOf(p.participant) === humanId && p.status === "active",
             )?.joinedAtSequence,
           ).toBe(authored.activity.sequence);
-          expect(yield* notifications(bound, humanId)).toHaveLength(3);
+          // The readmitting reply is their own, so it does not notify them.
+          expect(yield* notifications(bound, humanId)).toHaveLength(2);
         }),
       ),
     ),

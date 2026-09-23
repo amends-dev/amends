@@ -26,8 +26,8 @@ workflows exist today: the task and channel workflows that admit contacts and tr
 unimplemented, and general participation management remains incomplete. Group departure ends its
 associated thread participations and discards their pending agent input; workspace-member removal
 uses the same cleanup. Thread starts, reads, replies, and follow/unfollow use the shared
-group-audience check. Group discovery and current-participant lists are unpaginated; group thread
-lists and timelines have cursor pages. Separate reads and pages do not share a snapshot. Group
+group-audience check. Current-participant lists are unpaginated; group lists, rosters, group thread
+lists, and timelines have cursor pages. Separate reads and pages do not share a snapshot. Group
 creation, starts, replies, and timeline pages read members, admissions, participations, and
 referenced messages in batches, so their store reads do not grow with group size or page length. A
 start still publishes one participation fact per starting participant, and every fact reads and
@@ -37,9 +37,8 @@ model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is implem
 workflows: a team post starts with its author, mentioned members, and the group's followers; only
 mentioned agents need `agent.use`; group thread lists page by latest activity with unread state;
 group lists report new activity and following; and marking a thread read settles its notifications.
-Authors are still notified of their own unmentioned messages, as recipient selection has no sender
-exclusion; posting advances their read position but leaves that notification pending. Task and
-channel workflows, which will admit human followers, remain unimplemented.
+Messages never notify their author, and posting reads the thread through the author's message. Task
+and channel workflows, which will admit human followers, remain unimplemented.
 
 ## Design-system coverage
 

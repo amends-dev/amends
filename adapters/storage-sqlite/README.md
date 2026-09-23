@@ -50,6 +50,9 @@ Read-state tables reference no projection rows, so rebuilding projections keeps 
 `threads_by_latest` serves a group's threads newest latest activity first, from an exclusive
 `(latest_activity_at, id)` cursor.
 
+`active_group_memberships_by_member` pages a member's current groups in group-ID order for
+group lists; rosters page a group's active admissions by admission ID.
+
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions in ID order without scanning the workspace.
 The directory reads across workspaces, so `members_by_identity` and `invitations_by_recipient`

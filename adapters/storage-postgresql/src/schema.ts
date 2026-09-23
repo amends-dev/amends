@@ -161,6 +161,10 @@ export const groupMemberships = pgTable(
       table.memberId,
       sql`${table.id} COLLATE "C"`,
     ),
+    // A member's current groups, paged in group-ID order.
+    index("active_group_memberships_by_member")
+      .on(table.workspaceId, table.memberId, sql`${table.groupId} COLLATE "C"`)
+      .where(sql`${table.status} = 'active'`),
   ],
 );
 

@@ -187,6 +187,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         getMany: unexpected,
         findActive: unexpected,
         listByGroup: unexpected,
+        pageActiveByGroup: unexpected,
+        pageActiveByMember: unexpected,
         listActiveByMember: unexpected,
         insert: unexpected,
         markRemoved: unexpected,

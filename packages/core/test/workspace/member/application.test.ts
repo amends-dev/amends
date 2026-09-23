@@ -121,6 +121,8 @@ const configured = (
     getMany: () => Effect.die("These member tests have no group admissions"),
     findActive: () => Effect.die("These member tests have no group admissions"),
     listByGroup: () => Effect.die("These member tests have no group admissions"),
+    pageActiveByGroup: () => Effect.die("These member tests have no group admissions"),
+    pageActiveByMember: () => Effect.die("These member tests have no group admissions"),
     insert: () => Effect.die("These member tests have no group admissions"),
     markRemoved: () => Effect.die("These member tests have no group admissions"),
   });

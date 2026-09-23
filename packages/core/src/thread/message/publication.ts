@@ -112,8 +112,11 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       .publish(ThreadMessageFacts.Published, message)
       .pipe(Publication.withOccurredAt(request.occurredAt));
     // Mentions address members; without them the message reaches every selected participant.
+    // A message never notifies its own author.
+    const author = ThreadParticipation.keyOf(authorReference(request.author));
     const recipients = admitted.participants
       .filter((p) => {
+        if (ThreadParticipation.keyOf(p.participant) === author) return false;
         const memberId = ThreadParticipation.memberOf(p.participant);
         return (
           request.mentions.length === 0 ||

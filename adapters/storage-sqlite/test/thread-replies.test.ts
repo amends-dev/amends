@@ -241,7 +241,8 @@ it.effect("a human reply joins its author and broadcasts only to current thread 
           joinedAt: result.message.publishedAt,
           status: "active",
         });
-        expect(yield* notifications(bound, humanId)).toHaveLength(1);
+        // A message never notifies its author.
+        expect(yield* notifications(bound, humanId)).toEqual([]);
         expect(yield* notifications(bound, agentId)).toHaveLength(2);
         expect(yield* notifications(bound, otherId)).toEqual([]);
         expect(
@@ -285,8 +286,12 @@ it.effect("a human reply joins its author and broadcasts only to current thread 
         if (event === undefined) return yield* Effect.die("Missing activity");
         expect(event.provenance.performedBy).toMatchObject({ memberId: humanId });
         expect(event.provenance.causedBy?.id).toBe(entries[0]?.id);
+        // Every participant except the replying author.
         expect(event.payload.recipients.map((r) => r.participationId).sort()).toEqual(
-          participants.map((p) => p.id).sort(),
+          participants
+            .filter((p) => ThreadParticipation.memberOf(p.participant) !== humanId)
+            .map((p) => p.id)
+            .sort(),
         );
       }),
     ),
@@ -326,7 +331,8 @@ it.effect(
           expect(yield* notifications(bound, humanId)).toEqual([]);
           expect(yield* notifications(bound, agentId)).toHaveLength(1);
           yield* run(bound, human, reply(first.thread.id, [humanId]));
-          expect(yield* notifications(bound, humanId)).toHaveLength(1);
+          // Mentioning oneself does not notify the author either.
+          expect(yield* notifications(bound, humanId)).toEqual([]);
           expect(
             (yield* bound.participations.listByThread(first.thread.id)).filter(
               (p) => ThreadParticipation.memberOf(p.participant) === humanId,
@@ -744,7 +750,8 @@ it.effect("concurrent replies serialize sequence allocation and admit a new auth
               (p) => ThreadParticipation.memberOf(p.participant) === humanId,
             ),
           ).toHaveLength(1);
-          expect(yield* notifications(bound, humanId)).toHaveLength(successful.length);
+          // Authors are never notified of their own replies, even when they mention themselves.
+          expect(yield* notifications(bound, humanId)).toEqual([]);
         }),
       );
     }),
@@ -964,7 +971,7 @@ it.effect(
             ),
           );
           yield* run(bound, owner, reply(first.thread.id));
-          expect(yield* notifications(bound, humanId)).toHaveLength(1);
+          expect(yield* notifications(bound, humanId)).toEqual([]);
           const returned = yield* asActor(ownReply, human);
           const current = (yield* bound.participations.listByThread(first.thread.id)).find(
             (p) => ThreadParticipation.memberOf(p.participant) === humanId && p.status === "active",
@@ -974,7 +981,10 @@ it.effect(
             current === undefined ? undefined : memberParticipant(current).groupMembershipId,
           ).not.toBe(memberParticipant(old).groupMembershipId);
           expect(current?.joinedAtSequence).toBe(returned.activity.sequence);
-          expect(yield* notifications(bound, humanId)).toHaveLength(2);
+          // Their own reply does not notify them; the next unmentioned reply reaches the fresh participation.
+          expect(yield* notifications(bound, humanId)).toEqual([]);
+          yield* run(bound, owner, reply(first.thread.id));
+          expect(yield* notifications(bound, humanId)).toHaveLength(1);
           expect(yield* bound.participations.get(old.id)).toMatchObject({
             value: { status: "ended" },
           });

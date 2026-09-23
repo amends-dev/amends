@@ -170,12 +170,14 @@ admissions in its existing commit, with no extra group-management grant. The dep
 records its reason and uses journal provenance for actor and time. See
 [departures](../../docs/group-workflows.md#removing-a-member-or-leaving).
 
-`GroupApplication.listMine` returns `Group.ListItem` values with each group's latest activity, the
-caller's caught-up time, `newActivity`, and `following`, from a fixed number of reads.
-`ThreadApplication.listInGroup(groupId, { limit, before? })` pages a group's readable threads by
-latest activity as `Thread.ListItem` values with the caller's read position and `unread`.
-`Authorization.permitted` checks many requirements with one grant resolution and reports each,
-so lists skip items instead of failing. Starting and replying advance the author's read position.
+`GroupApplication.listMine({ limit, after? })` returns a page of `Group.ListItem` values with each
+group's latest activity, the caller's caught-up time, `newActivity`, and `following`, from a fixed
+number of reads. `ThreadApplication.listInGroup(groupId, { limit, before? })` pages a group's
+readable threads by latest activity as `Thread.ListItem` values with the caller's read position and
+`unread`. `Authorization.permitted` checks many requirements with one grant resolution and reports
+each, so lists skip items instead of failing. Starting and replying read the thread through the
+author's message, and a message never notifies its author. Rosters page by admission ID with
+`listCurrent(groupId, { limit, after? })`.
 
 `GroupApplication.get` and `listMine`, and `GroupMembershipApplication.listCurrent`, require
 current group membership and `group.read`. The permission is included in new Viewer and

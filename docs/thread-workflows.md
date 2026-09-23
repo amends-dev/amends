@@ -68,15 +68,15 @@ with `startInGroup`. Direct-group membership is fixed; see [group workflows](gro
 
 ## Initial participation and recipient selection
 
-These rules follow the agreed
-[attention model](core-model.md#agreed-attention-is-directed-followed-or-ambient). A team-group
-post is not a broadcast: it admits the group's [followers](group-workflows.md#following-a-group),
-and the rest of the group can read the thread without participating.
-[Read positions](#marking-conversations-read) are recorded; unread reads are not implemented yet.
+These rules follow the agreed [attention
+model](core-model.md#agreed-attention-is-directed-followed-or-ambient). A team-group post is not a
+broadcast: it admits the group's [followers](group-workflows.md#following-a-group), and the rest of
+the group can read the thread without participating; [thread lists](#reading-conversations) show it
+as unread.
 
 | Opening message                        | Initial participants                                          | Notification recipients                 |
 | -------------------------------------- | ------------------------------------------------------------- | --------------------------------------- |
-| Team group, no explicit mentions       | The author and the group's followers                          | All those participants                  |
+| Team group, no explicit mentions       | The author and the group's followers                          | The followers                           |
 | Team group, explicit mentions          | The author, the mentioned eligible members, and the followers | The explicitly mentioned participants   |
 | Direct group, with or without mentions | All members of the direct group                               | All participants, or the mentioned ones |
 
@@ -87,8 +87,8 @@ receives, a contact. Future task and channel workflows call the same start with 
 authorization and starting participants: a task's creator and triage, or a conversation's contacts
 and triage, without enrolling the group.
 
-An author mentioned explicitly appears only once. There is no implicit sender exclusion: an
-unmentioned opening notifies its author; a message not mentioning its author does not notify them.
+An author mentioned explicitly appears only once. A message never notifies its own author, even
+when it mentions them.
 Participation and notification selection are separate recorded decisions. Other group members
 remain in the inherited access audience and can read the thread when they hold `thread.read`.
 Reading does not enroll them.
@@ -136,18 +136,17 @@ boundary; a returning member whose prior participation ended receives a fresh pa
 to their current group admission. Its `joinedAtSequence` is the introducing message's sequence.
 Earlier messages remain history, without retroactive notifications.
 
-| Reply addressing  | Notification recipients                                                         |
-| ----------------- | ------------------------------------------------------------------------------- |
-| No mentions       | Every current participant, including contacts, triage, and the replying author. |
-| Explicit mentions | Only the mentioned eligible members, admitted in the same commit if needed.     |
+| Reply addressing  | Notification recipients                                                              |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| No mentions       | Every current participant except the replying author, including contacts and triage. |
+| Explicit mentions | Only the mentioned eligible members, admitted in the same commit if needed.          |
 
-Mentions do not remove existing participants. Group members outside the thread are not enrolled
-by an unmentioned reply, including members added to the group after the thread started. There
-is no sender exclusion: an author receives their unmentioned reply, or a message mentioning
-themselves. Each mentioned agent requires `agent.use` on its Member target. An unmentioned reply
-reaches agents already participating without that authority: whoever brought them into the
-thread authorized them to handle it. Missing agent authority rejects the whole publication
-instead of silently dropping recipients.
+Mentions do not remove existing participants. Group members outside the thread are not enrolled by
+an unmentioned reply, including members added to the group after the thread started. A reply never
+notifies its author. Each mentioned agent requires `agent.use` on its Member target. An unmentioned
+reply reaches agents already participating without that authority: whoever brought them into the
+thread authorized them to handle it. Missing agent authority rejects the whole publication instead
+of silently dropping recipients.
 
 Missing, foreign, and outside-audience thread IDs share `ThreadMessageApplication.NotFound`.
 Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`; agent callers get
@@ -270,7 +269,7 @@ Reads open no transaction and perform no journal, checkpoint, participation, or 
 writes. An enclosing caller transaction is honored, including staged activity, admissions,
 departures, and grant changes. Separate reads and pages do not promise a shared snapshot;
 revocation affects subsequent authorization checks but does not cancel an already-authorized read.
-Thread discovery and participant lists are currently unpaginated.
+Group thread lists and timelines have cursor pages; current-participant lists are unpaginated.
 
 ## Resolving a notification source
 
@@ -359,10 +358,9 @@ projection maintains both, and `ThreadStore.getLatest` and `GroupStore.getLatest
 batches. Notifications from thread activity carry their thread and sequence, so reading a thread
 settles exactly its notifications.
 
-Starting a thread or replying advances the author's read position to their message in the same
-commit. It does not settle notifications: the author of an unmentioned message is one of its
-recipients, since recipient selection has no sender exclusion, and that notification stays pending
-until they acknowledge it or mark the thread read. [Thread lists](#reading-conversations) and
+Starting a thread or replying reads it through the author's message in the same commit: their
+position advances, and their pending notifications from the thread up to it are acknowledged as
+`Seen`. The message itself never notifies its author. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups-and-their-current-members) report unread state
 from these records.
 

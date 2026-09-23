@@ -13,7 +13,7 @@ import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessagePermissions } from "./permissions.ts";
 import { ThreadMessagePublication } from "./publication.ts";
-import { ReadStateStore } from "../../attention/store.ts";
+import { ThreadReading } from "../../attention/reading.ts";
 
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadMessageApplication.NotFound", {
   threadId: ThreadId.Id,
@@ -37,8 +37,7 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   },
 ) {}
 export type Error =
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
+  | ThreadReading.Error
   | Authorization.Error
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
   | Exclude<ThreadMessagePublication.Error, ThreadParticipationAdmission.Unavailable>
@@ -64,7 +63,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const access = yield* ThreadAccess.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
   const publication = yield* ThreadMessagePublication.Service;
-  const readStates = yield* ReadStateStore.Service;
+  const readings = yield* ThreadReading.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -73,7 +72,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       access.workspaceId,
       admissions.workspaceId,
       publication.workspaceId,
-      readStates.workspaceId,
+      readings.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -142,13 +141,12 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
             Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
           ),
         );
-      // Replying reads the thread through the author's own message; notifications are unchanged.
-      yield* readStates.advanceThread({
-        workspaceId,
-        memberId: actor.memberId,
-        threadId: thread.id,
-        readThrough: published.activity.sequence,
-      });
+      // Replying reads the thread through the author's own message.
+      yield* readings.markRead(
+        { memberId: actor.memberId, recipient: actor.identity },
+        thread,
+        published.activity.sequence,
+      );
       return published;
     },
     Publication.withActor,

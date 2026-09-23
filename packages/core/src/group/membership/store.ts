@@ -37,6 +37,16 @@ export interface Interface {
   readonly listByGroup: (
     groupId: GroupId.Id,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+  /** A page of a group's active admissions in binary admission-ID order, after the cursor. */
+  readonly pageActiveByGroup: (
+    groupId: GroupId.Id,
+    options: GroupMembership.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+  /** A page of a member's active admissions in binary group-ID order, after the group cursor. */
+  readonly pageActiveByMember: (
+    memberId: MemberId.Id,
+    options: GroupMembership.ByMemberOptions,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
   /** Active admissions for workspace departure, in stable admission-ID order. Internal only. */
   readonly listActiveByMember: (
     memberId: MemberId.Id,

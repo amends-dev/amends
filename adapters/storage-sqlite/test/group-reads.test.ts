@@ -69,13 +69,15 @@ const getForManagement = (id: Group.Id) =>
   Effect.flatMap(GroupApplication.Service, (service) => service.getForManagement(id));
 /** The actor's readable groups as records; activity and following have their own tests. */
 const mine = Effect.flatMap(GroupApplication.Service, (service) =>
-  Effect.map(service.listMine, (items) => items.map((item) => item.group)),
+  Effect.map(service.listMine({ limit: 100 }), (items) => items.map((item) => item.group)),
 );
 const roster = (id: Group.Id) =>
-  Effect.flatMap(GroupMembershipApplication.Service, (service) => service.listCurrent(id));
+  Effect.flatMap(GroupMembershipApplication.Service, (service) =>
+    service.listCurrent(id, { limit: 100 }),
+  );
 const rosterForManagement = (id: Group.Id) =>
   Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-    service.listCurrentForManagement(id),
+    service.listCurrentForManagement(id, { limit: 100 }),
   );
 const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
   Effect.flatMap(GroupApplication.Service, (service) =>
@@ -407,7 +409,9 @@ it.effect(
               const original = yield* audience.require(first.id);
               expect(yield* groups.get(first.id)).toEqual(first);
               yield* memberships.leave({ groupId: first.id, membershipId: original.id });
-              expect((yield* groups.listMine).map((item) => item.group)).toEqual([second]);
+              expect((yield* groups.listMine({ limit: 100 })).map((item) => item.group)).toEqual([
+                second,
+              ]);
               expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
                 _tag: "GroupApplication.NotFound",
               });
@@ -420,7 +424,7 @@ it.effect(
               );
               expect(fresh.id).not.toBe(original.id);
               expect(yield* audience.require(first.id)).toEqual(fresh);
-              const current = yield* memberships.listCurrent(first.id);
+              const current = yield* memberships.listCurrent(first.id, { limit: 100 });
               expect(current.some((value) => value.id === original.id)).toBe(false);
               expect(current.some((value) => value.id === fresh.id)).toBe(true);
               const permissions = (names: ReadonlyArray<Permission.Name>) =>
@@ -432,11 +436,15 @@ it.effect(
                   })
                   .pipe(Publication.withActor);
               yield* asActor(permissions([]), owner);
-              expect((yield* groups.listMine).map((item) => item.group)).toEqual([]);
+              expect((yield* groups.listMine({ limit: 100 })).map((item) => item.group)).toEqual(
+                [],
+              );
               expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
                 _tag: "Authorization.Denied",
               });
-              expect(yield* Effect.flip(memberships.listCurrent(first.id))).toMatchObject({
+              expect(
+                yield* Effect.flip(memberships.listCurrent(first.id, { limit: 100 })),
+              ).toMatchObject({
                 _tag: "Authorization.Denied",
               });
               expect(yield* audience.require(first.id)).toEqual(fresh);
@@ -451,11 +459,11 @@ it.effect(
                   Actor.Service
                 >
               > = [
-                groups.listMine,
+                groups.listMine({ limit: 100 }),
                 groups.get(first.id),
-                memberships.listCurrent(first.id),
+                memberships.listCurrent(first.id, { limit: 100 }),
                 groups.getForManagement(first.id),
-                memberships.listCurrentForManagement(first.id),
+                memberships.listCurrentForManagement(first.id, { limit: 100 }),
                 audience.require(first.id),
               ];
               for (const effect of checks) {
@@ -499,7 +507,7 @@ it.effect("reads and audience policy never open a writer transaction or advance 
               Effect.Services<ReturnType<GroupApplication.Interface["get"]>>
             >().toEqualTypeOf<Actor.Service>();
             expectTypeOf<
-              Effect.Services<GroupApplication.Interface["listMine"]>
+              Effect.Services<ReturnType<GroupApplication.Interface["listMine"]>>
             >().toEqualTypeOf<Actor.Service>();
             expectTypeOf<
               Effect.Services<ReturnType<GroupMembershipApplication.Interface["listCurrent"]>>
@@ -643,7 +651,7 @@ it.effect("management revocation and invalid actors are checked again on every r
               _tag: "Authorization.Denied",
             });
             expect(
-              yield* Effect.flip(memberships.listCurrentForManagement(hidden.id)),
+              yield* Effect.flip(memberships.listCurrentForManagement(hidden.id, { limit: 100 })),
             ).toMatchObject({ _tag: "Authorization.Denied" });
             const impostor = Actor.Value.make({
               workspaceId,
@@ -659,11 +667,11 @@ it.effect("management revocation and invalid actors are checked again on every r
                 Actor.Service
               >
             > = [
-              groups.listMine,
+              groups.listMine({ limit: 100 }),
               groups.get(first.id),
-              memberships.listCurrent(first.id),
+              memberships.listCurrent(first.id, { limit: 100 }),
               groups.getForManagement(hidden.id),
-              memberships.listCurrentForManagement(hidden.id),
+              memberships.listCurrentForManagement(hidden.id, { limit: 100 }),
             ];
             for (const effect of checks) {
               expect(yield* Effect.flip(asActor(effect, impostor))).toMatchObject({
@@ -727,6 +735,7 @@ it.effect(
               context: Context.add(bound.context, GroupMembershipStore.Service, {
                 ...bound.groupMemberships,
                 listActiveByMember: () => Effect.succeed(records),
+                pageActiveByMember: () => Effect.succeed(records),
               }),
             };
             expect(yield* Effect.flip(run(broken, reader, mine))).toMatchObject({
@@ -760,6 +769,7 @@ it.effect(
               context: Context.add(bound.context, GroupMembershipStore.Service, {
                 ...bound.groupMemberships,
                 listByGroup: () => Effect.succeed(records),
+                pageActiveByGroup: () => Effect.succeed(records),
               }),
             };
             expect(yield* Effect.flip(run(broken, reader, roster(first.id)))).toMatchObject({
@@ -798,4 +808,60 @@ it.effect(
         }),
       ),
     ),
+);
+
+it.effect("group lists and rosters page in ID order and skip what the reader cannot see", () =>
+  withDatabase((location) =>
+    inDatabase(
+      location,
+      Effect.gen(function* () {
+        const { bound, owner, reader, first, second } = yield* prepare();
+        const third = yield* run(bound, owner, create("Operations", [readerId, otherId, agentId]));
+        const ids = [first.id, second.id, third.id].toSorted((a, b) => (a < b ? -1 : 1));
+        const page = (options: Group.ListOptions) =>
+          run(
+            bound,
+            reader,
+            Effect.flatMap(GroupApplication.Service, (s) =>
+              Effect.map(s.listMine(options), (items) => items.map((item) => item.group.id)),
+            ),
+          );
+        // Only the last group is readable at first; the page reads past the others to fill.
+        yield* grant(bound, readerId, GroupPermissions.Read, ids[2]);
+        expect(yield* page({ limit: 1 })).toEqual([ids[2]]);
+        yield* grant(bound, readerId, GroupPermissions.Read);
+        expect(yield* page({ limit: 2 })).toEqual(ids.slice(0, 2));
+        expect(yield* page({ after: ids[1]!, limit: 2 })).toEqual([ids[2]]);
+        expect(yield* page({ after: ids[2]!, limit: 2 })).toEqual([]);
+        // Rosters page by admission ID.
+        const admissions = (yield* bound.groupMemberships.listByGroup(third.id)).toSorted((a, b) =>
+          a.id < b.id ? -1 : 1,
+        );
+        const rosterPage = (options: GroupMembership.ListOptions) =>
+          run(
+            bound,
+            reader,
+            Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+              Effect.map(s.listCurrent(third.id, options), (items) => items.map((item) => item.id)),
+            ),
+          );
+        const admissionIds = admissions.map((admission) => admission.id);
+        expect(yield* rosterPage({ limit: 2 })).toEqual(admissionIds.slice(0, 2));
+        expect(yield* rosterPage({ after: admissionIds[1]!, limit: 2 })).toEqual(
+          admissionIds.slice(2),
+        );
+        // Members who leave the workspace drop out of the roster.
+        yield* run(
+          bound,
+          owner,
+          Effect.flatMap(MemberApplication.Service, (s) => s.remove(otherId)),
+        );
+        expect(yield* rosterPage({ limit: 3 })).toEqual(
+          admissions
+            .filter((admission) => admission.memberId !== otherId)
+            .map((admission) => admission.id),
+        );
+      }),
+    ),
+  ),
 );

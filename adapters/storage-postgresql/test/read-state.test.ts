@@ -478,7 +478,7 @@ describe.skipIf(!available)("PostgreSQL read state", () => {
             run(
               bound,
               actor,
-              Effect.flatMap(GroupApplication.Service, (s) => s.listMine),
+              Effect.flatMap(GroupApplication.Service, (s) => s.listMine({ limit: 100 })),
             );
           const quiet = yield* run(
             bound,
@@ -528,5 +528,31 @@ describe.skipIf(!available)("PostgreSQL read state", () => {
         }),
       ),
     ),
+  );
+
+  it.effect(
+    "posting reads the thread through the author's message and settles their earlier notifications",
+    () =>
+      withDatabase((location) =>
+        inDatabase(
+          location,
+          Effect.gen(function* () {
+            const { bound, owner, team } = yield* prepare();
+            const started = yield* run(bound, owner, start(team.id, [humanId]));
+            yield* run(bound, owner, reply(started.thread.id, [humanId]));
+            expect(yield* pending(bound, humanId)).toEqual([1, 2]);
+            const replied = yield* run(bound, actorFor(humanId), reply(started.thread.id, []));
+            expect(replied.activity.sequence).toBe(3);
+            expect(yield* pending(bound, humanId)).toEqual([]);
+            expect(yield* positionOf(bound, humanId, started.thread.id)).toEqual([3]);
+            // The reply notified the others, never its author.
+            expect(
+              (yield* bound.notifications.listPendingByRecipient(owner.identity, {
+                limit: 10,
+              })).map((note) => note.thread?.sequence),
+            ).toEqual([3]);
+          }),
+        ),
+      ),
   );
 });

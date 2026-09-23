@@ -80,6 +80,54 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
     ),
+    pageActiveByGroup: Effect.fn("GroupMemberships.pageActiveByGroup")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
+        const orderedId = sql`${groupMemberships.id} COLLATE "C"`;
+        return yield* guard(
+          db
+            .select()
+            .from(groupMemberships)
+            .where(
+              and(
+                inWorkspace,
+                eq(groupMemberships.groupId, groupId),
+                eq(groupMemberships.status, "active"),
+                options.after === undefined ? undefined : sql`${orderedId} > ${options.after}`,
+              ),
+            )
+            .orderBy(orderedId)
+            .limit(options.limit),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByGroup")),
+    ),
+    pageActiveByMember: Effect.fn("GroupMemberships.pageActiveByMember")(
+      function* (memberInput, input) {
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+        const options = yield* Schema.decodeEffect(GroupMembership.ByMemberOptions)(input);
+        const orderedGroup = sql`${groupMemberships.groupId} COLLATE "C"`;
+        return yield* guard(
+          db
+            .select()
+            .from(groupMemberships)
+            .where(
+              and(
+                inWorkspace,
+                eq(groupMemberships.memberId, memberId),
+                eq(groupMemberships.status, "active"),
+                options.afterGroupId === undefined
+                  ? undefined
+                  : sql`${orderedGroup} > ${options.afterGroupId}`,
+              ),
+            )
+            .orderBy(orderedGroup)
+            .limit(options.limit),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByMember")),
+    ),
     listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
       function* (input) {
         const memberId = yield* Schema.decodeEffect(Member.Id)(input);

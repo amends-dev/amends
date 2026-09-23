@@ -273,6 +273,7 @@ CREATE INDEX "group_follows_by_group" ON "group_follows" ("workspace_id","group_
 CREATE UNIQUE INDEX "active_group_membership" ON "group_memberships" ("workspace_id","group_id","member_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "group_memberships_by_group" ON "group_memberships" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "group_memberships_by_member" ON "group_memberships" ("workspace_id","member_id","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "active_group_memberships_by_member" ON "group_memberships" ("workspace_id","member_id","group_id" COLLATE "C") WHERE "status" = 'active';--> statement-breakpoint
 CREATE UNIQUE INDEX "direct_groups_by_members" ON "groups" ("workspace_id","direct_key") WHERE "direct_key" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "invitations_by_recipient" ON "invitations" ("workspace_id","recipient_id","state");--> statement-breakpoint
 CREATE INDEX "pending_invitations_by_recipient" ON "invitations" ("recipient_id") WHERE "state" = 'Pending';--> statement-breakpoint

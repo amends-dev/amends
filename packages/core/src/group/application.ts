@@ -83,11 +83,13 @@ export interface Interface {
   readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Service>;
   /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
   /**
-   * The actor's current groups that `group.read` covers, in stable ID order, each with its latest
-   * activity, the actor's caught-up time, whether it has new activity for them, and whether they
-   * follow it. Reads a fixed number of times however many groups the actor belongs to.
+   * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
+   * its latest activity, the actor's caught-up time, whether it has new activity for them, and
+   * whether they follow it. Each page reads a fixed number of times, however large.
    */
-  readonly listMine: Effect.Effect<ReadonlyArray<Group.ListItem>, ReadError, Actor.Service>;
+  readonly listMine: (
+    options: Group.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<Group.ListItem>, ReadError, Actor.Service>;
   /** Inspect a known group's metadata with management authority, without granting audience access. */
   readonly getForManagement: (
     groupId: Group.Id,
@@ -221,30 +223,15 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     ]);
     return yield* load(id);
   });
-  const listMine = Effect.gen(function* () {
-    yield* authorization.require([]);
-    const actor = yield* Actor.Service;
-    const invalid = (message: string) => new InvalidResponse({ message });
-    const decodeFailure = (cause: Schema.SchemaError) =>
-      invalid(`Group storage returned invalid data: ${cause.message}`);
-    const admissions = new Map<Group.Id, GroupMembership.Record>();
-    const seenAdmissions = new Set<GroupMembership.Id>();
-    for (const found of yield* memberships.listActiveByMember(actor.memberId)) {
-      const membership = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
-        found,
-      ).pipe(Effect.mapError(decodeFailure));
-      if (
-        membership.workspaceId !== workspaceId ||
-        membership.memberId !== actor.memberId ||
-        membership.status !== "active" ||
-        admissions.has(membership.groupId) ||
-        seenAdmissions.has(membership.id)
-      )
-        return yield* invalid("Membership store returned an inconsistent active admission listing");
-      admissions.set(membership.groupId, membership);
-      seenAdmissions.add(membership.id);
-    }
-    // One grant resolution and one read per kind of record, however many groups there are.
+  const invalidList = (message: string) => new InvalidResponse({ message });
+  const decodeFailure = (cause: Schema.SchemaError) =>
+    invalidList(`Group storage returned invalid data: ${cause.message}`);
+  /** Describe one page of the actor's admissions, keyed by group, in a fixed number of reads. */
+  const describe = Effect.fnUntraced(function* (
+    memberId: GroupMembership.Record["memberId"],
+    admissions: ReadonlyMap<Group.Id, GroupMembership.Record>,
+  ) {
+    // One grant resolution and one read per kind of record for the page.
     const candidates = [...admissions.keys()];
     const allowed = yield* authorization.permitted(
       candidates.map((groupId) =>
@@ -258,7 +245,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         Effect.mapError(decodeFailure),
       );
       if (group.workspaceId !== workspaceId || !admissions.has(group.id) || records.has(group.id))
-        return yield* invalid("Group store returned another group or workspace");
+        return yield* invalidList("Group store returned another group or workspace");
       records.set(group.id, group);
     }
     const latest = new Map<Group.Id, DateTime.Utc>();
@@ -267,17 +254,17 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         Effect.mapError(decodeFailure),
       );
       if (!records.has(value.groupId) || latest.has(value.groupId))
-        return yield* invalid("Group store returned activity for another group");
+        return yield* invalidList("Group store returned activity for another group");
       latest.set(value.groupId, value.occurredAt);
     }
     const caughtUp = new Map<Group.Id, DateTime.Utc>();
-    for (const value of yield* readStates.getGroupsCaughtUp(actor.memberId, ids)) {
+    for (const value of yield* readStates.getGroupsCaughtUp(memberId, ids)) {
       if (
         value.workspaceId !== workspaceId ||
-        value.memberId !== actor.memberId ||
+        value.memberId !== memberId ||
         !records.has(value.groupId)
       )
-        return yield* invalid("Read-state store returned another member's or group's time");
+        return yield* invalidList("Read-state store returned another member's or group's time");
       caughtUp.set(value.groupId, value.caughtUpAt);
     }
     const following = new Set<GroupMembership.Id>();
@@ -289,11 +276,11 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       );
       if (
         follow.workspaceId !== workspaceId ||
-        follow.memberId !== actor.memberId ||
+        follow.memberId !== memberId ||
         follow.status !== "active" ||
         admissions.get(follow.groupId)?.id !== follow.groupMembershipId
       )
-        return yield* invalid("Follow store returned another member's or admission's follow");
+        return yield* invalidList("Follow store returned another member's or admission's follow");
       following.add(follow.groupMembershipId);
     }
     const items: Array<Group.ListItem> = [];
@@ -317,7 +304,50 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       });
     }
     return items;
-  }).pipe(Effect.withSpan("GroupApplication.listMine"));
+  });
+  const listMine = Effect.fn("GroupApplication.listMine")(function* (input: Group.ListOptions) {
+    const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
+    yield* authorization.require([]);
+    const actor = yield* Actor.Service;
+    const seenGroups = new Set<Group.Id>();
+    const seenAdmissions = new Set<GroupMembership.Id>();
+    const items: Array<Group.ListItem> = [];
+    let after = options.after;
+    // Fill the page with readable groups, reading further when grants skip some.
+    while (items.length < options.limit) {
+      const admissions = new Map<Group.Id, GroupMembership.Record>();
+      for (const found of yield* memberships.pageActiveByMember(
+        actor.memberId,
+        after === undefined
+          ? { limit: options.limit }
+          : { afterGroupId: after, limit: options.limit },
+      )) {
+        const membership = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
+          found,
+        ).pipe(Effect.mapError(decodeFailure));
+        if (
+          membership.workspaceId !== workspaceId ||
+          membership.memberId !== actor.memberId ||
+          membership.status !== "active" ||
+          seenGroups.has(membership.groupId) ||
+          seenAdmissions.has(membership.id) ||
+          (after !== undefined && membership.groupId <= after)
+        )
+          return yield* invalidList(
+            "Membership store returned an inconsistent active admission listing",
+          );
+        seenGroups.add(membership.groupId);
+        seenAdmissions.add(membership.id);
+        admissions.set(membership.groupId, membership);
+      }
+      if (admissions.size === 0) break;
+      for (const item of yield* describe(actor.memberId, admissions))
+        if (items.length < options.limit) items.push(item);
+      after = [...admissions.keys()].at(-1);
+      if (admissions.size < options.limit) break;
+    }
+    return items;
+  });
 
   return Service.of({ workspaceId, createPrivateTeam, get, listMine, getForManagement });
 });

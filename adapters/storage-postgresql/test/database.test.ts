@@ -151,15 +151,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
                   memberIds: [owner.memberId, ...members],
                 });
                 return yield* Effect.forEach(Array.range(1, 6), () =>
-                  threads.startInGroup({ groupId: group.id, text: "Hello", mentions: [] }),
+                  threads.startInGroup({ groupId: group.id, text: "Hello", mentions: members }),
                 );
               }),
             ).pipe(Effect.map(Array.flatten), Effect.provideService(Actor.Service, owner));
           }).pipe(Effect.provide(core(bound)));
           const thread = threads[0]!.thread;
           const [admission] = yield* bound.groupMemberships.listActiveByMember(memberIds[0]!);
+          // Mentioned members are notified; authors are not.
           const inbox = yield* bound.notifications.listByRecipient(
-            { _tag: "Human", id: workspace.createdBy },
+            { _tag: "Human", id: Identity.HumanId.make(memberIds[0]!) },
             { limit: 2 },
           );
           const facts = yield* Effect.flatMap(Journal.Service, (journal) =>
@@ -196,7 +197,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             {
               index: "notifications_by_recipient",
               condition: "ROW(recorded_at, (id)::text) >",
-              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_id, '') = ${workspace.createdBy} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`,
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_id, '') = ${memberIds[0]!} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`,
             },
             {
               index: "log_entries_by_fact",

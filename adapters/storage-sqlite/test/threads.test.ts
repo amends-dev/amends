@@ -141,7 +141,7 @@ const sorted = (values: ReadonlyArray<ThreadParticipation.Record>) =>
 const everyone = (ownerId: Member.Id) => [ownerId, humanId, agentId];
 
 it.effect(
-  "an unmentioned team opening enrolls and notifies only its author, atomically and in order",
+  "an unmentioned team opening enrolls only its author and notifies no one, atomically and in order",
   () =>
     withDatabase((location) =>
       inDatabase(
@@ -193,20 +193,14 @@ it.effect(
           const event = events[0];
           if (event === undefined) return yield* Effect.die("Missing opening activity");
           expect(event.provenance.performedBy).toMatchObject({ memberId: owner.memberId });
-          expect(event.payload.recipients).toHaveLength(1);
-          for (const participant of result.participants) {
-            const rows = yield* notifications(bound, memberParticipant(participant).identity);
-            expect(rows).toHaveLength(1);
-            expect(rows[0]).toMatchObject({
-              participationId: participant.id,
-              source: { logId: event.logId, entryId: event.id },
-              recipient: memberParticipant(participant).identity,
-              state: { _tag: "Pending" },
-            });
-          }
-          // The rest of the group is neither enrolled nor notified.
-          for (const identity of [humanIdentity, agentIdentity])
+          expect(event.payload.recipients).toEqual([]);
+          // A message never notifies its author; the rest of the group is neither enrolled nor notified.
+          for (const identity of [owner.identity, humanIdentity, agentIdentity])
             expect(yield* notifications(bound, identity)).toEqual([]);
+          // Posting reads the thread through the author's own message.
+          expect(
+            yield* bound.readStates.getThreadPositions(owner.memberId, [result.thread.id]),
+          ).toMatchObject([{ readThrough: 1 }]);
           const after = yield* history(bound);
           expect(after).toHaveLength(before.length + 1);
           expect(after.at(-1)?.entries).toHaveLength(4);

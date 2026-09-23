@@ -46,6 +46,8 @@ export const loader = SqliteMigrator.fromRecord({
     yield* sql`CREATE TABLE log_append_keys (workspace_id TEXT NOT NULL, log_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, commit_id TEXT NOT NULL, first_index INTEGER NOT NULL CHECK(first_index >= 0), entry_count INTEGER NOT NULL CHECK(entry_count > 0), PRIMARY KEY(workspace_id, log_id, idempotency_key), FOREIGN KEY(workspace_id, log_id, commit_id) REFERENCES log_batches(workspace_id, log_id, commit_id))`;
     yield* sql`CREATE INDEX participations_by_thread ON thread_participations(workspace_id, thread_id, id COLLATE BINARY)`;
     yield* sql`CREATE INDEX group_memberships_by_member ON group_memberships(workspace_id, member_id, id COLLATE BINARY)`;
+    // A member's current groups, paged in group-ID order.
+    yield* sql`CREATE INDEX active_group_memberships_by_member ON group_memberships(workspace_id, member_id, group_id COLLATE BINARY) WHERE json_extract(record, '$.status') = 'active'`;
     // Directory reads cross workspaces, so these lead with the identity rather than the workspace.
     yield* sql`CREATE INDEX members_by_identity ON members(json_extract(record, '$.identity._tag'), json_extract(record, '$.identity.id'), workspace_id, id)`;
     yield* sql`CREATE INDEX invitations_by_recipient ON invitations(json_extract(record, '$.details.recipientId'), json_extract(record, '$.state._tag'), workspace_id, id)`;
