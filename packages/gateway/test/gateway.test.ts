@@ -9,7 +9,7 @@ import { ReadStateStore } from "@amends/core/attention";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
-import { Checkpoint, Commit, CommittedEvents, Store } from "@amends/core/journal";
+import { Checkpoint, Commit, Store } from "@amends/core/journal";
 import {
   Notification,
   NotificationApplication,
@@ -36,13 +36,11 @@ import {
   Result,
   Schema,
   Scope,
-  Stream,
 } from "effect";
 import { TestClock } from "effect/testing";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
-import { WorkspaceEvents } from "../src/workspace-events.ts";
 import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
@@ -74,6 +72,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         ),
       get: unexpected,
       read: options.read ?? (() => Effect.succeed([])),
+      head: () => Effect.succeedNone,
+      workspaceId: boundWorkspaceId,
       waitForAppend: unexpected,
       getAppend: unexpected,
     }),
@@ -247,7 +247,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
 };
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
-    WorkspaceEvents.layer(),
     Layer.succeed(WorkspaceStorage.Service, storage),
     Layer.succeed(
       Crypto.Crypto,
@@ -507,22 +506,10 @@ it.effect("concurrent requests share boot and later requests do not replay or re
   }),
 );
 
-/** A gateway whose workspace boots and buses are counted, for runtime lifetime tests. */
+/** A gateway whose workspace boots are counted, for runtime lifetime tests. */
 const counted = Effect.fnUntraced(function* (options: Gateway.Options) {
   const boots = { bound: 0, reads: 0 };
-  const buses: Array<CommittedEvents.Interface> = [];
-  const events = yield* WorkspaceEvents.Service;
   const gateway = yield* Gateway.make(options).pipe(
-    Effect.provideService(WorkspaceEvents.Service, {
-      forWorkspace: (id) =>
-        events.forWorkspace(id).pipe(
-          Effect.tap((bus) =>
-            Effect.sync(() => {
-              buses.push(bus);
-            }),
-          ),
-        ),
-    }),
     Effect.provideService(WorkspaceStorage.Service, {
       forWorkspace: () =>
         Effect.sync(() => {
@@ -537,17 +524,12 @@ const counted = Effect.fnUntraced(function* (options: Gateway.Options) {
         }),
     }),
   );
-  const released = (bus: CommittedEvents.Interface | undefined) =>
-    Effect.flip(Effect.scoped(bus?.subscribe ?? Effect.die("Expected a bus"))).pipe(
-      Effect.map((error) => error._tag === "CommittedEvents.Closed"),
-      Effect.orElseSucceed(() => false),
-    );
-  return { gateway, boots, buses, released };
+  return { gateway, boots };
 });
 
 it.effect("an idle workspace is released after its time-to-live and boots again from storage", () =>
   Effect.gen(function* () {
-    const { gateway, boots, buses, released } = yield* counted({ idleTimeToLive: "1 minute" });
+    const { gateway, boots } = yield* counted({ idleTimeToLive: "1 minute" });
     yield* gateway.inWorkspace(workspaceId, Effect.void);
     expect(boots).toEqual({ bound: 1, reads: 1 });
     // Each request restarts the idle time from its release.
@@ -556,55 +538,39 @@ it.effect("an idle workspace is released after its time-to-live and boots again 
     yield* TestClock.adjust("59 seconds");
     yield* gateway.inWorkspace(workspaceId, Effect.void);
     expect(boots).toEqual({ bound: 1, reads: 1 });
-    expect(yield* released(buses[0])).toBe(false);
     yield* TestClock.adjust("1 minute");
-    expect(yield* released(buses[0])).toBe(true);
     yield* gateway.asMember(workspaceId, alice, Effect.void);
     expect(boots).toEqual({ bound: 2, reads: 2 });
-    expect(buses).toHaveLength(2);
-    expect(yield* released(buses[1])).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
 
 it.effect("an open lease keeps its workspace prepared past the time-to-live", () =>
   Effect.gen(function* () {
-    const { gateway, boots, buses, released } = yield* counted({ idleTimeToLive: "1 minute" });
+    const { gateway, boots } = yield* counted({ idleTimeToLive: "1 minute" });
     // A response stream holds its lease the same way until the client disconnects.
     const stream = yield* Scope.make();
     yield* gateway.asMemberScoped(workspaceId, alice, Effect.void).pipe(Scope.provide(stream));
     yield* TestClock.adjust("10 minutes");
     yield* gateway.inWorkspace(workspaceId, Effect.void);
     expect(boots.bound).toBe(1);
-    expect(yield* released(buses[0])).toBe(false);
     yield* Scope.close(stream, Exit.void);
+    yield* TestClock.adjust("59 seconds");
+    yield* gateway.inWorkspace(workspaceId, Effect.void);
+    expect(boots.bound).toBe(1);
     yield* TestClock.adjust("1 minute");
-    expect(yield* released(buses[0])).toBe(true);
     yield* gateway.inWorkspace(workspaceId, Effect.void);
     expect(boots.bound).toBe(2);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
 
-it.effect("failed boot releases its bus and a later acquisition retries once", () =>
+it.effect("a failed boot is discarded and a later acquisition retries once", () =>
   Effect.gen(function* () {
     const failure = new Store.Failure({ operation: "read", cause: "boot failed" });
     let bound = 0;
     let executed = 0;
-    const buses: Array<CommittedEvents.Interface> = [];
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const events = yield* WorkspaceEvents.Service;
-        const gateway = yield* Gateway.make().pipe(
-          Effect.provideService(WorkspaceEvents.Service, {
-            forWorkspace: (id) =>
-              events.forWorkspace(id).pipe(
-                Effect.tap((bus) =>
-                  Effect.sync(() => {
-                    buses.push(bus);
-                  }),
-                ),
-              ),
-          }),
-        );
+        const gateway = yield* Gateway.make();
         const operation = Effect.sync(() => {
           executed += 1;
         });
@@ -612,17 +578,10 @@ it.effect("failed boot releases its bus and a later acquisition retries once", (
           failure,
         );
         expect(executed).toBe(0);
-        const failedBus = buses[0];
-        if (failedBus === undefined) throw new Error("Expected the failed boot's bus");
-        expect(yield* Effect.flip(failedBus.subscribe)).toMatchObject({
-          _tag: "CommittedEvents.Closed",
-        });
         yield* gateway.inWorkspace(workspaceId, operation);
         yield* gateway.inWorkspace(workspaceId, operation);
         expect(executed).toBe(2);
         expect(bound).toBe(2);
-        expect(buses).toHaveLength(2);
-        expect(buses[1]).not.toBe(failedBus);
       }),
     ).pipe(
       Effect.provide(
@@ -739,25 +698,14 @@ it.effect(
     ),
 );
 
-it.effect(
-  "host shutdown closes runtime buses and readers even with an outstanding request lease",
-  () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const owner = yield* Scope.fork(yield* Scope.Scope);
-        const runtimes = yield* WorkspaceRuntime.make().pipe(Scope.provide(owner));
-        const context = yield* runtimes.forWorkspace(workspaceId);
-        const bus = Context.get(context, CommittedEvents.Service);
-        const stream = yield* bus.subscribe;
-        const reader = yield* Stream.runDrain(stream).pipe(
-          Effect.forkChild({ startImmediately: true }),
-        );
-        yield* Scope.close(owner, Exit.void);
-        expect(Exit.hasInterrupts(yield* Fiber.await(reader))).toBe(true);
-        expect(yield* Effect.flip(bus.subscribe)).toMatchObject({ _tag: "CommittedEvents.Closed" });
-        expect(Exit.hasInterrupts(yield* Effect.exit(runtimes.forWorkspace(workspaceId)))).toBe(
-          true,
-        );
-      }),
-    ).pipe(Effect.provide(host({ forWorkspace: () => Effect.succeed(bindings()) }))),
+it.effect("host shutdown closes runtimes even with an outstanding request lease", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const owner = yield* Scope.fork(yield* Scope.Scope);
+      const runtimes = yield* WorkspaceRuntime.make().pipe(Scope.provide(owner));
+      yield* runtimes.forWorkspace(workspaceId);
+      yield* Scope.close(owner, Exit.void);
+      expect(Exit.hasInterrupts(yield* Effect.exit(runtimes.forWorkspace(workspaceId)))).toBe(true);
+    }),
+  ).pipe(Effect.provide(host({ forWorkspace: () => Effect.succeed(bindings()) }))),
 );

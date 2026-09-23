@@ -1,8 +1,8 @@
 # Core
 
 `@amends/core` implements one workspace's journal, authorization, and application
-operations. Hosts supply storage, cryptography, and a shared workspace event bus;
-the gateway supplies the actor for each protected operation. The root `layer`
+operations. Hosts supply storage and cryptography; the gateway supplies the actor
+for each protected operation. The root `layer`
 composes the workspace services.
 
 ## Features and ownership
@@ -355,14 +355,7 @@ applies the recorded change only if the previous owner matches, preserving all o
 metadata. The ownership fact is projected alongside the recorded assignment changes;
 replay does not reauthorize the former owner.
 
-## Committed event bus
-
-`CommittedEvents`, exported from `@amends/core/journal`, is a scoped, internal bus
-for one workspace. `make(workspaceId, { capacity })` constructs it, and `layer`
-delegates to that constructor. The default capacity is 256 committed batches.
-`Event.Record` describes the canonical decoded event shape with an unknown
-payload; each fact's schema supplies its specific payload type. `CommittedEvents.Batch`
-groups those events in publication order with their workspace and commit IDs.
+## Publication and the storage envelope
 
 Every `Journal.publish(fact, payload)` reads `Publication.Service` at invocation:
 workspace, performer, immediate cause, correlation ID, and occurrence time.
@@ -373,7 +366,8 @@ causal chain while retaining the current performer; `withPerformer` and `withOcc
 scope overrides to one effect or block. See the
 [publication pattern](../../docs/journal.md#event-provenance) for attribution rules,
 validation, and examples. Events use `Event.Type<F>` with required provenance throughout storage, replay,
-and delivery.
+and delivery. `Event.Record` describes the decoded event shape with an unknown payload;
+each fact's schema supplies its specific payload type.
 
 Facts can declare `occurrence: (payload) => [stableId]` to make publication
 idempotent automatically. The journal namespaces the tuple by fact name and scopes
@@ -381,7 +375,7 @@ it to the workspace/log. A declaration can return `null` for repeatable payloads
 Explicit `idempotencyKey` options remain available for facts without a derived key
 and for execution-log appends; they cannot override a declared occurrence.
 Matching retries return the original event or append slice without rerunning
-projections or broadcasting another batch. Conflicting content fails. `getAppend`
+projections. Conflicting content fails. `getAppend`
 on log readers supports transactional lookup by key, and `Fact.makeOccurrenceKey`
 derives the lookup key from a payload. See
 [idempotent publication](../../docs/journal.md#idempotent-publication-and-append)
@@ -398,60 +392,47 @@ name, or both; version requires a name. Reads use a
 `{ position, index }` cursor and `Event.decode(fact, entry)` for payload decoding.
 The existing journal log reader and projection replay retain complete-batch reads.
 
-The bus validates batch metadata and workspace binding. It owns frozen copies of
-the envelope, event array, and event metadata, including nested provenance references.
-Decoded payloads retain their original
-values and are shared read-only; producers and consumers must not mutate them.
-This is an internal event model, not a public HTTP or persistence codec for arbitrary
-payloads. The bus does not verify that a transaction committed: the publisher must
-call it only after a confirmed commit. `Journal.publish` collects canonical events
-after their projections succeed. The outer transaction publishes one batch through
-the adapter's confirmed-commit observer. Nested commits share that collection;
-rollback, uncertain commits, reads, replay, and execution-log-only writes publish nothing.
-
-The observer runs inside the native commit's uninterruptible completion boundary,
-so pending cancellation cannot skip publication after a confirmed commit. It must
-not access storage or wait for subscribers because the adapter may still hold its
-connection. Observer failures are logged with the commit ID and do not change the
-committed result or retry the write. This is process-local live delivery; recovery
-from missed publication and other writers remains separate work.
-
-`subscribe` registers eagerly and returns a single-consumer stream in the caller's
-scope. Registration therefore completes before the HTTP transport sends its ready
-message. It delivers only subsequent publications, with no replay or deduplication.
-The buffer slides instead of making publishers wait for slow consumers. A private
-sequence detects lost batches and fails that subscription with `CommittedEvents.Lagged`;
-the consumer must resubscribe and recover its view. The sequence is local to the bus,
-not a journal position or browser cursor. Closing the subscriber scope interrupts its
-pending read; closing the bus scope stops all subscriptions and rejects further use.
-
-Consumers authorize and transform events for their own purposes. The bus contains no
-recipient rules, frontend query keys, application-notification handling, or SSE behavior.
-Gateway's `WorkspaceEvents` registry manages shared bus lifetimes across requests.
-
 ## Change feed
 
-`@amends/core/change-feed` exports `ChangeFeed` schemas and
-`ChangeFeedApplication.watch`. The operation checks active membership, registers
-with the workspace bus, and returns a stream in the caller's scope. It emits
-`Ready { workspaceId }` first, then `Committed { workspaceId, commitId, events }`.
-Each event carries `id`, `name`, `version`, `recordedAt`, `provenance`, and a JSON-compatible
-`payload` encoded through its fact schema. Commit order is preserved within each
-batch. Events committed after subscription are retained even before Ready is read.
+`@amends/core/change-feed` exports the `ChangeFeed` schemas and
+`ChangeFeedApplication.watch(options?)`. The feed reads the workspace journal, so it
+carries every commit to the journal from any host or process over the same storage,
+including commits whose acknowledgment was lost. Nothing is published from the
+commit path.
 
-The feature has no store, projection, facts, cursor, or history API. It consumes
-confirmed local publications and does not create application notifications.
-Membership is checked when opening the subscription; per-event authorization and
-field filtering are deferred. Private group and thread facts are withheld,
-including their provenance, until audience-aware group delivery exists. Commits containing
-only those facts emit no public change; mixed commits retain their other supported events.
-Lag or an unsupported payload/version fails the stream with `ChangeFeed.Unavailable`;
-consumers reconnect and refresh on the new Ready rather than resume a cursor.
+`ChangeFeedSource` shares one follower of the journal per workspace runtime. It starts
+with the runtime's first subscriber, at the journal's head, and stops when the last
+subscriber leaves. It decodes each commit once through the registry in
+`src/change-feed/events.ts`, then buffers it for every subscriber; waiting for the next
+commit uses `Store.waitForAppend`, whatever the storage. A subscriber registers with
+the follower before reading the journal, so no commit falls between the two. A
+subscriber that falls behind its buffer (256 commits by default) reads the commits it
+lost from the journal instead of failing.
 
-When adding a fact or version, register its `Event.makeSchema` in
-`src/change-feed/events.ts`. This is the change-feed consumer's encoding catalog;
-the shared bus continues to carry the original decoded event. The HTTP contract
-reuses these core message schemas. Frontend query dependencies belong in the client.
+`watch` checks active membership, then emits `Ready { workspaceId, cursor, reset }`
+followed by `Committed { workspaceId, cursor, commitId, events }` for each later commit
+that carries an event the reader may see. A cursor is opaque and resumes after the
+commit that carried it. Given `after`, the feed replays the commits after it, up to 500,
+with `reset: false`; without one, with a cursor past the head, or with one further
+behind, `Ready` has `reset: true` at the head and the consumer must refresh its view.
+`Ready`'s cursor is null only for an empty journal.
+
+A reader sees an event when they hold a scope in its fact's
+[audience](../../docs/journal.md#fact-audiences) (the workspace, their membership or
+identity, or a group they belong to) and any read permission the registry names for it:
+`group.read` for group facts and `thread.read` for thread facts, the permissions the
+matching reads require. Their group admissions and grants are loaded when the
+subscription opens and reloaded before filtering a commit that changes them, so a
+commit that admits the reader delivers what it admits. The commit that removes the
+reader from the workspace is delivered, then the stream ends. Registry views give
+some facts their public shape: activity omits its notification recipients, and
+participation omits routing identities and admissions. Facts outside the registry,
+such as test facts, are internal; a registered name with an unknown version stops
+the follower, and its subscribers see `ChangeFeed.Unavailable`.
+
+A commit whose visible events are all withheld sends nothing, so a reader's cursor only
+advances with commits it sees. The HTTP contract reuses these message schemas.
+Frontend query dependencies belong in the client.
 
 ## Module dependencies and exports
 
@@ -607,7 +588,7 @@ const makeLogs = Effect.gen(function* () {
 });
 ```
 
-This still requires host storage and a workspace-bound `CommittedEvents.Service`.
+This still requires host storage; the coordinator takes its workspace from `Store.Service`.
 `Log.layer` supplies the coordinator and exposes both services so the journal and
 log operations share the same commit ownership.
 `Layer.build` materializes a layer into a scoped context; reserve `build` for that
@@ -615,30 +596,30 @@ meaning rather than using it as a synonym for a constructor.
 
 ## Service boundaries
 
-| Implementation            | Constructor                                   | Layer provides                           |
-| ------------------------- | --------------------------------------------- | ---------------------------------------- |
-| Transaction               | `Transaction.make()`                          | `Transaction.Service`                    |
-| Log                       | `Log.make()`                                  | `Log.Service` and `Transaction.Service`  |
-| Journal                   | `Journal.make(options)`                       | `Journal.Service`                        |
-| Committed-event bus       | `CommittedEvents.make(workspaceId, options?)` | `CommittedEvents.Service`                |
-| Permission catalog        | `PermissionCatalog.make(definitions)`         | `PermissionCatalog.Service`              |
-| Grant resolver            | `GrantResolver.make()`                        | `GrantResolver.Service`                  |
-| Authorization             | `Authorization.make()`                        | `Authorization.Service`                  |
-| Member operations         | `MemberApplication.make()`                    | `MemberApplication.Service`              |
-| Thread operations         | `ThreadApplication.make()`                    | `ThreadApplication.Service`              |
-| Thread participation      | `ThreadParticipationApplication.make()`       | `ThreadParticipationApplication.Service` |
-| Human message publication | `ThreadMessageApplication.make()`             | `ThreadMessageApplication.Service`       |
-| Notification reads        | `NotificationApplication.make()`              | `NotificationApplication.Service`        |
-| Private team creation     | `GroupApplication.make()`                     | `GroupApplication.Service`               |
-| Group membership          | `GroupMembershipApplication.make()`           | `GroupMembershipApplication.Service`     |
-| Group following           | `GroupFollowApplication.make()`               | `GroupFollowApplication.Service`         |
-| Read state                | `ReadStateApplication.make()`                 | `ReadStateApplication.Service`           |
-| Group audience policy     | `GroupAudience.make()`                        | `GroupAudience.Service`                  |
-| Assignment operations     | `AssignmentApplication.make()`                | `AssignmentApplication.Service`          |
-| Delegation policy         | `Delegation.make()`                           | `Delegation.Service`                     |
-| Invitation operations     | `InvitationApplication.make()`                | `InvitationApplication.Service`          |
-| Ownership operations      | `OwnershipApplication.make()`                 | `OwnershipApplication.Service`           |
-| Change feed               | `ChangeFeedApplication.make()`                | `ChangeFeedApplication.Service`          |
+| Implementation            | Constructor                             | Layer provides                           |
+| ------------------------- | --------------------------------------- | ---------------------------------------- |
+| Transaction               | `Transaction.make()`                    | `Transaction.Service`                    |
+| Log                       | `Log.make()`                            | `Log.Service` and `Transaction.Service`  |
+| Journal                   | `Journal.make(options)`                 | `Journal.Service`                        |
+| Change-feed follower      | `ChangeFeedSource.make(options?)`       | `ChangeFeedSource.Service`               |
+| Permission catalog        | `PermissionCatalog.make(definitions)`   | `PermissionCatalog.Service`              |
+| Grant resolver            | `GrantResolver.make()`                  | `GrantResolver.Service`                  |
+| Authorization             | `Authorization.make()`                  | `Authorization.Service`                  |
+| Member operations         | `MemberApplication.make()`              | `MemberApplication.Service`              |
+| Thread operations         | `ThreadApplication.make()`              | `ThreadApplication.Service`              |
+| Thread participation      | `ThreadParticipationApplication.make()` | `ThreadParticipationApplication.Service` |
+| Human message publication | `ThreadMessageApplication.make()`       | `ThreadMessageApplication.Service`       |
+| Notification reads        | `NotificationApplication.make()`        | `NotificationApplication.Service`        |
+| Private team creation     | `GroupApplication.make()`               | `GroupApplication.Service`               |
+| Group membership          | `GroupMembershipApplication.make()`     | `GroupMembershipApplication.Service`     |
+| Group following           | `GroupFollowApplication.make()`         | `GroupFollowApplication.Service`         |
+| Read state                | `ReadStateApplication.make()`           | `ReadStateApplication.Service`           |
+| Group audience policy     | `GroupAudience.make()`                  | `GroupAudience.Service`                  |
+| Assignment operations     | `AssignmentApplication.make()`          | `AssignmentApplication.Service`          |
+| Delegation policy         | `Delegation.make()`                     | `Delegation.Service`                     |
+| Invitation operations     | `InvitationApplication.make()`          | `InvitationApplication.Service`          |
+| Ownership operations      | `OwnershipApplication.make()`           | `OwnershipApplication.Service`           |
+| Change feed               | `ChangeFeedApplication.make()`          | `ChangeFeedApplication.Service`          |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
 `Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation

@@ -88,6 +88,41 @@ export const journal = (harness: Harness) => {
     );
 
     it.effect(
+      "a log's head is its latest batch, per log and workspace, and a transaction sees its own",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const host = yield* storage.connect();
+            const a = yield* forWorkspace(host, workspaceId);
+            const b = yield* forWorkspace(host, otherWorkspaceId);
+            const execution = Log.Id.make("execution");
+            const logs = yield* Log.Service.pipe(Effect.provide(core(a)));
+            const log = logs.open({ id: execution, schema: Schema.String });
+            expect(yield* a.store.head(execution)).toEqual(Option.none());
+            const first = yield* log.append("first");
+            const second = yield* log.append("second");
+            expect(second.position).toBeGreaterThan(first.position);
+            expect(yield* a.store.head(execution)).toEqual(Option.some(second.position));
+            expect(yield* log.head).toEqual(Option.some(second.position));
+            expect(yield* a.store.head(journalLog)).toEqual(Option.none());
+            expect(yield* b.store.head(execution)).toEqual(Option.none());
+            // A transaction's own append is visible to it before commit, and rolls back with it.
+            const staged = yield* Effect.flip(
+              logs.commit(
+                Effect.gen(function* () {
+                  const appended = yield* log.append("staged");
+                  expect(yield* a.store.head(execution)).toEqual(Option.some(appended.position));
+                  return yield* Effect.fail("rollback" as const);
+                }),
+              ),
+            );
+            expect(staged).toBe("rollback");
+            expect(yield* a.store.head(execution)).toEqual(Option.some(second.position));
+          }),
+        ),
+    );
+
+    it.effect(
       "replay restores ownership, membership, and recorded roles without regenerating permission bundles",
       () =>
         harness.withStorage((storage) =>

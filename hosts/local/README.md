@@ -61,16 +61,14 @@ Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
 `Crypto.Crypto`; credential construction is synchronous. Neither needs HTTP
 services or issues codes during construction. Database and server resources belong
-to their layer scopes. Each host also provides one `WorkspaceEvents` registry shared
-by gateway requests and internal consumers. Acquiring a workspace bus and its
-subscription requires holding their scope open; commits publish canonical event
-batches only after storage confirms success. `GET /workspaces/:workspaceId/changes`
-exposes the core change feed through authenticated SSE. The gateway lazily boots
-each workspace, replaying before it serves operations. It keeps the prepared services and
-bus lease while requests or streams use them and for five idle minutes afterwards, then
-releases them; the next request boots the workspace again. Request scopes own operation
-resources; a stream keeps its subscription and workspace open until disconnect.
-Delivery is process-local, with no cross-process recovery in this version.
+to their layer scopes. `GET /workspaces/:workspaceId/changes` exposes the core change
+feed through authenticated SSE; it follows the journal, so several host processes over one
+database deliver each other's commits. The gateway lazily boots each workspace, replaying
+before it serves operations. It keeps the prepared services, including the workspace's
+change-feed follower, while requests or streams use them and for five idle minutes
+afterwards, then releases them; the next request boots the workspace again. Request scopes
+own operation resources; a stream keeps its subscription and workspace open until
+disconnect.
 The host sets no application request-body limit or SSE connection/admission limit.
 It relies on runtime defaults; these are not an explicit edge resource policy.
 See [known limitations](../../docs/current-status.md) for commit classification,

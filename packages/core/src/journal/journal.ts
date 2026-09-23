@@ -27,7 +27,7 @@ export interface Interface {
   /**
    * Stamp trusted operation attribution and derive a key from the fact's occurrence rule.
    * Explicit keys are allowed only when no key is derived. Matching retries return the
-   * original event without applying projections or broadcasting; conflicting content aborts.
+   * original event without applying projections; conflicting content aborts.
    */
   readonly publish: <F extends Fact.Definition>(
     fact: F,
@@ -241,7 +241,6 @@ export const make = Effect.fn("Journal.make")(function* <
         );
         const event = yield* Event.decode(fact, entry);
         for (const runner of subscribers.get(fact.name) ?? []) yield* runner.apply(entry, event);
-        yield* transaction.recordEvent(event);
         return event;
       }),
     );
@@ -254,6 +253,7 @@ export const make = Effect.fn("Journal.make")(function* <
     getEntry: log.getEntry,
     getAppend: log.getAppend,
     read: log.read,
+    head: log.head,
     stream: log.stream,
     tail: log.tail,
   };

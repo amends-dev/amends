@@ -8,7 +8,7 @@ import {
 } from "@amends/core/notification";
 import { ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
-import { Gateway, WorkspaceEvents } from "@amends/gateway";
+import { Gateway } from "@amends/gateway";
 import { Context, DateTime, Effect, Option } from "effect";
 import { boundTo, otherWorkspaceId, runHost, Support, workspaceId } from "./support.ts";
 import type { Harness } from "./harness.ts";
@@ -503,7 +503,7 @@ export const notifications = (harness: Harness) => {
                 _tag: "Gateway.NotMember",
               });
               expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
-            }).pipe(Effect.scoped, Effect.provide(WorkspaceEvents.layer())),
+            }).pipe(Effect.scoped),
           ),
         ),
     );

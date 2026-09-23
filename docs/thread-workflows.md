@@ -450,10 +450,12 @@ Actual turn cancellation will be added with turn execution; there are no running
 
 ## Privacy and current limits
 
-Thread creation, participation, message, activity, and notification acknowledgment facts are withheld from the workspace-wide
-change feed, including text, recipient selection, and provenance. Mixed commits retain only their
-other supported public events. A thread-only commit therefore provides no inbox refresh signal
-through that feed. Audience-aware thread subscriptions and live notification delivery remain work.
+Thread creation, participation, message, and activity facts reach the thread's group members
+with `thread.read` for that thread over the [change feed](../packages/core/README.md#change-feed).
+Messages carry their full text, so clients render them without a refetch. Activity events omit
+their notification recipients, and participation events omit routing identities and admissions.
+Notification acknowledgments reach only their recipient. Notifications themselves are not yet
+delivered over the feed.
 Notifications expose source references, not continuing authority to read the source conversation.
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
@@ -480,7 +482,7 @@ scopes, inaccessible references, validation without partial writes, notification
 failures, outer transactions, concurrent departure, readmission, reopening, replay, and direct
 store constraints. Read suites cover exact grants, nonparticipant and later-member access,
 pagination, private identity filtering, no-write reads, current revocation, outer transactions,
-and rejection of corrupt cross-thread references. Core tests verify withholding private thread facts from the public change feed.
+and rejection of corrupt cross-thread references. Core tests verify that the change feed delivers thread facts only to the group's readers.
 Reply suites cover scoped action grants, live access changes, initial and returning admissions,
 mention and unmentioned selection, agent use for mentioned agents only, concurrent sequencing and
 removal, projection and late failures,
@@ -498,7 +500,8 @@ message and participation subjects, direct entry lookup, read-only behavior, out
 reopening, and gateway outcomes on every storage adapter.
 Acknowledgment suites cover ownership, agent rejection, stable repeat handling, source-access loss,
 projection and late-failure rollback, caller transactions, concurrent requests, direct-store validation,
-reopening, and replay after departure. Core tests verify codec validation and change-feed privacy.
+reopening, and replay after departure. Core tests verify codec validation and that the change feed delivers acknowledgments only to
+their recipient.
 They also exercise the common notification generator with nonempty recipient selections on
 non-message activity, ending activity for all departure paths, and rollback after a partial
 multi-thread departure cascade.

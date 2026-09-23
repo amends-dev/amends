@@ -19,11 +19,10 @@ notification generation or delivery.
 
 `ChangesHandlers.watch` enters through `Gateway.asMemberScoped` and calls
 `ChangeFeedApplication.watch`. Effect's HTTP server transfers the request scope
-to the response stream, keeping the workspace services, bus lease and subscription
-alive until completion or disconnect. HTTP owns SSE encoding, cache headers,
-and comment heartbeats; core owns Ready/Committed schemas and payload normalization.
-The handler sends no frontend query keys. It checks endpoint access on entry;
-per-event authorization remains deferred.
+to the response stream, keeping the workspace services and subscription alive until
+completion or disconnect. The `after` query resumes from a cursor. HTTP owns SSE
+encoding, cache headers, and comment heartbeats; core owns the Ready/Committed schemas,
+payload views, and per-event authorization. The handler sends no frontend query keys.
 
 ## Organization
 
@@ -73,4 +72,4 @@ after membership removal. Host fixtures seed notification records because their
 generation projection is still empty.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
-and reconnects without history.
+resuming from a cursor, and rejection of invalid cursors.

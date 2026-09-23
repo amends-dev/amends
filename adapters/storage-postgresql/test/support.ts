@@ -9,7 +9,7 @@ import * as Core from "@amends/core";
 import { ReadStateStore } from "@amends/core/attention";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity, Performer } from "@amends/core/identity";
-import { Event, Checkpoint, CommittedEvents, Log, Store } from "@amends/core/journal";
+import { Event, Checkpoint, Log, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import {
@@ -71,7 +71,6 @@ export const database = (url: string) =>
   PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 });
 export const core = (bound: Bound) =>
   Core.layer.pipe(
-    Layer.provideMerge(CommittedEvents.layer(bound.workspace.workspaceId)),
     Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
   );
 export const inDatabase = <A, E>(

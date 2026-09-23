@@ -3,7 +3,6 @@ import { expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 import { Codec } from "../../src/journal/codec.ts";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Event } from "../../src/journal/event.ts";
 import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
@@ -46,7 +45,6 @@ const run = <A, E>(
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-    Effect.provide(CommittedEvents.layer(workspaceId)),
   );
 it.effect(
   "storage keeps the fact header separate and filtered entry pages preserve mixed-version commit order",

@@ -1,21 +1,9 @@
 import { Subject } from "@amends/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import {
-  Cause,
-  Context,
-  Crypto,
-  DateTime,
-  Deferred,
-  Effect,
-  Exit,
-  Option,
-  Schema,
-  Stream,
-} from "effect";
+import { Cause, Context, Crypto, DateTime, Deferred, Effect, Exit, Option, Schema } from "effect";
 import { Actor } from "../../src/identity/actor.ts";
 import { Identity } from "../../src/identity/identity.ts";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Entry } from "../../src/journal/entry.ts";
 import { Event } from "../../src/journal/event.ts";
 import { Fact } from "../../src/journal/fact.ts";
@@ -43,14 +31,13 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Service | Transaction.Service | Checkpoint.Service | CommittedEvents.Service | Crypto.Crypto
+    Log.Service | Transaction.Service | Checkpoint.Service | Crypto.Crypto
   >,
 ) =>
   program.pipe(
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-    Effect.provide(CommittedEvents.layer(workspaceId)),
     Effect.provideService(Crypto.Crypto, testCrypto),
   );
 const setup = Journal.make({ logId, projections: [] });
@@ -263,11 +250,9 @@ it.effect("publication owns nested attribution before projections and committed 
           performedBy: { _tag: "Identity", identity } as const,
         });
         const journal = yield* setup;
-        const stream = yield* (yield* CommittedEvents.Service).subscribe;
         const event = yield* journal
           .publish(Changed, 1)
           .pipe(Effect.provideService(Publication.Service, provenance));
-        const batch = (yield* stream.pipe(Stream.take(1), Stream.runCollect))[0];
         expect(event.provenance).not.toBe(provenance);
         expect(Object.isFrozen(event.provenance)).toBe(true);
         if (event.provenance.performedBy._tag === "System")
@@ -276,8 +261,8 @@ it.effect("publication owns nested attribution before projections and committed 
         expect(Object.isFrozen(event.provenance.performedBy.identity)).toBe(true);
         identity.id = Identity.HumanId.make("changed-after-publication");
         expect(event.provenance.performedBy.identity.id).toBe(Identity.HumanId.make("alice"));
-        expect(batch?.events[0]?.provenance).toEqual(event.provenance);
-        expect(Object.isFrozen(batch?.events[0]?.provenance?.performedBy)).toBe(true);
+        const [stored] = (yield* journal.log.read({ limit: 1 }))[0]?.entries ?? [];
+        expect(stored?.payload.provenance).toEqual(event.provenance);
       }).pipe(Effect.scoped),
     );
   }),

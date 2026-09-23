@@ -2,7 +2,6 @@ import { Subject } from "@amends/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
@@ -49,7 +48,6 @@ const run = <A, E>(
     Effect.provideService(Store.Service, fixture.store),
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
-    Effect.provide(CommittedEvents.layer(workspaceId)),
   );
 it.effect(
   "occurrence tuples have a stable, namespaced encoding without delimiter collisions or schema versions",

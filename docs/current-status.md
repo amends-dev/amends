@@ -176,25 +176,23 @@ Turn/task activity kinds remain design intent.
 
 ## Live delivery and authorization
 
-[WorkspaceEvents](../packages/gateway/src/workspace-events.ts) and
-[CommittedEvents](../packages/core/src/journal/committed-events.ts) provide a
-process-local bus. Confirmed commits publish after native COMMIT, with bounded
-sliding buffers and lag detection. There is no durable publication outbox,
-cross-process fan-out, or replay on the public SSE endpoint. A missed publication
-or another process's commit can leave a connected client's view stale.
+The [change feed](../packages/core/README.md#change-feed) reads the journal, so it carries
+commits from every host over the same storage and resumes from a cursor. Its remaining gaps:
 
-[ChangeFeedApplication.watch](../packages/core/src/change-feed/application.ts) checks
-membership at subscription time and forwards the workspace-management events it registers.
-Every other fact, including private group, follow, thread, and notification acknowledgment facts,
-is withheld, with its message text, recipients, and provenance;
-group-only commits produce no public change until audience-aware group delivery exists.
-It does not filter fields or events by permission, or continuously recheck membership.
-Removal therefore does not itself close an existing subscription. Reconnecting
-checks access again; future clients must use Ready to refresh their views.
-
-The journal's storage-backed `log.tail` can catch up from durable history. It is a
-separate internal API and is not the transport used by the
-[HTTP change feed](../packages/api-http/README.md#live-changes).
+- PostgreSQL's [`waitForAppend`](../adapters/storage-postgresql/src/journal.ts) polls every
+  100 milliseconds for each workspace a process follows. Wakeups through `LISTEN`/`NOTIFY`
+  remain to be done.
+- Notifications are not delivered over the feed. A recipient learns of a new notification
+  only by rereading the inbox, prompted by the thread events they can see.
+- A reader's cursor advances only with commits that carry something they may see. A reader
+  who sees little of a busy workspace can fall more than 500 commits behind while
+  disconnected and then reset instead of resuming.
+- Scopes and grants reload from current state when a commit changes them, and that state
+  may already include later changes. Access to a group or thread extends to its history, so
+  this can deliver events from just before a grant, or withhold events from just before a
+  revocation, but never delivers after the revocation reaches the reader.
+- Access is rechecked only when the feed itself carries a change to it. The reader's
+  removal from the workspace ends their stream.
 
 ## Projection sets across hosts
 

@@ -34,12 +34,12 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     return handlers.handleAll({
-      watch: ({ params }) =>
+      watch: ({ params, query }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMemberScoped(
             params.workspaceId,
             principal,
-            Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch),
+            Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch(query)),
           ),
         ).pipe(HttpEffect.withPreResponseHandler(prepareResponse)),
     });

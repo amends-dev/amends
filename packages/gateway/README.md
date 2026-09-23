@@ -29,8 +29,8 @@ and `WorkspaceDirectoryListing` for public API documentation.
 
 ## Construction
 
-`Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`WorkspaceEvents.Service`, and `Crypto.Crypto`, in the host's scope. It captures
+`Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`
+and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `Gateway.layer(options?)`
@@ -43,28 +43,6 @@ adapters or hosts; they have no default `make` or `layer` here. `Service.of(...)
 is sufficient to type-check a supplied implementation.
 
 ## Surface
-
-### Workspace event bus foundation
-
-`WorkspaceEvents.make()` constructs a process-local registry of core's
-`CommittedEvents` buses. `WorkspaceEvents.layer(options?)` delegates to it. Provide
-one registry in the host scope and use `forWorkspace(workspaceId)` to acquire a bus
-for a request or subscriber scope. Concurrent acquisitions of the same workspace
-share one instance; different workspaces and different registries remain isolated.
-
-Effect's `RcMap` owns acquisition and reference counting. A subscriber holds its
-workspace lease for its entire lifetime. Releasing the last lease immediately
-closes that bus; a later acquisition creates a fresh live bus. Registry shutdown
-closes all buses even when callers still hold leases. The registry retains leased
-live buses without caching workspace records, event history, or authorization
-decisions. A runtime's lease can remain open while no request is active.
-
-This service is internal infrastructure, not a core application operation or an
-authorized subscription endpoint. A prepared workspace runtime holds a bus lease
-for as long as it stays prepared and injects it alongside workspace storage. Both local host compositions provide
-one shared registry. Journal commits publish to that bus after the adapter confirms
-success. The change-feed application consumes the bus; cross-process recovery
-remains separate work.
 
 ### Workspace operations
 
@@ -85,15 +63,14 @@ remains separate work.
   `asMember` wraps this operation in a short scope for ordinary request/response work.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
-part of core's `HostServices` bound to one workspace, plus `WorkspaceEvents.Service`
-and `Crypto.Crypto`. The event bus is not a storage-adapter responsibility.
+part of core's `HostServices` bound to one workspace, plus `Crypto.Crypto`.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
 
 The gateway owns an internal `WorkspaceRuntime` registry backed by Effect's
-`LayerMap`. The first acquisition of a workspace binds storage, acquires its bus,
-builds core, and completes journal replay before exposing the prepared context.
+`LayerMap`. The first acquisition of a workspace binds storage, builds core, and
+completes journal replay before exposing the prepared context.
 Concurrent callers await the same boot. Later requests reuse that context without
 replaying history or rebuilding services. Membership, authorization, transactions,
 and subscription scopes are resolved during each operation; boot uses the host's
@@ -103,10 +80,12 @@ operations check authorization inside their commit.
 
 Each request, and each open response stream, holds a lease on its workspace runtime. A
 successful runtime stays prepared while any lease is open and for the idle time-to-live after
-the last one closes. It is then released with its services and bus lease, and the next
-request boots it again, finding its projections live. Memory therefore follows the workspaces
-in recent use rather than every workspace acquired since startup. Host shutdown closes
-runtime resources and event subscriptions, including leased ones. A request cancellation does not cancel shared
+the last one closes. It is then released with its services, including its change-feed
+follower, and the next request boots it again, finding its projections live. Memory
+therefore follows the workspaces in recent use rather than every workspace acquired since
+startup. Change-feed subscribers share their runtime's follower, and each process follows
+the journal itself, so subscribers on different hosts see the same commits. Host shutdown
+closes runtime resources and subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
 fails its waiting requests as a defect. A later acquisition can retry; no operation
 runs before successful boot.

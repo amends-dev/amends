@@ -74,9 +74,9 @@ export const reads = (harness: Harness) => {
                     expect(
                       yield* Effect.flip(notifications.get(Notification.Id.make("missing"))),
                     ).toMatchObject({ _tag: "NotificationApplication.NotFound" });
-                    const stream = yield* (yield* ChangeFeedApplication.Service).watch;
-                    expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toEqual([
-                      { _tag: "Ready", workspaceId: workspace.id },
+                    const stream = yield* (yield* ChangeFeedApplication.Service).watch();
+                    expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
+                      { _tag: "Ready", workspaceId: workspace.id, reset: true },
                     ]);
                   }),
                 );

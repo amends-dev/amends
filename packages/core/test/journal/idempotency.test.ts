@@ -2,7 +2,6 @@ import { Subject } from "@amends/core/journal";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Event } from "../../src/journal/event.ts";
 import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
@@ -40,38 +39,29 @@ const run = <A, E>(
     | Checkpoint.Service
     | Publication.Service
   >,
-  published: CommittedEvents.Batch[] = [],
 ) =>
   Effect.gen(function* () {
-    const bus = yield* CommittedEvents.make(workspaceId);
-    return yield* Effect.gen(function* () {
-      const journal = yield* setup;
-      return yield* program.pipe(Effect.provideService(Journal.Service, journal));
-    }).pipe(
-      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-      Effect.provide(Log.layer),
-      Effect.provideService(Store.Service, fixture.store),
-      Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-      Effect.provideService(Counter, fixture.counter),
-      Effect.provideService(CommittedEvents.Service, {
-        ...bus,
-        publish: (batch) =>
-          bus.publish(batch).pipe(
-            Effect.tap(() =>
-              Effect.sync(() => {
-                published.push(batch);
-              }),
-            ),
-          ),
-      }),
-    );
-  }).pipe(Effect.scoped);
+    const journal = yield* setup;
+    return yield* program.pipe(Effect.provideService(Journal.Service, journal));
+  }).pipe(
+    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provide(Log.layer),
+    Effect.provideService(Store.Service, fixture.store),
+    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Counter, fixture.counter),
+    Effect.scoped,
+  );
+/** How many entries each committed batch holds, in log order. */
+const committed = Effect.flatMap(Journal.Service, (journal) =>
+  Effect.map(journal.log.read({ limit: 10 }), (batches) =>
+    batches.map((batch) => batch.entries.length),
+  ),
+);
 it.effect(
   "keyed publication returns the original event despite fresh provenance and stale expectedAfter",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
-      const published: CommittedEvents.Batch[] = [];
       yield* run(
         fixture,
         Effect.gen(function* () {
@@ -98,25 +88,20 @@ it.effect(
           );
           expect(retried).toEqual(first);
           expect(yield* fixture.counter.get).toBe(5);
-          expect(published).toHaveLength(2);
-          expect(published[1]?.events.map((event) => event.payload)).toEqual([3]);
-          expect(
-            (yield* journal.log.read({ limit: 10 })).flatMap((batch) => batch.entries),
-          ).toHaveLength(2);
+          // The retry's commit records only its new fact.
+          expect(yield* committed).toEqual([1, 1]);
           const original = yield* journal.log.getAppend(key);
           expect(Option.isSome(original) && original.value[0]?.id).toBe(first.id);
         }),
-        published,
       );
     }),
 );
 
 it.effect(
-  "retrying an uncertain commit recovers its original publication without applying or broadcasting again",
+  "retrying an uncertain commit recovers its original publication without applying it again",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
-      const published: CommittedEvents.Batch[] = [];
       yield* run(
         fixture,
         Effect.gen(function* () {
@@ -128,12 +113,8 @@ it.effect(
           const retry = yield* journal.publish(Changed, 7, { idempotencyKey: key });
           expect(retry.commitId).toBe(failure.commitId);
           expect(yield* fixture.counter.get).toBe(7);
-          expect(published).toEqual([]);
-          expect(
-            (yield* journal.log.read({ limit: 10 })).flatMap((batch) => batch.entries),
-          ).toHaveLength(1);
+          expect(yield* committed).toEqual([1]);
         }),
-        published,
       );
     }),
 );
@@ -141,7 +122,6 @@ it.effect(
 it.effect("concurrent retries in one commit publish and project only one keyed occurrence", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const published: CommittedEvents.Batch[] = [];
     yield* run(
       fixture,
       Effect.gen(function* () {
@@ -154,10 +134,8 @@ it.effect("concurrent retries in one commit publish and project only one keyed o
         );
         expect(new Set(events.map((event) => event.id)).size).toBe(1);
         expect(yield* fixture.counter.get).toBe(2);
-        expect(published).toHaveLength(1);
-        expect(published[0]?.events).toHaveLength(1);
+        expect(yield* committed).toEqual([1]);
       }),
-      published,
     );
   }),
 );

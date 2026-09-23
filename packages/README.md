@@ -84,8 +84,8 @@ service inventory and examples; each protocol package documents its own surface.
 
 `@amends/core` composes one workspace's core. Its root export holds the
 composition: `layer` builds the application operations over the journal,
-authorization, and permission catalog. `HostServices` describes the storage,
-cryptography, and workspace event bus a host must supply, derived from that layer.
+authorization, and permission catalog. `HostServices` describes the storage
+and cryptography a host must supply, derived from that layer.
 `Operations` is the set of application services a gateway may run. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/group`, `@amends/core/thread`, and

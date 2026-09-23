@@ -20,7 +20,6 @@ import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
@@ -236,7 +235,6 @@ it.effect(
       }).pipe(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
         Effect.provideService(Store.Service, fixture.store),
-        Effect.provide(CommittedEvents.layer(workspaceId)),
         Effect.provideService(Checkpoint.Service, fixture.checkpoints),
         Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
         Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),

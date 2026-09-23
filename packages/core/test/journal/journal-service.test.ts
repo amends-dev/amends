@@ -10,7 +10,6 @@ import { Log } from "../../src/journal/log.ts";
 import { Projection } from "../../src/journal/projection.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make } from "../memory-store.ts";
 
@@ -79,11 +78,7 @@ it.effect.each(["make", "layer"] as const)(
           ),
         }),
       );
-      const live = configured.pipe(
-        Layer.provide(Log.layer),
-        Layer.provide(host),
-        Layer.provide(CommittedEvents.layer(workspaceId)),
-      );
+      const live = configured.pipe(Layer.provide(Log.layer), Layer.provide(host));
       expectTypeOf<Layer.Services<typeof live>>().toEqualTypeOf<never>();
       const consume = Effect.gen(function* () {
         const journal = yield* Journal.Service;
@@ -139,7 +134,7 @@ it.effect.each(["make", "layer"] as const)(
           Effect.provideService(Publication.Service, testProvenance(workspaceId)),
           Effect.provideService(Journal.Service, journal),
         ),
-      ).pipe(Effect.provide(CommittedEvents.layer(workspaceId)));
+      );
       expectTypeOf<Effect.Services<typeof direct>>().toEqualTypeOf<never>();
       yield* construction === "make"
         ? direct
@@ -155,9 +150,7 @@ it.effect("each evaluation of the transaction constructor owns a separate coordi
     const fixture = yield* make();
     const acquire = Transaction.make();
     expectTypeOf<Effect.Success<typeof acquire>>().toEqualTypeOf<Transaction.Interface>();
-    expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<
-      Store.Service | CommittedEvents.Service
-    >();
+    expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<Store.Service>();
     expectTypeOf<Effect.Success<ReturnType<typeof Log.make>>>().toEqualTypeOf<Log.Interface>();
     expectTypeOf<Effect.Services<ReturnType<typeof Log.make>>>().toEqualTypeOf<
       Store.Service | Transaction.Service
@@ -170,10 +163,7 @@ it.effect("each evaluation of the transaction constructor owns a separate coordi
       expect(yield* fixture.attempts).toBe(1);
       yield* second.run(second.run(Effect.void));
       expect(yield* fixture.attempts).toBe(2);
-    }).pipe(
-      Effect.provideService(Store.Service, fixture.store),
-      Effect.provide(CommittedEvents.layer(workspaceId)),
-    );
+    }).pipe(Effect.provideService(Store.Service, fixture.store));
   }),
 );
 
@@ -233,7 +223,6 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
     }).pipe(
       Effect.provide(Log.layer),
       Effect.provideService(Store.Service, fixture.store),
-      Effect.provide(CommittedEvents.layer(workspaceId)),
       Effect.provideService(Checkpoint.Service, fixture.checkpoints),
       Effect.provideService(Counter, fixture.counter),
     );
@@ -249,7 +238,6 @@ it.effect("projection defects remain defects and still roll back the publication
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(Store.Service, fixture.store),
-          CommittedEvents.layer(workspaceId),
           Layer.succeed(Checkpoint.Service, fixture.checkpoints),
           Layer.succeed(Counter, fixture.counter),
         ),

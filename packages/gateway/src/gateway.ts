@@ -7,7 +7,6 @@ import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
-import { WorkspaceEvents } from "./workspace-events.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
 export interface Interface {
@@ -98,11 +97,7 @@ export type Options = WorkspaceRuntime.Options;
  */
 export const make = Effect.fn("Gateway.make")(function* (
   options: Options = {},
-): Effect.fn.Return<
-  Interface,
-  never,
-  WorkspaceStorage.Service | WorkspaceEvents.Service | Crypto.Crypto | Scope.Scope
-> {
+): Effect.fn.Return<Interface, never, WorkspaceStorage.Service | Crypto.Crypto | Scope.Scope> {
   const runtimes = yield* WorkspaceRuntime.make(options);
   const cryptography = yield* Crypto.Crypto;
 

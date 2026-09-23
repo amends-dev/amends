@@ -4,7 +4,7 @@
  */
 export { assignments } from "./assignments.ts";
 export { authorization } from "./authorization.ts";
-export { commitPublication } from "./commit-publication.ts";
+export { changeFeed } from "./change-feed.ts";
 export { contracts } from "./contracts.ts";
 export { factMetadata } from "./fact-metadata.ts";
 export { gateway } from "./gateway.ts";

@@ -28,6 +28,7 @@ import { ThreadActivityProjection } from "./thread/activity/projection.ts";
  */
 import { Layer } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
+import { ChangeFeedSource } from "./change-feed/source.ts";
 import { GroupApplication } from "./group/application.ts";
 import { GroupAudience } from "./group/audience.ts";
 import { GroupProjection } from "./group/projection.ts";
@@ -119,6 +120,10 @@ const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer))
 const activityReading = ThreadActivityReading.layer.pipe(Layer.provide(threadAccess));
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
 const threadReading = ThreadReading.layer.pipe(Layer.provide(NotificationAcknowledgment.layer));
+/** One journal follower per workspace runtime, shared by its change-feed subscribers. */
+const changeFeed = ChangeFeedApplication.layer.pipe(
+  Layer.provide(Layer.mergeAll(ChangeFeedSource.layer(), GrantResolver.layer)),
+);
 
 /**
  * Application operations, sharing one journal and one authorization check. These
@@ -130,7 +135,7 @@ const operations = Layer.mergeAll(
   AssignmentApplication.layer,
   OwnershipApplication.layer,
   NotificationApplication.layer,
-  ChangeFeedApplication.layer,
+  changeFeed,
   GroupApplication.layer,
   GroupMembershipApplication.layer,
   GroupFollowApplication.layer,

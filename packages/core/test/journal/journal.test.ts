@@ -10,7 +10,6 @@ import { Log } from "../../src/journal/log.ts";
 import { Projection } from "../../src/journal/projection.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { Counter, make, type Fixture } from "../memory-store.ts";
 
@@ -41,7 +40,6 @@ const run = <A, E>(
     Effect.provideService(Publication.Service, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
-    Effect.provide(CommittedEvents.layer(workspaceId)),
     Effect.provideService(Counter, fixture.counter),
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
   );

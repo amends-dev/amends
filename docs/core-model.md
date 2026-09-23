@@ -12,7 +12,7 @@ For current behavior, read [workspace workflows](workspace-workflows.md), the
 [group workflows](group-workflows.md), the [core package guide](../packages/core/README.md),
 and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
-and process-local live changes are implemented. Core and the storage adapters also implement
+and live changes read from the journal are implemented. Core and the storage adapters also implement
 private team-group creation, membership admission/departure, workspace-removal cleanup,
 authorized group reads, and a shared group-audience check. Direct groups (DMs and group DMs) are
 established and reused by member set, with their first thread, through `ThreadApplication.startDirect`.

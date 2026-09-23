@@ -4,6 +4,7 @@ import { Commit } from "./commit.ts";
 import { Entry as LogEntry } from "./entry.ts";
 import { Event } from "./event.ts";
 import { Occurrence } from "./occurrence.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /** Domain journals provide a fact header; generic logs provide only payload bytes. */
 export const Content = Schema.Struct({
@@ -167,32 +168,9 @@ export class Transaction extends Context.Service<
   }
 >()("@amends/core/journal/store/Transaction") {}
 
-export interface TransactionOptions {
-  /**
-   * Internal observer of a confirmed native commit. Run once, uninterruptibly, after COMMIT
-   * succeeds; never on rollback or an uncertain outcome. It must not access storage or wait
-   * for consumers: the adapter may still hold its connection. Failures are logged, never
-   * reported as a failed write. Adapters use notifyCommit to apply that policy consistently.
-   */
-  readonly onCommit?: Effect.Effect<void, unknown>;
-}
-
-/** Run a local commit observer without changing the already committed transaction's outcome. */
-export const notifyCommit = (
-  commitId: Commit.Id,
-  options?: TransactionOptions,
-): Effect.Effect<void> =>
-  options?.onCommit === undefined
-    ? Effect.void
-    : options.onCommit.pipe(
-        Effect.catchCause((cause) =>
-          Effect.logError("Post-commit observer failed", cause).pipe(
-            Effect.annotateLogs({ commitId }),
-          ),
-        ),
-      );
-
 export interface Interface {
+  /** Every log and read addresses this workspace alone. */
+  readonly workspaceId: WorkspaceId.Id;
   /** Lookup is workspace-bound and sees this transaction's staged keys when present. */
   readonly getAppend: (
     logId: LogEntry.LogId,
@@ -208,7 +186,6 @@ export interface Interface {
    */
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
-    options?: TransactionOptions,
   ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
 
   /** Reads use the current transaction when present, otherwise committed state. */
@@ -220,6 +197,13 @@ export interface Interface {
     logId: LogEntry.LogId,
     commitId: Commit.Id,
   ) => Effect.Effect<Option.Option<Batch>, Failure>;
+  /**
+   * The position of this log's latest batch, or None for an empty log. Use the current
+   * transaction's view when present, otherwise committed state.
+   */
+  readonly head: (
+    logId: LogEntry.LogId,
+  ) => Effect.Effect<Option.Option<LogEntry.Position>, Failure>;
   /**
    * Read complete batches for this log after the exclusive cursor, in increasing
    * position order. A commit touching other logs does not appear here. Never split

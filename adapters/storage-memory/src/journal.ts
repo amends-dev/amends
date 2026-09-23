@@ -147,6 +147,7 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   return Store.Service.of({
+    workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
         const space = yield* read;
@@ -182,12 +183,11 @@ export const make = Effect.fn("Journal.make")(function* () {
       },
       Effect.mapError(storeFailure(Store, "getAppend")),
     ),
-    transaction: (program, options) =>
-      transaction(
-        program,
-        (session) => ({ id: session.commit.id, append: (request) => append(session, request) }),
-        options,
-      ),
+    transaction: (program) =>
+      transaction(program, (session) => ({
+        id: session.commit.id,
+        append: (request) => append(session, request),
+      })),
     get: Effect.fn("Journal.get")(
       function* (logId, commitId: Commit.Id) {
         const space = yield* read;
@@ -197,6 +197,13 @@ export const make = Effect.fn("Journal.make")(function* () {
           : Option.some(yield* batchOf(space, logId, batch));
       },
       Effect.mapError(storeFailure(Store, "get")),
+    ),
+    head: Effect.fn("Journal.head")(
+      function* (logId) {
+        const space = yield* read;
+        return Option.map(Array.last(space.logs.get(logId) ?? []), (batch) => batch.position);
+      },
+      Effect.mapError(storeFailure(Store, "head")),
     ),
     read: Effect.fn("Journal.read")(
       function* (logId, input) {

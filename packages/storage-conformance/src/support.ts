@@ -4,7 +4,7 @@ import { ReadStateStore } from "@amends/core/attention";
 import { AssignmentStore, BuiltinRoles, type Role, RoleStore } from "@amends/core/authorization";
 import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
 import { Identity, Performer } from "@amends/core/identity";
-import { Checkpoint, CommittedEvents, Event, Log, Store } from "@amends/core/journal";
+import { Checkpoint, Event, Log, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   ThreadActivityStore,
@@ -20,7 +20,7 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway, WorkspaceEvents, WorkspaceStorage } from "@amends/gateway";
+import { Gateway, WorkspaceStorage } from "@amends/gateway";
 import { Clock, Context, DateTime, Effect, Layer, type Option } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 
@@ -76,10 +76,8 @@ export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
       Store.Service,
       Store.Service.of(
         Object.assign({}, bound.store, {
-          transaction: <A, E, R>(
-            program: Effect.Effect<A, E, R>,
-            options?: Store.TransactionOptions,
-          ) => bound.store.transaction(Effect.andThen(program, Effect.fail(failure)), options),
+          transaction: <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            bound.store.transaction(Effect.andThen(program, Effect.fail(failure))),
         }),
       ),
     ),
@@ -93,13 +91,11 @@ export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, 
 export const make = (harness: Harness) => {
   const core = (bound: Bound) =>
     Core.layer.pipe(
-      Layer.provideMerge(CommittedEvents.layer(bound.workspace.workspaceId)),
       Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), harness.crypto)),
     );
-  /** A gateway, with its workspace event bus, over a host. */
+  /** A gateway over a host. */
   const gateway = (host: Context.Context<Host>) =>
     Gateway.layer().pipe(
-      Layer.provideMerge(WorkspaceEvents.layer()),
       Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), harness.crypto)),
     );
   return {

@@ -1,8 +1,6 @@
-import { Array, Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect";
+import { Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect";
 import type { Cause, Scope } from "effect";
 import type { WorkspaceId } from "../workspace/id.ts";
-import { CommittedEvents } from "./committed-events.ts";
-import type { Event } from "./event.ts";
 import { Store } from "./store.ts";
 
 export class Aborted extends Schema.TaggedError<Aborted>()("Commit.Aborted", {
@@ -33,8 +31,6 @@ export interface Interface {
   readonly operation: <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Error, Remaining<R>>;
-  /** Journal-only collection of a canonical event after its projections succeed. */
-  readonly recordEvent: (event: Event.Record) => Effect.Effect<void, Error>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/journal/transaction/Service",
@@ -44,7 +40,6 @@ interface State {
   readonly owner: symbol;
   readonly native: Store.Transaction["Service"];
   readonly gate: Semaphore.Semaphore;
-  readonly events: Array<Event.Record>;
   active: boolean;
   failure: Option.Option<Cause.Cause<unknown>>;
 }
@@ -80,10 +75,9 @@ const observe = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =>
 export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return<
   Interface,
   never,
-  Store.Service | CommittedEvents.Service
+  Store.Service
 > {
   const store = yield* Store.Service;
-  const committed = yield* CommittedEvents.Service;
   const owner = Symbol("transaction coordinator");
 
   const run = Effect.fn("Commit.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
@@ -101,7 +95,6 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* new Foreign({});
 
-    const events: Array<Event.Record> = [];
     return yield* store.transaction(
       Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
@@ -111,7 +104,6 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
             owner,
             native,
             gate,
-            events,
             active: true,
             failure: Option.none(),
           };
@@ -137,17 +129,6 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
           return exit.value;
         }),
       ),
-      {
-        onCommit: Effect.suspend(() =>
-          Array.isReadonlyArrayNonEmpty(events)
-            ? committed.publish({
-                workspaceId: committed.workspaceId,
-                commitId: events[0].commitId,
-                events,
-              })
-            : Effect.void,
-        ),
-      },
     );
   });
 
@@ -180,19 +161,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     );
   });
 
-  const recordEvent = Effect.fn("Commit.recordEvent")(function* (event: Event.Record) {
-    const current = yield* Effect.serviceOption(Current);
-    if (Option.isNone(current)) return yield* new Foreign({});
-    const state = current.value;
-    yield* operation(
-      Effect.gen(function* () {
-        if (event.commitId !== state.native.id) return yield* new Foreign({});
-        state.events.push(Object.freeze(event));
-      }),
-    );
-  });
-
-  return Service.of({ workspaceId: committed.workspaceId, run, operation, recordEvent });
+  return Service.of({ workspaceId: store.workspaceId, run, operation });
 });
 
 /**

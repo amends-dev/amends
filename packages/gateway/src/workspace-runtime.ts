@@ -1,9 +1,8 @@
 import * as Core from "@amends/core";
-import { CommittedEvents, Journal } from "@amends/core/journal";
+import { Journal } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import { Context, Crypto, Duration, Effect, Exit, Layer, LayerMap, Schema, Scope } from "effect";
 import { WorkspaceStorage } from "./storage.ts";
-import { WorkspaceEvents } from "./workspace-events.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
@@ -25,35 +24,22 @@ export interface Interface {
 
 /**
  * Lazily boot each workspace in the host scope. Concurrent callers await the same boot, and
- * a successful runtime keeps its services and bus lease while leases are open and for the idle
- * time-to-live after the last one closes; then it is released, and the next request boots it
- * again. Request identity and transaction context must never enter service construction.
+ * a successful runtime keeps its services, including its change-feed follower, while leases are
+ * open and for the idle time-to-live after the last one closes; then it is released, and the
+ * next request boots it again. Request identity and transaction context must never enter service construction.
  *
  * @category constructors
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const storage = yield* WorkspaceStorage.Service;
-  const events = yield* WorkspaceEvents.Service;
   const cryptography = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
 
   const boot = Effect.fn("WorkspaceRuntime.boot")(function* (workspaceId: Workspace.Id) {
     const bindings = yield* storage.forWorkspace(workspaceId);
-    const bus = yield* Effect.orDie(events.forWorkspace(workspaceId));
-    if (bus.workspaceId !== workspaceId)
-      return yield* Effect.die(
-        new CommittedEvents.WorkspaceMismatch({
-          expectedWorkspaceId: workspaceId,
-          actualWorkspaceId: bus.workspaceId,
-        }),
-      );
     const services = Core.layer.pipe(
       Layer.provideMerge(
-        Layer.mergeAll(
-          Layer.succeedContext(bindings),
-          Layer.succeed(Crypto.Crypto, cryptography),
-          Layer.succeed(CommittedEvents.Service, bus),
-        ),
+        Layer.mergeAll(Layer.succeedContext(bindings), Layer.succeed(Crypto.Crypto, cryptography)),
       ),
       Layer.orDie,
     );

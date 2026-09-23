@@ -62,10 +62,9 @@ so a client can import the complete contract without loading server code.
   human or agent's inbox. `GET …/:notificationId` reads one notification. Active
   membership is required, and a missing record or another recipient's notification
   returns the same 404. The caller cannot select a different recipient.
-- `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream.
-  Authentication and active membership are checked on entry. The stream currently
-  forwards supported workspace-management events. Private group creation and admission
-  facts are withheld until audience-aware group delivery exists.
+- `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream of the
+  commits the caller may see, resumable from a cursor. Authentication and active
+  membership are checked on entry.
 
 ### Live changes
 
@@ -77,29 +76,38 @@ credential, for example:
 curl -N -H "Authorization: Bearer $TOKEN" "$API/workspaces/$WORKSPACE_ID/changes"
 ```
 
-The first SSE `message` has JSON data such as
-`{ "_tag": "Ready", "workspaceId": "workspace-one" }`. Ready is sent after
-subscription registration. Later messages contain `_tag: "Committed"`, `workspaceId`,
-`commitId`, and an ordered nonempty `events` array. Each event contains `id`, `name`,
-`version`, `recordedAt` (UTC ISO string), `provenance`, and its fact-schema-encoded `payload`.
-Provenance includes the workspace, performer, immediate cause, correlation ID, and
-occurrence time; public request bodies cannot choose that attribution.
-The server sends no query keys. Clients refresh on every Ready and choose which
-queries to invalidate for each commit.
+Resume with the cursor of the last commit received:
+`GET …/changes?after=<cursor>`. Native `EventSource` cannot send a bearer token, so
+clients use fetch-based SSE and pass the cursor explicitly; an invalid cursor is a 400.
 
-There are no SSE event IDs, cursor parameters, or replay on reconnect;
-`Last-Event-ID` has no effect. Five-second SSE comments keep idle connections open
-without producing application messages. Responses use `Cache-Control: no-store`
-and disable proxy buffering where supported. Missing/rejected credentials return
-401; absent active membership returns 403. A closed bus during acquisition returns 503. Failures after streaming starts use Effect's SSE failure encoding with
-`ChangeFeed.Unavailable`; reconnect and refresh to recover the current view.
-Delivery covers confirmed commits in the serving process. Other processes and
-missed publications need a future recovery mechanism.
-Private group facts and their provenance are omitted. A group-only commit emits no message;
-a mixed commit includes its other supported events in order. There are no group HTTP endpoints yet.
-Membership is not rechecked after entry, so removal does not itself terminate an
-existing subscription. There is no per-event permission check or field redaction.
-See [known limitations](../../docs/current-status.md) for delivery and edge controls.
+The first SSE `message` is Ready, such as
+`{ "_tag": "Ready", "workspaceId": "workspace-one", "cursor": "41", "reset": false }`,
+sent after the subscription registers. With `reset: false`, the commits after the given
+cursor follow, then live ones. With `reset: true` (no cursor, an unknown one, or one more
+than 500 commits behind) delivery starts at the head and the client must refresh the views
+it keeps; `cursor` is null only for an empty workspace. Later messages contain
+`_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, and an ordered nonempty `events`
+array. Each event contains `id`, `name`, `version`, `recordedAt` (UTC ISO string),
+`provenance`, and its JSON-encoded `payload`. Provenance includes the workspace, performer,
+immediate cause, correlation ID, and occurrence time; public request bodies cannot choose
+that attribution. The server sends no query keys; clients choose which queries to update or
+invalidate for each commit.
+
+Events reach the readers in their fact's audience with the matching read permission:
+workspace facts reach every member, group and thread facts the group's members with
+`group.read` or `thread.read`, and follows and acknowledgments only their owner. Message
+events carry the full message, so clients can render it without a refetch; activity and
+participation events carry their public views. A commit with nothing the caller may see
+sends no message. The commit that removes the caller from the workspace is delivered,
+then the stream ends; reconnecting returns 403.
+
+The feed follows the journal, so commits from every host over the same database arrive.
+Five-second SSE comments keep idle connections open without producing application messages,
+and messages carry no SSE event IDs. Responses use `Cache-Control: no-store` and disable
+proxy buffering where supported. Missing/rejected credentials return 401; absent active
+membership returns 403. Failures after streaming starts use Effect's SSE failure encoding
+with `ChangeFeed.Unavailable`; reconnect with the last cursor to continue. See
+[known limitations](../../docs/current-status.md) for delivery and edge controls.
 
 Notification lists require an integer `limit` from 1 to 100. The optional
 `pendingOnly=true` filter selects pending records; omission or `false` lists all

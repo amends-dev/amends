@@ -228,10 +228,10 @@ the storage adapters preserve exact group scopes in grants. Target support alone
 thread-audience authorization. The read operations and shared group audience policy above are
 implemented; thread starts, reads, and replies use that policy.
 
-Private group, admission, departure, and follow facts remain on the internal committed-event bus
-but are withheld from the workspace-wide change feed, which publishes only the workspace facts it
-registers. A commit containing only those facts emits
-no public change; a mixed commit retains its other supported events in order. Group discovery
+Group, admission, and departure facts reach the group's members with `group.read` over the
+[change feed](../packages/core/README.md#change-feed); admission and departure also reach the
+member concerned, and follows only the follower. A reader who is not in the group receives
+nothing for them. Group discovery
 and live delivery will need their own audience-aware HTTP/UI contract. Group creation generates no notifications. Opening and reply message activity generates notifications
 through the [thread workflow](thread-workflows.md).
 
@@ -268,5 +268,5 @@ and reads both outside and inside an existing transaction.
 Follow suites cover following and unfollowing for oneself and for agents, `group.follow` and
 `agent.use` checks, repeat calls, joining only later threads, mentions alongside followers, direct
 groups, ending with the admission, replay, and follow storage constraints.
-Core tests cover schema boundaries, exact group scopes, and withholding private group facts
-from the public change feed. Run `bun run check` and `bun run test` from the repository root.
+Core tests cover schema boundaries, exact group scopes, and the change feed's delivery of group
+facts to members only. Run `bun run check` and `bun run test` from the repository root.

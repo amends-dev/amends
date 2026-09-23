@@ -7,7 +7,6 @@ export { Audience } from "./audience.ts";
 export { Checkpoint } from "./checkpoint.ts";
 export { Codec } from "./codec.ts";
 export { Commit } from "./commit.ts";
-export { CommittedEvents } from "./committed-events.ts";
 export { Entry } from "./entry.ts";
 export { Event } from "./event.ts";
 export { Fact } from "./fact.ts";

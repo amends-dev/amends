@@ -380,6 +380,7 @@ export const make = Effect.fn("Journal.make")(function* () {
   });
 
   return Store.Service.of({
+    workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
         yield* Schema.decodeEffect(Entry.LogId)(logId);
@@ -450,19 +451,35 @@ export const make = Effect.fn("Journal.make")(function* () {
             : storedAppend(logId, key),
         ),
       ).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
-    transaction: (program, options) =>
-      transaction(
-        program,
-        (session) => ({
-          id: session.commit.id,
-          append: (request) => guard(append(session, request), true),
-        }),
-        options,
-      ),
+    transaction: (program) =>
+      transaction(program, (session) => ({
+        id: session.commit.id,
+        append: (request) => guard(append(session, request), true),
+      })),
     get: Effect.fn("Journal.get")(function* (logId, commitId) {
       return yield* flushed(
         guard(batches(headers().where(and(scoped(logId), eq(logBatches.commitId, commitId))))),
       ).pipe(Effect.map(Array.head), Effect.mapError(storeFailure(Store, "get")));
+    }),
+    head: Effect.fn("Journal.head")(function* (logId) {
+      return yield* flushed(
+        guard(
+          db
+            .select({ position: logBatches.position })
+            .from(logBatches)
+            .where(scoped(logId))
+            .orderBy(desc(logBatches.position))
+            .limit(1),
+        ),
+      ).pipe(
+        Effect.flatMap((rows) =>
+          Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ position: Entry.Position })))(
+            rows,
+          ),
+        ),
+        Effect.map((rows) => Option.map(Array.head(rows), (row) => row.position)),
+        Effect.mapError(storeFailure(Store, "head")),
+      );
     }),
     read: Effect.fn("Journal.read")(function* (logId, options) {
       return yield* flushed(

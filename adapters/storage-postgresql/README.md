@@ -214,18 +214,10 @@ defaults. Every failed COMMIT effect currently returns `Store.CommitUncertain`,
 including errors that could be classified as definite rollback. See the
 [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
 
-The optional `Store.transaction` observer runs after PostgreSQL confirms COMMIT,
-inside its uninterruptible completion boundary. It is skipped on rollback and
-uncertain outcomes. `Store.notifyCommit` logs observer failures without changing
-the committed result. Observers must not access storage or wait for consumers;
-the connection is still reserved. Core uses this hook to publish its collected
-domain events to the workspace's process-local bus.
-
 ## Composition
 
 ```ts
-Gateway.layer.pipe(
-  Layer.provideMerge(WorkspaceEvents.layer()),
+Gateway.layer().pipe(
   Layer.provideMerge(layer()),
   Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) })),
 );

@@ -16,7 +16,6 @@ import { Entry } from "../../src/journal/entry.ts";
 import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
-import { CommittedEvents } from "../../src/journal/committed-events.ts";
 import { Notification } from "../../src/notification/notification.ts";
 import { NotificationApplication } from "../../src/notification/application.ts";
 import { NotificationStore } from "../../src/notification/store.ts";
@@ -94,7 +93,6 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
   });
   const host = Layer.mergeAll(
     Layer.succeed(Store.Service, fixture.store),
-    CommittedEvents.layer(workspaceId),
     Layer.succeed(Checkpoint.Service, fixture.checkpoints),
     Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
     Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
@@ -149,7 +147,7 @@ it.effect(
       expectTypeOf<
         Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>
       >().toEqualTypeOf<Actor.Service>();
-      const fixture = yield* make();
+      const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       const attempts = yield* fixture.attempts;
       yield* run(
@@ -171,7 +169,7 @@ it.effect(
   "one notification service resolves each caller, including humans and agents with the same identity ID",
   () =>
     Effect.gen(function* () {
-      const fixture = yield* make();
+      const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       yield* run(
         fixture,
@@ -205,7 +203,7 @@ it.effect(
   "missing notifications and another recipient's notifications have the same public outcome",
   () =>
     Effect.gen(function* () {
-      const fixture = yield* make();
+      const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       yield* run(
         fixture,
@@ -228,7 +226,7 @@ it.effect(
   "authorization rejects missing, removed, mismatched, or foreign actors before reading notifications",
   () =>
     Effect.gen(function* () {
-      const fixture = yield* make();
+      const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(bob.memberId));
       for (const actor of [
@@ -263,7 +261,7 @@ it.effect(
 
 it.effect("notification reads join an outer commit and observe staged membership removal", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make(workspaceId);
     yield* seed(fixture);
     yield* run(
       fixture,
@@ -306,7 +304,7 @@ it.effect(
   "notification lists forward validated pagination with the actor's recipient, ignoring caller-selected recipients",
   () =>
     Effect.gen(function* () {
-      const fixture = yield* make();
+      const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       const options = {
         limit: 1,
@@ -344,7 +342,7 @@ it.effect(
 
 it.effect("invalid notification IDs and paging are rejected before store reads", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make(workspaceId);
     yield* seed(fixture);
     const invalid = record("invalid");
     Reflect.set(invalid, "id", "");
@@ -368,7 +366,7 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
 
 it.effect("notification construction rejects a store from another workspace", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make(workspaceId);
     expect(
       yield* Effect.flip(
         NotificationApplication.Service.pipe(
@@ -388,7 +386,7 @@ it.effect(
   "notification lookups fail closed on malformed records, wrong IDs, and foreign workspaces",
   () =>
     Effect.gen(function* () {
-      const fixture = yield* make();
+      const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       const malformed = record("mine");
       Reflect.set(malformed, "recordedAt", "not-a-date");
@@ -415,7 +413,7 @@ it.effect(
 
 it.effect("notification lists reject foreign, misaddressed, duplicate, and oversized pages", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make(workspaceId);
     yield* seed(fixture);
     for (const [values, limit, tag] of [
       [[mine, theirs], 10, "NotificationApplication.InvalidResponse"],
@@ -447,7 +445,7 @@ it.effect("notification lists reject foreign, misaddressed, duplicate, and overs
 
 it.effect("notification storage failures retain their cause", () =>
   Effect.gen(function* () {
-    const fixture = yield* make();
+    const fixture = yield* make(workspaceId);
     yield* seed(fixture);
     const failure = new NotificationStore.Failure({ operation: "read", cause: "unavailable" });
     const fail = () => Effect.fail(failure);

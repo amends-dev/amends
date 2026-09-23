@@ -33,7 +33,7 @@ available application operations.
 The core imports Effect only. Hosts choose storage and provide `Store.Service`,
 `Checkpoint.Service`, and the domain store services used by projection handlers.
 `Log.layer` builds the common log service and transaction coordinator from that
-store and the workspace-bound `CommittedEvents.Service` supplied by the host.
+store, which is bound to one workspace.
 `Journal.layer({ logId, projections })` builds `Journal.Service`, whose
 interface stays the same as projections are added. `Journal.make` remains available
 as its constructor and returns that same interface.
@@ -45,8 +45,8 @@ context, preserving the active host transaction and giving each operation its ow
 scope. Projection dependencies do not appear on journal calls. A published fact's
 own schema requirements remain on that particular `publish` call.
 
-For example, `HostServices` below is a host layer supplying storage, the shared
-workspace event bus, and dependencies used by an illustrative domain-owned
+For example, `HostServices` below is a host layer supplying storage and dependencies
+used by an illustrative domain-owned
 `AgentsProjection`. The shared log and
 transaction services stay exposed so execution-log writes can join journal commits:
 
@@ -220,10 +220,9 @@ For `Journal`, matching content means the same subject, fact name, version, and 
 domain payload. Attempt provenance is not part of the comparison: a retry can
 have a fresh correlation, performer, cause, or occurrence time, but it returns
 the first event's recorded provenance. The invocation still needs valid provenance
-for the bound workspace. Reuse runs no projections, advances no checkpoints or
-log positions, and publishes no new committed-event batch. If an uncertain first
-commit missed live delivery, retry does not rebroadcast it; consumers recover
-through durable history or refresh as before.
+for the bound workspace. Reuse runs no projections, advances no checkpoints
+or log positions, and appends no new batch. The change feed reads the journal, so a first
+commit whose acknowledgment was lost still reaches subscribers once.
 
 `log.getAppend(key)` and `journal.log.getAppend(key)` return `None` or the original
 append's decoded entries. For facts with an occurrence rule,
@@ -270,7 +269,7 @@ Every new `journal.publish(fact, payload)` requires `Publication.Service` in its
 Effect context. This service holds the operation's `Event.Provenance`. The journal
 reads it at publication time, validates and snapshots it, then persists it as
 structured event metadata and exposes it on decoded
-events, projections, committed batches, and change-feed events. `Fact` continues
+events, projections, and change-feed events. `Fact` continues
 to define only the domain statement. Generic `Log` entries retain their existing
 metadata and do not acquire domain attribution.
 

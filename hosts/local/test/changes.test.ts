@@ -31,22 +31,33 @@ const server = (url: string) =>
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
   );
-const listen = (api: Effect.Success<ReturnType<typeof client>>, workspaceId: Workspace.Id) =>
+const listen = (
+  api: Effect.Success<ReturnType<typeof client>>,
+  workspaceId: Workspace.Id,
+  after?: ChangeFeed.Cursor,
+) =>
   Effect.gen(function* () {
     const scope = yield* Scope.fork(yield* Scope.Scope);
     const queue = yield* Queue.unbounded<ChangeFeed.Message>();
-    yield* Stream.unwrap(api.changes.watch({ params: { workspaceId } })).pipe(
+    yield* Stream.unwrap(
+      api.changes.watch({
+        params: { workspaceId },
+        query: after === undefined ? {} : { after },
+      }),
+    ).pipe(
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.forkScoped,
       Scope.provide(scope),
     );
-    expect(yield* Queue.take(queue)).toEqual({ _tag: "Ready", workspaceId });
-    return { next: Queue.take(queue), close: Scope.close(scope, Exit.void) };
+    const ready = yield* Queue.take(queue);
+    if (ready._tag !== "Ready") return yield* Effect.die("Expected Ready first");
+    expect(ready).toMatchObject({ workspaceId, reset: after === undefined });
+    return { ready, next: Queue.take(queue), close: Scope.close(scope, Exit.void) };
   });
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
   it.live(
-    "SSE keeps workspace services alive, carries real commits, isolates workspaces, and reconnects without replay",
+    "SSE keeps workspace services alive, carries real commits, isolates workspaces, and resumes from a cursor",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
@@ -112,7 +123,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
             events: [{ payload: { id: missed.details.id } }],
           });
           expect(yield* asBob.next).toEqual(missedEvent);
+          // Resuming from the last commit it saw, the closed subscriber replays what it missed.
+          const resumed = yield* listen(alice, workspace.id, accepted.cursor);
+          expect(resumed.ready.cursor).toBe(accepted.cursor);
+          expect(yield* resumed.next).toEqual(missedEvent);
           const reconnected = yield* listen(alice, workspace.id);
+          expect(reconnected.ready.cursor).toBe(
+            missedEvent._tag === "Committed" ? missedEvent.cursor : null,
+          );
           const after = yield* issue(workspace.id, "eve");
           const afterEvent = yield* reconnected.next;
           expect(afterEvent).toMatchObject({
@@ -120,21 +138,24 @@ describe.skipIf(!available)("PostgreSQL", () => {
             events: [{ payload: { id: after.details.id } }],
           });
           expect(yield* second.next).toEqual(afterEvent);
+          expect(yield* resumed.next).toEqual(afterEvent);
           expect(yield* asBob.next).toEqual(afterEvent);
           yield* asBob.close;
           yield* alice.members.remove({
             params: { workspaceId: workspace.id, memberId: member.id },
           });
           expect(
-            yield* bob.changes.watch({ params: { workspaceId: workspace.id } }).pipe(Effect.flip),
+            yield* bob.changes
+              .watch({ params: { workspaceId: workspace.id }, query: {} })
+              .pipe(Effect.flip),
           ).toMatchObject({ _tag: "Gateway.NotMember" });
-          yield* Effect.all([second.close, foreign.close, reconnected.close]);
+          yield* Effect.all([second.close, foreign.close, reconnected.close, resumed.close]);
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
       ),
   );
 
   it.live(
-    "SSE requires authentication and active membership before sending Ready; wire format has no resume ID",
+    "SSE requires authentication and active membership before sending Ready, and validates cursors",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
@@ -146,8 +167,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(
             (yield* http.get(path, { headers: { authorization: "Bearer outsider" } })).status,
           ).toBe(403);
+          for (const after of ["-1", "x", "1.5"])
+            expect(
+              (yield* http.get(`${path}?after=${after}`, {
+                headers: { authorization: "Bearer alice" },
+              })).status,
+            ).toBe(400);
           const response = yield* http.get(path, {
-            headers: { authorization: "Bearer alice", "last-event-id": "ignored" },
+            headers: { authorization: "Bearer alice" },
           });
           expect(response.headers["content-type"]).toMatch(/^text\/event-stream/);
           expect(response.headers["cache-control"]).toBe("no-store");
@@ -158,7 +185,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           );
           const text = chunks.join("");
           expect(text).toContain('"_tag":"Ready"');
-          expect(text).not.toMatch(/^id:/m);
+          expect(text).toContain('"reset":true');
           const openapi = yield* (yield* http.get("/openapi.json")).json;
           expect(openapi).toMatchObject({
             paths: {

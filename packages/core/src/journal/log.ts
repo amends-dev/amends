@@ -73,6 +73,8 @@ export interface Handle<S extends Schema.Constraint> {
   readonly read: (
     options: Store.ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
+  /** The latest batch's position, or None while the log is empty. */
+  readonly head: Effect.Effect<Option.Option<Position>, ReadError>;
   /**
    * Replay complete batches until an empty page is observed; this is not a live
    * subscription or a fixed snapshot. Reads use the store's current transaction
@@ -94,7 +96,7 @@ export interface Handle<S extends Schema.Constraint> {
 /** Domain journals expose their underlying log through this read-only view. */
 export type Reader<S extends Schema.Constraint> = Pick<
   Handle<S>,
-  "id" | "schema" | "get" | "getEntry" | "getAppend" | "read" | "stream" | "tail"
+  "id" | "schema" | "get" | "getEntry" | "getAppend" | "read" | "head" | "stream" | "tail"
 >;
 
 export interface Interface {
@@ -297,6 +299,11 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       return Option.some(yield* decodeBatch(result.value));
     });
 
+    const head = Effect.flatMap(
+      Effect.suspend(() => store.head(id)),
+      (position) => Schema.decodeEffect(Schema.Option(Position))(position),
+    ).pipe(Effect.withSpan("Log.head"));
+
     const read = Effect.fn("Log.read")(function* (options: Store.ReadOptions) {
       const request = yield* validateRead(options);
       const resultSchema = Schema.Array(ownedBatch).check(
@@ -400,6 +407,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       getEntry,
       getAppend,
       read,
+      head,
       readFacts,
       stream,
       tail,

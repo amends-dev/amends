@@ -10,7 +10,7 @@ import { Entry } from "../src/journal/entry.ts";
 import { Store } from "../src/journal/store.ts";
 import { Member } from "../src/workspace/member/member.ts";
 import { MemberStore } from "../src/workspace/member/store.ts";
-import type { Workspace } from "../src/workspace/workspace.ts";
+import { Workspace } from "../src/workspace/workspace.ts";
 
 interface State {
   readonly logs: Map<Entry.LogId, Array<Store.Batch>>;
@@ -111,7 +111,10 @@ const cloneCursor = (cursor: Checkpoint.Cursor): Checkpoint.Cursor => ({
 });
 
 /** A test adapter: staged log records and projection data share one snapshot. */
-export const make = Effect.fn("JournalTest.memoryStore")(function* () {
+/** The journal store answers for one workspace; other stores are bound per call. */
+export const make = Effect.fn("JournalTest.memoryStore")(function* (
+  workspaceId: Workspace.Id = Workspace.Id.make("workspace-one"),
+) {
   const owner = Symbol("memory store");
   const state = yield* Ref.make<State>({
     logs: new Map(),
@@ -139,7 +142,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
 
   const transaction = Effect.fn("JournalTest.transaction")(function* <A, E, R>(
     program: Effect.Effect<A, E, R>,
-    options?: Store.TransactionOptions,
   ) {
     return yield* gate.withPermits(1)(
       Effect.uninterruptibleMask((restore) =>
@@ -298,7 +300,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
               cause: "lost acknowledgment",
             });
           }
-          yield* Store.notifyCommit(session.commit.id, options);
           return result;
         }),
       ),
@@ -306,6 +307,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
   });
 
   const store = Store.Service.of({
+    workspaceId,
     getEntry: Effect.fn("JournalTest.getEntry")(function* (logId, entryId) {
       return Option.fromUndefinedOr(
         ((yield* view).logs.get(logId) ?? [])
@@ -344,6 +346,9 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
         ),
         cloneBatch,
       );
+    }),
+    head: Effect.fn("JournalTest.head")(function* (logId) {
+      return Option.map(Array.last((yield* view).logs.get(logId) ?? []), (batch) => batch.position);
     }),
     read: Effect.fn("JournalTest.read")(function* (logId, options) {
       return ((yield* view).logs.get(logId) ?? [])
