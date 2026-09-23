@@ -13,11 +13,11 @@
     "@amends/gateway": "workspace:*",
     "@amends/server-http": "workspace:*",
     "@amends/storage-postgresql": "workspace:*",
-    "@amends/storage-sqlite": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/api-http": "workspace:*"
+    "@amends/api-http": "workspace:*",
+    "@effect/sql-pg": "catalog:"
   }
 }

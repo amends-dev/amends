@@ -6,10 +6,9 @@ storage, transports, and other platform adapters. They may use dependencies need
 by their runtime.
 
 `local/` is the Bun host. Run it from the repository root with `bun run start`
-or `bun run dev`. It implements no storage itself: it composes the SQLite
-adapter by default, or the PostgreSQL adapter when `AMENDS_DATABASE_URL` is
-set, and provides development sign-in and credentials. A future Cloudflare host
-belongs in `hosts/cloudflare/`.
+or `bun run dev`. It implements no storage itself: it composes the PostgreSQL
+adapter over the database at `AMENDS_DATABASE_URL` and provides development sign-in
+and credentials. A future Cloudflare host belongs in `hosts/cloudflare/`.
 
 Each host extends `../../tsconfig.base.json`, enables its own runtime types, and
 provides a `typecheck` script. Shared packages cannot import hosts.
@@ -24,9 +23,9 @@ tests may take a contract package as a development dependency to act as a client
 
 Use the [shared construction conventions](../packages/README.md#constructors-and-layers).
 `make` constructs a host-owned implementation; `layer` provides it or composes
-existing layers. Named layer exports start with `layer`, such as `layerSqlite`,
-`layerPostgres`, and `layerRoutes`. Each implementation owns its `make` constructor
-and returns the gateway contract's `Service.of(...)`.
+existing layers. Named layer exports start with `layer`, such as `layerRoutes`.
+Each implementation owns its `make` constructor and returns the gateway contract's
+`Service.of(...)`.
 Use `Layer.sync` for lazy synchronous construction and `Layer.effect` for effectful
 construction. Constructors own defaults, state allocation, and initialization.
 
@@ -43,9 +42,8 @@ Their respective `layer` exports delegate to those constructors.
 and code validation happen during operations. Construction issues no token or code.
 
 `LocalHost` and `LocalServer` are composition modules, so they expose layers without
-additional `make` wrappers. `LocalHost.layerSqlite` and `layerPostgres` compose the
-gateway, directory, database adapter, cryptography, and a shared `WorkspaceEvents`
-registry. The gateway owns prepared workspace runtimes in its host scope. Each
+additional `make` wrappers. `LocalHost.layer` composes the gateway, directory,
+PostgreSQL adapter, cryptography, and a shared `WorkspaceEvents` registry. The gateway owns prepared workspace runtimes in its host scope. Each
 runtime boots lazily, replays once, and holds its bus lease until host shutdown;
 requests resolve identity and open operation scopes over the prepared services.
 `LocalServer.layerRoutes`

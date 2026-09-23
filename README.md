@@ -1,22 +1,22 @@
 # amends-v2
 
 A Bun and TypeScript monorepo with a shared Solid application for web and Tauri desktop, an HTTP API, and workspace
-services backed by SQLite or PostgreSQL. The root workspace catalog pins Effect
+services backed by PostgreSQL. The root workspace catalog pins Effect
 **4.0.0-rc.115**, and `bun.lock` records resolved dependencies.
 
 From the repository root:
 
 ```bash
 bun install --frozen-lockfile
-mkdir -p hosts/local/data
-bun run start
+createdb amends
+AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
 
 `bun run start` keeps the local API running at `http://127.0.0.1:8787`;
-`bun run dev` restarts it when files change. Its default SQLite file is
-`hosts/local/data/amends.sqlite`. Startup does not create that parent directory,
-so the `mkdir` step is required on a fresh clone. The server creates workspaces
-only when requested through the API.
+`bun run dev` restarts it when files change. Both require `AMENDS_DATABASE_URL`, a
+PostgreSQL database the host may create its tables in; startup applies the schema
+but does not create the database. The server creates workspaces only when requested
+through the API.
 
 Run `bun run --filter @amends/web dev` and open `http://127.0.0.1:4321/`, or run
 `bun run --filter @amends/desktop dev` to open the Tauri app after installing its
@@ -44,7 +44,6 @@ packages/
   server-http/        @amends/server-http: HTTP handlers and authentication
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
 adapters/
-  storage-sqlite/      @amends/storage-sqlite: SQLite storage and directory
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
   storage-memory/     @amends/storage-memory: in-memory reference storage and directory
 hosts/

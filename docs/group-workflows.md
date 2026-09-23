@@ -1,7 +1,7 @@
 # Group workflows
 
 Core implements private team-group creation, authorized reads, member addition, removal, self-leave,
-and following over SQLite and PostgreSQL. These operations are available through
+and following over PostgreSQL and the in-memory reference storage. These operations are available through
 `GroupApplication.Service`, `GroupMembershipApplication.Service`, and
 `GroupFollowApplication.Service` in a workspace context, including `Gateway.asMember`.
 There is no group HTTP endpoint or web interface yet.
@@ -210,7 +210,7 @@ an old admission. Group readmission through `add` also uses a fresh admission ID
 
 Both projections preserve recorded IDs, timestamps, and attribution. Replay does not check
 the original actor's current permissions or whether an originally admitted workspace member
-is still active. Both adapters validate records before storage conversion and enforce one
+is still active. The storage adapters validate records before storage conversion and enforce one
 active admission per group/workspace-member pair. Store reads are internal and honor the
 current transaction; callers use the authorized application reads above instead of stores.
 
@@ -222,9 +222,9 @@ idempotency contract yet. An uncertain commit must be reconciled before another 
 ## Integration and current limits
 
 `@amends/core/group` exports the models, applications, facts, projections, permissions, and store
-contracts. Core requires `GroupStore`, `GroupMembershipStore`, and `GroupFollowStore`; both adapters
+contracts. Core requires `GroupStore`, `GroupMembershipStore`, and `GroupFollowStore`; the storage adapters
 compose them over the same workspace transaction. Authorization targets now include `Group`, and
-both adapters preserve exact group scopes in grants. Target support alone does not implement
+the storage adapters preserve exact group scopes in grants. Target support alone does not implement
 thread-audience authorization. The read operations and shared group audience policy above are
 implemented; thread starts, reads, and replies use that policy.
 
@@ -253,7 +253,7 @@ No read, application construction, or replay updates stored permission bundles.
 
 ## Verification
 
-The group suites in both adapters cover custom-role and direct permission grants, permission
+The group conformance suites cover, on every adapter, custom-role and direct permission grants, permission
 revocation, explicit human/agent audiences, invalid and foreign memberships, rollback after a
 partial projection, outer transaction rollback, reopening, replay, and store constraints.
 The membership suites also cover management scoped to one group, independence from creation

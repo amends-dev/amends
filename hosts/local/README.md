@@ -1,8 +1,8 @@
 # Local host
 
-This Bun host serves the HTTP API on one machine, using SQLite by default or
-PostgreSQL when configured. It composes the gateway, storage adapters, HTTP
-handlers, and development authentication for multiple workspaces.
+This Bun host serves the HTTP API on one machine over a PostgreSQL database. It
+composes the gateway, the PostgreSQL storage adapter, HTTP handlers, and development
+authentication for multiple workspaces.
 
 For workspace creation, membership, invitations, and removal, see the
 [workspace workflow guide](../../docs/workspace-workflows.md). The
@@ -14,30 +14,23 @@ From the repository root:
 
 ```bash
 bun install --frozen-lockfile
-mkdir -p hosts/local/data
-bun run start
+createdb amends
+AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
 
 The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `bun run dev` restarts the host when its source changes.
 
-| Setting               | Default                | Accepted value                                             |
-| --------------------- | ---------------------- | ---------------------------------------------------------- |
-| `AMENDS_PORT`         | `8787`                 | Integer from `0` through `65535`; `0` selects a free port. |
-| `AMENDS_DATABASE`     | `./data/amends.sqlite` | Non-blank SQLite filename.                                 |
-| `AMENDS_DATABASE_URL` | Unset                  | A `postgres://` or `postgresql://` URL.                    |
+| Setting               | Default  | Accepted value                                             |
+| --------------------- | -------- | ---------------------------------------------------------- |
+| `AMENDS_PORT`         | `8787`   | Integer from `0` through `65535`; `0` selects a free port. |
+| `AMENDS_DATABASE_URL` | Required | A `postgres://` or `postgresql://` URL.                    |
 
-A PostgreSQL URL takes precedence; the SQLite filename is then unused and is not
-validated. Invalid PostgreSQL configuration fails startup without falling back to
-SQLite. Missing settings use their defaults; explicitly blank settings fail
-validation. Database URLs stay redacted in configuration errors.
-
-Relative SQLite paths resolve from the process working directory. `bun run start`
-at the repository root runs the host in `hosts/local`, so its default database is
-`hosts/local/data/amends.sqlite`. The host does not create parent directories;
-without the setup step, the default path fails on a fresh clone. Use an absolute
-filename with an existing parent to choose another location.
+The database must exist; startup applies pending migrations to it before serving.
+A missing or invalid URL fails startup before any connection. A missing port uses
+its default; an explicitly blank setting fails validation. Database URLs stay
+redacted in configuration errors.
 
 ## Browser and desktop access
 
@@ -54,15 +47,15 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                              |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                          |
-| `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                                  |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                       |
-| `config.ts`                        | `LocalConfig.load()`, validating settings and selecting a `Storage` value before resource acquisition.                      |
-| `host.ts`                          | `LocalHost.layerSqlite(filename)` and `layerPostgres(url)`, providing the gateway and workspace directory as a `HostLayer`. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.    |
-| `index.ts`                         | Load configuration, choose the host layer, and launch through `BunRuntime.runMain`.                                         |
+| Module                             | Responsibility                                                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                       |
+| `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                               |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                    |
+| `config.ts`                        | `LocalConfig.load()`, validating the port and database URL before resource acquisition.                                  |
+| `host.ts`                          | `LocalHost.layer(url)`, providing the gateway and workspace directory over PostgreSQL as a `HostLayer`.                  |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server. |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                       |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
@@ -82,8 +75,7 @@ It relies on runtime defaults; these are not an explicit edge resource policy.
 See [known limitations](../../docs/current-status.md) for commit classification,
 PostgreSQL isolation, stream authorization, and reconnect behavior.
 Storage behavior is documented by the
-[SQLite](../../adapters/storage-sqlite/README.md) and
-[PostgreSQL](../../adapters/storage-postgresql/README.md) adapters.
+[PostgreSQL adapter](../../adapters/storage-postgresql/README.md).
 
 ## Development authentication
 
@@ -125,16 +117,19 @@ bun run test
 Authentication tests cover constructor and layer behavior, state isolation,
 single-use codes, exact expiry, repeated requests, concurrent completion, and
 failed or interrupted delivery. Configuration tests cover defaults, port bounds,
-backend precedence, empty values, and redacted errors.
+the required database URL, empty values, and redacted errors.
 
-HTTP fixtures own their delivered-code maps. Subprocess tests select temporary
-SQLite files, clear inherited backend settings, disable environment-file loading,
-drain both output streams, and bound startup and termination. Tests verify
-workflow persistence across restarts, startup failure, cleanup, and imports
-without execution.
+Tests that open storage run in the `postgresql` test project, each over its own
+temporary database; they are reported as skipped without PostgreSQL, as the
+[testing guide](../../docs/testing.md) describes. HTTP fixtures own their
+delivered-code maps. Subprocess tests override inherited configuration with their
+own database URL and port, disable environment-file loading, drain both output
+streams, and bound startup and termination. Tests verify workflow persistence
+across restarts, startup failure, cleanup, and imports without execution; fixture
+tests that never reach storage use an unreachable URL instead of PostgreSQL.
 
-After changing runtime composition, also run `AMENDS_PORT=0 bun run start` with a
-temporary absolute `AMENDS_DATABASE` filename and `AMENDS_DATABASE_URL` unset.
-Confirm the `Listening on` line, stop the process, and remove the temporary database.
+After changing runtime composition, also create a temporary database and run
+`AMENDS_PORT=0 bun run start` with `AMENDS_DATABASE_URL` naming it. Confirm the
+`Listening on` line, stop the process, and drop the database.
 The subprocess fixture in `test/server.ts` automates this startup and cleanup
 boundary without loading environment files.

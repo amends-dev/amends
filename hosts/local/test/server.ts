@@ -6,19 +6,18 @@ interface Options {
   readonly startupTimeoutMs?: number;
 }
 
-/** One lifetime of the real server entry point over a database, on an ephemeral port. */
+/** One lifetime of the real server entry point over a PostgreSQL database, on an ephemeral port. */
 export const withServer = async <A>(
-  filename: string,
+  databaseUrl: string,
   run: (call: Call) => Promise<A>,
   options: Options = {},
 ): Promise<A> => {
   const env: Record<string, string | undefined> = {
     ...process.env,
     ...options.env,
-    AMENDS_DATABASE: filename,
+    AMENDS_DATABASE_URL: databaseUrl,
     AMENDS_PORT: "0",
   };
-  delete env.AMENDS_DATABASE_URL;
   const child = Bun.spawn(
     [...(options.command ?? [process.execPath, "--no-env-file", "hosts/local/src/index.ts"])],
     {
@@ -53,7 +52,7 @@ export const withServer = async <A>(
   for (const draining of drains) void draining.catch(ready.reject);
   const timeout = setTimeout(() => {
     ready.reject(new Error(`Timed out waiting for the server to listen: ${output}`));
-  }, options.startupTimeoutMs ?? 3_000);
+  }, options.startupTimeoutMs ?? 10_000);
   try {
     const base = await Promise.race([
       ready.promise,

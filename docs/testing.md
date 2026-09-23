@@ -1,8 +1,8 @@
 # Testing
 
 All tests import their test APIs from `@effect/vitest`. The root dependency uses
-the same catalog release as Effect. Vitest runs on Bun so SQLite and host tests
-exercise the application's runtime. Oxlint rejects imports from `bun:test` and
+the same catalog release as Effect. Vitest runs on Bun so host tests exercise the
+application's runtime. Oxlint rejects imports from `bun:test` and
 direct test API imports from `vitest`.
 
 ## Commands
@@ -24,8 +24,8 @@ bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
-covers shared packages, the memory and SQLite adapters, and the local host. PostgreSQL has its own project
-and global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
+covers shared packages and the memory adapter. The `postgresql` project covers the
+PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
 headless state; web and desktop test their own route/UI integration; verify both frontend builds and desktop
 startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
 
@@ -237,17 +237,18 @@ appropriate for browser timers and atom registries that own separate runtimes.
 
 ## Integration resources
 
-SQLite fixtures acquire a temporary directory and close database layers before
-removing it. The host's Effect fixtures do the same for HTTP listeners. Subprocess
-tests retain the Promise fixture that drains output, bounds startup, and terminates
-the child in `finally`; each child uses a temporary database and an ephemeral port.
-
 The PostgreSQL project starts one temporary local cluster for the run, or uses
-`AMENDS_POSTGRES_URL` when supplied. Every test creates and drops its own database.
-Global teardown stops only the cluster started by the tests. A supplied URL must
-allow database creation and deletion. Without that URL or a local PostgreSQL
-installation, database suites are reported as skipped; pure PostgreSQL adapter
-tests still run. Startup and connection failures fail the run.
+`AMENDS_POSTGRES_URL` when supplied. Every test that opens storage creates and drops
+its own database, and closes its database layers and HTTP listeners first. Global
+teardown stops only the cluster started by the tests. A supplied URL must allow
+database creation and deletion. Without that URL or a local PostgreSQL installation,
+database suites are reported as skipped; pure PostgreSQL adapter tests and host tests
+that never open storage still run. Startup and connection failures fail the run.
+
+Subprocess tests keep the Promise fixture that drains output, bounds startup, and
+terminates the child in `finally`; each child uses its own database and an ephemeral
+port. Tests that need a database run the fixture inside `it.live` over the Effect
+that creates it.
 
 ## Storage conformance
 
@@ -273,14 +274,14 @@ repeated Ready/disconnect backoff behavior, or an application request-body limit
 These [known limitations](current-status.md) remain open even when the existing
 suite passes. Notification storage and inbox tests seed records; thread workflow tests verify
 opening and reply publication, participation admission, recipient selection, concurrent sequencing,
-quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on both adapters.
+quiet follows, self-unfollow, stale departures, rollback, replay, and departure settlement on every adapter.
 Acknowledgment suites verify human ownership, stable repeat handling, source-access loss, caller
 transactions, projection and late-failure rollback, concurrent requests, and replay after departure.
 Core tests validate the acknowledgment codec and withholding its facts from the public change feed.
 
-Subprocess fixtures create an existing temporary database parent, so passing host
-tests do not prove that the default SQLite path works on a fresh clone. Follow the
-[setup guide](../hosts/local/README.md#run) to create that directory first.
+Subprocess fixtures create each database before starting the host, so passing host
+tests do not prove that startup works against a database you configure. Follow the
+[setup guide](../hosts/local/README.md#run) to create it first.
 
 ## Application foundation
 

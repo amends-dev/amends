@@ -243,7 +243,7 @@ initialization. Concurrent initializers serialize or receive a storage conflict.
 ## Development data
 
 The required-role invitation schema replaces the earlier direct-grant model. This
-development change requires fresh SQLite and PostgreSQL development data. It does
+development change requires fresh PostgreSQL development data. It does
 not translate old invitation grants into roles or reset databases on startup.
 Fact and projection versions remain at 1 during development; versioned compatibility
 will be introduced when production data needs to be preserved.

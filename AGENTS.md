@@ -9,14 +9,12 @@ for synchronous assertions and Promise-based UI or subprocess tests. Test helper
 return Effects; do not run them with `Effect.runPromise` or `Effect.runSync`.
 Use `TestClock` and explicit concurrency signals, and scope acquired resources.
 See [docs/testing.md](docs/testing.md) for commands, fixtures, and examples.
-`bun run start` serves the local host on port 8787 and keeps running. On a fresh
-clone, create `hosts/local/data` first or select an absolute `AMENDS_DATABASE`
-filename whose parent exists. After changing runtime setup, start it in the
-background with `AMENDS_PORT=0`, a temporary absolute `AMENDS_DATABASE` filename,
-and `AMENDS_DATABASE_URL` unset; confirm the "Listening on" line and stop it.
-The host tests also spawn the server entry point. Use `bun run format` and
-`bun run lint:fix` to apply formatting and safe
-lint fixes.
+`bun run start` serves the local host on port 8787 and keeps running; it requires
+`AMENDS_DATABASE_URL`, a PostgreSQL database URL. After changing runtime setup,
+create a temporary database, start the host in the background with `AMENDS_PORT=0`
+and `AMENDS_DATABASE_URL` naming it, confirm the "Listening on" line, stop it, and
+drop the database. The host tests also spawn the server entry point. Use
+`bun run format` and `bun run lint:fix` to apply formatting and safe lint fixes.
 
 `bun install` runs `effect-tsgo patch` and `lefthook install` through the `prepare`
 script. This enables Effect diagnostics in the TypeScript compiler and workspace
@@ -46,17 +44,16 @@ currently run through TypeScript. Check compatibility before changing this setup
   core relies on belongs there, and adapter tests keep only what one adapter stores or
   fails differently.
 - `adapters/*`: implementations of gateway contracts over one external system, with
-  that system's dependencies. `storage-sqlite` implements workspace storage and the
-  workspace directory over one SQLite file; `storage-postgresql` implements them over
-  PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field;
-  `storage-memory` implements them in process memory as the reference implementation
-  of the storage contracts, with no dependencies. All follow one shape: a module per
-  store over a workspace binding, merged at the edge.
+  that system's dependencies. `storage-postgresql` implements workspace storage and
+  the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
+  per record field; `storage-memory` implements them in process memory as the reference
+  implementation of the storage contracts, with no dependencies. Both follow one shape:
+  a module per store over a workspace binding, merged at the edge.
   Hosts compose adapters and implement no storage themselves; shared packages never
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves
-  the HTTP API over the SQLite adapter, or the PostgreSQL adapter when
-  `AMENDS_DATABASE_URL` is set, with development sign-in and credentials.
+  the HTTP API over the PostgreSQL adapter at `AMENDS_DATABASE_URL`, with development
+  sign-in and credentials.
   Hosts may install their runtime's dependencies and consume shared packages. A host
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may

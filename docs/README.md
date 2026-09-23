@@ -7,28 +7,28 @@ remaining gaps with links to their owning code.
 
 ## Current implementation
 
-| Guide                                                                                                   | Scope                                                                                                               |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [Repository README](../README.md)                                                                       | Setup, workspace layout, tooling, and dependency updates.                                                           |
-| [Workspace workflows](workspace-workflows.md)                                                           | Creation, membership, invitations, access, and ownership transfer.                                                  |
-| [Group workflows](group-workflows.md)                                                                   | Private team creation, authorized reads, audience checks, membership lifecycle, and current limits.                 |
-| [Thread workflows](thread-workflows.md)                                                                 | Private-group starts, reads, participation, notification sources, human acknowledgment, and replay.                 |
-| [Journal and logs](journal.md)                                                                          | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
-| [Testing](testing.md)                                                                                   | Test commands, Effect test APIs, and database fixtures.                                                             |
-| [Shared packages](../packages/README.md)                                                                | Package boundaries, names, and construction conventions.                                                            |
-| [Core](../packages/core/README.md)                                                                      | Implemented domains, operation boundaries, and public services.                                                     |
-| [Gateway](../packages/gateway/README.md)                                                                | Workspace boot, identity resolution, host contracts, and bus lifetime.                                              |
-| [HTTP contract](../packages/api-http/README.md)                                                         | Endpoint groups, wire formats, authentication, and SSE semantics.                                                   |
-| [HTTP server](../packages/server-http/README.md)                                                        | Handler registration, request scopes, and authentication wiring.                                                    |
-| [Adapters](../adapters/README.md)                                                                       | Store validation, construction, and migration conventions.                                                          |
-| [Storage conformance](../packages/storage-conformance/README.md)                                        | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
-| [Memory storage](../adapters/storage-memory/README.md)                                                  | The in-memory reference implementation of the storage contracts.                                                    |
-| [SQLite](../adapters/storage-sqlite/README.md) / [PostgreSQL](../adapters/storage-postgresql/README.md) | Schema, locking, composition, and database-specific testing.                                                        |
-| [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md)                                    | Runtime composition, configuration, startup, and development identity.                                              |
-| [Apps](../apps/README.md) / [web](../apps/web/README.md)                                                | Platform-owned routing and composition of client and UI.                                                            |
-| [Desktop](../apps/desktop/README.md)                                                                    | Tauri prerequisites, host connection, and native verification.                                                      |
-| [Client](../apps/client/README.md)                                                                      | Headless credential scopes, API/query state, and route helpers.                                                     |
-| [UI](../apps/ui/README.md)                                                                              | Shared UI workshop, foundations, primitives, and compositions.                                                      |
+| Guide                                                                | Scope                                                                                                               |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                           |
+| [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                  |
+| [Group workflows](group-workflows.md)                                | Private team creation, authorized reads, audience checks, membership lifecycle, and current limits.                 |
+| [Thread workflows](thread-workflows.md)                              | Private-group starts, reads, participation, notification sources, human acknowledgment, and replay.                 |
+| [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
+| [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                             |
+| [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                            |
+| [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                     |
+| [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                              |
+| [HTTP contract](../packages/api-http/README.md)                      | Endpoint groups, wire formats, authentication, and SSE semantics.                                                   |
+| [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                    |
+| [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                          |
+| [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
+| [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                    |
+| [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                        |
+| [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                              |
+| [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                            |
+| [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                      |
+| [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, and route helpers.                                                     |
+| [UI](../apps/ui/README.md)                                           | Shared UI workshop, foundations, primitives, and compositions.                                                      |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
 drawings, generation, and visual review in the UI workshop.

@@ -46,20 +46,6 @@
         "drizzle-kit": "1.0.0-rc.5-5935859",
       },
     },
-    "adapters/storage-sqlite": {
-      "name": "@amends/storage-sqlite",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
-        "@effect/sql-sqlite-bun": "catalog:",
-        "effect": "catalog:",
-      },
-      "devDependencies": {
-        "@amends/storage-conformance": "workspace:*",
-        "@effect/platform-bun": "catalog:",
-      },
-    },
     "apps/client": {
       "name": "@amends/client",
       "version": "0.0.0",
@@ -167,12 +153,12 @@
         "@amends/gateway": "workspace:*",
         "@amends/server-http": "workspace:*",
         "@amends/storage-postgresql": "workspace:*",
-        "@amends/storage-sqlite": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
         "@amends/api-http": "workspace:*",
+        "@effect/sql-pg": "catalog:",
       },
     },
     "packages/api-http": {
@@ -228,7 +214,6 @@
     "@effect/atom-solid": "4.0.0-rc.115",
     "@effect/platform-bun": "4.0.0-rc.115",
     "@effect/sql-pg": "4.0.0-rc.115",
-    "@effect/sql-sqlite-bun": "4.0.0-rc.115",
     "@effect/vitest": "4.0.0-rc.115",
     "@solid-primitives/event-listener": "2.4.5",
     "@solid-primitives/keyed": "1.5.3",
@@ -262,8 +247,6 @@
     "@amends/storage-memory": ["@amends/storage-memory@workspace:adapters/storage-memory"],
 
     "@amends/storage-postgresql": ["@amends/storage-postgresql@workspace:adapters/storage-postgresql"],
-
-    "@amends/storage-sqlite": ["@amends/storage-sqlite@workspace:adapters/storage-sqlite"],
 
     "@amends/ui": ["@amends/ui@workspace:apps/ui"],
 

@@ -12,9 +12,11 @@ From the repository root:
 
 ```sh
 bun install --frozen-lockfile
-mkdir -p hosts/local/data
-bun run start
+createdb amends
+AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
+
+The host requires a PostgreSQL database; see the [local host guide](../../hosts/local/README.md#run).
 
 In another terminal:
 

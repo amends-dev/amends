@@ -69,11 +69,10 @@ only the domain payload is encoded through its fact schema. `Event.Envelope`
 remains the in-memory shape used by journal readers and projections, without a
 second binary wrapper in storage.
 
-Both adapters store `subject`, `fact_name`, and `fact_version` as columns in
+The PostgreSQL adapter stores `subject`, `fact_name`, and `fact_version` as columns in
 `log_entries`. Separate indexes cover workspace/log/name and workspace/log/subject,
-each ordered by position and entry index. SQLite stores provenance
-as schema-validated JSON in its own column. PostgreSQL stores its performer, cause,
-correlation, and occurrence time in separate columns. Workspace IDs in PostgreSQL
+each ordered by position and entry index. Provenance's performer, cause, correlation,
+and occurrence time have separate columns. Workspace IDs in PostgreSQL
 provenance are reconstructed from the containing row; writes validate workspace
 consistency before omitting those repeated IDs. Neither adapter duplicates the
 fact header inside a second binary wrapper.
@@ -214,8 +213,8 @@ The returned entries remain provisional until their owning commit succeeds.
 `Store.getAppend` supplies a validated receipt with the key, commit, first index,
 count, and exact entries. The entries a keyed append returns are its receipt; the log does not
 read the receipt back, and the [conformance suites](../packages/storage-conformance/README.md)
-check that every adapter keeps the two identical. Both adapters persist receipts in `log_append_keys`,
-using a unique workspace/log/key constraint and their existing writer serialization.
+check that every adapter keeps the two identical. The PostgreSQL adapter persists receipts in
+`log_append_keys`, using a unique workspace/log/key constraint and its existing writer serialization.
 
 Rollback removes both the append and its key. After `Store.CommitUncertain`, retry
 the same keyed intent: a committed first attempt is reused, and a rolled-back one
@@ -388,7 +387,7 @@ Adapters report unconfirmed commit outcomes with `Store.CommitUncertain`, includ
 the commit ID for lookup and reconciliation. The core does not automatically retry
 the program. Optional expected-position checks support conditional appends;
 idempotency keys separately support retrying the same append or publication.
-Both adapters currently classify every failed COMMIT effect as uncertain, including
+The PostgreSQL adapter currently classifies every failed COMMIT effect as uncertain, including
 some errors with a definite rollback outcome. PostgreSQL deadlock classification
 also remains incomplete. See [known limitations](current-status.md#commit-outcomes-and-postgresql-contention).
 
@@ -582,9 +581,9 @@ and that a journal that does not run a live projection cannot publish to its log
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
 staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The
-[SQLite](../adapters/storage-sqlite/README.md) and
-[PostgreSQL](../adapters/storage-postgresql/README.md) adapters test these contracts
-against persistent storage and independent connections; PostgreSQL suites require
-an available server as described in the [testing guide](testing.md).
-The [local host](../hosts/local/README.md) composes either adapter. The core's
-memory adapter remains test-only.
+[PostgreSQL](../adapters/storage-postgresql/README.md) and
+[memory](../adapters/storage-memory/README.md) adapters run these contracts through the
+conformance suites, over independent connections; PostgreSQL suites require an available
+server as described in the [testing guide](testing.md). The
+[local host](../hosts/local/README.md) composes the PostgreSQL adapter. The core's own
+memory store remains test-only.

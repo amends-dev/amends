@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // Separate processes preserve Bun's native SQLite and server APIs.
+    // Separate processes preserve Bun's native server APIs.
     pool: "forks",
     maxWorkers: 4,
     projects: [
@@ -10,12 +10,7 @@ export default defineConfig({
         test: {
           name: "backend",
           environment: "node",
-          include: [
-            "packages/*/test/**/*.test.ts",
-            "adapters/storage-sqlite/test/**/*.test.ts",
-            "adapters/storage-memory/test/**/*.test.ts",
-            "hosts/*/test/**/*.test.ts",
-          ],
+          include: ["packages/*/test/**/*.test.ts", "adapters/storage-memory/test/**/*.test.ts"],
         },
       },
       {
@@ -23,7 +18,7 @@ export default defineConfig({
           name: "postgresql",
           environment: "node",
           globalSetup: ["adapters/storage-postgresql/test/global-setup.ts"],
-          include: ["adapters/storage-postgresql/test/**/*.test.ts"],
+          include: ["adapters/storage-postgresql/test/**/*.test.ts", "hosts/*/test/**/*.test.ts"],
         },
       },
       "apps/icons/vite.config.ts",

@@ -1,6 +1,5 @@
 import { Gateway, WorkspaceEvents, type WorkspaceDirectory } from "@amends/gateway";
 import { PostgresDatabase, layer as postgres } from "@amends/storage-postgresql";
-import { SqliteDatabase, layer as sqlite } from "@amends/storage-sqlite";
 import { BunCrypto } from "@effect/platform-bun";
 import { Layer, type Redacted } from "effect";
 
@@ -11,24 +10,12 @@ export type HostLayer = Layer.Layer<
 >;
 
 /**
- * The gateway and the workspace directory over one SQLite file, through the
+ * The gateway and the workspace directory over one PostgreSQL database, through the
  * storage adapter. The HTTP server resolves bearer tokens before entering the gateway.
  *
  * @category layers
  */
-export const layerSqlite = (filename: string): HostLayer =>
-  Gateway.layer.pipe(
-    Layer.provideMerge(WorkspaceEvents.layer()),
-    Layer.provideMerge(sqlite),
-    Layer.provide(Layer.mergeAll(SqliteDatabase.layer(filename), BunCrypto.layer)),
-  );
-
-/**
- * Provide the gateway and directory over a PostgreSQL database through its adapter.
- *
- * @category layers
- */
-export const layerPostgres = (url: Redacted.Redacted<string>): HostLayer =>
+export const layer = (url: Redacted.Redacted<string>): HostLayer =>
   Gateway.layer.pipe(
     Layer.provideMerge(WorkspaceEvents.layer()),
     Layer.provideMerge(postgres()),

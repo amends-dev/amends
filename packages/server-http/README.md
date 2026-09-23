@@ -66,7 +66,7 @@ records entry and runs programs over stubbed core services, covering principal
 and parameter passing, tag and status preservation, unauthorized rejection
 before any gateway call, human-only endpoints, and JSON round-tripping of dates
 and grants, and compatibility of session and directory JSON fields. The local host's tests cover the same routes
-over real SQLite storage, including through its spawned server entry point.
+over real PostgreSQL storage, including through its spawned server entry point.
 Notification tests cover cursor and date round-trips, filter selection, malformed
 queries, human and agent inbox isolation, workspace boundaries, and loss of access
 after membership removal. Host fixtures seed notification records because their

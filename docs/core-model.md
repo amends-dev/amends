@@ -12,7 +12,7 @@ For current behavior, read [workspace workflows](workspace-workflows.md), the
 [group workflows](group-workflows.md), the [core package guide](../packages/core/README.md),
 and [known limitations](current-status.md).
 Workspace management, the generic journal, notification storage and inbox reads,
-and process-local live changes are implemented. Core and both adapters also implement
+and process-local live changes are implemented. Core and the storage adapters also implement
 private team-group creation, membership admission/departure, workspace-removal cleanup,
 authorized group reads, and a shared group-audience check. Direct groups (DMs and group DMs) are
 established and reused by member set, with their first thread, through `ThreadApplication.startDirect`.
@@ -2404,7 +2404,7 @@ self-leave verifies the admission belongs to the caller. A successful departure 
 the reason, while event provenance records the performer and time. Repeating the operation
 returns `AlreadyRemoved`; a later authorized addition creates a new admission ID that an old
 departure request cannot affect. These operations and workspace-removal cleanup are implemented
-in core and both adapters; their group HTTP/UI surface remains future work.
+in core and the storage adapters; their group HTTP/UI surface remains future work.
 
 Membership management concerns the group's membership, rather than access to its thread
 content. A member's management permission authorizes the metadata needed for that

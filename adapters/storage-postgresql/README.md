@@ -105,7 +105,7 @@ Notification recipients are Human, Agent, Contact, or workspace-singleton Triage
 Triage has no person ID. Recipient indexes normalize the missing ID only for
 indexing, preserving source/recipient uniqueness for concurrent Triage inserts.
 Notification reads match both recipient kind and ID, with bounded pages ordered
-by recorded time and ID using `COLLATE "C"` to match SQLite's binary ordering.
+by recorded time and ID using `COLLATE "C"`, which orders IDs by their bytes.
 Notification IDs and source/recipient associations are unique within the workspace.
 Inserts join the journal transaction; source existence and recipient selection
 remain generation responsibilities. The notification projection generates opening and reply message notifications from recorded thread activity
@@ -233,7 +233,7 @@ Gateway.layer.pipe(
 
 The root `layer(options)` provides both gateway contracts; `PostgresDatabase.layer`
 takes the Effect client's pool configuration. The local host also supplies
-cryptography and selects this composition when `AMENDS_DATABASE_URL` is set.
+cryptography and composes this over the database at `AMENDS_DATABASE_URL`.
 
 `PostgresDatabase.make()` instead accepts `SqlClient.SqlClient` through Effect's
 context. It constructs the Drizzle facade and migrates through that same client.

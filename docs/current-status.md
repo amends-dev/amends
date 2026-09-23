@@ -4,15 +4,15 @@ This page records implementation gaps, not completed fixes. Keep each item align
 with its owning code and guide when changing the behavior.
 
 Workspace creation, membership, required-role invitations, assignment management, and ownership
-transfer are implemented through core, the gateway, and HTTP. SQLite and PostgreSQL persist
-their journal and projections. See [workspace workflows](workspace-workflows.md) for the
-available operations. Core and both adapters implement [private group creation and membership
+transfer are implemented through core, the gateway, and HTTP. PostgreSQL persists their
+journal and projections; the in-memory reference adapter implements the same storage contracts. See [workspace workflows](workspace-workflows.md) for the
+available operations. Core and the storage adapters implement [private group creation and membership
 lifecycle](group-workflows.md), including permission-based addition/removal, self-leave,
 ordinary group reads, and management inspection of known groups. Direct groups (DMs and group
 DMs) are established and reused by member set when their first thread starts; their membership
 is fixed. Public groups and group HTTP/UI workflows remain unimplemented. [Starting a
 private-group thread](thread-workflows.md) with a human text message, initial participation,
-timeline activity, and notifications is implemented in core and both adapters. Authorized thread
+timeline activity, and notifications is implemented in core and the storage adapters. Authorized thread
 discovery, metadata, sequence-paginated timelines, and current-participant summaries and human
 replies are also implemented. Replies admit their author and eligible mentions, record the next
 timeline activity, and generate notifications atomically. Explicit self-follow/unfollow is
@@ -148,7 +148,7 @@ The [notification schema](../packages/core/src/notification/notification.ts) sup
 Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending`,
 `Discarded { reason: "participation-ended" }`, and `Acknowledged` states. The implemented
 acknowledgment outcome is human `Seen`, with an `acknowledgedAt` timestamp.
-Both adapters store these variants and enforce source/recipient
+The storage adapters store these variants and enforce source/recipient
 uniqueness. The [application](../packages/core/src/notification/application.ts) exposes
 only the acting human or agent's inbox, with active membership required. Contact
 and Triage reads are available only through internal stores.
@@ -157,7 +157,7 @@ and Triage reads are available only through internal stores.
 timeline item through core and the gateway. It requires current group access and `thread.read`,
 even for historical notifications. Unfollowing alone preserves source access; reading discarded
 agent input does not revive it. Unsupported or inaccessible sources return `SourceUnavailable`.
-Both adapters implement direct journal-entry lookup. Source resolution has no HTTP route or
+The storage adapters implement direct journal-entry lookup. Source resolution has no HTTP route or
 client integration yet. See [source resolution](thread-workflows.md#resolving-a-notification-source).
 
 The [projection](../packages/core/src/notification/projection.ts) generates notifications from
@@ -208,8 +208,7 @@ rows is not supported.
 
 ## Commit outcomes and PostgreSQL contention
 
-Both transaction bindings ([SQLite](../adapters/storage-sqlite/src/binding.ts),
-[PostgreSQL](../adapters/storage-postgresql/src/binding.ts)) return
+The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular
 database error could establish that nothing committed. This over-reports uncertainty.
 The gateway exposes `Gateway.Uncertain` with the commit ID; there is no public
@@ -231,15 +230,6 @@ the isolation level. The lock serializes cooperating writers, but the connection
 isolation default still determines snapshot behavior. The adapter's tests do not
 establish correctness for arbitrary session/database isolation settings.
 An explicit isolation choice and coverage for changed defaults remain outstanding.
-
-## Fresh-clone SQLite startup
-
-The [configuration](../hosts/local/src/config.ts) defaults to `./data/amends.sqlite`.
-Root `bun run start` runs in `hosts/local`, and neither the host nor the SQLite
-adapter creates the parent directory. Run `mkdir -p hosts/local/data` first, or
-select an absolute `AMENDS_DATABASE` filename whose parent exists. The updated
-[setup guide](../hosts/local/README.md#run) includes this workaround; automatic parent
-creation is still absent.
 
 ## Edge resource controls
 

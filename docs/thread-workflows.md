@@ -298,7 +298,7 @@ agent notifications can resolve; reading never acknowledges input, changes notif
 joins a thread, or requests work. These reads open no transaction, honor an enclosing commit,
 and have the same snapshot and revocation limits as timeline reads.
 
-Source resolution is implemented in core, the gateway, and both adapters. Its HTTP route and
+Source resolution is implemented in core, the gateway, and the storage adapters. Its HTTP route and
 client integration remain future work.
 
 ## Acknowledging a notification
@@ -329,7 +329,7 @@ The acknowledgment fact and its projection update commit together. Failure or
 an enclosing rollback restores pending state. Replay preserves the recorded outcome and timestamp
 without checking current membership or time. Acknowledgment creates no thread activity and no
 new notifications. Its fact is withheld from the workspace-wide feed. The operation is implemented
-through core and the gateway on both adapters; its HTTP route and client action remain pending.
+through core and the gateway on every storage adapter; its HTTP route and client action remain pending.
 
 ## Marking conversations read
 
@@ -393,8 +393,8 @@ The workflow records, in order, a thread, its initial participations, a user mes
 storage rejects gaps, duplicate positions, and activities whose message belongs to another thread.
 A timeline record references the message without duplicating its text. Internal stores preserve
 workspace-qualified relationships and immutable IDs. The PostgreSQL adapter stores record fields
-in relational columns, including a text array for mention IDs; SQLite uses validated JSON records
-with indexed identity and relationship columns. Admission loads a group's eligible members and a
+in relational columns, including a text array for mention IDs; the memory adapter keeps each
+record's encoded JSON. Admission loads a group's eligible members and a
 thread's current participants with batch store reads, and the notification projection loads
 every recipient's participation and inserts their notifications together, so a start or reply
 reads the same number of times at any group size. Timeline pages load their messages and
@@ -467,8 +467,7 @@ apply only to fresh workspace initialization unless stored roles are explicitly 
 Activity rows reference either a message or a participation lifecycle occurrence. Existing stored roles do not automatically gain
 `thread.read`, `thread.publish`, or `thread.follow`; assign explicit grants or update those roles before using the new operations.
 Human acknowledgment adds outcome and timestamp columns to PostgreSQL's development baseline;
-recreate disposable PostgreSQL databases when adopting it. SQLite stores the state in its existing
-JSON record and needs no schema change for acknowledgment.
+recreate disposable PostgreSQL databases when adopting it.
 
 ## Verification
 
@@ -493,7 +492,7 @@ projection and late-failure rollback, outer commits, replay, and historical foll
 Source-resolution suites cover human/agent ownership, current grant and audience revocation,
 historical reads after unfollow or readmission, discarded agent input, malformed references,
 message and participation subjects, direct entry lookup, read-only behavior, outer commits,
-reopening, and gateway outcomes on both adapters.
+reopening, and gateway outcomes on every storage adapter.
 Acknowledgment suites cover ownership, agent rejection, stable repeat handling, source-access loss,
 projection and late-failure rollback, caller transactions, concurrent requests, direct-store validation,
 reopening, and replay after departure. Core tests verify codec validation and change-feed privacy.

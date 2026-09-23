@@ -5,13 +5,12 @@ contracts over one external system, such as a database. Adapters consume shared
 packages and may install the dependencies their system needs, which is why they
 live outside `packages/`. Hosts compose them; shared packages never depend on them.
 
-`storage-sqlite/` implements the gateway's workspace storage and workspace
-directory contracts over one SQLite file; it is the local host's default.
-`storage-postgresql/` implements the same contracts over PostgreSQL, with Drizzle
-over the Effect PostgreSQL client and one column per record field.
-`storage-memory/` implements them in process memory with no dependencies: it is the
-reference implementation of the storage contracts and no host uses it. Each README
-covers running and testing. The adapters share one shape: one module per store
+`storage-postgresql/` implements the gateway's workspace storage and workspace
+directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
+and one column per record field; the local host uses it. `storage-memory/` implements
+them in process memory with no dependencies: it is the reference implementation of
+the storage contracts and no host uses it. Each README covers running and testing.
+The adapters share one shape: one module per store
 over a workspace binding that owns the transaction boundary, merged into the
 storage contract at the edge.
 
@@ -26,11 +25,11 @@ separate responsibilities. Add a feature directory when a store needs several
 related modules. Database tables and migrations belong to the adapter; domain
 models and store contracts belong to core.
 
-Use the same representation vocabulary in both adapters:
+Use the same representation vocabulary across adapters:
 
 | Name                 | Meaning                                                                                              |
 | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `Interface`          | A context service's contract, including `SqliteDatabase.Interface` and `PostgresDatabase.Interface`. |
+| `Interface`          | A context service's contract, including `PostgresDatabase.Interface` and `MemoryDatabase.Interface`. |
 | `DrizzleClient`      | PostgreSQL's Drizzle facade, distinct from its Effect SQL client.                                    |
 | `TransactionHandle`  | The native transaction handle exposed to core.                                                       |
 | `TransactionState`   | Mutable ownership and lifetime state for one transaction.                                            |
@@ -83,7 +82,7 @@ exports both, with one construction path. Constructors acquire stable dependenci
 inside their Effect and return the implemented contract's `Service.of(...)` value.
 They retain their acquisition errors and dependencies in the Effect type.
 
-The SQL adapters use the same construction boundaries:
+The PostgreSQL adapter uses these construction boundaries:
 
 | Module        | `make` constructs                                        | Dependencies                   |
 | ------------- | -------------------------------------------------------- | ------------------------------ |
@@ -131,11 +130,10 @@ Every adapter runs the [conformance suites](../packages/storage-conformance/READ
 through a harness in `test/harness.ts`, one suite per test file. Behavior core relies on
 belongs in those suites; an adapter's own tests keep what only it has, such as columns,
 query plans, and driver failure injection. The store-contract suite calls stores directly,
-so core's application validation cannot hide an adapter's missing checks. Each SQL adapter
-owns its database fixtures in `test/support.ts`.
+so core's application validation cannot hide an adapter's missing checks. The PostgreSQL
+adapter owns its database fixtures in `test/support.ts`.
 
-During local development, keep one initial schema baseline per adapter. SQLite's
-initializer lives in `src/migrations.ts`; PostgreSQL's generated baseline lives in
-`drizzle/`. Update or regenerate the baseline when the schema changes and reset
+During local development, keep one initial schema baseline per adapter. PostgreSQL's
+generated baseline lives in `drizzle/`. Regenerate it when the schema changes and reset
 development databases. Do not add upgrade chains, backfills, or legacy decoding
 paths to preserve disposable local data.
