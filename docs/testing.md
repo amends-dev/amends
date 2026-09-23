@@ -261,8 +261,9 @@ tests run in the `backend` project.
 
 The suites cover the journal and transactions, direct store contracts for workspaces,
 members, roles, assignments, invitations, and checkpoints, and the workspace, access,
-invitation, and gateway workflows. Group, thread, notification, and read-state tests still
-live in each SQL adapter until they move into the suites.
+invitation, and gateway workflows, and groups: creation, membership, reads, follows, and
+latest activity. Thread, notification, and read-state tests still live in each SQL adapter
+until they move into the suites.
 
 ## Limits of current coverage
 

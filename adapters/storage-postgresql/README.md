@@ -238,26 +238,24 @@ and drops it when done.
 Construction tests cover both `make` and `layer`, including initialization of all
 stores and reopening without data loss.
 
-`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md)
-over a database per test: another host is another pool, polling every 20 milliseconds, with a
+`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md) over a
+database per test: another host is another pool, polling every 20 milliseconds, with a
 100-millisecond lock timeout when a test asks for prompt contention. Discarding projections
 truncates the projection tables, and the footprint counts the rows of every table. The journal,
 transaction, commit-publication, idempotency, fact-metadata, provenance, read, store-contract,
-assignment, ownership, invitation, invitation-policy, invitation-replay, authorization, and
-gateway files register those suites. Beside them, `transactions.test.ts` injects a failed
-`COMMIT` to check `CommitUncertain`, `fact-metadata.test.ts` checks the fact columns, and
-`invitations.test.ts` checks that a refused statement the program ignores still aborts its
-transaction.
+assignment, ownership, invitation, invitation-policy, invitation-replay, authorization, gateway,
+group, group-membership, group-read, and group-follow files register those suites. Beside them,
+`transactions.test.ts` injects a failed `COMMIT` to check `CommitUncertain`, `fact-metadata.test.ts`
+checks the fact columns, and `invitations.test.ts` checks that a refused statement the program
+ignores still aborts its transaction.
 
-The remaining tests cover database construction, groups, threads, notifications, and read
-state. Each file creates its fixture through `support.ts`. The PostgreSQL Vitest project's global
-setup owns the shared test cluster; individual tests own their temporary databases.
-`notification-sources.test.ts` mirrors SQLite coverage for current source authorization, historical
-recipient integrity, direct entry lookup, no-write resolution, staged visibility, rollback,
-reopening, and gateway outcomes. `notification-acknowledgment.test.ts` mirrors SQLite's ownership,
-atomicity, repeat handling, concurrent requests, source-access loss, direct-store validation,
-reopening, and replay checks. `thread-starts.test.ts` mirrors SQLite's check that group creation,
-starts, replies, and timeline pages make the same store reads at any group size.
-`group-follows.test.ts` mirrors SQLite's group-following, permission, admission-ending, replay, and
-storage-constraint checks. `read-state.test.ts` mirrors SQLite's list, latest-activity, read-state,
-and inbox-settling checks.
+The remaining tests cover database construction, threads, notifications, and read state. Each file
+creates its fixture through `support.ts`. The PostgreSQL Vitest project's global setup owns the
+shared test cluster; individual tests own their temporary databases. `notification-sources.test.ts`
+mirrors SQLite coverage for current source authorization, historical recipient integrity, direct
+entry lookup, no-write resolution, staged visibility, rollback, reopening, and gateway outcomes.
+`notification-acknowledgment.test.ts` mirrors SQLite's ownership, atomicity, repeat handling,
+concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.
+`thread-starts.test.ts` mirrors SQLite's check that group creation, starts, replies, and timeline
+pages make the same store reads at any group size. `read-state.test.ts` mirrors SQLite's list,
+latest-activity, read-state, and inbox-settling checks.

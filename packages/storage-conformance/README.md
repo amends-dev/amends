@@ -52,9 +52,13 @@ registration.
 | `invitationPolicy`  | Recipient and workspace binding, expiry, delegated roles, and rechecks at acceptance.                                                                            |
 | `invitationReplay`  | Rollback of acceptance and removal, and replay of invitation records.                                                                                            |
 | `gateway`           | Workspace creation and isolation, the membership workflow, cold boot, and the directory.                                                                         |
+| `groups`            | Private team and direct group creation, permissions, storage constraints, replay, and latest activity that only moves forward.                                   |
+| `groupMemberships`  | Admission and departure authority, workspace removal, concurrent changes, rollback, and replay.                                                                  |
+| `groupReads`        | Audience and permission separation, rosters, management reads, and paging.                                                                                       |
+| `groupFollows`      | Following for oneself and for agents, joining later threads, ending with the admission, and storage constraints.                                                 |
 
-Group, thread, notification, and read-state tests still live in each SQL adapter and move here
-in later changes.
+Thread, notification, and read-state tests still live in each SQL adapter and move here in
+later changes.
 
 `Support` holds the fixtures the suites share: identities, bound stores by name, a fixed
 clock, and cores, hosts, and gateways over a harness's storage. `Operations` runs single application operations through a
