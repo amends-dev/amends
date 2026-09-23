@@ -3,6 +3,7 @@ import { Store } from "@amends/core/journal";
 import { Member } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(GroupMembership.Record));
@@ -46,6 +47,16 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
         ).pipe(Effect.flatMap(decode), Effect.map(records), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "get")),
+    ),
+    getMany: Effect.fn("GroupMemberships.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          sql`SELECT ${columns} FROM group_memberships WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "getMany")),
     ),
     findActive: Effect.fn("GroupMemberships.findActive")(
       function* (groupInput, memberInput) {

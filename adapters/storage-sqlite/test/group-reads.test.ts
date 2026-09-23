@@ -36,6 +36,7 @@ import {
   workspaceId,
   otherWorkspaceId,
   testProvenance,
+  replacing,
 } from "./support.ts";
 
 const readerId = Member.Id.make("reader");
@@ -769,7 +770,7 @@ it.effect(
             ...bound,
             context: Context.add(bound.context, MemberStore.Service, {
               ...bound.members,
-              get: (id) => (id === agentId ? bound.members.get(otherId) : bound.members.get(id)),
+              ...replacing(bound.members, agentId, yield* bound.members.get(otherId)),
             }),
           };
           expect(yield* Effect.flip(run(wrongMember, reader, roster(first.id)))).toMatchObject({

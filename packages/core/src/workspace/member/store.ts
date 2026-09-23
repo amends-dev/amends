@@ -30,6 +30,15 @@ export interface Interface {
   /** Find an active or removed membership in this workspace; None if absent. */
   readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Record>, Failure>;
 
+  /**
+   * Find several active or removed memberships in one read. Absent IDs are omitted and each found
+   * record appears once; order is unspecified, so callers index results by ID. An empty request
+   * reads nothing.
+   */
+  readonly getMany: (
+    memberIds: ReadonlyArray<Member.Id>,
+  ) => Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
+
   /** Match both the identity kind and ID, returning only an active membership. */
   readonly findActive: (
     identity: Identity.MemberReference,

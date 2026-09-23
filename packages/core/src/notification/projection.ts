@@ -54,18 +54,29 @@ export const definition = Projection.make("notifications", { version: 1 })
         )
           yield* notifications.discardPendingForParticipation(participant.id);
       }
+      // One read for every recipient's participation and one write for their notifications.
+      const requested = new Set(recipients.map((recipient) => recipient.participationId));
+      const found = new Map<ThreadParticipation.Id, ThreadParticipation.Record>();
+      for (const row of yield* participations.getMany([...requested])) {
+        const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
+          row,
+        );
+        if (!requested.has(participant.id) || found.has(participant.id))
+          return yield* new NotificationStore.Conflict({
+            operation: "project",
+            message: "Recipient participation is inconsistent",
+          });
+        found.set(participant.id, participant);
+      }
+      const records: Array<Notification.Record> = [];
       for (const recipient of recipients) {
-        const found = yield* participations.get(recipient.participationId);
-        if (Option.isNone(found))
+        const participant = found.get(recipient.participationId);
+        if (participant === undefined)
           return yield* new NotificationStore.Conflict({
             operation: "project",
             message: "Recipient participation is missing",
           });
-        const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-          found.value,
-        );
         if (
-          participant.id !== recipient.participationId ||
           participant.workspaceId !== activity.workspaceId ||
           participant.threadId !== activity.threadId ||
           participant.joinedAtSequence > activity.sequence ||
@@ -78,7 +89,7 @@ export const definition = Projection.make("notifications", { version: 1 })
             operation: "project",
             message: "Recipient participation is inconsistent",
           });
-        yield* notifications.insert({
+        records.push({
           id: Notification.Id.make(JSON.stringify([event.logId, event.id, participant.id])),
           workspaceId: activity.workspaceId,
           source: { logId: event.logId, entryId: event.id },
@@ -88,6 +99,7 @@ export const definition = Projection.make("notifications", { version: 1 })
           state: { _tag: "Pending" },
         });
       }
+      yield* notifications.insertMany(records);
     }),
   )
   .on(

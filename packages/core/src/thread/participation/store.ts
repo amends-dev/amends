@@ -20,6 +20,14 @@ export interface Interface {
   readonly get: (
     id: ThreadParticipation.Id,
   ) => Effect.Effect<Option.Option<ThreadParticipation.Record>, Failure>;
+  /**
+   * Find several participations, active or ended, in one read. Absent IDs are omitted and each
+   * found record appears once; order is unspecified, so callers index results by ID. An empty
+   * request reads nothing.
+   */
+  readonly getMany: (
+    ids: ReadonlyArray<ThreadParticipation.Id>,
+  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
   readonly listByThread: (
     id: ThreadId.Id,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;

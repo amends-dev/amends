@@ -934,6 +934,7 @@ it.effect("stores and readers reject mismatched follow references and stale depa
         const context = Context.add(bound.context, ThreadParticipationStore.Service, {
           ...bound.participations,
           get: () => Effect.succeedNone,
+          getMany: () => Effect.succeed([]),
         });
         expect(
           yield* Effect.flip(run({ ...bound, context }, owner, timeline(first.thread.id))),

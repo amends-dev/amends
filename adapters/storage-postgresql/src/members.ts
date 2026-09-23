@@ -3,6 +3,7 @@ import { Member, MemberStore } from "@amends/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { members } from "./schema.ts";
 
@@ -34,6 +35,13 @@ export const make = Effect.fn("Members.make")(function* () {
   return MemberStore.Service.of({
     workspaceId,
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(members.id, id))), Array.head),
+    getMany: Effect.fn("Members.getMany")(function* (input) {
+      const ids = yield* Schema.decodeEffect(Schema.Array(Member.Id))(input).pipe(
+        Effect.mapError(storeFailure(MemberStore, "getMany")),
+      );
+      if (ids.length === 0) return [];
+      return yield* select("getMany", and(inWorkspace, inIds(members.id, ids)));
+    }),
     findActive: (identity) =>
       Effect.map(
         select(

@@ -428,6 +428,13 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* () {
           cloneMember,
         );
       }),
+      getMany: Effect.fn("JournalTest.members.getMany")(function* (ids) {
+        const members = (yield* view).members;
+        return [...new Set(ids)].flatMap((id) => {
+          const member = members.get(keyOf(id));
+          return member === undefined ? [] : [cloneMember(member)];
+        });
+      }),
       findActive: Effect.fn("JournalTest.members.findActive")(function* (identity) {
         return Option.map(
           Array.findFirst(

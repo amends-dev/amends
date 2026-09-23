@@ -118,6 +118,7 @@ const configured = (
     workspaceId,
     listActiveByMember: () => Effect.succeed([]),
     get: () => Effect.die("These member tests have no group admissions"),
+    getMany: () => Effect.die("These member tests have no group admissions"),
     findActive: () => Effect.die("These member tests have no group admissions"),
     listByGroup: () => Effect.die("These member tests have no group admissions"),
     insert: () => Effect.die("These member tests have no group admissions"),

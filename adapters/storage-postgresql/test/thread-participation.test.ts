@@ -945,6 +945,7 @@ describe.runIf(available)("PostgreSQL thread participation", () => {
           const context = Context.add(bound.context, ThreadParticipationStore.Service, {
             ...bound.participations,
             get: () => Effect.succeedNone,
+            getMany: () => Effect.succeed([]),
           });
           expect(
             yield* Effect.flip(run({ ...bound, context }, owner, timeline(first.thread.id))),

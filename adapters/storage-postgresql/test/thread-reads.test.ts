@@ -16,6 +16,7 @@ import {
   GroupMembershipFacts,
   GroupMembershipStore,
   GroupPermissions,
+  GroupMembership,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
@@ -47,6 +48,7 @@ import {
   workspaceId,
   otherWorkspaceId,
   testProvenance,
+  replacing,
 } from "./support.ts";
 const { available, withDatabase } = setup();
 const readerId = Member.Id.make("reader");
@@ -864,7 +866,7 @@ describe.skipIf(!available)("PostgreSQL thread reads", () => {
                 ...bound,
                 context: Context.add(bound.context, ThreadMessageStore.Service, {
                   ...bound.messages,
-                  get: () => Effect.succeed(message),
+                  ...replacing(bound.messages, first.message.id, message),
                 }),
               };
               expect(
@@ -893,6 +895,72 @@ describe.skipIf(!available)("PostgreSQL thread reads", () => {
           }),
         ),
       ),
+  );
+
+  it.effect("batch reads return each stored record once and omit absent or foreign IDs", () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const { bound, owner, group, first, second } = yield* prepare();
+          const foreign = yield* boundTo(otherWorkspaceId);
+          const byId = <A extends { readonly id: string }>(records: ReadonlyArray<A>) =>
+            [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+          const memberIds = [owner.memberId, agentId, agentId, Member.Id.make("missing")];
+          const members = [
+            ...Option.toArray(yield* bound.members.get(owner.memberId)),
+            ...Option.toArray(yield* bound.members.get(agentId)),
+          ];
+          expect(byId(yield* bound.members.getMany(memberIds))).toEqual(byId(members));
+          const admissions = yield* bound.groupMemberships.listByGroup(group.id);
+          const admissionIds = admissions.map((admission) => admission.id);
+          expect(
+            byId(
+              yield* bound.groupMemberships.getMany([
+                ...admissionIds,
+                GroupMembership.Id.make("missing"),
+              ]),
+            ),
+          ).toEqual(byId(admissions));
+          const participations = yield* bound.participations.listByThread(second.thread.id);
+          const participationIds = participations.map((participation) => participation.id);
+          expect(
+            byId(
+              yield* bound.participations.getMany([
+                ...participationIds,
+                ThreadParticipation.Id.make("missing"),
+              ]),
+            ),
+          ).toEqual(byId(participations));
+          const messageIds = [second.message.id, first.message.id];
+          const messages = [
+            ...Option.toArray(yield* bound.messages.get(first.message.id)),
+            ...Option.toArray(yield* bound.messages.get(second.message.id)),
+          ];
+          expect(
+            byId(
+              yield* bound.messages.getMany([
+                ...messageIds,
+                first.message.id,
+                ThreadMessage.Id.make("missing"),
+              ]),
+            ),
+          ).toEqual(byId(messages));
+          expect(messages).toHaveLength(2);
+          for (const empty of [
+            bound.members.getMany([]),
+            bound.groupMemberships.getMany([]),
+            bound.participations.getMany([]),
+            bound.messages.getMany([]),
+            foreign.members.getMany(memberIds),
+            foreign.groupMemberships.getMany(admissionIds),
+            foreign.participations.getMany(participationIds),
+            foreign.messages.getMany(messageIds),
+          ])
+            expect(yield* empty).toEqual([]);
+        }),
+      ),
+    ),
   );
 
   it.effect(
@@ -959,7 +1027,7 @@ describe.skipIf(!available)("PostgreSQL thread reads", () => {
               ...bound,
               context: Context.add(bound.context, MemberStore.Service, {
                 ...bound.members,
-                get: (id) => (id === agentId ? bound.members.get(otherId) : bound.members.get(id)),
+                ...replacing(bound.members, agentId, yield* bound.members.get(otherId)),
               }),
             };
             expect(
@@ -978,8 +1046,7 @@ describe.skipIf(!available)("PostgreSQL thread reads", () => {
                 ...bound,
                 context: Context.add(bound.context, GroupMembershipStore.Service, {
                   ...bound.groupMemberships,
-                  get: (id) =>
-                    id === admission.id ? Effect.succeed(row) : bound.groupMemberships.get(id),
+                  ...replacing(bound.groupMemberships, admission.id, row),
                 }),
               };
               expect(
@@ -990,12 +1057,11 @@ describe.skipIf(!available)("PostgreSQL thread reads", () => {
               ...bound,
               context: Context.add(bound.context, GroupMembershipStore.Service, {
                 ...bound.groupMemberships,
-                get: (id) =>
-                  id === admission.id
-                    ? Effect.succeedSome(
-                        Object.assign({}, admission, { status: "removed" as const }),
-                      )
-                    : bound.groupMemberships.get(id),
+                ...replacing(
+                  bound.groupMemberships,
+                  admission.id,
+                  Option.some(Object.assign({}, admission, { status: "removed" as const })),
+                ),
               }),
             };
             expect(

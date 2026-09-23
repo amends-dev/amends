@@ -173,6 +173,41 @@ describe.skipIf(!available)("PostgreSQL", () => {
       ),
   );
 
+  it.effect("batch notification insertion writes every record or conflicts as a whole", () =>
+    withDatabase((location) =>
+      inDatabase(
+        location,
+        Effect.gen(function* () {
+          const bound = yield* boundTo(workspaceId);
+          yield* initialized(bound);
+          yield* bound.store.transaction(bound.notifications.insertMany([]));
+          const batch = [
+            record("one"),
+            record("two", { recipient: { ...agent } }),
+            record("three"),
+          ];
+          yield* bound.store.transaction(bound.notifications.insertMany(batch));
+          for (const saved of batch)
+            expect(yield* bound.notifications.get(saved.id)).toEqual(Option.some(saved));
+          for (const conflicting of [
+            [record("four"), record("one", { source: record("reused").source })],
+            [record("five"), record("five", { source: record("again").source })],
+            [record("six"), record("seven", { workspaceId: otherWorkspaceId })],
+          ]) {
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(bound.notifications.insertMany(conflicting)),
+              ),
+            ).toMatchObject({ _tag: "NotificationStore.Conflict", operation: "insertMany" });
+            for (const rejected of conflicting.slice(0, 1))
+              expect(yield* bound.notifications.get(rejected.id)).toEqual(Option.none());
+          }
+          expect(yield* bound.notifications.listByRecipient(human, page)).toHaveLength(2);
+        }),
+      ),
+    ),
+  );
+
   it.effect.each([human, agent, contact, triage])(
     "competing notification insertions produce only one source-recipient record for %o",
     (recipient) =>

@@ -46,6 +46,7 @@ import {
   workspaceId,
   otherWorkspaceId,
   testProvenance,
+  replacing,
 } from "./support.ts";
 
 /** Narrow a stored participation to its member participant for assertions. */
@@ -571,7 +572,11 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
           ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
           const wrongMessage = Context.add(bound.context, ThreadMessageStore.Service, {
             ...bound.messages,
-            get: () => Effect.succeedSome({ ...first.message, threadId: Thread.Id.make("wrong") }),
+            ...replacing(
+              bound.messages,
+              first.message.id,
+              Option.some({ ...first.message, threadId: Thread.Id.make("wrong") }),
+            ),
           });
           expect(
             yield* Effect.flip(run({ ...bound, context: wrongMessage }, human, resolve(note.id))),
@@ -591,6 +596,7 @@ describe.runIf(available)("PostgreSQL notification sources", () => {
           const guarded = Context.add(bound.context, ThreadMessageStore.Service, {
             ...bound.messages,
             get: () => Effect.die("Message must not be read without permission"),
+            getMany: () => Effect.die("Message must not be read without permission"),
           });
           expect(
             yield* Effect.flip(run({ ...bound, context: guarded }, human, resolve(note.id))),

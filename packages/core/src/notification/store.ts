@@ -66,6 +66,14 @@ export interface Interface {
   readonly insert: (
     record: Notification.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * Insert several records in one projection write, with insert's validation and conflicts,
+   * including duplicates within the request. Any conflict fails the call and writes none of them.
+   * An empty request writes nothing.
+   */
+  readonly insertMany: (
+    records: ReadonlyArray<Notification.Record>,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** Pending-only projection write. Preserve source/history; reject missing, terminal, or incompatible records. */
   readonly acknowledge: (
     id: Notification.Id,

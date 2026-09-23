@@ -18,6 +18,13 @@ export interface Interface {
   readonly get: (
     id: ThreadMessage.Id,
   ) => Effect.Effect<Option.Option<ThreadMessage.Record>, Failure>;
+  /**
+   * Find several messages in one read. Absent IDs are omitted and each found record appears once;
+   * order is unspecified, so callers index results by ID. An empty request reads nothing.
+   */
+  readonly getMany: (
+    ids: ReadonlyArray<ThreadMessage.Id>,
+  ) => Effect.Effect<ReadonlyArray<ThreadMessage.Record>, Failure>;
   /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
   readonly insert: (
     record: ThreadMessage.Record,

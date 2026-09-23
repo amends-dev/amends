@@ -601,9 +601,9 @@ describe.runIf(available)("PostgreSQL thread replies", () => {
               }),
               Context.add(bound.context, NotificationStore.Service, {
                 ...bound.notifications,
-                insert: () =>
+                insertMany: () =>
                   Effect.fail(
-                    new NotificationStore.Failure({ operation: "insert", cause: "injected" }),
+                    new NotificationStore.Failure({ operation: "insertMany", cause: "injected" }),
                   ),
               }),
               Context.add(bound.context, Checkpoint.Service, {

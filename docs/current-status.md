@@ -30,6 +30,11 @@ discards their pending agent input; workspace-member removal uses the same clean
 Thread starts, reads, replies, and follow/unfollow use the shared group-audience check.
 Group and thread discovery and current-participant lists are unpaginated; timelines have
 sequence-based pages. Separate reads and pages do not share a snapshot.
+Group creation, starts, replies, and timeline pages read members, admissions, participations,
+and referenced messages in batches, so their store reads do not grow with group size or page
+length. A start still publishes one participation fact per starting participant, and every fact
+reads and writes each projection's checkpoint and journal bookkeeping, so a broadcast start's
+storage work still grows with the group.
 
 ## Design-system coverage
 

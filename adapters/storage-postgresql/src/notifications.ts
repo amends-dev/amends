@@ -104,6 +104,47 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
   });
 
+  /** Validate every record, then write them in one statement. */
+  const insert = Effect.fnUntraced(function* (
+    input: ReadonlyArray<Notification.Record>,
+    operation: string,
+  ) {
+    yield* Store.Transaction;
+    const rows: Array<typeof notifications.$inferInsert> = [];
+    for (const value of input) {
+      const record = yield* validateRecord(value).pipe(
+        Effect.mapError(storeConflict(NotificationStore, operation)),
+      );
+      if (record.workspaceId !== workspaceId)
+        return yield* new NotificationStore.Conflict({
+          operation,
+          message: "Expected a notification in this workspace",
+        });
+      rows.push({
+        workspaceId,
+        id: record.id,
+        sourceLogId: record.source.logId,
+        sourceEntryId: record.source.entryId,
+        participationId: record.participationId ?? null,
+        discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
+        acknowledgmentOutcome:
+          record.state._tag === "Acknowledged" ? record.state.outcome._tag : null,
+        acknowledgedAt:
+          record.state._tag === "Acknowledged"
+            ? DateTime.toDate(record.state.acknowledgedAt)
+            : null,
+        recipientKind: record.recipient._tag,
+        recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
+        recordedAt: DateTime.toDate(record.recordedAt),
+        state: record.state._tag,
+      });
+    }
+    if (rows.length === 0) return;
+    yield* guard(db.insert(notifications).values(rows), true).pipe(
+      Effect.mapError(storeError(NotificationStore, operation)),
+    );
+  });
+
   return NotificationStore.Service.of({
     workspaceId,
     get: Effect.fn("Notifications.get")(
@@ -201,38 +242,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
         ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForParticipation")));
       },
     ),
-    insert: Effect.fn("Notifications.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(NotificationStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new NotificationStore.Conflict({
-          operation: "insert",
-          message: "Expected a notification in this workspace",
-        });
-      yield* guard(
-        db.insert(notifications).values({
-          workspaceId,
-          id: record.id,
-          sourceLogId: record.source.logId,
-          sourceEntryId: record.source.entryId,
-          participationId: record.participationId ?? null,
-          discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
-          acknowledgmentOutcome:
-            record.state._tag === "Acknowledged" ? record.state.outcome._tag : null,
-          acknowledgedAt:
-            record.state._tag === "Acknowledged"
-              ? DateTime.toDate(record.state.acknowledgedAt)
-              : null,
-          recipientKind: record.recipient._tag,
-          recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
-          recordedAt: DateTime.toDate(record.recordedAt),
-          state: record.state._tag,
-        }),
-        true,
-      ).pipe(Effect.mapError(storeError(NotificationStore, "insert")));
-    }),
+    insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),
+    insertMany: Effect.fn("Notifications.insertMany")((input) => insert(input, "insertMany")),
   });
 });
 

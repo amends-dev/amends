@@ -30,7 +30,10 @@ generic execution entries leave the entire fact header null.
 
 `SqliteDatabase.make()` enables `PRAGMA foreign_keys` on its connection before migrating,
 so the declared references between workspace records are enforced as in PostgreSQL. A rejected
-reference is a constraint error and becomes the store's `Conflict`.
+reference is a constraint error and becomes the store's `Conflict`. It also raises Bun's
+process-wide `Database.MAX_QUERY_CACHE_SIZE` to `SqliteDatabase.preparedStatements` (512) when
+smaller. The client prepares statements through that cache, which holds 20 SQL strings by
+default; the stores issue more, and an uncached statement is compiled again on every execution.
 
 `participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
 participant checks, and a member's group admissions in ID order without scanning the workspace.
@@ -38,6 +41,12 @@ The directory reads across workspaces, so `members_by_identity` and `invitations
 lead with the identity or recipient; the latter also serves one workspace's pending invitations.
 Plan tests check these access paths. Adding them replaced the development baseline; recreate
 local SQLite files, since an existing file keeps the old baseline without these indexes.
+
+Batch reads (`getMany` on members, group admissions, thread participations, and messages) bind
+their IDs as one JSON array matched through `json_each` against each table's workspace/ID key,
+and `NotificationStore.insertMany` inserts its rows from one JSON array, so every batch size
+shares one statement. A message's mentions are checked against its thread's participations in
+one query.
 
 `Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
 log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
@@ -203,3 +212,5 @@ historical recipient integrity, direct entry lookup, no-write resolution, staged
 rollback, reopening, and gateway outcomes.
 `notification-acknowledgment.test.ts` mirrors PostgreSQL's ownership, atomicity, repeat handling,
 concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.
+`thread-starts.test.ts` counts the store reads of group creation, a broadcast start, a reply, and a
+timeline page, and requires the same counts for a two-member and an eleven-member group.

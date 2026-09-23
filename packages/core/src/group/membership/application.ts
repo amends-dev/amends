@@ -304,8 +304,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   const current = Effect.fnUntraced(function* (groupId: Group.Id) {
     yield* loadGroup(groupId);
     const seenIds = new Set<GroupMembership.Id>();
-    const seenMembers = new Set<Member.Id>();
-    const active: Array<GroupMembership.Record> = [];
+    const admitted = new Map<Member.Id, GroupMembership.Record>();
     for (const found of yield* memberships.listByGroup(groupId)) {
       const membership = yield* decodeMembership(found).pipe(Effect.mapError(invalidRecord));
       if (
@@ -318,20 +317,28 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
         });
       seenIds.add(membership.id);
       if (membership.status !== "active") continue;
-      if (seenMembers.has(membership.memberId))
+      if (admitted.has(membership.memberId))
         return yield* new InvalidResponse({
           message: "Membership store returned duplicate active admissions",
         });
-      seenMembers.add(membership.memberId);
-      const foundMember = yield* members.get(membership.memberId);
-      if (Option.isNone(foundMember))
-        return yield* new InvalidResponse({
-          message: "Group admission references a missing workspace member",
-        });
-      const member = yield* decodeMember(foundMember.value).pipe(Effect.mapError(invalidRecord));
-      if (member.workspaceId !== workspaceId || member.id !== membership.memberId)
+      admitted.set(membership.memberId, membership);
+    }
+    // One read for every admitted member; only admissions of active members are current.
+    const found = new Map<Member.Id, Member.Record>();
+    for (const row of yield* members.getMany([...admitted.keys()])) {
+      const member = yield* decodeMember(row).pipe(Effect.mapError(invalidRecord));
+      if (member.workspaceId !== workspaceId || !admitted.has(member.id) || found.has(member.id))
         return yield* new InvalidResponse({
           message: "Member store returned another member or workspace",
+        });
+      found.set(member.id, member);
+    }
+    const active: Array<GroupMembership.Record> = [];
+    for (const [memberId, membership] of admitted) {
+      const member = found.get(memberId);
+      if (member === undefined)
+        return yield* new InvalidResponse({
+          message: "Group admission references a missing workspace member",
         });
       if (member.status === "active") active.push(membership);
     }

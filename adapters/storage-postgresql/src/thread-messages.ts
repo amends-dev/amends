@@ -2,9 +2,10 @@ import { ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
 
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, eq } from "drizzle-orm";
+import { and, countDistinct, eq } from "drizzle-orm";
 import { threadMessages, threadParticipations } from "./schema.ts";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
 const decode = Schema.decodeUnknownEffect(
@@ -50,6 +51,19 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadMessageStore, "get")),
     ),
+    getMany: Effect.fn("ThreadMessages.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadMessage.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select()
+            .from(threadMessages)
+            .where(and(inWorkspace, inIds(threadMessages.id, ids))),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadMessageStore, "getMany")),
+    ),
     insert: Effect.fn("ThreadMessages.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validate(input).pipe(
@@ -92,21 +106,22 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           operation: "insert",
           message: "Missing or inconsistent references",
         });
-      for (const memberId of record.mentions) {
-        const found = yield* guard(
+      // Mentions are distinct, so each must match a member with a participation in this thread.
+      if (record.mentions.length > 0) {
+        const [mentioned] = yield* guard(
           db
-            .select({ id: threadParticipations.id })
+            .select({ count: countDistinct(threadParticipations.memberId) })
             .from(threadParticipations)
             .where(
               and(
                 eq(threadParticipations.workspaceId, workspaceId),
                 eq(threadParticipations.threadId, record.threadId),
-                eq(threadParticipations.memberId, memberId),
+                inIds(threadParticipations.memberId, record.mentions),
               ),
             ),
           true,
         ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
-        if (found.length === 0)
+        if (mentioned?.count !== record.mentions.length)
           return yield* new ThreadMessageStore.Conflict({
             operation: "insert",
             message: "Mention has no participation in this thread",

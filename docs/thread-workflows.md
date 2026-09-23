@@ -342,7 +342,11 @@ storage rejects gaps, duplicate positions, and activities whose message belongs 
 A timeline record references the message without duplicating its text. Internal stores preserve
 workspace-qualified relationships and immutable IDs. The PostgreSQL adapter stores record fields
 in relational columns, including a text array for mention IDs; SQLite uses validated JSON records
-with indexed identity and relationship columns.
+with indexed identity and relationship columns. Admission loads a group's eligible members and a
+thread's current participants with batch store reads, and the notification projection loads
+every recipient's participation and inserts their notifications together, so a start or reply
+reads the same number of times at any group size. Timeline pages load their messages and
+participations the same way.
 
 `ThreadCreation` is an internal service for authorized workflows to reuse. It validates domain
 references and requires an existing transaction and publication context. It is excluded from
@@ -402,7 +406,7 @@ Notifications expose source references, not continuing authority to read the sou
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
 authorized thread APIs. Managing other participants, agent/contact/triage acknowledgment,
-silent agent completion, turn execution, task activity, direct groups, and task or channel
+silent agent completion, turn execution, task activity, and task or channel
 thread starts remain unimplemented. The [core model](core-model.md) describes the broader intent.
 
 Opening messages and participation activity updated both development schema baselines. Recreate disposable

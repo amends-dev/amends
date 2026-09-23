@@ -374,10 +374,15 @@ describe.skipIf(!available)("PostgreSQL threads", () => {
               ...bound,
               context: Context.add(bound.context, NotificationStore.Service, {
                 ...bound.notifications,
-                insert: (record) =>
-                  record.recipient._tag === "Human"
-                    ? Effect.fail(failure)
-                    : bound.notifications.insert(record),
+                insertMany: (records) =>
+                  Effect.andThen(
+                    bound.notifications.insertMany(
+                      records.filter((record) => record.recipient._tag !== "Human"),
+                    ),
+                    records.some((record) => record.recipient._tag === "Human")
+                      ? Effect.fail(failure)
+                      : Effect.void,
+                  ),
               }),
             };
             expect(yield* Effect.flip(run(broken, owner, start(group.id)))).toMatchObject({

@@ -4,6 +4,7 @@ import { Store } from "@amends/core/journal";
 import { Array, Effect, Layer, Schema } from "effect";
 
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
 const codec = Schema.fromJsonString(ThreadMessage.Record);
@@ -49,6 +50,16 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadMessageStore, "get")),
     ),
+    getMany: Effect.fn("ThreadMessages.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadMessage.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          sql`SELECT ${columns} FROM thread_messages WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(ThreadMessageStore, "getMany")),
+    ),
     insert: Effect.fn("ThreadMessages.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validate(input).pipe(
@@ -71,12 +82,13 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           operation: "insert",
           message: "Missing or inconsistent references",
         });
-      for (const memberId of record.mentions) {
-        const found = yield* guard(
-          sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${record.threadId} AND member_id = ${memberId}`,
+      // Mentions are distinct, so each must match a member with a participation in this thread.
+      if (record.mentions.length > 0) {
+        const mentioned = yield* guard(
+          sql`SELECT COUNT(DISTINCT member_id) AS count FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${record.threadId} AND member_id ${inIds(sql, record.mentions)}`,
           true,
         ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
-        if (found.length === 0)
+        if (mentioned[0]?.["count"] !== record.mentions.length)
           return yield* new ThreadMessageStore.Conflict({
             operation: "insert",
             message: "Mention has no participation in this thread",

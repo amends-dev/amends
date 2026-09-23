@@ -40,6 +40,11 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/activity/reading/Service",
 ) {}
+/** Records a set of activities reference, by ID. */
+interface Subjects {
+  readonly messages: ReadonlyMap<ThreadMessage.Id, ThreadMessage.Record>;
+  readonly participations: ReadonlyMap<ThreadParticipation.Id, ThreadParticipation.Record>;
+}
 const invalidRecord = (cause: Schema.SchemaError) =>
   new InvalidResponse({ message: `Thread storage returned invalid data: ${cause.message}` });
 /** @category constructors */
@@ -72,19 +77,50 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
     ]);
     return thread;
   });
+  /** Load the messages and participations these activities reference, one read for each kind. */
+  const loadSubjects = Effect.fnUntraced(function* (
+    listed: ReadonlyArray<ThreadActivity.Record>,
+  ): Effect.fn.Return<Subjects, Error> {
+    const messageIds = new Set<ThreadMessage.Id>();
+    const participationIds = new Set<ThreadParticipation.Id>();
+    for (const activity of listed)
+      if (activity.kind === "MessagePublished") messageIds.add(activity.messageId);
+      else participationIds.add(activity.participationId);
+    const foundMessages = new Map<ThreadMessage.Id, ThreadMessage.Record>();
+    for (const row of yield* messages.getMany([...messageIds])) {
+      const message = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Record))(row).pipe(
+        Effect.mapError(invalidRecord),
+      );
+      if (!messageIds.has(message.id) || foundMessages.has(message.id))
+        return yield* new InvalidResponse({
+          message: "Message store returned another message, thread, or workspace",
+        });
+      foundMessages.set(message.id, message);
+    }
+    const foundParticipations = new Map<ThreadParticipation.Id, ThreadParticipation.Record>();
+    for (const row of yield* participations.getMany([...participationIds])) {
+      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
+        row,
+      ).pipe(Effect.mapError(invalidRecord));
+      if (!participationIds.has(participant.id) || foundParticipations.has(participant.id))
+        return yield* new InvalidResponse({
+          message: "Participation store returned another participation",
+        });
+      foundParticipations.set(participant.id, participant);
+    }
+    return { messages: foundMessages, participations: foundParticipations };
+  });
   const resolve = Effect.fn("ThreadActivityReading.resolve")(function* (
     thread: Thread.Record,
     activity: ThreadActivity.Record,
+    subjects: Subjects,
   ): Effect.fn.Return<Thread.TimelineItem, Error> {
     if (activity.kind !== "MessagePublished") {
-      const found = yield* participations.get(activity.participationId);
-      if (Option.isNone(found))
+      const participant = subjects.participations.get(activity.participationId);
+      if (participant === undefined)
         return yield* new InvalidResponse({
           message: "Participation activity references missing participation",
         });
-      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-        found.value,
-      ).pipe(Effect.mapError(invalidRecord));
       if (
         participant.workspaceId !== workspaceId ||
         participant.threadId !== thread.id ||
@@ -101,14 +137,11 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
         });
       return { activity, participant: ThreadParticipation.toSummary(participant) };
     }
-    const found = yield* messages.get(activity.messageId);
-    if (Option.isNone(found))
+    const message = subjects.messages.get(activity.messageId);
+    if (message === undefined)
       return yield* new InvalidResponse({
         message: "Timeline activity references a missing message",
       });
-    const message = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Record))(
-      found.value,
-    ).pipe(Effect.mapError(invalidRecord));
     if (
       message.workspaceId !== workspaceId ||
       message.threadId !== thread.id ||
@@ -132,7 +165,7 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
     const seen = new Set<ThreadActivity.Id>();
     const seenMessages = new Set<ThreadMessage.Id>();
     const seenParticipationActivity = new Set<string>();
-    const items: Array<Thread.TimelineItem> = [];
+    const listed: Array<ThreadActivity.Record> = [];
     for (const row of found) {
       const activity = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(row).pipe(
         Effect.mapError(invalidRecord),
@@ -158,9 +191,10 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
           return yield* new InvalidResponse({ message: "Duplicate message activity" });
         seenMessages.add(activity.messageId);
       }
-      items.push(yield* resolve(thread, activity));
+      listed.push(activity);
     }
-    return items;
+    const subjects = yield* loadSubjects(listed);
+    return yield* Effect.forEach(listed, (activity) => resolve(thread, activity, subjects));
   });
   const get = Effect.fn("ThreadActivityReading.get")(function* (activityId: ThreadActivity.Id) {
     const id = yield* Schema.decodeEffect(ThreadActivity.Id)(activityId);
@@ -175,7 +209,7 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
         message: "Activity store returned another activity or workspace",
       });
     const thread = yield* authorize(activity.threadId);
-    return yield* resolve(thread, activity);
+    return yield* resolve(thread, activity, yield* loadSubjects([activity]));
   });
   return Service.of({ workspaceId, get, page });
 });

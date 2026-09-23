@@ -3,6 +3,7 @@ import { Member, MemberStore } from "@amends/core/workspace";
 import { Array, Effect, Layer, Schema } from "effect";
 import type { Statement } from "effect/unstable/sql";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { makeRecordDecoder } from "./record-column.ts";
 
@@ -35,6 +36,16 @@ export const make = Effect.fn("Members.make")(function* () {
         ),
         Array.head,
       ),
+    getMany: Effect.fn("Members.getMany")(function* (input) {
+      const ids = yield* Schema.decodeEffect(Schema.Array(Member.Id))(input).pipe(
+        Effect.mapError(storeFailure(MemberStore, "getMany")),
+      );
+      if (ids.length === 0) return [];
+      return yield* select(
+        "getMany",
+        sql`SELECT record FROM members WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)}`,
+      );
+    }),
     findActive: (identity) =>
       Effect.map(
         select(

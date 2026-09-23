@@ -4,6 +4,7 @@ import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
 const codec = Schema.fromJsonString(ThreadParticipation.Record);
@@ -56,6 +57,16 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
         ).pipe(Effect.flatMap(decode), Effect.map(records), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "get")),
+    ),
+    getMany: Effect.fn("ThreadParticipations.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          sql`SELECT ${columns} FROM thread_participations WHERE workspace_id = ${workspaceId} AND id ${inIds(sql, ids)}`,
+        ).pipe(Effect.flatMap(decode), Effect.map(records));
+      },
+      Effect.mapError(storeFailure(ThreadParticipationStore, "getMany")),
     ),
     listByThread: Effect.fn("ThreadParticipations.listByThread")(
       function* (input) {

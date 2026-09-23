@@ -47,6 +47,12 @@ workspaces; a workspace whose members were all removed still lists with a count 
 A plan test checks these access paths with sequential scans and sorts disabled. These indexes
 replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
 
+Batch reads (`getMany` on members, group admissions, thread participations, and messages) match
+`id = any($1)` with the IDs bound as one array against each table's workspace/ID key, so every
+batch size shares one prepared statement. `NotificationStore.insertMany` writes its rows in one
+multi-row insert, and a message's mentions are checked against its thread's participations in
+one query.
+
 `Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
 log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
 transaction, and opens none. This supports notification-source reads without scanning the log
@@ -226,3 +232,5 @@ historical recipient integrity, direct entry lookup, no-write resolution, staged
 rollback, reopening, and gateway outcomes.
 `notification-acknowledgment.test.ts` mirrors SQLite's ownership, atomicity, repeat handling,
 concurrent requests, source-access loss, direct-store validation, reopening, and replay checks.
+`thread-starts.test.ts` mirrors SQLite's check that group creation, starts, replies, and timeline
+pages make the same store reads at any group size.

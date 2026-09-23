@@ -5,6 +5,7 @@ import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq, sql } from "drizzle-orm";
 import { threadParticipations, threads, groupMemberships, members } from "./schema.ts";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
 const decode = Schema.decodeUnknownEffect(
@@ -89,6 +90,19 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "get")),
+    ),
+    getMany: Effect.fn("ThreadParticipations.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select()
+            .from(threadParticipations)
+            .where(and(inWorkspace, inIds(threadParticipations.id, ids))),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadParticipationStore, "getMany")),
     ),
     listByThread: Effect.fn("ThreadParticipations.listByThread")(
       function* (input) {

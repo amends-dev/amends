@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
-import { Group, GroupApplication } from "@amends/core/group";
+import { Group, GroupApplication, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Log, Publication } from "@amends/core/journal";
-import { Notification } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
   ThreadActivityRecording,
@@ -14,9 +14,13 @@ import {
   ThreadParticipation,
   ThreadParticipationAdmission,
   ThreadStart,
+  ThreadStore,
+  ThreadParticipationStore,
+  ThreadMessageStore,
+  ThreadActivityStore,
 } from "@amends/core/thread";
-import { Member, MemberFacts } from "@amends/core/workspace";
-import { DateTime, Effect, Layer, Option } from "effect";
+import { Member, MemberFacts, MemberStore } from "@amends/core/workspace";
+import { DateTime, Effect, Layer, Option, Context } from "effect";
 import {
   setup,
   boundTo,
@@ -104,6 +108,51 @@ const prepare = Effect.fnUntraced(function* () {
   );
   return { bound, owner };
 });
+
+/** Wrap a store so every read method call is counted under `name.method`; writes pass through. */
+const countReads = <S extends object>(name: string, store: S, counts: Map<string, number>): S =>
+  Object.fromEntries(
+    Object.entries(store).map(([method, value]) => [
+      method,
+      typeof value === "function" && /^(get|list|find|latest|read)/.test(method)
+        ? (...args: ReadonlyArray<unknown>) => {
+            const key = `${name}.${method}`;
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+            return value(...args);
+          }
+        : value,
+    ]),
+  ) as S;
+/** The binding with its record stores counted, and a way to take and reset the counts. */
+const countingReads = (bound: Bound) => {
+  const counts = new Map<string, number>();
+  const context = Context.mergeAll(
+    bound.context,
+    Context.make(MemberStore.Service, countReads("members", bound.members, counts)),
+    Context.make(GroupStore.Service, countReads("groups", bound.groups, counts)),
+    Context.make(
+      GroupMembershipStore.Service,
+      countReads("groupMemberships", bound.groupMemberships, counts),
+    ),
+    Context.make(ThreadStore.Service, countReads("threads", bound.threads, counts)),
+    Context.make(
+      ThreadParticipationStore.Service,
+      countReads("participations", bound.participations, counts),
+    ),
+    Context.make(ThreadMessageStore.Service, countReads("messages", bound.messages, counts)),
+    Context.make(ThreadActivityStore.Service, countReads("activities", bound.activities, counts)),
+    Context.make(
+      NotificationStore.Service,
+      countReads("notifications", bound.notifications, counts),
+    ),
+  );
+  const take = () => {
+    const taken = Object.fromEntries([...counts].sort(([a], [b]) => (a < b ? -1 : 1)));
+    counts.clear();
+    return taken;
+  };
+  return { bound: { ...bound, context }, take };
+};
 
 describe.skipIf(!available)("PostgreSQL thread starts", () => {
   it.effect("starting a direct group reuses it for the same members and enrolls all of them", () =>
@@ -247,6 +296,80 @@ describe.skipIf(!available)("PostgreSQL thread starts", () => {
             expect(
               yield* inbox(bound, { _tag: "Human", id: Identity.HumanId.make(humanId) }),
             ).toHaveLength(1);
+          }),
+        ),
+      ),
+  );
+
+  it.effect(
+    "group creation, starts, replies, and timelines read storage the same way at any size",
+    () =>
+      withDatabase((location) =>
+        inDatabase(
+          location,
+          Effect.gen(function* () {
+            const { bound, owner } = yield* prepare();
+            const extra = Array.from({ length: 10 }, (_, index) =>
+              Member.Id.make(`member-${index}`),
+            );
+            yield* trusted(
+              bound,
+              Effect.flatMap(Journal.Service, (journal) =>
+                journal.commit(
+                  Effect.forEach(extra, (memberId) =>
+                    journal.publish(MemberFacts.Added, {
+                      workspaceId,
+                      memberId,
+                      identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                    }),
+                  ),
+                ),
+              ),
+            );
+            const counted = countingReads(bound);
+            const measure = Effect.fnUntraced(function* (size: number) {
+              counted.take();
+              const team = yield* run(
+                counted.bound,
+                owner,
+                Effect.flatMap(GroupApplication.Service, (s) =>
+                  s.createPrivateTeam({
+                    name: `Team ${size}`,
+                    memberIds: [owner.memberId, ...extra.slice(0, size)],
+                  }),
+                ),
+              );
+              const create = counted.take();
+              const started = yield* run(
+                counted.bound,
+                owner,
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.startInGroup({ groupId: team.id, text: "Hello", mentions: [] }),
+                ),
+              );
+              const start = counted.take();
+              const reply = Effect.flatMap(ThreadMessageApplication.Service, (s) =>
+                s.publish({ threadId: started.thread.id, text: "Reply", mentions: [] }),
+              );
+              yield* run(counted.bound, owner, reply);
+              const replied = counted.take();
+              // A longer timeline for the larger group: its page must not read per item either.
+              for (let index = 0; index < size; index++) yield* run(bound, owner, reply);
+              counted.take();
+              const page = yield* run(
+                counted.bound,
+                owner,
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.readTimeline(started.thread.id, { limit: 50 }),
+                ),
+              );
+              expect(page).toHaveLength(size + 2);
+              return { create, start, replied, timeline: counted.take() };
+            });
+            const small = yield* measure(1);
+            const large = yield* measure(10);
+            expect(large).toEqual(small);
+            expect(small.replied).toMatchObject({ "members.getMany": expect.any(Number) });
           }),
         ),
       ),

@@ -115,14 +115,19 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreatePrivateTeamInput))(
         input,
       );
-      for (const memberId of request.memberIds) {
-        const found = yield* members.get(memberId);
-        if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
-        const member = yield* Schema.decodeEffect(Member.Record)(found.value);
-        if (member.workspaceId !== workspaceId || member.id !== memberId)
+      const requested = new Set(request.memberIds);
+      const found = new Map<Member.Id, Member.Record>();
+      for (const row of yield* members.getMany(request.memberIds)) {
+        const member = yield* Schema.decodeEffect(Member.Record)(row);
+        if (member.workspaceId !== workspaceId || !requested.has(member.id) || found.has(member.id))
           return yield* new InvalidResponse({
             message: "Member store returned another member or workspace",
           });
+        found.set(member.id, member);
+      }
+      for (const memberId of request.memberIds) {
+        const member = found.get(memberId);
+        if (member === undefined) return yield* new MemberNotFound({ memberId });
         if (member.status !== "active") return yield* new InactiveMember({ memberId });
       }
       const actor = yield* Actor.Service;

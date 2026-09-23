@@ -1,4 +1,5 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-bun";
+import { Database } from "bun:sqlite";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 
@@ -19,13 +20,22 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 /**
+ * Distinct SQL strings each connection keeps prepared. The client prepares every statement
+ * through Bun's `Database.query` cache, which holds 20 by default; the stores issue well over
+ * that, so a smaller cache compiles most statements again on every execution.
+ */
+export const preparedStatements = 512;
+
+/**
  * Construct the database service over the caller's SQL client, enforcing foreign keys and
- * applying pending migrations.
+ * applying pending migrations. Raises Bun's process-wide query cache to `preparedStatements`
+ * when it is smaller; the limit is read per query, so it covers connections already open.
  *
  * @category constructors
  */
 export const make = Effect.fn("SqliteDatabase.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
+  Database.MAX_QUERY_CACHE_SIZE = Math.max(Database.MAX_QUERY_CACHE_SIZE, preparedStatements);
   // SQLite ignores declared foreign keys unless each connection enables them outside a transaction.
   yield* sql`PRAGMA foreign_keys = ON`;
   yield* SqliteMigrator.run({ loader: Migrations.loader });

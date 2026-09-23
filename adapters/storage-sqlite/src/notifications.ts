@@ -58,6 +58,34 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ).pipe(Effect.flatMap(decode), Effect.map(records));
   });
 
+  /** Validate every record, then write them in one statement over a JSON array of rows. */
+  const insert = Effect.fnUntraced(function* (
+    input: ReadonlyArray<Notification.Record>,
+    operation: string,
+  ) {
+    yield* Store.Transaction;
+    const rows = [];
+    for (const value of input) {
+      const record = yield* validateRecord(value).pipe(
+        Effect.mapError(storeConflict(NotificationStore, operation)),
+      );
+      if (record.workspaceId !== workspaceId)
+        return yield* new NotificationStore.Conflict({
+          operation,
+          message: "Expected a notification in this workspace",
+        });
+      const data = yield* encode(record).pipe(
+        Effect.mapError(storeFailure(NotificationStore, operation)),
+      );
+      rows.push({ id: record.id, recordedAt: DateTime.toEpochMillis(record.recordedAt), data });
+    }
+    if (rows.length === 0) return;
+    yield* guard(
+      sql`INSERT INTO notifications (workspace_id, id, recorded_at, record) SELECT ${workspaceId}, json_extract(value, '$.id'), json_extract(value, '$.recordedAt'), json_extract(value, '$.data') FROM json_each(${JSON.stringify(rows)})`,
+      true,
+    ).pipe(Effect.mapError(storeError(NotificationStore, operation)));
+  });
+
   return NotificationStore.Service.of({
     workspaceId,
     get: Effect.fn("Notifications.get")(
@@ -133,24 +161,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
         ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForParticipation")));
       },
     ),
-    insert: Effect.fn("Notifications.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(NotificationStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new NotificationStore.Conflict({
-          operation: "insert",
-          message: "Expected a notification in this workspace",
-        });
-      const data = yield* encode(record).pipe(
-        Effect.mapError(storeFailure(NotificationStore, "insert")),
-      );
-      yield* guard(
-        sql`INSERT INTO notifications (workspace_id, id, recorded_at, record) VALUES (${workspaceId}, ${record.id}, ${DateTime.toEpochMillis(record.recordedAt)}, ${data})`,
-        true,
-      ).pipe(Effect.mapError(storeError(NotificationStore, "insert")));
-    }),
+    insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),
+    insertMany: Effect.fn("Notifications.insertMany")((input) => insert(input, "insertMany")),
   });
 });
 

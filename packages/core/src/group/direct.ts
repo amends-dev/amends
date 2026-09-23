@@ -86,16 +86,21 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
         });
       return group;
     }
-    for (const memberId of requested) {
-      const found = yield* members.get(memberId);
-      if (Option.isNone(found)) return yield* new Unavailable({ memberId });
-      const member = yield* Schema.decodeEffect(Member.Record)(found.value);
-      if (member.workspaceId !== workspaceId || member.id !== memberId)
+    const found = new Map<Member.Id, Member.Record>();
+    for (const row of yield* members.getMany(requested)) {
+      const member = yield* Schema.decodeEffect(Member.Record)(row);
+      if (
+        member.workspaceId !== workspaceId ||
+        !requested.includes(member.id) ||
+        found.has(member.id)
+      )
         return yield* new InvalidReference({
           message: "Member store returned another member or workspace",
         });
-      if (member.status !== "active") return yield* new Unavailable({ memberId });
+      found.set(member.id, member);
     }
+    for (const memberId of requested)
+      if (found.get(memberId)?.status !== "active") return yield* new Unavailable({ memberId });
     const group: Group.DirectRecord = {
       id: Group.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,

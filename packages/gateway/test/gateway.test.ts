@@ -94,6 +94,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       MemberStore.Service.of({
         workspaceId: options.memberWorkspaceId ?? boundWorkspaceId,
         get: unexpected,
+        getMany: unexpected,
         findActive:
           options.findActive ??
           ((identity) =>
@@ -129,6 +130,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listByRecipient: unexpected,
         listPendingByRecipient: unexpected,
         insert: unexpected,
+        insertMany: unexpected,
       }),
     ),
     Context.add(ThreadStore.Service, {
@@ -140,6 +142,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(ThreadParticipationStore.Service, {
       workspaceId: boundWorkspaceId,
       get: unexpected,
+      getMany: unexpected,
       listByThread: unexpected,
       listByAdmission: unexpected,
       insert: unexpected,
@@ -148,6 +151,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(ThreadMessageStore.Service, {
       workspaceId: boundWorkspaceId,
       get: unexpected,
+      getMany: unexpected,
       insert: unexpected,
     }),
     Context.add(ThreadActivityStore.Service, {
@@ -172,6 +176,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       GroupMembershipStore.Service.of({
         workspaceId: boundWorkspaceId,
         get: unexpected,
+        getMany: unexpected,
         findActive: unexpected,
         listByGroup: unexpected,
         listActiveByMember: unexpected,

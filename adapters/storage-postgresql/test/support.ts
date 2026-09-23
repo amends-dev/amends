@@ -20,7 +20,7 @@ import {
 } from "@amends/core/workspace";
 import { Gateway, WorkspaceEvents, type WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
-import { Context, DateTime, Effect, Layer, Redacted } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { layer, PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { temporary } from "./postgres.ts";
@@ -99,4 +99,23 @@ export const testProvenance = (id = workspaceId): Event.Provenance => ({
   causedBy: null,
   correlationId: Event.CorrelationId.make("test-operation"),
   occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+});
+
+/**
+ * Replace what a store's by-ID reads return for one ID, in both single and batch reads;
+ * `Option.none()` hides the record. Other IDs read through to the store.
+ */
+export const replacing = <Id, A, E>(
+  store: {
+    readonly get: (id: Id) => Effect.Effect<Option.Option<A>, E>;
+    readonly getMany: (ids: ReadonlyArray<Id>) => Effect.Effect<ReadonlyArray<A>, E>;
+  },
+  id: Id,
+  replacement: Option.Option<A>,
+) => ({
+  get: (requested: Id) => (requested === id ? Effect.succeed(replacement) : store.get(requested)),
+  getMany: (ids: ReadonlyArray<Id>) =>
+    Effect.map(store.getMany(ids.filter((requested) => requested !== id)), (rows) =>
+      ids.includes(id) ? [...rows, ...Option.toArray(replacement)] : rows,
+    ),
 });

@@ -36,6 +36,7 @@ import {
   workspaceId,
   otherWorkspaceId,
   testProvenance,
+  replacing,
 } from "./support.ts";
 
 const { available, withDatabase } = setup();
@@ -778,7 +779,7 @@ describe.skipIf(!available)("PostgreSQL group reads", () => {
               ...bound,
               context: Context.add(bound.context, MemberStore.Service, {
                 ...bound.members,
-                get: (id) => (id === agentId ? bound.members.get(otherId) : bound.members.get(id)),
+                ...replacing(bound.members, agentId, yield* bound.members.get(otherId)),
               }),
             };
             expect(yield* Effect.flip(run(wrongMember, reader, roster(first.id)))).toMatchObject({

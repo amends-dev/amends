@@ -21,6 +21,14 @@ export interface Interface {
   readonly get: (
     id: GroupMembership.Id,
   ) => Effect.Effect<Option.Option<GroupMembership.Record>, Failure>;
+  /**
+   * Find several admissions, active or ended, in one read. Absent IDs are omitted and each found
+   * record appears once; order is unspecified, so callers index results by ID. An empty request
+   * reads nothing.
+   */
+  readonly getMany: (
+    ids: ReadonlyArray<GroupMembership.Id>,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
   readonly findActive: (
     groupId: GroupId.Id,
     memberId: MemberId.Id,

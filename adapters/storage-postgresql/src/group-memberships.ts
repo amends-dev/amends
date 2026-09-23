@@ -4,6 +4,7 @@ import { Member } from "@amends/core/workspace";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { groupMemberships, groups, members } from "./schema.ts";
 
@@ -32,6 +33,19 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "get")),
+    ),
+    getMany: Effect.fn("GroupMemberships.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select()
+            .from(groupMemberships)
+            .where(and(inWorkspace, inIds(groupMemberships.id, ids))),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "getMany")),
     ),
     findActive: Effect.fn("GroupMemberships.findActive")(
       function* (groupInput, memberInput) {

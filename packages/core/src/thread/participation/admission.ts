@@ -1,4 +1,4 @@
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, Effect, Layer, Schema } from "effect";
 import type { DateTime, PlatformError } from "effect";
 import { Group } from "../../group/group.ts";
 import { GroupMembership } from "../../group/membership/membership.ts";
@@ -86,13 +86,48 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     return yield* new InvalidResponse({
       message: "Participation services belong to different workspaces",
     });
+  /** Load the requested members in one read, rejecting records the store should not return. */
+  const loadMembers = Effect.fnUntraced(function* (ids: ReadonlyArray<Member.Id>) {
+    const requested = new Set(ids);
+    const result = new Map<Member.Id, Member.Record>();
+    for (const row of yield* members.getMany([...requested])) {
+      const member = yield* Schema.decodeEffect(Member.Record)(row).pipe(
+        Effect.mapError(invalidRecord),
+      );
+      if (member.workspaceId !== workspaceId || !requested.has(member.id) || result.has(member.id))
+        return yield* new InvalidResponse({
+          message: "Member store returned another member or workspace",
+        });
+      result.set(member.id, member);
+    }
+    return result;
+  });
+  /** Load the requested group admissions in one read, rejecting records the store should not return. */
+  const loadAdmissions = Effect.fnUntraced(function* (ids: ReadonlyArray<GroupMembership.Id>) {
+    const requested = new Set(ids);
+    const result = new Map<GroupMembership.Id, GroupMembership.Record>();
+    for (const row of yield* memberships.getMany([...requested])) {
+      const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(row).pipe(
+        Effect.mapError(invalidRecord),
+      );
+      if (
+        admission.workspaceId !== workspaceId ||
+        !requested.has(admission.id) ||
+        result.has(admission.id)
+      )
+        return yield* new InvalidResponse({
+          message: "Admission store returned another admission or workspace",
+        });
+      result.set(admission.id, admission);
+    }
+    return result;
+  });
   const eligible = Effect.fn("ThreadParticipationAdmission.eligible")(function* (
     groupId: Group.Id,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    const result = new Map<Member.Id, Eligible>();
     const seen = new Set<GroupMembership.Id>();
-    const active = new Set<Member.Id>();
+    const active = new Map<Member.Id, GroupMembership.Record>();
     for (const row of yield* memberships.listByGroup(id)) {
       const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(row).pipe(
         Effect.mapError(invalidRecord),
@@ -107,17 +142,14 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
       if (admission.status !== "active") continue;
       if (active.has(admission.memberId))
         return yield* new InvalidResponse({ message: "Duplicate active group admission" });
-      active.add(admission.memberId);
-      const found = yield* members.get(admission.memberId);
-      if (Option.isNone(found))
+      active.set(admission.memberId, admission);
+    }
+    const found = yield* loadMembers([...active.keys()]);
+    const result = new Map<Member.Id, Eligible>();
+    for (const [memberId, admission] of active) {
+      const member = found.get(memberId);
+      if (member === undefined)
         return yield* new InvalidResponse({ message: "Group admission has no workspace member" });
-      const member = yield* Schema.decodeEffect(Member.Record)(found.value).pipe(
-        Effect.mapError(invalidRecord),
-      );
-      if (member.id !== admission.memberId || member.workspaceId !== workspaceId)
-        return yield* new InvalidResponse({
-          message: "Group admission references another member or workspace",
-        });
       if (member.status === "active") result.set(member.id, { admission, member });
     }
     return result;
@@ -130,7 +162,7 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     );
     if (thread.workspaceId !== workspaceId)
       return yield* new InvalidResponse({ message: "Thread belongs to another workspace" });
-    const result: Array<ThreadParticipation.Record> = [];
+    const active: Array<ThreadParticipation.Record> = [];
     const seen = new Set<ThreadParticipation.Id>();
     const seenParticipants = new Set<string>();
     for (const row of yield* participations.listByThread(thread.id)) {
@@ -151,31 +183,28 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
       if (seenParticipants.has(key))
         return yield* new InvalidResponse({ message: "Duplicate active thread participant" });
       seenParticipants.add(key);
-      // Contacts and triage take part without group access; members need a current admission.
+      active.push(participant);
+    }
+    // Contacts and triage take part without group access; members need a current admission.
+    const joined = active.flatMap((p) => (p.participant._tag === "Member" ? [p.participant] : []));
+    const admissions = yield* loadAdmissions(joined.map((p) => p.groupMembershipId));
+    const found = yield* loadMembers(joined.map((p) => p.memberId));
+    const result: Array<ThreadParticipation.Record> = [];
+    for (const participant of active) {
       if (participant.participant._tag !== "Member") {
         result.push(participant);
         continue;
       }
       const joined = participant.participant;
-      const foundAdmission = yield* memberships.get(joined.groupMembershipId);
-      const foundMember = yield* members.get(joined.memberId);
-      if (Option.isNone(foundAdmission) || Option.isNone(foundMember))
+      const admission = admissions.get(joined.groupMembershipId);
+      const member = found.get(joined.memberId);
+      if (admission === undefined || member === undefined)
         return yield* new InvalidResponse({
           message: "Participation references a missing admission or workspace member",
         });
-      const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
-        foundAdmission.value,
-      ).pipe(Effect.mapError(invalidRecord));
-      const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value).pipe(
-        Effect.mapError(invalidRecord),
-      );
       if (
-        admission.id !== joined.groupMembershipId ||
-        admission.workspaceId !== workspaceId ||
         admission.groupId !== thread.groupId ||
         admission.memberId !== joined.memberId ||
-        member.workspaceId !== workspaceId ||
-        member.id !== joined.memberId ||
         !sameIdentity(member.identity, joined.identity)
       )
         return yield* new InvalidResponse({
