@@ -267,7 +267,7 @@ it.effect(
 );
 
 it.effect(
-  "malformed or unavailable receipt reads fail closed and roll back a newly keyed append",
+  "malformed or unavailable receipt reads fail closed, and appends never read their receipt back",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
@@ -294,22 +294,13 @@ it.effect(
             id: Log.Id.make("guarded"),
             schema: Schema.String,
           });
-          expect((yield* Effect.flip(log.append("value", { idempotencyKey: key })))._tag).toBe(
-            "SchemaError",
-          );
+          // The store resolves the key itself; the log trusts its returned entries.
+          const appended = yield* log.append("value", { idempotencyKey: key });
+          expect(appended.payload).toBe("value");
+          expect((yield* Effect.flip(log.getAppend(key)))._tag).toBe("SchemaError");
         }),
       );
-      expect((yield* fixture.snapshot).logs.size).toBe(0);
-      yield* run(
-        fixture,
-        Effect.gen(function* () {
-          const log = (yield* Log.Service).open({
-            id: Log.Id.make("guarded"),
-            schema: Schema.String,
-          });
-          yield* log.append("value", { idempotencyKey: key });
-        }),
-      );
+      expect((yield* fixture.snapshot).logs.get(Log.Id.make("guarded"))).toHaveLength(1);
       const failure = new Store.Failure({ operation: "getAppend", cause: "lookup unavailable" });
       const unavailable: Fixture = {
         ...fixture,
@@ -323,7 +314,7 @@ it.effect(
             schema: Schema.String,
           });
           expect(yield* Effect.flip(log.getAppend(key))).toBe(failure);
-          expect(yield* Effect.flip(log.append("value", { idempotencyKey: key }))).toBe(failure);
+          expect((yield* log.append("value", { idempotencyKey: key })).payload).toBe("value");
         }),
       );
       expect((yield* fixture.snapshot).logs.get(Log.Id.make("guarded"))).toHaveLength(1);

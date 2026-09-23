@@ -212,7 +212,9 @@ rest of its payload. Keep those components consistent with the fact's declaratio
 Reads inside a transaction see its own staged keys.
 The returned entries remain provisional until their owning commit succeeds.
 `Store.getAppend` supplies a validated receipt with the key, commit, first index,
-count, and exact entries. Both adapters persist receipts in `log_append_keys`,
+count, and exact entries. The entries a keyed append returns are its receipt; the log does not
+read the receipt back, and the [conformance suites](../packages/storage-conformance/README.md)
+check that every adapter keeps the two identical. Both adapters persist receipts in `log_append_keys`,
 using a unique workspace/log/key constraint and their existing writer serialization.
 
 Rollback removes both the append and its key. After `Store.CommitUncertain`, retry

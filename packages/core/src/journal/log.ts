@@ -248,17 +248,11 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
               return undefined;
             }),
           );
+          // The store contract makes the returned entries the key's receipt; the conformance
+          // suites check that every adapter keeps it, so appends do not read it back.
           const entries = yield* Schema.decodeEffect(responseSchema)(
             yield* native.append({ logId: id, entries: contents, ...request }),
           );
-          if (request.idempotencyKey !== undefined) {
-            const saved = yield* receipt(request.idempotencyKey);
-            const sameEntries = Schema.toEquivalence(Schema.Array(Schema.toType(Store.Entry)));
-            if (Option.isNone(saved) || !sameEntries(entries, saved.value.entries))
-              return yield* new InvalidResponse({
-                message: "Append result does not match its durable key receipt",
-              });
-          }
           return yield* Effect.forEach(entries, decodeEntry);
         }),
       );

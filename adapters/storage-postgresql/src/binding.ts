@@ -29,6 +29,8 @@ export interface TransactionState {
   readonly workspaceId: Workspace.Id;
   readonly commit: Commit.Record;
   active: boolean;
+  /** Writes the transaction staged in memory, run after its program and before COMMIT. */
+  beforeCommit: Effect.Effect<void, Store.Failure | Store.Conflict>;
 }
 
 /** The session a program runs under; statements check it against their own binding. */
@@ -139,6 +141,7 @@ export const make = Effect.fn("Binding.make")(function* (
         recordedAt: yield* DateTime.now,
         entryCount: 0,
       },
+      beforeCommit: Effect.void,
     };
     const handle = native(session);
     // Reserve a pooled connection, but own the commit boundary: the generic
@@ -167,6 +170,8 @@ export const make = Effect.fn("Binding.make")(function* (
           const exit = yield* Effect.exit(
             restore(
               program.pipe(
+                // Staged writes land inside the transaction, with the program's services.
+                Effect.tap(() => Effect.suspend(() => session.beforeCommit)),
                 Effect.updateContext((context: Context.Context<R>) =>
                   Context.add(context, CurrentTransaction, session),
                 ),

@@ -30,10 +30,8 @@ filtered entry pages remain separate from complete-batch replay reads.
 workspace, log, subject, position, and entry index. Fact subjects are required;
 generic execution entries leave the entire fact header null.
 
-`log_entries_by_commit` supports keyed append receipts and the next entry index of an
-open batch by workspace, log, commit, and entry index. Appends read only the batch's
-highest index, so a commit's cost does not grow with the entries it already holds;
-a plan test checks that commit lookups use this index. Adding it replaced the
+`log_entries_by_commit` supports keyed append receipts and batch reads by workspace, log,
+commit, and entry index; a plan test checks that commit lookups use this index. Adding it replaced the
 development baseline; recreate disposable PostgreSQL databases when adopting it.
 
 `group_follows` stores each follow with its group, member, admission, and times;
@@ -179,6 +177,15 @@ workflows](../../docs/thread-workflows.md).
 projection versions each log's commits apply, one row per name. Live commits write neither;
 going live replaces the log's rows in the rebuild's last step. See [live
 projections](../../docs/journal.md#live-projections).
+
+Appends are staged in the transaction's session. A commit reads each log's last position once,
+the first time it appends to that log, and tracks the batch it opens and the next entry index in
+memory. Just before `COMMIT` it writes the commit row with its entry count, the new batches, the
+entries (in inserts of up to 500 rows), and the append keys, one statement each; a transaction
+that reads whole batches of the log writes what it has staged first. Key and entry lookups inside
+the transaction answer staged appends from memory, and a transaction remembers the keys it has
+looked up, since the workspace's writers take turns. A reply therefore spends one statement per
+fact on journal bookkeeping, for its idempotency key, plus a few per commit.
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
 idempotency key. Key lookup precedes expected-position checks; matching bytes

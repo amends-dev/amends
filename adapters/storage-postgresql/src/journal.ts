@@ -1,5 +1,5 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
-import { and, asc, desc, eq, gt, gte, lt, inArray, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, lt, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";
 import { Binding } from "./binding.ts";
@@ -22,6 +22,32 @@ const AppendHeaderRows = Schema.Array(
     entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
   }),
 );
+
+/**
+ * What one transaction has appended but not yet written, and what it learned about its logs.
+ * Appends stage entries in memory; the transaction writes them all at once before it commits,
+ * or earlier when it reads the log.
+ */
+interface Staging {
+  /** The batch this commit opened in each log: its position and next entry index. */
+  readonly open: Map<Entry.LogId, { readonly position: Entry.Position; next: number }>;
+  /** Keyed appends this transaction looked up or staged, by log and key. */
+  readonly receipts: Map<string, Option.Option<Store.AppendReceipt>>;
+  readonly batches: Array<{ readonly logId: Entry.LogId; readonly position: Entry.Position }>;
+  readonly entries: Array<Store.Entry>;
+  readonly keys: Array<Omit<Store.AppendReceipt, "entries">>;
+  /** Entries this commit has appended in every log; its commit row records the total. */
+  entryCount: number;
+}
+
+/** Rows per multi-row insert, well inside PostgreSQL's limit on bound parameters. */
+const insertChunk = 500;
+
+const receiptKey = (logId: Entry.LogId, key: Store.IdempotencyKey) => JSON.stringify([logId, key]);
+const copyEntry = (entry: Store.Entry): Store.Entry =>
+  Object.assign({}, entry, { payload: entry.payload.slice() });
+const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
+  Object.assign({}, receipt, { entries: receipt.entries.map(copyEntry) });
 
 /**
  * The workspace's logs: appends inside a transaction, reads of committed batches, and waiting.
@@ -52,7 +78,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         and(eq(commits.workspaceId, logBatches.workspaceId), eq(commits.id, logBatches.commitId)),
       );
 
-  const getAppend = Effect.fn("Journal.getAppend")(function* (
+  const storedAppend = Effect.fn("Journal.storedAppend")(function* (
     logId: Entry.LogId,
     key: Store.IdempotencyKey,
   ) {
@@ -144,6 +170,104 @@ export const make = Effect.fn("Journal.make")(function* () {
     });
   });
 
+  const stagings = new WeakMap<Binding.TransactionState, Staging>();
+
+  /** Write everything the transaction has staged, as one statement per table. */
+  const flush = Effect.fnUntraced(
+    function* (session: Binding.TransactionState) {
+      const staging = stagings.get(session);
+      if (staging === undefined || staging.entries.length === 0) return;
+      const { batches, entries, keys } = staging;
+      yield* db
+        .insert(commits)
+        .values({
+          workspaceId,
+          id: session.commit.id,
+          recordedAt: DateTime.toDate(session.commit.recordedAt),
+          entryCount: staging.entryCount,
+        })
+        .onConflictDoUpdate({
+          target: [commits.workspaceId, commits.id],
+          set: { entryCount: staging.entryCount },
+        });
+      if (batches.length > 0)
+        yield* db
+          .insert(logBatches)
+          .values(
+            batches.map((batch) =>
+              Object.assign({ workspaceId, commitId: session.commit.id }, batch),
+            ),
+          );
+      for (let start = 0; start < entries.length; start += insertChunk)
+        yield* db.insert(logEntries).values(
+          entries.slice(start, start + insertChunk).map((entry) =>
+            Object.assign(
+              {
+                workspaceId,
+                id: entry.id,
+                logId: entry.logId,
+                position: entry.position,
+                commitId: entry.commitId,
+                entryIndex: entry.index,
+                recordedAt: DateTime.toDate(entry.recordedAt),
+                payload: entry.payload,
+              },
+              JournalEntry.toColumns(entry),
+            ),
+          ),
+        );
+      if (keys.length > 0)
+        yield* db
+          .insert(logAppendKeys)
+          .values(keys.map((receipt) => Object.assign({ workspaceId }, receipt)));
+      batches.length = 0;
+      entries.length = 0;
+      keys.length = 0;
+    },
+    Effect.mapError(storeError(Store, "append")),
+  );
+
+  const stagingOf = (session: Binding.TransactionState) => {
+    const existing = stagings.get(session);
+    if (existing !== undefined) return existing;
+    const staging: Staging = {
+      open: new Map(),
+      receipts: new Map(),
+      batches: [],
+      entries: [],
+      keys: [],
+      entryCount: 0,
+    };
+    stagings.set(session, staging);
+    session.beforeCommit = flush(session);
+    return staging;
+  };
+
+  /** The caller's live transaction on this binding, if it has staged anything. */
+  const stagedSession = Effect.map(Effect.serviceOption(Binding.CurrentTransaction), (current) =>
+    Option.filter(current, (session) => session.active && stagings.has(session)),
+  );
+  /** Reads of whole batches see the transaction's own appends once they are written. */
+  const flushed = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+    Effect.flatMap(stagedSession, (session) =>
+      Option.isSome(session) ? Effect.andThen(flush(session.value), program) : program,
+    );
+
+  /** A keyed append, from what this transaction staged or looked up before, else from storage. */
+  const receiptIn = Effect.fnUntraced(function* (
+    staging: Staging,
+    logId: Entry.LogId,
+    key: Store.IdempotencyKey,
+  ) {
+    const id = receiptKey(logId, key);
+    const known = staging.receipts.get(id);
+    if (known !== undefined) return Option.map(known, copyReceipt);
+    // Writers to this workspace take turns, so a lookup stays true for the whole transaction.
+    const stored = yield* storedAppend(logId, key);
+    staging.receipts.set(id, stored);
+    return Option.map(stored, copyReceipt);
+  });
+
   const append = Effect.fn("Journal.append")(function* (
     session: Binding.TransactionState,
     input: Store.AppendInput,
@@ -166,8 +290,9 @@ export const make = Effect.fn("Journal.make")(function* () {
         operation: "append",
         message: "Fact belongs to another workspace",
       });
+    const staging = stagingOf(session);
     if (request.idempotencyKey !== undefined) {
-      const previous = yield* getAppend(request.logId, request.idempotencyKey).pipe(
+      const previous = yield* receiptIn(staging, request.logId, request.idempotencyKey).pipe(
         Effect.mapError(storeFailure(Store, "append")),
       );
       if (Option.isSome(previous)) {
@@ -179,115 +304,79 @@ export const make = Effect.fn("Journal.make")(function* () {
         return previous.value.entries;
       }
     }
-    const last = yield* db
-      .select({ position: logBatches.position, commitId: logBatches.commitId })
-      .from(logBatches)
-      .where(scoped(request.logId))
-      .orderBy(desc(logBatches.position))
-      .limit(1)
-      .pipe(
-        Effect.flatMap(
-          Schema.decodeUnknownEffect(
-            Schema.Array(Schema.Struct({ position: Entry.Position, commitId: Commit.Id })),
-          ),
-        ),
-        Effect.map(Array.head),
-        Effect.mapError(storeError(Store, "append")),
-      );
+    const opened = staging.open.get(request.logId);
+    // A log this commit has not appended to yet ends at its last stored batch.
+    const last =
+      opened !== undefined
+        ? Option.some(opened.position)
+        : yield* db
+            .select({ position: logBatches.position })
+            .from(logBatches)
+            .where(scoped(request.logId))
+            .orderBy(desc(logBatches.position))
+            .limit(1)
+            .pipe(
+              Effect.flatMap(
+                Schema.decodeUnknownEffect(
+                  Schema.Array(Schema.Struct({ position: Entry.Position })),
+                ),
+              ),
+              Effect.map((rows) => Option.map(Array.head(rows), (row) => row.position)),
+              Effect.mapError(storeError(Store, "append")),
+            );
     if (request.expectedAfter !== undefined) {
-      const actual = Option.map(last, (value) => value.position);
-      if (!Option.makeEquivalence<number>((a, b) => a === b)(actual, request.expectedAfter))
+      if (!Option.makeEquivalence<number>((a, b) => a === b)(last, request.expectedAfter))
         return yield* new Store.Conflict({
           operation: "append",
           message: "Expected log position changed",
         });
     }
     if (request.entries.length === 0) return [];
-    const extending = Option.isSome(last) && last.value.commitId === session.commit.id;
-    const position = Entry.Position.make(
-      Option.isNone(last) ? 0 : last.value.position + (extending ? 0 : 1),
-    );
-    // Seek the batch's next index through log_entries_by_commit instead of counting its entries.
-    const written = extending
-      ? yield* db
-          .select({ highest: max(logEntries.entryIndex) })
-          .from(logEntries)
-          .where(
-            and(
-              eq(logEntries.workspaceId, workspaceId),
-              eq(logEntries.logId, request.logId),
-              eq(logEntries.commitId, session.commit.id),
-            ),
-          )
-          .pipe(
-            Effect.map((rows) => {
-              const highest = rows[0]?.highest;
-              return highest === null || highest === undefined ? 0 : highest + 1;
-            }),
-            Effect.mapError(storeError(Store, "append")),
-          )
-      : 0;
+    const batch =
+      opened ??
+      (() => {
+        const position = Entry.Position.make(
+          Option.match(last, { onNone: () => 0, onSome: (value) => value + 1 }),
+        );
+        const created = { position, next: 0 };
+        staging.open.set(request.logId, created);
+        staging.batches.push({ logId: request.logId, position });
+        return created;
+      })();
+    const first = batch.next;
     const recordedAt = yield* DateTime.now;
-    yield* db
-      .insert(commits)
-      .values({
-        workspaceId,
-        id: session.commit.id,
-        recordedAt: DateTime.toDate(session.commit.recordedAt),
-        entryCount: 0,
-      })
-      .onConflictDoNothing()
-      .pipe(Effect.mapError(storeError(Store, "append")));
-    if (!extending)
-      yield* db
-        .insert(logBatches)
-        .values({ workspaceId, logId: request.logId, position, commitId: session.commit.id })
-        .pipe(Effect.mapError(storeError(Store, "append")));
-    const result: Array<Store.Entry> = [];
-    for (const [offset, content] of request.entries.entries()) {
-      const id = Entry.Id.make(crypto.randomUUID());
-      const index = written + offset;
-      yield* db
-        .insert(logEntries)
-        .values({
-          workspaceId,
-          id,
+    const entries = request.entries.map((content, offset): Store.Entry =>
+      Object.assign(
+        {
+          id: Entry.Id.make(crypto.randomUUID()),
           logId: request.logId,
-          position,
+          position: batch.position,
           commitId: session.commit.id,
-          entryIndex: index,
-          recordedAt: DateTime.toDate(recordedAt),
-          payload: content.payload.slice(),
-          ...JournalEntry.toColumns(content),
-        })
-        .pipe(Effect.mapError(storeError(Store, "append")));
-      result.push({
-        id,
-        logId: request.logId,
-        position,
-        commitId: session.commit.id,
-        index,
-        recordedAt,
-        ...content,
-        payload: content.payload.slice(),
-      });
-    }
-    yield* database.sql`UPDATE commits SET entry_count = entry_count + ${result.length} WHERE workspace_id = ${workspaceId} AND id = ${session.commit.id}`.pipe(
-      Effect.mapError(storeError(Store, "append")),
+          index: first + offset,
+          recordedAt,
+        },
+        content,
+        { payload: content.payload.slice() },
+      ),
     );
-    if (request.idempotencyKey !== undefined)
-      yield* db
-        .insert(logAppendKeys)
-        .values({
-          workspaceId,
-          logId: request.logId,
-          key: request.idempotencyKey,
-          commitId: session.commit.id,
-          firstIndex: written,
-          entryCount: result.length,
-        })
-        .pipe(Effect.mapError(storeError(Store, "append")));
-    return result;
+    batch.next = first + entries.length;
+    staging.entries.push(...entries);
+    staging.entryCount += entries.length;
+    if (request.idempotencyKey !== undefined && Array.isReadonlyArrayNonEmpty(entries)) {
+      const receipt = {
+        logId: request.logId,
+        key: request.idempotencyKey,
+        commitId: session.commit.id,
+        firstIndex: first,
+        entryCount: entries.length,
+      };
+      staging.keys.push(receipt);
+      staging.receipts.set(
+        receiptKey(request.logId, request.idempotencyKey),
+        Option.some(Object.assign({}, receipt, { entries: Array.map(entries, copyEntry) })),
+      );
+    }
+    return entries.map(copyEntry);
   });
 
   return Store.Service.of({
@@ -295,6 +384,16 @@ export const make = Effect.fn("Journal.make")(function* () {
       function* (logId, entryId) {
         yield* Schema.decodeEffect(Entry.LogId)(logId);
         yield* Schema.decodeEffect(Entry.Id)(entryId);
+        // An entry is either staged by this transaction or stored; staged ones need no write.
+        const session = yield* stagedSession;
+        const staged = Option.flatMap(session, (value) =>
+          Option.fromUndefinedOr(
+            stagings
+              .get(value)
+              ?.entries.find((entry) => entry.logId === logId && entry.id === entryId),
+          ),
+        );
+        if (Option.isSome(staged)) return Option.some(copyEntry(staged.value));
         return yield* guard(
           db
             .select(entryColumns)
@@ -311,36 +410,46 @@ export const make = Effect.fn("Journal.make")(function* () {
       Effect.mapError(storeFailure(Store, "getEntry")),
     ),
     readFacts: Effect.fn("Journal.readFacts")(function* (logId, input) {
-      return yield* guard(
-        Effect.gen(function* () {
-          yield* Schema.decodeEffect(Entry.LogId)(logId);
-          const options = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input);
-          return yield* db
-            .select(entryColumns)
-            .from(logEntries)
-            .where(
-              and(
-                eq(logEntries.workspaceId, workspaceId),
-                eq(logEntries.logId, logId),
-                options.name === undefined ? undefined : eq(logEntries.factName, options.name),
-                options.subject === undefined ? undefined : eq(logEntries.subject, options.subject),
-                options.version === undefined
-                  ? undefined
-                  : eq(logEntries.factVersion, options.version),
-                // A row comparison bounds the index scan; the equivalent OR form only filters it.
-                options.after === undefined
-                  ? undefined
-                  : sql`(${logEntries.position}, ${logEntries.entryIndex}) > (${options.after.position}, ${options.after.index})`,
-              ),
-            )
-            .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
-            .limit(options.limit)
-            .pipe(Effect.flatMap(decodeEntries));
-        }),
+      return yield* flushed(
+        guard(
+          Effect.gen(function* () {
+            yield* Schema.decodeEffect(Entry.LogId)(logId);
+            const options = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input);
+            return yield* db
+              .select(entryColumns)
+              .from(logEntries)
+              .where(
+                and(
+                  eq(logEntries.workspaceId, workspaceId),
+                  eq(logEntries.logId, logId),
+                  options.name === undefined ? undefined : eq(logEntries.factName, options.name),
+                  options.subject === undefined
+                    ? undefined
+                    : eq(logEntries.subject, options.subject),
+                  options.version === undefined
+                    ? undefined
+                    : eq(logEntries.factVersion, options.version),
+                  // A row comparison bounds the index scan; the equivalent OR form only filters it.
+                  options.after === undefined
+                    ? undefined
+                    : sql`(${logEntries.position}, ${logEntries.entryIndex}) > (${options.after.position}, ${options.after.index})`,
+                ),
+              )
+              .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
+              .limit(options.limit)
+              .pipe(Effect.flatMap(decodeEntries));
+          }),
+        ),
       ).pipe(Effect.mapError(storeFailure(Store, "readFacts")));
     }),
     getAppend: (logId, key) =>
-      guard(getAppend(logId, key)).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
+      guard(
+        Effect.flatMap(stagedSession, (session) =>
+          Option.isSome(session)
+            ? receiptIn(stagingOf(session.value), logId, key)
+            : storedAppend(logId, key),
+        ),
+      ).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
     transaction: (program, options) =>
       transaction(
         program,
@@ -351,17 +460,19 @@ export const make = Effect.fn("Journal.make")(function* () {
         options,
       ),
     get: Effect.fn("Journal.get")(function* (logId, commitId) {
-      return yield* guard(
-        batches(headers().where(and(scoped(logId), eq(logBatches.commitId, commitId)))),
+      return yield* flushed(
+        guard(batches(headers().where(and(scoped(logId), eq(logBatches.commitId, commitId))))),
       ).pipe(Effect.map(Array.head), Effect.mapError(storeFailure(Store, "get")));
     }),
     read: Effect.fn("Journal.read")(function* (logId, options) {
-      return yield* guard(
-        batches(
-          headers()
-            .where(and(scoped(logId), gt(logBatches.position, options.after ?? -1)))
-            .orderBy(asc(logBatches.position))
-            .limit(options.limit),
+      return yield* flushed(
+        guard(
+          batches(
+            headers()
+              .where(and(scoped(logId), gt(logBatches.position, options.after ?? -1)))
+              .orderBy(asc(logBatches.position))
+              .limit(options.limit),
+          ),
         ),
       ).pipe(Effect.mapError(storeFailure(Store, "read")));
     }),
