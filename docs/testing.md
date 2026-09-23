@@ -273,9 +273,9 @@ Client's session and directory suites verify headless storage, scope lifetime, q
 state, authorization failure, and retry with isolated transports. They require no UI
 package or router. Web's application suite verifies safe redirects, route guards,
 workspace changes, and credential/request cleanup. Desktop's application suite tests
-its independent composition with the real hash router. UI's Compositions / Application
-stories verify presentation and caller-supplied actions in its existing workshop at
-port 6007; client has no Storybook dependency or workshop.
+its independent composition with the real hash router. Each app composes its bootstrap
+screens from UI primitives. UI's workshop at port 6007 covers the shared foundations
+and components; client has no Storybook dependency or workshop.
 
 The local host's HTTP tests exercise desktop CORS preflights and 401 response headers.
 After changing host runtime setup, also perform the temporary-port startup check.

@@ -1,23 +1,24 @@
 import type { BaseRouterProps } from "@solidjs/router";
 import { ClientProvider, type ClientProviderProps } from "@amends/client";
-import { ApplicationFrame, ApplicationPage } from "@amends/ui/compositions/application";
+import { colorThemes } from "@amends/ui/foundations/color/styles";
+import { fontFamilies } from "@amends/ui/foundations/typography";
 import { ErrorBoundary, type Component } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { ApplicationRoutes } from "./routes.tsx";
+import { PlaceholderPage } from "./placeholder-page.tsx";
 
 export interface ApplicationProps extends ClientProviderProps {
   readonly router: Component<BaseRouterProps>;
 }
 export function Application(props: ApplicationProps) {
   return (
-    <ApplicationFrame>
+    <div
+      class={colorThemes.cotton}
+      style={{ "min-height": "100dvh", "font-family": fontFamilies.sans }}
+    >
       <ErrorBoundary
         fallback={
-          <ApplicationPage
-            brand="Amends"
-            title="Something went wrong"
-            message="Reload the app to try again."
-          />
+          <PlaceholderPage title="Something went wrong" message="Reload the app to try again." />
         }
       >
         <ClientProvider
@@ -30,6 +31,6 @@ export function Application(props: ApplicationProps) {
           </Dynamic>
         </ClientProvider>
       </ErrorBoundary>
-    </ApplicationFrame>
+    </div>
   );
 }

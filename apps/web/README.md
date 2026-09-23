@@ -43,8 +43,10 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 
 `src/main.tsx` mounts Solid and loads shared fonts/global styles. `src/app.tsx` chooses
 `Router`, resolves the endpoint (default `/api`), and supplies the session store.
-`src/application.tsx` connects the headless `ClientProvider` to UI's frame and the
-browser router. `src/routes.tsx` owns routes, redirects, guard presentations, and
-client-to-UI wiring. Client supplies session/API/query state; UI supplies presentation.
+`src/application.tsx` applies the theme and connects the headless `ClientProvider`
+to the browser router and error boundary. `src/placeholder-page.tsx` composes UI
+primitives for the temporary bootstrap screens. `src/routes.tsx` owns routes,
+redirects, guard presentations, and client-to-UI wiring.
+Client supplies session/API/query state; UI supplies presentation.
 Neither library imports the other. Route integration tests live in this app.
 Vite deduplicates Solid and compiles the shared vanilla-extract styles.

@@ -15,8 +15,8 @@ composes these foundations into primary, secondary, and ghost actions with nativ
 [client package](../client/README.md) independently. UI supplies presentation; client
 supplies headless session/API state. The apps own route trees and connect that state
 to UI props and actions. Neither library depends on the other.
-The [application composition](src/compositions/application/README.md) supplies the
-minimal frame/page presentation, and `@amends/ui/styles` supplies an opt-in document reset. This package was renamed from `@amends/frontend`;
+The apps compose their bootstrap screens from UI's foundations and primitives.
+`@amends/ui/styles` supplies an opt-in document reset. This package was renamed from `@amends/frontend`;
 it replaces the removed legacy UI implementation. The `design-system` package remains retired.
 
 ## Run and verify

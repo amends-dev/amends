@@ -8,14 +8,11 @@ import {
   useSession,
   useWorkspace,
 } from "@amends/client";
-import { ApplicationPage, type ApplicationPageProps } from "@amends/ui/compositions/application";
 import { Button } from "@amends/ui/primitives/button";
 import { Row } from "@amends/ui/primitives/layout";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
+import { PlaceholderPage as Page } from "./placeholder-page.tsx";
 
-function Page(props: ParentProps<ApplicationPageProps>) {
-  return <ApplicationPage {...props} brand="Amends" />;
-}
 function SessionActions() {
   const session = useSession();
   return (

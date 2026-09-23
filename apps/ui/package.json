@@ -41,7 +41,6 @@
     "./compositions/toast": "./src/compositions/toast/index.ts",
     "./compositions/drawer": "./src/compositions/drawer/index.ts",
     "./compositions/shell": "./src/compositions/shell/index.ts",
-    "./compositions/application": "./src/compositions/application/index.ts",
     "./styles": "./src/styles.css.ts"
   },
   "scripts": {

@@ -64,6 +64,9 @@ features need them. The production content security policy permits bundled asset
 API; development additionally permits the local Vite connection.
 
 `src/app.tsx` supplies `HashRouter` to this app's `src/application.tsx` composition.
+That composition applies the theme and connects the headless `ClientProvider`,
+router, and error boundary. `src/placeholder-page.tsx` composes UI primitives for
+the temporary bootstrap screens.
 `src/routes.tsx` owns routes, guard presentations, and redirects. Both platform apps
 import `@amends/client` and `@amends/ui` independently: client supplies headless state,
 and UI supplies presentation. Each app loads UI fonts and `@amends/ui/styles` explicitly.
