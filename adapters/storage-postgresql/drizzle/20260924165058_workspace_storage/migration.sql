@@ -188,6 +188,7 @@ CREATE TABLE "notifications" (
 	"discard_reason" text,
 	"recipient_kind" text NOT NULL,
 	"recipient_id" text,
+	"recipient_member_id" text,
 	"recorded_at" timestamp with time zone NOT NULL,
 	"state" text NOT NULL,
 	"thread_id" text,
@@ -195,6 +196,7 @@ CREATE TABLE "notifications" (
 	"thread_sequence" integer,
 	CONSTRAINT "notifications_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "notification_state" CHECK (("state" = 'Pending' AND "discard_reason" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" = 'participation-ended')),
+	CONSTRAINT "notification_recipient" CHECK (CASE "recipient_kind" WHEN 'Triage' THEN "recipient_id" IS NULL AND "recipient_member_id" IS NULL WHEN 'Contact' THEN "recipient_id" IS NOT NULL AND "recipient_member_id" IS NULL ELSE "recipient_id" IS NOT NULL AND "recipient_member_id" IS NOT NULL END),
 	CONSTRAINT "notification_thread" CHECK (("thread_id" IS NULL AND "thread_group_id" IS NULL AND "thread_sequence" IS NULL) OR ("thread_id" IS NOT NULL AND "thread_group_id" IS NOT NULL AND "thread_sequence" > 0)),
 	CONSTRAINT "notifications_recipient_kind" CHECK (("recipient_kind" = 'Triage' AND "recipient_id" IS NULL) OR ("recipient_kind" IN ('Human', 'Agent', 'Contact') AND "recipient_id" IS NOT NULL AND "recipient_id" <> ''))
 );
@@ -305,10 +307,10 @@ CREATE INDEX "log_entries_by_fact" ON "log_entries" ("workspace_id","log_id","fa
 CREATE UNIQUE INDEX "active_member_identity" ON "members" ("workspace_id","identity_kind","identity_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "members_by_identity" ON "members" ("identity_kind","identity_id","workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "notifications_by_source_recipient" ON "notifications" ("workspace_id","source_log_id","source_entry_id","recipient_kind",coalesce("recipient_id", ''));--> statement-breakpoint
-CREATE INDEX "notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"recorded_at","id" COLLATE "C");--> statement-breakpoint
-CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"recorded_at","id" COLLATE "C") WHERE "state" = 'Pending';--> statement-breakpoint
-CREATE INDEX "pending_notifications_by_group" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"thread_group_id") WHERE "state" = 'Pending';--> statement-breakpoint
-CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_id", ''),"thread_id","thread_sequence") WHERE "state" = 'Pending';--> statement-breakpoint
+CREATE INDEX "notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"recorded_at","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"recorded_at","id" COLLATE "C") WHERE "state" = 'Pending';--> statement-breakpoint
+CREATE INDEX "pending_notifications_by_group" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_group_id") WHERE "state" = 'Pending';--> statement-breakpoint
+CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_id","thread_sequence") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_message_activity" ON "thread_activities" ("workspace_id","message_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_participation_activity" ON "thread_activities" ("workspace_id","participation_id","kind");--> statement-breakpoint

@@ -48,7 +48,7 @@ const bob = Actor.Value.make({
 const page = { limit: 10 };
 const record = (
   id: string,
-  recipient = alice.identity,
+  recipient: Notification.Recipient = Notification.ofMember(alice.memberId, alice.identity),
   recordWorkspaceId = workspaceId,
 ): Notification.Record => ({
   id: Notification.Id.make(id),
@@ -59,8 +59,8 @@ const record = (
   state: { _tag: "Pending" },
 });
 const mine = record("mine");
-const theirs = record("theirs", bob.identity);
-const agents = record("agents", agent.identity);
+const theirs = record("theirs", Notification.ofMember(bob.memberId, bob.identity));
+const agents = record("agents", Notification.ofMember(agent.memberId, agent.identity));
 const sameRecipient = Schema.toEquivalence(Notification.Recipient);
 const unexpected = () => Effect.die("Notification reads must not write");
 const seed = (fixture: Fixture) =>
@@ -331,9 +331,11 @@ it.effect(
         alice,
         { listByRecipient: list(false), listPendingByRecipient: list(true) },
       );
+      // The actor's inbox is their membership's.
+      const recipient = Notification.ofMember(alice.memberId, alice.identity);
       expect(calls).toEqual([
-        { pending: false, recipient: alice.identity, options },
-        { pending: true, recipient: alice.identity, options },
+        { pending: false, recipient, options },
+        { pending: true, recipient, options },
       ]);
     }),
 );
@@ -391,7 +393,7 @@ it.effect(
       for (const [value, tag] of [
         [record("wrong-id"), "NotificationApplication.InvalidResponse"],
         [
-          record("mine", alice.identity, otherWorkspaceId),
+          record("mine", mine.recipient, otherWorkspaceId),
           "NotificationApplication.WorkspaceMismatch",
         ],
         [malformed, "NotificationApplication.InvalidResponse"],
@@ -417,7 +419,7 @@ it.effect("notification lists reject foreign, misaddressed, duplicate, and overs
       [[mine, theirs], 10, "NotificationApplication.InvalidResponse"],
       [[agents], 10, "NotificationApplication.InvalidResponse"],
       [
-        [record("mine", alice.identity, otherWorkspaceId)],
+        [record("mine", mine.recipient, otherWorkspaceId)],
         10,
         "NotificationApplication.WorkspaceMismatch",
       ],

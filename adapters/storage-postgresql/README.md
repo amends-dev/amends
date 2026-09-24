@@ -115,7 +115,10 @@ decoded with core schemas; corrupt rows remain `Failure` outcomes.
 Notification recipients are Human, Agent, Contact, or workspace-singleton Triage.
 Triage has no person ID. Recipient indexes normalize the missing ID only for
 indexing, preserving source/recipient uniqueness for concurrent Triage inserts.
-Notification reads match both recipient kind and ID, with bounded pages ordered
+A human or agent recipient also records `recipient_member_id`, the membership notified, which
+`notification_recipient` requires for them alone. The inbox indexes key on that membership, or on
+the contact's ID, so a member who rejoins under a new ID reads none of the earlier membership's.
+Notification reads match both recipient kind and inbox, with bounded pages ordered
 by recorded time and ID using `COLLATE "C"`, which orders IDs by their bytes.
 Notification IDs and source/recipient associations are unique within the workspace.
 Inserts join the journal transaction; source existence and recipient selection

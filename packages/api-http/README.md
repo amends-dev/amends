@@ -64,8 +64,8 @@ so a client can import the complete contract without loading server code.
 with the same key returns the first attempt's result, and the same key with a different body
 returns 422 `Request.Reused`. Clients generating the typed client pass it in `headers`.
 
-- `notifications`: `GET /workspaces/:workspaceId/notifications` lists the authenticated
-  human or agent's inbox. `GET …/:notificationId` reads one notification. Active
+- `notifications`: `GET /workspaces/:workspaceId/notifications` lists the inbox of the
+  authenticated human or agent's membership. `GET …/:notificationId` reads one notification. Active
   membership is required, and a missing record or another recipient's notification
   returns the same 404. The caller cannot select a different recipient.
 - `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream of the

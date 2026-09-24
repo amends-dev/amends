@@ -23,7 +23,7 @@ import { Actor, Identity } from "@amends/core/identity";
 import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 
-import { NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends/core/notification";
 
 import {
   Thread,
@@ -151,8 +151,10 @@ export const threads = (harness: Harness) => {
         agent: Actor.Value.make({ workspaceId, memberId: agentId, identity: agentIdentity }),
       };
     });
-    const notifications = (bound: Bound, identity: Identity.MemberReference) =>
-      bound.notifications.listByRecipient(identity, { limit: 100 });
+    const notifications = (bound: Bound, memberId: Member.Id, identity: Identity.MemberReference) =>
+      bound.notifications.listByRecipient(Notification.ofMember(memberId, identity), {
+        limit: 100,
+      });
     const sorted = (values: ReadonlyArray<ThreadParticipation.Record>) =>
       values.toSorted((a, b) => (a.id < b.id ? -1 : 1));
     /** Mentioning every member of the fixture group, the author included, enrolls and notifies them all. */
@@ -225,8 +227,12 @@ export const threads = (harness: Harness) => {
               expect(event.provenance.performedBy).toMatchObject({ memberId: owner.memberId });
               expect(event.payload.recipients).toEqual([]);
               // A message never notifies its author; the rest of the group is neither enrolled nor notified.
-              for (const identity of [owner.identity, humanIdentity, agentIdentity])
-                expect(yield* notifications(bound, identity)).toEqual([]);
+              for (const [memberId, identity] of [
+                [owner.memberId, owner.identity],
+                [humanId, humanIdentity],
+                [agentId, agentIdentity],
+              ] as const)
+                expect(yield* notifications(bound, memberId, identity)).toEqual([]);
               // Posting reads the thread through the author's own message.
               expect(
                 yield* bound.readStates.getThreadPositions(owner.memberId, [result.thread.id]),
@@ -256,9 +262,9 @@ export const threads = (harness: Harness) => {
                   .flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? [])
                   .sort(),
               ).toEqual([owner.memberId, agentId].sort());
-              expect(yield* notifications(bound, owner.identity)).toEqual([]);
-              expect(yield* notifications(bound, humanIdentity)).toEqual([]);
-              expect(yield* notifications(bound, agentIdentity)).toHaveLength(1);
+              expect(yield* notifications(bound, owner.memberId, owner.identity)).toEqual([]);
+              expect(yield* notifications(bound, humanId, humanIdentity)).toEqual([]);
+              expect(yield* notifications(bound, agentId, agentIdentity)).toHaveLength(1);
               expect(yield* bound.groupMemberships.findActive(group.id, otherId)).toEqual(
                 Option.none(),
               );
@@ -487,8 +493,12 @@ export const threads = (harness: Harness) => {
               _tag: "Projection.Failure",
             });
             expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
-            for (const identity of [owner.identity, humanIdentity, agentIdentity])
-              expect(yield* notifications(bound, identity)).toEqual([]);
+            for (const [memberId, identity] of [
+              [owner.memberId, owner.identity],
+              [humanId, humanIdentity],
+              [agentId, agentIdentity],
+            ] as const)
+              expect(yield* notifications(bound, memberId, identity)).toEqual([]);
             expect(yield* history(bound)).toEqual(before);
             // A subsequent valid operation can use the same connection and all projections.
             yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
@@ -524,12 +534,15 @@ export const threads = (harness: Harness) => {
               expect(yield* bound.participations.get(participant.id)).toMatchObject({
                 value: { status: "ended", endedAt: yield* DateTime.now },
               });
-              expect((yield* notifications(bound, agentIdentity))[0]?.state).toEqual({
+              expect((yield* notifications(bound, agentId, agentIdentity))[0]?.state).toEqual({
                 _tag: "Discarded",
                 reason: "participation-ended",
               });
               expect(
-                yield* bound.notifications.listPendingByRecipient(agentIdentity, { limit: 100 }),
+                yield* bound.notifications.listPendingByRecipient(
+                  Notification.ofMember(agentId, agentIdentity),
+                  { limit: 100 },
+                ),
               ).toEqual([]);
               yield* run(
                 bound,
@@ -541,7 +554,9 @@ export const threads = (harness: Harness) => {
               expect(yield* bound.participations.get(participant.id)).toMatchObject({
                 value: { status: "ended" },
               });
-              expect((yield* notifications(bound, agentIdentity))[0]?.state._tag).toBe("Discarded");
+              expect((yield* notifications(bound, agentId, agentIdentity))[0]?.state._tag).toBe(
+                "Discarded",
+              );
               const next = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
               expect(
                 next.participants
@@ -554,7 +569,7 @@ export const threads = (harness: Harness) => {
                 Effect.flatMap(MemberApplication.Service, (service) => service.remove(agentId)),
               );
               expect(
-                (yield* notifications(bound, agentIdentity)).every(
+                (yield* notifications(bound, agentId, agentIdentity)).every(
                   (row) => row.state._tag === "Discarded",
                 ),
               ).toBe(true);
@@ -564,7 +579,7 @@ export const threads = (harness: Harness) => {
                 )?.status,
               ).toBe("ended");
               expect(
-                (yield* notifications(bound, humanIdentity)).every(
+                (yield* notifications(bound, humanId, humanIdentity)).every(
                   (row) => row.state._tag === "Pending",
                 ),
               ).toBe(true);
@@ -681,7 +696,7 @@ export const threads = (harness: Harness) => {
                     started,
                     activities: yield* bound.activities.listByThread(started.thread.id),
                     participants: yield* bound.participations.listByThread(started.thread.id),
-                    notifications: yield* notifications(bound, agentIdentity),
+                    notifications: yield* notifications(bound, agentId, agentIdentity),
                     history: yield* history(bound),
                   };
                 }),
@@ -713,9 +728,11 @@ export const threads = (harness: Harness) => {
                   expect(yield* bound.activities.listByThread(saved.started.thread.id)).toEqual(
                     saved.activities,
                   );
-                  expect(yield* notifications(bound, agentIdentity)).toEqual(saved.notifications);
+                  expect(yield* notifications(bound, agentId, agentIdentity)).toEqual(
+                    saved.notifications,
+                  );
                   expect(
-                    yield* notifications(bound, {
+                    yield* notifications(bound, otherId, {
                       _tag: "Human",
                       id: Identity.HumanId.make("other"),
                     }),
@@ -917,9 +934,12 @@ export const threads = (harness: Harness) => {
                         .every((p) => p.status === "ended"),
                     ).toBe(true);
                   expect(
-                    yield* bound.notifications.listPendingByRecipient(agentIdentity, {
-                      limit: 100,
-                    }),
+                    yield* bound.notifications.listPendingByRecipient(
+                      Notification.ofMember(agentId, agentIdentity),
+                      {
+                        limit: 100,
+                      },
+                    ),
                   ).toEqual([]);
                 }),
               ),
@@ -989,7 +1009,10 @@ export const threads = (harness: Harness) => {
                 _tag: "Some",
               });
               expect(
-                yield* bound.notifications.listPendingByRecipient(agentIdentity, { limit: 100 }),
+                yield* bound.notifications.listPendingByRecipient(
+                  Notification.ofMember(agentId, agentIdentity),
+                  { limit: 100 },
+                ),
               ).toHaveLength(1);
               expect(yield* history(bound)).toEqual(snapshot);
             }),

@@ -26,6 +26,7 @@ import { GroupFollowStore } from "./follow/store.ts";
 import { ReadStateStore } from "../attention/store.ts";
 import { NotificationStore } from "../notification/store.ts";
 import { InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
+import { Notification } from "../notification/notification.ts";
 export { InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
@@ -302,7 +303,10 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       following.add(follow.groupMembershipId);
     }
     const pending = new Map<Group.Id, number>();
-    for (const found of yield* notifications.countPendingByGroup(actor.identity, ids)) {
+    for (const found of yield* notifications.countPendingByGroup(
+      Notification.ofMember(actor.memberId, actor.identity),
+      ids,
+    )) {
       const value = yield* Schema.decodeEffect(NotificationStore.PendingCount)(found).pipe(
         Effect.mapError(decodeFailure),
       );

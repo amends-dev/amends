@@ -1,3 +1,4 @@
+import type * as Core from "@amends/core";
 import { describe, expect, it } from "@effect/vitest";
 import { Actor, Identity } from "@amends/core/identity";
 import { Entry, Journal, Store } from "@amends/core/journal";
@@ -6,26 +7,38 @@ import {
   NotificationApplication,
   NotificationStore,
 } from "@amends/core/notification";
-import { Group } from "@amends/core/group";
-import { Thread, ThreadParticipation } from "@amends/core/thread";
+import { BuiltinRoles } from "@amends/core/authorization";
+import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+import { Thread, ThreadApplication, ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Array, Context, DateTime, Effect, Option } from "effect";
-import { boundTo, otherWorkspaceId, runHost, Support, workspaceId } from "./support.ts";
+import { acceptInvitation, createWorkspace, invite, removeMember } from "./operations.ts";
+import { boundTo, future, otherWorkspaceId, runHost, Support, workspaceId } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
 /** Notification storage: isolation, paging, batches, staged reads, and gateway reads. */
 
 export const notifications = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
+  const { core, initialized, runGateway } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: notifications`, () => {
-    const human = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("recipient") });
-    const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("recipient") });
+    const humanIdentity = Identity.Reference.cases.Human.make({
+      id: Identity.HumanId.make("recipient"),
+    });
+    const agentIdentity = Identity.Reference.cases.Agent.make({
+      id: Identity.AgentId.make("recipient"),
+    });
+    const anotherIdentity = Identity.Reference.cases.Human.make({
+      id: Identity.HumanId.make("another"),
+    });
+    // People and agents are notified as a membership.
+    const human = Notification.ofMember(Member.Id.make("recipient-member"), humanIdentity);
+    const agent = Notification.ofMember(Member.Id.make("agent-member"), agentIdentity);
     const contact = Identity.Reference.cases.Contact.make({
       id: Identity.ContactId.make("recipient"),
     });
     const triage = Notification.Recipient.cases.Triage.make({});
-    const another = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("another") });
+    const another = Notification.ofMember(Member.Id.make("another-member"), anotherIdentity);
     const recordedAt = DateTime.makeUnsafe("2026-09-19T12:00:00.123Z");
     const record = (
       id: string,
@@ -527,23 +540,34 @@ export const notifications = (harness: Harness) => {
             Effect.gen(function* () {
               const a = yield* boundTo(workspaceId);
               const b = yield* boundTo(otherWorkspaceId);
-              const workspace = yield* initialized(a, human.id);
-              yield* initialized(b, human.id);
-              const first = record("a");
-              const second = record("b");
-              const forAgent = record("agent", { recipient: agent });
+              const workspace = yield* initialized(a, humanIdentity.id);
+              const other = yield* initialized(b, humanIdentity.id);
+              const owner = Notification.ofMember(workspace.ownerMemberId, humanIdentity);
+              const agentMemberId = Member.Id.make("notification-agent");
+              const first = record("a", { recipient: owner });
+              const second = record("b", { recipient: owner });
+              const forAgent = record("agent", {
+                recipient: Notification.ofMember(agentMemberId, agentIdentity),
+              });
               const forAnother = record("another", { recipient: another });
-              const foreign = record("a", { workspaceId: otherWorkspaceId });
+              // The same person under an earlier membership: someone who left and was invited back.
+              const earlier = record("earlier", {
+                recipient: Notification.ofMember(Member.Id.make("earlier-member"), humanIdentity),
+              });
+              const foreign = record("a", {
+                workspaceId: otherWorkspaceId,
+                recipient: Notification.ofMember(other.ownerMemberId, humanIdentity),
+              });
               yield* a.store.transaction(
                 Effect.gen(function* () {
                   yield* a.members.insert({
-                    id: Member.Id.make("notification-agent"),
+                    id: agentMemberId,
                     workspaceId,
-                    identity: agent,
+                    identity: agentIdentity,
                     status: "active",
                   });
                   yield* Effect.forEach(
-                    [second, forAnother, forAgent, first],
+                    [second, forAnother, earlier, forAgent, first],
                     a.notifications.insert,
                   );
                 }),
@@ -553,11 +577,13 @@ export const notifications = (harness: Harness) => {
               const gateway = yield* Gateway.make().pipe(Effect.provide(harness.crypto));
               yield* gateway.asMember(
                 workspaceId,
-                human,
+                humanIdentity,
                 Effect.gen(function* () {
                   const notifications = yield* NotificationApplication.Service;
                   expect(yield* notifications.get(first.id)).toEqual(first);
                   expect(yield* notifications.list({ limit: 1 })).toEqual([first]);
+                  expect(yield* notifications.list(page)).toEqual([first, second]);
+                  expect(yield* notifications.listPending(page)).toEqual([first, second]);
                   const options = {
                     limit: 1,
                     after: { recordedAt: first.recordedAt, id: first.id },
@@ -569,22 +595,29 @@ export const notifications = (harness: Harness) => {
               const list = Effect.flatMap(NotificationApplication.Service, (notifications) =>
                 notifications.list(page),
               );
-              expect(yield* gateway.asMember(workspaceId, agent, list)).toEqual([forAgent]);
-              expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
-              for (const id of [forAgent.id, forAnother.id, Notification.Id.make("missing")]) {
+              expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual([forAgent]);
+              expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual([
+                foreign,
+              ]);
+              for (const id of [
+                forAgent.id,
+                forAnother.id,
+                earlier.id,
+                Notification.Id.make("missing"),
+              ]) {
                 const get = Effect.flatMap(NotificationApplication.Service, (notifications) =>
                   notifications.get(id),
                 );
-                expect(yield* Effect.flip(gateway.asMember(workspaceId, human, get))).toMatchObject(
-                  {
-                    _tag: "NotificationApplication.NotFound",
-                    workspaceId,
-                    notificationId: id,
-                  },
-                );
+                expect(
+                  yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, get)),
+                ).toMatchObject({
+                  _tag: "NotificationApplication.NotFound",
+                  workspaceId,
+                  notificationId: id,
+                });
               }
               expect(
-                yield* Effect.flip(gateway.asMember(workspaceId, another, list)),
+                yield* Effect.flip(gateway.asMember(workspaceId, anotherIdentity, list)),
               ).toMatchObject({
                 _tag: "Gateway.NotMember",
               });
@@ -592,10 +625,14 @@ export const notifications = (harness: Harness) => {
                 before,
               );
               yield* a.store.transaction(a.members.markRemoved(workspace.ownerMemberId));
-              expect(yield* Effect.flip(gateway.asMember(workspaceId, human, list))).toMatchObject({
+              expect(
+                yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, list)),
+              ).toMatchObject({
                 _tag: "Gateway.NotMember",
               });
-              expect(yield* gateway.asMember(otherWorkspaceId, human, list)).toEqual([foreign]);
+              expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual([
+                foreign,
+              ]);
             }).pipe(Effect.scoped),
           ),
         ),
@@ -609,13 +646,15 @@ export const notifications = (harness: Harness) => {
             storage,
             Effect.gen(function* () {
               const bound = yield* boundTo(workspaceId);
-              const workspace = yield* initialized(bound, human.id);
+              const workspace = yield* initialized(bound, humanIdentity.id);
               const actor = Actor.Value.make({
                 workspaceId,
                 memberId: workspace.ownerMemberId,
-                identity: human,
+                identity: humanIdentity,
               });
-              const value = record("staged");
+              const value = record("staged", {
+                recipient: Notification.ofMember(actor.memberId, humanIdentity),
+              });
               yield* Effect.gen(function* () {
                 const notifications = yield* NotificationApplication.Service;
                 const journal = yield* Journal.Service;
@@ -681,6 +720,78 @@ export const notifications = (harness: Harness) => {
             expect(yield* bound.notifications.listPendingByRecipient(agent, page)).toEqual(
               kept.filter((note) => note.recipient._tag === "Agent"),
             );
+          }),
+        ),
+      ),
+    );
+
+    it.effect("someone invited back after removal starts with an empty inbox", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const gateway = yield* Gateway.Service;
+            const alice = Identity.Reference.cases.Human.make({
+              id: Identity.HumanId.make("alice"),
+            });
+            const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
+            const workspace = yield* createWorkspace(alice.id);
+            const asAlice = <A, E, R extends Core.Operations | Actor.Service>(
+              program: Effect.Effect<A, E, R>,
+            ) => gateway.asMember(workspace.id, alice, program);
+            const asBob = <A, E, R extends Core.Operations | Actor.Service>(
+              program: Effect.Effect<A, E, R>,
+            ) => gateway.asMember(workspace.id, bob, program);
+            const join = Effect.gen(function* () {
+              const invitation = yield* invite(workspace.id, alice, {
+                recipientId: bob.id,
+                roleId: BuiltinRoles.ViewerId,
+                expiresAt: yield* future,
+              });
+              return yield* acceptInvitation(workspace.id, bob.id, invitation.details.id);
+            });
+            const mention = (groupId: Group.Id, memberId: Member.Id) =>
+              asAlice(
+                ThreadApplication.Service.use((threads) =>
+                  threads.startInGroup({ groupId, text: "Bob?", mentions: [memberId] }),
+                ),
+              );
+            const pending = asBob(
+              NotificationApplication.Service.use((notifications) =>
+                notifications.listPending(page),
+              ),
+            );
+            const sidebar = asBob(GroupApplication.Service.use((groups) => groups.listMine(page)));
+            const first = yield* join;
+            const group = yield* asAlice(
+              GroupApplication.Service.use((groups) =>
+                groups.createPrivateTeam({
+                  name: "Private",
+                  memberIds: [workspace.ownerMemberId, first.id],
+                }),
+              ),
+            );
+            yield* mention(group.id, first.id);
+            expect(yield* pending).toHaveLength(1);
+            yield* removeMember(workspace.id, alice, first.id);
+            // Invited back, Bob is a new member, and his earlier membership's inbox stays with it.
+            const second = yield* join;
+            expect(second.id).not.toBe(first.id);
+            expect(yield* pending).toEqual([]);
+            yield* asAlice(
+              GroupMembershipApplication.Service.use((memberships) =>
+                memberships.add({ groupId: group.id, memberId: second.id }),
+              ),
+            );
+            expect((yield* sidebar).map(({ pending }) => pending)).toEqual([0]);
+            // What reaches his new membership is his.
+            const again = yield* mention(group.id, second.id);
+            const [notification] = yield* pending;
+            expect(notification).toMatchObject({
+              recipient: { _tag: "Human", id: bob.id, memberId: second.id },
+              thread: { threadId: again.thread.id },
+            });
+            expect((yield* sidebar).map(({ pending }) => pending)).toEqual([1]);
           }),
         ),
       ),

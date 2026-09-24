@@ -13,11 +13,24 @@ const validateRecipient = Schema.decodeEffect(Notification.Recipient);
 const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
 const rows = Rows.make(Schema.fromJsonString(Notification.Record));
 
-const recipientKey = (recipient: Notification.Recipient) =>
-  keyOf(recipient._tag, recipient._tag === "Triage" ? "" : recipient.id);
-/** One notification per source entry and recipient. */
-const sourceKey = (record: Notification.Record) =>
-  keyOf(record.source.logId, record.source.entryId, recipientKey(record.recipient));
+/** Whose inbox a notification is in: a membership, a contact, or triage. */
+const inboxKey = (recipient: Notification.Recipient) =>
+  keyOf(
+    recipient._tag,
+    recipient._tag === "Triage"
+      ? ""
+      : recipient._tag === "Contact"
+        ? recipient.id
+        : recipient.memberId,
+  );
+/** One notification per source entry and recipient identity. */
+const sourceKey = ({ source, recipient }: Notification.Record) =>
+  keyOf(
+    source.logId,
+    source.entryId,
+    recipient._tag,
+    recipient._tag === "Triage" ? "" : recipient.id,
+  );
 /** Recorded time, then ID in binary order. */
 const byRecorded = (left: Notification.Record, right: Notification.Record) =>
   DateTime.toEpochMillis(left.recordedAt) - DateTime.toEpochMillis(right.recordedAt) ||
@@ -56,14 +69,14 @@ export const make = Effect.fn("Notifications.make")(function* () {
     options: NotificationStore.ReadOptions,
     pendingOnly: boolean,
   ) {
-    const target = recipientKey(yield* validateRecipient(recipient));
+    const target = inboxKey(yield* validateRecipient(recipient));
     const request = yield* validateOptions(options);
     const after = request.after;
     const records = yield* all;
     return records
       .filter(
         (record) =>
-          recipientKey(record.recipient) === target &&
+          inboxKey(record.recipient) === target &&
           (!pendingOnly || record.state._tag === "Pending") &&
           (after === undefined || isAfter(record, after)),
       )
@@ -140,14 +153,14 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (recipient, threadInput, throughSequence) {
-        const target = recipientKey(yield* validateRecipient(recipient));
+        const target = inboxKey(yield* validateRecipient(recipient));
         const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
         const through = yield* Schema.decodeEffect(Schema.Int)(throughSequence);
         const records = yield* all;
         return records
           .filter(
             (record) =>
-              recipientKey(record.recipient) === target &&
+              inboxKey(record.recipient) === target &&
               record.state._tag === "Pending" &&
               record.thread !== undefined &&
               record.thread.threadId === threadId &&
@@ -163,12 +176,12 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
       function* (recipient, groupInput) {
-        const target = recipientKey(yield* validateRecipient(recipient));
+        const target = inboxKey(yield* validateRecipient(recipient));
         const groupIds = new Set(yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput));
         const counts = new Map<Group.Id, number>();
         for (const record of yield* all)
           if (
-            recipientKey(record.recipient) === target &&
+            inboxKey(record.recipient) === target &&
             record.state._tag === "Pending" &&
             record.thread !== undefined &&
             groupIds.has(record.thread.groupId)

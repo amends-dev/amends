@@ -75,8 +75,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
       Effect.flatMap(NotificationApplication.Service, (s) => s.acknowledge(id));
     const resolve = (id: Notification.Id) =>
       Effect.flatMap(NotificationApplication.Service, (s) => s.resolveSource(id));
-    const notes = (bound: Bound, identity: Notification.Recipient) =>
-      bound.notifications.listByRecipient(identity, { limit: 100 });
+    /** A member's inbox, as their membership. */
+    const notes = (bound: Bound, member: Actor.Value) =>
+      bound.notifications.listByRecipient(Notification.ofMember(member.memberId, member.identity), {
+        limit: 100,
+      });
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const seenAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z");
     const seenState = (acknowledgedAt: DateTime.Utc): Notification.State =>
@@ -140,9 +143,9 @@ export const notificationAcknowledgment = (harness: Harness) => {
           }),
         ),
       );
-      const humanNote = (yield* notes(bound, human.identity))[0];
-      const agentNote = (yield* notes(bound, agent.identity))[0];
-      const ownerNote = (yield* notes(bound, owner.identity))[0];
+      const humanNote = (yield* notes(bound, human))[0];
+      const agentNote = (yield* notes(bound, agent))[0];
+      const ownerNote = (yield* notes(bound, owner))[0];
       if (!humanNote || !agentNote || !ownerNote)
         return yield* Effect.die("Missing generated notifications");
       return { bound, owner, group, first, humanNote, agentNote, ownerNote };
@@ -151,9 +154,9 @@ export const notificationAcknowledgment = (harness: Harness) => {
       return {
         history: yield* history(p.bound),
         live: yield* p.bound.checkpoints.listLive(journalLog),
-        human: yield* notes(p.bound, human.identity),
-        agent: yield* notes(p.bound, agent.identity),
-        owner: yield* notes(p.bound, p.owner.identity),
+        human: yield* notes(p.bound, human),
+        agent: yield* notes(p.bound, agent),
+        owner: yield* notes(p.bound, p.owner),
         activity: yield* p.bound.activities.listByThread(p.first.thread.id),
         participation: yield* p.bound.participations.listByThread(p.first.thread.id),
       };
@@ -173,9 +176,12 @@ export const notificationAcknowledgment = (harness: Harness) => {
               expect(result).toEqual(changed(p.humanNote, { state: seenState(now) }));
               expect(yield* p.bound.notifications.get(result.id)).toEqual(Option.some(result));
               expect(
-                yield* p.bound.notifications.listPendingByRecipient(human.identity, { limit: 100 }),
+                yield* p.bound.notifications.listPendingByRecipient(
+                  Notification.ofMember(human.memberId, human.identity),
+                  { limit: 100 },
+                ),
               ).toEqual([]);
-              expect(yield* notes(p.bound, human.identity)).toEqual([result]);
+              expect(yield* notes(p.bound, human)).toEqual([result]);
               const after = yield* snapshot(p);
               expect(after).toEqual(Object.assign({}, before, { human: [result] }));
               // Seen again later keeps the first time.
@@ -424,7 +430,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   );
                   return {
                     result,
-                    agent: yield* notes(p.bound, agent.identity),
+                    agent: yield* notes(p.bound, agent),
                     history: yield* history(p.bound),
                   };
                 }),
@@ -435,19 +441,22 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 storage,
                 Effect.gen(function* () {
                   const bound = yield* boundTo(workspaceId);
-                  expect(yield* notes(bound, human.identity)).toEqual([saved.result]);
+                  expect(yield* notes(bound, human)).toEqual([saved.result]);
                   yield* storage.discardProjections;
                   yield* TestClock.adjust("2 hours");
                   yield* facts(
                     bound,
                     Effect.flatMap(Journal.Service, (j) => j.replay),
                   );
-                  expect(yield* notes(bound, human.identity)).toEqual([saved.result]);
-                  expect(yield* notes(bound, agent.identity)).toEqual(saved.agent);
+                  expect(yield* notes(bound, human)).toEqual([saved.result]);
+                  expect(yield* notes(bound, agent)).toEqual(saved.agent);
                   expect(
-                    yield* bound.notifications.listPendingByRecipient(human.identity, {
-                      limit: 100,
-                    }),
+                    yield* bound.notifications.listPendingByRecipient(
+                      Notification.ofMember(human.memberId, human.identity),
+                      {
+                        limit: 100,
+                      },
+                    ),
                   ).toEqual([]);
                   const live = yield* bound.checkpoints.listLive(journalLog);
                   yield* facts(

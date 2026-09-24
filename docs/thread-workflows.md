@@ -301,6 +301,6 @@ Thread, participation, message, and activity facts reach the group's members wit
 for that thread over the [change feed](../packages/core/README.md#change-feed). Messages carry their
 full text, so clients render them without a refetch. Activity events omit their recipients, and
 participation events omit routing identities and admissions. Each notification an activity creates
-reaches its human or agent recipient in the same commit message, as their inbox lists it, whether
-or not they may read the thread. Notifications carry source references, not continuing authority to
+reaches its human or agent recipient's membership in the same commit message, as their inbox
+lists it, whether or not they may read the thread. Notifications carry source references, not continuing authority to
 read the source.

@@ -4,6 +4,7 @@ import { GroupApplication } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Fact, Journal, Publication, Subject } from "@amends/core/journal";
 import { ThreadApplication } from "@amends/core/thread";
+import { Notification } from "@amends/core/notification";
 import { Member, MemberFacts } from "@amends/core/workspace";
 import { Array, DateTime, Effect, Option, Redacted, Schema } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -189,7 +190,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const [admission] = yield* bound.groupMemberships.listActiveByMember(memberIds[0]!);
           // Mentioned members are notified; authors are not.
           const inbox = yield* bound.notifications.listByRecipient(
-            { _tag: "Human", id: Identity.HumanId.make(memberIds[0]!) },
+            Notification.ofMember(memberIds[0]!, {
+              _tag: "Human",
+              id: Identity.HumanId.make(memberIds[0]!),
+            }),
             { limit: 2 },
           );
           const facts = yield* Effect.flatMap(Journal.Service, (journal) =>
@@ -226,7 +230,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             {
               index: "notifications_by_recipient",
               condition: "ROW(recorded_at, (id)::text) >",
-              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_id, '') = ${memberIds[0]!} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`,
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`,
             },
             {
               index: "log_entries_by_fact",

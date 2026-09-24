@@ -1,3 +1,4 @@
+import { Notification } from "@amends/core/notification";
 import { describe, expect, it } from "@effect/vitest";
 import { AgentPermissions } from "@amends/core/agent";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
@@ -69,7 +70,9 @@ export const groupFollows = (harness: Harness) => {
           .sort(),
       );
     const inbox = (bound: Bound, memberId: Member.Id) =>
-      bound.notifications.listByRecipient(identityOf(memberId), { limit: 100 });
+      bound.notifications.listByRecipient(Notification.ofMember(memberId, identityOf(memberId)), {
+        limit: 100,
+      });
     /**
      * A team of the owner, a Viewer (`human`), a member with no role but a start grant on the team
      * (`plain`), and an agent; and a Viewer outside the team.

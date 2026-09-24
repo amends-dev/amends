@@ -26,7 +26,7 @@ import { Actor, Identity } from "@amends/core/identity";
 import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 
-import { NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends/core/notification";
 
 import {
   Thread,
@@ -98,7 +98,9 @@ export const threadReplies = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
-      bound.notifications.listByRecipient(identityFor(id), { limit: 100 });
+      bound.notifications.listByRecipient(Notification.ofMember(id, identityFor(id)), {
+        limit: 100,
+      });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(GroupApplication.Service, (s) =>
         s.createPrivateTeam({ name: "Engineering", memberIds }),
@@ -267,7 +269,10 @@ export const threadReplies = (harness: Harness) => {
               expect(yield* notifications(bound, agentId)).toHaveLength(2);
               expect(yield* notifications(bound, otherId)).toEqual([]);
               expect(
-                yield* bound.notifications.listByRecipient(owner.identity, { limit: 100 }),
+                yield* bound.notifications.listByRecipient(
+                  Notification.ofMember(owner.memberId, owner.identity),
+                  { limit: 100 },
+                ),
               ).toHaveLength(1);
               expect(yield* history(bound)).toHaveLength(before.length + 1);
               const again = yield* run(bound, human, reply(first.thread.id));
@@ -1096,9 +1101,12 @@ export const threadReplies = (harness: Harness) => {
                       .every((p) => p.status === "ended"),
                   ).toBe(true);
                   expect(
-                    yield* bound.notifications.listPendingByRecipient(identityFor(agentId), {
-                      limit: 100,
-                    }),
+                    yield* bound.notifications.listPendingByRecipient(
+                      Notification.ofMember(agentId, identityFor(agentId)),
+                      {
+                        limit: 100,
+                      },
+                    ),
                   ).toEqual([]);
                   const before = yield* snapshot(bound, saved.first.thread.id);
                   expect(

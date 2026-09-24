@@ -18,6 +18,7 @@ import { ThreadActivityStore } from "../activity/store.ts";
 import { ThreadMessageReceipt } from "./receipt.ts";
 import { ThreadMessageStore } from "./store.ts";
 import { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
+import { Notification } from "../../notification/notification.ts";
 export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
@@ -181,7 +182,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
             );
           // Replying reads the thread through the author's own message.
           yield* readings.markRead(
-            { memberId: actor.memberId, recipient: actor.identity },
+            Notification.ofMember(actor.memberId, actor.identity),
             thread,
             published.activity.sequence,
           );

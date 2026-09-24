@@ -11,7 +11,6 @@ import type { Audience } from "../journal/audience.ts";
 import { Event } from "../journal/event.ts";
 import { Fact } from "../journal/fact.ts";
 import type { Log } from "../journal/log.ts";
-import { Identity } from "../identity/identity.ts";
 import { Notification } from "../notification/notification.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import type { ThreadId } from "../thread/id.ts";
@@ -214,7 +213,7 @@ const registry: ReadonlyArray<Registered> = [
         selected.recipient._tag === "Human" || selected.recipient._tag === "Agent"
           ? [
               {
-                scope: Identity.audienceOf(selected.recipient),
+                scope: Member.audienceOf(selected.recipient.memberId),
                 record: Notification.generated(
                   event,
                   Object.assign({ groupId: event.payload.groupId }, event.payload.activity),

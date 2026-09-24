@@ -19,6 +19,7 @@ import {
   GroupMembership,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
+import { Notification } from "@amends/core/notification";
 import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts, MemberStore } from "@amends/core/workspace";
 import {
@@ -259,7 +260,7 @@ export const threadReads = (harness: Harness) => {
               const before = yield* history(bound);
               const beforeParts = yield* bound.participations.listByThread(first.thread.id);
               const beforeNotifications = yield* bound.notifications.listByRecipient(
-                readerIdentity,
+                Notification.ofMember(readerId, readerIdentity),
                 {
                   limit: 100,
                 },
@@ -297,7 +298,10 @@ export const threadReads = (harness: Harness) => {
                 beforeParts,
               );
               expect(
-                yield* bound.notifications.listByRecipient(readerIdentity, { limit: 100 }),
+                yield* bound.notifications.listByRecipient(
+                  Notification.ofMember(readerId, readerIdentity),
+                  { limit: 100 },
+                ),
               ).toEqual(beforeNotifications);
               expect(yield* history(bound)).toEqual(before);
             }),
@@ -802,9 +806,14 @@ export const threadReads = (harness: Harness) => {
                   (p) => ThreadParticipation.memberOf(p.participant) === memberId,
                 ),
               ).toBe(false);
-              expect(yield* bound.notifications.listByRecipient(identity, { limit: 10 })).toEqual(
-                [],
-              );
+              expect(
+                yield* bound.notifications.listByRecipient(
+                  Notification.ofMember(memberId, identity),
+                  {
+                    limit: 10,
+                  },
+                ),
+              ).toEqual([]);
             }),
           ),
         ),

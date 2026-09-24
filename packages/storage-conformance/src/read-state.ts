@@ -1,3 +1,4 @@
+import { Notification } from "@amends/core/notification";
 import { describe, expect, it } from "@effect/vitest";
 import { ReadState, ReadStateApplication } from "@amends/core/attention";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
@@ -70,7 +71,10 @@ export const readState = (harness: Harness) => {
       Effect.flatMap(ReadStateApplication.Service, (s) => s.markGroupRead({ groupId }));
     const pending = (bound: Bound, memberId: Member.Id) =>
       Effect.map(
-        bound.notifications.listPendingByRecipient(identityOf(memberId), { limit: 100 }),
+        bound.notifications.listPendingByRecipient(
+          Notification.ofMember(memberId, identityOf(memberId)),
+          { limit: 100 },
+        ),
         (records) =>
           records.map((record) => record.thread?.sequence ?? 0).toSorted((a, b) => a - b),
       );
@@ -575,9 +579,12 @@ export const readState = (harness: Harness) => {
               expect(yield* positionOf(bound, humanId, started.thread.id)).toEqual([3]);
               // The reply notified the others, never its author.
               expect(
-                (yield* bound.notifications.listPendingByRecipient(owner.identity, {
-                  limit: 10,
-                })).map((note) => note.thread?.sequence),
+                (yield* bound.notifications.listPendingByRecipient(
+                  Notification.ofMember(owner.memberId, owner.identity),
+                  {
+                    limit: 10,
+                  },
+                )).map((note) => note.thread?.sequence),
               ).toEqual([3]);
             }),
           ),

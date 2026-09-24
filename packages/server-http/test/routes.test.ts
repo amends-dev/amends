@@ -52,7 +52,7 @@ const notification: Notification.Record = {
   id: Notification.Id.make("pending"),
   workspaceId,
   source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("entry-one") },
-  recipient: alice,
+  recipient: Notification.ofMember(memberId, alice),
   recordedAt: DateTime.makeUnsafe("2026-01-01T00:00:00.123Z"),
   state: { _tag: "Pending" },
 };

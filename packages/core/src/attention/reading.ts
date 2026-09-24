@@ -2,7 +2,6 @@ import { Context, DateTime, Effect, Layer, Schema } from "effect";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
 import type { Thread } from "../thread/thread.ts";
-import type { MemberId } from "../workspace/member/id.ts";
 import { ReadStateStore } from "./store.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
@@ -16,10 +15,8 @@ export type Error =
   | ReadStateStore.Conflict
   | Schema.SchemaError
   | InvalidResponse;
-export interface Reader {
-  readonly memberId: MemberId.Id;
-  readonly recipient: Extract<Notification.Recipient, { readonly _tag: "Human" }>;
-}
+/** The human whose reading this is, as their notifications address them. */
+export type Reader = Extract<Notification.Recipient, { readonly _tag: "Human" }>;
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
   /** The reader's pending notifications from a thread's activity up to a position, validated. */
@@ -44,6 +41,8 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/attention/reading/Service",
 ) {}
 
+const sameRecipient = Schema.toEquivalence(Notification.Recipient);
+
 /** @category constructors */
 export const make = Effect.fn("ThreadReading.make")(function* () {
   const notifications = yield* NotificationStore.Service;
@@ -60,7 +59,7 @@ export const make = Effect.fn("ThreadReading.make")(function* () {
   ) {
     const result: Array<Notification.Record> = [];
     for (const row of yield* notifications.listPendingByThread(
-      reader.recipient,
+      reader,
       thread.id,
       throughSequence,
     )) {
@@ -71,8 +70,7 @@ export const make = Effect.fn("ThreadReading.make")(function* () {
       );
       if (
         note.workspaceId !== workspaceId ||
-        note.recipient._tag !== "Human" ||
-        note.recipient.id !== reader.recipient.id ||
+        !sameRecipient(note.recipient, reader) ||
         note.thread === undefined ||
         note.thread.threadId !== thread.id ||
         note.thread.sequence > throughSequence ||

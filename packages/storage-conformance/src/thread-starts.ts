@@ -221,8 +221,14 @@ export const threadStarts = (harness: Harness) => {
               const trio = yield* run(bound, owner, startDirect([otherId, humanId]));
               expect(trio.thread.groupId).not.toBe(group.id);
               // A thread in a direct group enrolls all members; mentions only narrow notification.
-              const humanInbox = (yield* inbox(bound, human.identity)).length;
-              const ownerInbox = (yield* inbox(bound, owner.identity)).length;
+              const humanInbox = (yield* inbox(
+                bound,
+                Notification.ofMember(human.memberId, human.identity),
+              )).length;
+              const ownerInbox = (yield* inbox(
+                bound,
+                Notification.ofMember(owner.memberId, owner.identity),
+              )).length;
               const mentioned = yield* run(
                 bound,
                 owner,
@@ -235,8 +241,12 @@ export const threadStarts = (harness: Harness) => {
                 ),
               );
               expect(yield* participantsOf(bound, mentioned.thread.id)).toHaveLength(3);
-              expect(yield* inbox(bound, human.identity)).toHaveLength(humanInbox + 1);
-              expect(yield* inbox(bound, owner.identity)).toHaveLength(ownerInbox);
+              expect(
+                yield* inbox(bound, Notification.ofMember(human.memberId, human.identity)),
+              ).toHaveLength(humanInbox + 1);
+              expect(
+                yield* inbox(bound, Notification.ofMember(owner.memberId, owner.identity)),
+              ).toHaveLength(ownerInbox);
               // Direct groups need another member, and every member must be available.
               const before = yield* history(bound);
               expect(
@@ -309,7 +319,9 @@ export const threadStarts = (harness: Harness) => {
               // The contact is not sent their own message; triage is notified.
               expect(yield* inbox(bound, contact)).toEqual([]);
               expect(yield* inbox(bound, { _tag: "Triage" })).toHaveLength(1);
-              expect(yield* inbox(bound, owner.identity)).toEqual([]);
+              expect(
+                yield* inbox(bound, Notification.ofMember(owner.memberId, owner.identity)),
+              ).toEqual([]);
               // A member reply without mentions reaches every participant, including the contact.
               yield* run(
                 bound,
@@ -320,7 +332,9 @@ export const threadStarts = (harness: Harness) => {
               );
               expect(yield* inbox(bound, contact)).toHaveLength(1);
               expect(yield* inbox(bound, { _tag: "Triage" })).toHaveLength(2);
-              expect(yield* inbox(bound, owner.identity)).toEqual([]);
+              expect(
+                yield* inbox(bound, Notification.ofMember(owner.memberId, owner.identity)),
+              ).toEqual([]);
               // Mentions narrow a reply to the mentioned members.
               yield* run(
                 bound,
@@ -331,7 +345,13 @@ export const threadStarts = (harness: Harness) => {
               );
               expect(yield* inbox(bound, contact)).toHaveLength(1);
               expect(
-                yield* inbox(bound, { _tag: "Human", id: Identity.HumanId.make(humanId) }),
+                yield* inbox(
+                  bound,
+                  Notification.ofMember(humanId, {
+                    _tag: "Human",
+                    id: Identity.HumanId.make(humanId),
+                  }),
+                ),
               ).toHaveLength(1);
             }),
           ),

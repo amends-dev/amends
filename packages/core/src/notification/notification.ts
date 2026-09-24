@@ -6,6 +6,7 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { GroupId } from "../group/id.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationId } from "../thread/participation/id.ts";
+import { MemberId } from "../workspace/member/id.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
 export type Id = typeof Id.Type;
@@ -28,14 +29,25 @@ export const ThreadReference = Schema.Struct({
 });
 export interface ThreadReference extends Schema.Schema.Type<typeof ThreadReference> {}
 
-/** Triage is one workspace-local recipient; people and agents retain their identity kind. */
+/**
+ * Whose inbox a notification belongs to. People and agents are notified as one workspace
+ * membership, keeping their identity kind: someone who rejoins under a new member ID starts with an
+ * empty inbox, as with their groups, threads, and read positions. Triage is one workspace-local
+ * recipient.
+ */
 export const Recipient = Schema.TaggedUnion({
-  Human: Identity.Reference.cases.Human.fields,
-  Agent: Identity.Reference.cases.Agent.fields,
+  Human: { ...Identity.Reference.cases.Human.fields, memberId: MemberId.Id },
+  Agent: { ...Identity.Reference.cases.Agent.fields, memberId: MemberId.Id },
   Contact: Identity.Reference.cases.Contact.fields,
   Triage: {},
 });
 export type Recipient = typeof Recipient.Type;
+
+/** The recipient a member is notified as: their identity, within this membership. */
+export const ofMember = <const I extends Identity.MemberReference>(
+  memberId: MemberId.Id,
+  identity: I,
+) => Object.assign({}, identity, { memberId });
 
 /** Extend with durable handoff outcomes when the owning turn/delivery workflows exist. */
 export const AcknowledgmentOutcome = Schema.TaggedUnion({ Seen: {} });

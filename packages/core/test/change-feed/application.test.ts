@@ -555,7 +555,7 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
             recipients: [
               {
                 participationId: ThreadParticipation.Id.make("participation"),
-                recipient: bob,
+                recipient: Notification.ofMember(bobMember, bob),
               },
             ],
           });
@@ -609,10 +609,16 @@ const notifying = publish(ThreadActivityFacts.Recorded, {
     occurredAt: at,
   },
   recipients: [
-    { participationId: ThreadParticipation.Id.make("alice-participation"), recipient: alice },
+    {
+      participationId: ThreadParticipation.Id.make("alice-participation"),
+      recipient: Notification.ofMember(actor.memberId, alice),
+    },
     {
       participationId: ThreadParticipation.Id.make("bob-participation"),
-      recipient: { _tag: "Human", id: Identity.HumanId.make("bob") },
+      recipient: Notification.ofMember(bobMember, {
+        _tag: "Human",
+        id: Identity.HumanId.make("bob"),
+      }),
     },
     { participationId: ThreadParticipation.Id.make("triage"), recipient: { _tag: "Triage" } },
   ],
@@ -635,7 +641,7 @@ it.effect("the notifications a commit creates reach their recipient alone, with 
           source: { logId: "journal", entryId: activity?.id },
           participationId: "alice-participation",
           thread: { threadId, groupId, sequence: 3 },
-          recipient: alice,
+          recipient: Notification.ofMember(actor.memberId, alice),
           recordedAt: activity?.recordedAt,
           state: { _tag: "Pending" },
         },

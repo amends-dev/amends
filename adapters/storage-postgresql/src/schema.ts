@@ -263,6 +263,8 @@ export const notifications = pgTable(
     discardReason: text("discard_reason", { enum: ["participation-ended"] }),
     recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
     recipientId: text("recipient_id"),
+    // The membership a human or agent is notified as; its inbox is the membership's.
+    recipientMemberId: text("recipient_member_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
     // The thread, its group, and the timeline position of thread-activity notifications.
@@ -276,6 +278,10 @@ export const notifications = pgTable(
       "notification_state",
       sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
     ),
+    check(
+      "notification_recipient",
+      sql`CASE ${table.recipientKind} WHEN 'Triage' THEN ${table.recipientId} IS NULL AND ${table.recipientMemberId} IS NULL WHEN 'Contact' THEN ${table.recipientId} IS NOT NULL AND ${table.recipientMemberId} IS NULL ELSE ${table.recipientId} IS NOT NULL AND ${table.recipientMemberId} IS NOT NULL END`,
+    ),
     // Source existence and recipient selection belong to notification generation.
     uniqueIndex("notifications_by_source_recipient").on(
       table.workspaceId,
@@ -284,10 +290,11 @@ export const notifications = pgTable(
       table.recipientKind,
       sql`coalesce(${table.recipientId}, '')`,
     ),
+    // Inboxes: a membership's for people and agents, a contact's, or triage's.
     index("notifications_by_recipient").on(
       table.workspaceId,
       table.recipientKind,
-      sql`coalesce(${table.recipientId}, '')`,
+      sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
       table.recordedAt,
       sql`${table.id} COLLATE "C"`,
     ),
@@ -295,7 +302,7 @@ export const notifications = pgTable(
       .on(
         table.workspaceId,
         table.recipientKind,
-        sql`coalesce(${table.recipientId}, '')`,
+        sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
         table.recordedAt,
         sql`${table.id} COLLATE "C"`,
       )
@@ -309,7 +316,7 @@ export const notifications = pgTable(
       .on(
         table.workspaceId,
         table.recipientKind,
-        sql`coalesce(${table.recipientId}, '')`,
+        sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
         table.threadGroupId,
       )
       .where(sql`${table.state} = 'Pending'`),
@@ -318,7 +325,7 @@ export const notifications = pgTable(
       .on(
         table.workspaceId,
         table.recipientKind,
-        sql`coalesce(${table.recipientId}, '')`,
+        sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
         table.threadId,
         table.threadSequence,
       )

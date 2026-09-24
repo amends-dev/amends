@@ -108,7 +108,8 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
-    return (yield* Actor.Service).identity;
+    const actor = yield* Actor.Service;
+    return Notification.ofMember(actor.memberId, actor.identity);
   });
 
   const get = Effect.fn("NotificationApplication.get")(function* (notificationId: Notification.Id) {

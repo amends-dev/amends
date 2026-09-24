@@ -15,6 +15,7 @@ import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
 import { ThreadReading } from "./reading.ts";
 import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
+import { Notification } from "../notification/notification.ts";
 export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
@@ -85,7 +86,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     const actor = yield* Actor.Service;
     if (actor.identity._tag !== "Human")
       return yield* new HumanRequired({ memberId: actor.memberId });
-    return { memberId: actor.memberId, recipient: actor.identity } satisfies ThreadReading.Reader;
+    return Notification.ofMember(actor.memberId, actor.identity) satisfies ThreadReading.Reader;
   });
   const markThreadRead = Effect.fn("ReadStateApplication.markThreadRead")(function* (
     input: ReadState.MarkThreadReadInput,

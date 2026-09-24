@@ -25,7 +25,8 @@ export type Participant = typeof Participant.Type;
 /** The notification recipient that a participant routes to. */
 export const recipientOf = (participant: Participant): Notification.Recipient =>
   Participant.match(participant, {
-    Member: ({ identity }): Notification.Recipient => identity,
+    Member: ({ memberId, identity }): Notification.Recipient =>
+      Notification.ofMember(memberId, identity),
     Contact: ({ contactId }): Notification.Recipient => ({ _tag: "Contact", id: contactId }),
     Triage: (): Notification.Recipient => ({ _tag: "Triage" }),
   });

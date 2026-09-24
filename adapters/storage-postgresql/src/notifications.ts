@@ -49,7 +49,9 @@ const toEncodedRecord = ({ notification: row, seenAt }: JoinedRow) => ({
       ? row.recipientId === null
         ? { _tag: "Triage" }
         : undefined
-      : { _tag: row.recipientKind, id: row.recipientId },
+      : row.recipientKind === "Contact"
+        ? { _tag: row.recipientKind, id: row.recipientId }
+        : { _tag: row.recipientKind, id: row.recipientId, memberId: row.recipientMemberId },
   recordedAt: row.recordedAt,
   ...(row.participationId === null ? {} : { participationId: row.participationId }),
   ...(row.threadId === null
@@ -71,6 +73,14 @@ const toEncodedRecord = ({ notification: row, seenAt }: JoinedRow) => ({
           : { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: seenAt },
 });
 
+/** A membership for people and agents, a contact, or triage. */
+const inboxOf = (recipient: Notification.Recipient) =>
+  recipient._tag === "Triage"
+    ? ""
+    : recipient._tag === "Contact"
+      ? recipient.id
+      : recipient.memberId;
+
 /**
  * Notification records and recipient reads over the workspace transaction.
  *
@@ -81,6 +91,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(notifications.workspaceId, workspaceId);
   const orderedId = sql`${notifications.id} COLLATE "C"`;
+  /** Whose inbox a row is in, as the recipient indexes key it. */
+  const inbox = sql`coalesce(${notifications.recipientMemberId}, ${notifications.recipientId}, '')`;
   const seenJoin = and(
     eq(notificationSeen.workspaceId, notifications.workspaceId),
     eq(notificationSeen.notificationId, notifications.id),
@@ -109,10 +121,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           and(
             inWorkspace,
             eq(notifications.recipientKind, target._tag),
-            eq(
-              sql`coalesce(${notifications.recipientId}, '')`,
-              target._tag === "Triage" ? "" : target.id,
-            ),
+            eq(inbox, inboxOf(target)),
             pending ? pendingOnly : undefined,
             // A row comparison bounds the index scan; the equivalent OR form only filters it.
             after === undefined
@@ -158,6 +167,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
         discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
         recipientKind: record.recipient._tag,
         recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
+        recipientMemberId:
+          record.recipient._tag === "Human" || record.recipient._tag === "Agent"
+            ? record.recipient.memberId
+            : null,
         recordedAt: DateTime.toDate(record.recordedAt),
         state: record.state._tag,
       });
@@ -201,10 +214,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
               and(
                 inWorkspace,
                 eq(notifications.recipientKind, target._tag),
-                eq(
-                  sql`coalesce(${notifications.recipientId}, '')`,
-                  target._tag === "Triage" ? "" : target.id,
-                ),
+                eq(inbox, inboxOf(target)),
                 pendingOnly,
                 inIds(notifications.threadGroupId, groupIds),
               ),
@@ -228,10 +238,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
               and(
                 inWorkspace,
                 eq(notifications.recipientKind, target._tag),
-                eq(
-                  sql`coalesce(${notifications.recipientId}, '')`,
-                  target._tag === "Triage" ? "" : target.id,
-                ),
+                eq(inbox, inboxOf(target)),
                 eq(notifications.threadId, threadId),
                 lte(notifications.threadSequence, through),
                 pendingOnly,

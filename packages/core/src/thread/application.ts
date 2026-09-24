@@ -42,6 +42,7 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./errors.ts";
+import { Notification } from "../notification/notification.ts";
 export {
   DirectMembersRequired,
   GroupNotFound,
@@ -286,7 +287,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       );
     // Posting reads the thread through the author's own message.
     yield* readings.markRead(
-      { memberId: actor.memberId, recipient: actor.identity },
+      Notification.ofMember(actor.memberId, actor.identity),
       started.thread,
       started.activity.sequence,
     );

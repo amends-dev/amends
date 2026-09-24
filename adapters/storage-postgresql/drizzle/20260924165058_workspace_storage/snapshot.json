@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "15af575c-b231-4654-9277-3b8263ee7e51",
+  "id": "03283829-23ad-4cdd-b107-888cf967f0b9",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1666,6 +1666,19 @@
       "table": "notifications"
     },
     {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_member_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -3124,7 +3137,7 @@
           "opclass": null
         },
         {
-          "value": "coalesce(\"recipient_id\", '')",
+          "value": "coalesce(\"recipient_member_id\", \"recipient_id\", '')",
           "isExpression": true,
           "asc": true,
           "nullsFirst": false,
@@ -3173,7 +3186,7 @@
           "opclass": null
         },
         {
-          "value": "coalesce(\"recipient_id\", '')",
+          "value": "coalesce(\"recipient_member_id\", \"recipient_id\", '')",
           "isExpression": true,
           "asc": true,
           "nullsFirst": false,
@@ -3222,7 +3235,7 @@
           "opclass": null
         },
         {
-          "value": "coalesce(\"recipient_id\", '')",
+          "value": "coalesce(\"recipient_member_id\", \"recipient_id\", '')",
           "isExpression": true,
           "asc": true,
           "nullsFirst": false,
@@ -3264,7 +3277,7 @@
           "opclass": null
         },
         {
-          "value": "coalesce(\"recipient_id\", '')",
+          "value": "coalesce(\"recipient_member_id\", \"recipient_id\", '')",
           "isExpression": true,
           "asc": true,
           "nullsFirst": false,
@@ -4030,6 +4043,13 @@
     {
       "value": "(\"state\" = 'Pending' AND \"discard_reason\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" = 'participation-ended')",
       "name": "notification_state",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "value": "CASE \"recipient_kind\" WHEN 'Triage' THEN \"recipient_id\" IS NULL AND \"recipient_member_id\" IS NULL WHEN 'Contact' THEN \"recipient_id\" IS NOT NULL AND \"recipient_member_id\" IS NULL ELSE \"recipient_id\" IS NOT NULL AND \"recipient_member_id\" IS NOT NULL END",
+      "name": "notification_recipient",
       "entityType": "checks",
       "schema": "public",
       "table": "notifications"

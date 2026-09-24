@@ -78,7 +78,9 @@ export const notificationSources = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
-      bound.notifications.listByRecipient(identityFor(id), { limit: 100 });
+      bound.notifications.listByRecipient(Notification.ofMember(id, identityFor(id)), {
+        limit: 100,
+      });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(GroupApplication.Service, (s) =>
         s.createPrivateTeam({ name: "Engineering", memberIds }),
@@ -698,9 +700,12 @@ export const notificationSources = (harness: Harness) => {
                   s.readTimeline(first.thread.id, { limit: 10 }),
                 ),
               );
-              const notes = yield* bound.notifications.listByRecipient(owner.identity, {
-                limit: 100,
-              });
+              const notes = yield* bound.notifications.listByRecipient(
+                Notification.ofMember(owner.memberId, owner.identity),
+                {
+                  limit: 100,
+                },
+              );
               for (const event of events) {
                 const note = notes.find((n) => n.source.entryId === event.id);
                 if (!note) return yield* Effect.die("Missing source notification");

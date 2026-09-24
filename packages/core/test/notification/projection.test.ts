@@ -20,6 +20,7 @@ import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Group } from "../../src/group/group.ts";
+import { Member } from "../../src/workspace/member/member.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { NotificationProjection } from "../../src/notification/projection.ts";
 import { make, type Fixture } from "../memory-store.ts";
@@ -155,11 +156,19 @@ it.effect("notifications rebuild from recorded activity alone", () =>
     const recipients = [
       {
         participationId: ThreadParticipation.Id.make("human-participation"),
-        recipient: { _tag: "Human" as const, id: Identity.HumanId.make("human") },
+        recipient: {
+          _tag: "Human" as const,
+          id: Identity.HumanId.make("human"),
+          memberId: Member.Id.make("human-member"),
+        },
       },
       {
         participationId: agent,
-        recipient: { _tag: "Agent" as const, id: Identity.AgentId.make("agent") },
+        recipient: {
+          _tag: "Agent" as const,
+          id: Identity.AgentId.make("agent"),
+          memberId: Member.Id.make("agent-member"),
+        },
       },
     ];
     const published: ThreadActivity.Record = {

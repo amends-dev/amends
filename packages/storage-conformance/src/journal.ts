@@ -1,3 +1,4 @@
+import { Notification } from "@amends/core/notification";
 import * as Core from "@amends/core";
 import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
 import {
@@ -301,7 +302,10 @@ export const journal = (harness: Harness) => {
                 ),
                 activities,
                 notifications: yield* Effect.forEach(actors, (actor) =>
-                  bound.notifications.listByRecipient(actor.identity, { limit: 100 }),
+                  bound.notifications.listByRecipient(
+                    Notification.ofMember(actor.memberId, actor.identity),
+                    { limit: 100 },
+                  ),
                 ),
               };
             });

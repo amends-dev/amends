@@ -1,5 +1,6 @@
 import { Identity } from "@amends/core/identity";
 import { Entry } from "@amends/core/journal";
+import { Member } from "@amends/core/workspace";
 import { Notification, type NotificationStore } from "@amends/core/notification";
 import { Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
@@ -21,9 +22,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           Effect.gen(function* () {
             const bound = yield* boundTo(workspaceId);
             yield* initialized(bound);
-            const human = Identity.Reference.cases.Human.make({
-              id: Identity.HumanId.make("recipient"),
-            });
+            const human = Notification.ofMember(
+              Member.Id.make("recipient-member"),
+              Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("recipient") }),
+            );
             const value: Notification.Record = {
               id: Notification.Id.make("malformed"),
               workspaceId,

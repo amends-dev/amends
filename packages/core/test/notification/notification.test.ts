@@ -8,7 +8,7 @@ const wire = {
   id: "notification-one",
   workspaceId: "workspace-one",
   source: { logId: "journal", entryId: "source-entry" },
-  recipient: { _tag: "Human", id: "recipient-one" },
+  recipient: { _tag: "Human", id: "recipient-one", memberId: "member-one" },
   recordedAt: "2026-09-19T12:00:00.000Z",
   state: { _tag: "Pending" },
 } as const;
@@ -35,7 +35,7 @@ it.effect(
       for (const invalid of [
         ...["Agent", "Contact", "Triage"].map((kind) => ({
           ...encoded,
-          recipient: { _tag: kind, id: "recipient" },
+          recipient: { _tag: kind, id: "recipient", memberId: "member-one" },
         })),
         { ...encoded, state: { ...encoded.state, acknowledgedAt: "invalid" } },
         {
@@ -54,7 +54,13 @@ it.effect.each(["Human", "Agent", "Contact"] as const)(
   "a %s notification preserves its source, recipient kind, and recorded time through codecs",
   (kind) =>
     Effect.gen(function* () {
-      const encoded = { ...wire, recipient: { ...wire.recipient, _tag: kind } };
+      const encoded = {
+        ...wire,
+        recipient:
+          kind === "Contact"
+            ? { _tag: kind, id: "recipient-one" }
+            : { ...wire.recipient, _tag: kind },
+      };
       const codec = Codec.makeForSchema(Notification.Record);
       yield* Effect.gen(function* () {
         const record = yield* Schema.decodeEffect(Notification.Record)(encoded);
@@ -62,6 +68,16 @@ it.effect.each(["Human", "Agent", "Contact"] as const)(
         const restored = yield* codec.decode(yield* codec.encode(record));
         expect(yield* Schema.encodeEffect(Notification.Record)(restored)).toEqual(encoded);
       });
+      // People and agents are notified as a membership, which their recipient must name.
+      if (kind !== "Contact")
+        expect(
+          Option.isNone(
+            Schema.decodeUnknownOption(Notification.Record)({
+              ...encoded,
+              recipient: { _tag: kind, id: "recipient-one" },
+            }),
+          ),
+        ).toBe(true);
     }),
 );
 it("notification decoding rejects malformed references and unsupported recipient or lifecycle states", () => {

@@ -61,7 +61,7 @@ const server = (url: string) => {
 const record = (
   workspaceId: Workspace.Id,
   id: string,
-  recipient: Notification.Recipient = alice,
+  recipient: Notification.Recipient,
 ): Notification.Record => ({
   id: Notification.Id.make(id),
   workspaceId,
@@ -89,12 +89,19 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const params = { workspaceId: workspace.id };
         expect(yield* humanClient.notifications.list({ params, query: { limit: 10 } })).toEqual([]);
-        const first = record(workspace.id, "a + & é");
-        const second = record(workspace.id, "pending");
-        const forBob = record(workspace.id, "bob", bob);
-        const forAgent = record(workspace.id, "agent", agent);
-        const foreign = record(otherWorkspace.id, "foreign");
+        // Inboxes belong to memberships: the creator's in each workspace, and the seeded members'.
+        const owner = Notification.ofMember(workspace.ownerMemberId, alice);
         const bobMemberId = Member.Id.make("bob-member");
+        const agentMemberId = Member.Id.make("agent-member");
+        const first = record(workspace.id, "a + & é", owner);
+        const second = record(workspace.id, "pending", owner);
+        const forBob = record(workspace.id, "bob", Notification.ofMember(bobMemberId, bob));
+        const forAgent = record(workspace.id, "agent", Notification.ofMember(agentMemberId, agent));
+        const foreign = record(
+          otherWorkspace.id,
+          "foreign",
+          Notification.ofMember(otherWorkspace.ownerMemberId, alice),
+        );
         // Notification generation and agent admission are not implemented yet; seed their read models.
         yield* Effect.gen(function* () {
           const storage = yield* PostgresStorage.make();
@@ -110,7 +117,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 status: "active",
               });
               yield* members.insert({
-                id: Member.Id.make("agent-member"),
+                id: agentMemberId,
                 workspaceId: workspace.id,
                 identity: agent,
                 status: "active",
