@@ -1,5 +1,6 @@
 import { Array, Context, Effect, Option, Schema } from "effect";
 import { Checkpoint } from "./checkpoint.ts";
+import { Entry } from "./entry.ts";
 import { Event } from "./event.ts";
 import type { Fact } from "./fact.ts";
 import type { Log } from "./log.ts";
@@ -166,6 +167,38 @@ const cursorOf = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
 });
 
 /**
+ * Replace a log's live versions in the current transaction. A version leaving the set was live,
+ * so it applied every commit through the log's head: its progress moves to the head's last
+ * entry, and rebuilding it later applies only the commits it missed, never earlier ones again.
+ */
+export const replaceLive = Effect.fnUntraced(function* (
+  checkpoints: Checkpoint.Interface,
+  log: Log.Reader<typeof Event.Envelope>,
+  current: ReadonlyArray<Checkpoint.LiveVersion>,
+  next: ReadonlyArray<Checkpoint.LiveVersion>,
+) {
+  const leaving = current.filter(
+    (version) =>
+      !next.some((kept) => kept.name === version.name && kept.version === version.version),
+  );
+  const head = leaving.length === 0 ? Option.none() : yield* log.head;
+  if (Option.isSome(head)) {
+    // Positions only advance, so the first batch after the position before the head is its batch.
+    const [batch] = yield* log.read(
+      head.value === 0 ? { limit: 1 } : { after: Entry.Position.make(head.value - 1), limit: 1 },
+    );
+    const last = batch?.entries.at(-1);
+    for (const version of leaving) {
+      const key = { logId: log.id, name: version.name, version: version.version };
+      if (batch?.position !== head.value || last === undefined)
+        return yield* new InvalidCheckpoint({ key, message: "The log's head batch is missing" });
+      yield* checkpoints.set(key, cursorOf(last));
+    }
+  }
+  yield* checkpoints.setLive(log.id, next);
+});
+
+/**
  * Construct a runner from a definition, its dependencies, and its host-owned checkpoint store.
  * Invocation context takes precedence, preserving the current transaction and
  * scope. A new version needs a fresh target or a domain-managed migration.
@@ -288,7 +321,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
           const pending = yield* next(yield* checkpoint);
           if (Option.isNone(pending)) {
             // Caught up with every commit: from this one on, commits apply the projection.
-            yield* checkpoints.setLive(log.id, [
+            yield* replaceLive(checkpoints, log, live, [
               ...live.filter(({ name }) => name !== key.name),
               { name: key.name, version: key.version },
             ]);

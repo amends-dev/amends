@@ -184,8 +184,9 @@ those are exactly the projections its host registers ([live
 projections](journal.md#live-projections)). Hosts that write one workspace must therefore run
 the same projections. During a deployment that adds or replaces one, hosts with the older set
 fail their writes until they are replaced, and a host that boots with the older set retires the
-newer projections, which newer hosts must rebuild. Rebuilding a retired version over its old
-rows is not supported.
+newer projections, which newer hosts must rebuild from the last commit each one applied. Hosts
+replay only when they prepare a workspace, so a newer host that already holds it fails its
+commits until it prepares the workspace again.
 
 ## Commit outcomes and PostgreSQL contention
 

@@ -20,10 +20,10 @@ export interface Interface {
   readonly commit: Transaction.Interface["run"];
   /**
    * Make exactly the registered projections live before accepting publications: rebuild any
-   * that are not live from the log, and retire live versions this journal does not run. When
-   * every registered projection is live, this reads nothing but the live versions. An empty log
-   * has nothing to rebuild, and its first commit makes the projections live, so replaying it
-   * writes nothing.
+   * that are not live from the log, and retire live versions this journal does not run, which
+   * later resume from the last commit they applied. When every registered projection is live,
+   * this reads nothing but the live versions. An empty log has nothing to rebuild, and its
+   * first commit makes the projections live, so replaying it writes nothing.
    */
   readonly replay: Effect.Effect<void, Projection.Error>;
   /**
@@ -267,13 +267,13 @@ export const make = Effect.fn("Journal.make")(function* <
     // booting a workspace that was never created must leave nothing behind.
     if ((yield* log.read({ limit: 1 })).length === 0) return;
     // Live versions this journal does not run would stop its commits, so they are retired first.
-    // Whoever runs a retired version again must rebuild it.
+    // Whoever runs a retired version again rebuilds it from the last commit it applied.
     if (!live.every(registered))
       yield* transaction.run(
         Effect.gen(function* () {
           const current = yield* checkpoints.listLive(log.id);
           if (!current.every(registered))
-            yield* checkpoints.setLive(log.id, current.filter(registered));
+            yield* Projection.replaceLive(checkpoints, log, current, current.filter(registered));
         }),
       );
     for (const runner of pending) yield* runner.replay;

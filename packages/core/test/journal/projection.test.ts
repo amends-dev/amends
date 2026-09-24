@@ -368,6 +368,70 @@ it.effect("a journal that does not run a live projection cannot publish to its l
   }),
 );
 
+it.effect("a retired projection rebuilds only the commits it missed, not its history again", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const older = yield* source;
+        const newer = yield* Journal.make({ logId, projections: [definition] });
+        yield* older.publish(Changed, { amount: 1 });
+        yield* older.publish(Changed, { amount: 2 });
+        yield* newer.replay;
+        yield* newer.commit(
+          Effect.gen(function* () {
+            yield* newer.publish(Changed, { amount: 10 });
+            yield* newer.publish(Changed, { amount: 20 });
+          }),
+        );
+        expect(yield* (yield* Counter).get).toBe(33);
+        // A host with the older set boots, retiring the projection, and keeps writing without it.
+        yield* older.replay;
+        expect(yield* fixture.checkpoints.listLive(logId)).toEqual([]);
+        yield* older.publish(Changed, { amount: 100 });
+        yield* newer.replay;
+        expect(yield* (yield* Counter).get).toBe(133);
+        yield* newer.publish(Changed, { amount: 1000 });
+        expect(yield* (yield* Counter).get).toBe(1133);
+      }),
+    );
+  }),
+);
+
+it.effect("versions that replace each other rebuild only the commits each one missed", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const total = yield* Ref.make(0);
+    const replacement = Projection.make("counter", { version: 2 }).on(Changed, (event) =>
+      Ref.update(total, (value) => value + event.payload.amount),
+    );
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const first = yield* Journal.make({ logId, projections: [definition] });
+        yield* first.publish(Changed, { amount: 1 });
+        // The next version rebuilds beside the first, then replaces it as it goes live.
+        const rebuilt = yield* Projection.makeRunner({ definition: replacement, log: first.log });
+        yield* rebuilt.replay;
+        expect(yield* fixture.checkpoints.listLive(logId)).toEqual([
+          { name: "counter", version: 2 },
+        ]);
+        const second = yield* Journal.make({ logId, projections: [replacement] });
+        yield* second.publish(Changed, { amount: 10 });
+        expect(yield* Ref.get(total)).toBe(11);
+        // A host still on the first version boots, retires the second, and catches the first up.
+        yield* first.replay;
+        expect(yield* (yield* Counter).get).toBe(11);
+        yield* first.publish(Changed, { amount: 100 });
+        yield* second.replay;
+        expect(yield* Ref.get(total)).toBe(111);
+        expect(yield* (yield* Counter).get).toBe(111);
+      }),
+    );
+  }),
+);
+
 it.effect(
   "unrelated facts advance progress but unsupported versions fail without skipping history",
   () =>

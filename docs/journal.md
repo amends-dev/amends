@@ -566,6 +566,12 @@ deployment that adds or replaces a projection, hosts running the older set fail 
 on commit until they are replaced; a host that boots with the older set retires the newer
 projections, which the newer hosts must then rebuild.
 
+A version leaves the live set when replay retires it or a rebuilt version of the same name
+replaces it. It was live, so it applied every commit through the log's head: in the same
+transaction, its checkpoint moves to the head's last entry. Rebuilding it again later applies
+only the commits written while it was not live, never earlier ones over its read model a
+second time.
+
 ## Rebuilding
 
 For individual control, `Projection.makeRunner({ definition, log: journal.log })` acquires
@@ -605,8 +611,9 @@ A projection version identifies its read-model interpretation, separately from f
 versions. A new version rebuilds from the beginning with its own checkpoint, and going live
 replaces the previous version of that name. The domain and host must supply a fresh target
 store or perform a coordinated migration. Changing a version alone does not clear existing
-rows, and rebuilding a retired version over its old rows would apply history twice. This
-API does not reset stores, migrate schemas, or switch readers between projection versions.
+rows. A retired version resumes from its checkpoint, so resetting its store also requires
+removing its checkpoint. This API does not reset stores, migrate schemas, or switch readers
+between projection versions.
 
 ## Verification
 
@@ -614,8 +621,9 @@ API does not reset stores, migrate schemas, or switch readers between projection
 memory adapter, including cross-log atomicity, rollback, nested and concurrent
 publication, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version
-routing, going live after a rebuild, the live-version checks on commit, and live
-publication that reads no batches or progress. Service tests check
+routing, going live after a rebuild, the live-version checks on commit, retired and
+replaced versions resuming from the last commit they applied, and live publication that
+reads no batches or progress. Service tests check
 dependency inference across different projections, the stable consumer interface,
 active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit

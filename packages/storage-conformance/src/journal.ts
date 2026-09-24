@@ -464,5 +464,54 @@ export const journal = (harness: Harness) => {
         }),
       ),
     );
+
+    it.effect("a projection another host retires rebuilds only the commits it missed", () =>
+      harness.withStorage((storage) =>
+        Effect.gen(function* () {
+          const newerHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const olderHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const logId = Log.Id.make("retire-conformance");
+          const Counted = Fact.make("conformance.counted", {
+            subject: () => Subject.make("test", "counted"),
+            version: 1,
+            payload: Schema.String,
+          });
+          const applied: Array<string> = [];
+          const recording = Projection.make("recording", { version: 1 }).on(Counted, (event) =>
+            Effect.sync(() => applied.push(event.payload)),
+          );
+          const on =
+            (bound: Bound) =>
+            <A, E, R>(program: Effect.Effect<A, E, R>) =>
+              program.pipe(
+                Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                Effect.provide(core(bound)),
+              );
+          const newer = yield* on(newerHost)(Journal.make({ logId, projections: [recording] }));
+          const older = yield* on(olderHost)(Journal.make({ logId, projections: [] }));
+          yield* on(olderHost)(older.publish(Counted, "one"));
+          yield* on(newerHost)(
+            Effect.gen(function* () {
+              yield* newer.replay;
+              yield* newer.commit(
+                Effect.andThen(newer.publish(Counted, "two"), newer.publish(Counted, "three")),
+              );
+            }),
+          );
+          // The older host boots without the projection, retiring it, and keeps writing.
+          yield* on(olderHost)(older.replay);
+          expect(yield* olderHost.checkpoints.listLive(logId)).toEqual([]);
+          expect(
+            yield* olderHost.checkpoints.get({ logId, name: "recording", version: 1 }),
+          ).toMatchObject({ _tag: "Some", value: { position: 1, index: 1 } });
+          yield* on(olderHost)(older.publish(Counted, "four"));
+          yield* on(newerHost)(newer.replay);
+          expect(applied).toEqual(["one", "two", "three", "four"]);
+          expect(yield* newerHost.checkpoints.listLive(logId)).toEqual([
+            { name: "recording", version: 1 },
+          ]);
+        }),
+      ),
+    );
   });
 };
