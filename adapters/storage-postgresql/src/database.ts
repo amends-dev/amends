@@ -5,6 +5,7 @@ import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { fileURLToPath } from "node:url";
 import { PostgresNotices } from "./notices.ts";
+import { PostgresTurns } from "./turns.ts";
 
 /** Migrations generated from the schema by `bun run generate`; applied during construction. */
 export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
@@ -22,6 +23,8 @@ export interface Interface {
   readonly sql: SqlClient.SqlClient;
   /** Append wakeups and relayed signals, from one listener for this pool. */
   readonly notices: PostgresNotices.Interface;
+  /** Turns among this process's writers to one workspace or log, before they take a connection. */
+  readonly turns: PostgresTurns.Interface;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -46,7 +49,7 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
     ),
   );
   const notices = yield* PostgresNotices.make();
-  return Service.of({ db, sql, notices });
+  return Service.of({ db, sql, notices, turns: PostgresTurns.make() });
 });
 
 /**

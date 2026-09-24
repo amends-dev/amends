@@ -205,12 +205,15 @@ HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction 
 Creating operations accept a request key, so their retries return the first result; other
 operations settle a repeat by their own rules, such as `AlreadyRemoved`, rather than repeating it.
 
-PostgreSQL's [error mapping](../adapters/storage-postgresql/src/errors.ts) recognizes
-`LockTimeoutError` and `SerializationError` as contention, but omits `DeadlockError`.
-The [pinned driver](../repos/effect/packages/sql/pg/src/internal/sqlError.ts) classifies
-SQLSTATE `40P01` separately as `DeadlockError`. It therefore follows a failure path
-instead of the intended retryable conflict path; during COMMIT it falls under the
-broad uncertain-outcome mapping above.
+PostgreSQL's [error mapping](../adapters/storage-postgresql/src/errors.ts) treats lock
+timeouts, serialization failures, and deadlocks as contention, a retryable conflict; during
+COMMIT they fall under the broad uncertain-outcome mapping above.
+
+A process's writers to one workspace wait for each other in memory, so they hold at most one
+pooled connection while PostgreSQL makes them wait, and every wait is bounded. Reads outside a
+transaction are not: they wait for a free pooled connection as long as it takes, and one
+workspace's reads can occupy all of a process's connections. Limits on the connections one
+workspace may use are not implemented.
 
 ## PostgreSQL isolation
 

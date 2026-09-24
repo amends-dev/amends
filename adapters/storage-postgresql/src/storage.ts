@@ -62,6 +62,8 @@ export const layerWorkspace = (workspaceId: Workspace.Id, options: Options = {})
  * @category constructors
  */
 export const make = Effect.fn("PostgresStorage.make")(function* (options: Options = {}) {
+  // Invalid options stop the host starting, rather than its first workspace.
+  yield* Binding.settings(options);
   const database = yield* PostgresDatabase.Service;
   const forWorkspace: WorkspaceStorage.Interface["forWorkspace"] = Effect.fn(
     "PostgresStorage.forWorkspace",

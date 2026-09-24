@@ -409,7 +409,9 @@ commit never waits for a standalone append to a log it does not touch. Journal f
 take the workspace's write order, since their projections do.
 
 Keep commit programs limited to short storage work. Harness execution, model
-inference, and other external actions belong outside storage transactions.
+inference, and other external actions belong outside storage transactions. The PostgreSQL
+adapter rolls back a program that runs past its
+[transaction timeout](../adapters/storage-postgresql/README.md#locks-and-timeouts).
 
 ## Failure and recovery
 

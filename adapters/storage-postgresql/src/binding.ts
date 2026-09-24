@@ -4,24 +4,85 @@
  * statements. Store modules require this service and nothing else of each other.
  */
 import { Commit, Store } from "@amends/core/journal";
+import type { Entry } from "@amends/core/journal";
 import type { Workspace } from "@amends/core/workspace";
-import { Cause, Context, DateTime, Duration, Effect, Exit, Layer, Option, Schema } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  DateTime,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Schema,
+} from "effect";
 import type { SqlError } from "effect/unstable/sql";
 import { PostgresDatabase } from "./database.ts";
 import { isContention } from "./errors.ts";
 
 export interface Options {
   /**
-   * How long a transaction waits for the workspace's writer lock before it
-   * reports contention. Writers to one workspace run one at a time.
+   * How long a transaction waits for its turn to write before it reports contention: behind this
+   * process's other writers to the workspace, for a pooled connection, and for the workspace's
+   * lock in PostgreSQL, altogether. Writers to one workspace run one at a time. Five seconds by
+   * default.
    */
   readonly lockTimeout?: Duration.Input | undefined;
+  /**
+   * How long one statement inside a transaction may run, at least the lock timeout, since taking
+   * the lock is a statement. Ten seconds by default.
+   */
+  readonly statementTimeout?: Duration.Input | undefined;
+  /**
+   * How long a transaction's program may run once it holds its lock before it rolls back.
+   * PostgreSQL also ends a session left idle inside a transaction this long, so a process that
+   * stalls cannot keep the workspace's lock. Thirty seconds by default.
+   */
+  readonly transactionTimeout?: Duration.Input | undefined;
   /**
    * How often a waiting reader re-checks the log without a notification: the fallback when a
    * notification is lost or `LISTEN` is unavailable, as behind a transaction-pooling proxy.
    */
   readonly pollInterval?: Duration.Input | undefined;
 }
+
+/** Options with their defaults, each a whole number of milliseconds. */
+export interface Settings {
+  readonly lockTimeout: Duration.Duration;
+  readonly statementTimeout: Duration.Duration;
+  readonly transactionTimeout: Duration.Duration;
+  readonly pollInterval: Duration.Duration;
+}
+
+/**
+ * Apply the defaults and check the options. PostgreSQL reads a timeout of zero as none, so every
+ * duration must be finite and at least a millisecond.
+ */
+export const settings = (options: Options = {}): Effect.Effect<Settings> =>
+  Effect.gen(function* () {
+    const resolve = (name: string, input: Duration.Input | undefined, fallback: Duration.Input) =>
+      Effect.suspend(() => {
+        const millis = Math.ceil(Duration.toMillis(Duration.fromInputUnsafe(input ?? fallback)));
+        return Number.isSafeInteger(millis) && millis >= 1
+          ? Effect.succeed(Duration.millis(millis))
+          : Effect.die(new Error(`${name} must be a finite duration of at least a millisecond`));
+      });
+    const resolved = {
+      lockTimeout: yield* resolve("lockTimeout", options.lockTimeout, "5 seconds"),
+      statementTimeout: yield* resolve("statementTimeout", options.statementTimeout, "10 seconds"),
+      transactionTimeout: yield* resolve(
+        "transactionTimeout",
+        options.transactionTimeout,
+        "30 seconds",
+      ),
+      pollInterval: yield* resolve("pollInterval", options.pollInterval, "5 seconds"),
+    };
+    if (Duration.isLessThan(resolved.statementTimeout, resolved.lockTimeout))
+      return yield* Effect.die(new Error("statementTimeout must be at least lockTimeout"));
+    return resolved;
+  });
 
 /** The native handle a session exposes to core. */
 export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>;
@@ -56,14 +117,14 @@ export interface Interface {
   ) => Effect.Effect<A, E | Store.Failure, R>;
   /**
    * The store's transaction primitive, given how to expose the native handle
-   * for the session it opens. See Store.Interface for the contract. With
-   * `workspace: false` it skips the workspace's writer lock, for a standalone append
-   * that locks only its log.
+   * for the session it opens. See Store.Interface for the contract. With `log`
+   * it skips the workspace's writer lock, for a standalone append that locks only
+   * that log, and takes turns with this process's other appends to it.
    */
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
     native: (session: TransactionState) => TransactionHandle,
-    options?: { readonly workspace?: boolean },
+    options?: { readonly log?: Entry.LogId },
   ) => Effect.Effect<
     A,
     E | Store.Failure | Store.Conflict | Store.CommitUncertain,
@@ -94,9 +155,15 @@ export const make = Effect.fn("Binding.make")(function* (
   options: Options = {},
 ) {
   const database = yield* PostgresDatabase.Service;
-  const { sql } = database;
-  const lockTimeout = Duration.fromInputUnsafe(options.lockTimeout ?? Duration.seconds(5));
-  const pollInterval = Duration.fromInputUnsafe(options.pollInterval ?? "5 seconds");
+  const { sql, turns } = database;
+  const { lockTimeout, statementTimeout, transactionTimeout, pollInterval } =
+    yield* settings(options);
+  const lockMillis = Duration.toMillis(lockTimeout);
+  /** Session settings for one transaction: they end with it, whether it commits or not. */
+  const limits = [
+    String(Duration.toMillis(statementTimeout)),
+    String(Duration.toMillis(transactionTimeout)),
+  ];
 
   const check = Effect.fnUntraced(function* (write: boolean) {
     const current = yield* Effect.serviceOption(CurrentTransaction);
@@ -129,7 +196,7 @@ export const make = Effect.fn("Binding.make")(function* (
   >(
     program: Effect.Effect<A, E, R>,
     native: (session: TransactionState) => TransactionHandle,
-    options: { readonly workspace?: boolean } = {},
+    options: { readonly log?: Entry.LogId } = {},
   ) {
     yield* check(false);
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
@@ -137,38 +204,45 @@ export const make = Effect.fn("Binding.make")(function* (
         operation: "transaction",
         cause: "Native transactions cannot nest; use journal.commit",
       });
-    const session: TransactionState = {
-      owner: database,
-      workspaceId,
-      active: true,
-      commit: {
-        id: Commit.Id.make(crypto.randomUUID()),
-        recordedAt: yield* DateTime.now,
-        entryCount: 0,
-      },
-      beforeCommit: Effect.void,
-    };
-    const handle = native(session);
+    const standalone = options.log !== undefined;
+    const held = standalone ? "log" : "workspace";
+    const busy = (waitingFor: string) =>
+      new Store.Conflict({
+        operation: "transaction",
+        message: `Waited longer than the lock timeout for ${waitingFor}`,
+      });
+    // Waiting in this process's queue, for a connection, and for the lock share one budget.
+    const began = yield* Clock.currentTimeMillis;
+    const remaining = Effect.map(Clock.currentTimeMillis, (now) =>
+      Math.max(1, Math.ceil(lockMillis - (now - began))),
+    );
     // Reserve a pooled connection, but own the commit boundary: the generic
     // SqlClient wrapper turns COMMIT errors into defects and cannot report CommitUncertain.
-    return yield* Effect.scoped(
+    const run = Effect.scoped(
       Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
-          const connection = yield* restore(sql.reserve).pipe(Effect.mapError(transactionError));
+          const reserved = yield* restore(sql.reserve).pipe(
+            Effect.timeoutOption(Duration.millis(yield* remaining)),
+            Effect.mapError(transactionError),
+          );
+          if (Option.isNone(reserved)) return yield* busy("a database connection");
+          const connection = reserved.value;
           const control = (statement: string, params: ReadonlyArray<unknown> = []) =>
             connection.executeUnprepared(statement, params, undefined);
           yield* control("BEGIN").pipe(Effect.mapError(transactionError));
           // Writers to one workspace take turns, so projections and checkpoints
           // serialize without serializable isolation. A workspace's key is a
-          // hash of its ID; a collision only over-serializes. The timeout also
-          // bounds waiting for a log's lock.
-          const timeout = control(
-            `SET LOCAL lock_timeout = ${Math.ceil(Duration.toMillis(lockTimeout))}`,
+          // hash of its ID; a collision only over-serializes. The lock timeout also
+          // bounds waiting for a log's lock, and the idle timeout ends the session,
+          // releasing its locks, if the process stops sending statements.
+          const limited = control(
+            "SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true), set_config('idle_in_transaction_session_timeout', $3, true)",
+            [String(yield* remaining), ...limits],
           );
           const locked = yield* Effect.exit(
-            options.workspace === false
-              ? timeout
-              : timeout.pipe(
+            standalone
+              ? limited
+              : limited.pipe(
                   Effect.andThen(
                     control("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [workspaceId]),
                   ),
@@ -178,6 +252,18 @@ export const make = Effect.fn("Binding.make")(function* (
             yield* Effect.ignore(control("ROLLBACK"));
             return yield* Effect.failCause(Cause.map(locked.cause, transactionError));
           }
+          // Recorded once the writer holds the workspace, so commit times follow their order.
+          const session: TransactionState = {
+            owner: database,
+            workspaceId,
+            active: true,
+            commit: {
+              id: Commit.Id.make(crypto.randomUUID()),
+              recordedAt: yield* DateTime.now,
+              entryCount: 0,
+            },
+            beforeCommit: Effect.void,
+          };
           const exit = yield* Effect.exit(
             restore(
               program.pipe(
@@ -186,8 +272,18 @@ export const make = Effect.fn("Binding.make")(function* (
                 Effect.updateContext((context: Context.Context<R>) =>
                   Context.add(context, CurrentTransaction, session),
                 ),
-                Effect.provideService(Store.Transaction, handle),
+                Effect.provideService(Store.Transaction, native(session)),
                 Effect.provideService(sql.transactionService, [connection, 0]),
+                Effect.timeoutOrElse({
+                  duration: transactionTimeout,
+                  orElse: () =>
+                    Effect.fail(
+                      new Store.Failure({
+                        operation: "transaction",
+                        cause: `The transaction ran longer than ${Duration.format(transactionTimeout)}`,
+                      }),
+                    ),
+                }),
               ),
             ),
           );
@@ -224,6 +320,14 @@ export const make = Effect.fn("Binding.make")(function* (
           return exit.value;
         }),
       ),
+    );
+    // This process's writers to the workspace, or to a standalone append's log, queue here, so
+    // only the one at the front holds a connection while PostgreSQL makes it wait for the lock.
+    return yield* turns.run(
+      JSON.stringify(standalone ? [workspaceId, options.log] : [workspaceId]),
+      lockTimeout,
+      () => busy(`this process's other writers to the ${held}`),
+      run,
     );
   });
 

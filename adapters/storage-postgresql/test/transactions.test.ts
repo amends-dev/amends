@@ -1,15 +1,206 @@
+import { Entry, Store } from "@amends/core/journal";
+import { Workspace } from "@amends/core/workspace";
 import { Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
-import { SqlError } from "effect/unstable/sql";
-import { PostgresDatabase } from "../src/index.ts";
+import {
+  Cause,
+  DateTime,
+  Deferred,
+  Duration,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Redacted,
+} from "effect";
+import { SqlClient, SqlError } from "effect/unstable/sql";
+import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { harness } from "./harness.ts";
+import type { Bound } from "./support.ts";
 import { initialized, inDatabase, setup, views, workspaceId } from "./support.ts";
 
 Suites.transactions(harness);
 
 const { available, withDatabase } = setup();
+const execution = Entry.LogId.make("execution");
+const first = Workspace.Id.make("workspace-first");
+const second = Workspace.Id.make("workspace-second");
+
+/** One process: a pool of `size` connections, and views of workspaces over it. */
+const process = Effect.fnUntraced(function* (
+  url: string,
+  size: number,
+  options: PostgresStorage.Options = {},
+) {
+  const pool = yield* Layer.build(
+    PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: size }),
+  );
+  const storage = yield* views(options).pipe(Effect.provide(pool));
+  return { pool, forWorkspace: storage.forWorkspace };
+});
+
+/** Append one entry to the workspace's execution log, then run `then` before committing. */
+const append = <E>(bound: Bound, then: Effect.Effect<void, E> = Effect.void) =>
+  bound.store.transaction(
+    Effect.flatMap(Store.Transaction, (transaction) =>
+      transaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
+    ).pipe(Effect.andThen(then)),
+  );
+
+/** A writer holding the workspace until released, once it has its lock. */
+const holding = Effect.fnUntraced(function* (bound: Bound) {
+  const held = yield* Deferred.make<void>();
+  const release = yield* Deferred.make<void>();
+  const fiber = yield* Effect.forkChild(
+    append(bound, Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release)))),
+  );
+  yield* Deferred.await(held);
+  return { fiber, release: Deferred.succeed(release, undefined) };
+});
+
 describe.skipIf(!available)("PostgreSQL", () => {
+  it.live("writers queued for one workspace leave the pool's connections to other workspaces", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const host = yield* process(url, 2);
+        const busy = yield* host.forWorkspace(first);
+        const other = yield* host.forWorkspace(second);
+        const holder = yield* holding(busy);
+        // They wait for their turn in memory, not each on a connection of their own.
+        const queued = yield* Effect.forkChild(
+          Effect.all(
+            Array.from({ length: 10 }, () => append(busy)),
+            { concurrency: "unbounded" },
+          ),
+        );
+        yield* Effect.sleep("100 millis");
+        yield* append(other).pipe(Effect.timeout("2 seconds"));
+        yield* holder.release;
+        yield* Fiber.join(holder.fiber);
+        expect(yield* Fiber.join(queued)).toHaveLength(10);
+      }).pipe(Effect.scoped),
+    ),
+  );
+
+  it.live(
+    "a writer that waits past the lock timeout reports contention, in this process or for a connection",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const host = yield* process(url, 1, { lockTimeout: "200 millis" });
+          const busy = yield* host.forWorkspace(first);
+          const holder = yield* holding(busy);
+          expect(yield* Effect.flip(append(busy))).toMatchObject({
+            _tag: "JournalStore.Conflict",
+            message: expect.stringContaining("this process's other writers to the workspace"),
+          });
+          // The holder has the pool's one connection, so another workspace finds none free.
+          expect(yield* Effect.flip(append(yield* host.forWorkspace(second)))).toMatchObject({
+            _tag: "JournalStore.Conflict",
+            message: expect.stringContaining("a database connection"),
+          });
+          yield* holder.release;
+          yield* Fiber.join(holder.fiber);
+          yield* append(busy);
+        }).pipe(Effect.scoped),
+      ),
+  );
+
+  it.live(
+    "a program that runs past the transaction timeout rolls back and frees the workspace",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const host = yield* process(url, 2, { transactionTimeout: "200 millis" });
+          const bound = yield* host.forWorkspace(first);
+          const failure = yield* Effect.flip(append(bound, Effect.sleep("2 seconds")));
+          expect(failure).toMatchObject({
+            _tag: "JournalStore.Failure",
+            cause: expect.stringContaining("ran longer than"),
+          });
+          expect(yield* bound.store.head(execution)).toEqual(Option.none());
+          yield* append(bound);
+          expect(Option.isSome(yield* bound.store.head(execution))).toBe(true);
+        }).pipe(Effect.scoped),
+      ),
+  );
+
+  // The test clock never advances, so the stalled writer's own deadline never ends it: only
+  // PostgreSQL's idle timeout can, as for a process that stopped responding.
+  it.effect("a stalled process's session ends, releasing the workspace to other processes", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const stalled = yield* process(url, 2, { transactionTimeout: "300 millis" });
+        yield* holding(yield* stalled.forWorkspace(first));
+        const other = yield* process(url, 2);
+        yield* append(yield* other.forWorkspace(first));
+      }).pipe(Effect.scoped),
+    ),
+  );
+
+  it.effect("timeouts apply to the transaction's session only while it runs", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const host = yield* process(url, 1);
+        const bound = yield* host.forWorkspace(first);
+        const settings = Effect.flatMap(
+          SqlClient.SqlClient,
+          (sql) => sql<{ readonly statement: string; readonly idle: string }>`
+            SELECT current_setting('statement_timeout') AS statement,
+              current_setting('idle_in_transaction_session_timeout') AS idle`,
+        ).pipe(Effect.provide(host.pool), Effect.orDie);
+        expect(yield* bound.store.transaction(settings)).toEqual([
+          { statement: "10s", idle: "30s" },
+        ]);
+        expect(yield* settings).toEqual([{ statement: "0", idle: "0" }]);
+      }).pipe(Effect.scoped),
+    ),
+  );
+
+  it.live("a writer that waited records when it wrote, not when it began waiting", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const host = yield* process(url, 2);
+        const bound = yield* host.forWorkspace(first);
+        const holder = yield* holding(bound);
+        const waiting = yield* Effect.forkChild(append(bound));
+        yield* Effect.sleep("300 millis");
+        yield* holder.release;
+        yield* Fiber.join(holder.fiber);
+        yield* Fiber.join(waiting);
+        const [earlier, later] = yield* bound.store.read(execution, { limit: 2 });
+        if (earlier === undefined || later === undefined)
+          return expect.fail("Expected two commits");
+        const waited = DateTime.distance(earlier.commit.recordedAt, later.commit.recordedAt);
+        expect(Duration.toMillis(waited)).toBeGreaterThanOrEqual(250);
+      }).pipe(Effect.scoped),
+    ),
+  );
+
+  it.effect("durations PostgreSQL would read as no limit stop the storage from starting", () =>
+    withDatabase((url) =>
+      inDatabase(
+        url,
+        Effect.gen(function* () {
+          for (const [options, expected] of [
+            [{ lockTimeout: 0 }, "lockTimeout must be a finite duration"],
+            [{ transactionTimeout: "Infinity" }, "transactionTimeout must be a finite duration"],
+            [
+              { lockTimeout: "2 seconds", statementTimeout: "1 second" },
+              "statementTimeout must be at least lockTimeout",
+            ],
+          ] as const) {
+            const exit = yield* Effect.exit(PostgresStorage.make(options));
+            if (Exit.isSuccess(exit)) return expect.fail("Expected the storage not to start");
+            expect(Cause.hasDies(exit.cause)).toBe(true);
+            expect(String(Cause.squash(exit.cause))).toContain(expected);
+          }
+        }),
+      ),
+    ),
+  );
+
   it.effect(
     "commit failure reports an uncertain outcome with its commit ID and never retries the operation",
     () =>
@@ -51,6 +242,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 db: real.db,
                 sql: failing,
                 notices: real.notices,
+                turns: real.turns,
               }),
             );
             const bound = yield* storage.forWorkspace(workspaceId);

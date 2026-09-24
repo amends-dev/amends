@@ -6,8 +6,8 @@ import { LocalServer } from "./server.ts";
 
 /** Serve the application on the loopback interface over the AMENDS_DATABASE_URL database. */
 const program = Effect.gen(function* () {
-  const { port, databaseUrl } = yield* LocalConfig.load();
-  return yield* Layer.launch(LocalServer.layer(LocalHost.layer(databaseUrl), port));
+  const { port, databaseUrl, poolSize } = yield* LocalConfig.load();
+  return yield* Layer.launch(LocalServer.layer(LocalHost.layer(databaseUrl, { poolSize }), port));
 });
 
 BunRuntime.runMain(

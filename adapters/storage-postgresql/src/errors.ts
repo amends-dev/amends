@@ -22,7 +22,9 @@ export const isConstraintViolation = (error: unknown): boolean => {
 /** Another writer holds what this transaction needs; the operation did not apply. */
 export const isContention = (error: unknown): boolean => {
   const reason = sqlError(error)?.reason._tag;
-  return reason === "LockTimeoutError" || reason === "SerializationError";
+  return (
+    reason === "LockTimeoutError" || reason === "SerializationError" || reason === "DeadlockError"
+  );
 };
 
 /** Every core store declares this pair; the constructors take the same fields. */

@@ -503,7 +503,7 @@ export const make = Effect.fn("Journal.make")(function* () {
           id: session.commit.id,
           append: (input) => guard(append(session, input), true),
         }),
-        { workspace: false },
+        { log: request.logId },
       );
     }),
     get: Effect.fn("Journal.get")(function* (logId, commitId) {

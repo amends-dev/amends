@@ -11,12 +11,36 @@ const load = (values: Record<string, unknown>) =>
   );
 const databaseUrl = "postgres://user:secret@localhost/database";
 
-it.effect("configuration defaults to port 8787", () =>
+it.effect("configuration defaults to port 8787 and a pool of ten connections", () =>
   Effect.gen(function* () {
     const options = yield* load({ AMENDS_DATABASE_URL: databaseUrl });
     expect(options.port).toBe(8787);
+    expect(options.poolSize).toBe(10);
     expect(Redacted.value(options.databaseUrl)).toBe(databaseUrl);
   }),
+);
+
+it.effect.each([2, 50, 1000])("configuration accepts a pool of %i connections", (size) =>
+  Effect.gen(function* () {
+    const options = yield* load({
+      AMENDS_DATABASE_URL: databaseUrl,
+      AMENDS_DATABASE_POOL_SIZE: String(size),
+    });
+    expect(options.poolSize).toBe(size);
+  }),
+);
+
+// One connection listens for notifications while readers wait, so a pool needs another to write.
+it.effect.each(["", "0", "1", "1001", "2.5", "many"])(
+  "configuration rejects a pool size of %j",
+  (size) =>
+    Effect.gen(function* () {
+      const error = yield* load({
+        AMENDS_DATABASE_URL: databaseUrl,
+        AMENDS_DATABASE_POOL_SIZE: size,
+      }).pipe(Effect.flip);
+      expect(error.message).toContain("AMENDS_DATABASE_POOL_SIZE");
+    }),
 );
 
 it.effect.each([0, 8787, 65535])("configuration accepts port %i", (port) =>

@@ -22,15 +22,20 @@ The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `bun run dev` restarts the host when its source changes.
 
-| Setting               | Default  | Accepted value                                             |
-| --------------------- | -------- | ---------------------------------------------------------- |
-| `AMENDS_PORT`         | `8787`   | Integer from `0` through `65535`; `0` selects a free port. |
-| `AMENDS_DATABASE_URL` | Required | A `postgres://` or `postgresql://` URL.                    |
+| Setting                     | Default  | Accepted value                                             |
+| --------------------------- | -------- | ---------------------------------------------------------- |
+| `AMENDS_PORT`               | `8787`   | Integer from `0` through `65535`; `0` selects a free port. |
+| `AMENDS_DATABASE_URL`       | Required | A `postgres://` or `postgresql://` URL.                    |
+| `AMENDS_DATABASE_POOL_SIZE` | `10`     | Integer from `2` through `1000`.                           |
+
+The pool size is the most connections the host opens. One of them listens for notifications
+while readers wait, and a busy workspace's writers wait for each other in memory rather than
+each holding a connection; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
 
 The database must exist; startup applies pending migrations to it before serving, one
 process at a time when several start together.
-A missing or invalid URL fails startup before any connection. A missing port uses
-its default; an explicitly blank setting fails validation. Database URLs stay
+A missing or invalid URL fails startup before any connection. A missing port or pool size
+uses its default; an explicitly blank setting fails validation. Database URLs stay
 redacted in configuration errors.
 
 ## Browser and desktop access
@@ -53,8 +58,8 @@ constructor and layer; related authentication modules share one directory.
 | `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                       |
 | `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                               |
 | `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                    |
-| `config.ts`                        | `LocalConfig.load()`, validating the port and database URL before resource acquisition.                                  |
-| `host.ts`                          | `LocalHost.layer(url)`, providing the gateway and workspace directory over PostgreSQL as a `HostLayer`.                  |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                      |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL as a `HostLayer`.        |
 | `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server. |
 | `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                       |
 
@@ -118,7 +123,7 @@ bun run test
 
 Authentication tests cover constructor and layer behavior, state isolation,
 single-use codes, exact expiry, repeated requests, concurrent completion, and
-failed or interrupted delivery. Configuration tests cover defaults, port bounds,
+failed or interrupted delivery. Configuration tests cover defaults, port and pool-size bounds,
 the required database URL, empty values, and redacted errors.
 
 Tests that open storage run in the `postgresql` test project, each over its own

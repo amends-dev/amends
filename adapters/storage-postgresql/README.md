@@ -101,8 +101,9 @@ identity, the transaction boundary, and the guard each statement runs under. `st
 `layerWorkspace(workspaceId, options)` to compose the store layers over a binding for the requested
 workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing
 SQL client in `make` and acquires the pool in `layer`; `directory.ts` reads across workspaces, and
-`schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener, and
-`signals.ts` the signal hub over it. Bindings and raw tables are internal to the adapter's public package
+`schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener,
+`signals.ts` the signal hub over it, and `turns.ts` the queue in which a process's writers to
+one workspace or log wait for each other. Bindings and raw tables are internal to the adapter's public package
 surface.
 
 Follow the [adapter naming and validation conventions](../README.md).
@@ -216,15 +217,34 @@ idempotency key. Key lookup precedes expected-position checks; matching bytes
 return the original append slice, while conflicting bytes or count fail. The key,
 entries, and projection writes commit or roll back together. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
 
+### Locks and timeouts
+
 Writers to one workspace take turns: each commit takes a transaction-scoped
 advisory lock keyed by the workspace before it runs. A commit also holds each log it appends
 to, or looks up a key of, with a transaction-scoped advisory lock keyed by workspace and log.
 `Store.append` opens a commit that takes only its log's lock, so execution output does not
 wait for the workspace's writers, and a transaction waits for it only on a log both write.
-Every lock wait is bounded by `lockTimeout` (five seconds by default), and maps lock timeouts and serialization errors at the
-transaction boundary to store conflicts without retrying. `DeadlockError` is not
-included in that classification and currently becomes a failure. Reads outside a
-transaction see committed state. A statement PostgreSQL
+
+A process's writers to one workspace, or its standalone appends to one log, first queue in
+memory (`turns.ts`), so only the one at the front takes a pooled connection and waits for
+PostgreSQL's lock. A busy workspace therefore holds at most one connection per process while
+its writers wait, and leaves the rest of the pool to other workspaces. Waiting in that queue,
+for a free connection, and for the lock share one budget, `lockTimeout` (five seconds by
+default); a writer still waiting when it runs out fails with a store conflict saying what it
+waited for, without retrying. Lock timeouts, serialization failures, and deadlocks at the
+transaction boundary map to the same conflict. The commit's `recordedAt` is taken once the
+writer holds its lock, so commit times follow commit order.
+
+Once it holds the lock, a transaction sets its own session limits, which end with it:
+`statement_timeout` (`statementTimeout`, ten seconds by default, at least `lockTimeout`)
+for each statement, and `idle_in_transaction_session_timeout` (`transactionTimeout`, thirty
+seconds by default). A program that runs past `transactionTimeout` rolls back and fails with a
+store failure; if the process itself stalls, PostgreSQL ends its session after that long idle,
+which releases its locks. Every duration must be finite and at least a millisecond, since
+PostgreSQL reads zero as no limit; `PostgresStorage.make` refuses others when the host starts.
+
+Reads outside a transaction see committed state, on any free pooled connection, and are
+not queued or bounded. A statement PostgreSQL
 refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the
@@ -269,9 +289,11 @@ Gateway.layer().pipe(
 );
 ```
 
-The root `layer(options)` provides the storage, directory, and signal hub contracts; `PostgresDatabase.layer`
-takes the Effect client's pool configuration. The local host also supplies
-cryptography and composes this over the database at `AMENDS_DATABASE_URL`.
+The root `layer(options)` provides the storage, directory, and signal hub contracts, with the
+[lock and timeout options](#locks-and-timeouts); `PostgresDatabase.layer` takes the Effect
+client's pool configuration, such as `maxConnections` (ten by default). The local host also
+supplies cryptography and composes this over the database at `AMENDS_DATABASE_URL`, with
+`AMENDS_DATABASE_POOL_SIZE` connections.
 
 `PostgresDatabase.make()` instead accepts `SqlClient.SqlClient` through Effect's
 context. It constructs the Drizzle facade and migrates through that same client, inside a
@@ -295,7 +317,11 @@ database per test: another host is another pool, woken by notifications with the
 fallback interval, and with a 100-millisecond lock timeout when a test asks for prompt
 contention. Discarding projections truncates the projection tables, and the footprint counts the rows of every table. Each test file
 registers one suite. Beside the registrations, only what PostgreSQL stores or fails differently is
-tested here: `transactions.test.ts` injects a failed `COMMIT` to check `CommitUncertain`,
+tested here: `transactions.test.ts` injects a failed `COMMIT` to check `CommitUncertain`, and
+checks the limits: queued writers leave a small pool to other workspaces, each wait ends in a
+conflict naming it, a program past its deadline rolls back, a stalled process's session ends and
+releases the workspace, the session limits end with the transaction, a writer that waited
+records when it wrote, and invalid durations stop the storage from starting;
 `fact-metadata.test.ts` checks the fact columns, `invitations.test.ts` checks that a refused
 statement the program ignores still aborts its transaction, and `notifications.test.ts` checks that
 a malformed stored record fails reads. `journal.test.ts` checks, with an hour-long fallback
