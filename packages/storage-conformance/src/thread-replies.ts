@@ -59,6 +59,7 @@ import {
   failingLate,
   journalLog,
   otherWorkspaceId,
+  publishedMessage,
   runHost,
   Support,
   testProvenance,
@@ -177,7 +178,7 @@ export const threadReplies = (harness: Harness) => {
     /** A thread's messages in ID order, found through its activities: each message has one. */
     const messages = Effect.fnUntraced(function* (bound: Bound, threadId: Thread.Id) {
       const ids = (yield* bound.activities.listByThread(threadId))
-        .flatMap((activity) => (activity.kind === "MessagePublished" ? [activity.messageId] : []))
+        .flatMap((activity) => publishedMessage(activity) ?? [])
         .toSorted((left, right) => (left < right ? -1 : left > right ? 1 : 0));
       return yield* Effect.forEach(ids, (id) => bound.messages.get(id));
     });
@@ -246,7 +247,7 @@ export const threadReplies = (harness: Harness) => {
               });
               expect(result.activity).toMatchObject({
                 threadId: first.thread.id,
-                messageId: result.message.id,
+                details: { messageId: result.message.id },
                 sequence: 2,
               });
               const participants = yield* bound.participations.listByThread(first.thread.id);
@@ -912,6 +913,7 @@ export const threadReplies = (harness: Harness) => {
                 identity: { _tag: "Human" as const, id: Identity.HumanId.make("wrong") },
               },
             });
+            const stored = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
             const contexts = [
               Context.add(bound.context, ThreadStore.Service, {
                 ...bound.threads,
@@ -920,12 +922,16 @@ export const threadReplies = (harness: Harness) => {
               Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,
                 latest: () =>
-                  Effect.succeedSome({ ...first.activity, threadId: Thread.Id.make("foreign") }),
+                  Effect.succeedSome(
+                    Object.assign({}, stored, { threadId: Thread.Id.make("foreign") }),
+                  ),
               }),
               Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,
                 latest: () =>
-                  Effect.succeedSome({ ...first.activity, sequence: Number.MAX_SAFE_INTEGER }),
+                  Effect.succeedSome(
+                    Object.assign({}, stored, { sequence: Number.MAX_SAFE_INTEGER }),
+                  ),
               }),
               Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,

@@ -29,6 +29,7 @@ import { ThreadMessageStore } from "./message/store.ts";
 import { ThreadParticipation } from "./participation/participation.ts";
 import { ThreadParticipationStore } from "./participation/store.ts";
 import { ThreadActivityReading } from "./activity/reading.ts";
+import { ThreadActivityResolvers } from "./activity/resolvers.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
 import { ThreadReading } from "../attention/reading.ts";
 import { ReadStateStore } from "../attention/store.ts";
@@ -86,6 +87,7 @@ export type ReadError =
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
   | ThreadActivityStore.Failure
+  | ThreadActivityResolvers.Failure
   | ThreadParticipationStore.Failure
   | Schema.SchemaError
   | GroupNotFound

@@ -4,7 +4,7 @@ import { ThreadMessageId } from "./id.ts";
 import { WorkspaceId } from "../../workspace/id.ts";
 import { MemberId } from "../../workspace/member/id.ts";
 import { Identity } from "../../identity/identity.ts";
-import { ThreadActivity } from "../activity/activity.ts";
+import { ThreadMessageActivity } from "./activity.ts";
 export const Id = ThreadMessageId.Id;
 export type Id = ThreadMessageId.Id;
 /** Preserve the submitted text, including indentation; reject whitespace-only messages. */
@@ -42,7 +42,7 @@ export interface PublishInput extends Schema.Schema.Type<typeof PublishInput> {}
 /** Publication result excludes internal admission and recipient identity snapshots. */
 export const Published = Schema.Struct({
   message: Record,
-  activity: ThreadActivity.MessagePublished,
+  activity: ThreadMessageActivity.Published.Activity,
 });
 export interface Published extends Schema.Schema.Type<typeof Published> {}
 export * as ThreadMessage from "./message.ts";

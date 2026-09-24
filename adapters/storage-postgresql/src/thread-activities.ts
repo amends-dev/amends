@@ -9,25 +9,7 @@ import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Union([
-      Schema.Struct({
-        ...ThreadActivity.MessagePublished.fields,
-        occurredAt: Schema.DateTimeUtcFromDate,
-        participationId: Schema.Null,
-        reason: Schema.Null,
-      }),
-      Schema.Struct({
-        ...ThreadActivity.ParticipationFollowed.fields,
-        reason: Schema.Null,
-        occurredAt: Schema.DateTimeUtcFromDate,
-        messageId: Schema.Null,
-      }),
-      Schema.Struct({
-        ...ThreadActivity.ParticipationEnded.fields,
-        occurredAt: Schema.DateTimeUtcFromDate,
-        messageId: Schema.Null,
-      }),
-    ]),
+    Schema.Struct({ ...ThreadActivity.Record.fields, occurredAt: Schema.DateTimeUtcFromDate }),
   ),
 );
 const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =>

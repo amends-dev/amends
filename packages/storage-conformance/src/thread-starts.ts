@@ -6,6 +6,7 @@ import { Journal, Log, Publication } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
+  ThreadActivityPublisher,
   ThreadActivityRecording,
   ThreadApplication,
   ThreadCreation,
@@ -42,7 +43,11 @@ export const threadStarts = (harness: Harness) => {
           ThreadCreation.layer,
           ThreadMessagePublication.layer.pipe(
             Layer.provide(
-              Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
+              ThreadActivityPublisher.layer.pipe(
+                Layer.provide(
+                  Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
+                ),
+              ),
             ),
           ),
         ),

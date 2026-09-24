@@ -3,9 +3,12 @@ import {
   Thread,
   ThreadActivity,
   ThreadActivityFacts,
+  ThreadActivityKind,
   ThreadFacts,
   ThreadMessage,
+  ThreadMessageActivity,
   ThreadParticipation,
+  ThreadParticipationActivity,
   ThreadProjection,
   ThreadStore,
 } from "@amends/core/thread";
@@ -28,14 +31,17 @@ const threadId = Thread.Id.make("thread");
 const memberId = Member.Id.make("member");
 const at = (minute: number) =>
   DateTime.makeUnsafe(`2026-09-20T12:${String(minute).padStart(2, "0")}:00.000Z`);
-const activity = (sequence: number, subject: ThreadActivity.Subject): ThreadActivity.Record => ({
-  ...subject,
+const common = (sequence: number) => ({
   id: ThreadActivity.Id.make(`activity-${sequence}`),
   workspaceId,
   threadId,
   sequence,
   occurredAt: at(sequence),
 });
+const published = (sequence: number, messageId: string) =>
+  ThreadActivityKind.makeRecordUnsafe(ThreadMessageActivity.Published, common(sequence), {
+    messageId: ThreadMessage.Id.make(messageId),
+  });
 
 it.effect(
   "threads and groups each rebuild their latest activity from recorded activity alone",
@@ -90,15 +96,17 @@ it.effect(
             createdBy: { _tag: "Member", memberId },
             createdAt: at(0),
           });
-          const subjects: ReadonlyArray<ThreadActivity.Subject> = [
-            { kind: "MessagePublished", messageId: ThreadMessage.Id.make("first") },
-            { kind: "ParticipationFollowed", participationId: ThreadParticipation.Id.make("p") },
-            { kind: "MessagePublished", messageId: ThreadMessage.Id.make("second") },
+          const activities = [
+            published(1, "first"),
+            ThreadActivityKind.makeRecordUnsafe(ThreadParticipationActivity.Followed, common(2), {
+              participationId: ThreadParticipation.Id.make("p"),
+            }),
+            published(3, "second"),
           ];
-          for (const [index, subject] of subjects.entries())
+          for (const activity of activities)
             yield* source.publish(ThreadActivityFacts.Recorded, {
               groupId,
-              activity: activity(index + 1, subject),
+              activity,
               recipients: [],
             });
         }),

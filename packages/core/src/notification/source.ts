@@ -36,7 +36,18 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/notification/source/Service",
 ) {}
 const sameRecipient = Schema.toEquivalence(Notification.Recipient);
-const sameActivity = Schema.toEquivalence(ThreadActivity.Record);
+/** The item shows the recorded activity: the same one, at the same place, about the same subject. */
+const sameActivity = (
+  recorded: ThreadActivity.Record,
+  shown: Pick<ThreadActivity.Record, "id" | "threadId" | "sequence" | "subject"> & {
+    readonly kind: string;
+  },
+) =>
+  recorded.id === shown.id &&
+  recorded.threadId === shown.threadId &&
+  recorded.sequence === shown.sequence &&
+  recorded.kind === shown.kind &&
+  recorded.subject === shown.subject;
 /** @category constructors */
 export const make = Effect.fn("NotificationSource.make")(function* () {
   const journal = yield* Journal.Service;

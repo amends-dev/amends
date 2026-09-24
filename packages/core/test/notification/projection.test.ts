@@ -3,8 +3,11 @@ import {
   Thread,
   ThreadActivity,
   ThreadActivityFacts,
+  ThreadActivityKind,
   ThreadMessage,
+  ThreadMessageActivity,
   ThreadParticipation,
+  ThreadParticipationActivity,
   ThreadParticipationFacts,
 } from "@amends/core/thread";
 import { Identity } from "@amends/core/identity";
@@ -171,15 +174,11 @@ it.effect("notifications rebuild from recorded activity alone", () =>
         },
       },
     ];
-    const published: ThreadActivity.Record = {
-      id: ThreadActivity.Id.make("published"),
-      workspaceId,
-      threadId,
-      sequence: 1,
-      kind: "MessagePublished",
-      messageId: ThreadMessage.Id.make("message"),
-      occurredAt,
-    };
+    const published = ThreadActivityKind.makeRecordUnsafe(
+      ThreadMessageActivity.Published,
+      { id: ThreadActivity.Id.make("published"), workspaceId, threadId, sequence: 1, occurredAt },
+      { messageId: ThreadMessage.Id.make("message") },
+    );
     yield* run(
       fixture,
       Effect.gen(function* () {
@@ -192,16 +191,11 @@ it.effect("notifications rebuild from recorded activity alone", () =>
         });
         yield* source.publish(ThreadActivityFacts.Recorded, {
           groupId,
-          activity: {
-            id: ThreadActivity.Id.make("ended"),
-            workspaceId,
-            threadId,
-            sequence: 2,
-            kind: "ParticipationEnded",
-            participationId: agent,
-            reason: "unfollowed",
-            occurredAt,
-          },
+          activity: ThreadActivityKind.makeRecordUnsafe(
+            ThreadParticipationActivity.Ended,
+            { id: ThreadActivity.Id.make("ended"), workspaceId, threadId, sequence: 2, occurredAt },
+            { participationId: agent, reason: "unfollowed" },
+          ),
           recipients: [],
         });
         const journal = yield* Journal.make({
@@ -211,7 +205,7 @@ it.effect("notifications rebuild from recorded activity alone", () =>
         yield* journal.replay;
         expect(inserted).toEqual(
           recipients.map((recipient) =>
-            Notification.generated(message, { groupId, ...published }, recipient),
+            Notification.generated(message, Object.assign({ groupId }, published), recipient),
           ),
         );
         // The store decides from its own records which of the participation's notifications settle.

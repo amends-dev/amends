@@ -29,6 +29,7 @@ import {
   ThreadParticipation,
   ThreadParticipationAdmission,
   ThreadParticipationFacts,
+  ThreadParticipationActivity,
   ThreadParticipationApplication,
   ThreadParticipationStore,
   ThreadPermissions,
@@ -558,9 +559,10 @@ export const notificationSources = (harness: Harness) => {
                 yield* Effect.flip(run({ ...bound, context }, human, resolve(note.id))),
               ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
             }
+            const stored = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
             for (const activity of [
-              { ...first.activity, id: ThreadActivity.Id.make("wrong") },
-              { ...first.activity, sequence: 2 },
+              Object.assign({}, stored, { id: ThreadActivity.Id.make("wrong") }),
+              Object.assign({}, stored, { sequence: 2 }),
             ]) {
               const context = Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,
@@ -665,7 +667,8 @@ export const notificationSources = (harness: Harness) => {
                         threadId: first.thread.id,
                         sequence,
                         occurredAt,
-                        subject: { kind: "ParticipationFollowed", participationId: participant.id },
+                        kind: ThreadParticipationActivity.Followed,
+                        details: { participationId: participant.id },
                         recipients,
                       });
                       yield* journal
@@ -681,11 +684,8 @@ export const notificationSources = (harness: Harness) => {
                         threadId: first.thread.id,
                         sequence: yield* recorder.nextSequence(first.thread.id),
                         occurredAt,
-                        subject: {
-                          kind: "ParticipationEnded",
-                          participationId: participant.id,
-                          reason: "unfollowed",
-                        },
+                        kind: ThreadParticipationActivity.Ended,
+                        details: { participationId: participant.id, reason: "unfollowed" },
                         recipients,
                       });
                       return [followed, ended];

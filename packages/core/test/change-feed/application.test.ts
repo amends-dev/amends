@@ -7,6 +7,8 @@ import {
   ThreadParticipationFacts,
   ThreadActivity,
   ThreadActivityFacts,
+  ThreadActivityKind,
+  ThreadMessageActivity,
   ThreadPermissions,
 } from "@amends/core/thread";
 import { Subject } from "@amends/core/journal";
@@ -542,15 +544,17 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
           });
           yield* publish(ThreadActivityFacts.Recorded, {
             groupId,
-            activity: {
-              id: ThreadActivity.Id.make("activity"),
-              workspaceId,
-              threadId,
-              sequence: 1,
-              kind: "MessagePublished",
-              messageId: ThreadMessage.Id.make("message"),
-              occurredAt: at,
-            },
+            activity: ThreadActivityKind.makeRecordUnsafe(
+              ThreadMessageActivity.Published,
+              {
+                id: ThreadActivity.Id.make("activity"),
+                workspaceId,
+                threadId,
+                sequence: 1,
+                occurredAt: at,
+              },
+              { messageId: ThreadMessage.Id.make("message") },
+            ),
             recipients: [
               {
                 participationId: ThreadParticipation.Id.make("participation"),
@@ -584,8 +588,11 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
               workspaceId,
               threadId,
               sequence: 1,
-              kind: "MessagePublished",
-              messageId: "message",
+              kind: "message.published",
+              subject: "message:message",
+              occurrence: JSON.stringify(["message.published", "message:message"]),
+              newActivity: true,
+              details: { messageId: "message" },
               occurredAt: "2026-09-20T12:00:00.123Z",
             },
           },
@@ -598,15 +605,17 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
 /** Activity in the group that selects Alice and Bob as recipients. */
 const notifying = publish(ThreadActivityFacts.Recorded, {
   groupId,
-  activity: {
-    id: ThreadActivity.Id.make("reply-activity"),
-    workspaceId,
-    threadId,
-    sequence: 3,
-    kind: "MessagePublished",
-    messageId: ThreadMessage.Id.make("reply"),
-    occurredAt: at,
-  },
+  activity: ThreadActivityKind.makeRecordUnsafe(
+    ThreadMessageActivity.Published,
+    {
+      id: ThreadActivity.Id.make("reply-activity"),
+      workspaceId,
+      threadId,
+      sequence: 3,
+      occurredAt: at,
+    },
+    { messageId: ThreadMessage.Id.make("reply") },
+  ),
   recipients: [
     {
       participationId: ThreadParticipation.Id.make("alice-participation"),

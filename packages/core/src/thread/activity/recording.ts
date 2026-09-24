@@ -10,6 +10,7 @@ import { ThreadId } from "../id.ts";
 import { Thread } from "../thread.ts";
 import { ThreadStore } from "../store.ts";
 import { ThreadActivity } from "./activity.ts";
+import { ThreadActivityKind } from "./kind.ts";
 import { ThreadActivityStore } from "./store.ts";
 import { ThreadActivityFacts } from "./facts.ts";
 
@@ -17,18 +18,26 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
   "ThreadActivityRecording.InvalidReference",
   { message: Schema.String },
 ) {}
-export const Input = Schema.Struct({
+/** An activity of one kind, at a position of its thread, with the recipients it selects. */
+export interface Input<K extends ThreadActivityKind.Definition> {
+  readonly threadId: ThreadId.Id;
+  readonly sequence: number;
+  readonly occurredAt: ThreadActivity.Record["occurredAt"];
+  readonly kind: K;
+  readonly details: K["details"]["Type"];
+  readonly recipients: ReadonlyArray<ThreadActivity.Recipient>;
+}
+const Position = Schema.Struct({
   threadId: ThreadId.Id,
   sequence: ThreadActivity.Common.fields.sequence,
-  occurredAt: ThreadActivity.Common.fields.occurredAt,
-  subject: ThreadActivity.Subject,
+  occurredAt: Schema.toType(ThreadActivity.Common.fields.occurredAt),
   recipients: ThreadActivityFacts.Recorded.payload.fields.recipients,
 });
-export interface Input extends Schema.Schema.Type<typeof Input> {}
 export type Error =
   | ThreadStore.Failure
   | ThreadActivityStore.Failure
   | InvalidReference
+  | ThreadActivityKind.Mismatch
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError
@@ -37,8 +46,8 @@ export interface Interface {
   readonly workspaceId: ThreadActivity.Record["workspaceId"];
   /** The caller must stay in this transaction until recording; record rechecks the position. */
   readonly nextSequence: (threadId: ThreadId.Id) => Effect.Effect<number, Error, Store.Transaction>;
-  readonly record: (
-    input: Input,
+  readonly record: <K extends ThreadActivityKind.Definition>(
+    input: Input<K>,
   ) => Effect.Effect<
     Event.Type<typeof ThreadActivityFacts.Recorded>,
     Error,
@@ -95,14 +104,17 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
     yield* Store.Transaction;
     return yield* sequenceAfter(yield* loadThread(threadId));
   });
-  const record = Effect.fn("ThreadActivityRecording.record")(function* (input: Input) {
+  const record = Effect.fn("ThreadActivityRecording.record")(function* <
+    K extends ThreadActivityKind.Definition,
+  >(input: Input<K>) {
     yield* Store.Transaction;
-    const request = yield* Schema.decodeEffect(Schema.toType(Input))(input);
+    const request = yield* Schema.decodeUnknownEffect(Position)(input);
+    const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details);
     const thread = yield* loadThread(request.threadId);
     if (request.sequence !== (yield* sequenceAfter(thread)))
       return yield* new InvalidReference({ message: "Activity position changed before recording" });
     const activity = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))({
-      ...request.subject,
+      ...prepared,
       id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       threadId: request.threadId,

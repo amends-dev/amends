@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "c666c395-1462-45b5-8199-971e8ceb621e",
+  "id": "6b4ea5c7-db8a-490c-9ab2-173323131420",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1876,12 +1876,12 @@
     {
       "type": "text",
       "typeSchema": null,
-      "notNull": false,
+      "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "message_id",
+      "name": "subject",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_activities"
@@ -1894,20 +1894,33 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "participation_id",
+      "name": "occurrence",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_activities"
     },
     {
-      "type": "text",
+      "type": "boolean",
       "typeSchema": null,
-      "notNull": false,
+      "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "reason",
+      "name": "new_activity",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "details",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_activities"
@@ -3382,7 +3395,7 @@
           "opclass": null
         },
         {
-          "value": "message_id",
+          "value": "occurrence",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -3394,42 +3407,7 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "thread_message_activity",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "thread_activities"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "workspace_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "participation_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "kind",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "thread_participation_activity",
+      "name": "thread_activity_occurrence",
       "entityType": "indexes",
       "schema": "public",
       "table": "thread_activities"

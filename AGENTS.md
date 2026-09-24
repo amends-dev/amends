@@ -47,7 +47,8 @@ currently run through TypeScript. Check compatibility before changing this setup
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
-  per record field; `storage-memory` implements them in process memory as the reference
+  per record field, except a thread activity's kind-specific `details`, stored as JSON;
+  `storage-memory` implements them in process memory as the reference
   implementation of the storage contracts, with no dependencies. Both follow one shape:
   a module per store over a workspace binding, merged at the edge.
   Hosts compose adapters and implement no storage themselves; shared packages never

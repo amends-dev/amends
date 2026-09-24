@@ -25,13 +25,16 @@ import {
   ThreadActivity,
   ThreadFacts,
   ThreadActivityFacts,
+  ThreadActivityKind,
   ThreadActivityRecording,
   ThreadActivityStore,
   ThreadMessage,
+  ThreadMessageActivity,
   ThreadMessageApplication,
   ThreadMessageFacts,
   ThreadMessagePermissions,
   ThreadParticipation,
+  ThreadParticipationActivity,
   ThreadParticipationAdmission,
   ThreadParticipationFacts,
   ThreadParticipationApplication,
@@ -310,8 +313,8 @@ export const threadParticipation = (harness: Harness) => {
               expect(after.human).toEqual(before.human);
               expect(after.agent).toEqual(before.agent);
               expect(after.activities[1]).toMatchObject({
-                kind: "ParticipationFollowed",
-                participationId: result.id,
+                kind: ThreadParticipationActivity.Followed.name,
+                details: { participationId: result.id },
                 sequence: 2,
               });
               expect(yield* run(bound, owner, timeline(first.thread.id, 1))).toEqual([
@@ -812,7 +815,9 @@ export const threadParticipation = (harness: Harness) => {
                   const active = yield* run(bound, saved.human, follow(saved.first.thread.id));
                   const rows = yield* bound.activities.listByThread(saved.first.thread.id);
                   expect(rows.map((r) => r.sequence)).toEqual(rows.map((_, i) => i + 1));
-                  expect(rows.filter((r) => r.kind === "ParticipationFollowed")).toHaveLength(1);
+                  expect(
+                    rows.filter((r) => r.kind === ThreadParticipationActivity.Followed.name),
+                  ).toHaveLength(1);
                   expect(
                     (yield* bound.participations.listByThread(saved.first.thread.id)).filter(
                       (p) => ThreadParticipation.memberOf(p.participant) === humanId,
@@ -1031,9 +1036,10 @@ export const threadParticipation = (harness: Harness) => {
             const { bound, owner, first, human } = yield* prepare();
             yield* grant(bound, humanId, ThreadParticipationPermissions.Follow);
             const before = yield* snapshot(bound, first.thread.id);
+            const stored = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
             for (const latest of [
-              { ...first.activity, threadId: Thread.Id.make("foreign") },
-              { ...first.activity, sequence: Number.MAX_SAFE_INTEGER },
+              Object.assign({}, stored, { threadId: Thread.Id.make("foreign") }),
+              Object.assign({}, stored, { sequence: Number.MAX_SAFE_INTEGER }),
             ]) {
               const context = Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,
@@ -1046,17 +1052,18 @@ export const threadParticipation = (harness: Harness) => {
             }
             const participant = yield* run(bound, human, follow(first.thread.id));
             const activity = Option.getOrThrow(yield* bound.activities.latest(first.thread.id));
-            if (activity.kind !== "ParticipationFollowed")
+            if (activity.kind !== ThreadParticipationActivity.Followed.name)
               return yield* Effect.die("Missing follow activity");
             // A participation is followed once.
             expect(
               yield* Effect.flip(
                 bound.store.transaction(
-                  bound.activities.insert({
-                    ...activity,
-                    id: ThreadActivity.Id.make("bad-follow"),
-                    sequence: 3,
-                  }),
+                  bound.activities.insert(
+                    Object.assign({}, activity, {
+                      id: ThreadActivity.Id.make("bad-follow"),
+                      sequence: 3,
+                    }),
+                  ),
                 ),
               ),
             ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
@@ -1135,7 +1142,8 @@ export const threadParticipation = (harness: Harness) => {
                         threadId: first.thread.id,
                         sequence,
                         occurredAt,
-                        subject: { kind: "ParticipationFollowed", participationId: participant.id },
+                        kind: ThreadParticipationActivity.Followed,
+                        details: { participationId: participant.id },
                         recipients,
                       });
                       const ended = yield* journal
@@ -1152,11 +1160,8 @@ export const threadParticipation = (harness: Harness) => {
                           threadId: first.thread.id,
                           sequence: yield* recorder.nextSequence(first.thread.id),
                           occurredAt,
-                          subject: {
-                            kind: "ParticipationEnded",
-                            participationId: participant.id,
-                            reason: "unfollowed",
-                          },
+                          kind: ThreadParticipationActivity.Ended,
+                          details: { participationId: participant.id, reason: "unfollowed" },
                           recipients,
                         })
                         .pipe(Publication.withCause(ended, occurredAt));
@@ -1228,7 +1233,7 @@ export const threadParticipation = (harness: Harness) => {
               const context = Context.add(bound.context, ThreadActivityStore.Service, {
                 ...bound.activities,
                 insert: (activity) =>
-                  activity.kind === "ParticipationEnded" && ++endings === 2
+                  activity.kind === ThreadParticipationActivity.Ended.name && ++endings === 2
                     ? Effect.fail(
                         new ThreadActivityStore.Failure({
                           operation: "insert",
@@ -1276,9 +1281,9 @@ export const threadParticipation = (harness: Harness) => {
                 const activities = yield* bound.activities.listByThread(threadId);
                 expect(activities).toHaveLength(2);
                 expect(activities[1]).toMatchObject({
-                  kind: "ParticipationEnded",
+                  kind: ThreadParticipationActivity.Ended.name,
                   sequence: 2,
-                  reason: index < 2 ? "group-removed" : "group-left",
+                  details: { reason: index < 2 ? "group-removed" : "group-left" },
                 });
                 expect(yield* run(bound, owner, timeline(threadId))).toHaveLength(2);
               }
@@ -1297,12 +1302,15 @@ export const threadParticipation = (harness: Harness) => {
               );
               const final = yield* bound.activities.listByThread(first.thread.id);
               expect(final.map((a) => a.kind)).toEqual([
-                "MessagePublished",
-                "ParticipationEnded",
-                "MessagePublished",
-                "ParticipationEnded",
+                ThreadMessageActivity.Published.name,
+                ThreadParticipationActivity.Ended.name,
+                ThreadMessageActivity.Published.name,
+                ThreadParticipationActivity.Ended.name,
               ]);
-              expect(final[3]).toMatchObject({ reason: "workspace-removed", sequence: 4 });
+              expect(final[3]).toMatchObject({
+                details: { reason: "workspace-removed" },
+                sequence: 4,
+              });
               expect(
                 yield* bound.notifications.listPendingByRecipient(
                   Notification.ofMember(agent.memberId, agent.identity),
@@ -1323,7 +1331,7 @@ export const threadParticipation = (harness: Harness) => {
               );
               expect(events).toHaveLength(8);
               for (const event of events.filter(
-                (e) => e.payload.activity.kind === "ParticipationEnded",
+                (e) => e.payload.activity.kind === ThreadParticipationActivity.Ended.name,
               )) {
                 expect(event.payload.recipients).toEqual([]);
                 expect(event.provenance.causedBy).not.toBeNull();
@@ -1385,11 +1393,8 @@ export const threadParticipation = (harness: Harness) => {
                           threadId: first.thread.id,
                           sequence: yield* recorder.nextSequence(first.thread.id),
                           occurredAt,
-                          subject: {
-                            kind: "ParticipationEnded",
-                            participationId: participant.id,
-                            reason: "unfollowed",
-                          },
+                          kind: ThreadParticipationActivity.Ended,
+                          details: { participationId: participant.id, reason: "unfollowed" },
                           recipients: [],
                         })
                         .pipe(Publication.withCause(ended, occurredAt));
@@ -1479,15 +1484,17 @@ export const threadParticipation = (harness: Harness) => {
                       );
                       yield* journal.publish(ThreadActivityFacts.Recorded, {
                         groupId,
-                        activity: {
-                          id: ThreadActivity.Id.make("contact-activity"),
-                          workspaceId,
-                          threadId,
-                          sequence: 2,
-                          kind: "MessagePublished",
-                          messageId: message.id,
-                          occurredAt: at,
-                        },
+                        activity: ThreadActivityKind.makeRecordUnsafe(
+                          ThreadMessageActivity.Published,
+                          {
+                            id: ThreadActivity.Id.make("contact-activity"),
+                            workspaceId,
+                            threadId,
+                            sequence: 2,
+                            occurredAt: at,
+                          },
+                          { messageId: message.id },
+                        ),
                         recipients: [
                           {
                             participationId: contact.id,

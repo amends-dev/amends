@@ -6,7 +6,8 @@ import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
 import { Thread } from "../thread.ts";
 import { ThreadStore } from "../store.ts";
-import { ThreadActivityRecording } from "../activity/recording.ts";
+import { ThreadActivityPublisher } from "../activity/publisher.ts";
+import { ThreadParticipationActivity } from "./activity.ts";
 import { ThreadParticipation } from "./participation.ts";
 import { ThreadParticipationStore } from "./store.ts";
 import { ThreadParticipationFacts } from "./facts.ts";
@@ -16,7 +17,7 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
   { message: Schema.String },
 ) {}
 export type Error =
-  | ThreadActivityRecording.Error
+  | ThreadActivityPublisher.Error
   | ThreadParticipationStore.Failure
   | InvalidReference;
 export interface Interface {
@@ -39,10 +40,10 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () {
   const participations = yield* ThreadParticipationStore.Service;
   const threads = yield* ThreadStore.Service;
-  const recording = yield* ThreadActivityRecording.Service;
+  const publisher = yield* ThreadActivityPublisher.Service;
   const journal = yield* Journal.Service;
   const workspaceId = participations.workspaceId;
-  if (threads.workspaceId !== workspaceId || recording.workspaceId !== workspaceId)
+  if (threads.workspaceId !== workspaceId || publisher.workspaceId !== workspaceId)
     return yield* new InvalidReference({
       message: "Departure services belong to different workspaces",
     });
@@ -83,19 +84,27 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
         message: "Departure participation is inconsistent or already ended",
       });
     const thread = yield* threadOf(participant);
-    const sequence = yield* recording.nextSequence(participant.threadId);
-    const ended = yield* journal
-      .publish(ThreadParticipationFacts.Ended, { ...departure, groupId: thread.groupId, reason })
-      .pipe(Publication.withOccurredAt(occurredAt));
-    yield* recording
-      .record({
-        threadId: participant.threadId,
-        sequence,
-        occurredAt,
-        subject: { kind: "ParticipationEnded", participationId: participant.id, reason },
-        recipients: [],
-      })
-      .pipe(Publication.withCause(ended, occurredAt));
+    yield* publisher.publish({
+      thread,
+      occurredAt,
+      step: () =>
+        Effect.map(
+          journal
+            .publish(ThreadParticipationFacts.Ended, {
+              ...departure,
+              groupId: thread.groupId,
+              reason,
+            })
+            .pipe(Publication.withOccurredAt(occurredAt)),
+          (ended) => ({
+            value: undefined,
+            kind: ThreadParticipationActivity.Ended,
+            details: { participationId: participant.id, reason },
+            recipients: [],
+            cause: ended,
+          }),
+        ),
+    });
   });
   const endByAdmission = Effect.fn("ThreadParticipationDeparture.endByAdmission")(function* (
     input: GroupMembership.Record,

@@ -4,8 +4,8 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { ThreadId } from "./id.ts";
 import { ThreadMessage } from "./message/message.ts";
-import { ThreadActivity } from "./activity/activity.ts";
-import { ThreadParticipation } from "./participation/participation.ts";
+import { ThreadMessageActivity } from "./message/activity.ts";
+import type { ThreadActivityKind } from "./activity/kind.ts";
 export const Id = ThreadId.Id;
 export type Id = ThreadId.Id;
 export const Record = Schema.Struct({
@@ -66,22 +66,12 @@ export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectI
 export const Started = Schema.Struct({
   thread: Record,
   message: ThreadMessage.Record,
-  activity: ThreadActivity.MessagePublished,
+  activity: ThreadMessageActivity.Published.Activity,
 });
 export interface Started extends Schema.Schema.Type<typeof Started> {}
-/** Resolve each activity's subject only after authorizing the thread. */
-export const TimelineItem = Schema.Union([
-  Schema.Struct({
-    activity: ThreadActivity.MessagePublished,
-    message: ThreadMessage.Record,
-  }),
-  Schema.Struct({
-    activity: Schema.Union([
-      ThreadActivity.ParticipationFollowed,
-      ThreadActivity.ParticipationEnded,
-    ]),
-    participant: ThreadParticipation.Summary,
-  }),
-]);
-export type TimelineItem = typeof TimelineItem.Type;
+/**
+ * One resolved timeline item: an activity with the records it references. Each domain that records
+ * activity adds its kinds' items, so this covers every registered kind.
+ */
+export type TimelineItem = ThreadActivityKind.Item;
 export * as Thread from "./thread.ts";

@@ -31,8 +31,11 @@ import {
   ThreadCreation,
   ThreadActivity,
   ThreadActivityFacts,
+  ThreadActivityKind,
   ThreadMessage,
+  ThreadMessageActivity,
   ThreadParticipation,
+  ThreadParticipationActivity,
   ThreadParticipationStore,
   ThreadPermissions,
 } from "@amends/core/thread";
@@ -187,9 +190,9 @@ export const threads = (harness: Harness) => {
               expect(result.message.mentions).toEqual([]);
               expect(result.activity).toMatchObject({
                 threadId: result.thread.id,
-                messageId: result.message.id,
+                details: { messageId: result.message.id },
                 sequence: 1,
-                kind: "MessagePublished",
+                kind: ThreadMessageActivity.Published.name,
               });
               expect(
                 result.participants
@@ -834,14 +837,15 @@ export const threads = (harness: Harness) => {
                   ),
                 ),
               ).toMatchObject({ _tag: "ThreadMessageStore.Conflict" });
+              const firstRow = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
               for (const record of [
                 // A message has one activity, even in the next position of another thread.
-                Object.assign({}, first.activity, {
+                Object.assign({}, firstRow, {
                   id: ThreadActivity.Id.make("same-message"),
                   threadId: second.thread.id,
                   sequence: 2,
                 }),
-                Object.assign({}, first.activity, {
+                Object.assign({}, firstRow, {
                   id: ThreadActivity.Id.make("gap"),
                   sequence: 3,
                 }),
@@ -1082,11 +1086,17 @@ export const threads = (harness: Harness) => {
             });
             yield* write(bound.messages.insert(message));
             const published = (id: string, messageId: ThreadMessage.Id, sequence: number) =>
-              Object.assign({}, first.activity, {
-                id: ThreadActivity.Id.make(id),
-                messageId,
-                sequence,
-              });
+              ThreadActivityKind.makeRecordUnsafe(
+                ThreadMessageActivity.Published,
+                {
+                  id: ThreadActivity.Id.make(id),
+                  workspaceId,
+                  threadId: first.thread.id,
+                  sequence,
+                  occurredAt: first.activity.occurredAt,
+                },
+                { messageId },
+              );
             for (const record of [
               published("gap", message.id, 3),
               published("same-subject", first.message.id, 2),
@@ -1101,16 +1111,17 @@ export const threads = (harness: Harness) => {
               threadId: first.thread.id,
               participationId: agentParticipation.id,
             };
-            const ended: ThreadActivity.Record = {
-              id: ThreadActivity.Id.make("ended"),
-              workspaceId,
-              threadId: first.thread.id,
-              sequence: 3,
-              occurredAt,
-              kind: "ParticipationEnded",
-              participationId: agentParticipation.id,
-              reason: "unfollowed",
-            };
+            const ended = ThreadActivityKind.makeRecordUnsafe(
+              ThreadParticipationActivity.Ended,
+              {
+                id: ThreadActivity.Id.make("ended"),
+                workspaceId,
+                threadId: first.thread.id,
+                sequence: 3,
+                occurredAt,
+              },
+              { participationId: agentParticipation.id, reason: "unfollowed" },
+            );
             yield* write(
               Effect.andThen(
                 bound.participations.end(departure, occurredAt),

@@ -11,12 +11,14 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  boolean,
   check,
   customType,
   doublePrecision,
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -657,21 +659,20 @@ export const threadActivities = pgTable(
     id: text("id").notNull(),
     threadId: text("thread_id").notNull(),
     sequence: integer("sequence").notNull(),
-    kind: text("kind", {
-      enum: ["MessagePublished", "ParticipationFollowed", "ParticipationEnded"],
-    }).notNull(),
-    messageId: text("message_id"),
-    participationId: text("participation_id"),
-    reason: text("reason", {
-      enum: ["unfollowed", "group-left", "group-removed", "workspace-removed"],
-    }),
+    // Every kind shares these columns; its definition in core reads `details`, the change the
+    // activity reports, so a new kind needs no schema change.
+    kind: text("kind").notNull(),
+    subject: text("subject").notNull(),
+    occurrence: text("occurrence"),
+    newActivity: boolean("new_activity").notNull(),
+    details: jsonb("details").$type<unknown>().notNull(),
     occurredAt: instant("occurred_at").notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     uniqueIndex("thread_activity_sequence").on(t.workspaceId, t.threadId, t.sequence),
-    uniqueIndex("thread_message_activity").on(t.workspaceId, t.messageId),
-    uniqueIndex("thread_participation_activity").on(t.workspaceId, t.participationId, t.kind),
+    // At most one activity per occurrence key; activities without one are repeatable.
+    uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
   ],
 );

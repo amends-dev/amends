@@ -17,7 +17,11 @@ import {
   Store,
   Subject,
 } from "@amends/core/journal";
-import { ThreadApplication, ThreadMessageApplication } from "@amends/core/thread";
+import {
+  ThreadApplication,
+  ThreadMessageApplication,
+  ThreadParticipationActivity,
+} from "@amends/core/thread";
 import { InvitationApplication, Member, MemberPermissions } from "@amends/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
@@ -31,6 +35,7 @@ import {
   future,
   journalLog,
   otherWorkspaceId,
+  publishedMessage,
   request,
   Support,
   testProvenance,
@@ -293,11 +298,7 @@ export const journal = (harness: Harness) => {
                 ),
                 messages: byId(
                   yield* bound.messages.getMany(
-                    activities
-                      .flat()
-                      .flatMap((activity) =>
-                        activity.kind === "MessagePublished" ? [activity.messageId] : [],
-                      ),
+                    activities.flat().flatMap((activity) => publishedMessage(activity) ?? []),
                   ),
                 ),
                 activities,
@@ -316,7 +317,7 @@ export const journal = (harness: Harness) => {
             expect(live.threadLatest).toHaveLength(1);
             expect(live.messages).toHaveLength(2);
             expect(live.activities.flat().map((activity) => activity.kind)).toContain(
-              "ParticipationEnded",
+              ThreadParticipationActivity.Ended.name,
             );
             // Leaving settled the agent's pending notifications.
             expect(live.notifications[2]?.map((notification) => notification.state._tag)).toEqual([

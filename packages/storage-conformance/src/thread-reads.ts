@@ -12,6 +12,7 @@ import {
 import {
   Group,
   GroupApplication,
+  GroupAudience,
   GroupMembershipApplication,
   GroupMembershipFacts,
   GroupMembershipStore,
@@ -20,25 +21,35 @@ import {
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
-import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
+import { Checkpoint, Fact, Journal, Log, Publication, Store, Subject } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts, MemberStore } from "@amends/core/workspace";
 import {
   Thread,
+  ThreadAccess,
   ThreadApplication,
   ThreadActivity,
   ThreadActivityFacts,
+  ThreadActivityKind,
+  ThreadActivityPublisher,
+  ThreadActivityReading,
+  ThreadActivityRecording,
+  ThreadActivityResolvers,
   ThreadActivityStore,
   ThreadMessage,
+  ThreadMessageActivity,
   ThreadMessageFacts,
   ThreadMessageStore,
+  ThreadMessageTimeline,
   ThreadParticipation,
+  ThreadParticipationAdmission,
   ThreadParticipationApplication,
   ThreadParticipationStore,
+  ThreadParticipationTimeline,
   ThreadPermissions,
   ThreadStore,
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
-import { Context, DateTime, Effect, Option } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import {
   type Bound,
   boundTo,
@@ -203,15 +214,17 @@ export const threadReads = (harness: Harness) => {
                 mentions: [],
                 publishedAt: time,
               };
-              const activity: ThreadActivity.Record = {
-                id: ThreadActivity.Id.make(`${thread.id}-activity-${sequence}`),
-                workspaceId: thread.workspaceId,
-                threadId: thread.id,
-                sequence,
-                kind: "MessagePublished",
-                messageId: message.id,
-                occurredAt: time,
-              };
+              const record = ThreadActivityKind.makeRecordUnsafe(
+                ThreadMessageActivity.Published,
+                {
+                  id: ThreadActivity.Id.make(`${thread.id}-activity-${sequence}`),
+                  workspaceId: thread.workspaceId,
+                  threadId: thread.id,
+                  sequence,
+                  occurredAt: time,
+                },
+                { messageId: message.id },
+              );
               yield* journal.publish(
                 ThreadMessageFacts.Published,
                 Object.assign({ groupId: thread.groupId }, message),
@@ -224,9 +237,13 @@ export const threadReads = (harness: Harness) => {
                 }));
               yield* journal.publish(ThreadActivityFacts.Recorded, {
                 groupId: thread.groupId,
-                activity,
+                activity: record,
                 recipients,
               });
+              const activity = yield* ThreadActivityKind.decode(
+                ThreadMessageActivity.Published,
+                record,
+              );
               return { activity, message };
             }),
           ),
@@ -717,15 +734,17 @@ export const threadReads = (harness: Harness) => {
                     );
                     yield* journal.publish(ThreadActivityFacts.Recorded, {
                       groupId: first.thread.groupId,
-                      activity: {
-                        id: ThreadActivity.Id.make("staged-activity"),
-                        workspaceId,
-                        threadId: first.thread.id,
-                        sequence: 2,
-                        kind: "MessagePublished",
-                        messageId: message.id,
-                        occurredAt: message.publishedAt,
-                      },
+                      activity: ThreadActivityKind.makeRecordUnsafe(
+                        ThreadMessageActivity.Published,
+                        {
+                          id: ThreadActivity.Id.make("staged-activity"),
+                          workspaceId,
+                          threadId: first.thread.id,
+                          sequence: 2,
+                          occurredAt: message.publishedAt,
+                        },
+                        { messageId: message.id },
+                      ),
                       recipients: [],
                     });
                     expect(
@@ -943,16 +962,21 @@ export const threadReads = (harness: Harness) => {
               const { bound, owner, first, second } = yield* prepare();
               const next = yield* append(bound, first.thread, 2);
               const before = yield* history(bound);
+              // Storage returns activity in the shape every kind shares.
+              const stored = (id: ThreadActivity.Id) =>
+                Effect.map(bound.activities.get(id), Option.getOrThrow);
+              const firstRow = yield* stored(first.activity.id);
+              const nextRow = yield* stored(next.activity.id);
               for (const { rows, limit } of [
-                { rows: [first.activity, next.activity], limit: 1 },
-                { rows: [next.activity, first.activity], limit: 2 },
-                { rows: [first.activity, first.activity], limit: 2 },
+                { rows: [firstRow, nextRow], limit: 1 },
+                { rows: [nextRow, firstRow], limit: 2 },
+                { rows: [firstRow, firstRow], limit: 2 },
                 {
-                  rows: [Object.assign({}, first.activity, { workspaceId: otherWorkspaceId })],
+                  rows: [Object.assign({}, firstRow, { workspaceId: otherWorkspaceId })],
                   limit: 1,
                 },
                 {
-                  rows: [Object.assign({}, first.activity, { threadId: second.thread.id })],
+                  rows: [Object.assign({}, firstRow, { threadId: second.thread.id })],
                   limit: 1,
                 },
               ]) {
@@ -971,7 +995,7 @@ export const threadReads = (harness: Harness) => {
                 ...bound,
                 context: Context.add(bound.context, ThreadActivityStore.Service, {
                   ...bound.activities,
-                  readPage: () => Effect.succeed([first.activity]),
+                  readPage: () => Effect.succeed([firstRow]),
                 }),
               };
               expect(
@@ -1383,6 +1407,170 @@ export const threadReads = (harness: Harness) => {
                 yield* run(firstLapsed, owner, participants(second.thread.id, { limit: 2 })),
               ).toEqual(everyone.slice(1, 3));
               expect(yield* history(bound)).toEqual(before);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "a kind defined outside the thread domain records, stores, rebuilds, and reads in timelines",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, first } = yield* prepare();
+              // Kinds only this test defines: nothing in the thread domain or storage knows them.
+              const Noted = ThreadActivityKind.make("test.noted", {
+                details: Schema.Struct({
+                  noteId: Schema.NonEmptyString,
+                  text: Schema.String,
+                  at: Schema.DateTimeUtcFromString,
+                  tags: Schema.Array(Schema.String),
+                }),
+                subject: ({ noteId }) => Subject.make("note", noteId),
+                newActivity: false,
+              });
+              const Pinged = ThreadActivityKind.make("test.pinged", {
+                details: Schema.Struct({ count: Schema.Int }),
+                subject: () => Subject.make("thread", first.thread.id),
+                occurrence: () => null,
+                newActivity: true,
+              });
+              const Happened = Fact.make("test.activity.happened", {
+                version: 1,
+                payload: Schema.String,
+                subject: () => Subject.make("test", "happened"),
+              });
+              const publisher = ThreadActivityPublisher.layer.pipe(
+                Layer.provide(
+                  Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
+                ),
+              );
+              const record = <K extends ThreadActivityKind.Definition>(
+                kind: K,
+                details: K["details"]["Type"],
+                expectedSequence?: number,
+              ) =>
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.commit(
+                    Effect.flatMap(ThreadActivityPublisher.Service, (activities) =>
+                      activities.publish({
+                        thread: first.thread,
+                        occurredAt: DateTime.makeUnsafe("2026-09-24T12:00:00.000Z"),
+                        ...(expectedSequence === undefined ? {} : { expectedSequence }),
+                        step: () =>
+                          Effect.map(journal.publish(Happened, kind.name), (cause) => ({
+                            value: undefined,
+                            kind,
+                            details,
+                            recipients: [],
+                            cause,
+                          })),
+                      }),
+                    ),
+                  ),
+                ).pipe(
+                  Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                  Effect.provide(publisher.pipe(Layer.provideMerge(core(bound)))),
+                );
+              const at = DateTime.makeUnsafe("2026-09-24T11:00:00.000Z");
+              const note = { noteId: "note-1", text: "Checked", at, tags: ["a", "b"] };
+              const latest = yield* bound.threads.getLatest([first.thread.id]);
+              const noted = yield* record(Noted, note);
+              // Storage keeps the shared shape, with the details in their encoded form.
+              const stored = Option.getOrThrow(
+                yield* bound.activities.get(noted.event.payload.activity.id),
+              );
+              expect(stored).toEqual(noted.event.payload.activity);
+              expect(stored).toMatchObject({
+                kind: "test.noted",
+                subject: "note:note-1",
+                newActivity: false,
+                details: { noteId: "note-1", at: "2026-09-24T11:00:00.000Z", tags: ["a", "b"] },
+              });
+              expect((yield* ThreadActivityKind.decode(Noted, stored)).details).toEqual(note);
+              // One activity per note, and it does not move the thread's latest activity.
+              const before = yield* history(bound);
+              expect(yield* Effect.flip(record(Noted, note))).toMatchObject({
+                _tag: "Projection.Failure",
+              });
+              expect(yield* history(bound)).toEqual(before);
+              expect(yield* bound.threads.getLatest([first.thread.id])).toEqual(latest);
+              // Repeatable activity that counts as new moves it each time.
+              yield* record(Pinged, { count: 1 });
+              const pinged = yield* record(Pinged, { count: 2 });
+              const position = pinged.event.payload.activity.sequence;
+              expect(yield* bound.threads.getLatest([first.thread.id])).toMatchObject([
+                { sequence: position },
+              ]);
+              // An expected position records only there.
+              expect(yield* Effect.flip(record(Pinged, { count: 3 }, position + 2))).toMatchObject({
+                _tag: "ThreadActivityPublisher.PositionChanged",
+                expected: position + 2,
+                actual: position + 1,
+              });
+              yield* record(Pinged, { count: 3 }, position + 1);
+              // Timelines read it through the resolver its owning domain registers.
+              const resolver = Effect.succeed({
+                workspaceId,
+                kinds: [Noted, Pinged],
+                resolve: (_thread: Thread.Record, listed: ReadonlyArray<ThreadActivity.Record>) =>
+                  Effect.forEach(listed, (activity) =>
+                    Effect.gen(function* () {
+                      const decoded =
+                        activity.kind === Noted.name
+                          ? yield* ThreadActivityKind.decode(Noted, activity)
+                          : yield* ThreadActivityKind.decode(Pinged, activity);
+                      // Items of kinds declared here are not in core's item union.
+                      return { activity: decoded } as unknown as ThreadActivityKind.Item;
+                    }).pipe(
+                      Effect.mapError(
+                        (error) =>
+                          new ThreadActivityResolvers.InvalidResponse({ message: error.message }),
+                      ),
+                    ),
+                  ),
+              } satisfies ThreadActivityResolvers.Resolver);
+              // Fresh: core builds its own reader, over only the resolvers core registers.
+              const reading = Layer.fresh(ThreadActivityReading.layer).pipe(
+                Layer.provide(
+                  Layer.mergeAll(
+                    ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer)),
+                    ThreadActivityResolvers.layer([
+                      ThreadMessageTimeline.resolver,
+                      ThreadParticipationTimeline.resolver,
+                      resolver,
+                    ]),
+                  ),
+                ),
+                Layer.provideMerge(core(bound)),
+              );
+              const items = yield* Effect.flatMap(ThreadActivityReading.Service, (timelines) =>
+                timelines.page(first.thread.id, { limit: 10 }),
+              ).pipe(Effect.provideService(Actor.Service, owner), Effect.provide(reading));
+              expect(items.map((item) => item.activity.kind)).toEqual([
+                ThreadMessageActivity.Published.name,
+                "test.noted",
+                "test.pinged",
+                "test.pinged",
+                "test.pinged",
+              ]);
+              expect(items[1]?.activity).toMatchObject({ details: note });
+              // A host that registers no resolver for a kind says so rather than guessing.
+              expect(
+                yield* Effect.flip(run(bound, owner, timeline(first.thread.id))),
+              ).toMatchObject({
+                _tag: "ThreadApplication.InvalidResponse",
+                message: "No resolver for activity kind test.noted",
+              });
+              // Rebuilding restores the same rows from the recorded facts.
+              const rows = yield* bound.activities.listByThread(first.thread.id);
+              yield* storage.discardProjections;
+              yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                Effect.provide(core(bound)),
+              );
+              expect(yield* bound.activities.listByThread(first.thread.id)).toEqual(rows);
             }),
           ),
         ),

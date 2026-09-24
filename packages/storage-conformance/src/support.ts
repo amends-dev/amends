@@ -14,7 +14,10 @@ import { type Actor, Identity, Performer } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
+  type ThreadActivity,
+  ThreadActivityKind,
   ThreadActivityStore,
+  ThreadMessageActivity,
   ThreadMessageStore,
   ThreadParticipationStore,
   ThreadStore,
@@ -30,7 +33,7 @@ import {
 } from "@amends/core/workspace";
 import { Gateway, SignalHub, WorkspaceStorage } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
-import { Clock, Context, DateTime, Effect, Layer, type Option } from "effect";
+import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -164,6 +167,12 @@ export const make = (harness: Harness) => {
       Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host)))),
   };
 };
+
+/** The message a timeline activity publishes, when it is a message publication. */
+export const publishedMessage = (activity: ThreadActivity.Record) =>
+  ThreadActivityKind.is(ThreadMessageActivity.Published)(activity)
+    ? Schema.decodeUnknownSync(ThreadMessageActivity.Published.details)(activity.details).messageId
+    : undefined;
 
 /** Attribution for low-level fixture writes outside application operations. */
 export const testProvenance = (id = workspaceId): Event.Provenance => ({

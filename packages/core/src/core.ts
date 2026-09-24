@@ -13,6 +13,10 @@ import { ThreadParticipationPermissions } from "./thread/participation/permissio
 import { ThreadParticipationDeparture } from "./thread/participation/departure.ts";
 import { ThreadActivityRecording } from "./thread/activity/recording.ts";
 import { ThreadActivityReading } from "./thread/activity/reading.ts";
+import { ThreadActivityPublisher } from "./thread/activity/publisher.ts";
+import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
+import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
+import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
 import { NotificationSource } from "./notification/source.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
@@ -25,7 +29,7 @@ import { ThreadActivityProjection } from "./thread/activity/projection.ts";
  * workspace and supply cryptography; a gateway resolves the acting member and
  * runs the application operations.
  */
-import { Layer } from "effect";
+import { Layer, Schema } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
 import { SignalApplication } from "./signal/application.ts";
@@ -106,6 +110,22 @@ export const permissions = [
 ];
 
 /**
+ * How each kind of thread activity appears in a timeline, one resolver per owning domain. A domain
+ * that records a new kind adds its resolver here, and its timeline item schema below.
+ */
+const activityResolvers = [
+  ThreadMessageTimeline.resolver,
+  ThreadParticipationTimeline.resolver,
+] as const;
+
+/** Every kind of timeline item, for protocols that encode timelines. */
+export const TimelineItem = Schema.Union([
+  ThreadMessageTimeline.Item,
+  ThreadParticipationTimeline.FollowedItem,
+  ThreadParticipationTimeline.EndedItem,
+]);
+
+/**
  * The workspace journal's log. A workspace that was never created has no batch in it, which
  * hosts can check without booting the workspace.
  */
@@ -121,16 +141,19 @@ const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer
 
 const admissions = ThreadParticipationAdmission.layer;
 const recording = ThreadActivityRecording.layer;
-const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(recording));
-const groupDeparture = GroupMembershipDeparture.layer.pipe(Layer.provide(departures));
-const messagePublication = ThreadMessagePublication.layer.pipe(
+const publisher = ThreadActivityPublisher.layer.pipe(
   Layer.provide(Layer.mergeAll(admissions, recording)),
 );
+const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(publisher));
+const groupDeparture = GroupMembershipDeparture.layer.pipe(Layer.provide(departures));
+const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(publisher));
 const threadStart = ThreadStart.layer.pipe(
   Layer.provide(Layer.mergeAll(ThreadCreation.layer, messagePublication)),
 );
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
-const activityReading = ThreadActivityReading.layer.pipe(Layer.provide(threadAccess));
+const activityReading = ThreadActivityReading.layer.pipe(
+  Layer.provide(Layer.mergeAll(threadAccess, ThreadActivityResolvers.layer(activityResolvers))),
+);
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
 const threadReading = ThreadReading.layer;
 /** One journal follower per workspace runtime, shared by its change-feed subscribers. */
@@ -169,7 +192,7 @@ const operations = Layer.mergeAll(
       notificationSource,
       threadReading,
       admissions,
-      recording,
+      publisher,
       departures,
       groupDeparture,
       messagePublication,

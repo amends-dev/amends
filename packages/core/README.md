@@ -166,13 +166,48 @@ no action checks of their own; they are excluded from `Core.Operations`:
 | `ThreadMessagePublication`     | Publishes a message with its admissions, activity, and recipients                                     |
 | `ThreadParticipationAdmission` | Finds eligible members and current participants, and admits new ones                                  |
 | `ThreadParticipationDeparture` | Ends a participation with its activity, for unfollow and group departure alike                        |
+| `ThreadActivityPublisher`      | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
 | `ThreadActivityRecording`      | Assigns the next timeline position and records `ThreadActivityFacts.Recorded`                         |
 | `ThreadAccess`                 | Checks current group access to a thread, shared by reads and writes                                   |
 | `ThreadActivityReading`        | Resolves timeline subjects under access, for timeline pages and notification sources                  |
+| `ThreadActivityResolvers`      | Routes each activity kind to the resolver its domain registers                                        |
 
-Every activity kind uses `ThreadActivityFacts.Recorded`, carrying a typed activity and its selected
+Every activity kind uses `ThreadActivityFacts.Recorded`, carrying an activity and its selected
 recipients; the activity, thread, group, and notification projections each consume that one
 envelope into their own store. Domain facts own state, and activity owns timeline position.
+
+### Activity kinds
+
+An activity has one shape for every kind, `ThreadActivity.Record`: its position, a dotted `kind`
+such as `message.published`, its `subject`, an `occurrence` key, `newActivity`, and the kind's
+`details` in encoded JSON. Storage, facts, and the change feed carry that shape, so a new kind
+changes none of them and needs no migration. The domain that owns a kind defines it next to its
+facts with `ThreadActivityKind.make(name, { details, subject, occurrence?, newActivity })`:
+`ThreadMessageActivity.Published`, and `ThreadParticipationActivity.Followed` and `Ended`.
+
+- `details` is the kind's schema, encoded to JSON when recorded and decoded when read.
+- `subject` names what the activity is about, derived from its details.
+- `occurrence` gives the parts that make it unique; by default its subject, so each subject has
+  at most one activity of the kind. Returning `null` makes the kind repeatable.
+- `newActivity` says whether it becomes its thread's and group's latest activity for readers;
+  messages do, and participation changes are quiet.
+
+`ThreadActivityKind.prepare` derives those fields from the details, and `ThreadActivityKind.decode`
+reads an activity back as its kind, rejecting one whose derived fields disagree.
+
+A domain publishes activity through `ThreadActivityPublisher.publish`, in its operation's commit.
+The publisher takes the thread's next position, failing with `PositionChanged` when an
+`expectedSequence` is given and activity took that position first. It admits the participants the
+operation asks for, then runs the domain's step, which publishes the domain fact and returns the
+kind, details, and recipients. The activity is recorded at that position, caused by that fact.
+
+A kind appears in timelines through a resolver its domain registers:
+`ThreadMessageTimeline.resolver` and `ThreadParticipationTimeline.resolver`. Each loads what its
+kinds reference in one batch per page and returns typed items; each timeline module adds its item
+type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers
+and exports `Core.TimelineItem`, the closed schema of every item, for protocols that encode
+timelines; a new kind adds its resolver and item schema there. Reading a kind without a resolver fails the read with
+`ThreadActivityReading.InvalidResponse`.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without

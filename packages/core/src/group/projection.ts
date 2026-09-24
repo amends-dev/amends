@@ -26,8 +26,9 @@ export const definition = Projection.make("groups", { version: 1 })
           operation: "project",
           message: "Fact belongs to another workspace",
         });
-      // A group's latest activity is the latest message in any of its threads.
-      if (activity.kind !== "MessagePublished") return;
+      // A group's latest activity is the latest activity of a kind that counts as new, such as a
+      // message, in any of its threads.
+      if (!activity.newActivity) return;
       yield* store.recordLatest({ groupId, occurredAt: activity.occurredAt });
     }),
   );

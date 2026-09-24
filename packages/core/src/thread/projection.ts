@@ -26,8 +26,8 @@ export const definition = Projection.make("threads", { version: 1 })
           operation: "project",
           message: "Fact belongs to another workspace",
         });
-      // A thread's latest activity is its latest message.
-      if (activity.kind !== "MessagePublished") return;
+      // A thread's latest activity is its latest of a kind that counts as new, such as a message.
+      if (!activity.newActivity) return;
       yield* store.recordLatest({
         threadId: activity.threadId,
         sequence: activity.sequence,

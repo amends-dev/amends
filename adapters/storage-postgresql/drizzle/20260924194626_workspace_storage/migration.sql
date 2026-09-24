@@ -217,9 +217,10 @@ CREATE TABLE "thread_activities" (
 	"thread_id" text NOT NULL,
 	"sequence" integer NOT NULL,
 	"kind" text NOT NULL,
-	"message_id" text,
-	"participation_id" text,
-	"reason" text,
+	"subject" text NOT NULL,
+	"occurrence" text,
+	"new_activity" boolean NOT NULL,
+	"details" jsonb NOT NULL,
 	"occurred_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "thread_activities_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "thread_activity_positive_sequence" CHECK ("sequence" > 0)
@@ -314,8 +315,7 @@ CREATE INDEX "pending_notifications_by_group" ON "notifications" ("workspace_id"
 CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_id","thread_sequence") WHERE "state" = 'Pending' AND "seen_at" IS NULL;--> statement-breakpoint
 CREATE INDEX "pending_agent_notifications_by_participation" ON "notifications" ("workspace_id","participation_id") WHERE "state" = 'Pending' AND "recipient_kind" = 'Agent';--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
-CREATE UNIQUE INDEX "thread_message_activity" ON "thread_activities" ("workspace_id","message_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "thread_participation_activity" ON "thread_activities" ("workspace_id","participation_id","kind");--> statement-breakpoint
+CREATE UNIQUE INDEX "thread_activity_occurrence" ON "thread_activities" ("workspace_id","occurrence");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","participant_kind",coalesce("member_id", "identity_id", '')) WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "active_participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C") WHERE "status" = 'active';--> statement-breakpoint

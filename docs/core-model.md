@@ -2070,16 +2070,19 @@ make it responsible for spawning environments or implementing turn execution. Th
 continues to own its execution lifecycle, transcript, configuration, and snapshots.
 
 Thread activity is the timeline item already established in this design. The implemented
-opening-message and human-reply workflows record `MessagePublished` activity referencing a separate message,
-starting at sequence 1 and appending replies at the next sequence. Explicit following records
-`ParticipationFollowed` activity referencing its participation. Every departure path records
-`ParticipationEnded` with its historical reason. Both kinds currently select no notification recipients.
-All kinds use one activity-recorded fact and internal recorder; notification generation consumes
-that fact uniformly.
-Agents' published messages and turn/task lifecycle variants remain future work. It is a defined
-set of activity types, including message publication, turn lifecycle activity such as
-turn started, and task updates. It is not another log beside the timeline. The remaining
-discriminators and payload schemas remain to be specified.
+opening-message and human-reply workflows record `message.published` activity referencing a separate
+message, starting at sequence 1 and appending replies at the next sequence. Explicit following
+records `participation.followed` activity referencing its participation. Every departure path
+records `participation.ended` with its historical reason. Both participation kinds currently select
+no notification recipients. All kinds use one activity-recorded fact and internal publisher;
+notification generation consumes that fact uniformly.
+
+It is a defined set of activity types, including message publication, turn lifecycle activity such
+as turn started, and task updates. It is not another log beside the timeline. Every kind shares one
+record: its position, a dotted kind name, the subject it is about, whether it is new activity for
+readers, and details whose schema the owning domain defines beside its facts. Core assembles the
+kinds into a closed set, each shown in timelines by its domain's resolver. Agents' published
+messages remain future work, and turn and task kinds and their details remain to be specified.
 
 The owning domain performs an operation, and its committed activity is recorded on the
 relevant thread. The task domain still owns task state and the turn domain still owns

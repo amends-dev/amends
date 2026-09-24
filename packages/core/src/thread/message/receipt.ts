@@ -1,9 +1,11 @@
 import { Effect, Option, Schema } from "effect";
 import { ThreadActivity } from "../activity/activity.ts";
+import { ThreadActivityKind } from "../activity/kind.ts";
 import type { ThreadActivityStore } from "../activity/store.ts";
 import { Thread } from "../thread.ts";
 import type { ThreadStore } from "../store.ts";
 import { ThreadMessage } from "./message.ts";
+import { ThreadMessageActivity } from "./activity.ts";
 import type { ThreadMessageStore } from "./store.ts";
 
 /** What a keyed request that published a message created, by ID: the message and its activity. */
@@ -25,7 +27,7 @@ export const startedOf = (started: Thread.Started): Started =>
   Object.assign({ threadId: started.thread.id }, publishedOf(started));
 
 const decodeMessage = Schema.decodeUnknownEffect(Schema.toType(ThreadMessage.Record));
-const decodeActivity = Schema.decodeUnknownEffect(Schema.toType(ThreadActivity.MessagePublished));
+const decodeActivity = Schema.decodeUnknownEffect(Schema.toType(ThreadActivity.Record));
 
 /**
  * Read a request's published message and activity again, or None when either is missing or they
@@ -42,11 +44,13 @@ export const restorePublished = Effect.fnUntraced(function* (
   const activity = yield* stores.activities.get(reference.activityId);
   if (Option.isNone(message) || Option.isNone(activity))
     return Option.none<ThreadMessage.Published>();
-  const published = {
-    message: yield* decodeMessage(message.value),
-    activity: yield* decodeActivity(activity.value),
-  };
-  return published.activity.messageId === published.message.id &&
+  const typed = yield* ThreadActivityKind.decode(
+    ThreadMessageActivity.Published,
+    yield* decodeActivity(activity.value),
+  ).pipe(Effect.option);
+  if (Option.isNone(typed)) return Option.none<ThreadMessage.Published>();
+  const published = { message: yield* decodeMessage(message.value), activity: typed.value };
+  return published.activity.details.messageId === published.message.id &&
     published.activity.threadId === published.message.threadId
     ? Option.some(published)
     : Option.none<ThreadMessage.Published>();

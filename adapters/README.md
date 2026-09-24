@@ -7,7 +7,8 @@ live outside `packages/`. Hosts compose them; shared packages never depend on th
 
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
-and one column per record field; the local host uses it. `storage-memory/` implements
+and one column per record field, except a thread activity's kind-specific details, which
+it stores as JSON; the local host uses it. `storage-memory/` implements
 them in process memory with no dependencies: it is the reference implementation of
 the storage contracts and no host uses it. Each README covers running and testing.
 The adapters share one shape: one module per store

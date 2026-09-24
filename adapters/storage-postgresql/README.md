@@ -181,11 +181,13 @@ replies use the same tables and transaction boundary. The latest-activity lookup
 workspace/thread/sequence index; insertion still rejects duplicate positions and gaps. Reply tests
 cover scoped publishing grants, new and returning participants, addressing, concurrent
 replies/departures, rollback, reopening, and replay. Self-follow records a quiet activity
-referencing its participation, with no message or notifications. Activity rows keep nullable message
-and participation references, at most one activity per message, and at most one per participation
-and lifecycle kind. Core validates each activity kind; the table has no
-per-kind constraint, so a new kind adds nullable reference columns rather than rewriting one. Ending
-activity follows the participation's ending in the same commit and preserves its reason.
+referencing its participation, with no message or notifications. Activity rows hold every kind in
+one shape: the common position columns, the dotted `kind`, its `subject`, a nullable `occurrence`
+key, `new_activity`, and the kind's encoded `details` as `jsonb`, the one field not given its own
+columns, so a new kind needs no migration. A unique index on the workspace and `occurrence` keeps a
+kind recorded once per subject, as with one activity per message or per participation ending;
+repeatable kinds leave it null. Core defines and validates each kind; the table has no per-kind
+constraint. Ending activity follows the participation's ending in the same commit and preserves its reason.
 Unfollow, group departure, and workspace removal record the same per-participation ending facts and
 activity; pending agent input is discarded in the same commit. Every kind uses the common
 activity-recorded fact and notification generator. The participation suite covers scoped grants,

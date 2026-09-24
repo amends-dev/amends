@@ -10,12 +10,6 @@ const rows = Rows.make(Schema.fromJsonString(ThreadActivity.Record));
 const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =>
   left.sequence - right.sequence;
 
-/** One activity per message, and one of each kind per participation. */
-const subjectOf = (record: ThreadActivity.Record) =>
-  record.kind === "MessagePublished"
-    ? `message:${record.messageId}`
-    : `${record.kind}:${record.participationId}`;
-
 /** Workspace-bound thread-activities projection storage. @category constructors */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
@@ -75,7 +69,8 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         .all(space.records.threadActivities)
         .pipe(Effect.mapError(storeFailure(ThreadActivityStore, "insert")));
       const timeline = activities.filter((activity) => activity.threadId === record.threadId);
-      const next = Math.max(0, ...timeline.map((activity) => activity.sequence)) + 1;
+      const next =
+        timeline.reduce((latest, activity) => Math.max(latest, activity.sequence), 0) + 1;
       if (record.sequence !== next)
         return yield* new ThreadActivityStore.Conflict({
           operation: "insert",
@@ -83,11 +78,12 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         });
       if (
         space.records.threadActivities.has(record.id) ||
-        activities.some((activity) => subjectOf(activity) === subjectOf(record))
+        (record.occurrence !== null &&
+          activities.some((activity) => activity.occurrence === record.occurrence))
       )
         return yield* new ThreadActivityStore.Conflict({
           operation: "insert",
-          message: "Activity ID reused, or its subject is already recorded",
+          message: "Activity ID reused, or its occurrence is already recorded",
         });
       const row = yield* rows
         .encode(record)

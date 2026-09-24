@@ -7,7 +7,8 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import { Thread } from "../thread.ts";
 import { ThreadAccess } from "../access.ts";
-import { ThreadActivityRecording } from "../activity/recording.ts";
+import { ThreadActivityPublisher } from "../activity/publisher.ts";
+import { ThreadParticipationActivity } from "./activity.ts";
 import { ThreadParticipation } from "./participation.ts";
 import { ThreadParticipationStore } from "./store.ts";
 import { ThreadParticipationAdmission } from "./admission.ts";
@@ -24,7 +25,7 @@ export type Error =
   | Authorization.Error
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
   | ThreadParticipationAdmission.Error
-  | ThreadActivityRecording.Error
+  | ThreadActivityPublisher.Error
   | ThreadParticipationDeparture.Error
   | ThreadNotFound
   | NotFound
@@ -52,7 +53,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
   const access = yield* ThreadAccess.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
   const participations = yield* ThreadParticipationStore.Service;
-  const recording = yield* ThreadActivityRecording.Service;
+  const publisher = yield* ThreadActivityPublisher.Service;
   const departures = yield* ThreadParticipationDeparture.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -62,7 +63,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
       access.workspaceId,
       admissions.workspaceId,
       participations.workspaceId,
-      recording.workspaceId,
+      publisher.workspaceId,
       departures.workspaceId,
     ].some((id) => id !== workspaceId)
   )
@@ -92,36 +93,38 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         { _tag: "Member", memberId: actor.memberId },
       ]);
       if (current !== undefined) return ThreadParticipation.toSummary(current);
-      const sequence = yield* recording.nextSequence(thread.id);
-      const occurredAt = yield* DateTime.now;
-      const admitted = yield* admissions
-        .ensure(thread, [{ _tag: "Member", memberId: actor.memberId }], sequence, occurredAt)
-        .pipe(Publication.withOccurredAt(occurredAt));
-      const participant = admitted.participants[0];
-      const added = admitted.added[0];
-      if (
-        admitted.participants.length !== 1 ||
-        admitted.added.length !== 1 ||
-        added === undefined ||
-        participant === undefined ||
-        participant.participant._tag !== "Member" ||
-        participant.participant.memberId !== actor.memberId ||
-        participant.threadId !== thread.id ||
-        participant.workspaceId !== workspaceId ||
-        participant.joinedAtSequence !== sequence ||
-        !sameIdentity(participant.participant.identity, actor.identity)
-      )
-        return yield* new InvalidResponse({ message: "Admission returned another participation" });
-      yield* recording
-        .record({
-          threadId: thread.id,
-          sequence,
-          occurredAt,
-          subject: { kind: "ParticipationFollowed", participationId: participant.id },
-          recipients: [],
-        })
-        .pipe(Publication.withCause(added, occurredAt));
-      return ThreadParticipation.toSummary(participant);
+      const followed = yield* publisher.publish({
+        thread,
+        occurredAt: yield* DateTime.now,
+        admit: [{ _tag: "Member", memberId: actor.memberId }],
+        step: ({ sequence, admitted }) => {
+          const participant = admitted.participants[0];
+          const added = admitted.added[0];
+          if (
+            admitted.participants.length !== 1 ||
+            admitted.added.length !== 1 ||
+            added === undefined ||
+            participant === undefined ||
+            participant.participant._tag !== "Member" ||
+            participant.participant.memberId !== actor.memberId ||
+            participant.threadId !== thread.id ||
+            participant.workspaceId !== workspaceId ||
+            participant.joinedAtSequence !== sequence ||
+            !sameIdentity(participant.participant.identity, actor.identity)
+          )
+            return Effect.fail(
+              new InvalidResponse({ message: "Admission returned another participation" }),
+            );
+          return Effect.succeed({
+            value: participant,
+            kind: ThreadParticipationActivity.Followed,
+            details: { participationId: participant.id },
+            recipients: [],
+            cause: added,
+          });
+        },
+      });
+      return ThreadParticipation.toSummary(followed.value);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

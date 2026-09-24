@@ -135,7 +135,7 @@ on a reply rather than a start, is a separate request. Without a key, every call
 
 `ThreadParticipationApplication.follow(threadId)` joins the acting human or agent and returns a
 public `ThreadParticipation.Summary`. It requires active workspace and group membership and
-`thread.follow` on the thread. A new follow records a quiet `ParticipationFollowed` timeline
+`thread.follow` on the thread. A new follow records a quiet `participation.followed` timeline
 activity at the next position, with no message and no notifications. Following while already
 participating returns the existing summary and records nothing.
 
@@ -146,7 +146,7 @@ missing participations share `ThreadParticipationApplication.NotFound`; one's ow
 participation returns `AlreadyEnded`. An inaccessible or missing thread returns
 `ThreadParticipationApplication.ThreadNotFound`.
 
-Unfollowing records a `ParticipationEnded` activity with its reason and keeps the participation's
+Unfollowing records a `participation.ended` activity with its reason and keeps the participation's
 history. Pending agent notifications for that participation are discarded in the same commit;
 human notification history remains. A later follow, own reply, or mention can establish a fresh
 participation, which an old unfollow request cannot end. Unmentioned messages do not re-enroll an
@@ -193,11 +193,14 @@ first item's `activity.sequence` as `beforeSequence` until a page comes back emp
 by passing the last item's sequence as `afterSequence`, where an empty page means no later activity
 yet. Cursors belong to the thread; they are not journal or notification cursors.
 
-Message items contain `{ activity, message }`. Participation items contain
-`{ activity, participant }`, where `participant` is a public joining summary, even for a
-participation that later ended. `ParticipationEnded` includes the departure reason and time. Use
-`activity.kind` to tell them apart. Missing or inconsistent subjects fail the read instead of
-producing partial pages.
+Every item's `activity` has the thread position, a dotted `kind`, its `subject`, `newActivity`,
+and kind-specific `details`. Message items (`message.published`) contain `{ activity, message }`,
+with `details: { messageId }`. Participation items (`participation.followed` and
+`participation.ended`) contain `{ activity, participant }`, where `participant` is a public joining
+summary, even for a participation that later ended, and `details` holds the `participationId`; an
+ending adds the departure `reason`, at the activity's `occurredAt`. Use `activity.kind` to tell them
+apart. Missing or inconsistent subjects, and kinds this host has no resolver for, fail the read
+instead of producing partial pages. See [activity kinds](../packages/core/README.md#activity-kinds).
 
 ### Current participants
 
@@ -289,7 +292,7 @@ notification history is kept. All of it shares the departure's commit.
 
 ## Recorded history and delivery
 
-A start records the thread, its initial participations, the message, and one `MessagePublished`
+A start records the thread, its initial participations, the message, and one `message.published`
 activity at sequence 1, in one commit; each later message, follow, and departure adds activity at
 the next sequence. Notifications come from the recipients recorded with each activity, with IDs
 derived from the activity and participation, never recomputed from today's group or grants. Replay

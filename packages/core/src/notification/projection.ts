@@ -1,6 +1,8 @@
 import { Effect } from "effect";
 import { Projection } from "../journal/projection.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
+import { ThreadActivityKind } from "../thread/activity/kind.ts";
+import { ThreadParticipationActivity } from "../thread/participation/activity.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 /**
@@ -21,8 +23,10 @@ export const definition = Projection.make("notifications", { version: 1 }).on(
       });
     // Settlement is driven by the activity itself, even when no new recipients are selected. The
     // store settles only an agent's notifications, which it recognizes by their recipient.
-    if (activity.kind === "ParticipationEnded")
-      yield* notifications.discardPendingForParticipation(activity.participationId);
+    if (ThreadActivityKind.is(ThreadParticipationActivity.Ended)(activity)) {
+      const ended = yield* ThreadActivityKind.decode(ThreadParticipationActivity.Ended, activity);
+      yield* notifications.discardPendingForParticipation(ended.details.participationId);
+    }
     yield* notifications.insertMany(
       recipients.map((recipient) =>
         Notification.generated(
