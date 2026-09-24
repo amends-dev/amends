@@ -1,16 +1,9 @@
 # Workspace workflows
 
-This guide describes the implemented workspace, membership, and invitation
-workflows in the backend. Web and desktop currently contain bootstrap pages only;
-the former web workflow screens have been removed. For server setup and development authentication, see the
-[local host guide](../hosts/local/README.md). The
-[HTTP contract](../packages/api-http/README.md) defines the available endpoints;
-[core design](./core-model.md) records the broader model and planned work.
-See [known limitations](./current-status.md) for storage outcomes and live-update
-constraints that affect these workflows.
-
-The examples assume the local host is running on port 8787 and use its
-development bearer identities.
+Workspace creation, membership, invitations, access, and ownership transfer, as the HTTP API
+exposes them. The [HTTP contract](../packages/api-http/README.md) lists the endpoints, and the
+[local host guide](../hosts/local/README.md) covers server setup and development authentication.
+The examples assume the local host on port 8787 with its development bearer identities.
 
 ## Workspaces and members
 
@@ -24,47 +17,37 @@ curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json
   -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
 ```
 
-`GET /me/workspaces` lists the caller's
-memberships, including ended ones, with each workspace's active member count,
-and the caller's pending invitations. It reads the host's projection tables
-across every workspace; this is host routing, not a core operation.
+`GET /me/workspaces` lists the caller's memberships, including ended ones, with each
+workspace's active member count, and the caller's pending invitations. This is host routing
+across workspaces, not a core operation.
 
 `GET /workspaces/:id/members` lists the memberships the caller may read: a
 workspace-scoped `member.read` grant sees everyone, active and removed, and an
 exact grant sees that member. `GET …/members/:memberId` reads one.
 
-`DELETE …/members/:memberId` removes a member and returns the record with
-status `removed`. Core requires `member.remove` on that member; `member.read`
-is not required. Both workspace and exact-member grants work. Humans and agents
-follow the same rules. An authorized non-owner may remove their own membership.
-Administrators can remove ordinary Viewer-only or unassigned members, but only the
-owner can remove another administrator or a member with additional access. An authorized
-non-owner can still leave. Ownership alone does not authorize removal, and the current owner cannot be
-removed even by an otherwise authorized member. Use the ownership transfer
-workflow before removing the former owner.
+`DELETE …/members/:memberId` removes a member and returns the record with status `removed`.
+It requires `member.remove` on that member, at workspace or member scope; `member.read` is not
+required. Humans and agents follow the same rules. An authorized non-owner may remove their own
+membership. Administrators can remove ordinary Viewer-only or unassigned members, but only the
+owner can remove another administrator or a member with additional access. Ownership alone does
+not authorize removal, and the current owner cannot be removed even by an otherwise authorized
+member: transfer ownership first.
 
-Removal also revokes every pending invitation for that human in this workspace,
-including expired invitations still recorded as pending. This is part of removal
-and requires no additional `invitation.manage` grant. Accepted receipts and
-invitations for other people or workspaces are preserved.
+Removal also, in the same commit and without further grants:
 
-For humans and agents, removal also ends every active group admission tied to that workspace
-member ID. This requires no additional `group.membership.manage` grant. Each departure retains
-the admission's history and records `workspace-removed`, with the workspace-removal event as
-its cause. Already ended admissions and other members are unchanged. Rejoining the workspace
-does not restore old group admissions. See [group departures](group-workflows.md#workspace-member-removal).
+- revokes every pending invitation for that human in this workspace, including expired ones
+  still recorded as pending; accepted receipts and other people's invitations are kept;
+- ends every active group admission of that workspace member, recording `workspace-removed`
+  with the removal as its cause; see [group departures](group-workflows.md#workspace-member-removal).
 
-Authorization, the ownership check, the member/group removal and invitation revocation facts,
-and projections share one transaction. A failure rolls them back
-together. Repeating a removal returns `MemberApplication.AlreadyRemoved` without
-publishing another fact; the caller must still be active and authorized.
-Missing members return `MemberApplication.NotFound` only after authorization.
+A failure rolls all of it back. Repeating a removal returns `MemberApplication.AlreadyRemoved`
+without recording anything; the caller must still be active and authorized. Missing members
+return `MemberApplication.NotFound`, only after authorization.
 
-The membership and its assignments remain historical records. Active-membership
-checks deny subsequent operations, including calls with an actor resolved before
-removal. Authorized readers can still inspect the removed record. Other workspace
-memberships are unaffected. An old accepted invitation cannot restore access;
-rejoining creates a fresh member ID with the new invitation's role.
+The removed membership and its assignments remain historical records that authorized readers can
+inspect. Active-membership checks deny its later operations, including calls with an actor resolved
+before removal. An old accepted invitation cannot restore access: rejoining creates a fresh member
+ID with the new invitation's role, and inherits no group admissions.
 
 ## Invitations
 
@@ -81,7 +64,6 @@ curl -X POST -H 'Authorization: Bearer bob' http://127.0.0.1:8787/workspaces/<wo
 The response carries the invitation ID under `details.id` and the selected role
 under `details.roleId`. Expiry must follow issuance; acceptance at the exact
 deadline fails. Invitations require a role and always assign it at workspace scope.
-There is no direct-grant or optional-role invitation path.
 
 Issuance and revocation require `invitation.manage` and `assignment.manage` on the
 workspace. The shared delegation policy allows the owner to select Viewer or
@@ -90,22 +72,21 @@ be granted through an invitation. `GET …/invitations` requires `invitation.man
 
 Only the named authenticated human can accept. Acceptance rechecks the original
 inviter's active membership, permissions, and current authority to delegate the
-referenced role. It commits membership, a role assignment, and acceptance together.
+referenced role, then commits membership, a role assignment, and acceptance together.
 The role's current stored permissions apply; they are not copied into direct grants.
-Invitations use stable human IDs; email delivery and unregistered email addresses
-remain outside this local workflow.
+Invitations use stable human IDs; email delivery is outside this workflow.
 
 Already-active members cannot be invited or accept a second invitation. Multiple
 pending invitations may exist, but only one can establish an active membership.
 Repeating acceptance of the same accepted invitation returns its recorded member
 without granting again, even after expiry or loss of inviter authority. If that
 membership was later removed, the receipt returns the removed record; it never
-reactivates it. Rejoining requires a fresh invitation and membership.
+reactivates it.
 
 `POST …/invitations/:invitationId/revoke` revokes a pending invitation.
 Repeating revocation is harmless. Revocation cannot undo an accepted membership;
 use member removal for that. Expiry is checked against the clock, so no
-background task is required to change expired rows.
+background task changes expired rows.
 
 ## Assignments and delegation
 
@@ -118,22 +99,19 @@ remain readable but cannot receive or change assignments.
 All assignment mutations require `assignment.manage` on the workspace:
 
 - `POST …/assignments` accepts `{ memberId, roleId }` and adds a workspace role.
-  Repeating the same active assignment returns it without another journal fact.
+  Repeating the same active assignment returns it without recording anything.
 - `DELETE …/members/:memberId/assignments/:assignmentId` revokes one assignment.
   Repeating revocation is harmless after current authorization and recipient checks.
 - `PUT …/assignments` accepts `{ memberId, roleId, expectedAssignmentIds }`. The IDs
-  must match all current workspace-scoped role assignments. A stale form receives
+  must match all current workspace-scoped role assignments; a stale form receives
   HTTP 409. Revoking previous roles and assigning the replacement share one commit.
   Direct grants and exact-target assignments are preserved and displayed separately.
 
-The owner can manage Viewer and Administrator access. Other holders of management
+The owner can manage Viewer and Administrator access. Other holders of the management
 permission can manage only Viewer-only or unassigned recipients. Direct grants and
 unfamiliar roles require the owner. The Owner assignment and owner membership are
-protected from these mutations, including attempts by the owner. Ownership transfer
-has its own operation. Custom-role management remains unimplemented.
-
-Clients should reread access after a stale-change error before submitting again.
-Future invitation forms should offer role choices from the same backend policy.
+protected from these mutations, including attempts by the owner; ownership transfer
+has its own operation. Clients should reread access after a stale-change error.
 
 ## Ownership transfer
 
@@ -151,102 +129,40 @@ or current ownership receives HTTP 403. Missing recipients return 404; the curre
 owner, removed members, and agents are rejected as recipients with 409.
 
 The operation checks both current ownership and the transfer permission. In one
-journal commit it revokes both members' built-in workspace roles, assigns
-Administrator to the previous owner and Owner to the recipient, and updates
-`ownerMemberId`. Direct grants and assignments scoped to specific resources remain
-unchanged. The workspace's name and `createdBy` remain unchanged. Core requires one
-matching active human Owner assignment before and after the change. Failures roll
-back metadata, assignments, and facts together.
+commit it revokes both members' built-in workspace roles, assigns Administrator to the
+previous owner and Owner to the recipient, and updates `ownerMemberId`. Direct grants,
+resource-scoped assignments, the workspace's name, and `createdBy` are unchanged. Core
+requires one matching active human Owner assignment before and after the change.
 
-Workspace settings provide candidate selection and a review dialog naming the new
-owner and explaining the previous owner's Administrator access. Success refreshes
-ownership, the workspace directory, and role choices. After a stale-form error,
-cancel the dialog and refresh ownership before reviewing another transfer.
+## Initialization and permissions
 
-The ownership fact and metadata projection remain at version 1. Storage updates
-the existing owner field, so this workflow needs no database schema migration.
-Existing role bundles are not regenerated; use a fresh development workspace to
-receive the new owner-tier permission. During development, recreate the database
-when permission declarations change rather than synchronizing stored role bundles.
+Creating a workspace records, in one commit, its initialization, the creator's membership,
+the three built-in roles, and the creator's Owner assignment. A repeated initialization
+returns `WorkspaceInitialization.AlreadyInitialized` without changing ownership or access.
+Creation attribution is kept separately from current ownership.
 
-## Initialization
+Authorization resolves stored grants: roles confer permissions only through the bundles they
+store, and ownership supplies no implicit bypass. Each permission declares the lowest built-in
+role whose bundle includes it; Administrator includes the Viewer permissions, and Owner all of
+them. Bundles are recorded when a workspace is initialized, so a declaration change reaches only
+new workspaces. Role IDs are `builtin:viewer`, `builtin:administrator`, and `builtin:owner`.
 
-The host allocates the workspace ID and binds its storage views. Core initialization
-then publishes six facts in one journal commit: workspace initialization, creator
-membership, three built-in roles, and one Owner role assignment. Projections persist
-the records in that same transaction, which also makes the new log's projections live.
+| Permission                     | Lowest role   | Target    | Authorizes                                                                        |
+| ------------------------------ | ------------- | --------- | --------------------------------------------------------------------------------- |
+| `member.read`                  | Viewer        | Member    | Reading memberships                                                               |
+| `member.remove`                | Administrator | Member    | Removing a member                                                                 |
+| `invitation.manage`            | Administrator | Workspace | Listing invitations; with `assignment.manage`, issuing and revoking them          |
+| `assignment.read`              | Viewer        | Member    | Reading a member's access                                                         |
+| `assignment.manage`            | Administrator | Workspace | Adding, replacing, and revoking roles, within delegation limits                   |
+| `workspace.transfer-ownership` | Owner         | Workspace | Transferring ownership                                                            |
+| `group.create`                 | Administrator | Workspace | [Creating a private team group](group-workflows.md#creating-a-group)              |
+| `group.read`                   | Viewer        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                |
+| `group.follow`                 | Viewer        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself             |
+| `group.membership.manage`      | Administrator | Group     | Adding and removing members, and management reads                                 |
+| `thread.start`                 | Viewer        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                  |
+| `thread.read`                  | Viewer        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read |
+| `thread.publish`               | Viewer        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation) and typing             |
+| `thread.follow`                | Viewer        | Thread    | Following a thread for oneself                                                    |
+| `agent.use`                    | Viewer        | Member    | Mentioning an agent, starting a direct group with it, or making it follow a group |
 
-The creator is a human and is recorded as the initial owner. Creation attribution
-is retained separately from current ownership. The creator receives Owner at workspace
-scope. Authorization resolves that assignment's stored role permissions; ownership
-supplies no implicit permission bypass.
-
-Each registered permission declares a required `builtinTier`. Viewer includes
-`viewer` permissions, Administrator also includes `administrator` permissions,
-and Owner includes all three tiers, including `owner`. The current bundles are:
-
-| Role          | Stored permissions                                                                                                                                                                                                                                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Viewer        | `member.read`, `assignment.read`, `group.read`, `group.follow`, `thread.start`, `thread.read`, `thread.publish`, `thread.follow`, `agent.use`                                                                                                                                       |
-| Administrator | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `group.create`, `group.read`, `group.follow`, `group.membership.manage`, `thread.start`, `thread.read`, `thread.publish`, `thread.follow`, `agent.use`                                 |
-| Owner         | `member.read`, `member.remove`, `invitation.manage`, `assignment.read`, `assignment.manage`, `workspace.transfer-ownership`, `group.create`, `group.read`, `group.follow`, `group.membership.manage`, `thread.start`, `thread.read`, `thread.publish`, `thread.follow`, `agent.use` |
-
-Ownership transfer is the first owner-tier permission. Delegation separately reserves
-administrator management for the current owner.
-
-`group.read` authorizes [ordinary group reads](group-workflows.md#reading-groups-and-their-current-members)
-only when the caller also has current group membership. Management authority does not bypass
-that audience check. It separately permits inspecting metadata and current admissions for
-a known group through the management read methods.
-
-`thread.read` authorizes reading group-thread metadata, timeline content, and current participants
-when the caller has current group access. It is included in new Viewer and higher-tier bundles;
-existing role records retain their stored grants.
-
-`thread.start` authorizes starting a conversation in a group where the actor is a current
-member. `agent.use` authorizes mentioning, and so bringing in, the selected agent membership;
-posting where an agent already takes part needs no grant for it. Both are included
-in newly initialized Viewer and higher-tier bundles. See [thread workflows](thread-workflows.md).
-
-`thread.publish` authorizes human replies on a Thread target, with current group access and
-`agent.use` for mentioned agents. `ThreadMessagePermissions.Publish` declares it with
-a Viewer default tier. Publication needs no separate read or start grant; existing stored roles
-need an explicit grant or role update. Starting includes its opening publication under `thread.start`.
-
-`thread.follow` authorizes explicit self-follow on a Thread target, with current group access.
-It has a Viewer default tier; existing stored roles need an explicit update or grant. Self-unfollow
-requires no action grant and can end only the actor’s addressed participation.
-
-`group.follow` authorizes following a team group for oneself on a Group target, with current group
-membership. It has a Viewer default tier. Making an agent follow uses `agent.use` instead; see
-[following a group](group-workflows.md#following-a-group).
-
-`group.create` authorizes [private team-group creation](group-workflows.md).
-`group.membership.manage` separately authorizes [adding](group-workflows.md#adding-a-member) and
-[removing](group-workflows.md#removing-a-member-or-leaving) members on a Group target.
-Default bundle placement does not limit either permission to a role name; any role or direct
-grant can supply it. Self-leave requires active workspace membership, with no management grant.
-
-Role IDs are stable within each workspace: `builtin:viewer`, `builtin:administrator`,
-and `builtin:owner`. These identities are reserved for built-in definitions. Tiers
-construct permission bundles; they do not authorize requests or confer delegation
-authority. The bundles are saved through role facts, so changing declarations affects
-new workspaces only. Existing workspaces retain their recorded roles or direct grants;
-development uses fresh data when definitions change. Replay never regenerates roles
-from current declarations.
-
-Initialization requires an absent workspace record. A repeated call returns
-`WorkspaceInitialization.AlreadyInitialized` without replacing ownership or
-granting more access. A failed projection rolls back the entire
-initialization. Concurrent initializers serialize or receive a storage conflict.
-
-## Development data
-
-The required-role invitation schema replaces the earlier direct-grant model. This
-development change requires fresh PostgreSQL development data. It does
-not translate old invitation grants into roles or reset databases on startup.
-Fact and projection versions remain at 1 during development; versioned compatibility
-will be introduced when production data needs to be preserved.
-Permission additions and tier changes also use fresh development data. Recreate the
-development database and initialize workspaces from the current catalog; a workflow
-to synchronize existing role bundles is not required in this phase.
+Group and thread permissions also need current membership in the group; see each guide.

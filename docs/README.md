@@ -11,8 +11,8 @@ remaining gaps with links to their owning code.
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                           |
 | [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                  |
-| [Group workflows](group-workflows.md)                                | Private team creation, authorized reads, audience checks, membership lifecycle, and current limits.                 |
-| [Thread workflows](thread-workflows.md)                              | Private-group starts, reads, participation, notification sources, human acknowledgment, and replay.                 |
+| [Group workflows](group-workflows.md)                                | Private team groups: creation, reads, membership, and following.                                                    |
+| [Thread workflows](thread-workflows.md)                              | Starts, replies, participation, reads, notifications, read state, and typing.                                       |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                             |
 | [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                            |
@@ -35,14 +35,8 @@ drawings, generation, and visual review in the UI workshop.
 
 ## Design and historical references
 
-- [Core model](core-model.md) is living design intent. Workspace management is
-  implemented, along with private team creation, authorized reads, and membership admission/departure in core; private-group opening messages also create participation, ordered activity, and notifications. Authorized thread reads, human replies, self-follow/unfollow, notification-source resolution, and human acknowledgment are implemented in core; other group workflows, turns, execution, triage,
-  and channel delivery remain planned. Its opening status note links to current guides.
-- [Effect capability map](effect-capability-map.md) records an earlier source review
-  and architecture proposal. Its module inventory reflects the pinned source;
-  proposed workflow, cluster, AI, and MCP choices are not implemented integrations.
-- [Web architecture proposal](web-architecture-proposal.md) preserves accepted design
-  rationale and findings from before the refactor. It describes the former web/UI implementation, removed during the bootstrap reset; the proposed TurnLog backend and component remain future work.
+- [Core model](core-model.md) is living design intent, not a description of the
+  implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not
   implemented API schemas. [Token sync](../design-system/sync/README.md) explains the
   historical handoff and points to the current token and style modules.

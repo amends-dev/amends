@@ -32,54 +32,19 @@ authorization. Future features such as thread and task belong beside these
 domains; workspace scoping alone does not make a feature part of workspace
 management.
 
-The notification foundation is exported as `@amends/core/notification`. A record
-references a source log entry and a Human, Agent, Contact, or Triage recipient and
-supports `Pending`, departure-related `Discarded`, and human `Acknowledged` states. Triage is one recipient per workspace,
-represented by `{ _tag: "Triage" }` without a person ID. Both storage adapters implement its bounded recipient reads
-and transactional insert. `NotificationApplication.get`, `list`, and `listPending`
-require current active membership and derive the recipient from the acting identity.
-They expose only that recipient's inbox; missing and other recipients' IDs both
-return `NotificationApplication.NotFound`. Authorization and reads query current
-state without opening a transaction, honoring an outer commit when present. Reading never acknowledges a
-notification or grants access to its source. Core now requires `NotificationStore`.
-
-The HTTP API exposes those inbox reads, and the web client provides session-scoped query
-atoms. Contact and Triage recipients are available to internal storage consumers; the
-member inbox API remains limited to the acting human or agent. The projection now generates
-notifications from the common activity-recorded fact for every activity kind. Quiet participation
-activity selects no recipients. The same activity handler settles pending agent input when it
-sees `ParticipationEnded`, then generates notifications for the recorded recipients. Group and
-workspace departures record that activity through the internal lifecycle service. Participation
-domain facts change participation state only; notification generation and departure settlement
-subscribe to recorded activity. The projection preserves historical recipient selection and
-references the originating participation. A human's `Seen` is private state beside it.
-Agent/contact/triage processing and delivery remain deferred.
-
-`NotificationApplication.resolveSource(notificationId)` first establishes notification ownership,
-then resolves the referenced recorded activity through the internal `NotificationSource` service.
-It validates historical recipient and participation links and returns a `Thread.TimelineItem`
-under current group access and `thread.read`. Missing, unsupported, or inaccessible sources return
-`SourceUnavailable`; inconsistent references fail internally. Unfollowing and discarded state do
-not themselves prevent historical reads. Resolution opens no transaction and does not acknowledge,
-join, or revive work. It is available through the gateway, with HTTP/UI integration still pending.
-See [source resolution](../../docs/thread-workflows.md#resolving-a-notification-source).
-
-`NotificationApplication.acknowledge(notificationId)` records `Seen` for the acting human's own
-notification, under active membership with no action grant or source-access requirement. It returns
-the record with `Acknowledged { outcome: { _tag: "Seen" }, acknowledgedAt }`, removes it from pending
-results and counts, and preserves history. Repeats, and concurrent calls from other devices, return
-the first time stored. Agents receive `HumanRecipientRequired`; discarded notifications return
-`AlreadyHandled`.
-
-`Seen` is private state written by `NotificationStore.markSeen` outside the journal, like a read
-position: no journal commit, no place in the workspace's write order, and kept when projections are
-rebuilt. The journal settles notifications only as `Pending` or `Discarded`. The write joins an
-enclosing transaction when there is one. Acknowledgment creates no activity, notifications, or
-journal commit; the acting human's connected sessions hear of it as a `NotificationsSeen`
-[signal](#signals). Handoffs of work, a turn accepting input or a channel delivery
-accepting a reply, will be journal facts their owning workflows record; notifications never create
-turns, accept their input, or execute work. HTTP/UI actions remain pending.
-See [human acknowledgment](../../docs/thread-workflows.md#acknowledging-a-notification).
+`@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
+contract, `NotificationApplication`, and the projection that generates notifications. A record
+references a source log entry and a Human, Agent, Contact, or Triage recipient (one Triage
+recipient per workspace, `{ _tag: "Triage" }`), and is `Pending`, `Discarded` when its agent
+participation ends, or `Acknowledged` once a human saw it. `NotificationApplication` serves the
+acting human or agent's own inbox (`get`, `list`, `listPending`), `resolveSource`, and human
+`acknowledge`; contact and triage inboxes are read only through the store. `NotificationProjection`
+generates notifications from each recorded thread activity's recipients, and settles pending agent
+input when a participation ends. A human's `Seen` is private state the store keeps outside the
+journal. Internal `NotificationSource` resolves a notification's recorded activity for
+`resolveSource`. Notifications never create turns, accept their input, or execute work. See
+[resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source)
+and [acknowledging a notification](../../docs/thread-workflows.md#acknowledging-a-notification).
 
 Membership demonstrates the feature layout:
 
@@ -136,83 +101,31 @@ build a read screen do not authorize a later write. Stores still require a valid
 workspace transaction for every mutation. A read invoked inside an existing commit
 uses that transaction and sees its staged changes without opening another one.
 
-## Private team groups
+## Groups
 
-`@amends/core/group` exposes `GroupApplication.createPrivateTeam({ name, memberIds })`.
-It requires `group.create` on the workspace, validates the name and distinct active workspace
-membership IDs, and records the group and its initial admissions in one commit. Any role or
-direct grant can provide that permission. The default Administrator and Owner bundles include
-it; their names play no part in authorization.
+`@amends/core/group` holds team and direct groups, their admissions, and follows.
+`GroupApplication` creates private teams and reads groups (`listMine`, `get`, `getForManagement`);
+`GroupMembershipApplication` adds, removes, and lets members leave team groups, and reads rosters;
+`GroupFollowApplication` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
+`GroupFollowStore` are required host bindings. A direct group has a fixed set of two or more
+members in `Group.directMembers` order, identified by `Group.directKey` and found in any order
+through `GroupStore.findDirect`; internal `DirectGroups.establish` finds or creates one for
+`ThreadApplication.startDirect`.
 
-Initial members are explicit and may be empty. The creator is admitted only if included.
-`GroupStore` and `GroupMembershipStore` are required host bindings; each admission retains its
-own ID and workspace-membership reference. `Group.Record` is a team or direct group: a direct
-group has a fixed set of two or more members in `Group.directMembers` order, including its
-creator, and `Group.directKey` identifies that set. `GroupStore.findDirect` resolves a member set
-in any order. `GroupMembershipApplication` adds, removes, and lets members leave team groups
-only; a direct group returns `GroupMembershipApplication.FixedMembership`. The internal
-`DirectGroups.establish` finds or creates a direct group with one admission per member for
-`ThreadApplication.startDirect`. Public groups and HTTP/UI workflows remain separate work. See
-[group creation](../../docs/group-workflows.md) for the current contract and verification.
+Internal `GroupAudience.require` checks current workspace and group membership, with no action
+permission and no management bypass; each application checks its own action grant alongside it,
+inside its commit for writes. `GroupMembershipDeparture` records a group departure and ends the
+member's thread participations; workspace-member removal uses it for every admission. See
+[group workflows](../../docs/group-workflows.md).
 
-`GroupMembershipApplication.add({ groupId, memberId })` requires
-`GroupMembershipPermissions.Manage` (`group.membership.manage`) on that Group target.
-It validates the group and the member's current workspace membership, rejects an active
-duplicate, and publishes a fresh admission using the existing fact and projection. All
-checks and writes share one commit. The caller need not belong to the group when their
-grants authorize management. Creation permission and group membership confer no management
-authority by themselves. Both operations check current permissions, including staged changes
-in a caller's transaction. See [adding a member](../../docs/group-workflows.md#adding-a-member).
+## Read state
 
-`GroupMembershipApplication.remove({ groupId, membershipId })` uses the same management
-permission. `leave` takes that same address but requires only active workspace membership
-and the caller's own admission. Both record a terminal departure and preserve admission
-history; rejoining through `add` creates a new ID, safe from stale departure requests.
-`MemberApplication.remove` also records departures for all of the member's active group
-admissions in its existing commit, with no extra group-management grant. The departure fact
-records its reason and uses journal provenance for actor and time. See
-[departures](../../docs/group-workflows.md#removing-a-member-or-leaving).
-
-`GroupApplication.listMine({ limit, after? })` returns a page of `Group.ListItem` values with each
-group's latest activity, the caller's caught-up time, `newActivity`, `following`, and `pending`,
-the caller's pending notifications from the group's threads, from a fixed number of reads. `ThreadApplication.listInGroup(groupId, { limit, before? })` pages a group's
-readable threads by latest activity as `Thread.ListItem` values with the caller's read position and
-`unread`. `Authorization.permitted` checks many requirements with one grant resolution and reports
-each, so lists skip items instead of failing. Starting and replying read the thread through the
-author's message, and a message never notifies its author. Rosters page by admission ID with
-`listCurrent(groupId, { limit, after? })`.
-
-`GroupApplication.get` and `listMine`, and `GroupMembershipApplication.listCurrent`, require
-current group membership and `group.read`. The permission is included in new Viewer and
-higher-tier bundles; existing stored roles are unchanged. `getForManagement` and
-`listCurrentForManagement` are explicit metadata/roster reads for a known group under
-`group.membership.manage`. They require no membership or read grant, and establish no
-conversation access. Current rosters expose admission records, not member profiles or
-historical admissions. Reads open no transaction, honor staged changes in a caller's commit,
-and do not promise a shared snapshot. See [group reads](../../docs/group-workflows.md#reading-groups-and-their-current-members).
-
-`GroupFollowApplication.follow({ groupId, memberId })` and `unfollow` let a team-group member follow
-the group for themselves under `GroupPermissions.Follow` (`group.follow`), or make an agent member
-follow under `agent.use` for it. A follow admits the member to threads started in the group
-afterwards; it belongs to their admission and ends when the admission does, which the
-`GroupFollowProjection` records from the admission's removal. `GroupFollowStore` is a required
-host binding. Direct groups return `NotFollowable`. See
-[following a group](../../docs/group-workflows.md#following-a-group).
-
-`@amends/core/attention` holds private read state. `ReadStateApplication.markThreadRead` records
-how far a person has read a thread and marks their pending notifications from it up to that
-position `Seen`; `markGroupRead` records when they caught up with a group. Both only move forward.
-`ReadStateStore` is a required host binding, kept outside the journal. The person's connected
-sessions hear of each change as a `ThreadRead` or `GroupCaughtUp` [signal](#signals). Thread activity maintains
-each thread's and group's latest message through `ThreadStore.recordLatest` and
-`GroupStore.recordLatest`, and notifications from thread activity carry their thread and sequence.
-See [marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
-
-`GroupAudience.require` checks active workspace and group membership without checking any
-action permission or allowing a management bypass. It returns the current admission and
-requires only the actor at operation time. Core provides this policy internally to application
-services; it is excluded from `Core.Operations`. Future thread writes must call it inside
-their commit and separately require the relevant action grant.
+`@amends/core/attention` holds private read state: `ReadStateApplication.markThreadRead` and
+`markGroupRead`, over the required `ReadStateStore` binding, which is kept outside the journal.
+Thread activity maintains each thread's and group's latest message through `ThreadStore.recordLatest`
+and `GroupStore.recordLatest`, and notifications from thread activity carry their thread and
+sequence, so reading a thread settles exactly its notifications. See
+[marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
 
 ## Identity and target boundaries
 
@@ -223,103 +136,44 @@ gateway. External authors use `Performer.Reference.Identity` with a Contact;
 not grant authority, and a contact identity does not select an external reply destination.
 
 `Target.Reference` supports Workspace, Member, Group, and Thread. Group targets carry
-`workspaceId` and `Group.Id`; thread targets carry
-`workspaceId` and `ThreadId.Id`, exported from `@amends/core/thread`. Exact target
-scopes compare the workspace, kind, and ID; a workspace scope covers targets in
-that workspace. Adding a Thread target supplies scoped grant storage. The
-[planned audience policy](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions)
-also requires group access alongside action permissions; every thread belongs to one group.
-Group creation, reads, admission/departure, and the shared group-audience policy are implemented.
-Group-thread reads enforce audience membership and `thread.read`; subscription enforcement
-remains future work.
-The thread module supplies opening-message and human-reply workflows described below.
+`workspaceId` and `Group.Id`; thread targets carry `workspaceId` and `ThreadId.Id`, exported from
+`@amends/core/thread`. Exact target scopes compare the workspace, kind, and ID; a workspace scope
+covers targets in that workspace. Group and thread actions also require current group membership,
+following the [thread access rule](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions);
+every thread belongs to one group.
 
-## Starting a thread in a private group
+## Threads
 
-`ThreadApplication.startInGroup({ groupId, text, mentions })` requires a human actor, current group
-membership, `thread.start` on the group, and `agent.use` on each mentioned agent member. A
-team-group thread starts with its author, mentioned members, and the group's followers; the rest of
-the group can read it without participating. A direct-group thread enrolls all its members. The
-thread, admissions, verbatim user text, sequence-1 `MessagePublished` activity, and notifications
-commit together.
+`@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
+four store contracts. Its operations are `ThreadApplication` (`startInGroup`, `startDirect`, `get`,
+`listInGroup`, `readTimeline`, `listParticipants`), `ThreadMessageApplication.publish`, and
+`ThreadParticipationApplication` (`follow`, `unfollow`). A participant is a member, a contact, or
+triage: member participation references the exact group admission, while contacts and triage take
+part without group access. A message author is a member or a contact.
 
-`ThreadStart` is the internal start every workflow uses, excluded from `Core.Operations`: it
-creates the thread through `ThreadCreation`, admits the starting participants, and records the
-first message activity in the caller's commit, without repeating an action permission check.
-`startDirect` starts a direct group's thread, and `startInGroup` enrolls every member of a direct
-group. Four store contracts persist threads, participations, messages, and timeline
-activity. `ThreadParticipation.Participant` is a member, a contact, or triage: member
-participation references the exact group admission, while contacts and triage take part without
-group access. `ThreadMessage.Author` is a member or a contact, and activity recipients record a
-`Notification.Recipient`. Member workflows admit members; replies without mentions reach every
-current participant, and contact and triage participants arrive with the task and channel workflows. Group departure ends member
-participation and discards pending agent input. Replay uses recorded recipients and stable
-notification IDs.
+Internal services carry the shared work inside the caller's commit and publication context, with
+no action checks of their own; they are excluded from `Core.Operations`:
 
-These operations reuse the existing workspace journal; the timeline is a read model of ordered
-activity, not an independent second event stream. Authorized reads now provide discovery,
-metadata, timeline pages, and current-participant summaries. HTTP/UI and agent-turn
-execution workflows remain separate work. See [thread workflows](../../docs/thread-workflows.md).
+| Service                        | Role                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `ThreadStart`                  | The one start every workflow uses: creates the thread, admits its starters, records the first message |
+| `ThreadCreation`               | Validates and records a new thread for `ThreadStart`                                                  |
+| `ThreadMessagePublication`     | Publishes a message with its admissions, activity, and recipients                                     |
+| `ThreadParticipationAdmission` | Finds eligible members and current participants, and admits new ones                                  |
+| `ThreadParticipationDeparture` | Ends a participation with its activity, for unfollow and group departure alike                        |
+| `ThreadActivityRecording`      | Assigns the next timeline position and records `ThreadActivityFacts.Recorded`                         |
+| `ThreadAccess`                 | Checks current group access to a thread, shared by reads and writes                                   |
+| `ThreadActivityReading`        | Resolves timeline subjects under access, for timeline pages and notification sources                  |
 
-Thread reads use `ThreadApplication.get`, `listInGroup`, `readTimeline`, and `listParticipants`.
-All require current workspace/group membership and `thread.read` on the Thread target; lists
-omit threads outside the caller's grants. Participation is not required or created by reading.
-Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional nonnegative
-`afterSequence`) and return typed timeline items in sequence order: message items contain
-`activity` and `message`, while participation items contain `activity` and a public `participant` joining summary. Current participants are paged
-with `ThreadParticipation.ListOptions` (positive `limit`, optional exclusive `after` participation
-ID) as `ThreadParticipation.Summary`, whose `participant` is a public member, contact, or triage
-reference without internal identity snapshots or admission links, excluding ended participation.
+Every activity kind uses `ThreadActivityFacts.Recorded`, carrying a typed activity and its selected
+recipients; the notification projection consumes that one envelope. Domain facts own state, and
+activity owns timeline position.
+
 Starts and replies read only the admissions and participations of those they name, through
-`GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; the stores'
+`GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without
+mentions pages the thread's active participants, the people it notifies. The stores'
 whole-history `listByGroup` and `listByThread` remain for inspection, and no operation uses them.
-Reads honor caller transactions but open none, and make no notification or checkpoint changes.
-Internal `ThreadActivityReading` shares authorized subject resolution between timeline pages and
-notification-source reads. It and `NotificationSource` are excluded from `Core.Operations`.
-New Viewer bundles include the permission; stored role records are unchanged. See
-[thread reads](../../docs/thread-workflows.md#reading-conversations).
-
-## Publishing a human reply
-
-`ThreadMessageApplication.publish({ threadId, text, mentions })` publishes a human reply under
-current group access and `ThreadMessagePermissions.Publish` (`thread.publish`) on the Thread target.
-The author and eligible mentions join when necessary; unmentioned replies address current thread
-participants plus the author. Each mentioned agent requires `agent.use`; agents already
-participating are reached without it. The result contains only
-`message` and `activity`. New Viewer and higher-tier bundles include publish permission, while
-existing roles keep their stored grants. See [human replies](../../docs/thread-workflows.md#replying-to-a-conversation).
-
-Starts and replies reuse `ThreadParticipationAdmission` and `ThreadMessagePublication` internally.
-These services validate references and record domain facts within the caller's transaction and
-publication context. They perform no independent action authorization and are excluded from
-`Core.Operations`. `ThreadAccess` shares audience validation between reads and replies; each
-application checks its own action. Starting includes its initial publication under `thread.start`
-without requiring `thread.publish`; replies require neither `thread.read` nor `thread.start`.
-
-## Following and unfollowing
-
-`ThreadParticipationApplication.follow(threadId)` requires current group access and
-`ThreadParticipationPermissions.Follow` (`thread.follow`) on the Thread target. It uses the
-internal admission service and records a quiet `ParticipationFollowed` activity at the joining
-sequence, without messages or notifications. It returns `ThreadParticipation.Summary`; repeated
-follow returns the existing participation without changing its boundary. New Viewer bundles
-include the permission, while existing stored roles retain their grants.
-
-`unfollow({ threadId, participationId })` requires current group access and the actor’s own
-participation, with no action grant. It uses internal `ThreadParticipationDeparture` to record `ThreadParticipationFacts.Ended` and
-`ParticipationEnded` activity, ending that record and discarding pending agent input atomically. Human notification history is retained.
-It returns no value. A fresh participation after rejoining cannot be ended by an old request.
-Both workflows honor caller transactions. See [following and unfollowing](../../docs/thread-workflows.md#following-and-unfollowing).
-
-All activity kinds use `ThreadActivityRecording` and `ThreadActivityFacts.Recorded`, carrying a
-typed activity and its selected recipients. The notification generator consumes that common
-envelope; it needs no kind-specific registration. Domain facts own state and activity owns timeline
-position. Quiet follow and departure activity use empty recipient lists.
-
-`GroupMembershipDeparture` records a group departure and invokes the participation departure
-service for each active participation; member removal uses that same group service. These internal
-services are excluded from `Core.Operations` and require the caller’s transaction and publication
-context. Projections replay explicit facts rather than deriving unrecorded bulk departures.
+See [thread workflows](../../docs/thread-workflows.md).
 
 ## Permission declarations and built-in roles
 
@@ -352,7 +206,7 @@ an existing workspace requires an explicit role fact; neither authorization nor
 replay regenerates its roles. `AssignmentApplication` provides listing, assignment,
 revocation, and atomic workspace-role replacement. `Delegation` supplies the shared
 rules used by assignments, invitations, and member removal. Role definition editing
-and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization)
+and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)
 for the implemented bundles and current invitation restrictions.
 
 `OwnershipApplication` coordinates ownership and assignments in one commit. It

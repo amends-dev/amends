@@ -3,45 +3,36 @@
 This page records implementation gaps, not completed fixes. Keep each item aligned
 with its owning code and guide when changing the behavior.
 
-Workspace creation, membership, required-role invitations, assignment management, and ownership
-transfer are implemented through core, the gateway, and HTTP. PostgreSQL persists their
-journal and projections; the in-memory reference adapter implements the same storage contracts. See [workspace workflows](workspace-workflows.md) for the
-available operations. Core and the storage adapters implement [private group creation and membership
-lifecycle](group-workflows.md), including permission-based addition/removal, self-leave,
-ordinary group reads, and management inspection of known groups. Direct groups (DMs and group
-DMs) are established and reused by member set when their first thread starts; their membership
-is fixed. Public groups and group HTTP/UI workflows remain unimplemented. [Starting a
-private-group thread](thread-workflows.md) with a human text message, initial participation,
-timeline activity, and notifications is implemented in core and the storage adapters. Authorized thread
-discovery, metadata, sequence-paginated timelines, and current-participant summaries and human
-replies are also implemented. Replies admit their author and eligible mentions, record the next
-timeline activity, and generate notifications atomically. Explicit self-follow/unfollow is
-implemented, including quiet follow/ending activity and pending agent-input cleanup. Managing
-other participants, muting, turns, agent execution, triage, and channel delivery remain future
-work. The [group and audience
-rules](core-model.md#agreed-groups-provide-a-shared-home-for-threads) include implemented
-group-inherited read access. Every thread belongs to one group. All thread starts use one
-internal thread start, and stores, facts, and notifications support member, contact, and triage
-participants and member or contact authors. Replies without mentions reach every current
-participant. Only member workflows exist today: the task and channel workflows that admit
-contacts and triage remain unimplemented, and general participation management remains
-incomplete. Group departure ends its associated thread participations and discards their pending
-agent input; workspace-member removal uses the same cleanup. Thread starts, reads, replies, and
-follow/unfollow use the shared group-audience check. Current-participant lists, group lists,
-rosters, group thread lists, and timelines have cursor pages. Separate reads and
-pages do not share a snapshot. Group creation, starts, replies, and timeline pages read members,
-admissions, participations, and referenced messages in batches, so their store reads do not grow
-with group size or page length. A start still publishes one participation fact per starting
-participant, and each fact adds its append bookkeeping and the handlers of the projections that
-handle it, so a start's storage work still grows with its participants, by a few statements
-each. The agreed [attention
-model](core-model.md#agreed-attention-is-directed-followed-or-ambient) is implemented for member
-workflows: a team post starts with its author, mentioned members, and the group's followers;
-only mentioned agents need `agent.use`; group thread lists page by latest activity with unread
-state; group lists report new activity and following; and marking a thread read settles its
-notifications. Messages never notify their author, and posting reads the thread through the
-author's message. Task and channel workflows, which will admit human followers, remain
-unimplemented.
+The backend implements [workspace](workspace-workflows.md), [group](group-workflows.md), and
+[thread](thread-workflows.md) workflows through core and the gateway, over PostgreSQL and the
+in-memory reference storage. The guides describe what exists; this page lists what does not.
+
+## Domain gaps
+
+- Public groups, and joining or discovering them, are not implemented. Direct groups exist, with
+  fixed membership.
+- Only member workflows exist. Task and channel workflows, which will start threads with contacts
+  and triage and admit human followers, are not implemented, and neither are managing other
+  participants or muting.
+- Notifications to agents stay pending: no turns, execution, silent completion, or channel
+  delivery run, and contacts and triage have no inbox outside the store. Turn and task activity
+  kinds remain design intent.
+- Requests have no idempotency beyond recorded facts: repeating a start, reply, or group creation
+  after an uncertain commit creates another one, so callers reconcile first.
+
+## HTTP coverage
+
+HTTP exposes sign-in, workspace creation and the directory, members, invitations, assignments, ownership,
+the notification inbox reads, the change feed, and typing. Groups, threads, read state,
+notification sources, and acknowledgment are available through core and the gateway only, and
+the web and desktop apps have no domain pages yet.
+
+## Storage cost
+
+Group creation, starts, replies, and timeline pages read members, admissions, participations, and
+messages in batches, so their store reads do not grow with group size or page length, and a reply
+reads only those it addresses. A start still publishes one participation fact per starting
+participant, so its storage work grows with its participants, by a few statements each.
 
 ## Design-system coverage
 
@@ -142,37 +133,13 @@ future work. The removed legacy web screens remain available in Git history.
 Theme preferences, route focus management, Tauri signing/updates, production artwork,
 and cross-platform installer verification are pending.
 
-## Notification recipients and generation
+## Development data
 
-The [notification schema](../packages/core/src/notification/notification.ts) supports
-Human, Agent, Contact, and workspace-singleton Triage recipients, with `Pending`,
-`Discarded { reason: "participation-ended" }`, and `Acknowledged` states. The implemented
-acknowledgment outcome is human `Seen`, with an `acknowledgedAt` timestamp, kept as private state
-outside the journal.
-The storage adapters store these variants and enforce source/recipient
-uniqueness. The [application](../packages/core/src/notification/application.ts) exposes
-only the acting human or agent's inbox, with active membership required. Contact
-and Triage reads are available only through internal stores.
-
-`NotificationApplication.resolveSource` resolves an owned notification to its typed thread
-timeline item through core and the gateway. It requires current group access and `thread.read`,
-even for historical notifications. Unfollowing alone preserves source access; reading discarded
-agent input does not revive it. Unsupported or inaccessible sources return `SourceUnavailable`.
-The storage adapters implement direct journal-entry lookup. Source resolution has no HTTP route or
-client integration yet. See [source resolution](thread-workflows.md#resolving-a-notification-source).
-
-The [projection](../packages/core/src/notification/projection.ts) generates notifications from
-the shared activity-recorded fact and its historical recipient selection, for every activity kind.
-Follow and participation endings currently select no recipients. Ending activity settles pending
-agent input before the same handler generates notifications for selected recipients. Participation
-domain facts do not directly change notifications. Group and workspace departures record ending
-activity for each affected thread through the same internal lifecycle service. Human acknowledgment
-is implemented through core and the gateway as private `Seen` state; future turn workflows own turn
-creation, input acceptance, and execution, and will record their handoffs as journal facts. Agent/contact/triage handling, silent completion, and
-delivery remain unimplemented. Acknowledgment HTTP/UI actions are also pending; see
-[human acknowledgment](thread-workflows.md#acknowledging-a-notification). Existing tests also seed
-notifications for storage and inbox contracts. Quiet participation activity creates no notifications.
-Turn/task activity kinds remain design intent.
+Fact and projection versions remain at 1, and each storage adapter has one development baseline
+with no upgrade migrations: recreate development databases after a schema or fact change.
+Built-in role bundles are recorded when a workspace is initialized, so permission declarations
+added later reach only new workspaces; existing workspaces need an explicit grant or role update,
+since nothing synchronizes stored bundles.
 
 ## Live delivery and authorization
 
@@ -274,5 +241,4 @@ There is no golden-bytes test for the persisted SchemaBinary format.
 
 Add fixed fixtures before claiming byte compatibility across Effect or schema
 changes. Keep dependency and vendored-source versions aligned, and follow the
-[journal compatibility guidance](journal.md#reading-and-replay). Current development
-schema changes still use fresh databases rather than upgrade migrations.
+[journal compatibility guidance](journal.md#reading-and-replay).

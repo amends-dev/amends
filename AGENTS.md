@@ -112,9 +112,7 @@ to verify APIs rather than guessing from prior versions or web snippets.
   `repos/effect/packages/effect/test`.
 - Usage examples: `repos/effect/ai-docs/src`.
 - Bun integration: `repos/effect/packages/platform/bun`.
-- Domain design: `docs/core-model.md` and `docs/effect-capability-map.md`.
-  The capability map records an earlier review; verify version-specific claims
-  against the installed release and vendored source.
+- Domain design: `docs/core-model.md`.
 
 ## Vendored repositories
 
