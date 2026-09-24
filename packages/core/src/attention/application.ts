@@ -2,42 +2,21 @@ import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { GroupAudience } from "../group/audience.ts";
-import { GroupId } from "../group/id.ts";
 import { GroupPermissions } from "../group/permissions.ts";
 import { Actor } from "../identity/actor.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadActivity } from "../thread/activity/activity.ts";
 import { ThreadActivityStore } from "../thread/activity/store.ts";
-import { ThreadId } from "../thread/id.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
 import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
 import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
 import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
 import { ThreadReading } from "./reading.ts";
+import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
+export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 
-/** Only people keep read state; agents' turns track their input progress. */
-export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
-  "ReadStateApplication.HumanRequired",
-  { memberId: MemberId.Id },
-) {}
-/** Missing, foreign, and inaccessible threads share this outcome. */
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "ReadStateApplication.ThreadNotFound",
-  { threadId: ThreadId.Id },
-) {}
-/** Missing groups and groups the actor does not belong to share this outcome. */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "ReadStateApplication.GroupNotFound",
-  { groupId: GroupId.Id },
-) {}
-/** The requested position is past the thread's latest recorded activity. */
-export class BeyondTimeline extends Schema.TaggedError<BeyondTimeline>()(
-  "ReadStateApplication.BeyondTimeline",
-  { threadId: ThreadId.Id, throughSequence: Schema.Int, latestSequence: Schema.Int },
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "ReadStateApplication.InvalidResponse",
   { message: Schema.String },

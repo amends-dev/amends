@@ -15,21 +15,9 @@ import { Assignment } from "./assignment.ts";
 import { AssignmentFacts } from "./facts.ts";
 import { AssignmentPermissions } from "./permissions.ts";
 import { AssignmentStore } from "./store.ts";
+import { Changed, InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
+export { Changed, InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
 
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "AssignmentApplication.MemberNotFound",
-  { memberId: Member.Id },
-) {}
-export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
-  "AssignmentApplication.InactiveMember",
-  { memberId: Member.Id },
-) {}
-export class NotFound extends Schema.TaggedError<NotFound>()("AssignmentApplication.NotFound", {
-  assignmentId: Assignment.Id,
-}) {}
-export class Changed extends Schema.TaggedError<Changed>()("AssignmentApplication.Changed", {
-  memberId: Member.Id,
-}) {}
 export type Error =
   | Delegation.Error
   | MemberStore.Failure

@@ -65,6 +65,7 @@ src/workspace/member/
 | `<feature>.ts`   | Domain schemas, value types, and pure domain functions.                              |
 | `id.ts`          | An ID-only dependency when references between models would otherwise create a cycle. |
 | `application.ts` | Authorized operations and transactional workflow coordination.                       |
+| `errors.ts`      | Outcomes a caller can act on, as schemas only; the application re-exports them.      |
 | `store.ts`       | The persistence contract implemented by adapters.                                    |
 | `facts.ts`       | Versioned declarations of recorded domain changes.                                   |
 | `projection.ts`  | Replay those facts into the store; export the projection as `definition`.            |

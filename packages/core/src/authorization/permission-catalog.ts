@@ -1,11 +1,9 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Permission } from "./permission.ts";
+import { Unknown } from "./permission-catalog-errors.ts";
+export { Unknown } from "./permission-catalog-errors.ts";
 
 export class Duplicate extends Schema.TaggedError<Duplicate>()("PermissionCatalog.Duplicate", {
-  name: Permission.Name,
-}) {}
-
-export class Unknown extends Schema.TaggedError<Unknown>()("PermissionCatalog.Unknown", {
   name: Permission.Name,
 }) {}
 

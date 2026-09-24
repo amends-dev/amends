@@ -20,24 +20,9 @@ import { WorkspaceStore } from "../store.ts";
 import { Workspace } from "../workspace.ts";
 import { Ownership } from "./ownership.ts";
 import { OwnershipPermissions } from "./permissions.ts";
+import { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./errors.ts";
+export { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./errors.ts";
 
-export class NotOwner extends Schema.TaggedError<NotOwner>()("OwnershipApplication.NotOwner", {
-  workspaceId: Workspace.Id,
-}) {}
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "OwnershipApplication.MemberNotFound",
-  { memberId: Member.Id },
-) {}
-export class InvalidRecipient extends Schema.TaggedError<InvalidRecipient>()(
-  "OwnershipApplication.InvalidRecipient",
-  {
-    memberId: Member.Id,
-    reason: Schema.Literals(["same-owner", "removed", "agent"]),
-  },
-) {}
-export class Changed extends Schema.TaggedError<Changed>()("OwnershipApplication.Changed", {
-  workspaceId: Workspace.Id,
-}) {}
 export class InvalidState extends Schema.TaggedError<InvalidState>()(
   "OwnershipApplication.InvalidState",
   { message: Schema.String },

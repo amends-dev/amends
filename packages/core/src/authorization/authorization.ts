@@ -9,26 +9,18 @@ import { GrantResolver } from "./grant-resolver.ts";
 import { PermissionCatalog } from "./permission-catalog.ts";
 import { Requirement } from "./requirement.ts";
 import { Scope } from "./scope.ts";
+import { Denied, InvalidActor } from "./errors.ts";
+export { Denied, InvalidActor } from "./errors.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
   "Authorization.WorkspaceMismatch",
   { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
 ) {}
 
-export class InvalidActor extends Schema.TaggedError<InvalidActor>()("Authorization.InvalidActor", {
-  memberId: Member.Id,
-  reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"]),
-}) {}
-
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "Authorization.InvalidResponse",
   { message: Schema.String },
 ) {}
-
-export class Denied extends Schema.TaggedError<Denied>()("Authorization.Denied", {
-  memberId: Member.Id,
-  requirement: Requirement.Value,
-}) {}
 
 export type Error =
   | MemberStore.Failure

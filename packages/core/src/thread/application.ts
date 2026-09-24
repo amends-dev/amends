@@ -35,27 +35,20 @@ import { ReadStateStore } from "../attention/store.ts";
 import type { Request } from "../request/request.ts";
 import { RequestReceipts } from "../request/receipts.ts";
 import { ThreadMessageReceipt } from "./message/receipt.ts";
-/** Missing, foreign, and outside-audience threads share this outcome. */
-export class NotFound extends Schema.TaggedError<NotFound>()("ThreadApplication.NotFound", {
-  threadId: Thread.Id,
-}) {}
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "ThreadApplication.GroupNotFound",
-  { groupId: Group.Id },
-) {}
-export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(
-  "ThreadApplication.ParticipantUnavailable",
-  { memberId: Member.Id },
-) {}
-export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>()(
-  "ThreadApplication.HumanAuthorRequired",
-  { memberId: Member.Id },
-) {}
-/** A direct group needs the author and at least one other member. */
-export class DirectMembersRequired extends Schema.TaggedError<DirectMembersRequired>()(
-  "ThreadApplication.DirectMembersRequired",
-  {},
-) {}
+import {
+  DirectMembersRequired,
+  GroupNotFound,
+  HumanAuthorRequired,
+  NotFound,
+  ParticipantUnavailable,
+} from "./errors.ts";
+export {
+  DirectMembersRequired,
+  GroupNotFound,
+  HumanAuthorRequired,
+  NotFound,
+  ParticipantUnavailable,
+} from "./errors.ts";
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "ThreadApplication.InvalidResponse",
   { message: Schema.String },

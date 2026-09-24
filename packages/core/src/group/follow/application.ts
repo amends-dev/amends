@@ -20,27 +20,9 @@ import { GroupMembershipStore } from "../membership/store.ts";
 import { GroupFollow } from "./follow.ts";
 import { GroupFollowFacts } from "./facts.ts";
 import { GroupFollowStore } from "./store.ts";
+import { AgentRequired, GroupNotFound, MemberUnavailable, NotFollowable } from "./errors.ts";
+export { AgentRequired, GroupNotFound, MemberUnavailable, NotFollowable } from "./errors.ts";
 
-/** Missing, foreign, and groups the actor does not belong to share this outcome. */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "GroupFollowApplication.GroupNotFound",
-  { groupId: Group.Id },
-) {}
-/** A direct group's members already take part in all of its threads. */
-export class NotFollowable extends Schema.TaggedError<NotFollowable>()(
-  "GroupFollowApplication.NotFollowable",
-  { groupId: Group.Id },
-) {}
-/** The named member is missing, inactive, or not a current member of the group. */
-export class MemberUnavailable extends Schema.TaggedError<MemberUnavailable>()(
-  "GroupFollowApplication.MemberUnavailable",
-  { memberId: Member.Id },
-) {}
-/** Only an agent can be made to follow by another member; people follow for themselves. */
-export class AgentRequired extends Schema.TaggedError<AgentRequired>()(
-  "GroupFollowApplication.AgentRequired",
-  { memberId: Member.Id },
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupFollowApplication.InvalidResponse",
   { message: Schema.String },

@@ -82,6 +82,13 @@ service inventory and examples; each protocol package documents its own surface.
 
 ## Package boundaries
 
+Shared packages declare `"sideEffects": false`: importing a module runs nothing beyond its
+declarations, so a bundler drops what a client does not use. Contracts reach core's records,
+inputs, and errors, never its operations, so a feature keeps the errors a protocol exposes in its
+`errors.ts`, which holds schemas only, and its application re-exports them. A browser bundle then
+carries core's schemas and errors without their implementation; the web app's bundle test fails
+when an implementation reaches it.
+
 `@amends/core` composes one workspace's core. Its root export holds the
 composition: `layer` builds the application operations over the journal,
 authorization, and permission catalog. `HostServices` describes the storage,

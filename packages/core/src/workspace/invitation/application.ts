@@ -21,29 +21,9 @@ import { InvitationStore } from "./store.ts";
 import { Member } from "../member/member.ts";
 import { MemberFacts } from "../member/facts.ts";
 import { MemberStore } from "../member/store.ts";
+import { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
+export { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
 
-export class NotFound extends Schema.TaggedError<NotFound>()("InvitationApplication.NotFound", {
-  invitationId: Invitation.Id,
-}) {}
-export class NotRecipient extends Schema.TaggedError<NotRecipient>()(
-  "InvitationApplication.NotRecipient",
-  { invitationId: Invitation.Id },
-) {}
-export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
-  "InvitationApplication.AlreadyMember",
-  { recipientId: Identity.HumanId },
-) {}
-export class Unavailable extends Schema.TaggedError<Unavailable>()(
-  "InvitationApplication.Unavailable",
-  {
-    invitationId: Invitation.Id,
-    reason: Schema.Literals(["expired", "revoked", "accepted"]),
-  },
-) {}
-export class InvalidExpiry extends Schema.TaggedError<InvalidExpiry>()(
-  "InvitationApplication.InvalidExpiry",
-  {},
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "InvitationApplication.InvalidResponse",
   { message: Schema.String },

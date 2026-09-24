@@ -8,12 +8,8 @@ import { NotificationSource } from "./source.ts";
 import type { Thread } from "../thread/thread.ts";
 import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
-
-/** Missing and other recipients' notifications deliberately share this outcome. */
-export class NotFound extends Schema.TaggedError<NotFound>()("NotificationApplication.NotFound", {
-  workspaceId: WorkspaceId.Id,
-  notificationId: Notification.Id,
-}) {}
+import { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
+export { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
   "NotificationApplication.WorkspaceMismatch",
@@ -23,19 +19,6 @@ export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "NotificationApplication.InvalidResponse",
   { message: Schema.String },
-) {}
-/** The caller owns the notification, but its supported source cannot currently be read. */
-export class SourceUnavailable extends Schema.TaggedError<SourceUnavailable>()(
-  "NotificationApplication.SourceUnavailable",
-  { notificationId: Notification.Id },
-) {}
-export class HumanRecipientRequired extends Schema.TaggedError<HumanRecipientRequired>()(
-  "NotificationApplication.HumanRecipientRequired",
-  {},
-) {}
-export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()(
-  "NotificationApplication.AlreadyHandled",
-  { notificationId: Notification.Id },
 ) {}
 
 export type Error =

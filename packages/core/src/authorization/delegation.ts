@@ -13,23 +13,9 @@ import { Requirement } from "./requirement.ts";
 import { BuiltinRoles } from "./role/builtin.ts";
 import { Role } from "./role/role.ts";
 import { RoleStore } from "./role/store.ts";
+import { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
+export { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
 
-export class Denied extends Schema.TaggedError<Denied>()("Delegation.Denied", {
-  reason: Schema.Literals(["administrator-role", "protected-member"]),
-}) {}
-export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(
-  "Delegation.OwnerProtected",
-  {
-    workspaceId: Workspace.Id,
-  },
-) {}
-export class UnsupportedRole extends Schema.TaggedError<UnsupportedRole>()(
-  "Delegation.UnsupportedRole",
-  { roleId: Role.Id },
-) {}
-export class RoleNotFound extends Schema.TaggedError<RoleNotFound>()("Delegation.RoleNotFound", {
-  roleId: Role.Id,
-}) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "Delegation.InvalidResponse",
   { message: Schema.String },

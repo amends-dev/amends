@@ -8,12 +8,9 @@ import { Thread } from "../thread/thread.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { Signal } from "./signal.ts";
 import { Signals } from "./signals.ts";
+import { ThreadNotFound } from "./errors.ts";
+export { ThreadNotFound } from "./errors.ts";
 
-/** Missing and inaccessible threads share this outcome. */
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "SignalApplication.ThreadNotFound",
-  { threadId: Thread.Id },
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "SignalApplication.InvalidResponse",
   { message: Schema.String },

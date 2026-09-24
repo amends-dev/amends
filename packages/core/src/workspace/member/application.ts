@@ -21,11 +21,8 @@ import { MemberStore } from "./store.ts";
 import { Member } from "./member.ts";
 import { WorkspaceStore } from "../store.ts";
 import { Workspace } from "../workspace.ts";
-
-export class NotFound extends Schema.TaggedError<NotFound>()("MemberApplication.NotFound", {
-  workspaceId: Workspace.Id,
-  memberId: Member.Id,
-}) {}
+import { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
+export { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
   "MemberApplication.WorkspaceMismatch",
@@ -35,16 +32,6 @@ export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "MemberApplication.InvalidResponse",
   { message: Schema.String },
-) {}
-
-export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(
-  "MemberApplication.OwnerProtected",
-  { workspaceId: Workspace.Id, memberId: Member.Id },
-) {}
-
-export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
-  "MemberApplication.AlreadyRemoved",
-  { workspaceId: Workspace.Id, memberId: Member.Id },
 ) {}
 
 export type Error =

@@ -13,20 +13,9 @@ import { ThreadParticipationStore } from "./store.ts";
 import { ThreadParticipationAdmission } from "./admission.ts";
 import { ThreadParticipationDeparture } from "./departure.ts";
 import { ThreadParticipationPermissions } from "./permissions.ts";
+import { AlreadyEnded, NotFound, ThreadNotFound } from "./errors.ts";
+export { AlreadyEnded, NotFound, ThreadNotFound } from "./errors.ts";
 
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "ThreadParticipationApplication.ThreadNotFound",
-  { threadId: Thread.Id },
-) {}
-/** Missing, other-thread, and other-member participations share this outcome. */
-export class NotFound extends Schema.TaggedError<NotFound>()(
-  "ThreadParticipationApplication.NotFound",
-  ThreadParticipation.UnfollowInput.fields,
-) {}
-export class AlreadyEnded extends Schema.TaggedError<AlreadyEnded>()(
-  "ThreadParticipationApplication.AlreadyEnded",
-  ThreadParticipation.UnfollowInput.fields,
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "ThreadParticipationApplication.InvalidResponse",
   { message: Schema.String },

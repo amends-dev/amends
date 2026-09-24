@@ -26,7 +26,8 @@ bun run check
 The root configuration discovers only application tests. The `backend` project
 covers shared packages and the memory adapter. The `postgresql` project covers the
 PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
-headless state; web and desktop test their own route/UI integration; verify both frontend builds and desktop
+headless state; web and desktop test their own route/UI integration, and web's bundle test builds the app and fails when
+core's implementation reaches the browser bundle; verify both frontend builds and desktop
 startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
 
 The [icons package](../apps/icons/README.md) tests geometry validation, composition,

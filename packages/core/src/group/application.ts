@@ -25,24 +25,9 @@ import { GroupFollow } from "./follow/follow.ts";
 import { GroupFollowStore } from "./follow/store.ts";
 import { ReadStateStore } from "../attention/store.ts";
 import { NotificationStore } from "../notification/store.ts";
+import { InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
+export { InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
 
-/** Missing groups and groups outside the caller's audience share this outcome. */
-export class NotFound extends Schema.TaggedError<NotFound>()("GroupApplication.NotFound", {
-  groupId: Group.Id,
-}) {}
-
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "GroupApplication.MemberNotFound",
-  {
-    memberId: Member.Id,
-  },
-) {}
-export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
-  "GroupApplication.InactiveMember",
-  {
-    memberId: Member.Id,
-  },
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupApplication.InvalidResponse",
   {

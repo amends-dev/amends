@@ -3,10 +3,8 @@ import { Authorization } from "../../authorization/authorization.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { AgentPermissions } from "../../agent/permissions.ts";
 import { Actor } from "../../identity/actor.ts";
-import { Member } from "../../workspace/member/member.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
-import { ThreadId } from "../id.ts";
 import { ThreadAccess } from "../access.ts";
 import { ThreadParticipationAdmission } from "../participation/admission.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
@@ -19,22 +17,9 @@ import { RequestReceipts } from "../../request/receipts.ts";
 import { ThreadActivityStore } from "../activity/store.ts";
 import { ThreadMessageReceipt } from "./receipt.ts";
 import { ThreadMessageStore } from "./store.ts";
+import { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
+export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
 
-export class NotFound extends Schema.TaggedError<NotFound>()("ThreadMessageApplication.NotFound", {
-  threadId: ThreadId.Id,
-}) {}
-export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(
-  "ThreadMessageApplication.ParticipantUnavailable",
-  {
-    memberId: Member.Id,
-  },
-) {}
-export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>()(
-  "ThreadMessageApplication.HumanAuthorRequired",
-  {
-    memberId: Member.Id,
-  },
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "ThreadMessageApplication.InvalidResponse",
   {

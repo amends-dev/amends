@@ -20,36 +20,25 @@ import { GroupMembershipFacts } from "./facts.ts";
 import { GroupMembershipDeparture } from "./departure.ts";
 import { GroupMembershipPermissions } from "./permissions.ts";
 import { GroupMembershipStore } from "./store.ts";
+import {
+  AlreadyMember,
+  AlreadyRemoved,
+  FixedMembership,
+  GroupNotFound,
+  InactiveMember,
+  MemberNotFound,
+  NotFound,
+} from "./errors.ts";
+export {
+  AlreadyMember,
+  AlreadyRemoved,
+  FixedMembership,
+  GroupNotFound,
+  InactiveMember,
+  MemberNotFound,
+  NotFound,
+} from "./errors.ts";
 
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "GroupMembershipApplication.GroupNotFound",
-  { groupId: Group.Id },
-) {}
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "GroupMembershipApplication.MemberNotFound",
-  { memberId: Member.Id },
-) {}
-export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
-  "GroupMembershipApplication.InactiveMember",
-  { memberId: Member.Id },
-) {}
-export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
-  "GroupMembershipApplication.AlreadyMember",
-  { groupId: Group.Id, memberId: Member.Id },
-) {}
-export class NotFound extends Schema.TaggedError<NotFound>()(
-  "GroupMembershipApplication.NotFound",
-  GroupMembership.RemoveInput.fields,
-) {}
-export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
-  "GroupMembershipApplication.AlreadyRemoved",
-  GroupMembership.RemoveInput.fields,
-) {}
-/** A direct group's members never change; including someone else needs another direct group. */
-export class FixedMembership extends Schema.TaggedError<FixedMembership>()(
-  "GroupMembershipApplication.FixedMembership",
-  { groupId: Group.Id },
-) {}
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupMembershipApplication.InvalidResponse",
   { message: Schema.String },
