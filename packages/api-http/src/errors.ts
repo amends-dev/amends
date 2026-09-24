@@ -11,6 +11,7 @@ import {
 } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
 import { NotificationApplication } from "@amends/core/notification";
+import { Request } from "@amends/core/request";
 import { SignalApplication } from "@amends/core/signal";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
@@ -28,6 +29,15 @@ export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
  */
 export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403));
 export const WorkspaceNotFound = GatewayErrors.WorkspaceNotFound.pipe(HttpApiSchema.status(404));
+/** The request key was already used for a different request. */
+export const RequestReused = Request.Reused.pipe(HttpApiSchema.status(422));
+/**
+ * The request key a creating endpoint accepts: send a new one for each logical request and the
+ * same one on every retry of it, and the retry returns the first attempt's result.
+ */
+export const requestKey = {
+  "idempotency-key": Schema.optionalKey(Request.Key),
+};
 export const Conflict = GatewayErrors.Conflict.pipe(HttpApiSchema.status(409));
 export const Uncertain = GatewayErrors.Uncertain.pipe(HttpApiSchema.status(500));
 export const InvalidInput = GatewayErrors.InvalidInput.pipe(HttpApiSchema.status(400));

@@ -26,6 +26,7 @@ The current domains contain these features:
 | `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.                     |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -174,6 +175,14 @@ Starts and replies read only the admissions and participations of those they nam
 mentions pages the thread's active participants, the people it notifies. The stores'
 whole-history `listByGroup` and `listByThread` remain for inspection, and no operation uses them.
 See [thread workflows](../../docs/thread-workflows.md).
+
+## Request keys
+
+`@amends/core/request` holds `Request.Key`, the `Request.Options` creating operations accept, and
+`Request.Reused`. Starts, replies, group creation, and invitation issuance pass their decoded input
+through the internal `RequestReceipts.once`, which records a `request.completed` receipt (the input's
+digest and the created records' IDs) in the operation's commit, and on a retry reads those records
+back instead of running again. See [retrying safely](../../docs/thread-workflows.md#retrying-safely).
 
 ## Permission declarations and built-in roles
 

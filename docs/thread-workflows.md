@@ -92,9 +92,8 @@ const reply = (threadId: Thread.Id) =>
   });
 ```
 
-The result contains `message` and `activity`. Text and mentions are validated as for starts. Every
-call publishes a new message; there is no request-level idempotency, so reconcile an uncertain
-commit before retrying.
+The result contains `message` and `activity`. Text and mentions are validated as for starts.
+Without a request key, every call publishes a new message; see [retrying safely](#retrying-safely).
 
 The caller must be a human with active workspace membership, current membership in the thread's
 group, and `thread.publish` on the thread. Replying needs no `thread.read`, `thread.start`,
@@ -119,6 +118,16 @@ Missing, foreign, and outside-audience threads share `ThreadMessageApplication.N
 Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`, and agent callers get
 `ThreadMessageApplication.HumanAuthorRequired`. Admission, the message, its timeline activity, and
 its notifications commit together; the timeline never has gaps or duplicate positions.
+
+## Retrying safely
+
+Starts (`startInGroup` and `startDirect`) and replies take an optional second argument,
+`{ requestKey }`. A client chooses a new key, such as a UUID, for each message it sends and repeats
+it on every retry. A retry returns the thread or message the first attempt created and records
+nothing more, including when the first attempt committed but its answer was lost. The same key with
+a different input returns `Request.Reused`, and a retry after an attempt that rolled back runs
+again. Keys belong to their member and their operation, so another member's key, or the same key
+on a reply rather than a start, is a separate request. Without a key, every call creates anew.
 
 ## Following and unfollowing
 
@@ -278,9 +287,8 @@ activity at sequence 1, in one commit; each later message, follow, and departure
 the next sequence. Notifications come from the recipients recorded with each activity, with IDs
 derived from the activity and participation, never recomputed from today's group or grants. Replay
 therefore reproduces the same timeline, recipients, and departures after permissions and
-membership change. Recording the same fact again reuses the original, but calling `startInGroup`
-again creates another thread: there is no request-level idempotency, so reconcile an uncertain
-commit before retrying.
+membership change. Recording the same fact again reuses the original, and a keyed start or reply
+returns its first result on a retry ([retrying safely](#retrying-safely)).
 
 Thread, participation, message, and activity facts reach the group's members with `thread.read`
 for that thread over the [change feed](../packages/core/README.md#change-feed). Messages carry their

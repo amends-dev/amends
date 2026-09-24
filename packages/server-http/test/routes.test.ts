@@ -1,3 +1,4 @@
+import { Request } from "@amends/core/request";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { expect, it } from "@effect/vitest";
 import { Api, Authentication } from "@amends/api-http";
@@ -297,6 +298,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
         }),
         client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
         client.workspaces.create({
+          headers: {},
           payload: { name: "Test workspace" },
           responseMode: "response-only",
         }),
@@ -320,12 +322,18 @@ it.effect("missing or rejected credentials are unauthorized before any gateway c
 it.effect("workspace creation and acceptance require a human principal", () =>
   Effect.gen(function* () {
     calls.length = 0;
+    // The Idempotency-Key header reaches the operation as its request key.
     const created = yield* run("alice", (client) =>
-      client.workspaces.create({ payload: { name: "Test workspace" } }),
+      client.workspaces.create({
+        headers: { "idempotency-key": Request.Key.make("create-1") },
+        payload: { name: "Test workspace" },
+      }),
     );
     expect(created).toEqual(workspace);
     const refused = yield* run("agent", (client) =>
-      client.workspaces.create({ payload: { name: "Test workspace" } }).pipe(Effect.flip),
+      client.workspaces
+        .create({ headers: {}, payload: { name: "Test workspace" } })
+        .pipe(Effect.flip),
     );
     expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
     const accepted = yield* run("alice", (client) =>
@@ -335,7 +343,10 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     );
     expect(accepted).toEqual(member);
     expect(calls).toEqual([
-      { operation: "createWorkspace", arguments: [alice.id, { name: "Test workspace" }] },
+      {
+        operation: "createWorkspace",
+        arguments: [alice.id, { name: "Test workspace" }, { requestKey: "create-1" }],
+      },
       { operation: "inWorkspace", arguments: [workspaceId] },
       { operation: "accept", arguments: ["invitation-one", alice.id] },
     ]);
@@ -348,6 +359,7 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
     const expiresAt = DateTime.makeUnsafe("2026-02-01T00:00:00Z");
     const issued = yield* run("alice", (client) =>
       client.invitations.issue({
+        headers: { "idempotency-key": Request.Key.make("issue-1") },
         params: { workspaceId },
         payload: {
           recipientId: Identity.HumanId.make("bob"),
@@ -368,6 +380,7 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
           recipientId: "bob",
           roleId: BuiltinRoles.ViewerId,
         },
+        { requestKey: "issue-1" },
       ],
     });
   }),

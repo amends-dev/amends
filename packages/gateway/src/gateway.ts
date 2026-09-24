@@ -7,8 +7,10 @@ import {
   MemberStore,
   Workspace,
   WorkspaceInitialization,
+  WorkspaceStore,
 } from "@amends/core/workspace";
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
+import { Request } from "@amends/core/request";
+import { Context, Crypto, Effect, Encoding, Layer, Option, Result, Schema } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import type { SignalHub } from "./signals.ts";
@@ -29,9 +31,10 @@ export interface Interface {
   readonly createWorkspace: (
     creator: Identity.HumanId,
     input: Workspace.CreateInput,
+    options?: Request.Options,
   ) => Effect.Effect<
     Workspace.Record,
-    GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
+    GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput | Request.Reused
   >;
   /**
    * Run core operations in a workspace without an actor: invitation acceptance,
@@ -63,6 +66,9 @@ const isPublic = Schema.is(GatewayErrors.PublicError);
 const isConflict = Schema.is(Store.Conflict);
 const isUncertain = Schema.is(Store.CommitUncertain);
 const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
+
+/** A string's UTF-8 bytes; hex encoding reads strings as UTF-8, and valid hex always decodes. */
+const utf8 = (text: string) => Result.getOrThrow(Encoding.decodeHex(Encoding.encodeHex(text)));
 
 /**
  * Apply the public error policy once. Schema failures and workspace mismatches
@@ -181,11 +187,77 @@ export const make = Effect.fn("Gateway.make")(function* (
     return yield* expose(workspaceId, Effect.provideService(program, Actor.Service, actor));
   });
 
+  /**
+   * A keyed creation's workspace ID, derived from its creator and key: a retry names the same
+   * workspace, and nobody without the key can predict it. Formatted as a UUID (version 8).
+   */
+  const keyedId = Effect.fnUntraced(function* (creator: Identity.HumanId, key: Request.Key) {
+    const digest = yield* Effect.orDie(
+      cryptography.digest("SHA-256", utf8(JSON.stringify(["workspace.create", creator, key]))),
+    );
+    const bytes = digest.slice(0, 16);
+    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
+    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+    const hex = Encoding.encodeHex(bytes);
+    return Workspace.Id.make(
+      [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join(
+        "-",
+      ),
+    );
+  });
+  /** A retry returns the workspace its first attempt created, when it asked for the same one. */
+  const reuse = (
+    record: Workspace.Record,
+    creator: Identity.HumanId,
+    input: Workspace.CreateInput,
+    key: Request.Key,
+  ) =>
+    record.createdBy === creator && record.name === input.name
+      ? Effect.succeed(record)
+      : Effect.fail(new Request.Reused({ operation: "workspace.create", key }));
+
   const createWorkspace: Interface["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(
-    function* (creator: Identity.HumanId, input: Workspace.CreateInput) {
-      const id = Workspace.Id.make(yield* Effect.orDie(cryptography.randomUUIDv4));
+    function* (
+      creator: Identity.HumanId,
+      input: Workspace.CreateInput,
+      options: Request.Options = {},
+    ) {
+      const key = options.requestKey;
+      if (key === undefined) {
+        const id = Workspace.Id.make(yield* Effect.orDie(cryptography.randomUUIDv4));
+        return yield* Effect.scoped(
+          bind(id, expose(id, WorkspaceInitialization.initialize(creator, input))),
+        );
+      }
+      const id = yield* keyedId(creator, key);
+      // A completed first attempt answers its retry without preparing the workspace.
+      const recorded = yield* storage.forWorkspace(id).pipe(
+        Effect.flatMap((bindings) => Context.get(bindings, WorkspaceStore.Service).get),
+        Effect.orDie,
+        Effect.setContext(environment),
+      );
+      if (Option.isSome(recorded)) return yield* reuse(recorded.value, creator, input, key);
       return yield* Effect.scoped(
-        bind(id, expose(id, WorkspaceInitialization.initialize(creator, input))),
+        bind(
+          id,
+          expose(
+            id,
+            WorkspaceInitialization.initialize(creator, input).pipe(
+              // A concurrent attempt with the same key initialized it first.
+              Effect.catchTag("WorkspaceInitialization.AlreadyInitialized", () =>
+                Effect.flatMap(WorkspaceStore.Service, (store) => store.get).pipe(
+                  Effect.orDie,
+                  Effect.flatMap(
+                    Option.match({
+                      onNone: () => Effect.die("An initialized workspace has no record"),
+                      onSome: (record) => reuse(record, creator, input, key),
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       );
     },
   );

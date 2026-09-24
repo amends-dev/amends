@@ -17,8 +17,6 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Notifications to agents stay pending: no turns, execution, silent completion, or channel
   delivery run, and contacts and triage have no inbox outside the store. Turn and task activity
   kinds remain design intent.
-- Requests have no idempotency beyond recorded facts: repeating a start, reply, or group creation
-  after an uncertain commit creates another one, so callers reconcile first.
 
 ## HTTP coverage
 
@@ -194,7 +192,8 @@ The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/binding.
 database error could establish that nothing committed. This over-reports uncertainty.
 The gateway exposes `Gateway.Uncertain` with the commit ID; there is no public
 HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction programs.
-Keyed journal appends support reuse, but do not make entire HTTP operations idempotent.
+Creating operations accept a request key, so their retries return the first result; other
+operations settle a repeat by their own rules, such as `AlreadyRemoved`, rather than repeating it.
 
 PostgreSQL's [error mapping](../adapters/storage-postgresql/src/errors.ts) recognizes
 `LockTimeoutError` and `SerializationError` as contention, but omits `DeadlockError`.

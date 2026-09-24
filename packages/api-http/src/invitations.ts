@@ -23,11 +23,12 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
     }),
     HttpApiEndpoint.post("issue", "/", {
       params: { workspaceId: Workspace.Id },
+      headers: ApiErrors.requestKey,
       payload: Invitation.IssueInput,
       success: Invitation.Record.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "IssuedWorkspaceInvitation",
       }),
-      error: [...ApiErrors.member, ...invitation],
+      error: [...ApiErrors.member, ...invitation, ApiErrors.RequestReused],
     }),
     HttpApiEndpoint.post("accept", "/:invitationId/accept", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },

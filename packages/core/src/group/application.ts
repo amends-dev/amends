@@ -1,4 +1,6 @@
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import type { Request } from "../request/request.ts";
+import { RequestReceipts } from "../request/receipts.ts";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
@@ -58,6 +60,8 @@ export type Error =
   | MemberNotFound
   | InactiveMember
   | InvalidResponse;
+/** Creating can also meet a request key used before for a different group. */
+export type CreateError = Error | RequestReceipts.Error | GroupStore.Failure | NotFound;
 
 export type ReadError =
   | Authorization.Error
@@ -80,7 +84,8 @@ export interface Interface {
    */
   readonly createPrivateTeam: (
     input: Group.CreatePrivateTeamInput,
-  ) => Effect.Effect<Group.Record, Error, Actor.Service>;
+    options?: Request.Options,
+  ) => Effect.Effect<Group.Record, CreateError, Actor.Service>;
   /** Require group.read and current audience membership; no transaction or publication. */
   readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Service>;
   /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
@@ -98,6 +103,10 @@ export interface Interface {
   ) => Effect.Effect<Group.Record, ReadError, Actor.Service>;
 }
 
+/** What a keyed group creation created, so that a retry returns it. */
+const CreatedReference = Schema.Struct({ groupId: Group.Id });
+type CreatedReference = typeof CreatedReference.Type;
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/application/Service",
 ) {}
@@ -113,6 +122,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   const readStates = yield* ReadStateStore.Service;
   const notifications = yield* NotificationStore.Service;
   const journal = yield* Journal.Service;
+  const receipts = yield* RequestReceipts.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   if (
@@ -124,6 +134,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       follows.workspaceId,
       readStates.workspaceId,
       notifications.workspaceId,
+      receipts.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({ message: "Group services belong to different workspaces" });
@@ -133,53 +144,70 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   );
 
   const createPrivateTeam = Effect.fn("GroupApplication.createPrivateTeam")(
-    function* (input: Group.CreatePrivateTeamInput) {
-      yield* authorization.require([create]);
+    function* (input: Group.CreatePrivateTeamInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreatePrivateTeamInput))(
         input,
       );
-      const requested = new Set(request.memberIds);
-      const found = new Map<Member.Id, Member.Record>();
-      for (const row of yield* members.getMany(request.memberIds)) {
-        const member = yield* Schema.decodeEffect(Member.Record)(row);
-        if (member.workspaceId !== workspaceId || !requested.has(member.id) || found.has(member.id))
-          return yield* new InvalidResponse({
-            message: "Member store returned another member or workspace",
-          });
-        found.set(member.id, member);
-      }
-      for (const memberId of request.memberIds) {
-        const member = found.get(memberId);
-        if (member === undefined) return yield* new MemberNotFound({ memberId });
-        if (member.status !== "active") return yield* new InactiveMember({ memberId });
-      }
-      const actor = yield* Actor.Service;
-      const createdAt = yield* DateTime.now;
-      const group: Group.Record = {
-        id: Group.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        kind: "Team",
-        visibility: "Private",
-        name: request.name,
-        createdBy: actor.memberId,
-        createdAt,
-      };
-      const created = yield* journal
-        .publish(GroupFacts.Created, group)
-        .pipe(Publication.withOccurredAt(createdAt));
-      for (const memberId of request.memberIds) {
-        yield* journal
-          .publish(GroupMembershipFacts.Added, {
-            id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
+      return yield* receipts.once(
+        {
+          operation: "group.create",
+          key: options.requestKey,
+          input: Group.CreatePrivateTeamInput,
+          value: request,
+          result: CreatedReference,
+          resultOf: (group: Group.Record) => ({ groupId: group.id }),
+          restore: (reference: CreatedReference) => load(reference.groupId),
+        },
+        Effect.gen(function* () {
+          yield* authorization.require([create]);
+          const requested = new Set(request.memberIds);
+          const found = new Map<Member.Id, Member.Record>();
+          for (const row of yield* members.getMany(request.memberIds)) {
+            const member = yield* Schema.decodeEffect(Member.Record)(row);
+            if (
+              member.workspaceId !== workspaceId ||
+              !requested.has(member.id) ||
+              found.has(member.id)
+            )
+              return yield* new InvalidResponse({
+                message: "Member store returned another member or workspace",
+              });
+            found.set(member.id, member);
+          }
+          for (const memberId of request.memberIds) {
+            const member = found.get(memberId);
+            if (member === undefined) return yield* new MemberNotFound({ memberId });
+            if (member.status !== "active") return yield* new InactiveMember({ memberId });
+          }
+          const actor = yield* Actor.Service;
+          const createdAt = yield* DateTime.now;
+          const group: Group.Record = {
+            id: Group.Id.make(yield* crypto.randomUUIDv4),
             workspaceId,
-            groupId: group.id,
-            memberId,
-            admittedAt: createdAt,
-            status: "active",
-          })
-          .pipe(Publication.withCause(created, createdAt));
-      }
-      return group;
+            kind: "Team",
+            visibility: "Private",
+            name: request.name,
+            createdBy: actor.memberId,
+            createdAt,
+          };
+          const created = yield* journal
+            .publish(GroupFacts.Created, group)
+            .pipe(Publication.withOccurredAt(createdAt));
+          for (const memberId of request.memberIds) {
+            yield* journal
+              .publish(GroupMembershipFacts.Added, {
+                id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
+                workspaceId,
+                groupId: group.id,
+                memberId,
+                admittedAt: createdAt,
+                status: "active",
+              })
+              .pipe(Publication.withCause(created, createdAt));
+          }
+          return group;
+        }),
+      );
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

@@ -66,13 +66,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const alice = yield* client("alice");
           const bob = yield* client("bob");
-          const workspace = yield* alice.workspaces.create({ payload: { name: "First" } });
-          const other = yield* alice.workspaces.create({ payload: { name: "Other" } });
+          const workspace = yield* alice.workspaces.create({
+            headers: {},
+            payload: { name: "First" },
+          });
+          const other = yield* alice.workspaces.create({ headers: {}, payload: { name: "Other" } });
           const first = yield* listen(alice, workspace.id);
           const second = yield* listen(alice, workspace.id);
           const foreign = yield* listen(alice, other.id);
           const issue = (workspaceId: Workspace.Id, recipientId = "bob") =>
             alice.invitations.issue({
+              headers: {},
               params: { workspaceId },
               payload: {
                 recipientId: Identity.HumanId.make(recipientId),
@@ -164,8 +168,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
       Effect.gen(function* () {
         const alice = yield* client("alice");
         const bob = yield* client("bob");
-        const workspace = yield* alice.workspaces.create({ payload: { name: "Typing" } });
+        const workspace = yield* alice.workspaces.create({
+          headers: {},
+          payload: { name: "Typing" },
+        });
         const invitation = yield* alice.invitations.issue({
+          headers: {},
           params: { workspaceId: workspace.id },
           payload: {
             recipientId: Identity.HumanId.make("bob"),
@@ -218,7 +226,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
       withDatabase((url) =>
         Effect.gen(function* () {
           const alice = yield* client("alice");
-          const workspace = yield* alice.workspaces.create({ payload: { name: "First" } });
+          const workspace = yield* alice.workspaces.create({
+            headers: {},
+            payload: { name: "First" },
+          });
           const http = yield* HttpClient.HttpClient;
           const path = `/workspaces/${workspace.id}/changes`;
           expect((yield* http.get(path)).status).toBe(401);

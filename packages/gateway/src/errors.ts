@@ -25,6 +25,7 @@ import {
 } from "@amends/core/workspace";
 import { ReadStateApplication } from "@amends/core/attention";
 import { SignalApplication } from "@amends/core/signal";
+import { Request } from "@amends/core/request";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -64,6 +65,7 @@ export const PublicError = Schema.Union([
   ChangeFeed.Unavailable,
   NotMember,
   WorkspaceNotFound,
+  Request.Reused,
   Conflict,
   Uncertain,
   InvalidInput,

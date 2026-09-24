@@ -5,7 +5,7 @@ import { Identity } from "@amends/core/identity";
 import { Member } from "@amends/core/workspace";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
+import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { LocalHost } from "../src/host.ts";
 import { LocalServer } from "../src/server.ts";
@@ -39,6 +39,37 @@ const server = (url: string) => {
 };
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
+  it.live("an Idempotency-Key makes a retried creation return the first result", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const http = yield* HttpClient.HttpClient;
+        const post = (path: string, body: unknown, key: string) =>
+          http.post(path, {
+            headers: { authorization: "Bearer alice", "idempotency-key": key },
+            body: HttpBody.jsonUnsafe(body),
+          });
+        const created = yield* post("/workspaces", { name: "Studio" }, "create-1");
+        expect(created.status).toBe(201);
+        const workspace = (yield* created.json) as { readonly id: string };
+        const retried = yield* post("/workspaces", { name: "Studio" }, "create-1");
+        expect(yield* retried.json).toEqual(workspace);
+        const reused = yield* post("/workspaces", { name: "Other" }, "create-1");
+        expect(reused.status).toBe(422);
+        expect(yield* reused.json).toMatchObject({ _tag: "Request.Reused" });
+        const invitation = {
+          recipientId: "bob",
+          roleId: BuiltinRoles.ViewerId,
+          expiresAt: "2036-09-20T12:00:00.000Z",
+        };
+        const path = `/workspaces/${workspace.id}/invitations`;
+        const issued = yield* (yield* post(path, invitation, "issue-1")).json;
+        expect(yield* (yield* post(path, invitation, "issue-1")).json).toEqual(issued);
+        const other = yield* (yield* post(path, invitation, "issue-2")).json;
+        expect(other).not.toEqual(issued);
+      }).pipe(Effect.scoped, Effect.provide(server(url).layer)),
+    ),
+  );
+
   it.live(
     "the HTTP server carries the membership workflow over PostgreSQL with bearer identities",
     () =>
@@ -51,12 +82,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const asAlice = yield* client(alice);
             const asBob = yield* client(bob);
             const workspace = yield* asAlice.workspaces.create({
+              headers: {},
               payload: { name: "Test workspace" },
             });
             const params = { workspaceId: workspace.id, memberId: workspace.ownerMemberId };
             const owner = yield* asAlice.members.get({ params });
             const outsider = yield* Effect.flip(asBob.members.get({ params }));
             const invitation = yield* asAlice.invitations.issue({
+              headers: {},
               params: { workspaceId: workspace.id },
               payload: {
                 recipientId: bob,
@@ -75,6 +108,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const readByBob = yield* asBob.members.get({ params });
             const cannotInvite = yield* Effect.flip(
               asBob.invitations.issue({
+                headers: {},
                 params: { workspaceId: workspace.id },
                 payload: {
                   recipientId: Identity.HumanId.make("charlie"),
@@ -175,11 +209,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             const before = yield* client.me.workspaces();
             const workspace = yield* client.workspaces.create({
+              headers: {},
               payload: { name: "Test workspace" },
             });
             const inviter = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(alice)));
-            const other = yield* inviter.workspaces.create({ payload: { name: "Test workspace" } });
+            const other = yield* inviter.workspaces.create({
+              headers: {},
+              payload: { name: "Test workspace" },
+            });
             const invitation = yield* inviter.invitations.issue({
+              headers: {},
               params: { workspaceId: other.id },
               payload: {
                 recipientId: session.humanId,

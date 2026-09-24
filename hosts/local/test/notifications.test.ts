@@ -79,8 +79,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const bobClient = yield* client("bob");
         const agentClient = yield* client("agent");
         const outsiderClient = yield* client("outsider");
-        const workspace = yield* humanClient.workspaces.create({ payload: { name: "Inbox" } });
+        const workspace = yield* humanClient.workspaces.create({
+          headers: {},
+          payload: { name: "Inbox" },
+        });
         const otherWorkspace = yield* humanClient.workspaces.create({
+          headers: {},
           payload: { name: "Other inbox" },
         });
         const params = { workspaceId: workspace.id };
@@ -221,7 +225,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
     withDatabase((url) =>
       Effect.gen(function* () {
         const humanClient = yield* client("human");
-        const workspace = yield* humanClient.workspaces.create({ payload: { name: "Inbox" } });
+        const workspace = yield* humanClient.workspaces.create({
+          headers: {},
+          payload: { name: "Inbox" },
+        });
         const http = yield* HttpClient.HttpClient;
         const base = `/workspaces/${workspace.id}/notifications`;
         for (const query of [

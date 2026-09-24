@@ -90,6 +90,7 @@ signals, and cryptography a host must supply, derived from that layer.
 workspace journal's log, whose history shows whether a workspace was ever created. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/signal`, `@amends/core/attention`,
+`@amends/core/request`,
 `@amends/core/group`, `@amends/core/thread`, and
 `@amends/core/agent`, and `@amends/core/workspace`, each exposing the records, facts, stores, projections,
 and operations it implements. The thread surface implements private-group starts with initial

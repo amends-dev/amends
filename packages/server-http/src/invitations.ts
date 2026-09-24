@@ -23,13 +23,13 @@ export const layer = HttpApiBuilder.group(
             Effect.flatMap(InvitationApplication.Service, (invitations) => invitations.list),
           ),
         ),
-      issue: ({ params, payload }) =>
+      issue: ({ params, headers, payload }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
             Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.issue(payload),
+              invitations.issue(payload, { requestKey: headers["idempotency-key"] }),
             ),
           ),
         ),

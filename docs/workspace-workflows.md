@@ -17,6 +17,11 @@ curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json
   -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
 ```
 
+Creation and invitation issuance accept an `Idempotency-Key` header. Send a new key, such as a
+UUID, for each workspace or invitation and the same one on every retry: the retry returns what the
+first attempt created, even if its answer was lost, and the same key with a different body returns
+422 `Request.Reused`. A retried workspace creation keeps its ID, derived from the creator and key.
+
 `GET /me/workspaces` lists the caller's memberships, including ended ones, with each
 workspace's active member count, and the caller's pending invitations. This is host routing
 across workspaces, not a core operation.

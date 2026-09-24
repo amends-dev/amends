@@ -7,6 +7,7 @@ import { ApiErrors } from "./errors.ts";
 export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
   .add(
     HttpApiEndpoint.post("create", "/", {
+      headers: ApiErrors.requestKey,
       payload: Workspace.CreateInput,
       success: Workspace.Record.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedWorkspace",
@@ -16,6 +17,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
         ApiErrors.Conflict,
         ApiErrors.Uncertain,
         ApiErrors.InvalidInput,
+        ApiErrors.RequestReused,
       ],
     }),
     HttpApiEndpoint.get("ownership", "/:workspaceId/ownership", {

@@ -1,3 +1,5 @@
+import type { Request } from "../../request/request.ts";
+import { RequestReceipts } from "../../request/receipts.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Assignment } from "../../authorization/assignment/assignment.ts";
@@ -61,11 +63,14 @@ export type Error =
   | Unavailable
   | InvalidExpiry
   | InvalidResponse;
+/** Issuing can also meet a request key used before for a different invitation. */
+export type IssueError = Error | RequestReceipts.Error;
 
 export interface Interface {
   readonly issue: (
     request: Invitation.IssueInput,
-  ) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
+    options?: Request.Options,
+  ) => Effect.Effect<Invitation.Record, IssueError, Actor.Service>;
   /** Trusted ingress supplies the authenticated recipient; no membership is required yet. */
   readonly accept: (
     id: Invitation.Id,
@@ -75,6 +80,10 @@ export interface Interface {
   /** Every invitation in the workspace in issue order; requires invitation.manage. */
   readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Error, Actor.Service>;
 }
+/** What a keyed issuance created, so that a retry returns it. */
+const IssuedReference = Schema.Struct({ invitationId: Invitation.Id });
+type IssuedReference = typeof IssuedReference.Type;
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/workspace/invitation-application/Service",
 ) {}
@@ -92,6 +101,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   | Authorization.Service
   | Delegation.Service
   | Journal.Service
+  | RequestReceipts.Service
   | Crypto.Crypto
 > {
   const invitations = yield* InvitationStore.Service;
@@ -99,6 +109,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
+  const receipts = yield* RequestReceipts.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = invitations.workspaceId;
   if (
@@ -145,26 +156,40 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   });
 
   const issue = Effect.fn("InvitationApplication.issue")(
-    function* (input: Invitation.IssueInput) {
-      yield* authorization.require([manage]);
+    function* (input: Invitation.IssueInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input);
-      const actor = yield* authorizeAccess(request);
-      const issuedAt = yield* DateTime.now;
-      if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
-      yield* requireUnjoined(request.recipientId);
-      const details: Invitation.Issuance = {
-        id: Invitation.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        inviterMemberId: actor.memberId,
-        issuedAt,
-        expiresAt: request.expiresAt,
-        recipientId: request.recipientId,
-        roleId: request.roleId,
-      };
-      yield* journal
-        .publish(InvitationFacts.Issued, details)
-        .pipe(Publication.withOccurredAt(issuedAt));
-      return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
+      return yield* receipts.once(
+        {
+          operation: "invitation.issue",
+          key: options.requestKey,
+          input: Invitation.IssueInput,
+          value: request,
+          result: IssuedReference,
+          resultOf: (invitation: Invitation.Record) => ({ invitationId: invitation.details.id }),
+          restore: (reference: IssuedReference) => load(reference.invitationId),
+        },
+        Effect.gen(function* () {
+          yield* authorization.require([manage]);
+          const actor = yield* authorizeAccess(request);
+          const issuedAt = yield* DateTime.now;
+          if (!DateTime.isGreaterThan(request.expiresAt, issuedAt))
+            return yield* new InvalidExpiry({});
+          yield* requireUnjoined(request.recipientId);
+          const details: Invitation.Issuance = {
+            id: Invitation.Id.make(yield* crypto.randomUUIDv4),
+            workspaceId,
+            inviterMemberId: actor.memberId,
+            issuedAt,
+            expiresAt: request.expiresAt,
+            recipientId: request.recipientId,
+            roleId: request.roleId,
+          };
+          yield* journal
+            .publish(InvitationFacts.Issued, details)
+            .pipe(Publication.withOccurredAt(issuedAt));
+          return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
+        }),
+      );
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

@@ -35,11 +35,13 @@ export const layer = HttpApiBuilder.group(
             ),
           );
         }),
-      create: ({ payload }) =>
+      create: ({ headers, payload }) =>
         Effect.gen(function* () {
           const principal = yield* Principal;
           if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
-          return yield* gateway.createWorkspace(principal.id, payload);
+          return yield* gateway.createWorkspace(principal.id, payload, {
+            requestKey: headers["idempotency-key"],
+          });
         }),
     });
   }),

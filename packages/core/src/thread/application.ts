@@ -32,6 +32,9 @@ import { ThreadActivityReading } from "./activity/reading.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
 import { ThreadReading } from "../attention/reading.ts";
 import { ReadStateStore } from "../attention/store.ts";
+import type { Request } from "../request/request.ts";
+import { RequestReceipts } from "../request/receipts.ts";
+import { ThreadMessageReceipt } from "./message/receipt.ts";
 /** Missing, foreign, and outside-audience threads share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadApplication.NotFound", {
   threadId: Thread.Id,
@@ -75,6 +78,10 @@ export type Error =
   | ParticipantUnavailable
   | HumanAuthorRequired
   | DirectMembersRequired
+  | RequestReceipts.Error
+  | ThreadStore.Failure
+  | ThreadMessageStore.Failure
+  | ThreadActivityStore.Failure
   | InvalidResponse;
 export type ReadError =
   | ReadStateStore.Failure
@@ -100,6 +107,7 @@ export interface Interface {
    */
   readonly startInGroup: (
     input: Thread.StartInGroupInput,
+    options?: Request.Options,
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
   /**
    * Establish or reuse the direct group for the author and the given members, then start a
@@ -108,6 +116,7 @@ export interface Interface {
    */
   readonly startDirect: (
     input: Thread.StartDirectInput,
+    options?: Request.Options,
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
   /** Current group audience plus thread.read. Reading creates no participation or acknowledgment. */
   readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Service>;
@@ -156,6 +165,9 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const reading = yield* ThreadActivityReading.Service;
   const readStates = yield* ReadStateStore.Service;
   const readings = yield* ThreadReading.Service;
+  const receipts = yield* RequestReceipts.Service;
+  const messages = yield* ThreadMessageStore.Service;
+  const activities = yield* ThreadActivityStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -173,11 +185,41 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       reading.workspaceId,
       readStates.workspaceId,
       readings.workspaceId,
+      receipts.workspaceId,
+      messages.workspaceId,
+      activities.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
       message: "Thread services belong to different workspaces",
     });
+  /** How a keyed start records what it created, and reads it back on a retry. */
+  const started = <S extends typeof Thread.StartInGroupInput | typeof Thread.StartDirectInput>(
+    operation: string,
+    input: S,
+    value: S["Type"],
+    options: Request.Options,
+  ) => ({
+    operation,
+    key: options.requestKey,
+    input,
+    value,
+    result: ThreadMessageReceipt.Started,
+    resultOf: ThreadMessageReceipt.startedOf,
+    restore: (reference: ThreadMessageReceipt.Started) =>
+      ThreadMessageReceipt.restoreStarted({ threads, messages, activities }, reference).pipe(
+        Effect.flatMap(
+          Option.match({
+            onNone: () =>
+              Effect.fail(
+                new InvalidResponse({ message: "A request's started thread is missing" }),
+              ),
+            onSome: Effect.succeed,
+          }),
+        ),
+      ),
+  });
+
   /** The group's active follows, checked; whether each counts depends on its member's admission. */
   const followsOf = Effect.fnUntraced(function* (groupId: Group.Id) {
     const seen = new Set<GroupFollow.Id>();
@@ -258,100 +300,112 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     return started;
   });
   const startDirect = Effect.fn("ThreadApplication.startDirect")(
-    function* (input: Thread.StartDirectInput) {
+    function* (input: Thread.StartDirectInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartDirectInput)(input);
-      yield* authorization.require([]);
-      const actor = yield* Actor.Service;
-      if (actor.identity._tag !== "Human")
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
-      if (memberIds.length < 2) return yield* new DirectMembersRequired({});
-      const missing = request.mentions.find((id) => !memberIds.includes(id));
-      if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
-      const group = yield* directGroups
-        .establish(memberIds, actor.memberId, yield* DateTime.now)
-        .pipe(
-          Effect.catchTag("DirectGroups.Unavailable", (error) =>
-            Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
-          ),
-        );
-      yield* authorization.require([
-        Requirement.make(ThreadPermissions.Start, {
-          _tag: "Group",
-          workspaceId,
-          groupId: group.id,
+      return yield* receipts.once(
+        started("thread.start-direct", Thread.StartDirectInput, request, options),
+        Effect.gen(function* () {
+          yield* authorization.require([]);
+          const actor = yield* Actor.Service;
+          if (actor.identity._tag !== "Human")
+            return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+          const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
+          if (memberIds.length < 2) return yield* new DirectMembersRequired({});
+          const missing = request.mentions.find((id) => !memberIds.includes(id));
+          if (missing !== undefined)
+            return yield* new ParticipantUnavailable({ memberId: missing });
+          const group = yield* directGroups
+            .establish(memberIds, actor.memberId, yield* DateTime.now)
+            .pipe(
+              Effect.catchTag("DirectGroups.Unavailable", (error) =>
+                Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
+              ),
+            );
+          yield* authorization.require([
+            Requirement.make(ThreadPermissions.Start, {
+              _tag: "Group",
+              workspaceId,
+              groupId: group.id,
+            }),
+          ]);
+          const eligible = yield* admissions
+            .eligible(group.id, memberIds)
+            .pipe(
+              Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
+                Effect.fail(new InvalidResponse({ message: error.message })),
+              ),
+            );
+          return yield* begin(group.id, memberIds, memberIds, eligible, request);
         }),
-      ]);
-      const eligible = yield* admissions
-        .eligible(group.id, memberIds)
-        .pipe(
-          Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
-            Effect.fail(new InvalidResponse({ message: error.message })),
-          ),
-        );
-      return yield* begin(group.id, memberIds, memberIds, eligible, request);
+      );
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
   const startInGroup = Effect.fn("ThreadApplication.startInGroup")(
-    function* (input: Thread.StartInGroupInput) {
+    function* (input: Thread.StartInGroupInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input);
-      const authorAdmission = yield* audience
-        .require(request.groupId)
-        .pipe(
-          Effect.catchTag("GroupAudience.NotMember", () =>
-            Effect.fail(new GroupNotFound({ groupId: request.groupId })),
-          ),
-        );
-      yield* authorization.require([
-        Requirement.make(ThreadPermissions.Start, {
-          _tag: "Group",
-          workspaceId,
-          groupId: request.groupId,
+      return yield* receipts.once(
+        started("thread.start", Thread.StartInGroupInput, request, options),
+        Effect.gen(function* () {
+          const authorAdmission = yield* audience
+            .require(request.groupId)
+            .pipe(
+              Effect.catchTag("GroupAudience.NotMember", () =>
+                Effect.fail(new GroupNotFound({ groupId: request.groupId })),
+              ),
+            );
+          yield* authorization.require([
+            Requirement.make(ThreadPermissions.Start, {
+              _tag: "Group",
+              workspaceId,
+              groupId: request.groupId,
+            }),
+          ]);
+          const actor = yield* Actor.Service;
+          if (actor.identity._tag !== "Human")
+            return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+          const foundGroup = yield* groups.get(request.groupId);
+          if (Option.isNone(foundGroup))
+            return yield* new InvalidResponse({ message: "Audience group is missing" });
+          const group = foundGroup.value;
+          // A direct group's members all take part; a team thread starts with its author, the
+          // members its opening message mentions, and the group's followers. The rest of the group
+          // sees it as unread, so only these members' admissions are read.
+          const followed = group.kind === "Direct" ? [] : yield* followsOf(request.groupId);
+          const involved =
+            group.kind === "Direct"
+              ? group.memberIds
+              : [...request.mentions, ...followed.map((follow) => follow.memberId)];
+          const eligible = yield* admissions
+            .eligible(request.groupId, [actor.memberId, ...involved])
+            .pipe(
+              Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
+                Effect.fail(new InvalidResponse({ message: error.message })),
+              ),
+            );
+          if (eligible.get(actor.memberId)?.admission.id !== authorAdmission.id)
+            return yield* new InvalidResponse({
+              message: "Admission lookup omitted the author's current admission",
+            });
+          // A follow counts only through the member's current admission.
+          const followers = followed
+            .filter(
+              (follow) => eligible.get(follow.memberId)?.admission.id === follow.groupMembershipId,
+            )
+            .map((follow) => follow.memberId)
+            .sort();
+          const selected =
+            group.kind === "Direct"
+              ? [...eligible.keys()].sort()
+              : [...new Set([actor.memberId, ...request.mentions, ...followers])];
+          const missing = request.mentions.find((id) => !eligible.has(id));
+          if (missing !== undefined)
+            return yield* new ParticipantUnavailable({ memberId: missing });
+          return yield* begin(request.groupId, selected, request.mentions, eligible, request);
         }),
-      ]);
-      const actor = yield* Actor.Service;
-      if (actor.identity._tag !== "Human")
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const foundGroup = yield* groups.get(request.groupId);
-      if (Option.isNone(foundGroup))
-        return yield* new InvalidResponse({ message: "Audience group is missing" });
-      const group = foundGroup.value;
-      // A direct group's members all take part; a team thread starts with its author, the
-      // members its opening message mentions, and the group's followers. The rest of the group
-      // sees it as unread, so only these members' admissions are read.
-      const followed = group.kind === "Direct" ? [] : yield* followsOf(request.groupId);
-      const involved =
-        group.kind === "Direct"
-          ? group.memberIds
-          : [...request.mentions, ...followed.map((follow) => follow.memberId)];
-      const eligible = yield* admissions
-        .eligible(request.groupId, [actor.memberId, ...involved])
-        .pipe(
-          Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
-            Effect.fail(new InvalidResponse({ message: error.message })),
-          ),
-        );
-      if (eligible.get(actor.memberId)?.admission.id !== authorAdmission.id)
-        return yield* new InvalidResponse({
-          message: "Admission lookup omitted the author's current admission",
-        });
-      // A follow counts only through the member's current admission.
-      const followers = followed
-        .filter(
-          (follow) => eligible.get(follow.memberId)?.admission.id === follow.groupMembershipId,
-        )
-        .map((follow) => follow.memberId)
-        .sort();
-      const selected =
-        group.kind === "Direct"
-          ? [...eligible.keys()].sort()
-          : [...new Set([actor.memberId, ...request.mentions, ...followers])];
-      const missing = request.mentions.find((id) => !eligible.has(id));
-      if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
-      return yield* begin(request.groupId, selected, request.mentions, eligible, request);
+      );
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

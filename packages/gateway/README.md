@@ -46,8 +46,10 @@ is sufficient to type-check a supplied implementation.
 
 ### Workspace operations
 
-- `createWorkspace(creator, input)` accepts `Workspace.CreateInput` with a required
-  name, allocates a workspace ID, and runs core initialization for the creator.
+- `createWorkspace(creator, input, options?)` accepts `Workspace.CreateInput` with a required
+  name, allocates a workspace ID, and runs core initialization for the creator. With
+  `options.requestKey`, the ID is derived from the creator and key, so a retry returns the
+  workspace its first attempt created, and a different name returns `Request.Reused`.
   Core rejects blank or untrimmed names before committing any facts. The caller
   has authenticated the creator and checked entitlement.
 - `asMember(workspaceId, identity, program)` resolves the identity's active membership
@@ -138,7 +140,7 @@ signals.
 Programs fail only with outcomes a caller can act on. Domain errors from core
 pass through unchanged. The gateway adds `NotMember` when the identity has no
 active membership, `WorkspaceNotFound` when invitation acceptance names a workspace that was
-never created, `Conflict` for retryable storage contention, `Uncertain`
+never created, `Request.Reused` when a request key returns for a different request, `Conflict` for retryable storage contention, `Uncertain`
 when a commit's outcome is unknown, and `InvalidInput` when core rejects
 caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its
