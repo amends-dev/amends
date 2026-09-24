@@ -201,6 +201,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           ).pipe(Effect.provide(core(bound)));
           const sql = yield* SqlClient.SqlClient;
           yield* sql`ANALYZE`;
+          const pendingInbox = sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL ORDER BY recorded_at, id COLLATE "C" LIMIT 20`;
           const cases = [
             {
               index: "participations_by_thread",
@@ -231,6 +232,27 @@ describe.skipIf(!available)("PostgreSQL", () => {
               index: "notifications_by_recipient",
               condition: "ROW(recorded_at, (id)::text) >",
               query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`,
+            },
+            // Pending reads use indexes that leave out what the reader has already seen.
+            {
+              index: "pending_notifications_by_recipient",
+              condition: "recipient_kind =",
+              query: pendingInbox,
+            },
+            {
+              index: "pending_notifications_by_group",
+              condition: "thread_group_id =",
+              query: sql`SELECT thread_group_id, count(*) FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = any(${[thread.groupId]}::text[]) GROUP BY thread_group_id`,
+            },
+            {
+              index: "pending_notifications_by_thread",
+              condition: "thread_id =",
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_id = ${thread.id} AND thread_sequence <= 10`,
+            },
+            {
+              index: "pending_agent_notifications_by_participation",
+              condition: "participation_id =",
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND participation_id = ${inbox[0]!.participationId ?? ""} AND recipient_kind = 'Agent' AND state = 'Pending'`,
             },
             {
               index: "log_entries_by_fact",
@@ -264,6 +286,18 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             expect(plan).not.toMatch(/^\s*(->\s*)?Sort\b/m);
           }
+          // Seen notifications leave the pending indexes, so pending reads never visit them.
+          yield* bound.notifications.markSeen([inbox[0]!.id], inbox[0]!.recordedAt);
+          const pendingPlan = yield* sql.withTransaction(
+            Effect.gen(function* () {
+              yield* sql`SET LOCAL enable_seqscan = off`;
+              yield* sql`SET LOCAL enable_bitmapscan = off`;
+              const rows = yield* sql<{ "QUERY PLAN": string }>`EXPLAIN ANALYZE ${pendingInbox}`;
+              return rows.map((row) => row["QUERY PLAN"]).join("\n");
+            }),
+          );
+          expect(pendingPlan).toMatch(/Index Scan using pending_notifications_by_recipient /);
+          expect(pendingPlan).not.toMatch(/Rows Removed by Filter/);
         }),
       ),
     ),

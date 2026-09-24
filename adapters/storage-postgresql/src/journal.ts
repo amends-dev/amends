@@ -222,7 +222,7 @@ export const make = Effect.fn("Journal.make")(function* () {
           ),
         ),
         (chunk) => db.insert(logEntries).values(chunk),
-        entriesPerInsert,
+        { limit: entriesPerInsert },
       );
       yield* insertChunked(
         logAppendKeys,

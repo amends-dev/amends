@@ -68,7 +68,8 @@ order without a sort. Notification and fact pages compare `(recorded_at, id)` an
 earlier rows. The directory reads across workspaces through `members_by_identity` and
 `pending_invitations_by_recipient`, and counts active members only for the identity's own
 workspaces; a workspace whose members were all removed still lists with a count of zero.
-A plan test checks these access paths with sequential scans and sorts disabled. These indexes
+A plan test checks these access paths, and the pending notification indexes, with sequential
+scans and sorts disabled, and that a pending read filters out none of the reader's seen rows. These indexes
 replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
 
 Batch reads (`getMany` on members, group admissions, thread participations, and messages) match
@@ -127,10 +128,14 @@ and discards pending agent input when its participation ends.
 The row's `state` holds what the journal settles, `Pending` or `Discarded`. A human's `Seen` lives
 in `notification_seen`, keyed by workspace and notification with the first `seen_at`, which is not
 a projection table: it has no foreign key to `notifications`, so truncating and rebuilding them keeps
-it. Reads join it to show a seen pending notification as `Acknowledged`, and pending reads and
-counts leave it out. `markSeen` checks every notification in one query, then inserts all of them,
-keeping existing times, in the caller's transaction or on its own. This replaces the development
-baseline. Recreate disposable PostgreSQL databases when adopting it.
+it. The row keeps a copy in `seen_at`, which `notification_seen_state` allows only on a pending
+human notification: reads show it as `Acknowledged`, and the pending indexes leave seen rows out, so
+pending reads and counts never visit a reader's seen history however long it grows. An insert
+restores the copy from `notification_seen` in the same statement, so a rebuild keeps what was seen.
+`markSeen` checks every notification in one query, then in one statement sets the rows' `seen_at`
+and records `notification_seen`, keeping existing times, in the caller's transaction or on its own;
+updating the rows first makes concurrent calls take turns on their locks and agree on the first time.
+`pending_agent_notifications_by_participation` finds the pending agent input a departure settles.
 
 ## Transactions
 

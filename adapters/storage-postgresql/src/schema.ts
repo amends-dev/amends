@@ -267,6 +267,9 @@ export const notifications = pgTable(
     recipientMemberId: text("recipient_member_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
+    // When a human saw a pending notification: a copy of notification_seen, which keeps it across
+    // rebuilds, so that pending indexes leave seen notifications out.
+    seenAt: instant("seen_at"),
     // The thread, its group, and the timeline position of thread-activity notifications.
     threadId: text("thread_id"),
     threadGroupId: text("thread_group_id"),
@@ -277,6 +280,10 @@ export const notifications = pgTable(
     check(
       "notification_state",
       sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
+    ),
+    check(
+      "notification_seen_state",
+      sql`${table.seenAt} IS NULL OR (${table.recipientKind} = 'Human' AND ${table.state} = 'Pending')`,
     ),
     check(
       "notification_recipient",
@@ -306,7 +313,7 @@ export const notifications = pgTable(
         table.recordedAt,
         sql`${table.id} COLLATE "C"`,
       )
-      .where(sql`${table.state} = 'Pending'`),
+      .where(sql`${table.state} = 'Pending' AND ${table.seenAt} IS NULL`),
     check(
       "notification_thread",
       sql`(${table.threadId} IS NULL AND ${table.threadGroupId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadGroupId} IS NOT NULL AND ${table.threadSequence} > 0)`,
@@ -319,7 +326,7 @@ export const notifications = pgTable(
         sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
         table.threadGroupId,
       )
-      .where(sql`${table.state} = 'Pending'`),
+      .where(sql`${table.state} = 'Pending' AND ${table.seenAt} IS NULL`),
     // A reader's pending notifications from one thread, settled when they read it.
     index("pending_notifications_by_thread")
       .on(
@@ -329,7 +336,11 @@ export const notifications = pgTable(
         table.threadId,
         table.threadSequence,
       )
-      .where(sql`${table.state} = 'Pending'`),
+      .where(sql`${table.state} = 'Pending' AND ${table.seenAt} IS NULL`),
+    // An ended participation's pending agent input, settled in the commit that ends it.
+    index("pending_agent_notifications_by_participation")
+      .on(table.workspaceId, table.participationId)
+      .where(sql`${table.state} = 'Pending' AND ${table.recipientKind} = 'Agent'`),
     check(
       "notifications_recipient_kind",
       sql`(${table.recipientKind} = 'Triage' AND ${table.recipientId} IS NULL) OR (${table.recipientKind} IN ('Human', 'Agent', 'Contact') AND ${table.recipientId} IS NOT NULL AND ${table.recipientId} <> '')`,
