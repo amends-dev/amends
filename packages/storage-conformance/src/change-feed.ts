@@ -1,31 +1,16 @@
-import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
+import { BuiltinRoles } from "@amends/core/authorization";
 import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
 import { GroupApplication, GroupFacts } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Publication } from "@amends/core/journal";
 import { NotificationApplication } from "@amends/core/notification";
 import { ThreadApplication, ThreadMessageFacts } from "@amends/core/thread";
-import {
-  InvitationApplication,
-  InvitationFacts,
-  Member,
-  MemberFacts,
-} from "@amends/core/workspace";
+import { InvitationApplication, InvitationFacts, Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Queue, Stream } from "effect";
 import type { Scope } from "effect";
 import type { Harness } from "./harness.ts";
-import {
-  alice,
-  bob,
-  type Bound,
-  boundTo,
-  runHost,
-  Support,
-  testProvenance,
-  workspaceId,
-} from "./support.ts";
+import { alice, bob, boundTo, runHost, Support, workspaceId } from "./support.ts";
 
 const issue = (recipient: Identity.HumanId) =>
   InvitationApplication.Service.use((invitations) =>
@@ -67,39 +52,7 @@ const memberActor = (name: string) =>
 
 /** The change feed read from the journal: delivery across hosts, resumption, and audiences. */
 export const changeFeed = (harness: Harness) => {
-  const { core, gateway, initialized } = Support.make(harness);
-  /** Add members, giving some the viewer role, as invitation acceptance would. */
-  const seed = (
-    bound: Bound,
-    members: ReadonlyArray<Actor.Value>,
-    viewers: ReadonlyArray<Actor.Value>,
-  ) =>
-    Effect.flatMap(Journal.Service, (journal) =>
-      journal.commit(
-        Effect.gen(function* () {
-          for (const member of members)
-            yield* journal.publish(MemberFacts.Added, {
-              workspaceId,
-              memberId: member.memberId,
-              identity: member.identity,
-            });
-          for (const viewer of viewers)
-            yield* journal.publish(AssignmentFacts.Created, {
-              workspaceId,
-              assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
-              memberId: viewer.memberId,
-              source: {
-                _tag: "Role",
-                roleId: BuiltinRoles.ViewerId,
-                scope: { _tag: "Workspace", workspaceId },
-              },
-            });
-        }),
-      ),
-    ).pipe(
-      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-      Effect.provide(core(bound)),
-    );
+  const { core, gateway, initialized, seed } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: change feed`, () => {
     it.live("a subscriber receives commits made through its own host and through another", () =>
       harness.withStorage((storage) =>

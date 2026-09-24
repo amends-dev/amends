@@ -14,7 +14,8 @@
     "./notification": "./src/notification/index.ts",
     "./workspace": "./src/workspace/index.ts",
     "./agent": "./src/agent/index.ts",
-    "./attention": "./src/attention/index.ts"
+    "./attention": "./src/attention/index.ts",
+    "./signal": "./src/signal/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

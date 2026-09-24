@@ -183,10 +183,9 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   notification queue that serializes such commits across the whole database, which matters only
   at thousands of commits a second; a batched poll per process is the alternative then. Behind a
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
-- New notifications reach their recipients over the feed, but later state changes do not. A
-  human's `Seen` is private state, so their other devices learn of it only by rereading the inbox
-  and counts; an agent's pending notifications discarded when its participation ends show only
-  through the participation-ended activity and the inbox.
+- New notifications reach their recipients over the feed, and a human's `Seen` and read positions
+  reach their other sessions as signals. An agent's pending notifications discarded when its
+  participation ends show only through the participation-ended activity and the inbox.
 - A reader's cursor advances only with commits that carry something they may see. A reader
   who sees little of a busy workspace can fall more than 500 commits behind while
   disconnected and then reset instead of resuming.
@@ -196,6 +195,20 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   revocation, but never delivers after the revocation reaches the reader.
 - Access is rechecked only when the feed itself carries a change to it. The reader's
   removal from the workspace ends their stream.
+
+[Signals](../packages/core/README.md#signals) carry typing and read-state changes between
+commits on the same stream. They are best effort by design, with these consequences:
+
+- A signal published while a PostgreSQL listener reconnects, or to a subscriber more than 256
+  signals behind, is lost; a client that reconnects refreshes read state rather than replaying.
+  A typing indicator simply expires.
+- The two-second typing throttle is per process, so a member's typing through several hosts can
+  send one signal per host in that window.
+- PostgreSQL relays each signal as one `NOTIFY`, sharing the notification queue lock with
+  commits and limited to 8000 bytes per payload. Behind a transaction-pooling proxy, signals are
+  unavailable.
+- Presence, such as who is online or viewing a thread, is not implemented; it would be another
+  signal with an expiry, like typing. Typing over HTTP is the only signal clients send.
 
 ## Projection sets across hosts
 

@@ -1,5 +1,6 @@
 import { Api, Principal } from "@amends/api-http";
 import { ChangeFeedApplication } from "@amends/core/change-feed";
+import { SignalApplication } from "@amends/core/signal";
 import { Gateway } from "@amends/gateway";
 import { Effect, Stream } from "effect";
 import { HttpBody, HttpEffect, HttpServerResponse } from "effect/unstable/http";
@@ -42,6 +43,14 @@ export const layer = HttpApiBuilder.group(
             Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch(query)),
           ),
         ).pipe(HttpEffect.withPreResponseHandler(prepareResponse)),
+      typing: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(params.threadId)),
+          ),
+        ),
     });
   }),
 );

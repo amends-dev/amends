@@ -50,7 +50,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               Effect.provideService(PostgresDatabase.Service, {
                 db: real.db,
                 sql: failing,
-                appends: real.appends,
+                notices: real.notices,
               }),
             );
             const bound = yield* storage.forWorkspace(workspaceId);

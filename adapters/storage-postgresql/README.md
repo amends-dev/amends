@@ -1,6 +1,6 @@
 # PostgreSQL storage
 
-Workspace storage and the workspace directory over PostgreSQL. Statements are
+Workspace storage, the workspace directory, and the signal hub over PostgreSQL. Statements are
 written with Drizzle and run through `@effect/sql-pg`, so they share the Effect
 client's transaction service; the journal opens each commit on a reserved
 connection and every Drizzle statement inside it lands on that connection.
@@ -91,7 +91,8 @@ identity, the transaction boundary, and the guard each statement runs under. `st
 `layerWorkspace(workspaceId, options)` to compose the store layers over a binding for the requested
 workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing
 SQL client in `make` and acquires the pool in `layer`; `directory.ts` reads across workspaces, and
-`schema.ts` holds the tables. Bindings and raw tables are internal to the adapter's public package
+`schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener, and
+`signals.ts` the signal hub over it. Bindings and raw tables are internal to the adapter's public package
 surface.
 
 Follow the [adapter naming and validation conventions](../README.md).
@@ -203,16 +204,26 @@ included in that classification and currently becomes a failure. Reads outside a
 transaction see committed state. A statement PostgreSQL
 refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
-A commit that appends to a log sends `pg_notify` on the `amends_log_appends` channel with the
+A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the
 workspace and log, inside its transaction, so the notification arrives only if the commit
-succeeds. Each pool's listener, started by the first waiting reader and stopped 30 seconds after
-the last, holds one pooled connection on `LISTEN` and wakes that log's waiters in the process.
+succeeds. Each pool's listener, started by the first waiting reader or signal subscriber and
+stopped 30 seconds after the last, holds one pooled connection on `LISTEN` and wakes that log's
+waiters in the process.
 A waiter takes its wakeup signal before checking the log, so an append between the check and the
 wait still wakes it; the log is the truth and the notification only says when to look again.
 When its connection fails, the listener listens again after a second and then wakes every waiter
 to re-check what it missed. Waiters also re-check every `pollInterval` (five seconds by default)
 without a notification. `LISTEN` needs a session connection, so behind a transaction-pooling proxy
 the adapter falls back to that interval.
+
+`PostgresSignals` relays [signals](../../packages/core/README.md#signals) on the same channel:
+`publish` sends the JSON-encoded signal with its workspace through `pg_notify` outside any
+transaction, and the listener in every pool, including the sender's, offers it to that
+workspace's subscribers. Each subscriber has a queue of 256 that drops the oldest when it falls
+behind; a signal this version cannot decode is skipped. Nothing is stored. Signals sent while a
+listener reconnects are lost, a failed publish is logged rather than failing its operation, and a
+payload over PostgreSQL's 8000-byte notification limit is not delivered; current signals are far
+smaller. Behind a transaction-pooling proxy, signals are unavailable.
 
 Ordinary application reads and SSE authorization do not open a transaction or take
 the workspace advisory lock. They use available pool connections to query committed
@@ -235,7 +246,7 @@ Gateway.layer().pipe(
 );
 ```
 
-The root `layer(options)` provides both gateway contracts; `PostgresDatabase.layer`
+The root `layer(options)` provides the storage, directory, and signal hub contracts; `PostgresDatabase.layer`
 takes the Effect client's pool configuration. The local host also supplies
 cryptography and composes this over the database at `AMENDS_DATABASE_URL`.
 
@@ -264,7 +275,8 @@ tested here: `transactions.test.ts` injects a failed `COMMIT` to check `CommitUn
 statement the program ignores still aborts its transaction, and `notifications.test.ts` checks that
 a malformed stored record fails reads. `journal.test.ts` checks, with an hour-long fallback
 interval, that a waiting reader wakes on another pool's commit through its notification, and still
-wakes when an append lands while its listener reconnects. `database.test.ts` covers construction
+wakes when an append lands while its listener reconnects. The signals suite covers relaying
+between pools. `database.test.ts` covers construction
 and access paths, and `scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
 project's global setup owns the shared test cluster, and individual tests own their temporary
 databases.

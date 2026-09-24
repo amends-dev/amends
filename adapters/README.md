@@ -113,8 +113,9 @@ views on demand. Those views acquire no resources of their own, so their build
 scope can close immediately while the database's scope remains alive. Adding
 scoped resources to a view requires revisiting that lifetime contract.
 
-Each adapter's root `layer` composes workspace storage and the directory. It leaves
-the database dependency to the host. Composition-only exports need no additional
+Each adapter's root `layer` composes workspace storage, the directory, and the signal hub,
+which relays ephemeral signals between the hosts over the same storage and stores nothing. It
+leaves the database dependency to the host. Composition-only exports need no additional
 `make`. Public layer variants use the `layer...` prefix. Public constructors and
 layers have `@category constructors` and `@category layers` documentation.
 

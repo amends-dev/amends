@@ -2,7 +2,7 @@ import { Commit, Entry, Store } from "@amends/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";
-import { PostgresAppends } from "./appends.ts";
+import { PostgresNotices } from "./notices.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
@@ -202,8 +202,8 @@ export const make = Effect.fn("Journal.make")(function* () {
       // Delivered only if the transaction commits; repeats within it are delivered once.
       for (const logId of new Set(batches.map((batch) => batch.logId)))
         yield* database.sql.unsafe("SELECT pg_notify($1, $2)", [
-          PostgresAppends.channel,
-          PostgresAppends.payloadOf(workspaceId, logId),
+          PostgresNotices.channel,
+          PostgresNotices.appendNotice(workspaceId, logId),
         ]);
       for (let start = 0; start < entries.length; start += insertChunk)
         yield* db.insert(logEntries).values(
@@ -526,9 +526,9 @@ export const make = Effect.fn("Journal.make")(function* () {
       // notifications only say when to look again, and the interval covers any that are lost.
       yield* Effect.scoped(
         Effect.gen(function* () {
-          yield* database.appends.listening;
+          yield* database.notices.listening;
           while (true) {
-            const signal = database.appends.next(workspaceId, logId);
+            const signal = database.notices.next(workspaceId, logId);
             if (yield* appended) return;
             yield* Deferred.await(signal).pipe(Effect.timeoutOption(pollInterval));
           }

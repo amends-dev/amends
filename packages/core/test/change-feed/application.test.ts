@@ -50,6 +50,10 @@ import { Workspace } from "../../src/workspace/workspace.ts";
 import { Role } from "../../src/authorization/role/role.ts";
 import { make, type Fixture } from "../memory-store.ts";
 import { testProvenance } from "../publication.ts";
+import { TestSignals } from "../signals.ts";
+import { Notification } from "../../src/notification/notification.ts";
+import { Signal } from "../../src/signal/signal.ts";
+import { Signals } from "../../src/signal/signals.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const at = DateTime.makeUnsafe("2026-09-20T12:00:00.123Z");
@@ -141,7 +145,12 @@ interface World {
   /** The groups the actor currently belongs to, as the membership projection would report. */
   readonly admitted: Set<Group.Id>;
 }
-type Services = ChangeFeedApplication.Service | Journal.Service | Actor.Service | Scope.Scope;
+type Services =
+  | ChangeFeedApplication.Service
+  | Journal.Service
+  | Signals.Service
+  | Actor.Service
+  | Scope.Scope;
 
 const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options: Options = {}) =>
   Effect.gen(function* () {
@@ -190,6 +199,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
       Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
       Layer.succeed(GroupMembershipStore.Service, memberships),
+      TestSignals.layer(workspaceId),
       PermissionCatalog.layer([ThreadPermissions.Read, GroupPermissions.Read]),
     );
     const services = Layer.mergeAll(
@@ -236,6 +246,32 @@ const committed = (message: ChangeFeed.Message) => {
   if (message._tag !== "Committed") throw new Error(`Expected a commit, got ${message._tag}`);
   return message;
 };
+const signal = (value: Signal.Value) => Effect.flatMap(Signals.Service, (s) => s.publish(value));
+const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
+  Signal.Value.cases.Typing.make({
+    workspaceId,
+    groupId: group,
+    threadId: thread,
+    memberId,
+    until: at,
+  });
+const caughtUp = (memberId: Member.Id, group = groupId) =>
+  Signal.Value.cases.GroupCaughtUp.make({ workspaceId, memberId, groupId: group, caughtUpAt: at });
+const sameSignal = Schema.toEquivalence(Signal.Value);
+/** The signals delivered before a marker the reader is known to receive. */
+const signalsUntil = Effect.fnUntraced(function* (
+  next: Effect.Effect<ChangeFeed.Message>,
+  marker: Signal.Value,
+) {
+  yield* signal(marker);
+  const received: Array<Signal.Value> = [];
+  for (;;) {
+    const message = yield* next;
+    if (message._tag !== "Signal") throw new Error(`Expected a signal, got ${message._tag}`);
+    if (sameSignal(message.signal, marker)) return received;
+    received.push(message.signal);
+  }
+});
 
 it.effect("a subscription without a cursor resets at the head, then delivers later commits", () =>
   run(() =>
@@ -589,6 +625,79 @@ it.effect("internal facts are skipped, and a commit of only internal facts sends
       const received = committed(yield* feed.next);
       expect(received.cursor).toBe("1");
       expect(received.events.map((e) => e.name)).toEqual([InvitationFacts.Issued.name]);
+    }),
+  ),
+);
+
+it.effect(
+  "typing reaches the thread's readers, and private read state reaches its member alone",
+  () =>
+    run(
+      ({ admitted }) =>
+        Effect.gen(function* () {
+          admitted.add(groupId);
+          const feed = yield* listen();
+          yield* feed.next;
+          const readThread = Signal.Value.cases.ThreadRead.make({
+            workspaceId,
+            memberId: actor.memberId,
+            threadId,
+            readThrough: 3,
+          });
+          const seen = Signal.Value.cases.NotificationsSeen.make({
+            workspaceId,
+            memberId: bobMember,
+            notificationIds: [Notification.Id.make("notification")],
+          });
+          yield* signal(typing(threadId, groupId));
+          // Withheld: a thread the reader may not read, and a group they do not belong to.
+          yield* signal(typing(otherThreadId, groupId));
+          yield* signal(typing(threadId, otherGroupId));
+          yield* signal(readThread);
+          // Another member's private state stays with them.
+          yield* signal(Object.assign({}, readThread, { memberId: bobMember }));
+          yield* signal(seen);
+          yield* signal(caughtUp(bobMember));
+          const received = yield* signalsUntil(feed.next, caughtUp(actor.memberId));
+          expect(received).toEqual([typing(threadId, groupId), readThread]);
+          expect(yield* Queue.size(feed.queue)).toBe(0);
+        }),
+      { grants: [threadGrant(threadId)] },
+    ),
+);
+
+it.effect("signals follow the reader's access as commits change it, and are never replayed", () =>
+  run(({ admitted }) =>
+    Effect.gen(function* () {
+      const early = yield* listen();
+      yield* early.next;
+      yield* signal(typing(threadId, groupId));
+      expect(yield* signalsUntil(early.next, caughtUp(actor.memberId))).toEqual([]);
+      admitted.add(groupId);
+      yield* commit(publish(GroupMembershipFacts.Added, admission(groupId)));
+      expect(committed(yield* early.next).cursor).toBe("0");
+      yield* signal(typing(threadId, groupId));
+      expect(yield* signalsUntil(early.next, caughtUp(actor.memberId))).toEqual([
+        typing(threadId, groupId),
+      ]);
+      admitted.delete(groupId);
+      yield* commit(
+        publish(GroupMembershipFacts.Removed, {
+          groupId,
+          membershipId: admission(groupId).id,
+          workspaceId,
+          memberId: actor.memberId,
+          reason: "removed",
+        }),
+      );
+      expect(committed(yield* early.next).cursor).toBe("1");
+      yield* signal(typing(threadId, groupId));
+      expect(yield* signalsUntil(early.next, caughtUp(actor.memberId))).toEqual([]);
+      // A resumed subscription replays commits but not the signals sent while it was away.
+      const late = yield* listen({ after: ChangeFeed.Cursor.make("0") });
+      expect(yield* late.next).toMatchObject({ _tag: "Ready", reset: false });
+      expect(committed(yield* late.next).cursor).toBe("1");
+      expect(yield* signalsUntil(late.next, caughtUp(actor.memberId))).toEqual([]);
     }),
   ),
 );

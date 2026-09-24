@@ -25,6 +25,7 @@ The current domains contain these features:
 | `agent`         | Permission to direct input to an agent workspace member.                                                         |
 | `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.                     |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -73,8 +74,9 @@ the first time stored. Agents receive `HumanRecipientRequired`; discarded notifi
 `Seen` is private state written by `NotificationStore.markSeen` outside the journal, like a read
 position: no journal commit, no place in the workspace's write order, and kept when projections are
 rebuilt. The journal settles notifications only as `Pending` or `Discarded`. The write joins an
-enclosing transaction when there is one. Acknowledgment creates no activity or notifications and
-does not appear in the change feed. Handoffs of work, a turn accepting input or a channel delivery
+enclosing transaction when there is one. Acknowledgment creates no activity, notifications, or
+journal commit; the acting human's connected sessions hear of it as a `NotificationsSeen`
+[signal](#signals). Handoffs of work, a turn accepting input or a channel delivery
 accepting a reply, will be journal facts their owning workflows record; notifications never create
 turns, accept their input, or execute work. HTTP/UI actions remain pending.
 See [human acknowledgment](../../docs/thread-workflows.md#acknowledging-a-notification).
@@ -200,7 +202,8 @@ host binding. Direct groups return `NotFollowable`. See
 `@amends/core/attention` holds private read state. `ReadStateApplication.markThreadRead` records
 how far a person has read a thread and marks their pending notifications from it up to that
 position `Seen`; `markGroupRead` records when they caught up with a group. Both only move forward.
-`ReadStateStore` is a required host binding, kept outside the journal. Thread activity maintains
+`ReadStateStore` is a required host binding, kept outside the journal. The person's connected
+sessions hear of each change as a `ThreadRead` or `GroupCaughtUp` [signal](#signals). Thread activity maintains
 each thread's and group's latest message through `ThreadStore.recordLatest` and
 `GroupStore.recordLatest`, and notifications from thread activity carry their thread and sequence.
 See [marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
@@ -436,8 +439,36 @@ recipient's arrives in the same `Committed` message's `notifications`, derived w
 `Notification.generated` exactly as the projection stores it, so it equals what the inbox
 lists; human and agent recipients receive their own, whether or not they may read the thread,
 and nobody else sees them. A commit with no visible events and no notifications for the reader
-sends nothing, so a reader's cursor only advances with commits it sees. The HTTP contract reuses these message schemas.
-Frontend query dependencies belong in the client.
+sends nothing, so a reader's cursor only advances with commits it sees.
+
+The same stream carries `Signal { workspaceId, signal }` messages between commits, for the
+[signals](#signals) the reader may see, filtered by the same scopes and grants as events and
+reloaded by the same commits. The subscription registers for signals before `Ready`, so it misses
+none published after that. Signals have no cursor and are never replayed; a consumer that
+reconnects refreshes read state along with the rest of its view. The HTTP contract reuses these
+message schemas. Frontend query dependencies belong in the client.
+
+## Signals
+
+`@amends/core/signal` holds what is happening now and is never stored: `Signal.Value` is `Typing`,
+`ThreadRead`, `GroupCaughtUp`, or `NotificationsSeen`. `Signal.reachOf` gives each its audience,
+as a fact declares one: typing reaches the thread's group with `thread.read` for the thread, and
+the three read-state signals reach only the member whose private state changed, so their other
+sessions stay current without the journal.
+
+`Signals.Service` is the workspace's delivery, a required host binding: `publish` offers a signal
+to the subscribers present at that moment, in every process over the same storage, and
+`subscribe` returns those published from then until its scope closes. Delivery is best effort.
+Publishing never fails the operation that publishes, and a subscriber that falls behind, or whose
+process loses its connection to the others, misses signals rather than delaying anyone.
+
+`SignalApplication.typing(threadId)` tells the thread's readers that the acting member is
+composing there until `until`, six seconds later (`SignalApplication.typingFor`). It requires
+current group access and `thread.publish`, as posting does, and returns `ThreadNotFound` for
+missing and inaccessible threads alike. Repeats from the same member in the same thread within two
+seconds are dropped by the process that receives them, so a client may call it on each keystroke;
+clients hide their own member's typing. `ReadStateApplication` and
+`NotificationApplication.acknowledge` publish the read-state signals after their writes.
 
 ## Module dependencies and exports
 
@@ -625,8 +656,10 @@ meaning rather than using it as a synonym for a constructor.
 | Invitation operations     | `InvitationApplication.make()`          | `InvitationApplication.Service`          |
 | Ownership operations      | `OwnershipApplication.make()`           | `OwnershipApplication.Service`           |
 | Change feed               | `ChangeFeedApplication.make()`          | `ChangeFeedApplication.Service`          |
+| Typing signals            | `SignalApplication.make()`              | `SignalApplication.Service`              |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
+`Signals.Service` is a host contract too, bound to one workspace like the stores.
 `Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation
 context supplied by trusted ingress, application operations, and storage. These contracts have no default implementation or
 pass-through `make`/`layer` wrappers in core. Private transaction tags coordinate

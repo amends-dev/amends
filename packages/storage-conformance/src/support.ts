@@ -1,10 +1,17 @@
 /** Fixtures the suites share: identities, bound stores, and cores and gateways over a host. */
 import * as Core from "@amends/core";
 import { ReadStateStore } from "@amends/core/attention";
-import { AssignmentStore, BuiltinRoles, type Role, RoleStore } from "@amends/core/authorization";
+import {
+  Assignment,
+  AssignmentFacts,
+  AssignmentStore,
+  BuiltinRoles,
+  type Role,
+  RoleStore,
+} from "@amends/core/authorization";
 import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
-import { Identity, Performer } from "@amends/core/identity";
-import { Checkpoint, Event, Log, Store } from "@amends/core/journal";
+import { type Actor, Identity, Performer } from "@amends/core/identity";
+import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   ThreadActivityStore,
@@ -15,12 +22,14 @@ import {
 import {
   type Invitation,
   InvitationStore,
+  MemberFacts,
   MemberStore,
   Workspace,
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway, WorkspaceStorage } from "@amends/gateway";
+import { Gateway, SignalHub, WorkspaceStorage } from "@amends/gateway";
+import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 
@@ -34,7 +43,7 @@ export const otherWorkspaceId = Workspace.Id.make("workspace-two");
 export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
-export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
+export const bind = (context: Context.Context<WorkspaceStorage.Bindings | Signals.Service>) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
   participations: Context.get(context, ThreadParticipationStore.Service),
@@ -55,14 +64,26 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
 });
 export type Bound = ReturnType<typeof bind>;
 
-/** One workspace's stores on a host. */
+/** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
-  Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), bind);
+  Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
+    bind(
+      Context.add(context, Signals.Service, Context.get(host, SignalHub.Service).forWorkspace(id)),
+    ),
+  );
 
-/** One workspace's stores on the host in context, as a gateway's caller has it. */
+/** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = (id: Workspace.Id) =>
-  Effect.flatMap(WorkspaceStorage.Service, (storage) => storage.forWorkspace(id)).pipe(
-    Effect.map(bind),
+  Effect.flatMap(Effect.context<WorkspaceStorage.Service | SignalHub.Service>(), (host) =>
+    Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
+      bind(
+        Context.add(
+          context,
+          Signals.Service,
+          Context.get(host, SignalHub.Service).forWorkspace(id),
+        ),
+      ),
+    ),
   );
 
 /**
@@ -104,6 +125,38 @@ export const make = (harness: Harness) => {
     /** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
     initialized: (bound: Bound, creator = alice.id) =>
       WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
+        Effect.provide(core(bound)),
+      ),
+    /** Add members, giving some the viewer role, as invitation acceptance would. */
+    seed: (
+      bound: Bound,
+      members: ReadonlyArray<Actor.Value>,
+      viewers: ReadonlyArray<Actor.Value>,
+    ) =>
+      Effect.flatMap(Journal.Service, (journal) =>
+        journal.commit(
+          Effect.gen(function* () {
+            for (const member of members)
+              yield* journal.publish(MemberFacts.Added, {
+                workspaceId: bound.workspace.workspaceId,
+                memberId: member.memberId,
+                identity: member.identity,
+              });
+            for (const viewer of viewers)
+              yield* journal.publish(AssignmentFacts.Created, {
+                workspaceId: bound.workspace.workspaceId,
+                assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
+                memberId: viewer.memberId,
+                source: {
+                  _tag: "Role",
+                  roleId: BuiltinRoles.ViewerId,
+                  scope: { _tag: "Workspace", workspaceId: bound.workspace.workspaceId },
+                },
+              });
+          }),
+        ),
+      ).pipe(
+        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
         Effect.provide(core(bound)),
       ),
     /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */

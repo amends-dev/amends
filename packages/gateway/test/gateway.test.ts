@@ -36,10 +36,12 @@ import {
   Result,
   Schema,
   Scope,
+  Stream,
 } from "effect";
 import { TestClock } from "effect/testing";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
+import { SignalHub } from "../src/signals.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
 import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
@@ -246,9 +248,18 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     ),
   );
 };
+/** Signals no test here observes: published into nothing, and no subscriber ever hears one. */
+const quiet = SignalHub.Service.of({
+  forWorkspace: (workspaceId) => ({
+    workspaceId,
+    publish: () => Effect.void,
+    subscribe: Effect.succeed(Stream.never),
+  }),
+});
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
+    Layer.succeed(SignalHub.Service, quiet),
     Layer.succeed(
       Crypto.Crypto,
       Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),

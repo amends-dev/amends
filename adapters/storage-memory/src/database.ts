@@ -5,8 +5,10 @@
  * enforce with plain maps.
  */
 import type { Commit, Entry, Store } from "@amends/core/journal";
+import type { Signal } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
 import { Context, Deferred, Effect, Layer } from "effect";
+import type { Queue } from "effect";
 
 /** One commit's entries in one log, at one position. Stored batches are never changed. */
 export interface Batch {
@@ -78,6 +80,8 @@ export interface Interface {
   readonly writers: Map<Workspace.Id, object>;
   /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
+  /** Each workspace's signal subscribers, across every host; signals themselves are never kept. */
+  readonly listeners: Map<Workspace.Id, Set<Queue.Queue<Signal.Value>>>;
   /** Issue an identifier unique within this storage, for commits and entries. */
   readonly nextId: (prefix: string) => string;
 }
@@ -170,6 +174,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
     spaces: new Map(),
     writers: new Map(),
     appended: yield* Deferred.make<void>(),
+    listeners: new Map(),
     nextId: (prefix) => `${prefix}-${++issued}`,
   });
 });

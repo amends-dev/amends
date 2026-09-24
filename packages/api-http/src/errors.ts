@@ -11,6 +11,7 @@ import {
 } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
 import { NotificationApplication } from "@amends/core/notification";
+import { SignalApplication } from "@amends/core/signal";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
 
@@ -34,6 +35,9 @@ export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status
 export const UnknownPermission = PermissionCatalog.Unknown.pipe(HttpApiSchema.status(400));
 export const MemberNotFound = MemberApplication.NotFound.pipe(HttpApiSchema.status(404));
 export const NotificationNotFound = NotificationApplication.NotFound.pipe(
+  HttpApiSchema.status(404),
+);
+export const TypingThreadNotFound = SignalApplication.ThreadNotFound.pipe(
   HttpApiSchema.status(404),
 );
 export const OwnerProtected = MemberApplication.OwnerProtected.pipe(HttpApiSchema.status(409));

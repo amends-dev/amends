@@ -1,10 +1,11 @@
 import type * as Core from "@amends/core";
+import type { Signals } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
 import { Context } from "effect";
 import type { Crypto, Effect } from "effect";
 
-/** Storage-only dependencies; the gateway supplies cryptography. */
-export type Bindings = Exclude<Core.HostServices, Crypto.Crypto>;
+/** Storage-only dependencies; the gateway supplies cryptography and the workspace's signals. */
+export type Bindings = Exclude<Core.HostServices, Crypto.Crypto | Signals.Service>;
 
 export interface Interface {
   /**

@@ -1,7 +1,9 @@
 import * as Core from "@amends/core";
 import { Journal } from "@amends/core/journal";
+import { Signals } from "@amends/core/signal";
 import { Workspace } from "@amends/core/workspace";
 import { Context, Crypto, Duration, Effect, Exit, Layer, LayerMap, Schema, Scope } from "effect";
+import { SignalHub } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
@@ -32,6 +34,7 @@ export interface Interface {
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const storage = yield* WorkspaceStorage.Service;
+  const hub = yield* SignalHub.Service;
   const cryptography = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
 
@@ -39,7 +42,11 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     const bindings = yield* storage.forWorkspace(workspaceId);
     const services = Core.layer.pipe(
       Layer.provideMerge(
-        Layer.mergeAll(Layer.succeedContext(bindings), Layer.succeed(Crypto.Crypto, cryptography)),
+        Layer.mergeAll(
+          Layer.succeedContext(bindings),
+          Layer.succeed(Crypto.Crypto, cryptography),
+          Layer.succeed(Signals.Service, hub.forWorkspace(workspaceId)),
+        ),
       ),
       Layer.orDie,
     );

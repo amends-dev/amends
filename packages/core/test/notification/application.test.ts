@@ -24,6 +24,8 @@ import { MemberProjection } from "../../src/workspace/member/projection.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
 import { make, type Fixture } from "../memory-store.ts";
+import { TestSignals } from "../signals.ts";
+import { Signals } from "../../src/signal/signals.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
@@ -107,6 +109,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provide(host))),
     Layer.provide(notifications),
     Layer.provide(Layer.succeed(NotificationSource.Service, { workspaceId, resolve: unexpected })),
+    Layer.provide(TestSignals.layer(workspaceId)),
     Layer.provide(
       Layer.succeed(
         Crypto.Crypto,
@@ -134,7 +137,10 @@ it.effect(
   () =>
     Effect.gen(function* () {
       expectTypeOf<Layer.Services<typeof NotificationApplication.layer>>().toEqualTypeOf<
-        NotificationStore.Service | Authorization.Service | NotificationSource.Service
+        | NotificationStore.Service
+        | Authorization.Service
+        | NotificationSource.Service
+        | Signals.Service
       >();
       expectTypeOf<
         Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>

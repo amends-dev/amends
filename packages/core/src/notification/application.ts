@@ -6,6 +6,8 @@ import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationSource } from "./source.ts";
 import type { Thread } from "../thread/thread.ts";
+import { Signal } from "../signal/signal.ts";
+import { Signals } from "../signal/signals.ts";
 
 /** Missing and other recipients' notifications deliberately share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("NotificationApplication.NotFound", {
@@ -110,14 +112,16 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   WorkspaceMismatch,
-  NotificationStore.Service | Authorization.Service | NotificationSource.Service
+  NotificationStore.Service | Authorization.Service | NotificationSource.Service | Signals.Service
 > {
   const notifications = yield* NotificationStore.Service;
+  const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
   const source = yield* NotificationSource.Service;
   const workspaceId = authorization.workspaceId;
   yield* requireWorkspace(workspaceId, notifications.workspaceId);
   yield* requireWorkspace(workspaceId, source.workspaceId);
+  yield* requireWorkspace(workspaceId, signals.workspaceId);
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
@@ -199,6 +203,14 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     if (notification.state._tag !== "Pending")
       return yield* new AlreadyHandled({ notificationId: notification.id });
     yield* notifications.markSeen([notification.id], yield* DateTime.now);
+    // The recipient's other sessions hear of it as a signal.
+    yield* signals.publish(
+      Signal.Value.cases.NotificationsSeen.make({
+        workspaceId,
+        memberId: (yield* Actor.Service).memberId,
+        notificationIds: [notification.id],
+      }),
+    );
     // Another device may have seen it first; the stored time is the one that holds.
     const seen = yield* get(notification.id);
     if (seen.state._tag !== "Acknowledged")

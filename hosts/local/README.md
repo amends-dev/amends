@@ -63,7 +63,9 @@ configuration or start the application. Sign-in construction requires
 services or issues codes during construction. Database and server resources belong
 to their layer scopes. `GET /workspaces/:workspaceId/changes` exposes the core change
 feed through authenticated SSE; it follows the journal, so several host processes over one
-database deliver each other's commits. The gateway lazily boots each workspace, replaying
+database deliver each other's commits. Signals, such as typing sent with
+`POST /workspaces/:workspaceId/threads/:threadId/typing`, reach every host's subscribers through
+the PostgreSQL adapter's signal hub, which relays them with `NOTIFY`. The gateway lazily boots each workspace, replaying
 before it serves operations. It keeps the prepared services, including the workspace's
 change-feed follower, while requests or streams use them and for five idle minutes
 afterwards, then releases them; the next request boots the workspace again. Request scopes

@@ -1,6 +1,6 @@
 # Memory storage
 
-Workspace storage and the workspace directory held in process memory. This is the reference
+Workspace storage, the workspace directory, and the signal hub held in process memory. This is the reference
 implementation of the storage contracts: it passes the
 [conformance suites](../../packages/storage-conformance/README.md) like the PostgreSQL adapter, and
 enforces the same rules with plain maps and no query language. Nothing survives the process,
@@ -35,9 +35,13 @@ transaction see committed state; inside one, they see its copy. A handle from an
 workspace, or closed transaction fails. `waitForAppend` waits on a signal that each appending
 commit replaces.
 
+`MemorySignals` delivers [signals](../../packages/core/README.md#signals) between the hosts over
+one `MemoryDatabase`: publishing offers the signal to each of the workspace's subscribers at that
+moment, each through a queue of 256 that drops the oldest when it falls behind. Nothing is kept.
+
 ## Composition
 
-`layer` provides both gateway contracts over a new connection; a host provides
+`layer` provides the storage, directory, and signal hub contracts over a new connection; a host provides
 `MemoryDatabase.layer` beneath it. Building `layer` again over the same database is another
 host.
 

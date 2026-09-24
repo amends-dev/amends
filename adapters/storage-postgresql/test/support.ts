@@ -23,7 +23,8 @@ import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
-import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
+import { PostgresDatabase, PostgresSignals, PostgresStorage } from "../src/index.ts";
+import { Signals } from "@amends/core/signal";
 import { temporary } from "./postgres.ts";
 
 export const setup = () => {
@@ -42,7 +43,7 @@ export const workspaceId = Workspace.Id.make("workspace-one");
 export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
-export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
+export const bind = (context: Context.Context<WorkspaceStorage.Bindings | Signals.Service>) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
   participations: Context.get(context, ThreadParticipationStore.Service),
@@ -62,11 +63,18 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings>) => ({
   readStates: Context.get(context, ReadStateStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
+/** Workspace views over the database in context, each with its signals. */
 export const views = (options: PostgresStorage.Options = {}) =>
-  Effect.map(PostgresStorage.make(options), (service) => ({
-    forWorkspace: (workspaceId: Workspace.Id) =>
-      Effect.map(service.forWorkspace(workspaceId), bind),
-  }));
+  Effect.gen(function* () {
+    const service = yield* PostgresStorage.make(options);
+    const hub = yield* PostgresSignals.make();
+    return {
+      forWorkspace: (workspaceId: Workspace.Id) =>
+        Effect.map(service.forWorkspace(workspaceId), (context) =>
+          bind(Context.add(context, Signals.Service, hub.forWorkspace(workspaceId))),
+        ),
+    };
+  });
 export const database = (url: string) =>
   PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 });
 export const core = (bound: Bound) =>

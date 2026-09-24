@@ -28,6 +28,7 @@ import { ThreadActivityProjection } from "./thread/activity/projection.ts";
 import { Layer } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
+import { SignalApplication } from "./signal/application.ts";
 import { GroupApplication } from "./group/application.ts";
 import { GroupAudience } from "./group/audience.ts";
 import { GroupProjection } from "./group/projection.ts";
@@ -142,6 +143,7 @@ const operations = Layer.mergeAll(
   ReadStateApplication.layer,
   ThreadMessageApplication.layer,
   ThreadParticipationApplication.layer,
+  SignalApplication.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
@@ -174,9 +176,9 @@ export const layer = operations.pipe(
 );
 
 /**
- * Host-provided dependencies derived from the layer: workspace-bound stores,
- * the checkpoint store, cryptography, and the shared committed-event bus. Adding a required store changes this
- * type and makes incomplete host compositions fail type checking.
+ * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
+ * store, cryptography, and the workspace's signals. Adding a required store changes this type
+ * and makes incomplete host compositions fail type checking.
  *
  * @category models
  */

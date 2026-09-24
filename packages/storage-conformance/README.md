@@ -1,7 +1,7 @@
 # Storage conformance
 
-Test suites for the gateway's storage contracts, run by every storage adapter against
-itself. Behavior that core relies on is specified once here and checked on each adapter,
+Test suites for the gateway's storage and signal hub contracts, run by every storage adapter
+against itself. Behavior that core relies on is specified once here and checked on each adapter,
 so an adapter for another database passes the same tests as the ones in this repository.
 The [memory adapter](../../adapters/storage-memory/README.md) runs them as the reference
 implementation, with no query language behind it.
@@ -22,11 +22,11 @@ An adapter supplies a `Harness`, conventionally in `test/harness.ts`:
 
 `withStorage` passes the test a `Storage`:
 
-| Member               | Meaning                                                                                                                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `connect(options?)`  | Opens another host over the same storage, with its own connection or pool, closed with the test's scope. `failFast` asks for prompt contention where the adapter would otherwise wait. |
-| `discardProjections` | Removes every projected record, live projection version, and checkpoint, keeping logs and read state, as rebuilding projections does before replay. No storage contract performs this. |
-| `footprint`          | Counts every stored record, so a test can show that a rolled-back write left none.                                                                                                     |
+| Member               | Meaning                                                                                                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `connect(options?)`  | Opens another host over the same storage, with its own connection or pool, closed with the test's scope: its storage, directory, and signal hub. `failFast` asks for prompt contention where the adapter would otherwise wait. |
+| `discardProjections` | Removes every projected record, live projection version, and checkpoint, keeping logs and read state, as rebuilding projections does before replay. No storage contract performs this.                                         |
+| `footprint`          | Counts every stored record, so a test can show that a rolled-back write left none.                                                                                                                                             |
 
 Each adapter test file registers one suite, for example
 `Suites.transactions(harness)`. Tests of how one adapter stores data, such as SQL columns,
@@ -40,6 +40,7 @@ registration.
 | `journal`                    | Live appends observed across hosts, each log's head, workspace isolation of identical log IDs, projections going live on a new log and after a rebuild, commits stopped while projections are not exactly the registered ones, and replay after discarding projections. |
 | `transactions`               | Competing initialization, rollback of a late failure without leftover records, interruption, foreign and expired handles, and contention from another host.                                                                                                             |
 | `changeFeed`                 | The change feed read from the journal: commits from another host, resuming from a cursor on another host, and thread activity reaching only the group's readers.                                                                                                        |
+| `signals`                    | Signals between hosts in order, only to subscribers present and only within their workspace; typing reaching the thread's readers on another host and its authorization; read state reaching the person's own sessions alone.                                           |
 | `idempotency`                | Keyed appends across reopening, content validation, rollback of receipts, returned byte ownership, and concurrent attempts from two hosts.                                                                                                                              |
 | `factMetadata`               | Fact headers across reopening, filtered and paged fact and subject reads, and retries that compare metadata.                                                                                                                                                            |
 | `provenance`                 | Attribution of bootstrap, invitations, acceptance, and removal.                                                                                                                                                                                                         |

@@ -63,8 +63,9 @@ so a client can import the complete contract without loading server code.
   membership is required, and a missing record or another recipient's notification
   returns the same 404. The caller cannot select a different recipient.
 - `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream of the
-  commits the caller may see, resumable from a cursor. Authentication and active
-  membership are checked on entry.
+  commits and signals the caller may see, resumable from a cursor. Authentication and active
+  membership are checked on entry. `POST /workspaces/:workspaceId/threads/:threadId/typing`
+  tells the thread's readers that the caller is typing there, answering 204.
 
 ### Live changes
 
@@ -102,6 +103,16 @@ events carry the full message, so clients can render it without a refetch; activ
 participation events carry their public views. A commit with nothing the caller may see and
 no notification for them sends no message. The commit that removes the caller from the workspace is delivered,
 then the stream ends; reconnecting returns 403.
+
+Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
+`Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
+readers, and `ThreadRead`, `GroupCaughtUp`, and `NotificationsSeen` reach only the caller's own
+sessions after one of them records read state or acknowledges a notification. Signals have no
+cursor, are never replayed, and may be missed; after reconnecting, refresh read state with the rest
+of the view. Show a typing indicator until `until` unless another `Typing` extends it, and hide the
+caller's own. Send `POST …/threads/:threadId/typing` while the user types; repeats within two
+seconds are dropped, so clients need not throttle. It requires access to the thread and
+`thread.publish`; a missing or inaccessible thread returns 404 and a missing permission 403.
 
 The feed follows the journal, so commits from every host over the same database arrive.
 Five-second SSE comments keep idle connections open without producing application messages,

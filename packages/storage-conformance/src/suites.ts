@@ -24,6 +24,7 @@ export { ownership } from "./ownership.ts";
 export { provenance } from "./provenance.ts";
 export { readState } from "./read-state.ts";
 export { reads } from "./reads.ts";
+export { signals } from "./signals.ts";
 export { threadParticipation } from "./thread-participation.ts";
 export { threadReads } from "./thread-reads.ts";
 export { threadReplies } from "./thread-replies.ts";

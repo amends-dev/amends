@@ -55,7 +55,9 @@ caller's caught-up times, their follows, and their pending notification counts. 
 the caller's pending notifications from the group's threads: the activity addressed to them, as a
 sidebar badge shows it beside the bold of `newActivity`. Reading a thread settles its
 notifications and so lowers the count. Each notification records its thread's group, and the
-change feed delivers new ones to their recipient, so a client can keep the badge current.
+change feed delivers new ones to their recipient, so a client can keep the badge current; the
+reader's `ThreadRead`, `GroupCaughtUp`, and `NotificationsSeen`
+[signals](../packages/core/README.md#signals) keep it current across their sessions as they read.
 
 Management reads require neither group membership nor `group.read`. They expose only the
 group record and current admission records needed to manage that group. They do not join

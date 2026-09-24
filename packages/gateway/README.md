@@ -29,15 +29,15 @@ and `WorkspaceDirectoryListing` for public API documentation.
 
 ## Construction
 
-`Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`
-and `Crypto.Crypto`, in the host's scope. It captures
+`Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
+`SignalHub.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
-`WorkspaceStorage`, `Credentials`, `SignIn`, and `WorkspaceDirectory` declare
+`WorkspaceStorage`, `SignalHub`, `Credentials`, `SignIn`, and `WorkspaceDirectory` declare
 host-owned contracts. Their implementations and construction APIs belong to
 adapters or hosts; they have no default `make` or `layer` here. `Service.of(...)`
 is sufficient to type-check a supplied implementation.
@@ -63,7 +63,9 @@ is sufficient to type-check a supplied implementation.
   `asMember` wraps this operation in a short scope for ordinary request/response work.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
-part of core's `HostServices` bound to one workspace, plus `Crypto.Crypto`.
+part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
+`SignalHub.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`, and
+`Crypto.Crypto`.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
@@ -84,7 +86,9 @@ the last one closes. It is then released with its services, including its change
 follower, and the next request boots it again, finding its projections live. Memory
 therefore follows the workspaces in recent use rather than every workspace acquired since
 startup. Change-feed subscribers share their runtime's follower, and each process follows
-the journal itself, so subscribers on different hosts see the same commits. Host shutdown
+the journal itself, so subscribers on different hosts see the same commits. Signals reach
+them through the host's `SignalHub`, which relays between the processes over the same
+storage. Host shutdown
 closes runtime resources and subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
 fails its waiting requests as a defect. A later acquisition can retry; no operation
@@ -109,6 +113,13 @@ each workspace's active member count, and its pending invitations. Both are
 host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
+
+`SignalHub.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
+between every process over the same storage. It is separate from `WorkspaceStorage` because
+it stores nothing: an adapter may relay through its database, as PostgreSQL does with
+`NOTIFY`, or through any broker the host composes. Its `Signals.Service` is best effort; a
+publish never fails, and a subscriber that falls behind or loses its connection misses
+signals.
 
 ## Public outcomes
 

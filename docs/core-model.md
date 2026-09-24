@@ -2672,6 +2672,8 @@ Read positions and caught-up times are private, per-member state rather than jou
 change on every view, carry no audit value, and must not compete with conversation writes for the
 workspace's write order. Rebuilding projections from the journal does not restore them. Their
 store contract needs only keyed records, batch reads, and a forward-only update.
+A member's other connected sessions learn of each change as an ephemeral signal on the change
+feed, delivered only to that member and never stored; a session that reconnects rereads them.
 
 ### Effect at scale
 

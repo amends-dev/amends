@@ -326,8 +326,9 @@ recipients in its workspace, all or none of a call, and joins the caller's trans
 is one, so an enclosing rollback restores pending state. Rebuilding projections keeps it: the seen
 records reference notifications by ID, and the rebuilt notifications read as seen again.
 
-Acknowledgment creates no thread activity, no new notifications, and nothing in the change feed;
-a person's other devices learn of it when they reread the inbox. Handoffs of work, such as an
+Acknowledgment creates no thread activity, no new notifications, and no journal commit; the
+person's other connected sessions hear of it as a `NotificationsSeen`
+[signal](../packages/core/README.md#signals) on the change feed. Handoffs of work, such as an
 agent's turn accepting input or a channel delivery accepting a reply, will be journal facts that
 their owning workflows record in the same commit as the turn or delivery. The operation is
 implemented through core and the gateway on every storage adapter; its HTTP route and client
@@ -349,8 +350,9 @@ current group membership and `group.read`, and returns `GroupNotFound` otherwise
 time also only moves forward.
 
 Read positions and caught-up times are private state in `ReadStateStore`, outside the journal, as is
-human `Seen` beside the notifications: they are not facts, the change feed carries nothing for
-them, and rebuilding projections keeps them. A write outside a journal commit runs on its own, so reading does not wait for the
+human `Seen` beside the notifications: they are not facts, the change feed carries no events for
+them, and rebuilding projections keeps them. The person's connected sessions hear of each change
+as a `ThreadRead` or `GroupCaughtUp` [signal](../packages/core/README.md#signals). A write outside a journal commit runs on its own, so reading does not wait for the
 workspace's conversation writes.
 
 Each thread records the sequence and time of its latest message, and each group the time of its
@@ -368,6 +370,16 @@ from these records.
 Read-state tables reference no projection rows, so rebuilding projections from the journal keeps
 positions and caught-up times. Operations write read state only for threads and groups they have
 checked.
+
+## Typing
+
+`SignalApplication.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
+over HTTP, tells the thread's readers that the acting member is composing there. It needs the
+same current group access and `thread.publish` as posting, and returns `ThreadNotFound` for
+missing and inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals)
+reaches the group's members with `thread.read` for the thread, on every host, and lasts six
+seconds unless repeated; repeats within two seconds are dropped. It is never stored, creates no
+activity or participation, and a reader who connects later never sees it.
 
 ## Recorded changes and replay
 
@@ -455,7 +467,8 @@ with `thread.read` for that thread over the [change feed](../packages/core/READM
 Messages carry their full text, so clients render them without a refetch. Activity events omit
 their notification recipients, and participation events omit routing identities and admissions.
 Each notification an activity creates reaches its human or agent recipient in the same commit
-message, as their inbox lists it, with or without read access to the thread.
+message, as their inbox lists it, with or without read access to the thread. Typing reaches the
+same readers as the thread's facts, and read-state signals only the reader's own sessions.
 Notifications expose source references, not continuing authority to read the source conversation.
 
 The public core surface provides starts, human replies, follow/unfollow, and the authorized reads above. Internal store reads are not
@@ -484,7 +497,9 @@ scopes, inaccessible references, validation without partial writes, notification
 failures, outer transactions, concurrent departure, readmission, reopening, replay, and direct
 store constraints. Read suites cover exact grants, nonparticipant and later-member access,
 pagination, private identity filtering, no-write reads, current revocation, outer transactions,
-and rejection of corrupt cross-thread references. Core tests verify that the change feed delivers thread facts only to the group's readers.
+and rejection of corrupt cross-thread references. Core tests verify that the change feed delivers thread facts only to the group's readers, and
+signals by their reach under the reader's current access. Signal suites cover typing across hosts
+and its authorization, and read state reaching only the reader's own sessions.
 Reply suites cover scoped action grants, live access changes, initial and returning admissions,
 mention and unmentioned selection, agent use for mentioned agents only, concurrent sequencing and
 removal, projection and late failures,

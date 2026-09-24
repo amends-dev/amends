@@ -1,8 +1,11 @@
-import type { WorkspaceDirectory, WorkspaceStorage } from "@amends/gateway";
+import type { SignalHub, WorkspaceDirectory, WorkspaceStorage } from "@amends/gateway";
 import type { Context, Crypto, Effect, Layer, Scope } from "effect";
 
-/** The gateway contracts a storage adapter implements; one host holds both. */
-export type Host = WorkspaceStorage.Service | WorkspaceDirectory.Service;
+/**
+ * The gateway contracts a storage adapter implements; one host holds all three. Hosts over the
+ * same storage share the signal hub's signals, as processes over one system do.
+ */
+export type Host = WorkspaceStorage.Service | WorkspaceDirectory.Service | SignalHub.Service;
 
 export interface HostOptions {
   /**

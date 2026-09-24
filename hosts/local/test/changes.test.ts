@@ -2,7 +2,9 @@ import { Api, Authentication } from "@amends/api-http";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { ChangeFeed } from "@amends/core/change-feed";
 import { Identity } from "@amends/core/identity";
+import { Thread, ThreadApplication } from "@amends/core/thread";
 import { InvitationFacts, MemberFacts, Workspace } from "@amends/core/workspace";
+import { Gateway } from "@amends/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Exit, Layer, Queue, Redacted, Schema, Scope, Stream } from "effect";
@@ -18,12 +20,13 @@ const asToken = (token: string) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+/** The HTTP server over a host; the host's gateway stays available to seed what HTTP cannot. */
 const server = (url: string) =>
   HttpRouter.serve(LocalServer.layerRoutes, {
     disableLogger: true,
     disableListenLog: true,
   }).pipe(
-    Layer.provide(
+    Layer.provideMerge(
       Layer.mergeAll(
         LocalHost.layer(Redacted.make(url)),
         DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer)),
@@ -154,6 +157,59 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* Effect.all([second.close, foreign.close, reconnected.close, resumed.close]);
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
       ),
+  );
+
+  it.live("typing over HTTP reaches the thread's other readers through their subscription", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const alice = yield* client("alice");
+        const bob = yield* client("bob");
+        const workspace = yield* alice.workspaces.create({ payload: { name: "Typing" } });
+        const invitation = yield* alice.invitations.issue({
+          params: { workspaceId: workspace.id },
+          payload: {
+            recipientId: Identity.HumanId.make("bob"),
+            roleId: BuiltinRoles.ViewerId,
+            expiresAt: DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"),
+          },
+        });
+        const member = yield* bob.invitations.accept({
+          params: { workspaceId: workspace.id, invitationId: invitation.details.id },
+        });
+        // No HTTP endpoint starts threads yet; the host's gateway does it as alice.
+        const gateway = yield* Gateway.Service;
+        const started = yield* gateway.asMember(
+          workspace.id,
+          { _tag: "Human", id: Identity.HumanId.make("alice") },
+          Effect.flatMap(ThreadApplication.Service, (threads) =>
+            threads.startDirect({ memberIds: [member.id], mentions: [], text: "Hello" }),
+          ),
+        );
+        const threadId = started.thread.id;
+        const watching = yield* listen(bob, workspace.id);
+        yield* alice.changes.typing({ params: { workspaceId: workspace.id, threadId } });
+        const typing = yield* watching.next;
+        expect(typing).toMatchObject({
+          _tag: "Signal",
+          workspaceId: workspace.id,
+          signal: { _tag: "Typing", threadId, groupId: started.thread.groupId },
+        });
+        expect(
+          yield* alice.changes
+            .typing({
+              params: { workspaceId: workspace.id, threadId: Thread.Id.make("missing") },
+            })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "SignalApplication.ThreadNotFound", threadId: "missing" });
+        const http = yield* HttpClient.HttpClient;
+        const path = `/workspaces/${workspace.id}/threads/${threadId}/typing`;
+        expect((yield* http.post(path)).status).toBe(401);
+        expect(
+          (yield* http.post(path, { headers: { authorization: "Bearer outsider" } })).status,
+        ).toBe(403);
+        yield* watching.close;
+      }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
+    ),
   );
 
   it.live(

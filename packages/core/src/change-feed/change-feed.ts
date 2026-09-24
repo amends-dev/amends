@@ -3,6 +3,7 @@ import { Commit } from "../journal/commit.ts";
 import { Entry } from "../journal/entry.ts";
 import { Event as JournalEvent } from "../journal/event.ts";
 import { Notification } from "../notification/notification.ts";
+import { Signal } from "../signal/signal.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 
 /**
@@ -38,7 +39,8 @@ export interface Event extends Schema.Schema.Type<typeof Event> {}
  * consumer's cursor follow. Its cursor is where delivery starts; null means an empty journal.
  * Committed carries one commit for the reader, with the cursor that resumes after it: the events
  * they may see, in order, and the notifications it created for them, as their inbox lists them.
- * It is sent only when at least one of the two is present.
+ * It is sent only when at least one of the two is present. Signal carries something happening now,
+ * such as typing, that the reader may see; it has no cursor, is never replayed, and may be missed.
  */
 export const Message = Schema.TaggedUnion({
   Ready: {
@@ -52,6 +54,10 @@ export const Message = Schema.TaggedUnion({
     commitId: Commit.Id,
     events: Schema.Array(Event),
     notifications: Schema.Array(Notification.Record),
+  },
+  Signal: {
+    workspaceId: WorkspaceId.Id,
+    signal: Signal.Value,
   },
 }).annotate({ identifier: "ChangeFeedMessage" });
 export type Message = typeof Message.Type;

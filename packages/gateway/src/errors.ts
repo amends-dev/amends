@@ -24,6 +24,7 @@ import {
   Workspace,
 } from "@amends/core/workspace";
 import { ReadStateApplication } from "@amends/core/attention";
+import { SignalApplication } from "@amends/core/signal";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -81,6 +82,7 @@ export const PublicError = Schema.Union([
   NotificationApplication.SourceUnavailable,
   NotificationApplication.HumanRecipientRequired,
   NotificationApplication.AlreadyHandled,
+  SignalApplication.ThreadNotFound,
   ThreadApplication.GroupNotFound,
   ThreadApplication.NotFound,
   ThreadApplication.ParticipantUnavailable,

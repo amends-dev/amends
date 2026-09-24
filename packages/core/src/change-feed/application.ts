@@ -15,6 +15,8 @@ import { Member } from "../workspace/member/member.ts";
 import { ChangeFeed } from "./change-feed.ts";
 import type { ChangeFeedEvents } from "./events.ts";
 import { ChangeFeedSource } from "./source.ts";
+import { Signal } from "../signal/signal.ts";
+import { Signals } from "../signal/signals.ts";
 
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -51,9 +53,16 @@ const permits = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Va
       GrantScope.covers(grant.scope, requirement.target),
   );
 
+/** Whether a reader with this access holds a scope in the audience and any permission named. */
+const reaches = (
+  access: Access,
+  reach: { readonly audience: Audience.Value; readonly requirement: Requirement.Value | undefined },
+) =>
+  reach.audience.some((scope) => access.scopes.has(scope)) &&
+  (reach.requirement === undefined || permits(access.grants, reach.requirement));
+
 const visible = (access: Access) => (prepared: ChangeFeedEvents.Prepared) =>
-  prepared.audience.some((scope) => access.scopes.has(scope)) &&
-  (prepared.requirement === undefined || permits(access.grants, prepared.requirement));
+  reaches(access, prepared);
 
 /** Whether a fact changes this reader's access, so it must be reloaded before filtering. */
 const changes = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
@@ -63,15 +72,18 @@ const changes = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
 /** Capture the shared source and the reader's policy; authenticate the actor per subscription. @category constructors */
 export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
   const source = yield* ChangeFeedSource.Service;
+  const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
   const resolver = yield* GrantResolver.Service;
   const memberships = yield* GroupMembershipStore.Service;
   const workspaceId = authorization.workspaceId;
-  if (resolver.workspaceId !== workspaceId || memberships.workspaceId !== workspaceId)
+  const mismatched = [resolver.workspaceId, memberships.workspaceId, signals.workspaceId].find(
+    (id) => id !== workspaceId,
+  );
+  if (mismatched !== undefined)
     return yield* new Authorization.WorkspaceMismatch({
       expectedWorkspaceId: workspaceId,
-      actualWorkspaceId:
-        resolver.workspaceId !== workspaceId ? resolver.workspaceId : memberships.workspaceId,
+      actualWorkspaceId: mismatched,
     });
 
   const load = Effect.fnUntraced(function* (actor: Actor.Value) {
@@ -95,6 +107,8 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
     yield* authorization.require([]);
     const actor = yield* Actor.Service;
     let access = yield* load(actor).pipe(Effect.mapError(() => new ChangeFeed.Unavailable({})));
+    // Register for signals and commits before Ready, so neither misses what follows it.
+    const live = yield* signals.subscribe;
     const subscription = yield* source.subscribe(
       Option.map(Option.fromUndefinedOr(options.after), ChangeFeed.positionOf),
     );
@@ -135,7 +149,14 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
         ),
       ),
     );
-    return Stream.make(ready).pipe(Stream.concat(updates));
+    // Signals follow the reader's current access, reloaded by the commits above.
+    const happening = live.pipe(
+      Stream.filter((signal) => reaches(access, Signal.reachOf(signal))),
+      Stream.map((signal) => ChangeFeed.Message.cases.Signal.make({ workspaceId, signal })),
+    );
+    return Stream.make(ready).pipe(
+      Stream.concat(Stream.merge(updates, happening, { haltStrategy: "left" })),
+    );
   });
   return Service.of({ workspaceId, watch });
 });

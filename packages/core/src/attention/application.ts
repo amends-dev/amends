@@ -14,6 +14,8 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
+import { Signal } from "../signal/signal.ts";
+import { Signals } from "../signal/signals.ts";
 import { ThreadReading } from "./reading.ts";
 
 /** Only people keep read state; agents' turns track their input progress. */
@@ -82,6 +84,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const activities = yield* ThreadActivityStore.Service;
   const reading = yield* ThreadReading.Service;
   const readStates = yield* ReadStateStore.Service;
+  const signals = yield* Signals.Service;
   const workspaceId = authorization.workspaceId;
   if (
     [
@@ -90,6 +93,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       activities.workspaceId,
       reading.workspaceId,
       readStates.workspaceId,
+      signals.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -143,8 +147,16 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       readThrough: request.throughSequence,
     };
     // Reading settles the inbox up to the position. Both are private state, written outside the
-    // workspace's write order.
+    // workspace's write order; the reader's other sessions hear of it as a signal.
     yield* reading.markRead(reader, thread, position.readThrough);
+    yield* signals.publish(
+      Signal.Value.cases.ThreadRead.make({
+        workspaceId,
+        memberId: reader.memberId,
+        threadId: thread.id,
+        readThrough: position.readThrough,
+      }),
+    );
   });
 
   const markGroupRead = Effect.fn("ReadStateApplication.markGroupRead")(function* (
@@ -166,12 +178,21 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
         groupId: request.groupId,
       }),
     ]);
+    const caughtUpAt = yield* DateTime.now;
     yield* readStates.advanceGroup({
       workspaceId,
       memberId: reader.memberId,
       groupId: request.groupId,
-      caughtUpAt: yield* DateTime.now,
+      caughtUpAt,
     });
+    yield* signals.publish(
+      Signal.Value.cases.GroupCaughtUp.make({
+        workspaceId,
+        memberId: reader.memberId,
+        groupId: request.groupId,
+        caughtUpAt,
+      }),
+    );
   });
 
   return Service.of({ workspaceId, markThreadRead, markGroupRead });
