@@ -47,6 +47,13 @@ export const definition = Projection.make("workspace.roles", { version: 1 })
       const store = yield* requireStore(payload.workspaceId);
       yield* store.setPermissions(payload.roleId, payload.permissions);
     }),
+  )
+  .on(
+    RoleFacts.BuiltinsRevised,
+    Effect.fn("RoleProjection.builtinsRevised")(function* ({ payload }) {
+      const store = yield* requireStore(payload.workspaceId);
+      yield* store.recordBuiltinRevision(payload.revision);
+    }),
   );
 
 export * as RoleProjection from "./projection.ts";

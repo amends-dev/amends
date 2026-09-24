@@ -5,11 +5,12 @@ import { SqlClient } from "effect/unstable/sql";
 import { layer } from "../src/index.ts";
 import { database, inDatabase, setup } from "./support.ts";
 
-/** Projection tables; truncated together, so references among them need no order. */
+/** Projection tables, truncated to discard every projected record. */
 const projections = [
   "workspaces",
   "members",
   "roles",
+  "builtin_role_revisions",
   "assignments",
   "invitations",
   "notifications",

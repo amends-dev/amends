@@ -106,7 +106,9 @@ storage. Host shutdown
 closes runtime resources and subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
 fails its waiting requests as a defect. A later acquisition can retry; no operation
-runs before successful boot.
+runs before successful boot. After replay, boot brings built-in roles recorded at an earlier bundle
+revision to this host's with `BuiltinRoleUpgrade`; a workspace it cannot upgrade yet, such as
+while another host writes, boots with its recorded roles.
 
 Workspace creation remains core's atomic initialization operation. A new workspace
 has no history to replay. After boot, commits persist events and projection records

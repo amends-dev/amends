@@ -1,4 +1,5 @@
 import { expect, it } from "@effect/vitest";
+import * as Core from "../../src/core.ts";
 import { Permission } from "../../src/authorization/permission.ts";
 import { BuiltinRoles } from "../../src/authorization/role/builtin.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
@@ -63,4 +64,67 @@ it("invalid or duplicate declarations cannot silently produce built-in roles", (
     Reflect.set(malformed, "builtinTier", tier);
     expect(() => BuiltinRoles.make(workspaceId, [malformed])).toThrow("Schema validation failed");
   }
+});
+
+/**
+ * The bundles each released revision holds, by role. A workspace recorded at a revision keeps
+ * them until a host with a later one upgrades it, so an entry never changes once released: to
+ * change the declarations, add the next revision here and raise `BuiltinRoles.revision`.
+ */
+const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<string>>>>> = {
+  1: {
+    [BuiltinRoles.ViewerId]: [
+      "member.read",
+      "assignment.read",
+      "group.read",
+      "group.follow",
+      "thread.start",
+      "thread.read",
+      "thread.publish",
+      "thread.follow",
+      "agent.use",
+    ],
+    [BuiltinRoles.AdministratorId]: [
+      "member.read",
+      "member.remove",
+      "invitation.manage",
+      "assignment.read",
+      "assignment.manage",
+      "group.create",
+      "group.read",
+      "group.follow",
+      "group.membership.manage",
+      "thread.start",
+      "thread.read",
+      "thread.publish",
+      "thread.follow",
+      "agent.use",
+    ],
+    [BuiltinRoles.OwnerId]: [
+      "member.read",
+      "member.remove",
+      "invitation.manage",
+      "assignment.read",
+      "assignment.manage",
+      "workspace.transfer-ownership",
+      "group.create",
+      "group.read",
+      "group.follow",
+      "group.membership.manage",
+      "thread.start",
+      "thread.read",
+      "thread.publish",
+      "thread.follow",
+      "agent.use",
+    ],
+  },
+};
+
+it("the registered declarations make the current revision's bundles", () => {
+  expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
+  expect(
+    Object.fromEntries(
+      BuiltinRoles.make(workspaceId, Core.permissions).map((role) => [role.id, role.permissions]),
+    ),
+  ).toEqual(revisions[BuiltinRoles.revision]);
 });

@@ -25,8 +25,9 @@ export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()
  * Trusted host entry point after creation entitlement is checked. The caller is
  * an authenticated human, before a membership/Actor exists. Initialization is
  * one atomic commit and never grants additional access on a repeated call.
- * Built-in roles are recorded from the permission catalog's tiers, and the creator
- * receives one workspace-scoped Owner assignment. Existing roles are never refreshed here.
+ * Built-in roles are recorded from the permission catalog's tiers at the current revision, and
+ * the creator receives one workspace-scoped Owner assignment. Existing roles are never refreshed
+ * here; `BuiltinRoleUpgrade` brings an older workspace's roles to a later revision.
  */
 export const initialize = Effect.fn("WorkspaceInitialization.initialize")(function* (
   creator: Identity.HumanId,
@@ -67,6 +68,10 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
           permissions: role.permissions,
         });
       }
+      yield* journal.publish(RoleFacts.BuiltinsRevised, {
+        workspaceId: record.id,
+        revision: BuiltinRoles.revision,
+      });
       yield* journal.publish(AssignmentFacts.Created, {
         workspaceId: record.id,
         assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),

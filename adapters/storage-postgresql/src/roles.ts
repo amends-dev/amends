@@ -1,10 +1,10 @@
-import { Role, RoleStore } from "@amends/core/authorization";
+import { BuiltinRoles, Role, RoleStore } from "@amends/core/authorization";
 import { Store } from "@amends/core/journal";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
-import { roles } from "./schema.ts";
+import { builtinRoleRevisions, roles } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Role.Record));
 
@@ -82,6 +82,39 @@ export const make = Effect.fn("Roles.make")(function* () {
         permissions,
       ).pipe(Effect.mapError(storeConflict(RoleStore, "setPermissions")));
       yield* edit("setPermissions", id, { permissions: [...validated] });
+    }),
+    builtinRevision: guard(
+      db
+        .select({ revision: builtinRoleRevisions.revision })
+        .from(builtinRoleRevisions)
+        .where(eq(builtinRoleRevisions.workspaceId, workspaceId)),
+    ).pipe(
+      Effect.map((rows) => Array.head(rows.map(({ revision }) => revision))),
+      Effect.mapError(storeFailure(RoleStore, "builtinRevision")),
+    ),
+    recordBuiltinRevision: Effect.fn("Roles.recordBuiltinRevision")(function* (input) {
+      yield* Store.Transaction;
+      const revision = yield* Schema.decodeEffect(BuiltinRoles.Revision)(input).pipe(
+        Effect.mapError(storeConflict(RoleStore, "recordBuiltinRevision")),
+      );
+      // Only a later revision replaces the recorded one.
+      const rows = yield* guard(
+        db
+          .insert(builtinRoleRevisions)
+          .values({ workspaceId, revision })
+          .onConflictDoUpdate({
+            target: builtinRoleRevisions.workspaceId,
+            set: { revision },
+            setWhere: lt(builtinRoleRevisions.revision, revision),
+          })
+          .returning({ revision: builtinRoleRevisions.revision }),
+        true,
+      ).pipe(Effect.mapError(storeError(RoleStore, "recordBuiltinRevision")));
+      if (rows.length === 0)
+        return yield* new RoleStore.Conflict({
+          operation: "recordBuiltinRevision",
+          message: "Expected a later built-in revision",
+        });
     }),
   });
 });

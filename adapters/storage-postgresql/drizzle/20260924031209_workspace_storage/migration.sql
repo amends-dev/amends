@@ -16,6 +16,12 @@ CREATE TABLE "assignments" (
 	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_thread_id" IS NOT NULL AND "target_member_id" IS NULL AND "target_group_id" IS NULL) OR ("target_kind" = 'Group' AND "target_group_id" IS NOT NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL))))
 );
 --> statement-breakpoint
+CREATE TABLE "builtin_role_revisions" (
+	"workspace_id" text PRIMARY KEY,
+	"revision" integer NOT NULL,
+	CONSTRAINT "builtin_role_revision_positive" CHECK ("revision" > 0)
+);
+--> statement-breakpoint
 CREATE TABLE "checkpoints" (
 	"workspace_id" text,
 	"log_id" text,

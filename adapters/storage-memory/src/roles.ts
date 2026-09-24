@@ -1,4 +1,4 @@
-import { Role, RoleStore } from "@amends/core/authorization";
+import { BuiltinRoles, Role, RoleStore } from "@amends/core/authorization";
 import { Store } from "@amends/core/journal";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -7,6 +7,9 @@ import { Rows } from "./rows.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Role.Record));
 const rows = Rows.make(Schema.fromJsonString(Role.Record));
+const revisions = Rows.make(Schema.fromJsonString(BuiltinRoles.Revision));
+/** The workspace's one built-in revision row. */
+const revisionKey = "builtin";
 
 /**
  * Named permission bundles; edits keep the role's identity.
@@ -66,6 +69,30 @@ export const make = Effect.fn("Roles.make")(function* () {
     rename: (id, name) => edit("rename", id, (role) => Object.assign({}, role, { name })),
     setPermissions: (id, permissions) =>
       edit("setPermissions", id, (role) => Object.assign({}, role, { permissions })),
+    builtinRevision: Effect.flatMap(read, (space) =>
+      revisions.get(space.records.builtinRoleRevision, revisionKey),
+    ).pipe(Effect.mapError(storeFailure(RoleStore, "builtinRevision"))),
+    recordBuiltinRevision: Effect.fn("Roles.recordBuiltinRevision")(function* (input) {
+      yield* Store.Transaction;
+      const revision = yield* Schema.decodeEffect(BuiltinRoles.Revision)(input).pipe(
+        Effect.mapError(storeConflict(RoleStore, "recordBuiltinRevision")),
+      );
+      const space = yield* write.pipe(
+        Effect.mapError(storeFailure(RoleStore, "recordBuiltinRevision")),
+      );
+      const current = yield* revisions
+        .get(space.records.builtinRoleRevision, revisionKey)
+        .pipe(Effect.mapError(storeFailure(RoleStore, "recordBuiltinRevision")));
+      if (Option.isSome(current) && revision <= current.value)
+        return yield* new RoleStore.Conflict({
+          operation: "recordBuiltinRevision",
+          message: "Expected a later built-in revision",
+        });
+      const row = yield* revisions
+        .encode(revision)
+        .pipe(Effect.mapError(storeFailure(RoleStore, "recordBuiltinRevision")));
+      space.records.builtinRoleRevision.set(revisionKey, row);
+    }),
   });
 });
 

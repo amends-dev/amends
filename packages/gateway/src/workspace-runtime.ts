@@ -1,4 +1,5 @@
 import * as Core from "@amends/core";
+import { BuiltinRoleUpgrade } from "@amends/core/authorization";
 import { Journal } from "@amends/core/journal";
 import { Signals } from "@amends/core/signal";
 import { Workspace } from "@amends/core/workspace";
@@ -65,6 +66,12 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     );
     const context = yield* Layer.build(services);
     yield* Effect.orDie(Context.get(context, Journal.Service).replay);
+    // Bring built-in roles recorded by older code to this host's bundles. Recorded roles still
+    // serve if it cannot run now, such as while another host writes; a later boot finishes it.
+    yield* BuiltinRoleUpgrade.upgrade().pipe(
+      Effect.provide(context),
+      Effect.catch((error) => Effect.logWarning("Built-in role upgrade did not run", error)),
+    );
     return context;
   });
 

@@ -135,9 +135,8 @@ and cross-platform installer verification are pending.
 
 Fact and projection versions remain at 1, and each storage adapter has one development baseline
 with no upgrade migrations: recreate development databases after a schema or fact change.
-Built-in role bundles are recorded when a workspace is initialized, so permission declarations
-added later reach only new workspaces; existing workspaces need an explicit grant or role update,
-since nothing synchronizes stored bundles.
+Built-in roles are managed by the product: a later bundle revision replaces their names and
+permissions, and custom roles, which a workspace would edit itself, are not implemented.
 
 ## Live delivery and authorization
 

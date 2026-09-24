@@ -19,6 +19,8 @@ interface State {
   readonly live: Map<Entry.LogId, ReadonlyArray<Checkpoint.LiveVersion>>;
   readonly members: Map<string, Member.Record>;
   readonly roles: Map<string, Role.Record>;
+  /** Each workspace's built-in role revision. */
+  readonly builtinRevisions: Map<string, number>;
   readonly assignments: Map<string, Assignment.Record>;
   value: number;
 }
@@ -63,6 +65,7 @@ const cloneState = (state: State): State => ({
   ),
   members: new Map([...state.members].map(([key, member]) => [key, cloneMember(member)])),
   roles: new Map([...state.roles].map(([key, role]) => [key, cloneRole(role)])),
+  builtinRevisions: new Map(state.builtinRevisions),
   assignments: new Map(
     [...state.assignments].map(([key, assignment]) => [key, cloneAssignment(assignment)]),
   ),
@@ -123,6 +126,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
     live: new Map(),
     members: new Map(),
     roles: new Map(),
+    builtinRevisions: new Map(),
     assignments: new Map(),
     value: 0,
   });
@@ -646,6 +650,23 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
         });
         target.roles.set(keyOf(id), cloneRole(next));
       }),
+      builtinRevision: Effect.map(read("builtinRevision"), (state) =>
+        Option.fromUndefinedOr(state.builtinRevisions.get(workspaceId)),
+      ),
+      recordBuiltinRevision: Effect.fn("JournalTest.roles.recordBuiltinRevision")(
+        function* (revision) {
+          const target = yield* write("recordBuiltinRevision");
+          if (
+            !Number.isSafeInteger(revision) ||
+            revision <= (target.builtinRevisions.get(workspaceId) ?? 0)
+          )
+            return yield* new RoleStore.Conflict({
+              operation: "recordBuiltinRevision",
+              message: "Expected a later built-in revision",
+            });
+          target.builtinRevisions.set(workspaceId, revision);
+        },
+      ),
     });
   };
 

@@ -11,6 +11,7 @@ export { AssignmentStore } from "./assignment/store.ts";
 export { Authorization } from "./authorization.ts";
 export { Delegation } from "./delegation.ts";
 export { BuiltinRoles } from "./role/builtin.ts";
+export { BuiltinRoleUpgrade } from "./role/upgrade.ts";
 export { Grant } from "./grant.ts";
 export { GrantResolver } from "./grant-resolver.ts";
 export { Permission } from "./permission.ts";

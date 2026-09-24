@@ -25,6 +25,7 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 export type Error =
   | MemberStore.Failure
   | GrantResolver.Error
+  | PermissionCatalog.Unknown
   | WorkspaceMismatch
   | InvalidActor
   | InvalidResponse

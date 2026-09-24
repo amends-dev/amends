@@ -748,10 +748,10 @@ Custom roles will use explicit permission sets without needing a place in this h
 Workspace initialization records the generated role definitions and assigns Owner
 to the creator. These are ordinary stored permission bundles with stable reserved
 identities. Authorization and replay use the recorded permissions, so changing tier
-declarations never silently changes existing workspace access. During development,
-permission changes use a recreated database and freshly initialized workspaces.
-Synchronizing existing bundles is not required in this phase; compatibility will
-be revisited when production data must be preserved.
+declarations never silently changes existing workspace access. Instead, the bundles carry a
+revision: when a host loads a workspace recorded at an earlier one, it records the current
+bundles as role facts attributed to the system, and it never reverts a later revision. Built-in
+roles are therefore managed by the product; custom roles will carry a workspace's own choices.
 
 ### Creating, configuring, using, and authorizing an agent are distinct actions
 

@@ -272,23 +272,25 @@ it.effect("a missing role fails the complete resolution even after a valid direc
   }),
 );
 
-it.effect("unknown permissions fail resolution for both direct and role assignments", () =>
+it.effect("a permission the catalog no longer declares grants nothing, directly or by role", () =>
   Effect.gen(function* () {
-    const unknown = Permission.Name.make("member.unknown");
-    for (const source of [directSource(unknown, workspaceScope), roleSource()]) {
+    const retired = Permission.Name.make("member.retired");
+    const read = { permission: MemberPermissions.Read.name, scope: workspaceScope };
+    for (const [source, expected] of [
+      [directSource(retired, workspaceScope), [read]],
+      [roleSource(), [read, read]],
+    ] as const) {
       const fixture = yield* make();
       yield* seed(
         fixture,
-        [{ ...role, permissions: [MemberPermissions.Read.name, unknown] }],
+        [{ ...role, permissions: [MemberPermissions.Read.name, retired] }],
         [
           assigned("valid", directSource(MemberPermissions.Read.name, workspaceScope)),
-          assigned("invalid", source),
+          assigned("retired", source),
         ],
       );
-      expect(yield* run(fixture, Effect.flip(resolve))).toMatchObject({
-        _tag: "PermissionCatalog.Unknown",
-        name: unknown,
-      });
+      // The member keeps every other grant.
+      expect(yield* run(fixture, resolve)).toEqual(expected);
     }
   }),
 );

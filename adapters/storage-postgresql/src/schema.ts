@@ -189,6 +189,16 @@ export const roles = pgTable(
   (table) => [primaryKey({ columns: [table.workspaceId, table.id] })],
 );
 
+/** The built-in bundle revision a workspace's roles hold, which only moves forward. */
+export const builtinRoleRevisions = pgTable(
+  "builtin_role_revisions",
+  {
+    workspaceId: text("workspace_id").primaryKey(),
+    revision: integer("revision").notNull(),
+  },
+  (table) => [check("builtin_role_revision_positive", sql`${table.revision} > 0`)],
+);
+
 export const assignments = pgTable(
   "assignments",
   {

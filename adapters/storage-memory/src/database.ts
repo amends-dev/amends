@@ -32,6 +32,7 @@ export const projections = [
   "workspace",
   "members",
   "roles",
+  "builtinRoleRevision",
   "assignments",
   "invitations",
   "notifications",

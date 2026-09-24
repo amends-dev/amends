@@ -4,6 +4,7 @@
  */
 export { assignments } from "./assignments.ts";
 export { authorization } from "./authorization.ts";
+export { builtinRoles } from "./builtin-roles.ts";
 export { changeFeed } from "./change-feed.ts";
 export { contracts } from "./contracts.ts";
 export { factMetadata } from "./fact-metadata.ts";

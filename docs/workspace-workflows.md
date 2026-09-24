@@ -149,8 +149,16 @@ Creation attribution is kept separately from current ownership.
 Authorization resolves stored grants: roles confer permissions only through the bundles they
 store, and ownership supplies no implicit bypass. Each permission declares the lowest built-in
 role whose bundle includes it; Administrator includes the Viewer permissions, and Owner all of
-them. Bundles are recorded when a workspace is initialized, so a declaration change reaches only
-new workspaces. Role IDs are `builtin:viewer`, `builtin:administrator`, and `builtin:owner`.
+them. Role IDs are `builtin:viewer`, `builtin:administrator`, and `builtin:owner`.
+
+Bundles are recorded with the workspace at the current bundle revision, and authorization and
+replay use what is recorded. A change to the declarations raises the revision; when a host loads a
+workspace recorded at an earlier one, it records the new bundles as role facts attributed to the
+`builtin-roles` system, which open change feeds deliver like any role change. A host never reverts
+a later revision, so hosts on different versions during a deployment agree. If the upgrade cannot
+run, such as while another host writes, the workspace serves its recorded roles and a later load
+finishes it. A permission the code no longer declares grants nothing, leaving its holders' other
+grants intact.
 
 | Permission                     | Lowest role   | Target    | Authorizes                                                                        |
 | ------------------------------ | ------------- | --------- | --------------------------------------------------------------------------------- |

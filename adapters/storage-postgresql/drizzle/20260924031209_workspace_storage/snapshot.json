@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "1fd40242-df69-41fe-837a-a6fedc727ee1",
+  "id": "15af575c-b231-4654-9277-3b8263ee7e51",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -9,6 +9,12 @@
     {
       "isRlsEnabled": false,
       "name": "assignments",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "builtin_role_revisions",
       "entityType": "tables",
       "schema": "public"
     },
@@ -293,6 +299,32 @@
       "entityType": "columns",
       "schema": "public",
       "table": "assignments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "builtin_role_revisions"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "revision",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "builtin_role_revisions"
     },
     {
       "type": "text",
@@ -3889,6 +3921,16 @@
         "workspace_id"
       ],
       "nameExplicit": false,
+      "name": "builtin_role_revisions_pkey",
+      "schema": "public",
+      "table": "builtin_role_revisions",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "workspace_id"
+      ],
+      "nameExplicit": false,
       "name": "workspaces_pkey",
       "schema": "public",
       "table": "workspaces",
@@ -3907,6 +3949,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "assignments"
+    },
+    {
+      "value": "\"revision\" > 0",
+      "name": "builtin_role_revision_positive",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "builtin_role_revisions"
     },
     {
       "value": "(\"status\" = 'active' AND \"ended_at\" IS NULL) OR (\"status\" = 'ended' AND \"ended_at\" IS NOT NULL)",

@@ -57,6 +57,17 @@ export interface Interface {
     roleId: Role.Id,
     permissions: Role.Record["permissions"],
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+
+  /** The built-in bundle revision the workspace's roles hold; None before one is recorded. */
+  readonly builtinRevision: Effect.Effect<Option.Option<number>, Failure>;
+
+  /**
+   * Record a later built-in bundle revision. Fail with Conflict for one that is not a positive
+   * integer or not later than the recorded revision.
+   */
+  readonly recordBuiltinRevision: (
+    revision: number,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(

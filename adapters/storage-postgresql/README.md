@@ -149,8 +149,8 @@ and admission/removal races. Departure reuses the existing schema baseline.
 Authorized group reads also reuse these stores: ordinary reads require audience membership
 and `group.read`; explicit management reads inspect a known group under its management grant.
 The read suite verifies permission and audience separation, current rosters, staged changes,
-revocation, and reads without opening transactions. New role bundles include `group.read`;
-existing stored roles are unchanged.
+revocation, and reads without opening transactions. `builtin_role_revisions` holds the built-in
+bundle revision of each workspace's roles, which an upsert only moves forward.
 
 Thread opening persists the thread, its initial participants, a text message, ordered activity, and
 notifications in one workspace commit. A team-group opening enrolls its author and mentioned

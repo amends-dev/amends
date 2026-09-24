@@ -28,7 +28,6 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 export type Error =
   | AssignmentStore.Failure
   | RoleStore.Failure
-  | PermissionCatalog.Unknown
   | Schema.SchemaError
   | WorkspaceMismatch
   | MissingRole
@@ -39,7 +38,8 @@ export interface Interface {
   /**
    * Resolve active assignments from current state, using an existing transaction
    * when the caller supplies one. This does not open a transaction. Any invalid
-   * assignment fails the whole operation. Overlapping grants may repeat.
+   * assignment fails the whole operation. A recorded permission the catalog no longer declares
+   * grants nothing, since no requirement can name it. Overlapping grants may repeat.
    * Actor identity, active membership, and action requirements are checked by authorization.
    */
   readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Value>, Error>;
@@ -76,9 +76,16 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   const workspaceId = assignments.workspaceId;
   yield* requireWorkspace(workspaceId, roles.workspaceId);
 
+  /** A retired permission grants nothing, rather than failing every grant its holder has. */
   const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
-    const permission = yield* catalog.get(name);
-    return yield* Schema.decodeEffect(Grant.makeSchema(permission))({ permission: name, scope });
+    const permission = yield* catalog.get(name).pipe(
+      Effect.asSome,
+      Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
+    );
+    if (Option.isNone(permission)) return [];
+    return [
+      yield* Schema.decodeEffect(Grant.makeSchema(permission.value))({ permission: name, scope }),
+    ];
   });
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
@@ -101,7 +108,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
 
       const source = assignment.source;
       if (source._tag === "Direct") {
-        grants.push(yield* resolveGrant(source.grant.permission, source.grant.scope));
+        grants.push(...(yield* resolveGrant(source.grant.permission, source.grant.scope)));
       } else {
         const found = yield* roles.get(source.roleId);
         if (Option.isNone(found)) {
@@ -113,7 +120,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
           return yield* new InvalidResponse({ message: "Role store returned a different role ID" });
         }
         for (const name of role.permissions) {
-          grants.push(yield* resolveGrant(name, source.scope));
+          grants.push(...(yield* resolveGrant(name, source.scope)));
         }
       }
     }

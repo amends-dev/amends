@@ -211,9 +211,15 @@ names and scopes, and application services enforce ownership and delegation rule
 `Permission.Reference` retains only the name and target kind used by requirements,
 preserving the HTTP error contract without exposing bundle-construction metadata.
 
-Changing a declaration changes the desired bundles for new workspaces. Updating
-an existing workspace requires an explicit role fact; neither authorization nor
-replay regenerates its roles. `AssignmentApplication` provides listing, assignment,
+Neither authorization nor replay regenerates a workspace's roles; they use the recorded
+facts. Each workspace records the bundle revision its built-in roles hold. To change the
+declarations, raise `BuiltinRoles.revision` and add the new revision's bundles to the test that
+pins them. `BuiltinRoleUpgrade.upgrade` brings a workspace at an earlier revision to the host's,
+in one commit attributed to the `builtin-roles` system: it creates a missing built-in role and
+records the names and permissions that differ, then the revision. It leaves a workspace at the
+same or a later revision alone, so an older host never reverts it. The gateway runs it when it
+boots a workspace. A recorded permission the catalog no longer declares grants nothing, since no
+requirement can name it, and its holder's other grants stand. `AssignmentApplication` provides listing, assignment,
 revocation, and atomic workspace-role replacement. `Delegation` supplies the shared
 rules used by assignments, invitations, and member removal. Role definition editing
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)

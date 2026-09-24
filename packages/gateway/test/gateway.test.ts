@@ -99,7 +99,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       WorkspaceStore.Service,
       WorkspaceStore.Service.of({
         workspaceId: boundWorkspaceId,
-        get: unexpected(),
+        // Booting checks the built-in roles of an initialized workspace; these boot none.
+        get: Effect.succeedNone,
         insert: unexpected,
         transferOwnership: unexpected,
       }),
@@ -242,6 +243,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         insert: unexpected,
         rename: unexpected,
         setPermissions: unexpected,
+        builtinRevision: unexpected(),
+        recordBuiltinRevision: unexpected,
       }),
     ),
     Context.add(

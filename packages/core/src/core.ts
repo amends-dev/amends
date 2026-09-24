@@ -83,8 +83,11 @@ export const projections = [
   NotificationProjection.definition,
 ] as const;
 
-/** Permissions the domains declare; requirements and grants must name one of these. */
-const permissions = [
+/**
+ * Permissions the domains declare; requirements and grants must name one of these. Their tiers
+ * make the built-in role bundles, pinned by revision.
+ */
+export const permissions = [
   MemberPermissions.Read,
   MemberPermissions.Remove,
   InvitationPermissions.Manage,
