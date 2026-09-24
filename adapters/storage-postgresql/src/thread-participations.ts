@@ -117,6 +117,61 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "listByThread")),
     ),
+    pageActiveByThread: Effect.fn("ThreadParticipations.pageActiveByThread")(
+      function* (threadInput, input) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const options = yield* Schema.decodeEffect(ThreadParticipation.ListOptions)(input);
+        const orderedId = sql`${threadParticipations.id} COLLATE "C"`;
+        return yield* guard(
+          db
+            .select()
+            .from(threadParticipations)
+            .where(
+              and(
+                inWorkspace,
+                eq(threadParticipations.threadId, id),
+                eq(threadParticipations.status, "active"),
+                options.after === undefined ? undefined : sql`${orderedId} > ${options.after}`,
+              ),
+            )
+            .orderBy(orderedId)
+            .limit(options.limit),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadParticipationStore, "pageActiveByThread")),
+    ),
+    findActive: Effect.fn("ThreadParticipations.findActive")(
+      function* (threadInput, input) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const references = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Reference))(
+          input,
+        );
+        if (references.length === 0) return [];
+        // Each participant as the active-participation index keys it: its kind and ID.
+        const kinds = references.map((reference) => reference._tag);
+        const keys = references.map((reference) =>
+          reference._tag === "Member"
+            ? reference.memberId
+            : reference._tag === "Contact"
+              ? reference.contactId
+              : "",
+        );
+        return yield* guard(
+          db
+            .select()
+            .from(threadParticipations)
+            .where(
+              and(
+                inWorkspace,
+                eq(threadParticipations.threadId, id),
+                eq(threadParticipations.status, "active"),
+                sql`(${threadParticipations.participantKind}, coalesce(${threadParticipations.memberId}, ${threadParticipations.identityId}, '')) in (select * from unnest(${sql.param(kinds)}::text[], ${sql.param(keys)}::text[]))`,
+              ),
+            ),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadParticipationStore, "findActive")),
+    ),
     listByAdmission: Effect.fn("ThreadParticipations.listByAdmission")(
       function* (input) {
         const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);

@@ -266,9 +266,13 @@ All require current workspace/group membership and `thread.read` on the Thread t
 omit threads outside the caller's grants. Participation is not required or created by reading.
 Timeline pages use `ThreadActivityStore.ReadOptions` (positive `limit`, optional nonnegative
 `afterSequence`) and return typed timeline items in sequence order: message items contain
-`activity` and `message`, while participation items contain `activity` and a public `participant` joining summary. Current participants use
-`ThreadParticipation.Summary`, whose `participant` is a public member, contact, or triage reference
-without internal identity snapshots or admission links, excluding ended participation.
+`activity` and `message`, while participation items contain `activity` and a public `participant` joining summary. Current participants are paged
+with `ThreadParticipation.ListOptions` (positive `limit`, optional exclusive `after` participation
+ID) as `ThreadParticipation.Summary`, whose `participant` is a public member, contact, or triage
+reference without internal identity snapshots or admission links, excluding ended participation.
+Starts and replies read only the admissions and participations of those they name, through
+`GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; the stores'
+whole-history `listByGroup` and `listByThread` remain for inspection, and no operation uses them.
 Reads honor caller transactions but open none, and make no notification or checkpoint changes.
 Internal `ThreadActivityReading` shares authorized subject resolution between timeline pages and
 notification-source reads. It and `NotificationSource` are excluded from `Core.Operations`.

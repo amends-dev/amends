@@ -67,6 +67,40 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "listByThread")),
     ),
+    pageActiveByThread: Effect.fn("ThreadParticipations.pageActiveByThread")(
+      function* (threadInput, input) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const options = yield* Schema.decodeEffect(ThreadParticipation.ListOptions)(input);
+        const after = options.after;
+        return (yield* all)
+          .filter(
+            (record) =>
+              record.threadId === id &&
+              record.status === "active" &&
+              (after === undefined || compareBinary(record.id, after) > 0),
+          )
+          .toSorted(byId)
+          .slice(0, options.limit);
+      },
+      Effect.mapError(storeFailure(ThreadParticipationStore, "pageActiveByThread")),
+    ),
+    findActive: Effect.fn("ThreadParticipations.findActive")(
+      function* (threadInput, input) {
+        const id = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const references = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Reference))(
+          input,
+        );
+        if (references.length === 0) return [];
+        const keys = new Set(references.map(ThreadParticipation.keyOf));
+        return (yield* all).filter(
+          (record) =>
+            record.threadId === id &&
+            record.status === "active" &&
+            keys.has(ThreadParticipation.keyOf(record.participant)),
+        );
+      },
+      Effect.mapError(storeFailure(ThreadParticipationStore, "findActive")),
+    ),
     listByAdmission: Effect.fn("ThreadParticipations.listByAdmission")(
       function* (input) {
         const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);

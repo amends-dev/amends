@@ -51,11 +51,33 @@ export interface Ensured {
 }
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
+  /**
+   * Those of the given members with a current admission to the group and active workspace
+   * membership, with both records. Reads only the members asked about.
+   */
   readonly eligible: (
     groupId: Group.Id,
+    memberIds: ReadonlyArray<Member.Id>,
   ) => Effect.Effect<ReadonlyMap<Member.Id, Eligible>, ReadError | Schema.SchemaError>;
+  /**
+   * Every current participant: an active participation whose member, if any, still has a current
+   * group admission. Read in pages; a reply that addresses everyone needs them all.
+   */
   readonly current: (
     thread: Thread.Record,
+  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ReadError>;
+  /**
+   * A page of current participants in participation-ID order after the cursor. Stored
+   * participants that have lapsed are skipped, and reading continues to fill the page.
+   */
+  readonly page: (
+    thread: Thread.Record,
+    options: ThreadParticipation.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ReadError | Schema.SchemaError>;
+  /** The current participations of these participants, reading only them. */
+  readonly find: (
+    thread: Thread.Record,
+    participants: ReadonlyArray<ThreadParticipation.Reference>,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ReadError>;
   /**
    * Required admission steps of an authorized workflow. Members need a current group admission;
@@ -124,28 +146,32 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
   });
   const eligible = Effect.fn("ThreadParticipationAdmission.eligible")(function* (
     groupId: Group.Id,
+    memberIds: ReadonlyArray<Member.Id>,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
+    const requested = new Set(memberIds);
+    const result = new Map<Member.Id, Eligible>();
+    if (requested.size === 0) return result;
     const seen = new Set<GroupMembership.Id>();
     const active = new Map<Member.Id, GroupMembership.Record>();
-    for (const row of yield* memberships.listByGroup(id)) {
+    for (const row of yield* memberships.findActiveMany(id, [...requested])) {
       const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(row).pipe(
         Effect.mapError(invalidRecord),
       );
       if (
         admission.workspaceId !== workspaceId ||
         admission.groupId !== id ||
+        admission.status !== "active" ||
+        !requested.has(admission.memberId) ||
         seen.has(admission.id)
       )
         return yield* new InvalidResponse({ message: "Group admissions are inconsistent" });
       seen.add(admission.id);
-      if (admission.status !== "active") continue;
       if (active.has(admission.memberId))
         return yield* new InvalidResponse({ message: "Duplicate active group admission" });
       active.set(admission.memberId, admission);
     }
     const found = yield* loadMembers([...active.keys()]);
-    const result = new Map<Member.Id, Eligible>();
     for (const [memberId, admission] of active) {
       const member = found.get(memberId);
       if (member === undefined)
@@ -154,38 +180,50 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     }
     return result;
   });
-  const current = Effect.fn("ThreadParticipationAdmission.current")(function* (
-    input: Thread.Record,
-  ) {
+  const checkThread = Effect.fnUntraced(function* (input: Thread.Record) {
     const thread = yield* Schema.decodeEffect(Schema.toType(Thread.Record))(input).pipe(
       Effect.mapError(invalidRecord),
     );
     if (thread.workspaceId !== workspaceId)
       return yield* new InvalidResponse({ message: "Thread belongs to another workspace" });
+    return thread;
+  });
+  /** What one read of a thread's active participations has seen, so later reads cannot repeat it. */
+  interface Seen {
+    readonly ids: Set<ThreadParticipation.Id>;
+    readonly participants: Set<string>;
+  }
+  const unseen = (): Seen => ({ ids: new Set(), participants: new Set() });
+  /**
+   * Validate stored active participations of the thread, then keep those still current: contacts
+   * and triage take part without group access, and members need their current admission.
+   */
+  const backed = Effect.fnUntraced(function* (
+    thread: Thread.Record,
+    rows: ReadonlyArray<ThreadParticipation.Record>,
+    seen: Seen,
+  ) {
     const active: Array<ThreadParticipation.Record> = [];
-    const seen = new Set<ThreadParticipation.Id>();
-    const seenParticipants = new Set<string>();
-    for (const row of yield* participations.listByThread(thread.id)) {
+    for (const row of rows) {
       const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
         row,
       ).pipe(Effect.mapError(invalidRecord));
       if (
         participant.workspaceId !== workspaceId ||
         participant.threadId !== thread.id ||
-        seen.has(participant.id)
+        participant.status !== "active" ||
+        seen.ids.has(participant.id)
       )
         return yield* new InvalidResponse({
           message: "Participation store returned an inconsistent thread listing",
         });
-      seen.add(participant.id);
-      if (participant.status !== "active") continue;
+      seen.ids.add(participant.id);
       const key = ThreadParticipation.keyOf(participant.participant);
-      if (seenParticipants.has(key))
+      if (seen.participants.has(key))
         return yield* new InvalidResponse({ message: "Duplicate active thread participant" });
-      seenParticipants.add(key);
+      seen.participants.add(key);
       active.push(participant);
     }
-    // Contacts and triage take part without group access; members need a current admission.
     const joined = active.flatMap((p) => (p.participant._tag === "Member" ? [p.participant] : []));
     const admissions = yield* loadAdmissions(joined.map((p) => p.groupMembershipId));
     const found = yield* loadMembers(joined.map((p) => p.memberId));
@@ -214,6 +252,79 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     }
     return result;
   });
+  /** Read one page of stored active participations: those current, and the cursor after it. */
+  const pageAfter = Effect.fnUntraced(function* (
+    thread: Thread.Record,
+    options: ThreadParticipation.ListOptions,
+    seen: Seen,
+  ) {
+    const rows = yield* participations.pageActiveByThread(thread.id, options);
+    if (rows.length > options.limit)
+      return yield* new InvalidResponse({ message: "Participation page exceeds its limit" });
+    const participants = yield* backed(thread, rows, seen);
+    const last = rows.at(-1);
+    return {
+      participants,
+      next: rows.length < options.limit || last === undefined ? undefined : last.id,
+    };
+  });
+  /** Store pages a whole-thread read takes at a time. */
+  const pageSize = 500;
+  const current = Effect.fn("ThreadParticipationAdmission.current")(function* (
+    input: Thread.Record,
+  ) {
+    const thread = yield* checkThread(input);
+    const seen = unseen();
+    const result: Array<ThreadParticipation.Record> = [];
+    let after: ThreadParticipation.Id | undefined;
+    do {
+      const read = yield* pageAfter(
+        thread,
+        after === undefined ? { limit: pageSize } : { after, limit: pageSize },
+        seen,
+      );
+      result.push(...read.participants);
+      after = read.next;
+    } while (after !== undefined);
+    return result;
+  });
+  const page = Effect.fn("ThreadParticipationAdmission.page")(function* (
+    input: Thread.Record,
+    request: ThreadParticipation.ListOptions,
+  ) {
+    const thread = yield* checkThread(input);
+    const options = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.ListOptions))(
+      request,
+    );
+    const seen = unseen();
+    const result: Array<ThreadParticipation.Record> = [];
+    let after = options.after;
+    do {
+      const read = yield* pageAfter(
+        thread,
+        after === undefined ? { limit: options.limit } : { after, limit: options.limit },
+        seen,
+      );
+      // Anything past the limit follows the last one returned, so the caller's cursor finds it.
+      result.push(...read.participants.slice(0, options.limit - result.length));
+      after = read.next;
+    } while (after !== undefined && result.length < options.limit);
+    return result;
+  });
+  const find = Effect.fn("ThreadParticipationAdmission.find")(function* (
+    input: Thread.Record,
+    references: ReadonlyArray<ThreadParticipation.Reference>,
+  ) {
+    const thread = yield* checkThread(input);
+    const requested = new Set(references.map(ThreadParticipation.keyOf));
+    if (requested.size === 0) return [];
+    const rows = yield* participations.findActive(thread.id, references);
+    if (rows.some((row) => !requested.has(ThreadParticipation.keyOf(row.participant))))
+      return yield* new InvalidResponse({
+        message: "Participation store returned a participant not asked for",
+      });
+    return yield* backed(thread, rows, unseen());
+  });
   const ensure = Effect.fn("ThreadParticipationAdmission.ensure")(function* (
     thread: Thread.Record,
     references: ReadonlyArray<ThreadParticipation.Reference>,
@@ -226,15 +337,33 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     );
     if (new Set(requested.map(ThreadParticipation.keyOf)).size !== requested.length)
       return yield* new InvalidResponse({ message: "Participants must be distinct" });
-    const candidates = requested.some((reference) => reference._tag === "Member")
-      ? yield* eligible(thread.groupId)
-      : new Map<Member.Id, Eligible>();
+    // Current participants are reused; they already hold the member's current admission.
     const existing = new Map(
-      (yield* current(thread)).map((p) => [ThreadParticipation.keyOf(p.participant), p] as const),
+      (yield* find(thread, requested)).map(
+        (p) => [ThreadParticipation.keyOf(p.participant), p] as const,
+      ),
     );
+    const joining = requested.flatMap((reference) =>
+      reference._tag === "Member" && !existing.has(ThreadParticipation.keyOf(reference))
+        ? [reference.memberId]
+        : [],
+    );
+    const candidates =
+      joining.length > 0
+        ? yield* eligible(thread.groupId, joining)
+        : new Map<Member.Id, Eligible>();
     const result: Array<ThreadParticipation.Record> = [];
     const added: Array<Event.Type<typeof ThreadParticipationFacts.Added>> = [];
     for (const reference of requested) {
+      const previous = existing.get(ThreadParticipation.keyOf(reference));
+      if (previous !== undefined) {
+        if (previous.joinedAtSequence > sequence)
+          return yield* new InvalidResponse({
+            message: "Current participation has an inconsistent admission or sequence",
+          });
+        result.push(previous);
+        continue;
+      }
       let participant: ThreadParticipation.Participant;
       if (reference._tag === "Member") {
         const candidate = candidates.get(reference.memberId);
@@ -247,20 +376,6 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
           identity: candidate.member.identity,
         };
       } else participant = reference;
-      const previous = existing.get(ThreadParticipation.keyOf(reference));
-      if (previous !== undefined) {
-        if (
-          (participant._tag === "Member" &&
-            (previous.participant._tag !== "Member" ||
-              previous.participant.groupMembershipId !== participant.groupMembershipId)) ||
-          previous.joinedAtSequence > sequence
-        )
-          return yield* new InvalidResponse({
-            message: "Current participation has an inconsistent admission or sequence",
-          });
-        result.push(previous);
-        continue;
-      }
       const admitted = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Admission))({
         id: ThreadParticipation.Id.make(yield* crypto.randomUUIDv4),
         workspaceId,
@@ -281,7 +396,7 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     }
     return { participants: result, added };
   });
-  return Service.of({ workspaceId, eligible, current, ensure });
+  return Service.of({ workspaceId, eligible, current, page, find, ensure });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadParticipationAdmission from "./admission.ts";

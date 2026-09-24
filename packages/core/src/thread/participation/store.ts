@@ -28,8 +28,26 @@ export interface Interface {
   readonly getMany: (
     ids: ReadonlyArray<ThreadParticipation.Id>,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+  /**
+   * Every participation the thread has had, active or ended, in stable ID order. A history read
+   * for inspection; operations use the bounded reads below.
+   */
   readonly listByThread: (
     id: ThreadId.Id,
+  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+  /** A page of the thread's active participations in binary participation-ID order, after the cursor. */
+  readonly pageActiveByThread: (
+    id: ThreadId.Id,
+    options: ThreadParticipation.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+  /**
+   * The thread's active participations of these participants, in one read. Each found record
+   * appears once; order is unspecified, so callers index results by participant. An empty
+   * request reads nothing.
+   */
+  readonly findActive: (
+    id: ThreadId.Id,
+    participants: ReadonlyArray<ThreadParticipation.Reference>,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
   readonly listByAdmission: (
     id: GroupMembership.Id,

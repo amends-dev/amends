@@ -99,9 +99,9 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         }),
       ]);
       const actor = yield* Actor.Service;
-      const current = (yield* admissions.current(thread)).find(
-        (p) => ThreadParticipation.memberOf(p.participant) === actor.memberId,
-      );
+      const [current] = yield* admissions.find(thread, [
+        { _tag: "Member", memberId: actor.memberId },
+      ]);
       if (current !== undefined) return ThreadParticipation.toSummary(current);
       const sequence = yield* recording.nextSequence(thread.id);
       const occurredAt = yield* DateTime.now;
@@ -162,7 +162,9 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
       if (!sameIdentity(own.identity, actor.identity))
         return yield* new InvalidResponse({ message: "Participation has another identity" });
       if (participant.status === "ended") return yield* new AlreadyEnded(request);
-      const current = (yield* admissions.current(thread)).find((p) => p.id === participant.id);
+      const current = (yield* admissions.find(thread, [ThreadParticipation.referenceOf(own)])).find(
+        (p) => p.id === participant.id,
+      );
       if (current === undefined)
         return yield* new InvalidResponse({
           message: "Participation no longer has a current group admission",

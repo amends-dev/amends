@@ -901,6 +901,12 @@ export const threadReplies = (harness: Harness) => {
             const before = yield* snapshot(bound, first.thread.id);
             const current = (yield* bound.participations.listByThread(first.thread.id))[0];
             if (current === undefined) return yield* Effect.die("Missing participant");
+            const mistaken = Object.assign({}, current, {
+              participant: {
+                ...memberParticipant(current),
+                identity: { _tag: "Human" as const, id: Identity.HumanId.make("wrong") },
+              },
+            });
             const contexts = [
               Context.add(bound.context, ThreadStore.Service, {
                 ...bound.threads,
@@ -925,17 +931,26 @@ export const threadReplies = (harness: Harness) => {
               }),
               Context.add(bound.context, ThreadParticipationStore.Service, {
                 ...bound.participations,
-                listByThread: () => Effect.succeed([current, current]),
+                pageActiveByThread: () => Effect.succeed([current, current]),
               }),
               Context.add(bound.context, ThreadParticipationStore.Service, {
                 ...bound.participations,
-                listByThread: () =>
-                  Effect.succeed([
+                pageActiveByThread: () => Effect.succeed([mistaken]),
+              }),
+              // The reply's own lookup of the participants it addresses is checked the same way.
+              Context.add(bound.context, ThreadParticipationStore.Service, {
+                ...bound.participations,
+                findActive: () => Effect.succeed([mistaken]),
+              }),
+              // A participant the reply did not ask about, however valid, is not trusted.
+              Context.add(bound.context, ThreadParticipationStore.Service, {
+                ...bound.participations,
+                findActive: (threadId, participants) =>
+                  Effect.map(bound.participations.findActive(threadId, participants), (rows) => [
+                    ...rows,
                     Object.assign({}, current, {
-                      participant: {
-                        ...memberParticipant(current),
-                        identity: { _tag: "Human" as const, id: Identity.HumanId.make("wrong") },
-                      },
+                      id: ThreadParticipation.Id.make("unasked"),
+                      participant: { _tag: "Triage" as const },
                     }),
                   ]),
               }),

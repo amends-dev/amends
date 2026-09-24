@@ -67,6 +67,27 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "findActive")),
     ),
+    findActiveMany: Effect.fn("GroupMemberships.findActiveMany")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const memberIds = yield* Schema.decodeEffect(Schema.Array(Member.Id))(input);
+        if (memberIds.length === 0) return [];
+        return yield* guard(
+          db
+            .select()
+            .from(groupMemberships)
+            .where(
+              and(
+                inWorkspace,
+                eq(groupMemberships.groupId, groupId),
+                eq(groupMemberships.status, "active"),
+                inIds(groupMemberships.memberId, memberIds),
+              ),
+            ),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
+    ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
       function* (input) {
         const groupId = yield* Schema.decodeEffect(Group.Id)(input);

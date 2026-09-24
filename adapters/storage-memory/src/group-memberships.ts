@@ -45,6 +45,20 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "findActive")),
     ),
+    findActiveMany: Effect.fn("GroupMemberships.findActiveMany")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const memberIds = new Set(yield* Schema.decodeEffect(Schema.Array(Member.Id))(input));
+        if (memberIds.size === 0) return [];
+        return (yield* all).filter(
+          (record) =>
+            record.groupId === groupId &&
+            record.status === "active" &&
+            memberIds.has(record.memberId),
+        );
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
+    ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
       function* (input) {
         const groupId = yield* Schema.decodeEffect(Group.Id)(input);

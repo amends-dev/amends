@@ -98,8 +98,9 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const current = yield* admissions.current(thread);
-      // Without mentions a reply addresses every current participant, including contacts and triage.
+      // Without mentions a reply addresses every current participant, including contacts and
+      // triage; with them, only the author and those mentioned are read.
+      const current = request.mentions.length === 0 ? yield* admissions.current(thread) : [];
       const author: ThreadParticipation.Reference = { _tag: "Member", memberId: actor.memberId };
       const addressed: ReadonlyArray<ThreadParticipation.Reference> =
         request.mentions.length === 0
@@ -113,9 +114,18 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
           ]),
         ).values(),
       ];
-      const eligible = yield* admissions.eligible(thread.groupId);
+      // Current participants already hold a current admission; only the others need checking.
+      const participating = new Set(
+        current.flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? []),
+      );
+      const joining = selected.flatMap((reference) =>
+        reference._tag === "Member" && !participating.has(reference.memberId)
+          ? [reference.memberId]
+          : [],
+      );
+      const eligible = yield* admissions.eligible(thread.groupId, joining);
       for (const reference of selected) {
-        if (reference._tag !== "Member") continue;
+        if (reference._tag !== "Member" || participating.has(reference.memberId)) continue;
         const entry = eligible.get(reference.memberId);
         if (entry === undefined)
           return yield* new ParticipantUnavailable({ memberId: reference.memberId });

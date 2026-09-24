@@ -1476,7 +1476,9 @@ export const threadParticipation = (harness: Harness) => {
               const participants = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) => s.listParticipants(threadId)),
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.listParticipants(threadId, { limit: 100 }),
+                ),
               );
               expect(
                 participants.map((p) => p.participant).filter((p) => p._tag !== "Member"),
@@ -1485,6 +1487,18 @@ export const threadParticipation = (harness: Harness) => {
                   left._tag < right._tag ? -1 : 1,
                 ),
               );
+              // A participant is found by its kind and ID: a member with the contact's ID is not it.
+              expect(
+                (yield* bound.participations.findActive(threadId, [
+                  { _tag: "Contact", contactId },
+                  { _tag: "Triage" },
+                ])).toSorted((left, right) => (left.id < right.id ? -1 : 1)),
+              ).toEqual([contact, triage]);
+              expect(
+                yield* bound.participations.findActive(threadId, [
+                  { _tag: "Member", memberId: Member.Id.make(contactId) },
+                ]),
+              ).toEqual([]);
               for (const recipient of [
                 { _tag: "Contact", id: contactId },
                 { _tag: "Triage" },

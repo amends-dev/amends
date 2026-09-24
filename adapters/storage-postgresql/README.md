@@ -54,8 +54,13 @@ Read-state tables reference no projection rows, so rebuilding projections keeps 
 `active_group_memberships_by_member` pages a member's current groups in group-ID order for
 group lists; rosters page a group's active admissions by admission ID.
 
-`participations_by_thread` and `group_memberships_by_member` serve a thread's participants,
-participant checks, and a member's group admissions; they and `threads_by_group` and
+`active_participations_by_thread` pages a thread's current participants by participation ID,
+and `active_thread_participation`, the index that keeps one active participation per participant,
+also finds the participants a start or reply names. `active_group_membership` likewise finds the
+current admissions of the members it names.
+
+`participations_by_thread` and `group_memberships_by_member` serve a thread's participation
+history, participant checks, and a member's group admissions; they and `threads_by_group` and
 `participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID
 order without a sort. Notification and fact pages compare `(recorded_at, id)` and
 `(position, entry_index)` cursors as rows, which bounds the index scan instead of filtering

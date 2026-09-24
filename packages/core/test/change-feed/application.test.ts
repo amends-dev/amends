@@ -185,6 +185,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       getMany: unexpected,
       findActive: unexpected,
       listByGroup: unexpected,
+      findActiveMany: unexpected,
       pageActiveByGroup: unexpected,
       pageActiveByMember: unexpected,
       listActiveByMember: (memberId) =>

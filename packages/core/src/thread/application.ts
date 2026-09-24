@@ -125,9 +125,14 @@ export interface Interface {
     threadId: Thread.Id,
     options: ThreadActivityStore.ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Thread.TimelineItem>, ReadError, Actor.Service>;
-  /** Active participation backed by current workspace/group admissions; public member references only. */
+  /**
+   * A page of current participants: active participations backed by current workspace and group
+   * admissions, in participation-ID order after the exclusive cursor, with public member
+   * references only.
+   */
   readonly listParticipants: (
     threadId: Thread.Id,
+    options: ThreadParticipation.ListOptions,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Summary>, ReadError, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
@@ -173,14 +178,11 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     return yield* new InvalidResponse({
       message: "Thread services belong to different workspaces",
     });
-  /** Members whose current admission follows the group, in stable order. */
-  const followersOf = Effect.fnUntraced(function* (
-    groupId: Group.Id,
-    eligible: ReadonlyMap<Member.Id, ThreadParticipationAdmission.Eligible>,
-  ) {
+  /** The group's active follows, checked; whether each counts depends on its member's admission. */
+  const followsOf = Effect.fnUntraced(function* (groupId: Group.Id) {
     const seen = new Set<GroupFollow.Id>();
     const admissions = new Set<GroupMembership.Id>();
-    const followers: Array<Member.Id> = [];
+    const result: Array<GroupFollow.Record> = [];
     for (const row of yield* follows.listActiveByGroup(groupId)) {
       const follow = yield* Schema.decodeEffect(Schema.toType(GroupFollow.Record))(row).pipe(
         Effect.mapError(
@@ -199,11 +201,9 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         });
       seen.add(follow.id);
       admissions.add(follow.groupMembershipId);
-      // A follow counts only through the member's current admission.
-      if (eligible.get(follow.memberId)?.admission.id === follow.groupMembershipId)
-        followers.push(follow.memberId);
+      result.push(follow);
     }
-    return followers.sort();
+    return result;
   });
   /**
    * Check the starting participants, authorize the agents the author names, then open the thread
@@ -283,7 +283,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         }),
       ]);
       const eligible = yield* admissions
-        .eligible(group.id)
+        .eligible(group.id, memberIds)
         .pipe(
           Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
             Effect.fail(new InvalidResponse({ message: error.message })),
@@ -315,8 +315,20 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+      const foundGroup = yield* groups.get(request.groupId);
+      if (Option.isNone(foundGroup))
+        return yield* new InvalidResponse({ message: "Audience group is missing" });
+      const group = foundGroup.value;
+      // A direct group's members all take part; a team thread starts with its author, the
+      // members its opening message mentions, and the group's followers. The rest of the group
+      // sees it as unread, so only these members' admissions are read.
+      const followed = group.kind === "Direct" ? [] : yield* followsOf(request.groupId);
+      const involved =
+        group.kind === "Direct"
+          ? group.memberIds
+          : [...request.mentions, ...followed.map((follow) => follow.memberId)];
       const eligible = yield* admissions
-        .eligible(request.groupId)
+        .eligible(request.groupId, [actor.memberId, ...involved])
         .pipe(
           Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
             Effect.fail(new InvalidResponse({ message: error.message })),
@@ -324,24 +336,19 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         );
       if (eligible.get(actor.memberId)?.admission.id !== authorAdmission.id)
         return yield* new InvalidResponse({
-          message: "Group listing omitted the author's current admission",
+          message: "Admission lookup omitted the author's current admission",
         });
-      const foundGroup = yield* groups.get(request.groupId);
-      if (Option.isNone(foundGroup))
-        return yield* new InvalidResponse({ message: "Audience group is missing" });
-      // A direct group's members all take part; a team thread starts with its author, the
-      // members its opening message mentions, and the group's followers. The rest of the group
-      // sees it as unread.
+      // A follow counts only through the member's current admission.
+      const followers = followed
+        .filter(
+          (follow) => eligible.get(follow.memberId)?.admission.id === follow.groupMembershipId,
+        )
+        .map((follow) => follow.memberId)
+        .sort();
       const selected =
-        foundGroup.value.kind === "Direct"
+        group.kind === "Direct"
           ? [...eligible.keys()].sort()
-          : [
-              ...new Set([
-                actor.memberId,
-                ...request.mentions,
-                ...(yield* followersOf(request.groupId, eligible)),
-              ]),
-            ];
+          : [...new Set([actor.memberId, ...request.mentions, ...followers])];
       const missing = request.mentions.find((id) => !eligible.has(id));
       if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
       return yield* begin(request.groupId, selected, request.mentions, eligible, request);
@@ -471,10 +478,11 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   );
   const listParticipants = Effect.fn("ThreadApplication.listParticipants")(function* (
     threadId: Thread.Id,
+    options: ThreadParticipation.ListOptions,
   ) {
     const thread = yield* get(threadId);
     const participants = yield* admissions
-      .current(thread)
+      .page(thread, options)
       .pipe(
         Effect.catchTag("ThreadParticipationAdmission.InvalidResponse", (error) =>
           Effect.fail(new InvalidResponse({ message: error.message })),

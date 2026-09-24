@@ -213,7 +213,7 @@ for an exact thread. Membership, authorship, ownership, group management, `group
 | `get(threadId)`                                     | The thread's metadata.                                                                                                                                                                                       |
 | `listInGroup(groupId, { limit, before? })`          | A page of `Thread.ListItem` values, newest latest activity first: each readable thread with its latest message, the caller's read position, and `unread`. Threads without a covering read grant are skipped. |
 | `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject.                                                                                                            |
-| `listParticipants(threadId)`                        | Current `ThreadParticipation.Summary` values in participation-ID order.                                                                                                                                      |
+| `listParticipants(threadId, { limit, after? })`     | A page of current `ThreadParticipation.Summary` values in participation-ID order, after the exclusive `after` participation ID.                                                                              |
 
 `listInGroup` checks `thread.read` for each page of threads with one grant resolution and keeps
 reading until the page is full or the group has no older threads. Its exclusive `before` cursor
@@ -256,6 +256,9 @@ history. A member appears only while its participation, exact original group adm
 workspace membership are all active; contacts and triage need only active participation. The
 current start and reply workflows admit members only. Rejoining a group under a new admission cannot make an
 old participation current again. Member profiles are read through their own authorized operations.
+A page skips participants who are no longer current and keeps reading until it holds `limit` of
+them or the thread has no more; an empty page ends the listing. Reads return active participations
+only, so a thread's ended history never adds to a page's cost.
 
 Missing, foreign, and outside-audience thread IDs share `ThreadApplication.NotFound` for metadata,
 timeline, and participant reads. An inaccessible group list returns `ThreadApplication.GroupNotFound`.
@@ -269,7 +272,7 @@ Reads open no transaction and perform no journal, checkpoint, participation, or 
 writes. An enclosing caller transaction is honored, including staged activity, admissions,
 departures, and grant changes. Separate reads and pages do not promise a shared snapshot;
 revocation affects subsequent authorization checks but does not cancel an already-authorized read.
-Group thread lists and timelines have cursor pages; current-participant lists are unpaginated.
+Group thread lists, timelines, and current-participant lists have cursor pages.
 
 ## Resolving a notification source
 
@@ -406,10 +409,14 @@ storage rejects gaps, duplicate positions, and activities whose message belongs 
 A timeline record references the message without duplicating its text. Internal stores preserve
 workspace-qualified relationships and immutable IDs. The PostgreSQL adapter stores record fields
 in relational columns, including a text array for mention IDs; the memory adapter keeps each
-record's encoded JSON. Admission loads a group's eligible members and a
-thread's current participants with batch store reads, and the notification projection loads
-every recipient's participation and inserts their notifications together, so a start or reply
-reads the same number of times at any group size. Timeline pages load their messages and
+record's encoded JSON. Admission reads only the members and participants a start or reply names:
+the admissions of members joining, with `GroupMembershipStore.findActiveMany`, and the current
+participation of each addressed participant, with `ThreadParticipationStore.findActive`. A reply
+without mentions also reads the thread's current participants, the people it notifies, in pages of
+active participations. Neither reads a group's roster or a thread's ended participations, so a
+reply costs the same in a large group or a long-lived thread as in a small one. The notification
+projection loads every recipient's participation and inserts their notifications together, so a
+start or reply reads the same number of times at any group size. Timeline pages load their messages and
 participations the same way.
 
 `ThreadCreation` is an internal service for authorized workflows to reuse. It validates domain

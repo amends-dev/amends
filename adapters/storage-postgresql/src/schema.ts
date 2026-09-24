@@ -669,6 +669,10 @@ export const threadParticipations = pgTable(
       sql`(${t.participantKind} = 'Member' AND ${t.memberId} IS NOT NULL AND ${t.groupMembershipId} IS NOT NULL AND ${t.identityKind} IN ('Human', 'Agent') AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Contact' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} = 'Contact' AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Triage' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} IS NULL AND ${t.identityId} IS NULL)`,
     ),
     index("participations_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
+    // A thread's current participants, paged in participation-ID order.
+    index("active_participations_by_thread")
+      .on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`)
+      .where(sql`${t.status} = 'active'`),
     index("participations_by_admission").on(
       t.workspaceId,
       t.groupMembershipId,

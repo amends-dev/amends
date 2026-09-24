@@ -33,7 +33,18 @@ export interface Interface {
     groupId: GroupId.Id,
     memberId: MemberId.Id,
   ) => Effect.Effect<Option.Option<GroupMembership.Record>, Failure>;
-  /** Stable ID order, including historical admissions. This is an internal store read. */
+  /**
+   * The group's active admissions of these members, in one read. Each found record appears once;
+   * order is unspecified, so callers index results by member. An empty request reads nothing.
+   */
+  readonly findActiveMany: (
+    groupId: GroupId.Id,
+    memberIds: ReadonlyArray<MemberId.Id>,
+  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+  /**
+   * Stable ID order, including historical admissions. A history read for inspection; operations
+   * use the bounded reads.
+   */
   readonly listByGroup: (
     groupId: GroupId.Id,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;

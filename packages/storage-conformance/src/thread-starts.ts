@@ -13,6 +13,7 @@ import {
   ThreadMessagePublication,
   ThreadParticipation,
   ThreadParticipationAdmission,
+  ThreadParticipationApplication,
   ThreadStart,
   ThreadStore,
   ThreadParticipationStore,
@@ -104,52 +105,86 @@ export const threadStarts = (harness: Harness) => {
       return { bound, owner };
     });
 
-    /** Wrap a store so every read method call is counted under `name.method`; writes pass through. */
-    const countReads = <S extends object>(name: string, store: S, counts: Map<string, number>): S =>
+    /** Records a read returned: each element of a list, or one for a found record. */
+    const sizeOf = (result: unknown) =>
+      globalThis.Array.isArray(result)
+        ? result.length
+        : Option.isOption(result)
+          ? Option.isSome(result)
+            ? 1
+            : 0
+          : 1;
+    /**
+     * Wrap a store so every read method call is counted under `name.method`, with the records it
+     * returned; writes pass through.
+     */
+    const countReads = <S extends object>(
+      name: string,
+      store: S,
+      counts: Map<string, number>,
+      rows: Map<string, number>,
+    ): S =>
       Object.fromEntries(
         Object.entries(store).map(([method, value]) => [
           method,
-          typeof value === "function" && /^(get|list|find|latest|read)/.test(method)
+          typeof value === "function" && /^(get|list|find|latest|read|page)/.test(method)
             ? (...args: ReadonlyArray<unknown>) => {
                 const key = `${name}.${method}`;
                 counts.set(key, (counts.get(key) ?? 0) + 1);
-                return value(...args);
+                return (value(...args) as Effect.Effect<unknown, unknown, unknown>).pipe(
+                  Effect.tap((result) =>
+                    Effect.sync(() => rows.set(key, (rows.get(key) ?? 0) + sizeOf(result))),
+                  ),
+                );
               }
             : value,
         ]),
       ) as S;
-    /** The binding with its record stores counted, and a way to take and reset the counts. */
+    /** The binding with its record stores counted, and ways to take and reset the counts. */
     const countingReads = (bound: Bound) => {
       const counts = new Map<string, number>();
+      const rows = new Map<string, number>();
       const context = Context.mergeAll(
         bound.context,
-        Context.make(MemberStore.Service, countReads("members", bound.members, counts)),
-        Context.make(GroupStore.Service, countReads("groups", bound.groups, counts)),
+        Context.make(MemberStore.Service, countReads("members", bound.members, counts, rows)),
+        Context.make(GroupStore.Service, countReads("groups", bound.groups, counts, rows)),
         Context.make(
           GroupMembershipStore.Service,
-          countReads("groupMemberships", bound.groupMemberships, counts),
+          countReads("groupMemberships", bound.groupMemberships, counts, rows),
         ),
-        Context.make(ThreadStore.Service, countReads("threads", bound.threads, counts)),
+        Context.make(ThreadStore.Service, countReads("threads", bound.threads, counts, rows)),
         Context.make(
           ThreadParticipationStore.Service,
-          countReads("participations", bound.participations, counts),
+          countReads("participations", bound.participations, counts, rows),
         ),
-        Context.make(ThreadMessageStore.Service, countReads("messages", bound.messages, counts)),
+        Context.make(
+          ThreadMessageStore.Service,
+          countReads("messages", bound.messages, counts, rows),
+        ),
         Context.make(
           ThreadActivityStore.Service,
-          countReads("activities", bound.activities, counts),
+          countReads("activities", bound.activities, counts, rows),
         ),
         Context.make(
           NotificationStore.Service,
-          countReads("notifications", bound.notifications, counts),
+          countReads("notifications", bound.notifications, counts, rows),
         ),
       );
-      const take = () => {
-        const taken = Object.fromEntries([...counts].sort(([a], [b]) => (a < b ? -1 : 1)));
-        counts.clear();
+      const drain = (map: Map<string, number>) => {
+        const taken = Object.fromEntries([...map].sort(([a], [b]) => (a < b ? -1 : 1)));
+        map.clear();
         return taken;
       };
-      return { bound: { ...bound, context }, take };
+      const take = () => {
+        rows.clear();
+        return drain(counts);
+      };
+      /** The records each read returned since the last take. */
+      const takeRows = () => {
+        counts.clear();
+        return drain(rows);
+      };
+      return { bound: { ...bound, context }, take, takeRows };
     };
 
     it.effect(
@@ -377,6 +412,96 @@ export const threadStarts = (harness: Harness) => {
               const large = yield* measure(10);
               expect(large).toEqual(small);
               expect(small.replied).toMatchObject({ "members.getMany": expect.any(Number) });
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "a reply reads the records of those it addresses, not the group's roster or the thread's history",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner } = yield* prepare();
+              const extra = Array.from({ length: 10 }, (_, index) =>
+                Member.Id.make(`member-${index}`),
+              );
+              yield* trusted(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.commit(
+                    Effect.forEach(extra, (memberId) =>
+                      journal.publish(MemberFacts.Added, {
+                        workspaceId,
+                        memberId,
+                        identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                      }),
+                    ),
+                  ),
+                ),
+              );
+              const as = (memberId: Member.Id) =>
+                Actor.Value.make({
+                  workspaceId,
+                  memberId,
+                  identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                });
+              const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
+                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
+                  s.publish({ threadId, text: "Reply", mentions }),
+                );
+              const counted = countingReads(bound);
+              const measure = Effect.fnUntraced(function* (size: number) {
+                const team = yield* run(
+                  bound,
+                  owner,
+                  Effect.flatMap(GroupApplication.Service, (s) =>
+                    s.createPrivateTeam({
+                      name: `Team ${size}`,
+                      memberIds: [owner.memberId, ...extra.slice(0, size)],
+                    }),
+                  ),
+                );
+                const started = yield* run(
+                  bound,
+                  owner,
+                  Effect.flatMap(ThreadApplication.Service, (s) =>
+                    s.startInGroup({
+                      groupId: team.id,
+                      text: "Hello",
+                      mentions: extra.slice(0, size),
+                    }),
+                  ),
+                );
+                // All but the first mentioned leave the thread again: the larger group's thread
+                // keeps their ended participations, and the group keeps every member.
+                for (const memberId of extra.slice(1, size)) {
+                  const own = (yield* bound.participations.listByThread(started.thread.id)).find(
+                    (p) => ThreadParticipation.memberOf(p.participant) === memberId,
+                  );
+                  if (own === undefined) return yield* Effect.die("Missing participation");
+                  yield* run(
+                    bound,
+                    as(memberId),
+                    Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
+                      s.unfollow({ threadId: started.thread.id, participationId: own.id }),
+                    ),
+                  );
+                }
+                counted.takeRows();
+                yield* run(counted.bound, owner, reply(started.thread.id, []));
+                const everyone = counted.takeRows();
+                yield* run(counted.bound, owner, reply(started.thread.id, extra.slice(0, 1)));
+                const mentioning = counted.takeRows();
+                return { everyone, mentioning };
+              });
+              const small = yield* measure(1);
+              const large = yield* measure(10);
+              expect(large).toEqual(small);
+              // Addressing everyone reads the two current participants, and only them.
+              expect(small.everyone).toMatchObject({ "participations.pageActiveByThread": 2 });
             }),
           ),
         ),

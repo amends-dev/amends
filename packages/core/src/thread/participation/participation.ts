@@ -78,6 +78,12 @@ export const referenceOf = (participant: Participant): Reference =>
     Contact: ({ contactId }): Reference => ({ _tag: "Contact", contactId }),
     Triage: (): Reference => ({ _tag: "Triage" }),
   });
+/** A page of current participants in binary participation-ID order, after the exclusive cursor. */
+export const ListOptions = Schema.Struct({
+  after: Schema.optionalKey(Id),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 /** Public current-participant view. */
 export const Summary = Schema.Struct({
   id: Id,

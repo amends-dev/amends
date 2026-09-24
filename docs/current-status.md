@@ -27,8 +27,8 @@ participant. Only member workflows exist today: the task and channel workflows t
 contacts and triage remain unimplemented, and general participation management remains
 incomplete. Group departure ends its associated thread participations and discards their pending
 agent input; workspace-member removal uses the same cleanup. Thread starts, reads, replies, and
-follow/unfollow use the shared group-audience check. Current-participant lists are unpaginated;
-group lists, rosters, group thread lists, and timelines have cursor pages. Separate reads and
+follow/unfollow use the shared group-audience check. Current-participant lists, group lists,
+rosters, group thread lists, and timelines have cursor pages. Separate reads and
 pages do not share a snapshot. Group creation, starts, replies, and timeline pages read members,
 admissions, participations, and referenced messages in batches, so their store reads do not grow
 with group size or page length. A start still publishes one participation fact per starting

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "9bacad41-160b-41fa-855c-c9219216e311",
+  "id": "9484ba82-69ec-4e6a-b729-dbb6431cf54e",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -3434,6 +3434,41 @@
       "method": "btree",
       "concurrently": false,
       "name": "participations_by_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "thread_participations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"status\" = 'active'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "active_participations_by_thread",
       "entityType": "indexes",
       "schema": "public",
       "table": "thread_participations"
