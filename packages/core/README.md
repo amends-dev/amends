@@ -288,8 +288,9 @@ lost from the journal instead of failing.
 followed by `Committed { workspaceId, cursor, commitId, events }` for each later commit
 that carries an event the reader may see. A cursor is opaque and resumes after the
 commit that carried it. Given `after`, the feed replays the commits after it, up to 500,
-with `reset: false`; without one, with a cursor past the head, or with one further
-behind, `Ready` has `reset: true` at the head and the consumer must refresh its view.
+with `reset: false`; without one, with a cursor past the head, with one further behind,
+or with one before a commit this host cannot read, `Ready` has `reset: true` at the head and
+the consumer must refresh its view.
 `Ready`'s cursor is null only for an empty journal.
 
 A reader sees an event when they hold a scope in its fact's
@@ -304,8 +305,10 @@ commit that admits the reader delivers what it admits. The commit that removes t
 reader from the workspace is delivered, then the stream ends. Registry views give
 some facts their public shape: activity omits its notification recipients, and
 participation omits routing identities and admissions. Facts outside the registry,
-such as test facts, are internal; a registered name with an unknown version stops
-the follower, and its subscribers see `ChangeFeed.Unavailable`.
+such as test facts, are internal. A registered name recorded in a version this host does not
+know, written by a newer host or no longer registered, can be neither shown nor filtered: the
+commit holding it reaches no reader, and ends every subscription with `ChangeFeed.Unavailable`,
+so reconnecting from the last cursor resets. The follower logs it and continues.
 
 Recorded thread activity also carries the notifications its projection creates. Each
 recipient's arrives in the same `Committed` message's `notifications`, derived with

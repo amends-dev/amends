@@ -151,6 +151,9 @@ commits from every host over the same storage and resumes from a cursor. Its rem
 - New notifications reach their recipients over the feed, and a human's `Seen` and read positions
   reach their other sessions as signals. An agent's pending notifications discarded when its
   participation ends show only through the participation-ended activity and the inbox.
+- While a newer host records a fact version an older host does not know, as during a deployment
+  that changes a fact, each such commit ends every subscription on the older host, which
+  reconnects with a reset and refreshes its view.
 - A reader's cursor advances only with commits that carry something they may see. A reader
   who sees little of a busy workspace can fall more than 500 commits behind while
   disconnected and then reset instead of resuming.

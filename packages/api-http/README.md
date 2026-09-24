@@ -90,8 +90,8 @@ clients use fetch-based SSE and pass the cursor explicitly; an invalid cursor is
 The first SSE `message` is Ready, such as
 `{ "_tag": "Ready", "workspaceId": "workspace-one", "cursor": "41", "reset": false }`,
 sent after the subscription registers. With `reset: false`, the commits after the given
-cursor follow, then live ones. With `reset: true` (no cursor, an unknown one, or one more
-than 500 commits behind) delivery starts at the head and the client must refresh the views
+cursor follow, then live ones. With `reset: true` (no cursor, an unknown one, one more
+than 500 commits behind, or one before a commit the server cannot read) delivery starts at the head and the client must refresh the views
 it keeps; `cursor` is null only for an empty workspace. Later messages contain
 `_tag: "Committed"`, `workspaceId`, `cursor`, `commitId`, an ordered `events` array, and a
 `notifications` array; at least one of the two is nonempty. `notifications` holds the
@@ -127,7 +127,9 @@ Five-second SSE comments keep idle connections open without producing applicatio
 and messages carry no SSE event IDs. Responses use `Cache-Control: no-store` and disable
 proxy buffering where supported. Missing/rejected credentials return 401; absent active
 membership returns 403. Failures after streaming starts use Effect's SSE failure encoding
-with `ChangeFeed.Unavailable`; reconnect with the last cursor to continue. See
+with `ChangeFeed.Unavailable`; reconnect with the last cursor to continue. A commit the server
+cannot read, such as a fact version a newer server wrote during a deployment, also ends the
+stream, and reconnecting then resets. See
 [known limitations](../../docs/current-status.md) for delivery and edge controls.
 
 Notification lists require an integer `limit` from 1 to 100. The optional

@@ -883,7 +883,7 @@ it.effect("a slow subscriber catches up from the journal instead of losing commi
 );
 
 it.effect(
-  "an unknown version of a delivered fact stops the feed; a new subscription recovers",
+  "a commit this host cannot read ends each subscription, and resuming across it resets",
   () =>
     run(() =>
       Effect.gen(function* () {
@@ -894,15 +894,29 @@ it.effect(
         });
         const feed = yield* listen();
         yield* feed.next;
-        yield* commit(publish(Future, "unknown to this host"));
+        yield* commit(publish(InvitationFacts.Issued, invitation("before")));
+        const before = committed(yield* feed.next).cursor;
+        // Nothing of the commit arrives, not even the event this host can read.
+        yield* commit(
+          Effect.andThen(
+            publish(InvitationFacts.Issued, invitation("beside")),
+            publish(Future, "unknown to this host"),
+          ),
+        );
         const exit = yield* Fiber.await(feed.fiber);
         expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
           Option.some(new ChangeFeed.Unavailable({})),
         );
-        const next = yield* listen();
-        expect(yield* next.next).toMatchObject({ _tag: "Ready", cursor: "0", reset: true });
-        yield* commit(publish(InvitationFacts.Issued, invitation("recovered")));
-        expect(committed(yield* next.next).cursor).toBe("1");
+        expect(yield* Queue.size(feed.queue)).toBe(0);
+        // Reconnecting from the last cursor resets rather than resuming across it.
+        const resumed = yield* listen({ after: before });
+        expect(yield* resumed.next).toMatchObject({ _tag: "Ready", cursor: "1", reset: true });
+        // A cursor past it resumes, and the feed continues for both.
+        const later = yield* listen({ after: ChangeFeed.Cursor.make("1") });
+        expect(yield* later.next).toMatchObject({ _tag: "Ready", cursor: "1", reset: false });
+        yield* commit(publish(InvitationFacts.Issued, invitation("after")));
+        expect(committed(yield* resumed.next).cursor).toBe("2");
+        expect(committed(yield* later.next).cursor).toBe("2");
       }),
     ),
 );

@@ -21,7 +21,10 @@ export interface Subscription {
   readonly from: Option.Option<Entry.Position>;
   /** The subscriber must refresh its view rather than rely on earlier deliveries. */
   readonly reset: boolean;
-  /** Every later commit in position order, history first; fails when delivery cannot continue. */
+  /**
+   * Every later commit in position order, history first. Fails when delivery cannot continue,
+   * including at a commit this host cannot read.
+   */
   readonly deliveries: Stream.Stream<Delivery, ChangeFeed.Unavailable>;
 }
 
@@ -51,8 +54,17 @@ export const Options = Schema.Struct({
 });
 export interface Options extends Schema.Schema.Type<typeof Options> {}
 
+/**
+ * A prepared commit. An unreadable one holds a delivered fact in a version this host does not
+ * know, written by a newer host or no longer registered: nobody can be told what it changed or
+ * whom it reaches, so its subscribers must refresh instead.
+ */
+interface Prepared extends Delivery {
+  readonly unreadable: ReadonlyArray<ChangeFeedEvents.UnknownVersion>;
+}
+
 type Item =
-  | { readonly _tag: "Delivery"; readonly sequence: bigint; readonly delivery: Delivery }
+  | { readonly _tag: "Delivery"; readonly sequence: bigint; readonly delivery: Prepared }
   | { readonly _tag: "Stopped" };
 
 interface Follower {
@@ -62,6 +74,7 @@ interface Follower {
 }
 
 const unavailable = () => new ChangeFeed.Unavailable({});
+const readable = (delivery: Prepared) => delivery.unreadable.length === 0;
 
 /**
  * Share one follower of the workspace journal among this runtime's subscribers. It starts with
@@ -78,11 +91,24 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
 
   const prepare = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
     const events: Array<ChangeFeedEvents.Prepared> = [];
+    const unreadable: Array<ChangeFeedEvents.UnknownVersion> = [];
     for (const entry of batch.entries) {
-      const prepared = yield* ChangeFeedEvents.prepare(entry);
+      const prepared = yield* ChangeFeedEvents.prepare(entry).pipe(
+        Effect.catchTag("ChangeFeedEvents.UnknownVersion", (unknown) =>
+          Effect.sync(() => {
+            unreadable.push(unknown);
+            return Option.none<ChangeFeedEvents.Prepared>();
+          }),
+        ),
+      );
       if (Option.isSome(prepared)) events.push(prepared.value);
     }
-    return { position: batch.position, commitId: batch.commit.id, events } satisfies Delivery;
+    return {
+      position: batch.position,
+      commitId: batch.commit.id,
+      events,
+      unreadable,
+    } satisfies Prepared;
   });
 
   const follow = Effect.gen(function* () {
@@ -95,8 +121,17 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
       onNone: () => ({ limit: pageSize }),
       onSome: (after) => ({ after, limit: pageSize }),
     });
+    // A commit this host cannot read ends its subscribers' streams, but the follower continues.
     yield* log.tail(from).pipe(
       Stream.mapEffect(prepare),
+      Stream.tap((delivery) =>
+        readable(delivery)
+          ? Effect.void
+          : Effect.logWarning("Change feed met a commit this host cannot read", {
+              position: delivery.position,
+              facts: delivery.unreadable.map(({ name, version }) => ({ name, version })),
+            }),
+      ),
       Stream.runForEach((delivery) =>
         gate.withPermits(1)(
           Effect.suspend(() => {
@@ -141,12 +176,13 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
 
     let reset = true;
     let from = head;
-    let history: ReadonlyArray<Delivery> = [];
+    let history: ReadonlyArray<Prepared> = [];
     if (Option.isSome(after) && Option.isSome(head) && after.value <= head.value) {
       const page = yield* log
         .read({ after: after.value, limit: replayLimit + 1 })
         .pipe(Effect.flatMap(Effect.forEach(prepare)), Effect.mapError(unavailable));
-      if (page.length <= replayLimit) {
+      // Resuming across a commit this host cannot read would hide what it changed.
+      if (page.length <= replayLimit && page.every(readable)) {
         reset = false;
         from = after;
         history = page;
@@ -155,8 +191,8 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
 
     // Deliveries at or before the last one sent were already covered by history or the head.
     let last = history.at(-1)?.position ?? Option.getOrUndefined(from);
-    const fresh = (delivery: Delivery) => last === undefined || delivery.position > last;
-    const sent = (delivery: Delivery) =>
+    const fresh = (delivery: Prepared) => last === undefined || delivery.position > last;
+    const sent = (delivery: Prepared) =>
       Effect.sync(() => {
         last = delivery.position;
       });
@@ -170,7 +206,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
       Stream.mapError(unavailable),
     );
     const live = Stream.fromEffectRepeat(PubSub.take(subscription)).pipe(
-      Stream.flatMap((item): Stream.Stream<Delivery, ChangeFeed.Unavailable> => {
+      Stream.flatMap((item): Stream.Stream<Prepared, ChangeFeed.Unavailable> => {
         if (item._tag === "Stopped")
           return Stream.fromEffect(RcRef.invalidate(followers)).pipe(
             Stream.flatMap(() => Stream.fail(unavailable())),
@@ -188,6 +224,11 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
       reset,
       deliveries: Stream.fromIterable(history).pipe(
         Stream.concat(live),
+        // The subscriber reconnects from its last cursor, where this commit makes it reset.
+        Stream.mapEffect(
+          ({ unreadable, ...delivery }): Effect.Effect<Delivery, ChangeFeed.Unavailable> =>
+            unreadable.length === 0 ? Effect.succeed(delivery) : Effect.fail(unavailable()),
+        ),
         Stream.mapError(unavailable),
       ),
     } satisfies Subscription;

@@ -258,7 +258,8 @@ for (const registered of registry) {
 
 /**
  * Decode one journal entry for delivery. Facts the feed does not register are internal and
- * yield None; a registered name recorded with an unknown version fails rather than disappear.
+ * yield None; a registered name recorded with an unknown version fails rather than disappear,
+ * and the source makes subscribers refresh instead of delivering its commit.
  */
 export const prepare = Effect.fn("ChangeFeedEvents.prepare")(function* (
   entry: Log.Entry<Event.Envelope>,
