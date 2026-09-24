@@ -25,6 +25,7 @@ export { provenance } from "./provenance.ts";
 export { readState } from "./read-state.ts";
 export { reads } from "./reads.ts";
 export { signals } from "./signals.ts";
+export { standaloneAppends } from "./standalone-appends.ts";
 export { threadParticipation } from "./thread-participation.ts";
 export { threadReads } from "./thread-reads.ts";
 export { threadReplies } from "./thread-replies.ts";

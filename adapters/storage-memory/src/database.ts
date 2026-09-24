@@ -7,7 +7,7 @@
 import type { Commit, Entry, Store } from "@amends/core/journal";
 import type { Signal } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
-import { Context, Deferred, Effect, Layer } from "effect";
+import { Context, Deferred, Effect, Layer, Semaphore } from "effect";
 import type { Queue } from "effect";
 
 /** One commit's entries in one log, at one position. Stored batches are never changed. */
@@ -78,6 +78,11 @@ export interface Interface {
    * a host's own writers wait for each other, and another host's writer reports contention.
    */
   readonly writers: Map<Workspace.Id, object>;
+  /**
+   * Each log's writer lock, across every host: a transaction holds the logs it appends to until
+   * it ends, and a standalone append holds its one log.
+   */
+  readonly logLocks: Map<string, Semaphore.Semaphore>;
   /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
   /** Each workspace's signal subscribers, across every host; signals themselves are never kept. */
@@ -141,19 +146,55 @@ const earlier = (current: Map<string, number>, staged: Map<string, number>) => {
   return merged;
 };
 
+/** What a commit wrote: the logs it held, and whether it held the workspace's writer. */
+export interface Written {
+  readonly logs: ReadonlySet<string>;
+  readonly workspace: boolean;
+}
+
 /**
- * Make a transaction's staged state the workspace's committed state. Only this transaction
- * wrote the journal and projections meanwhile, but read state may have advanced outside it,
- * so read state keeps the later of the two values, and Seen the earlier time.
+ * Make a transaction's snapshot the committed state of what it wrote. Its logs replace the
+ * committed ones it held; other logs keep what their own writers committed meanwhile, and keys
+ * and commits combine. Holding the workspace, its records replace the committed ones, and read
+ * state keeps the later value of each key, or the earlier first time for Seen.
  */
-export const commit = (database: Interface, workspaceId: Workspace.Id, staged: Space) => {
+export const commit = (
+  database: Interface,
+  workspaceId: Workspace.Id,
+  staged: Space,
+  written: Written,
+) => {
   const current = committed(database, workspaceId);
-  database.spaces.set(workspaceId, {
-    ...staged,
-    threadPositions: later(current.threadPositions, staged.threadPositions),
-    groupTimes: later(current.groupTimes, staged.groupTimes),
-    notificationsSeen: earlier(current.notificationsSeen, staged.notificationsSeen),
-  });
+  const logs = new Map(current.logs);
+  for (const logId of written.logs) {
+    const batches = staged.logs.get(logId);
+    if (batches !== undefined) logs.set(logId, batches);
+  }
+  const shared = {
+    logs,
+    commits: new Map([...current.commits, ...staged.commits]),
+    appends: new Map([...current.appends, ...staged.appends]),
+  };
+  database.spaces.set(
+    workspaceId,
+    written.workspace
+      ? Object.assign({}, staged, shared, {
+          threadPositions: later(current.threadPositions, staged.threadPositions),
+          groupTimes: later(current.groupTimes, staged.groupTimes),
+          notificationsSeen: earlier(current.notificationsSeen, staged.notificationsSeen),
+        })
+      : Object.assign({}, current, shared),
+  );
+};
+
+/** A log's writer lock, created on first use. */
+export const logLock = (database: Interface, workspaceId: Workspace.Id, logId: string) => {
+  const key = JSON.stringify([workspaceId, logId]);
+  const existing = database.logLocks.get(key);
+  if (existing !== undefined) return existing;
+  const created = Semaphore.makeUnsafe(1);
+  database.logLocks.set(key, created);
+  return created;
 };
 
 /** Wake every reader waiting for an append. */
@@ -173,6 +214,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
   return Service.of({
     spaces: new Map(),
     writers: new Map(),
+    logLocks: new Map(),
     appended: yield* Deferred.make<void>(),
     listeners: new Map(),
     nextId: (prefix) => `${prefix}-${++issued}`,

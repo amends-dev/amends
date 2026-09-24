@@ -56,6 +56,29 @@ export const make = Effect.fn("Journal.make")(function* () {
     return Option.some(yield* validateReceipt({ logId, key, ...slice, entries }));
   });
 
+  /**
+   * Hold a log for the rest of the transaction, then bring the snapshot's view of it up to date:
+   * its other writers may have committed since the snapshot, and none can until this one ends.
+   */
+  const hold = Effect.fnUntraced(function* (session: Binding.TransactionState, logId: string) {
+    if (session.held.has(logId)) return;
+    const lock = MemoryDatabase.logLock(database, workspaceId, logId);
+    yield* Effect.uninterruptibleMask((restore) =>
+      restore(lock.take(1)).pipe(Effect.tap(() => Effect.sync(() => session.held.add(logId)))),
+    );
+    const current = MemoryDatabase.committed(database, workspaceId);
+    const batches = current.logs.get(logId);
+    if (batches === undefined) return;
+    session.space.logs.set(logId, batches);
+    for (const batch of batches) {
+      const commit = current.commits.get(batch.commitId);
+      if (commit !== undefined && !session.space.commits.has(batch.commitId))
+        session.space.commits.set(batch.commitId, commit);
+    }
+    for (const [key, slice] of current.appends)
+      if (!session.space.appends.has(key)) session.space.appends.set(key, slice);
+  });
+
   const append = Effect.fn("Journal.append")(function* (
     session: Binding.TransactionState,
     input: Store.AppendInput,
@@ -78,6 +101,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         operation: "append",
         message: "Fact belongs to another workspace",
       });
+    yield* hold(session, request.logId);
     const space = session.space;
     if (request.idempotencyKey !== undefined) {
       const previous = yield* receiptOf(space, request.logId, request.idempotencyKey).pipe(
@@ -179,7 +203,11 @@ export const make = Effect.fn("Journal.make")(function* () {
     ),
     getAppend: Effect.fn("Journal.getAppend")(
       function* (logId, key) {
-        return yield* receiptOf(yield* read, logId, key);
+        const space = yield* read;
+        // Inside a transaction, the lookup holds the log, so it stays true until the commit.
+        const session = yield* Effect.serviceOption(Binding.CurrentTransaction);
+        if (Option.isSome(session)) yield* hold(session.value, logId);
+        return yield* receiptOf(space, logId, key);
       },
       Effect.mapError(storeFailure(Store, "getAppend")),
     ),
@@ -188,6 +216,19 @@ export const make = Effect.fn("Journal.make")(function* () {
         id: session.commit.id,
         append: (request) => append(session, request),
       })),
+    append: Effect.fn("Journal.appendAlone")(function* (request) {
+      if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+        return yield* new Store.Failure({
+          operation: "append",
+          cause: "A standalone append cannot run inside a transaction; use its append",
+        });
+      // Its own commit, holding only the log: the workspace's transactions do not wait for it.
+      return yield* transaction(
+        Effect.flatMap(Store.Transaction, (native) => native.append(request)),
+        (session) => ({ id: session.commit.id, append: (input) => append(session, input) }),
+        { workspace: false },
+      );
+    }),
     get: Effect.fn("Journal.get")(
       function* (logId, commitId: Commit.Id) {
         const space = yield* read;

@@ -27,7 +27,8 @@ server proxies `/api` here. `bun run dev` restarts the host when its source chan
 | `AMENDS_PORT`         | `8787`   | Integer from `0` through `65535`; `0` selects a free port. |
 | `AMENDS_DATABASE_URL` | Required | A `postgres://` or `postgresql://` URL.                    |
 
-The database must exist; startup applies pending migrations to it before serving.
+The database must exist; startup applies pending migrations to it before serving, one
+process at a time when several start together.
 A missing or invalid URL fails startup before any connection. A missing port uses
 its default; an explicitly blank setting fails validation. Database URLs stay
 redacted in configuration errors.

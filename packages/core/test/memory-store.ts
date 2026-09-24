@@ -128,6 +128,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
   });
   const changes = yield* Ref.make(yield* Deferred.make<void>());
   const attempts = yield* Ref.make(0);
+  const standalone = yield* Ref.make(0);
   const uncertain = yield* Ref.make(false);
   const gate = yield* Semaphore.make(1);
   let nextEntry = 0;
@@ -140,13 +141,15 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       : yield* Ref.get(state);
   });
 
-  const transaction = Effect.fn("JournalTest.transaction")(function* <A, E, R>(
+  /** One commit; `counted` separates workspace transactions from standalone appends. */
+  const commitWith = Effect.fnUntraced(function* <A, E, R>(
     program: Effect.Effect<A, E, R>,
+    counted: Ref.Ref<number>,
   ) {
     return yield* gate.withPermits(1)(
       Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
-          yield* Ref.update(attempts, (count) => count + 1);
+          yield* Ref.update(counted, (count) => count + 1);
           const session: Session = {
             owner,
             state: cloneState(yield* Ref.get(state)),
@@ -306,8 +309,20 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
     );
   });
 
+  const transaction = <A, E, R>(program: Effect.Effect<A, E, R>) => commitWith(program, attempts);
+  /** The test store has one writer at a time, so a standalone append is a commit like any other. */
+  const append = Effect.fn("JournalTest.appendAlone")(function* (request: Store.AppendInput) {
+    if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+      return yield* new Store.Failure({ operation: "append", cause: "inside a transaction" });
+    return yield* commitWith(
+      Effect.flatMap(Store.Transaction, (native) => native.append(request)),
+      standalone,
+    );
+  });
+
   const store = Store.Service.of({
     workspaceId,
+    append,
     getEntry: Effect.fn("JournalTest.getEntry")(function* (logId, entryId) {
       return Option.fromUndefinedOr(
         ((yield* view).logs.get(logId) ?? [])
@@ -729,6 +744,8 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
     roles,
     assignments,
     attempts: Ref.get(attempts),
+    /** Standalone appends committed or attempted, outside any workspace transaction. */
+    standalone: Ref.get(standalone),
     snapshot: Effect.map(Ref.get(state), cloneState),
     loseNextAcknowledgment: Ref.set(uncertain, true),
   };

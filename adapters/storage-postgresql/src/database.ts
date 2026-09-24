@@ -30,14 +30,21 @@ export class Service extends Context.Service<Service, Interface>()(
 
 /**
  * Construct the database service over the caller's PostgreSQL client, applying pending
- * migrations. Its notice listener holds one of the pool's connections while readers wait.
+ * migrations one process at a time. Its notice listener holds one of the pool's connections while readers wait.
  *
  * @category constructors
  */
 export const make = Effect.fn("PostgresDatabase.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const db = yield* PgDrizzle.makeWithDefaults();
-  yield* migrate(db, { migrationsFolder });
+  // Processes starting together would otherwise race to create the schema. The first to take
+  // the lock migrates; the others wait for its commit and then find nothing left to apply.
+  yield* sql.withTransaction(
+    Effect.andThen(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended('amends:migrate', 0))`,
+      migrate(db, { migrationsFolder }),
+    ),
+  );
   const notices = yield* PostgresNotices.make();
   return Service.of({ db, sql, notices });
 });

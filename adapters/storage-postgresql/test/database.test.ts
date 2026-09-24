@@ -64,6 +64,35 @@ describe.skipIf(!available)("PostgreSQL", () => {
         ),
     );
 
+  it.live("processes starting together on an empty database each finish migrating", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        // Each pool migrates as it opens; without taking turns they race to create the schema.
+        const opened = yield* Effect.forEach(
+          Array.range(1, 4),
+          () =>
+            Effect.flatMap(PostgresDatabase.Service, (database) => database.sql`SELECT 1`).pipe(
+              Effect.provide(database(url)),
+              Effect.exit,
+            ),
+          { concurrency: "unbounded" },
+        );
+        expect(opened.filter((exit) => exit._tag === "Failure")).toEqual([]);
+        const applied = yield* inDatabase(
+          url,
+          Effect.flatMap(
+            SqlClient.SqlClient,
+            (sql) =>
+              sql<{
+                readonly count: number;
+              }>`SELECT COUNT(*)::int AS count FROM drizzle.__drizzle_migrations`,
+          ),
+        );
+        expect(applied).toEqual([{ count: 1 }]);
+      }),
+    ),
+  );
+
   it.effect("commit entry lookups seek within one batch through the commit index", () =>
     withDatabase((url) =>
       inDatabase(

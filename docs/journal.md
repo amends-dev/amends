@@ -366,8 +366,8 @@ The commit record counts entries across all affected logs. A batch contains only
 that commit's entries for its particular log. Commits that do not touch a log do
 not appear in that log's reads or advance its cursor.
 
-`Log.append`, `Log.appendAll`, and `Journal.publish` create an implicit commit when
-needed. `journal.commit(program)` or `logs.commit(program)` groups operations.
+`Journal.publish` creates an implicit commit when needed. `journal.commit(program)` or
+`logs.commit(program)` groups operations.
 Nested commits join the current commit. Appends and their projection updates are
 serialized within that commit, including when publications originate in parallel
 fibers. Returned entry references are provisional until the outer commit succeeds.
@@ -386,6 +386,15 @@ const incorporate = Effect.gen(function* () {
 The domain supplies the fact and execution-entry schemas in this example. The two
 entries belong to different logs but become visible together with the projection
 updates. Ordinary harness output can use `turnLog.append` directly.
+
+Outside a commit, `Log.append` and `Log.appendAll` are a commit of their own through
+`Store.append`, which takes no place in the workspace's write order: it waits only for that
+log's other writers. Execution output streamed while a turn runs therefore never waits for
+conversation writes, and they never wait for it. A commit that appends to a log, or looks up
+one of its keys, holds that log until it ends, so a standalone append to it waits and then
+takes the next position, and keys and expected positions stay true within the commit. A
+commit never waits for a standalone append to a log it does not touch. Journal facts always
+take the workspace's write order, since their projections do.
 
 Keep commit programs limited to short storage work. Harness execution, model
 inference, and other external actions belong outside storage transactions.
@@ -597,7 +606,8 @@ publication that reads no batches or progress. Service tests check
 dependency inference across different projections, the stable consumer interface,
 active transaction and scope preservation, and defect handling. The root type
 check includes these tests. Tail tests cover read/wait races, backpressure, commit
-visibility, rollback, independent consumers, cancellation, and wait failures.
+visibility, rollback, independent consumers, cancellation, and wait failures. Journal tests
+check that output appended outside a commit uses the store's standalone append.
 Projection tests also confirm that a large commit's publications read no batches or progress,
 and that a journal that does not run a live projection cannot publish to its log.
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
@@ -605,7 +615,8 @@ staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The
 [PostgreSQL](../adapters/storage-postgresql/README.md) and
 [memory](../adapters/storage-memory/README.md) adapters run these contracts through the
-conformance suites, over independent connections; PostgreSQL suites require an available
+conformance suites, over independent connections, including standalone appends beside a
+transaction that holds the workspace or the log; PostgreSQL suites require an available
 server as described in the [testing guide](testing.md). The
 [local host](../hosts/local/README.md) composes the PostgreSQL adapter. The core's own
 memory store remains test-only.

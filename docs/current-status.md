@@ -239,9 +239,14 @@ broad uncertain-outcome mapping above.
 ## PostgreSQL isolation
 
 The [binding](../adapters/storage-postgresql/src/binding.ts) uses plain `BEGIN`,
-then takes a transaction-scoped advisory lock for the workspace. It does not pin
-the isolation level. The lock serializes cooperating writers, but the connection's
-isolation default still determines snapshot behavior. The adapter's tests do not
+then takes a transaction-scoped advisory lock for the workspace, and one for each log a
+commit touches; a standalone append takes only its log's. It does not pin the isolation
+level. The locks serialize cooperating writers, but the connection's isolation default still
+determines snapshot behavior.
+
+Every journal commit still takes the workspace's lock, so one workspace's conversation writes
+run one at a time, at roughly the rate one commit's statements allow. Execution output appended
+outside a commit does not count against that; turn execution itself is not implemented yet. The adapter's tests do not
 establish correctness for arbitrary session/database isolation settings.
 An explicit isolation choice and coverage for changed defaults remain outstanding.
 

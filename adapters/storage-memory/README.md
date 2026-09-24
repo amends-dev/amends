@@ -30,7 +30,12 @@ transaction writes the journal and projections meanwhile. Read-state writes outs
 apply at once, so a commit keeps the later of its own and the committed read-state values.
 
 A workspace that another connection is writing reports `JournalStore.Conflict` at once, as if
-its lock wait had timed out immediately; the same connection's writers wait for each other. Reads outside a
+its lock wait had timed out immediately; the same connection's writers wait for each other.
+Each log also has a lock shared by every host: a transaction takes it on its first append to
+the log, or lookup of one of its keys, refreshes its copy of that log from committed state,
+and keeps it until it ends. `Store.append` takes only its log's lock, not the workspace's, and
+commits only that log. A commit therefore replaces the logs it held and keeps what other
+writers committed to the rest meanwhile. Reads outside a
 transaction see committed state; inside one, they see its copy. A handle from another connection,
 workspace, or closed transaction fails. `waitForAppend` waits on a signal that each appending
 commit replaces.

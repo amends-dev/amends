@@ -188,7 +188,7 @@ memory. Just before `COMMIT` it writes the commit row with its entry count, the 
 entries (in inserts of up to 500 rows), and the append keys, one statement each; a transaction
 that reads whole batches of the log writes what it has staged first. Key and entry lookups inside
 the transaction answer staged appends from memory, and a transaction remembers the keys it has
-looked up, since the workspace's writers take turns. A reply therefore spends one statement per
+looked up, since it holds the log from its first lookup or append. A reply therefore spends one statement per
 fact on journal bookkeeping, for its idempotency key, plus a few per commit.
 
 `log_append_keys` stores durable append receipts, scoped by workspace, log, and
@@ -197,8 +197,11 @@ return the original append slice, while conflicting bytes or count fail. The key
 entries, and projection writes commit or roll back together. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
 
 Writers to one workspace take turns: each commit takes a transaction-scoped
-advisory lock keyed by the workspace before it runs, bounded by `lockTimeout`
-(five seconds by default), and maps lock timeouts and serialization errors at the
+advisory lock keyed by the workspace before it runs. A commit also holds each log it appends
+to, or looks up a key of, with a transaction-scoped advisory lock keyed by workspace and log.
+`Store.append` opens a commit that takes only its log's lock, so execution output does not
+wait for the workspace's writers, and a transaction waits for it only on a log both write.
+Every lock wait is bounded by `lockTimeout` (five seconds by default), and maps lock timeouts and serialization errors at the
 transaction boundary to store conflicts without retrying. `DeadlockError` is not
 included in that classification and currently becomes a failure. Reads outside a
 transaction see committed state. A statement PostgreSQL
@@ -251,7 +254,9 @@ takes the Effect client's pool configuration. The local host also supplies
 cryptography and composes this over the database at `AMENDS_DATABASE_URL`.
 
 `PostgresDatabase.make()` instead accepts `SqlClient.SqlClient` through Effect's
-context. It constructs the Drizzle facade and migrates through that same client.
+context. It constructs the Drizzle facade and migrates through that same client, inside a
+transaction holding an advisory lock, so processes starting together on an empty database
+take turns and the later ones find nothing left to apply.
 Keep the client's scope open while using the result. Workspace bindings, Drizzle
 queries, and journal transactions all share the resulting database service.
 
@@ -276,7 +281,7 @@ statement the program ignores still aborts its transaction, and `notifications.t
 a malformed stored record fails reads. `journal.test.ts` checks, with an hour-long fallback
 interval, that a waiting reader wakes on another pool's commit through its notification, and still
 wakes when an append lands while its listener reconnects. The signals suite covers relaying
-between pools. `database.test.ts` covers construction
-and access paths, and `scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
+between pools. `database.test.ts` covers construction,
+concurrent migration, and access paths, and `scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
 project's global setup owns the shared test cluster, and individual tests own their temporary
 databases.

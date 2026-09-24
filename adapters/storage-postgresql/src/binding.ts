@@ -56,11 +56,14 @@ export interface Interface {
   ) => Effect.Effect<A, E | Store.Failure, R>;
   /**
    * The store's transaction primitive, given how to expose the native handle
-   * for the session it opens. See Store.Interface for the contract.
+   * for the session it opens. See Store.Interface for the contract. With
+   * `workspace: false` it skips the workspace's writer lock, for a standalone append
+   * that locks only its log.
    */
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
     native: (session: TransactionState) => TransactionHandle,
+    options?: { readonly workspace?: boolean },
   ) => Effect.Effect<
     A,
     E | Store.Failure | Store.Conflict | Store.CommitUncertain,
@@ -123,7 +126,11 @@ export const make = Effect.fn("Binding.make")(function* (
     A,
     E,
     R,
-  >(program: Effect.Effect<A, E, R>, native: (session: TransactionState) => TransactionHandle) {
+  >(
+    program: Effect.Effect<A, E, R>,
+    native: (session: TransactionState) => TransactionHandle,
+    options: { readonly workspace?: boolean } = {},
+  ) {
     yield* check(false);
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* new Store.Failure({
@@ -151,15 +158,21 @@ export const make = Effect.fn("Binding.make")(function* (
           const control = (statement: string, params: ReadonlyArray<unknown> = []) =>
             connection.executeUnprepared(statement, params, undefined);
           yield* control("BEGIN").pipe(Effect.mapError(transactionError));
-          // Writers to one workspace take turns, so positions and checkpoints
+          // Writers to one workspace take turns, so projections and checkpoints
           // serialize without serializable isolation. A workspace's key is a
-          // hash of its ID; a collision only over-serializes.
+          // hash of its ID; a collision only over-serializes. The timeout also
+          // bounds waiting for a log's lock.
+          const timeout = control(
+            `SET LOCAL lock_timeout = ${Math.ceil(Duration.toMillis(lockTimeout))}`,
+          );
           const locked = yield* Effect.exit(
-            control(`SET LOCAL lock_timeout = ${Math.ceil(Duration.toMillis(lockTimeout))}`).pipe(
-              Effect.andThen(
-                control("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [workspaceId]),
-              ),
-            ),
+            options.workspace === false
+              ? timeout
+              : timeout.pipe(
+                  Effect.andThen(
+                    control("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [workspaceId]),
+                  ),
+                ),
           );
           if (Exit.isFailure(locked)) {
             yield* Effect.ignore(control("ROLLBACK"));

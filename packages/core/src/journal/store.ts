@@ -161,6 +161,8 @@ export class Transaction extends Context.Service<
      * appending or checking expectedAfter. Different bytes, fact metadata, or count conflict.
      * Persist the key and append slice in this same transaction; rollback releases it.
      * Copy input bytes and reject expired handles. Returned entries are provisional.
+     * Appending to a log holds it against standalone appends until the transaction ends, so its
+     * position and keys stay true meanwhile; so does looking up one of its keys in the transaction.
      */
     readonly append: (
       request: AppendInput,
@@ -171,7 +173,10 @@ export class Transaction extends Context.Service<
 export interface Interface {
   /** Every log and read addresses this workspace alone. */
   readonly workspaceId: WorkspaceId.Id;
-  /** Lookup is workspace-bound and sees this transaction's staged keys when present. */
+  /**
+   * Lookup is workspace-bound and sees this transaction's staged keys when present. Inside a
+   * transaction, it holds the log against standalone appends, as appending does.
+   */
   readonly getAppend: (
     logId: LogEntry.LogId,
     key: IdempotencyKey,
@@ -187,6 +192,16 @@ export interface Interface {
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
+  /**
+   * Append to one log in a commit of its own, outside the workspace's write order: it waits
+   * only for that log's other writers, including a transaction that holds the log, never for
+   * the workspace's transactions. Otherwise as Transaction.append, returning committed entries.
+   * For logs written without projections, such as execution output. Fail inside a transaction,
+   * whose own append joins it instead.
+   */
+  readonly append: (
+    request: AppendInput,
+  ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict | CommitUncertain>;
 
   /** Reads use the current transaction when present, otherwise committed state. */
   readonly getEntry: (

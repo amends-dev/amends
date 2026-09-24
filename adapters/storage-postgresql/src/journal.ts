@@ -4,7 +4,7 @@ import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect
 import { JournalEntry } from "./journal-entry.ts";
 import { PostgresNotices } from "./notices.ts";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { isContention, storeConflict, storeError, storeFailure } from "./errors.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
 
 const BatchHeaderRow = Schema.Struct({
@@ -30,6 +30,8 @@ const AppendHeaderRows = Schema.Array(
  * or earlier when it reads the log.
  */
 interface Staging {
+  /** Logs this transaction holds against other writers of the log, until it ends. */
+  readonly held: Set<Entry.LogId>;
   /** The batch this commit opened in each log: its position and next entry index. */
   readonly open: Map<Entry.LogId, { readonly position: Entry.Position; next: number }>;
   /** Keyed appends this transaction looked up or staged, by log and key. */
@@ -238,6 +240,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     const existing = stagings.get(session);
     if (existing !== undefined) return existing;
     const staging: Staging = {
+      held: new Set(),
       open: new Map(),
       receipts: new Map(),
       batches: [],
@@ -260,6 +263,27 @@ export const make = Effect.fn("Journal.make")(function* () {
       Option.isSome(session) ? Effect.andThen(flush(session.value), program) : program,
     );
 
+  /**
+   * Hold a log for the rest of the transaction: its other writers, a standalone append or
+   * another transaction, wait until it ends, so its position and keys stay true meanwhile. A
+   * log's key is a hash of its workspace and ID, seeded apart from workspace keys.
+   */
+  const hold = Effect.fnUntraced(function* (staging: Staging, logId: Entry.LogId) {
+    if (staging.held.has(logId)) return;
+    yield* database.sql
+      .unsafe("SELECT pg_advisory_xact_lock(hashtextextended($1, 1))", [
+        JSON.stringify([workspaceId, logId]),
+      ])
+      .pipe(
+        Effect.mapError((cause) =>
+          isContention(cause)
+            ? new Store.Conflict({ operation: "append", message: "Another writer holds the log" })
+            : new Store.Failure({ operation: "append", cause }),
+        ),
+      );
+    staging.held.add(logId);
+  });
+
   /** A keyed append, from what this transaction staged or looked up before, else from storage. */
   const receiptIn = Effect.fnUntraced(function* (
     staging: Staging,
@@ -269,7 +293,8 @@ export const make = Effect.fn("Journal.make")(function* () {
     const id = receiptKey(logId, key);
     const known = staging.receipts.get(id);
     if (known !== undefined) return Option.map(known, copyReceipt);
-    // Writers to this workspace take turns, so a lookup stays true for the whole transaction.
+    // Holding the log keeps a lookup true for the whole transaction.
+    yield* hold(staging, logId);
     const stored = yield* storedAppend(logId, key);
     staging.receipts.set(id, stored);
     return Option.map(stored, copyReceipt);
@@ -298,6 +323,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         message: "Fact belongs to another workspace",
       });
     const staging = stagingOf(session);
+    yield* hold(staging, request.logId);
     if (request.idempotencyKey !== undefined) {
       const previous = yield* receiptIn(staging, request.logId, request.idempotencyKey).pipe(
         Effect.mapError(storeFailure(Store, "append")),
@@ -452,8 +478,9 @@ export const make = Effect.fn("Journal.make")(function* () {
     }),
     getAppend: (logId, key) =>
       guard(
-        Effect.flatMap(stagedSession, (session) =>
-          Option.isSome(session)
+        // Inside a transaction, the lookup holds the log, so it stays true until the commit.
+        Effect.flatMap(Effect.serviceOption(Binding.CurrentTransaction), (session) =>
+          Option.isSome(session) && session.value.active
             ? receiptIn(stagingOf(session.value), logId, key)
             : storedAppend(logId, key),
         ),
@@ -463,6 +490,22 @@ export const make = Effect.fn("Journal.make")(function* () {
         id: session.commit.id,
         append: (request) => guard(append(session, request), true),
       })),
+    append: Effect.fn("Journal.appendAlone")(function* (request) {
+      if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+        return yield* new Store.Failure({
+          operation: "append",
+          cause: "A standalone append cannot run inside a transaction; use its append",
+        });
+      // Its own commit, holding only the log: the workspace's transactions do not wait for it.
+      return yield* transaction(
+        Effect.flatMap(Store.Transaction, (native) => native.append(request)),
+        (session) => ({
+          id: session.commit.id,
+          append: (input) => guard(append(session, input), true),
+        }),
+        { workspace: false },
+      );
+    }),
     get: Effect.fn("Journal.get")(function* (logId, commitId) {
       return yield* flushed(
         guard(batches(headers().where(and(scoped(logId), eq(logBatches.commitId, commitId))))),

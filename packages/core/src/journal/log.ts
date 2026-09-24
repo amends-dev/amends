@@ -47,18 +47,14 @@ export interface Handle<S extends Schema.Constraint> {
   readonly append: (
     value: S["Type"],
     options?: Store.AppendOptions,
-  ) => Effect.Effect<
-    Entry<S["Type"]>,
-    WriteError,
-    Transaction.Remaining<S["EncodingServices"] | S["DecodingServices"]>
-  >;
+  ) => Effect.Effect<Entry<S["Type"]>, WriteError, S["EncodingServices"] | S["DecodingServices"]>;
   readonly appendAll: (
     values: ReadonlyArray<S["Type"]>,
     options?: Store.AppendOptions,
   ) => Effect.Effect<
     ReadonlyArray<Entry<S["Type"]>>,
     WriteError,
-    Transaction.Remaining<S["EncodingServices"] | S["DecodingServices"]>
+    S["EncodingServices"] | S["DecodingServices"]
   >;
   readonly readFacts: (
     options: Store.ReadFactsOptions,
@@ -207,56 +203,74 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         : Option.some(yield* Effect.forEach(found.value.entries, decodeEntry));
     });
 
+    /**
+     * Encode and append through the given store operation, checking that what it returns is
+     * the request's content in one consecutive batch of this log, from the expected commit.
+     */
+    const write = Effect.fnUntraced(function* (
+      values: ReadonlyArray<S["Type"]>,
+      options: Store.AppendOptions,
+      commitId: Commit.Id | undefined,
+      store: (request: Store.AppendInput) => Effect.Effect<ReadonlyArray<Store.Entry>, WriteError>,
+    ) {
+      const request = yield* validateAppend(options);
+      const contents = yield* Effect.forEach(values, codec.encode);
+      if (request.idempotencyKey !== undefined)
+        yield* Schema.decodeUnknownEffect(Schema.NonEmptyArray(Schema.toType(Store.Content)))(
+          contents,
+        );
+      const responseSchema = Schema.Array(Schema.toType(Store.Entry)).check(
+        Schema.makeFilter((entries) => {
+          if (entries.length !== contents.length)
+            return "Append response count does not match the request";
+          const ids = new Set<string>();
+          let previous: Store.Entry | undefined;
+          for (const [index, entry] of entries.entries()) {
+            const content = contents[index];
+            if (
+              entry.logId !== id ||
+              (request.idempotencyKey === undefined &&
+                commitId !== undefined &&
+                entry.commitId !== commitId)
+            )
+              return "Append returned a different log or commit";
+            if (ids.has(entry.id)) return "Append returned duplicate entry ids";
+            if (
+              previous !== undefined &&
+              (entry.commitId !== previous.commitId ||
+                entry.position !== previous.position ||
+                entry.index !== previous.index + 1)
+            ) {
+              return "Append entries must be consecutive in one log batch";
+            }
+            if (content === undefined || !Store.sameContents([content], [entry]))
+              return "Append changed the entry content";
+            ids.add(entry.id);
+            previous = entry;
+          }
+          return undefined;
+        }),
+      );
+      // The store contract makes the returned entries the key's receipt; the conformance
+      // suites check that every adapter keeps it, so appends do not read it back.
+      const entries = yield* Schema.decodeEffect(responseSchema)(
+        yield* store({ logId: id, entries: contents, ...request }),
+      );
+      return yield* Effect.forEach(entries, decodeEntry);
+    });
+
     const appendAll = Effect.fn("Log.appendAll")(function* (
       values: ReadonlyArray<S["Type"]>,
       options: Store.AppendOptions = {},
     ) {
+      // Outside a commit, the append is a commit of its own. It needs no place in the
+      // workspace's write order, so it waits only for this log's other writers.
+      if (Option.isNone(yield* Effect.serviceOption(Store.Transaction)))
+        return yield* write(values, options, undefined, store.append);
       return yield* transaction.operation(
-        Effect.gen(function* () {
-          const request = yield* validateAppend(options);
-          const native = yield* Store.Transaction;
-          const contents = yield* Effect.forEach(values, codec.encode);
-          if (request.idempotencyKey !== undefined)
-            yield* Schema.decodeUnknownEffect(Schema.NonEmptyArray(Schema.toType(Store.Content)))(
-              contents,
-            );
-          const responseSchema = Schema.Array(Schema.toType(Store.Entry)).check(
-            Schema.makeFilter((entries) => {
-              if (entries.length !== contents.length)
-                return "Append response count does not match the request";
-              const ids = new Set<string>();
-              let previous: Store.Entry | undefined;
-              for (const [index, entry] of entries.entries()) {
-                const content = contents[index];
-                if (
-                  entry.logId !== id ||
-                  (request.idempotencyKey === undefined && entry.commitId !== native.id)
-                )
-                  return "Append returned a different log or commit";
-                if (ids.has(entry.id)) return "Append returned duplicate entry ids";
-                if (
-                  previous !== undefined &&
-                  (entry.commitId !== previous.commitId ||
-                    entry.position !== previous.position ||
-                    entry.index !== previous.index + 1)
-                ) {
-                  return "Append entries must be consecutive in one log batch";
-                }
-                if (content === undefined || !Store.sameContents([content], [entry]))
-                  return "Append changed the entry content";
-                ids.add(entry.id);
-                previous = entry;
-              }
-              return undefined;
-            }),
-          );
-          // The store contract makes the returned entries the key's receipt; the conformance
-          // suites check that every adapter keeps it, so appends do not read it back.
-          const entries = yield* Schema.decodeEffect(responseSchema)(
-            yield* native.append({ logId: id, entries: contents, ...request }),
-          );
-          return yield* Effect.forEach(entries, decodeEntry);
-        }),
+        Effect.flatMap(Store.Transaction, (native) =>
+          write(values, options, native.id, native.append),
+        ),
       );
     });
 

@@ -388,7 +388,10 @@ for payload matching, expected-position precedence, and composing larger operati
 The storage envelope separates `Event.Header` (subject, name, version, provenance) from
 encoded domain payload bytes. `Store.Content` represents append content and
 `Store.Entry` adds the log entry metadata. Journal entries use `Event.storageCodec`;
-ordinary execution logs use the default payload codec and have no fact header.
+ordinary execution logs use the default payload codec and have no fact header. An execution-log
+append outside a commit goes through `Store.append`, a commit of its own that waits only for
+the log's other writers, never for the workspace's write order; see
+[commits and positions](../../docs/journal.md#commits-and-positions).
 Both adapters persist fact subjects, names, and versions as columns, with separate
 name and subject indexes. Read matching history with
 `journal.read({ subject?, name?, version?, after?, limit })`: supply a subject, a

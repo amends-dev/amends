@@ -18,6 +18,8 @@ export interface TransactionState {
   readonly workspaceId: Workspace.Id;
   readonly commit: Commit.Record;
   readonly space: MemoryDatabase.Space;
+  /** Logs this transaction holds against their other writers, released when it ends. */
+  readonly held: Set<string>;
   active: boolean;
 }
 
@@ -40,11 +42,13 @@ export interface Interface {
   readonly join: Effect.Effect<MemoryDatabase.Space, Store.Failure>;
   /**
    * The store's transaction primitive, given how to expose the native handle for the session
-   * it opens. See Store.Interface for the contract.
+   * it opens. See Store.Interface for the contract. With `workspace: false` it does not take the
+   * workspace's writer, for a standalone append that holds only its log, and commits only logs.
    */
   readonly transaction: <A, E, R>(
     program: Effect.Effect<A, E, R>,
     native: (session: TransactionState) => TransactionHandle,
+    options?: { readonly workspace?: boolean },
   ) => Effect.Effect<
     A,
     E | Store.Failure | Store.Conflict | Store.CommitUncertain,
@@ -105,7 +109,12 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
     A,
     E,
     R,
-  >(program: Effect.Effect<A, E, R>, native: (session: TransactionState) => TransactionHandle) {
+  >(
+    program: Effect.Effect<A, E, R>,
+    native: (session: TransactionState) => TransactionHandle,
+    options: { readonly workspace?: boolean } = {},
+  ) {
+    const exclusive = options.workspace !== false;
     yield* read;
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* new Store.Failure({
@@ -115,15 +124,17 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
     return yield* Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         // This host's writers wait for each other; another host's writer is contention.
-        yield* restore(gate.take(1));
-        if (database.writers.has(workspaceId)) {
-          yield* gate.release(1);
-          return yield* new Store.Conflict({
-            operation: "transaction",
-            message: "Another host is writing this workspace",
-          });
+        if (exclusive) {
+          yield* restore(gate.take(1));
+          if (database.writers.has(workspaceId)) {
+            yield* gate.release(1);
+            return yield* new Store.Conflict({
+              operation: "transaction",
+              message: "Another host is writing this workspace",
+            });
+          }
+          database.writers.set(workspaceId, connection);
         }
-        database.writers.set(workspaceId, connection);
         const state: TransactionState = {
           connection,
           workspaceId,
@@ -134,6 +145,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
             entryCount: 0,
           },
           space: MemoryDatabase.copy(MemoryDatabase.committed(database, workspaceId)),
+          held: new Set(),
         };
         const exit = yield* Effect.exit(
           restore(
@@ -146,14 +158,21 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
           ),
         );
         state.active = false;
-        // Committing replaces the workspace's state with the snapshot; rolling back drops it.
+        // Committing makes the snapshot of what it wrote committed; rolling back drops it.
         if (Exit.isSuccess(exit)) {
-          MemoryDatabase.commit(database, workspaceId, state.space);
+          MemoryDatabase.commit(database, workspaceId, state.space, {
+            logs: state.held,
+            workspace: exclusive,
+          });
           if ((state.space.commits.get(state.commit.id)?.entryCount ?? 0) > 0)
             MemoryDatabase.signalAppend(database);
         }
-        database.writers.delete(workspaceId);
-        yield* gate.release(1);
+        for (const logId of state.held)
+          yield* MemoryDatabase.logLock(database, workspaceId, logId).release(1);
+        if (exclusive) {
+          database.writers.delete(workspaceId);
+          yield* gate.release(1);
+        }
         if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
         return exit.value;
       }),

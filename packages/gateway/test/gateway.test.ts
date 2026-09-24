@@ -78,6 +78,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       workspaceId: boundWorkspaceId,
       waitForAppend: unexpected,
       getAppend: unexpected,
+      append: unexpected,
     }),
   ).pipe(
     Context.add(

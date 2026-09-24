@@ -49,35 +49,41 @@ const setup = Effect.gen(function* () {
   const turn = logs.open({ id: Log.Id.make("turn/one"), schema: Harness });
   return { logs, journal, turn };
 });
-it.effect("facts and turn output use independent logs through the same storage", () =>
-  Effect.gen(function* () {
-    const fixture = yield* make();
-    yield* run(
-      fixture,
-      Effect.gen(function* () {
-        const { journal, turn } = yield* setup;
-        const event = yield* journal.publish(Changed, { amount: 2 });
-        yield* turn.append({ _tag: "Text", text: "working" });
-        yield* turn.append({ _tag: "Finished" });
-        const domain = yield* journal.log.read({ limit: 10 });
-        const output = yield* Stream.runCollect(turn.stream({ limit: 1 }));
-        expect(domain).toHaveLength(1);
-        expect(output.map((batch) => batch.position)).toEqual([
-          Log.Position.make(0),
-          Log.Position.make(1),
-        ]);
-        expect(output.flatMap((batch) => batch.entries.map((entry) => entry.payload._tag))).toEqual(
-          ["Text", "Finished"],
-        );
-        expect(event.logId).toBe(journal.log.id);
-        expect(event.payload.amount).toBe(2);
-        expect(yield* (yield* Counter).get).toBe(2);
-        const raw = domain[0]?.entries[0];
-        if (raw === undefined) throw new Error("Missing fact");
-        expect((yield* Journal.decode(Changed, raw)).payload.amount).toBe(2);
-      }),
-    );
-  }),
+it.effect(
+  "facts and turn output use independent logs; output alone needs no workspace commit",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* make();
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          const { journal, turn } = yield* setup;
+          const event = yield* journal.publish(Changed, { amount: 2 });
+          yield* turn.append({ _tag: "Text", text: "working" });
+          yield* turn.append({ _tag: "Finished" });
+          const domain = yield* journal.log.read({ limit: 10 });
+          const output = yield* Stream.runCollect(turn.stream({ limit: 1 }));
+          expect(domain).toHaveLength(1);
+          expect(output.map((batch) => batch.position)).toEqual([
+            Log.Position.make(0),
+            Log.Position.make(1),
+          ]);
+          expect(
+            output.flatMap((batch) => batch.entries.map((entry) => entry.payload._tag)),
+          ).toEqual(["Text", "Finished"]);
+          expect(event.logId).toBe(journal.log.id);
+          expect(event.payload.amount).toBe(2);
+          expect(yield* (yield* Counter).get).toBe(2);
+          // Only the fact took the workspace's write order; each output was a commit of its own.
+          expect(yield* fixture.attempts).toBe(1);
+          expect(yield* fixture.standalone).toBe(2);
+          expect(new Set(output.map((batch) => batch.commit.id)).size).toBe(2);
+          const raw = domain[0]?.entries[0];
+          if (raw === undefined) throw new Error("Missing fact");
+          expect((yield* Journal.decode(Changed, raw)).payload.amount).toBe(2);
+        }),
+      );
+    }),
 );
 
 it.effect("one explicit commit spans logs, nested commits, and projections", () =>
@@ -105,6 +111,7 @@ it.effect("one explicit commit spans logs, nested commits, and projections", () 
         expect(domain[0]?.commit.entryCount).toBe(3);
         expect(output[0]?.commit.entryCount).toBe(3);
         expect(yield* fixture.attempts).toBe(1);
+        expect(yield* fixture.standalone).toBe(0);
       }),
     );
   }),
