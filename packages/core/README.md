@@ -420,8 +420,8 @@ background work.
 attributed to it as a `System` performer named after it, and returns its outcome. An unregistered
 name fails with `BackgroundRuns.Unknown`, a process's own failure with `BackgroundRuns.Failure`,
 and two processes sharing a name stop the workspace's core from starting. It is part of `Core.layer`
-but not of `Core.Operations`, since no actor runs it. Hosts do not run background work yet; see
-[known limitations](../../docs/current-status.md).
+but not of `Core.Operations`, since no actor runs it. The gateway runs it for hosts through
+[`runBackground`](../gateway/README.md#background-work-on-effect-cluster).
 
 ## Module dependencies and exports
 

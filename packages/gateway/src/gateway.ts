@@ -1,5 +1,6 @@
 import * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
+import { type BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Store } from "@amends/core/journal";
 import {
@@ -58,6 +59,19 @@ export interface Interface {
     identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
+  /**
+   * Run one of a workspace's background processes once, for the host process that runs its
+   * background work when a wake arrives, and report what it left outstanding. It has no actor:
+   * the process acts as itself. A workspace that was never created returns WorkspaceNotFound
+   * without being prepared.
+   */
+  readonly runBackground: (
+    workspaceId: Workspace.Id,
+    process: string,
+  ) => Effect.Effect<
+    BackgroundProcess.Outcome,
+    BackgroundRuns.Unknown | BackgroundRuns.Failure | GatewayErrors.WorkspaceNotFound
+  >;
 }
 
 /** Workspace bootstrap and entry; core's application services are the operations. */
@@ -297,7 +311,21 @@ export const make = Effect.fn("Gateway.make")(function* (
   const asMember: Interface["asMember"] = (workspaceId, identity, program) =>
     Effect.scoped(asMemberScoped(workspaceId, identity, program));
 
-  return Service.of({ createWorkspace, inWorkspace, asMember, asMemberScoped });
+  const runBackground: Interface["runBackground"] = Effect.fn("Gateway.runBackground")(function* (
+    workspaceId: Workspace.Id,
+    process: string,
+  ) {
+    if (!(yield* runtimes.prepared(workspaceId)) && !(yield* created(workspaceId)))
+      return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+    return yield* Effect.scoped(
+      bind(
+        workspaceId,
+        Effect.flatMap(BackgroundRuns.Service, (runs) => runs.run(process)),
+      ),
+    );
+  });
+
+  return Service.of({ createWorkspace, inWorkspace, asMember, asMemberScoped, runBackground });
 });
 
 /**

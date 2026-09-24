@@ -6,3 +6,4 @@ export { SignIn } from "./sign-in.ts";
 export { SignalHub } from "./signals.ts";
 export { WorkspaceStorage } from "./storage.ts";
 export { WorkspaceWakes } from "./wakes.ts";
+export { ClusterBackground } from "./cluster-background.ts";

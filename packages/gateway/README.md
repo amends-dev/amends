@@ -67,6 +67,11 @@ is sufficient to type-check a supplied implementation.
   the runtime lease and operation resources. Streaming ingress uses it to keep
   subscriptions alive until disconnect. Programs may additionally require `Scope`.
   `asMember` wraps this operation in a short scope for ordinary request/response work.
+- `runBackground(workspaceId, process)` runs one of the workspace's
+  [background processes](../core/README.md#background-work) once, with no actor, and returns
+  what it left outstanding. It is for the host process that runs background work, when a wake
+  arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
+  workspace that was never created returns `WorkspaceNotFound` without being prepared.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
@@ -134,9 +139,29 @@ contracts.
 
 `WorkspaceWakes.Service` supplies each workspace's `BackgroundWakes.Service`: it stores a
 commit's requests for [background work](../core/README.md#background-work) with that commit and
-delivers them to whichever process runs the workspace's background work. No host runs background
-work yet, so hosts provide `WorkspaceWakes.layerUnavailable`, whose requests fail the commit that
-makes them rather than accept work nothing would do; no process is registered to make one.
+delivers them to whichever process runs the workspace's background work. A host that runs no
+background work provides `WorkspaceWakes.layerUnavailable`, whose requests fail the commit that
+makes them rather than accept work nothing would do.
+
+### Background work on Effect Cluster
+
+`ClusterBackground` runs background work on the host's Effect Cluster (`Sharding`). Each
+workspace's process is an entity, `amends/WorkspaceProcess`, keyed by workspace and process,
+whose persisted `Wake` says when it should run. Cluster keeps an entity on one runner at a time,
+so a process runs one run at a time, and redelivers a wake whose run was cut short, so work
+resumes after a restart.
+
+- `layerWakes` provides `WorkspaceWakes.Service`. A commit's wake is keyed by its commit ID, so
+  a commit that asks twice asks once. Sent inside the commit, it is stored in the commit's
+  transaction when Cluster's message storage uses the same SQL client as the workspace's
+  storage; the host composing them owns that.
+- `layerWorker` registers the entity. When a wake arrives it calls `runBackground`, then asks
+  for the next run: at once after `Continue`, at the due time after `At`, and after a backoff
+  that doubles from two seconds up to five minutes after a failure. A process this host does
+  not register is dropped after `unknownAttempts` (ten) failed runs, and a workspace that was
+  never created at once. A wake it could not act on stays undelivered, so Cluster runs it again.
+- `layer` provides both. Every runner over the same storage runs the worker, as Cluster
+  requires of every entity type.
 
 `SignalHub.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because

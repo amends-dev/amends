@@ -1,0 +1,167 @@
+/**
+ * Background work on Effect Cluster. Each workspace's process is an entity whose persisted wakes
+ * say when it should run: a commit stores one with itself, and the runner that owns the entity
+ * runs the process when it arrives, then asks for the next run from what the process left
+ * outstanding. Cluster keeps an entity on one runner at a time and redelivers a wake whose run
+ * was cut short, so a process runs one run at a time and resumes after a restart.
+ */
+import { BackgroundProcess, BackgroundWakes } from "@amends/core/background";
+import { Store } from "@amends/core/journal";
+import { Workspace } from "@amends/core/workspace";
+import {
+  Cause,
+  Crypto,
+  DateTime,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  PrimaryKey,
+  Schema,
+} from "effect";
+import { ClusterSchema, DeliverAt, Entity } from "effect/unstable/cluster";
+import { Rpc } from "effect/unstable/rpc";
+import { Gateway } from "./gateway.ts";
+import { WorkspaceWakes } from "./wakes.ts";
+
+/**
+ * A request for a workspace's process to run at `at`. Its key identifies it among the process's
+ * wakes: Cluster keeps one wake per key, so a commit's retry or a repeated schedule asks once.
+ */
+export class Wake extends Schema.Class<Wake>("amends/background/Wake")({
+  workspaceId: Workspace.Id,
+  process: BackgroundProcess.Name,
+  key: Schema.String,
+  at: Schema.DateTimeUtcFromMillis,
+  /** Failed runs before this one, for its backoff. */
+  attempt: Schema.Int,
+}) {
+  [PrimaryKey.symbol]() {
+    return this.key;
+  }
+  [DeliverAt.symbol]() {
+    return this.at;
+  }
+}
+
+/** One workspace's process: runs of it take turns, and its wakes survive the runner. */
+export const WorkspaceProcess = Entity.make("amends/WorkspaceProcess", [
+  Rpc.make("Wake", { payload: Wake }).annotate(ClusterSchema.Persisted, true),
+]);
+
+/** The entity for a workspace's process. */
+export const entityId = (workspaceId: Workspace.Id, process: BackgroundProcess.Name) =>
+  JSON.stringify([workspaceId, process]);
+
+/** How long a process waits after failed runs before it runs again: doubling, up to five minutes. */
+export const backoff = (attempt: number) =>
+  Duration.seconds(Math.min(300, 2 ** Math.min(attempt, 9)));
+
+/** An unknown process is dropped after this many failed runs, as when its host no longer runs it. */
+export const unknownAttempts = 10;
+
+/**
+ * Wakes stored by Cluster. Sent inside a commit, a wake shares its transaction when Cluster's
+ * message storage uses the same SQL client as the workspace's storage, so it commits or rolls
+ * back with the commit; the host composing them owns that.
+ *
+ * @category layers
+ */
+export const layerWakes = Layer.effect(
+  WorkspaceWakes.Service,
+  Effect.gen(function* () {
+    const clientFor = yield* WorkspaceProcess.client;
+    return WorkspaceWakes.Service.of({
+      forWorkspace: (workspaceId) =>
+        BackgroundWakes.Service.of({
+          workspaceId,
+          request: Effect.fnUntraced(function* (process, options = {}) {
+            const commit = yield* Store.Transaction;
+            const at = options.at ?? (yield* DateTime.now);
+            const key =
+              options.at === undefined
+                ? `commit:${commit.id}`
+                : `commit:${commit.id}@${DateTime.toEpochMillis(at)}`;
+            yield* clientFor(entityId(workspaceId, process))
+              .Wake(new Wake({ workspaceId, process, key, at, attempt: 0 }), { discard: true })
+              .pipe(Effect.mapError((cause) => new Store.Failure({ operation: "wake", cause })));
+          }),
+        }),
+    });
+  }),
+);
+
+/**
+ * Run each workspace process when its wake arrives, through the gateway, then ask for its next
+ * run: at once while more is outstanding, when it is next due, or after a backoff when it failed.
+ * A wake it could not act on stays undelivered, so Cluster runs it again.
+ *
+ * @category layers
+ */
+export const layerWorker = WorkspaceProcess.toLayer(
+  Effect.gen(function* () {
+    const gateway = yield* Gateway.Service;
+    const clientFor = yield* WorkspaceProcess.client;
+    const crypto = yield* Crypto.Crypto;
+    const schedule = Effect.fnUntraced(function* (
+      wake: Wake,
+      at: DateTime.Utc,
+      key: string,
+      attempt: number,
+    ) {
+      yield* clientFor(entityId(wake.workspaceId, wake.process))
+        .Wake(
+          new Wake({ workspaceId: wake.workspaceId, process: wake.process, key, at, attempt }),
+          { discard: true },
+        )
+        .pipe(Effect.orDie);
+    });
+    const unique = (prefix: string) =>
+      Effect.map(Effect.orDie(crypto.randomUUIDv4), (id) => `${prefix}:${id}`);
+    return WorkspaceProcess.of({
+      Wake: ({ payload: wake }) =>
+        Effect.gen(function* () {
+          const exit = yield* Effect.exit(gateway.runBackground(wake.workspaceId, wake.process));
+          const now = yield* DateTime.now;
+          if (Exit.isSuccess(exit)) {
+            const outcome = exit.value;
+            if (outcome._tag === "Continue") yield* schedule(wake, now, yield* unique("more"), 0);
+            if (outcome._tag === "At")
+              yield* schedule(wake, outcome.at, `due:${DateTime.toEpochMillis(outcome.at)}`, 0);
+            return;
+          }
+          const failure = Option.map(Cause.findErrorOption(exit.cause), (error) => error._tag);
+          const notFound = Option.contains(failure, "Gateway.WorkspaceNotFound");
+          const unknown = Option.contains(failure, "BackgroundRuns.Unknown");
+          if (notFound || (unknown && wake.attempt + 1 >= unknownAttempts)) {
+            yield* Effect.logError("Background process dropped", {
+              workspaceId: wake.workspaceId,
+              process: wake.process,
+              cause: exit.cause,
+            });
+            return;
+          }
+          const attempt = wake.attempt + 1;
+          yield* Effect.logWarning("Background process failed; running it again later", {
+            workspaceId: wake.workspaceId,
+            process: wake.process,
+            attempt,
+            cause: exit.cause,
+          });
+          yield* schedule(
+            wake,
+            DateTime.addDuration(now, backoff(attempt)),
+            yield* unique("retry"),
+            attempt,
+          );
+        }),
+    });
+  }),
+  { maxIdleTime: "1 minute" },
+);
+
+/** Stored wakes and the worker that runs them, over the host's Cluster. @category layers */
+export const layer = Layer.merge(layerWorker, layerWakes);
+
+export * as ClusterBackground from "./cluster-background.ts";

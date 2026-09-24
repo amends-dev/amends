@@ -22,11 +22,12 @@ The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `bun run dev` restarts the host when its source changes.
 
-| Setting                     | Default  | Accepted value                                             |
-| --------------------------- | -------- | ---------------------------------------------------------- |
-| `AMENDS_PORT`               | `8787`   | Integer from `0` through `65535`; `0` selects a free port. |
-| `AMENDS_DATABASE_URL`       | Required | A `postgres://` or `postgresql://` URL.                    |
-| `AMENDS_DATABASE_POOL_SIZE` | `10`     | Integer from `2` through `1000`.                           |
+| Setting                     | Default           | Accepted value                                             |
+| --------------------------- | ----------------- | ---------------------------------------------------------- |
+| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port. |
+| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                    |
+| `AMENDS_DATABASE_POOL_SIZE` | `10`              | Integer from `2` through `1000`.                           |
+| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.         |
 
 The pool size is the most connections the host opens. One of them listens for notifications
 while readers wait, and a busy workspace's writers wait for each other in memory rather than
@@ -37,6 +38,21 @@ process at a time when several start together.
 A missing or invalid URL fails startup before any connection. A missing port or pool size
 uses its default; an explicitly blank setting fails validation. Database URLs stay
 redacted in configuration errors.
+
+## Background work
+
+The host runs its workspaces' [background work](../../packages/gateway/README.md#background-work-on-effect-cluster)
+in its own process, on an Effect Cluster runner (`SingleRunner`) over the same database pool as
+its storage, so a wake a commit asks for is stored in that commit's transaction. Cluster keeps
+its own tables beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
+`cluster_migrations`), creating them at startup; reads for due wakes every two seconds; and
+holds two of the pool's connections.
+
+`AMENDS_RUNNER_ADDRESS` is the process's identity among the runners over the database. Only one
+process may run at an address at a time: two processes sharing one also share Cluster's machine
+ID, and the first to stop removes the other's registration. Restart a host by stopping the old
+process before starting the new one; wakes sent meanwhile wait in the database. Several host
+processes over one database need Cluster's socket transport, which this host does not configure.
 
 ## Browser and desktop access
 
@@ -53,15 +69,15 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                              |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                          |
-| `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                                                                                  |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                       |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                         |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL as a `HostLayer`; it runs no background work yet, so wakes are unavailable. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                    |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                          |
+| Module                             | Responsibility                                                                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                      |
+| `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                                                                                                              |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                   |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                     |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                      |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
@@ -123,8 +139,10 @@ bun run test
 
 Authentication tests cover constructor and layer behavior, state isolation,
 single-use codes, exact expiry, repeated requests, concurrent completion, and
-failed or interrupted delivery. Configuration tests cover defaults, port and pool-size bounds,
-the required database URL, empty values, and redacted errors.
+failed or interrupted delivery. Configuration tests cover defaults, port, pool-size, and runner-address bounds,
+the required database URL, empty values, and redacted errors. `background.test.ts` checks, over
+the host's database composition, that a wake asked for inside a commit is stored with it, reaches
+the worker, and is absent if the commit rolls back.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

@@ -43,6 +43,32 @@ it.effect.each(["", "0", "1", "1001", "2.5", "many"])(
     }),
 );
 
+it.effect("background work runs at localhost:34431 unless told otherwise", () =>
+  Effect.gen(function* () {
+    expect((yield* load({ AMENDS_DATABASE_URL: databaseUrl })).runnerAddress).toEqual({
+      host: "localhost",
+      port: 34431,
+    });
+    const options = yield* load({
+      AMENDS_DATABASE_URL: databaseUrl,
+      AMENDS_RUNNER_ADDRESS: "runner-2.internal:40001",
+    });
+    expect(options.runnerAddress).toEqual({ host: "runner-2.internal", port: 40001 });
+  }),
+);
+
+it.effect.each(["", "localhost", ":34431", "localhost:0", "localhost:65536", "a b:1"])(
+  "configuration rejects a runner address of %j",
+  (address) =>
+    Effect.gen(function* () {
+      const error = yield* load({
+        AMENDS_DATABASE_URL: databaseUrl,
+        AMENDS_RUNNER_ADDRESS: address,
+      }).pipe(Effect.flip);
+      expect(error.message).toContain("AMENDS_RUNNER_ADDRESS");
+    }),
+);
+
 it.effect.each([0, 8787, 65535])("configuration accepts port %i", (port) =>
   Effect.gen(function* () {
     const options = yield* load({ AMENDS_PORT: String(port), AMENDS_DATABASE_URL: databaseUrl });

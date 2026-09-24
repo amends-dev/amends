@@ -7,6 +7,8 @@ export interface Options {
   readonly databaseUrl: Redacted.Redacted<string>;
   /** The most connections the host opens to it; one listens for notifications while needed. */
   readonly poolSize: number;
+  /** This process's address among those running background work over the database. */
+  readonly runnerAddress: { readonly host: string; readonly port: number };
 }
 
 const port = Config.schema(
@@ -27,6 +29,24 @@ const databaseUrl = Config.schema(
   ),
   "AMENDS_DATABASE_URL",
 );
+const runnerAddress = Config.schema(
+  Schema.String.check(
+    Schema.makeFilter((value) => {
+      const match = /^([A-Za-z0-9.-]+):([0-9]{1,5})$/.exec(value);
+      return (
+        (match !== null && Number(match[2]) >= 1 && Number(match[2]) <= 65535) ||
+        "Expected host:port, with a port from 1 through 65535"
+      );
+    }),
+  ),
+  "AMENDS_RUNNER_ADDRESS",
+).pipe(
+  Config.withDefault("localhost:34431"),
+  Config.map((value) => {
+    const separator = value.lastIndexOf(":");
+    return { host: value.slice(0, separator), port: Number(value.slice(separator + 1)) };
+  }),
+);
 const poolSize = Config.schema(
   Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 1000 })),
   "AMENDS_DATABASE_POOL_SIZE",
@@ -37,7 +57,12 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
   Options,
   Config.ConfigError
 > {
-  return { port: yield* port, databaseUrl: yield* databaseUrl, poolSize: yield* poolSize };
+  return {
+    port: yield* port,
+    databaseUrl: yield* databaseUrl,
+    poolSize: yield* poolSize,
+    runnerAddress: yield* runnerAddress,
+  };
 });
 
 export * as LocalConfig from "./config.ts";
