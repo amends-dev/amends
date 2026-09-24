@@ -21,7 +21,9 @@ export interface Interface {
   /**
    * Make exactly the registered projections live before accepting publications: rebuild any
    * that are not live from the log, and retire live versions this journal does not run. When
-   * every registered projection is live, this reads nothing but the live versions.
+   * every registered projection is live, this reads nothing but the live versions. An empty log
+   * has nothing to rebuild, and its first commit makes the projections live, so replaying it
+   * writes nothing.
    */
   readonly replay: Effect.Effect<void, Projection.Error>;
   /**
@@ -261,22 +263,20 @@ export const make = Effect.fn("Journal.make")(function* <
     const live = yield* checkpoints.listLive(log.id);
     const pending = runners.filter((runner) => !live.some(Projection.isVersion(runner.key)));
     if (pending.length === 0 && live.every(registered)) return;
-    // One transaction settles what needs no rebuild: on an empty log every registered projection
-    // goes live, and live versions this journal does not run, which would stop its commits,
-    // are retired. Whoever runs a retired version again must rebuild it.
-    const settled = yield* transaction.run(
-      Effect.gen(function* () {
-        const current = yield* checkpoints.listLive(log.id);
-        if ((yield* log.read({ limit: 1 })).length === 0) {
-          yield* checkpoints.setLive(log.id, registeredVersions);
-          return true;
-        }
-        if (!current.every(registered))
-          yield* checkpoints.setLive(log.id, current.filter(registered));
-        return false;
-      }),
-    );
-    if (!settled) for (const runner of pending) yield* runner.replay;
+    // An empty log waits for its first commit, which makes the registered projections live;
+    // booting a workspace that was never created must leave nothing behind.
+    if ((yield* log.read({ limit: 1 })).length === 0) return;
+    // Live versions this journal does not run would stop its commits, so they are retired first.
+    // Whoever runs a retired version again must rebuild it.
+    if (!live.every(registered))
+      yield* transaction.run(
+        Effect.gen(function* () {
+          const current = yield* checkpoints.listLive(log.id);
+          if (!current.every(registered))
+            yield* checkpoints.setLive(log.id, current.filter(registered));
+        }),
+      );
+    for (const runner of pending) yield* runner.replay;
   }).pipe(Effect.withSpan("Journal.replay"));
 
   return Service.of({ log: reader, read: log.readFacts, commit: transaction.run, replay, publish });

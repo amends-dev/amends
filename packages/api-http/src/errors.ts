@@ -27,6 +27,7 @@ export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
  * concerns, so the status lives on the contract's view of each error.
  */
 export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403));
+export const WorkspaceNotFound = GatewayErrors.WorkspaceNotFound.pipe(HttpApiSchema.status(404));
 export const Conflict = GatewayErrors.Conflict.pipe(HttpApiSchema.status(409));
 export const Uncertain = GatewayErrors.Uncertain.pipe(HttpApiSchema.status(500));
 export const InvalidInput = GatewayErrors.InvalidInput.pipe(HttpApiSchema.status(400));

@@ -57,7 +57,8 @@ so a client can import the complete contract without loading server code.
   set; `DELETE …/members/:memberId/assignments/:assignmentId` revokes access.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;
   `POST` to the same path issues one with required `recipientId`, `roleId`, and `expiresAt`. `POST …/:invitationId/accept` and
-  `POST …/:invitationId/revoke` change state.
+  `POST …/:invitationId/revoke` change state; accepting in a workspace that was never created
+  returns 404 with `Gateway.WorkspaceNotFound`.
 - `notifications`: `GET /workspaces/:workspaceId/notifications` lists the authenticated
   human or agent's inbox. `GET …/:notificationId` reads one notification. Active
   membership is required, and a missing record or another recipient's notification

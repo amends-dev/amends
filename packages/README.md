@@ -86,7 +86,8 @@ service inventory and examples; each protocol package documents its own surface.
 composition: `layer` builds the application operations over the journal,
 authorization, and permission catalog. `HostServices` describes the storage,
 signals, and cryptography a host must supply, derived from that layer.
-`Operations` is the set of application services a gateway may run. Domains are subpath exports:
+`Operations` is the set of application services a gateway may run, and `journalLog` names the
+workspace journal's log, whose history shows whether a workspace was ever created. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/signal`, `@amends/core/attention`,
 `@amends/core/group`, `@amends/core/thread`, and

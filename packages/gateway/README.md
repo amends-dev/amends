@@ -50,13 +50,16 @@ is sufficient to type-check a supplied implementation.
   name, allocates a workspace ID, and runs core initialization for the creator.
   Core rejects blank or untrimmed names before committing any facts. The caller
   has authenticated the creator and checked entitlement.
-- `asMember(workspaceId, identity, program)` binds the workspace, resolves the
-  identity's active membership into `Actor.Service`, and runs the program.
+- `asMember(workspaceId, identity, program)` resolves the identity's active membership
+  into `Actor.Service`, binds the workspace, and runs the program. Membership is resolved
+  before the workspace is prepared, so a non-member or an unknown workspace returns
+  `NotMember` without loading it.
   Programs may require only core's `Operations` and the actor. Stores,
   the journal, and authorization are not reachable, so protocol code cannot
   bypass the checks core performs inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for
-  invitation acceptance where the recipient is not yet a member.
+  invitation acceptance where the recipient is not yet a member. A workspace that was never
+  created returns `WorkspaceNotFound` without being prepared.
 - `asMemberScoped(workspaceId, identity, program)` uses the caller's scope for
   the runtime lease and operation resources. Streaming ingress uses it to keep
   subscriptions alive until disconnect. Programs may additionally require `Scope`.
@@ -73,6 +76,15 @@ Identities must come from a trusted ingress, never from client input.
 The gateway owns an internal `WorkspaceRuntime` registry backed by Effect's
 `LayerMap`. The first acquisition of a workspace binds storage, builds core, and
 completes journal replay before exposing the prepared context.
+
+Only callers who may enter prepare a workspace. Before preparing one, the gateway reads its
+stores through a storage view, as the host rather than inside the request's actor or
+transaction: the identity's active membership admits the caller, whose membership is not
+looked up again. A workspace with no journal history was never created, and one whose read
+models are live but show no membership is not the caller's; both are refused without
+preparing anything. Only a created workspace whose read models await a rebuild is prepared
+first, and membership is then resolved from what its boot restores. A prepared workspace
+resolves membership inside it, since a member already prepared it.
 Concurrent callers await the same boot. Later requests reuse that context without
 replaying history or rebuilding services. Membership, authorization, transactions,
 and subscription scopes are resolved during each operation; boot uses the host's
@@ -125,7 +137,8 @@ signals.
 
 Programs fail only with outcomes a caller can act on. Domain errors from core
 pass through unchanged. The gateway adds `NotMember` when the identity has no
-active membership, `Conflict` for retryable storage contention, `Uncertain`
+active membership, `WorkspaceNotFound` when invitation acceptance names a workspace that was
+never created, `Conflict` for retryable storage contention, `Uncertain`
 when a commit's outcome is unknown, and `InvalidInput` when core rejects
 caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its

@@ -9,7 +9,7 @@ import { ReadStateStore } from "@amends/core/attention";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
-import { Checkpoint, Commit, Store } from "@amends/core/journal";
+import { Checkpoint, Commit, Entry, Store } from "@amends/core/journal";
 import {
   Notification,
   NotificationApplication,
@@ -54,10 +54,15 @@ interface BindingOptions {
   readonly workspaceId?: Workspace.Id;
   readonly findActive?: MemberStore.Interface["findActive"];
   readonly read?: Store.Interface["read"];
+  readonly head?: Store.Interface["head"];
+  readonly listLive?: Checkpoint.Interface["listLive"];
   readonly memberWorkspaceId?: Workspace.Id;
 }
 
-/** Empty journal and explicit host contracts; unexpected writes fail instead of simulating storage. */
+/**
+ * A created workspace whose projections replay from an empty page, with explicit host contracts;
+ * unexpected writes fail instead of simulating storage.
+ */
 const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorage.Bindings> => {
   const boundWorkspaceId = options.workspaceId ?? workspaceId;
   return Context.make(
@@ -74,7 +79,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         ),
       get: unexpected,
       read: options.read ?? (() => Effect.succeed([])),
-      head: () => Effect.succeedNone,
+      head: options.head ?? (() => Effect.succeedSome(Entry.Position.make(0))),
       workspaceId: boundWorkspaceId,
       waitForAppend: unexpected,
       getAppend: unexpected,
@@ -86,7 +91,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       Checkpoint.Service.of({
         get: () => Effect.succeedNone,
         set: unexpected,
-        listLive: () => Effect.succeed([]),
+        listLive: options.listLive ?? (() => Effect.succeed([])),
         setLive: () => Effect.void,
       }),
     ),
@@ -293,7 +298,12 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
   (entry) =>
     run((gateway) =>
       Effect.gen(function* () {
-        const enter = <A, E>(program: Effect.Effect<A, E>) =>
+        const enter = <A, E>(
+          program: Effect.Effect<A, E>,
+        ): Effect.Effect<
+          A,
+          GatewayErrors.ExposedError<E> | GatewayErrors.NotMember | GatewayErrors.WorkspaceNotFound
+        > =>
           entry === "inWorkspace"
             ? gateway.inWorkspace(workspaceId, program)
             : gateway.asMember(workspaceId, alice, program);
@@ -505,16 +515,17 @@ it.effect("concurrent requests share boot and later requests do not replay or re
             { concurrency: "unbounded" },
           ).pipe(Effect.forkChild({ startImmediately: true }));
           yield* Deferred.await(entered);
-          expect(bound).toBe(1);
           expect(executed).toBe(0);
           yield* Deferred.succeed(resume, undefined);
           yield* Fiber.join(requests);
           expect(executed).toBe(20);
-          expect(reads).toBe(1); // Boot reads the log once, to find it empty.
+          expect(reads).toBe(1); // One boot, which reads the log once to find it empty.
+          const views = bound;
           yield* gateway.asMember(workspaceId, alice, operation);
           yield* gateway.inWorkspace(workspaceId, operation);
-          expect(bound).toBe(1);
-          expect(reads).toBe(1); // Later requests reuse the booted workspace.
+          // Later requests reuse the booted workspace, with no admission check or view of their own.
+          expect(bound).toBe(views);
+          expect(reads).toBe(1);
           expect(executed).toBe(22);
         }).pipe(Effect.provide(host(storage)));
       }),
@@ -522,7 +533,136 @@ it.effect("concurrent requests share boot and later requests do not replay or re
   }),
 );
 
-/** A gateway whose workspace boots are counted, for runtime lifetime tests. */
+/** Admission against one workspace's stores, counting boots by their replay's read. */
+const admitting = Effect.fnUntraced(function* (
+  options: BindingOptions & {
+    readonly setLive?: Checkpoint.Interface["setLive"];
+    /** Runs as a boot replays, as a rebuild would restore the read models. */
+    readonly onBoot?: () => void;
+  },
+) {
+  const boots = { reads: 0 };
+  const gateway = yield* Gateway.make().pipe(
+    Effect.provideService(WorkspaceStorage.Service, {
+      forWorkspace: () =>
+        Effect.succeed(
+          Context.add(
+            bindings(
+              Object.assign({}, options, {
+                read: () =>
+                  Effect.sync(() => {
+                    boots.reads += 1;
+                    options.onBoot?.();
+                    return [];
+                  }),
+              }),
+            ),
+            Checkpoint.Service,
+            Checkpoint.Service.of({
+              get: () => Effect.succeedNone,
+              set: unexpected,
+              listLive: options.listLive ?? (() => Effect.succeed([])),
+              setLive: options.setLive ?? unexpected,
+            }),
+          ),
+        ),
+    }),
+  );
+  return { gateway, boots };
+});
+const liveVersion: Checkpoint.LiveVersion = { name: "members", version: 1 };
+
+it.effect("a workspace that was never created is refused without being prepared", () =>
+  Effect.gen(function* () {
+    const { gateway, boots } = yield* admitting({
+      head: () => Effect.succeedNone,
+      findActive: () => Effect.succeedNone,
+    });
+    expect(yield* Effect.flip(gateway.asMember(workspaceId, alice, Effect.void))).toEqual(
+      new GatewayErrors.NotMember({ workspaceId }),
+    );
+    expect(yield* Effect.flip(gateway.inWorkspace(workspaceId, Effect.void))).toEqual(
+      new GatewayErrors.WorkspaceNotFound({ workspaceId }),
+    );
+    // Nothing was booted, and nothing was written: setLive would have failed the request.
+    expect(boots.reads).toBe(0);
+  }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
+);
+
+it.effect("a non-member of a created workspace is refused without preparing it", () =>
+  Effect.gen(function* () {
+    let called = false;
+    const { gateway, boots } = yield* admitting({
+      findActive: () => Effect.succeedNone,
+      listLive: () => Effect.succeed([liveVersion]),
+    });
+    const refused = yield* Effect.flip(
+      gateway.asMember(
+        workspaceId,
+        alice,
+        Effect.sync(() => {
+          called = true;
+        }),
+      ),
+    );
+    expect(refused).toEqual(new GatewayErrors.NotMember({ workspaceId }));
+    expect(called).toBe(false);
+    expect(boots.reads).toBe(0);
+  }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
+);
+
+it.effect(
+  "a member's first request prepares the workspace, and the admission check answers it",
+  () =>
+    Effect.gen(function* () {
+      const lookups: Array<Identity.MemberReference> = [];
+      const { gateway, boots } = yield* admitting({
+        findActive: (identity) =>
+          Effect.sync(() => {
+            lookups.push(identity);
+            return Option.some({ id: memberId, workspaceId, identity, status: "active" as const });
+          }),
+      });
+      expect(yield* gateway.asMember(workspaceId, alice, Actor.Service)).toEqual({
+        workspaceId,
+        memberId,
+        identity: alice,
+      });
+      expect(boots.reads).toBe(1);
+      expect(lookups).toEqual([alice]);
+      // A prepared workspace resolves each later caller inside it, without another admission view.
+      yield* gateway.asMember(workspaceId, agent, Actor.Service);
+      expect(lookups).toEqual([alice, agent]);
+      expect(boots.reads).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
+);
+
+it.effect("read models awaiting a rebuild are prepared first, then resolve membership", () =>
+  Effect.gen(function* () {
+    // Before boot rebuilds them, the read models know no one and nothing is live; the created
+    // workspace's history is what lets the request prepare it.
+    let rebuilt = false;
+    const { gateway, boots } = yield* admitting({
+      findActive: (identity) =>
+        Effect.sync(() =>
+          rebuilt && identity.id === alice.id
+            ? Option.some({ id: memberId, workspaceId, identity, status: "active" as const })
+            : Option.none(),
+        ),
+      onBoot: () => {
+        rebuilt = true;
+      },
+    });
+    expect((yield* gateway.asMember(workspaceId, alice, Actor.Service)).identity).toEqual(alice);
+    expect(boots.reads).toBe(1);
+    // The rebuilt read models still refuse someone who is not a member.
+    expect(yield* Effect.flip(gateway.asMember(workspaceId, agent, Effect.void))).toEqual(
+      new GatewayErrors.NotMember({ workspaceId }),
+    );
+  }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
+);
+
+/** A gateway whose workspace boots are counted by their replay's read, for runtime lifetime tests. */
 const counted = Effect.fnUntraced(function* (options: Gateway.Options) {
   const boots = { bound: 0, reads: 0 };
   const gateway = yield* Gateway.make(options).pipe(
@@ -547,16 +687,16 @@ it.effect("an idle workspace is released after its time-to-live and boots again 
   Effect.gen(function* () {
     const { gateway, boots } = yield* counted({ idleTimeToLive: "1 minute" });
     yield* gateway.inWorkspace(workspaceId, Effect.void);
-    expect(boots).toEqual({ bound: 1, reads: 1 });
+    expect(boots.reads).toBe(1);
     // Each request restarts the idle time from its release.
     yield* TestClock.adjust("59 seconds");
     yield* gateway.asMember(workspaceId, alice, Effect.void);
     yield* TestClock.adjust("59 seconds");
     yield* gateway.inWorkspace(workspaceId, Effect.void);
-    expect(boots).toEqual({ bound: 1, reads: 1 });
+    expect(boots.reads).toBe(1);
     yield* TestClock.adjust("1 minute");
     yield* gateway.asMember(workspaceId, alice, Effect.void);
-    expect(boots).toEqual({ bound: 2, reads: 2 });
+    expect(boots.reads).toBe(2);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
 
@@ -568,21 +708,21 @@ it.effect("an open lease keeps its workspace prepared past the time-to-live", ()
     yield* gateway.asMemberScoped(workspaceId, alice, Effect.void).pipe(Scope.provide(stream));
     yield* TestClock.adjust("10 minutes");
     yield* gateway.inWorkspace(workspaceId, Effect.void);
-    expect(boots.bound).toBe(1);
+    expect(boots.reads).toBe(1);
     yield* Scope.close(stream, Exit.void);
     yield* TestClock.adjust("59 seconds");
     yield* gateway.inWorkspace(workspaceId, Effect.void);
-    expect(boots.bound).toBe(1);
+    expect(boots.reads).toBe(1);
     yield* TestClock.adjust("1 minute");
     yield* gateway.inWorkspace(workspaceId, Effect.void);
-    expect(boots.bound).toBe(2);
+    expect(boots.reads).toBe(2);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
 
 it.effect("a failed boot is discarded and a later acquisition retries once", () =>
   Effect.gen(function* () {
     const failure = new Store.Failure({ operation: "read", cause: "boot failed" });
-    let bound = 0;
+    let reads = 0;
     let executed = 0;
     yield* Effect.scoped(
       Effect.gen(function* () {
@@ -597,16 +737,21 @@ it.effect("a failed boot is discarded and a later acquisition retries once", () 
         yield* gateway.inWorkspace(workspaceId, operation);
         yield* gateway.inWorkspace(workspaceId, operation);
         expect(executed).toBe(2);
-        expect(bound).toBe(2);
+        expect(reads).toBe(2); // The failed boot and its one retry.
       }),
     ).pipe(
       Effect.provide(
         host({
           forWorkspace: () =>
-            Effect.sync(() => {
-              bound += 1;
-              return bindings(bound === 1 ? { read: () => Effect.fail(failure) } : {});
-            }),
+            Effect.succeed(
+              bindings({
+                read: () =>
+                  Effect.suspend(() => {
+                    reads += 1;
+                    return reads === 1 ? Effect.fail(failure) : Effect.succeed([]);
+                  }),
+              }),
+            ),
         }),
       ),
     );
@@ -615,7 +760,7 @@ it.effect("a failed boot is discarded and a later acquisition retries once", () 
 
 it.effect("interrupting a caller leaves shared boot available to the next request", () =>
   Effect.gen(function* () {
-    let bound = 0;
+    let boots = 0;
     yield* Effect.scoped(
       Effect.gen(function* () {
         const entered = yield* Deferred.make<void>();
@@ -633,17 +778,23 @@ it.effect("interrupting a caller leaves shared boot available to the next reques
             .pipe(Effect.forkChild({ startImmediately: true }));
           yield* Deferred.succeed(resume, undefined);
           expect((yield* Fiber.join(second)).identity).toEqual(alice);
-          expect(bound).toBe(1);
+          expect(boots).toBe(1);
         }).pipe(
           Effect.provide(
             host({
+              // Boot pauses in its replay, after the first caller's admission check.
               forWorkspace: () =>
-                Effect.gen(function* () {
-                  bound += 1;
-                  yield* Deferred.succeed(entered, undefined);
-                  yield* Deferred.await(resume);
-                  return bindings();
-                }),
+                Effect.succeed(
+                  bindings({
+                    read: () =>
+                      Effect.gen(function* () {
+                        boots += 1;
+                        yield* Deferred.succeed(entered, undefined);
+                        yield* Deferred.await(resume);
+                        return [];
+                      }),
+                  }),
+                ),
             }),
           ),
         );
@@ -654,13 +805,19 @@ it.effect("interrupting a caller leaves shared boot available to the next reques
 
 it.effect("workspace runtimes are isolated and a new host boots from storage again", () =>
   Effect.gen(function* () {
-    const requested: Array<Workspace.Id> = [];
+    const booted: Array<Workspace.Id> = [];
     const storage = {
       forWorkspace: (id: Workspace.Id) =>
-        Effect.sync(() => {
-          requested.push(id);
-          return bindings({ workspaceId: id });
-        }),
+        Effect.succeed(
+          bindings({
+            workspaceId: id,
+            read: () =>
+              Effect.sync(() => {
+                booted.push(id);
+                return [];
+              }),
+          }),
+        ),
     };
     const other = Workspace.Id.make("other");
     for (let restart = 0; restart < 2; restart += 1) {
@@ -675,7 +832,7 @@ it.effect("workspace runtimes are isolated and a new host boots from storage aga
         }),
       ).pipe(Effect.provide(host(storage)));
     }
-    expect(requested).toEqual([workspaceId, other, workspaceId, other]);
+    expect(booted).toEqual([workspaceId, other, workspaceId, other]);
   }),
 );
 
@@ -685,13 +842,17 @@ it.effect(
     Effect.scoped(
       Effect.gen(function* () {
         const gateway = yield* Gateway.make();
-        yield* gateway.inWorkspace(workspaceId, Effect.void).pipe(
-          Effect.provideService(Actor.Service, { workspaceId, memberId, identity: alice }),
-          Effect.provideService(Store.Transaction, {
-            id: Commit.Id.make("request"),
-            append: unexpected,
-          }),
-        );
+        const inRequest = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+          effect.pipe(
+            Effect.provideService(Actor.Service, { workspaceId, memberId, identity: alice }),
+            Effect.provideService(Store.Transaction, {
+              id: Commit.Id.make("request"),
+              append: unexpected,
+            }),
+          );
+        yield* inRequest(gateway.inWorkspace(workspaceId, Effect.void));
+        // A member's admission check reads another cold workspace's stores as the host, too.
+        yield* inRequest(gateway.asMember(Workspace.Id.make("cold"), alice, Effect.void));
         yield* gateway.inWorkspace(
           workspaceId,
           Effect.gen(function* () {
@@ -703,11 +864,11 @@ it.effect(
     ).pipe(
       Effect.provide(
         host({
-          forWorkspace: () =>
+          forWorkspace: (id) =>
             Effect.gen(function* () {
               expect(Option.isNone(yield* Effect.serviceOption(Actor.Service))).toBe(true);
               expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
-              return bindings();
+              return bindings({ workspaceId: id });
             }),
         }),
       ),

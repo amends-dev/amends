@@ -1,8 +1,13 @@
-import type * as Core from "@amends/core";
+import * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
-import { Store } from "@amends/core/journal";
-import { MemberStore, Workspace, WorkspaceInitialization } from "@amends/core/workspace";
+import { Checkpoint, Store } from "@amends/core/journal";
+import {
+  type Member,
+  MemberStore,
+  Workspace,
+  WorkspaceInitialization,
+} from "@amends/core/workspace";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
@@ -31,15 +36,18 @@ export interface Interface {
   /**
    * Run core operations in a workspace without an actor: invitation acceptance,
    * where the recipient is not yet a member. Programs may require only core's
-   * application services, never its stores or journal.
+   * application services, never its stores or journal. A workspace that was never
+   * created returns WorkspaceNotFound without being prepared.
    */
   readonly inWorkspace: <A, E, R extends Core.Operations>(
     workspaceId: Workspace.Id,
     program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, GatewayErrors.ExposedError<E>>;
+  ) => Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.WorkspaceNotFound>;
   /**
-   * Run core operations as the identity's active membership. Core rechecks
-   * membership and permissions per operation; writes do so inside their transaction.
+   * Run core operations as the identity's active membership. Membership is resolved before the
+   * workspace is prepared, so a non-member or an unknown workspace returns NotMember without
+   * loading it. Core rechecks membership and permissions per operation; writes do so inside
+   * their transaction.
    */
   readonly asMember: <A, E, R extends Core.Operations | Actor.Service>(
     workspaceId: Workspace.Id,
@@ -104,6 +112,9 @@ export const make = Effect.fn("Gateway.make")(function* (
   WorkspaceStorage.Service | SignalHub.Service | Crypto.Crypto | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options);
+  const storage = yield* WorkspaceStorage.Service;
+  // Admission reads storage as the host, never inside a request's actor or transaction.
+  const environment = yield* Effect.context<never>();
   const cryptography = yield* Crypto.Crypto;
 
   const bind = Effect.fn("Gateway.bind")(function* <A, E>(
@@ -114,12 +125,57 @@ export const make = Effect.fn("Gateway.make")(function* (
     return yield* program.pipe(Effect.provide(context));
   });
 
+  /** The admission check's reads, from a view of the workspace's stores. */
+  const probe = Effect.fnUntraced(function* (
+    workspaceId: Workspace.Id,
+    identity: Identity.MemberReference,
+  ) {
+    const bindings = yield* storage.forWorkspace(workspaceId);
+    const membership = yield* Effect.orDie(
+      Context.get(bindings, MemberStore.Service).findActive(identity),
+    );
+    if (Option.isSome(membership)) return { _tag: "Member", member: membership.value } as const;
+    const live = yield* Effect.orDie(
+      Context.get(bindings, Checkpoint.Service).listLive(Core.journalLog),
+    );
+    if (live.length > 0) return { _tag: "Refused" } as const;
+    const head = yield* Effect.orDie(Context.get(bindings, Store.Service).head(Core.journalLog));
+    return Option.isNone(head) ? ({ _tag: "Refused" } as const) : ({ _tag: "Prepare" } as const);
+  });
+
+  /**
+   * Whether an identity may enter a workspace. A prepared workspace resolves membership inside
+   * it, since a member already booted it. Otherwise its stores answer without preparing it: the
+   * identity's active membership, or a refusal when the workspace was never created, having no
+   * history, or its live read models show no membership. Only a workspace whose read models
+   * await a rebuild is prepared first, so membership is resolved from what its boot restores.
+   */
+  const admit = Effect.fn("Gateway.admit")(function* (
+    workspaceId: Workspace.Id,
+    identity: Identity.MemberReference,
+  ) {
+    if (yield* runtimes.prepared(workspaceId)) return { _tag: "Prepare" } as const;
+    return yield* probe(workspaceId, identity).pipe(Effect.setContext(environment));
+  });
+  /** Whether the workspace has history, read as the host. */
+  const created = (workspaceId: Workspace.Id) =>
+    storage.forWorkspace(workspaceId).pipe(
+      Effect.flatMap((bindings) => Context.get(bindings, Store.Service).head(Core.journalLog)),
+      Effect.map(Option.isSome),
+      Effect.orDie,
+      Effect.setContext(environment),
+    );
+
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
+    found: Option.Option<Member.Record>,
   ) {
-    const membership = yield* Effect.orDie((yield* MemberStore.Service).findActive(identity));
+    // Without an answer from the admission check, the prepared workspace's read models decide.
+    const membership = Option.isSome(found)
+      ? found
+      : yield* Effect.orDie((yield* MemberStore.Service).findActive(identity));
     if (Option.isNone(membership)) return yield* new GatewayErrors.NotMember({ workspaceId });
     const actor = Actor.Value.make({ workspaceId, memberId: membership.value.id, identity });
     return yield* expose(workspaceId, Effect.provideService(program, Actor.Service, actor));
@@ -140,6 +196,9 @@ export const make = Effect.fn("Gateway.make")(function* (
     R extends Core.Operations,
   >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, R>) {
     const operation: Effect.Effect<A, E, Core.Operations> = program;
+    // A workspace that was never created has no history, and is refused before it is prepared.
+    if (!(yield* runtimes.prepared(workspaceId)) && !(yield* created(workspaceId)))
+      return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
     return yield* Effect.scoped(bind(workspaceId, expose(workspaceId, operation)));
   });
 
@@ -150,7 +209,11 @@ export const make = Effect.fn("Gateway.make")(function* (
       program: Effect.Effect<A, E, R>,
     ) {
       const operation: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope> = program;
-      return yield* bind(workspaceId, withActor(workspaceId, identity, operation));
+      const admission = yield* admit(workspaceId, identity);
+      if (admission._tag === "Refused") return yield* new GatewayErrors.NotMember({ workspaceId });
+      const found =
+        admission._tag === "Member" ? Option.some(admission.member) : Option.none<Member.Record>();
+      return yield* bind(workspaceId, withActor(workspaceId, identity, operation, found));
     },
   );
 

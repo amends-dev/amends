@@ -31,6 +31,12 @@ export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMembe
   workspaceId: Workspace.Id,
 }) {}
 
+/** No workspace was ever created under this ID. */
+export class WorkspaceNotFound extends Schema.TaggedError<WorkspaceNotFound>()(
+  "Gateway.WorkspaceNotFound",
+  { workspaceId: Workspace.Id },
+) {}
+
 /** Storage contention; the operation did not apply and may be retried. */
 export class Conflict extends Schema.TaggedError<Conflict>()("Gateway.Conflict", {
   workspaceId: Workspace.Id,
@@ -57,6 +63,7 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.In
 export const PublicError = Schema.Union([
   ChangeFeed.Unavailable,
   NotMember,
+  WorkspaceNotFound,
   Conflict,
   Uncertain,
   InvalidInput,

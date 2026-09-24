@@ -32,7 +32,12 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
     HttpApiEndpoint.post("accept", "/:invitationId/accept", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
       success: Member.Record,
-      error: [ApiErrors.HumanRequired, ...ApiErrors.workspace, ...invitation],
+      error: [
+        ApiErrors.HumanRequired,
+        ApiErrors.WorkspaceNotFound,
+        ...ApiErrors.workspace,
+        ...invitation,
+      ],
     }),
     HttpApiEndpoint.post("revoke", "/:invitationId/revoke", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },

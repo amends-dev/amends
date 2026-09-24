@@ -316,6 +316,29 @@ it.effect("live publication reads no log batches or progress, and checks live ve
   }),
 );
 
+it.effect(
+  "replaying an empty log writes nothing; its first commit makes the projections live",
+  () =>
+    Effect.gen(function* () {
+      const fixture = yield* make();
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          const journal = yield* Journal.make({ logId, projections: [definition] });
+          yield* journal.replay;
+          // A workspace booted before it was ever created must leave nothing behind.
+          expect(yield* fixture.attempts).toBe(0);
+          expect(yield* fixture.checkpoints.listLive(logId)).toEqual([]);
+          yield* journal.publish(Changed, { amount: 1 });
+          expect(yield* fixture.checkpoints.listLive(logId)).toEqual([
+            { name: definition.name, version: definition.version },
+          ]);
+          expect(yield* (yield* Counter).get).toBe(1);
+        }),
+      );
+    }),
+);
+
 it.effect("a journal that does not run a live projection cannot publish to its log", () =>
   Effect.gen(function* () {
     const fixture = yield* make();

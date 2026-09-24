@@ -14,10 +14,11 @@ import {
   MemberApplication,
   MemberFacts,
   MemberPermissions,
+  Invitation,
   OwnershipPermissions,
-  type Workspace,
+  Workspace,
 } from "@amends/core/workspace";
-import { Gateway, WorkspaceDirectory } from "@amends/gateway";
+import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends/gateway";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";
@@ -302,6 +303,45 @@ export const gateway = (harness: Harness) => {
           }),
         ),
       ),
+    );
+
+    it.effect(
+      "requests for workspaces that were never created, or by non-members, leave nothing stored",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const workspace = yield* Effect.scoped(
+              runGateway(storage, Operations.createWorkspace(alice.id)),
+            );
+            const before = yield* storage.footprint;
+            yield* Effect.scoped(
+              runGateway(
+                storage,
+                Effect.gen(function* () {
+                  const unknown = Workspace.Id.make("never-created");
+                  expect(
+                    yield* Effect.flip(Operations.getMember(unknown, bob, workspace.ownerMemberId)),
+                  ).toEqual(new GatewayErrors.NotMember({ workspaceId: unknown }));
+                  expect(
+                    yield* Effect.flip(
+                      Operations.acceptInvitation(
+                        unknown,
+                        bob.id,
+                        Invitation.Id.make("never-issued"),
+                      ),
+                    ),
+                  ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: unknown }));
+                  expect(
+                    yield* Effect.flip(
+                      Operations.getMember(workspace.id, bob, workspace.ownerMemberId),
+                    ),
+                  ).toEqual(new GatewayErrors.NotMember({ workspaceId: workspace.id }));
+                }),
+              ),
+            );
+            expect(yield* storage.footprint).toBe(before);
+          }),
+        ),
     );
 
     it.effect("cold workspace boot replays projection history before resolving the caller", () =>

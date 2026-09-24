@@ -2,7 +2,18 @@ import * as Core from "@amends/core";
 import { Journal } from "@amends/core/journal";
 import { Signals } from "@amends/core/signal";
 import { Workspace } from "@amends/core/workspace";
-import { Context, Crypto, Duration, Effect, Exit, Layer, LayerMap, Schema, Scope } from "effect";
+import {
+  Context,
+  Crypto,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  LayerMap,
+  RcMap,
+  Schema,
+  Scope,
+} from "effect";
 import { SignalHub } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
 
@@ -22,6 +33,8 @@ export interface Interface {
   readonly forWorkspace: (
     workspaceId: Workspace.Id,
   ) => Effect.Effect<Context.Context<Provided>, never, Scope.Scope>;
+  /** Whether the workspace is prepared or being prepared, so a lease on it would not boot it. */
+  readonly prepared: (workspaceId: Workspace.Id) => Effect.Effect<boolean>;
 }
 
 /**
@@ -82,7 +95,9 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     return yield* runtimes.contextEffect(id);
   });
 
-  return { forWorkspace } satisfies Interface;
+  const prepared = (workspaceId: Workspace.Id) => RcMap.has(runtimes.rcMap, workspaceId);
+
+  return { forWorkspace, prepared } satisfies Interface;
 });
 
 export * as WorkspaceRuntime from "./workspace-runtime.ts";

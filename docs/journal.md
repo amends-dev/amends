@@ -542,9 +542,10 @@ exactly the journal's registered projections:
   projection live.
 
 `journal.replay` makes exactly the registered projections live before a host accepts
-publications. When they already are, it reads only the live versions. Otherwise it settles
-what needs no rebuild in one transaction: on an empty log every registered projection goes
-live, and live versions this journal does not register are retired. It then rebuilds each
+publications. When they already are, it reads only the live versions. An empty log has
+nothing to rebuild, and its first commit makes the projections live, so replaying it writes
+nothing: preparing a workspace that was never created leaves no trace. Otherwise replay
+retires, in one transaction, live versions this journal does not register, then rebuilds each
 registered projection that is not live. For example, using the host layer above:
 
 ```ts

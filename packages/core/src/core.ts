@@ -98,8 +98,14 @@ const permissions = [
   AgentPermissions.Use,
 ];
 
+/**
+ * The workspace journal's log. A workspace that was never created has no batch in it, which
+ * hosts can check without booting the workspace.
+ */
+export const journalLog = Log.Id.make("journal");
+
 /** The domain journal and its log, over host storage. */
-const journal = Journal.layer({ logId: Log.Id.make("journal"), projections }).pipe(
+const journal = Journal.layer({ logId: journalLog, projections }).pipe(
   Layer.provideMerge(Log.layer),
 );
 
