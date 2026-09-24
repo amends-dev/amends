@@ -103,7 +103,6 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       workspaceId,
       threadId: thread.id,
       author: request.author,
-      kind: "User",
       text: request.text,
       mentions: request.mentions,
       publishedAt: request.occurredAt,

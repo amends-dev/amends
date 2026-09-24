@@ -634,7 +634,6 @@ export const threadMessages = pgTable(
     authorKind: text("author_kind", { enum: ["Member", "Contact"] }).notNull(),
     authorMemberId: text("author_member_id"),
     authorContactId: text("author_contact_id"),
-    kind: text("kind", { enum: ["User"] }).notNull(),
     text: text("text").notNull(),
     mentions: text("mentions").array().notNull(),
     publishedAt: instant("published_at").notNull(),

@@ -1455,7 +1455,6 @@ export const threadParticipation = (harness: Harness) => {
                 workspaceId,
                 threadId,
                 author: { _tag: "Contact", contactId },
-                kind: "User",
                 text: "Hello from outside",
                 mentions: [],
                 publishedAt: at,

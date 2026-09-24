@@ -239,7 +239,6 @@ export const threadReplies = (harness: Harness) => {
               );
               expect(Object.keys(result).sort()).toEqual(["activity", "message"]);
               expect(result.message).toMatchObject({
-                kind: "User",
                 author: { _tag: "Member", memberId: humanId },
                 text: "  Reply\nverbatim  ",
                 mentions: [],

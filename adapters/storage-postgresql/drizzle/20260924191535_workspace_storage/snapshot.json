@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "c1728cd5-3090-43cf-a57e-190119ec60c6",
+  "id": "c666c395-1462-45b5-8199-971e8ceb621e",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1999,19 +1999,6 @@
       "generated": null,
       "identity": null,
       "name": "author_contact_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "thread_messages"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "kind",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_messages"

@@ -13,7 +13,11 @@ export const Text = Schema.NonEmptyString.check(
     (text) => /\S/u.test(text) || "Message text must contain non-whitespace content",
   ),
 );
-/** Members author messages in the app; contacts author the messages a channel receives. */
+/**
+ * Who wrote a message: a member, human or agent, writing in a thread, or a contact whose message a
+ * channel received. An agent's reply is its own message like anyone's; the turn that produced it
+ * is how the agent worked, not who wrote it.
+ */
 export const Author = Schema.TaggedUnion({
   Member: { memberId: MemberId.Id },
   Contact: { contactId: Identity.ContactId },
@@ -24,7 +28,6 @@ export const Record = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
   author: Author,
-  kind: Schema.Literal("User"),
   text: Text,
   mentions: Schema.UniqueArray(MemberId.Id),
   publishedAt: Schema.DateTimeUtcFromString,

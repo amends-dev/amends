@@ -232,7 +232,6 @@ CREATE TABLE "thread_messages" (
 	"author_kind" text NOT NULL,
 	"author_member_id" text,
 	"author_contact_id" text,
-	"kind" text NOT NULL,
 	"text" text NOT NULL,
 	"mentions" text[] NOT NULL,
 	"published_at" timestamp with time zone NOT NULL,

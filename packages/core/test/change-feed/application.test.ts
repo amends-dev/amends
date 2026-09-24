@@ -113,7 +113,6 @@ const message = (id: string, thread: Thread.Id, group: Group.Id) => ({
   groupId: group,
   threadId: thread,
   author: { _tag: "Member" as const, memberId: bobMember },
-  kind: "User" as const,
   text: `Message ${id}`,
   mentions: [],
   publishedAt: at,

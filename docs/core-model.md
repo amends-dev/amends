@@ -265,10 +265,10 @@ See [groups and thread audiences](#agreed-groups-provide-a-shared-home-for-threa
   through their read positions.
 - For message-publication activity, notify explicitly mentioned participants, or all current
   participants when there are no mentions, never the message's own author. This applies equally to
-  user and assistant messages.
-- Humans acknowledge notifications. Agents accept work from relevant user messages and
+  messages from people and from agents.
+- Humans acknowledge notifications. Agents accept work from relevant messages from people and
   actionable task changes, explicit retries, and explicit agent work requests and their
-  results. They discard ordinary assistant-message notifications. Informational turn status
+  results. They discard notifications of agents' ordinary messages. Informational turn status
   notifies all current participants without requesting agent work. Triage handles
   task-entered-triage activity.
 - Contact handlers forward eligible published replies through the channel, using the
@@ -304,7 +304,7 @@ An agent explicitly requests another agent's work through a tool that records ad
 thread activity. The tool returns after that activity is recorded; the receiving agent
 accepts work through normal notification handling. Result activity refers to the request
 and gives the requesting agent new input, including a response, resources, failure, or
-cancellation. The requesting turn need not stay open. Ordinary assistant replies remain
+cancellation. The requesting turn need not stay open. Agents' ordinary replies remain
 conversation, and a request on the same thread does not require a separate task.
 
 ### Atomic handoff and independent execution
@@ -364,12 +364,12 @@ does not incorporate input newly accepted through 12. The turn log records this 
 The turn log preserves intermediate and superseded assistant responses. When publishing a
 final response, the turn deterministically derives a message from the log: the last completed
 assistant response that accounts for the required input, preserved verbatim, plus separate
-resource attachments. The assistant need not mention an attachment in its text. Resource creation
+resource attachments. The agent need not mention an attachment in its text. Resource creation
 remains detail in the turn log; the published message presents selected artifacts without
 requiring separate timeline items for their creation. Attachment selection remains open.
 The turn must have incorporated all accepted input before successful closure.
 
-A turn can succeed without a final assistant message when the harness reports successful
+A turn can succeed without a final response when the harness reports successful
 completion, required input is incorporated, and the closure check finds no additional
 relevant work. No replacement text is invented. The timeline records completion; work and
 resources remain accessible through the turn. A disconnected or truncated stream is not
@@ -395,7 +395,7 @@ whose notifications have not yet been processed.
 
 A stale response remains in the turn log; it is not inserted earlier in the thread to
 repair ordering. Accepting new input and closing follow one consistent order, so accepted
-work cannot disappear between those operations. Assistant publication records message
+work cannot disappear between those operations. Publishing the agent's message records message
 activity and generates ordinary notifications, whose agent recipients discard them under
 the current message-handling policy.
 
@@ -501,7 +501,7 @@ finds or creates the matching thread; a new task intake creates its task in tria
 replies continue that conversation rather than creating another task for every message.
 All resulting notifications still originate from committed thread activity.
 
-Published assistant replies reach contact handlers through notifications. Contacts sharing
+Replies agents publish reach contact handlers through notifications. Contacts sharing
 the same destination request the same logical channel delivery. The delivery key identifies
 the published message and external destination; it excludes contact and notification IDs.
 Within a channel, `messageId:threadId` is sufficient only when that thread has one stable
@@ -555,7 +555,7 @@ and relationships; detailed schemas and lifecycle rules remain open where stated
 | Connection       | Workspace-owned access to an external system, with provider or endpoint settings, authentication configuration, protected credential references, and declared support for toolkits, channels, model inference, or a combination.      | Supplies external access to compatible consumers while keeping access separate from their behavior.                   |
 | Group            | A lasting space within a workspace for multiple threads, with a shared access audience. A team group has managed membership; a direct group has a fixed set of two or more members, such as a DM or group DM.                         | Lets related conversations share access without making everyone participate in every thread.                          |
 | Thread           | One conversation in exactly one group, with participants and an ordered timeline of message, turn, and task activity. It can reference an originating conversation independently of its group.                                        | Preserves the conversation and its activity, and establishes the source and possible recipients of notifications.     |
-| Message          | Input or output in a thread's conversation. Several user messages can contribute to one turn; its final assistant response is published when it can close.                                                                            | Records communication while the turn log retains the detailed execution history.                                      |
+| Message          | Input or output in a thread's conversation, written by a person or an agent. Several messages from people can contribute to one turn; its final response is published as the agent's message when it can close.                       | Records communication while the turn log retains the detailed execution history.                                      |
 | Turn             | One bounded attempt to perform work on a thread using an agent and an environment. Effects can occur during the attempt.                                                                                                              | Identifies an attempt so its activity, effects, and outcome can be understood together.                               |
 | Task             | An objective with one current assignee, worked on across turns. Each task references its own unique working thread, placed in a group when the task is created.                                                                       | Gives work an objective, assignment, and lifecycle beyond one attempt.                                                |
 | Resource         | An amends entity produced or used during work. A resource created during a turn explicitly references that turn. Its detailed content and revision contracts remain open.                                                             | Gives an output or input an application identity that survives an execution environment, with a record of its origin. |
@@ -1855,13 +1855,13 @@ contribute its already-produced work to continuation or a later turn.
 An agent performs a turn on exactly one thread, optionally toward a task. The thread owns
 the conversation; the turn owns the attempt.
 
-Several actionable thread activities can precede a turn, including user messages and task
+Several actionable thread activities can precede a turn, including messages from people and task
 assignment. Additional input can be incorporated during work through the harness contract.
 Recording activity, accepting its input, and incorporating that input are separate events.
 The turn records its progress. Its log can contain several assistant messages even though
 the final response is published to the thread only when the turn can close.
 
-A retry or task assignment can start an attempt without a new user message. These cases
+A retry or task assignment can start an attempt without a new message from a person. These cases
 make a single message an insufficient execution boundary.
 
 A turn logically holds or references:
@@ -2076,7 +2076,7 @@ starting at sequence 1 and appending replies at the next sequence. Explicit foll
 `ParticipationEnded` with its historical reason. Both kinds currently select no notification recipients.
 All kinds use one activity-recorded fact and internal recorder; notification generation consumes
 that fact uniformly.
-Assistant publication and turn/task lifecycle variants remain future work. It is a defined
+Agents' published messages and turn/task lifecycle variants remain future work. It is a defined
 set of activity types, including message publication, turn lifecycle activity such as
 turn started, and task updates. It is not another log beside the timeline. The remaining
 discriminators and payload schemas remain to be specified.
@@ -2092,12 +2092,12 @@ Sorting record creation timestamps alone does not represent those relationships.
 For example:
 
 ```text
-1. User message: "Implement this."
+1. Message from a person: "Implement this."
 2. Turn A started.
-3. User message: "Also handle empty input."
+3. Message from a person: "Also handle empty input."
 4. Turn A began an environment transfer requested through a tool call.
 5. Turn A continued in the destination after receiving that tool call's result.
-6. Final assistant message from Turn A: "Finished."
+6. The agent's message, Turn A's final response: "Finished."
 7. Turn A completed.
 ```
 
@@ -2155,7 +2155,7 @@ The derivation:
 4. Builds a message containing the unchanged assistant text, separate attachments, and
    its producing turn reference.
 
-Selection uses the turn log, independently of which assistant messages already exist on
+Selection uses the turn log, independently of which of the agent's messages already exist on
 the thread. No independently maintained draft message record is required. Tool calls and
 intermediate assistant messages remain available as detailed turn activity rather than
 being rewritten into the final response.
@@ -2198,9 +2198,9 @@ relevant input, the turn incorporates that input and continues. Its log grows, a
 next closing attempt derives a new message from the updated log. Superseded responses
 remain in execution history.
 
-### Successful completion does not require an assistant message
+### Successful completion does not require a final response
 
-A turn can succeed without publishing an assistant message. For example, it may update a
+A turn can succeed without publishing a message. For example, it may update a
 task or create a resource without producing a final conversational response. This requires
 successful completion reported by the harness, incorporation of all required input, and a
 closure check that finds no additional relevant work.
@@ -2240,7 +2240,7 @@ turn. The atomic acceptance operation checks that the turn is still able to acce
 For example:
 
 ```text
-Thread sequence 1: user message M1
+Thread sequence 1: message M1 from a person
 Thread sequence 2: turn T started
 
 T incorporates M1 and produces assistant response A in its own log.
@@ -2248,13 +2248,13 @@ T expects the next thread timeline position to be 3.
 ```
 
 T requests a conditional append: publish its response only if the thread's latest sequence
-is still 2. If a user message M2 has taken position 3, the append fails without publishing A
+is still 2. If a message M2 from a person has taken position 3, the append fails without publishing A
 or closing T. T incorporates M2, continues its log, and attempts to close again using the
 updated context and expected timeline sequence.
 
 The sequence check and append must occur as one operation relative to other timeline
-appends. Checking first and publishing later would allow a user message to arrive between
-those actions. The response is appended in order; it is never inserted before a user message
+appends. Checking first and publishing later would allow another message to arrive between
+those actions. The response is appended in order; it is never inserted before a message
 that already arrived.
 
 The expected sequence represents timeline history the turn has accounted for. Merely
@@ -2278,7 +2278,7 @@ response against the new sequence. Every further conflict requires inspecting th
 intervening activity again. If relevant work arrived, incorporate it and continue execution
 before deriving a response that covers that input.
 
-Completion without an assistant message uses the same conditional closure check. It can
+Completion without a final response uses the same conditional closure check. It can
 retry closure after informational activity, but it must continue execution if relevant
 input is pending. These checks include committed activity whose notifications have not
 yet been processed.
@@ -2290,7 +2290,7 @@ additional input. Withholding a response from the thread does not undo tool call
 filesystem changes, or amends operations already performed.
 
 Live output can be shown as activity within the running turn. Its presence in the log or
-live UI does not make it a published assistant message on the thread. This preserves the
+live UI does not make it a message published on the thread. This preserves the
 full execution history while allowing the final conversational response to account for
 pending input.
 
@@ -2538,7 +2538,7 @@ creation is implemented through `group.create`, and member addition/removal thro
 implemented. Private-group reads use `group.read` plus audience membership, with separate management
 inspection and a reusable audience check. Starting a private-group thread with a human text message,
 initial participation, and notifications is implemented, as is starting a direct group; task and
-channel thread starts, group/thread HTTP/UI, assistant publication and subscriptions remain future
+channel thread starts, group/thread HTTP/UI, agents' published messages, and subscriptions remain future
 work. Human replies require current group access and `thread.publish`, and `agent.use` only for
 mentioned agents, as the [attention model](#agreed-attention-is-directed-followed-or-ambient)
 agrees. Their required participation and publication steps share internal services with starts;
@@ -2603,9 +2603,9 @@ Thread participants supply the possible notification recipients for every activi
 activity narrows those recipients according to its type and addressing. For a published
 message, explicit mentions select recipients; with no mentions, all current participants
 are notified. A message never notifies its own author, even when it mentions them. That
-message rule applies equally to user and assistant authors.
+message rule applies equally when a person or an agent wrote the message.
 Other activity types have their own
-recipient rules, rather than being treated as synthetic user messages.
+recipient rules, rather than being treated as synthetic messages.
 
 Addressing does not limit which messages can be supplied as conversational history.
 Ordinary agent responses contribute to the conversation; agent recipients discard the
@@ -2758,7 +2758,7 @@ If the old turn is still cancelling, work from the new participation waits until
 
 ## Agreed: agent collaboration uses explicit requests and results
 
-An ordinary assistant message does not invoke another agent, including when it mentions
+An agent's ordinary message does not invoke another agent, including when it mentions
 one. Deliberate collaboration uses an explicit tool operation that records work-request
 activity on the thread, addressed to the agent being asked to act. The operation follows
 the existing permission and participant rules, including authorized addition of a
@@ -2774,7 +2774,7 @@ A requests a review from B through a tool.
 
 The request and result each have an explicit activity meaning. The result references its
 request and can point to B's response and resources or record failure or cancellation.
-An ordinary turn-status or assistant-message notification does not stand in for that result:
+A notification of turn status or of an agent's ordinary message does not stand in for that result:
 agents still handle those as informational or discard them under the existing rules.
 
 The requesting tool returns after recording the request activity. It does not wait for B's
@@ -2810,8 +2810,8 @@ The activity type determines how to resolve and interpret its subject.
 
 The turn log remains a separate execution record. Intermediate assistant messages, tool
 events, and resource creation recorded only there do not generate notifications. Publishing
-a final assistant response creates message-publication activity on the thread, and that
-activity generates notifications.
+a turn's final response as the agent's message creates message-publication activity on the
+thread, and that activity generates notifications.
 
 ### Activity selects recipients from thread participants
 
@@ -2820,16 +2820,16 @@ notifications preserve that selection; later participant changes do not change h
 recipients. A participant that should receive an assignment or triage notification must be
 present before or consistently with recording the activity that selects it.
 
-| Activity                                                           | Recipient rule                                                                                                                                                            |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Message published                                                  | Explicitly mentioned participants, or all current participants if there are no mentions, never including its author. This applies equally to user and assistant messages. |
-| Turn created, started, completed, failed, or cancellation activity | All current thread participants.                                                                                                                                          |
-| Explicit retry requested                                           | The agent whose earlier attempt is referenced.                                                                                                                            |
-| Explicit agent work request                                        | The agent being asked to act.                                                                                                                                             |
-| Result of an explicit agent work request                           | The requesting agent, through the request reference and current participation rules.                                                                                      |
-| Task entered triage                                                | The thread's triage participant.                                                                                                                                          |
-| Task assigned to a workspace member                                | The assignee, including when already participating in the thread.                                                                                                         |
-| Task requirement, bookkeeping, stop, or resumption changes         | All current thread participants; handling depends on the change's meaning and origin.                                                                                     |
+| Activity                                                           | Recipient rule                                                                                                                                                                     |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Message published                                                  | Explicitly mentioned participants, or all current participants if there are no mentions, never including its author. This applies equally to messages from people and from agents. |
+| Turn created, started, completed, failed, or cancellation activity | All current thread participants.                                                                                                                                                   |
+| Explicit retry requested                                           | The agent whose earlier attempt is referenced.                                                                                                                                     |
+| Explicit agent work request                                        | The agent being asked to act.                                                                                                                                                      |
+| Result of an explicit agent work request                           | The requesting agent, through the request reference and current participation rules.                                                                                               |
+| Task entered triage                                                | The thread's triage participant.                                                                                                                                                   |
+| Task assigned to a workspace member                                | The assignee, including when already participating in the thread.                                                                                                                  |
+| Task requirement, bookkeeping, stop, or resumption changes         | All current thread participants; handling depends on the change's meaning and origin.                                                                                              |
 
 Task assignment is the work request. Adding the assignee to the thread can accompany it,
 but an assignment must still notify someone already participating in the thread. Likewise, entering
@@ -2852,8 +2852,8 @@ behavior is design intent; the current implementation only generates pending not
 | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Human using amends | Activity selected for notification                              | Receive and acknowledge the notification.                                                         |
 | External contact   | Published message selected for outward delivery                 | Create or reuse the channel delivery and acknowledge with its reference.                          |
-| Agent              | User message addressed to it                                    | Accept the input into an existing turn or its next turn.                                          |
-| Agent              | Assistant message published                                     | Discard without starting a turn or adding input to one.                                           |
+| Agent              | A person's message addressed to it                              | Accept the input into an existing turn or its next turn.                                          |
+| Agent              | An agent's message published                                    | Discard without starting a turn or adding input to one.                                           |
 | Agent              | Informational turn status                                       | Acknowledge or discard as informational; do not start another turn merely because a turn started. |
 | Agent              | Explicit retry addressed to it                                  | Accept the retry request through normal batching; wait if cancellation is pending.                |
 | Agent              | Explicit work request addressed to it, or result of its request | Accept the request or result as new input through normal batching.                                |
@@ -2864,13 +2864,13 @@ behavior is design intent; the current implementation only generates pending not
 | Agent              | Task bookkeeping or requirement change for another assignee     | Settle as informational unless the operation explicitly requests work.                            |
 | Triage participant | Task entered triage                                             | Evaluate the workspace triage policy and record a decision.                                       |
 
-The assistant-message discard rule applies to message-publication activity whose author
+The rule discarding agents' messages applies to message-publication activity whose author
 is an agent. It does not discard every kind of activity caused by an agent: for example,
 an assignment remains task activity regardless of who performed the assignment.
 
-Discarding an assistant-message notification does not remove the message from the thread
-or prevent its use as history. Under these rules, an assistant mentioning an agent also
-does not by itself invoke that agent.
+Discarding the notification of an agent's message does not remove the message from the thread
+or prevent its use as history. Under these rules, an agent mentioning another agent also
+does not by itself invoke it.
 
 ### Informational turn activity informs all current participants
 
@@ -3011,14 +3011,14 @@ backward. Relevant input between the starting boundary and the incorporation bou
 has been incorporated by this turn. Relevant input after incorporation and through
 acceptance is this turn's pending work. An activity present only as history does not become
 newly handled by this turn. These boundaries cover actionable thread activity, including
-task assignment, rather than only published user messages.
+task assignment, rather than only published messages from people.
 
 ### Boundaries cover relevant input in order
 
 Apply thread participation, joining, activity-specific recipient rules, and recipient handling
-when identifying relevant input. A user message addressed to this agent and a task
+when identifying relevant input. A person's message addressed to this agent and a task
 assignment to it can both require incorporation. Messages addressed only to other participants,
-ordinary assistant responses, and informational turn lifecycle events do not become prompts
+agents' ordinary messages, and informational turn lifecycle events do not become prompts
 merely because their sequence falls inside a range. Apply the task-change rules to requirement
 edits, resumption, stop instructions, and changes originating in the turn itself. Explicit
 agent work requests and their results are actionable input. History and pending input can
@@ -3109,8 +3109,8 @@ establishes the boundary for the participant:
 Record the introducing activity and timeline sequence. A later join does not retroactively
 make earlier activity pending work for that participant. Joining and requesting work are
 different facts: an assignment to an existing participant still requires handling. If an
-assistant message introduces an agent participant, its message notification is still discarded
-under the assistant-message rule; participation alone does not turn it into a work request.
+agent's message introduces an agent participant, its message notification is still discarded
+under the rule for agents' messages; participation alone does not turn it into a work request.
 Leaving and rejoining records a new introducing position. Earlier requests then become
 history under the [rejoining rule](#rejoining-establishes-a-new-history-boundary), even when
 they were left unfinished during the earlier participation.
@@ -3155,9 +3155,9 @@ recipients must not be recomputed using only current participants or current tas
 
 ### Publication checks consider input for the particular agent
 
-A user message addressed only to A prevents A from closing before incorporation, but does
-not impose the same requirement on B. An unmentioned user message addresses all current agent
-participants, so their relevant attempts must account for it.
+A person's message addressed only to A prevents A from closing before incorporation, but does
+not impose the same requirement on B. An unmentioned message from a person addresses all current
+agent participants, so their relevant attempts must account for it.
 
 A task assignment or other actionable task change follows the same rule for the agent
 selected to handle it. Informational task changes do not automatically become prompts.
@@ -3194,8 +3194,7 @@ When a decision assigns the task, record the assignment as activity on that same
 The assignee must be a thread participant before or consistently with that activity so it
 can select them. The activity notifies the assignee even if already participating. Human
 assignees acknowledge; agent assignees accept the assignment through the atomic turn and
-notification handoff. Assignment need not be encoded as a synthetic assistant or user
-message.
+notification handoff. Assignment need not be encoded as a synthetic message.
 
 The task remains authoritative for its current state. Its timeline activities preserve
 the historical changes that caused notifications. Changing a task later cannot reinterpret
@@ -3243,7 +3242,7 @@ turn log without requiring another thread activity or notification.
 If a turn creates a resource and later fails without publishing a response, the resource
 still exists and remains accessible through the turn. A separate timeline action for
 independently publishing an artifact can be considered if that product behavior is needed;
-it is not required for attachments to a final assistant message.
+it is not required for attachments to an agent's final message.
 
 Resource revisions and an explicit task deliverable relationship are possible extensions
 whose contracts remain open. If revisions are supported, which turn produced a version
@@ -3367,12 +3366,12 @@ assignment, or a mention.
 
 ### Contact handlers deliver published replies
 
-When an assistant publishes its final response, its thread activity generates notifications
+When an agent publishes its final response, its thread activity generates notifications
 for the selected participants, including external contacts. Each contact's handler uses the
 channel and thread's external-conversation reference to request outward delivery of the
 published message and its attachments.
 
-The current outward-reply case is a published assistant message. Raw turn-log content and
+The current outward-reply case is a message an agent published. Raw turn-log content and
 turn lifecycle notifications are not automatically sent as external replies. Imported
 messages must not be echoed back to the conversation they came from. Other outward activity,
 including replies authored by an internal human, requires an explicit handling rule.
