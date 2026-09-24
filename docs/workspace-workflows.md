@@ -177,6 +177,6 @@ listed, assigned, and offered in invitations.
 | `thread.read`                  | Viewer        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read |
 | `thread.publish`               | Viewer        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation) and typing             |
 | `thread.follow`                | Viewer        | Thread    | Following a thread for oneself                                                    |
-| `agent.use`                    | Viewer        | Member    | Mentioning an agent, starting a direct group with it, or making it follow a group |
+| `agent.use`                    | Viewer        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group |
 
 Group and thread permissions also need current membership in the group; see each guide.

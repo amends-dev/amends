@@ -387,6 +387,74 @@ export const threads = (harness: Harness) => {
         ),
     );
 
+    it.effect(
+      "a direct group needs agent-use authority for its agents when created, and later only for mentioned ones",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, human } = yield* prepare();
+              const direct = (
+                memberIds: ReadonlyArray<Member.Id>,
+                mentions: ReadonlyArray<Member.Id> = [],
+              ) =>
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.startDirect({ memberIds, text: "Hello", mentions }),
+                );
+              // The human may start threads anywhere, but may not use the agent.
+              yield* publish(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.publish(AssignmentFacts.Created, {
+                    workspaceId,
+                    assignmentId: Assignment.Id.make("start-anywhere"),
+                    memberId: humanId,
+                    source: {
+                      _tag: "Direct",
+                      grant: Grant.make(ThreadPermissions.Start, {
+                        _tag: "Workspace",
+                        workspaceId,
+                      }),
+                    },
+                  }),
+                ),
+              );
+              const denied = {
+                _tag: "Authorization.Denied",
+                requirement: {
+                  permission: { name: AgentPermissions.Use.name },
+                  target: { memberId: agentId },
+                },
+              };
+              // Creating a direct group with an agent gives it a place in every thread.
+              const before = yield* history(bound);
+              expect(
+                yield* Effect.flip(run(bound, human, direct([owner.memberId, agentId]))),
+              ).toMatchObject(denied);
+              expect(yield* history(bound)).toEqual(before);
+              const created = yield* run(bound, owner, direct([humanId, agentId]));
+              // Its members then start threads there without it, through either operation.
+              const reused = yield* run(bound, human, direct([owner.memberId, agentId]));
+              expect(reused.thread.groupId).toBe(created.thread.groupId);
+              const again = yield* run(bound, human, start(created.thread.groupId));
+              for (const { thread } of [reused, again])
+                expect(
+                  (yield* bound.participations.listByThread(thread.id)).map(
+                    (record) => ThreadParticipation.memberOf(record.participant) ?? null,
+                  ),
+                ).toContain(agentId);
+              // Mentioning the agent directs it, which still needs the authority.
+              for (const mentioning of [
+                direct([owner.memberId, agentId], [agentId]),
+                startOnly(created.thread.groupId, [agentId]),
+              ])
+                expect(yield* Effect.flip(run(bound, human, mentioning))).toMatchObject(denied);
+            }),
+          ),
+        ),
+    );
+
     it.effect("notification failure after earlier inserts rolls back all thread records", () =>
       harness.withStorage((storage) =>
         runHost(

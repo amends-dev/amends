@@ -307,7 +307,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           const missing = request.mentions.find((id) => !memberIds.includes(id));
           if (missing !== undefined)
             return yield* new ParticipantUnavailable({ memberId: missing });
-          const group = yield* directGroups
+          const { group, created } = yield* directGroups
             .establish(memberIds, actor.memberId, yield* DateTime.now)
             .pipe(
               Effect.catchTag("DirectGroups.Unavailable", (error) =>
@@ -328,7 +328,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
                 Effect.fail(new InvalidResponse({ message: error.message })),
               ),
             );
-          return yield* begin(group.id, memberIds, memberIds, eligible, request);
+          // Creating the group gives its agents a place in all of its threads, as making an agent
+          // follow a team group does, so it needs agent use on each; later starts name only mentions.
+          const named = created ? memberIds : request.mentions;
+          return yield* begin(group.id, memberIds, named, eligible, request);
         }),
       );
     },

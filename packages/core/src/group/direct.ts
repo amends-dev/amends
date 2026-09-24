@@ -33,15 +33,20 @@ export type Error =
 export interface Interface {
   readonly workspaceId: Group.Record["workspaceId"];
   /**
-   * Reuse the direct group for exactly these members, or create it with an admission for each.
-   * The creator must be one of them. Members need active workspace membership only to create;
-   * a reused group keeps its fixed members. The caller owns authorization.
+   * Reuse the direct group for exactly these members, or create it with an admission for each,
+   * saying which. The creator must be one of them. Members need active workspace membership only
+   * to create; a reused group keeps its fixed members. The caller owns authorization.
    */
   readonly establish: (
     memberIds: ReadonlyArray<Member.Id>,
     createdBy: Member.Id,
     occurredAt: DateTime.Utc,
-  ) => Effect.Effect<Group.DirectRecord, Error, Store.Transaction | Publication.Service>;
+  ) => Effect.Effect<Established, Error, Store.Transaction | Publication.Service>;
+}
+export interface Established {
+  readonly group: Group.DirectRecord;
+  /** This call created the group, rather than finding it. */
+  readonly created: boolean;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/direct/Service",
@@ -84,7 +89,7 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
         return yield* new InvalidReference({
           message: "Group store returned another direct group or workspace",
         });
-      return group;
+      return { group, created: false } satisfies Established;
     }
     const found = new Map<Member.Id, Member.Record>();
     for (const row of yield* members.getMany(requested)) {
@@ -123,7 +128,7 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
           status: "active",
         })
         .pipe(Publication.withCause(created, occurredAt));
-    return group;
+    return { group, created: true } satisfies Established;
   });
   return Service.of({ workspaceId, establish });
 });

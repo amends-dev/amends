@@ -49,9 +49,11 @@ inaccessible groups share `ThreadApplication.GroupNotFound`.
 of the author and `memberIds`. The same members, in any order and whether or not the author is
 listed, always reuse one direct group; a different set gets a different group. The first start
 establishes the group and one admission per member in the same commit. The caller needs active
-workspace membership, a human identity, `agent.use` for each agent member, and `thread.start` on
-the direct group. Every member takes part in the thread, and mentions, which must name members,
-only narrow notification. Fewer than two distinct members returns
+workspace membership, a human identity, and `thread.start` on the direct group. The start that
+creates the group also needs `agent.use` for each agent member, since the group gives its agents a
+place in every thread, as making an agent follow a team group does; later starts, through either
+operation, need it only for mentioned agents. Every member takes part in the thread, and mentions,
+which must name members, only narrow notification. Fewer than two distinct members returns
 `ThreadApplication.DirectMembersRequired`; a missing or inactive member, or a mention outside the
 group, returns `ThreadApplication.ParticipantUnavailable`. Later threads in the same direct group
 can also start with `startInGroup`.
