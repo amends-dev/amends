@@ -189,6 +189,30 @@ from automatically adding an unresolved setup path when another package installs
 Build the workshop with `bun run --filter @amends/ui build`. The root `vite-node` override keeps vanilla-extract's
 evaluator on its supported Vite 7 line; verify the workshop build before changing it.
 
+## Continuous integration
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pull requests to `main` and
+pushes to it, as parallel jobs, so a run takes as long as its slowest job:
+
+| Job            | Runs                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| Static         | Lint, format, package boundaries, generated icons, and the PostgreSQL migration          |
+| Types          | `bun run typecheck`                                                                      |
+| Tests          | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
+| Frontend build | The web and desktop bundles and the UI workshop                                          |
+| Check          | Succeeds only when every job above does; require it for merging                          |
+
+Each job installs the pinned Bun and the locked dependencies through
+[`.github/actions/setup`](../.github/actions/setup/action.yml), which caches Bun's packages by
+lockfile. A new push to a pull request cancels its earlier run. The PostgreSQL shards each start a
+throwaway cluster from the runner's installation with `AMENDS_POSTGRES_REQUIRED=true`. The
+migration step regenerates the baseline and fails if anything changes. When one project's tests
+outgrow their job, give it its own matrix entry or more shards; `--shard` splits by test file.
+
+[`.github/workflows/native.yml`](../.github/workflows/native.yml) runs desktop's `cargo fmt` and
+`cargo check` only when `apps/desktop/src-tauri` or the workflow changes, with Tauri's Linux
+libraries and a Rust build cache.
+
 ## Choosing a test API
 
 - Use `it.effect` for Effect programs. Return the Effect from the callback; the
@@ -244,7 +268,8 @@ its own database, and closes its database layers and HTTP listeners first. Globa
 teardown stops only the cluster started by the tests. A supplied URL must allow
 database creation and deletion. Without that URL or a local PostgreSQL installation,
 database suites are reported as skipped; pure PostgreSQL adapter tests and host tests
-that never open storage still run. Startup and connection failures fail the run.
+that never open storage still run. With `AMENDS_POSTGRES_REQUIRED=true`, as in CI, a missing
+server fails the run instead. Startup and connection failures fail the run.
 
 Subprocess tests keep the Promise fixture that drains output, bounds startup, and
 terminates the child in `finally`; each child uses its own database and an ephemeral

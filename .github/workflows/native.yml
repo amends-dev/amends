@@ -1,0 +1,47 @@
+name: Desktop native
+
+# Rust and Tauri configuration change rarely and take minutes to check, so this runs only when
+# they change, apart from the main CI run.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - apps/desktop/src-tauri/**
+      - .github/workflows/native.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/desktop/src-tauri/**
+      - .github/workflows/native.yml
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Rust format and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The system libraries Tauri's Linux webview builds against.
+      - name: Tauri Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      # A development check reads no built frontend, so none is needed here.
+      - name: Format
+        run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+      - name: Check
+        run: cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml

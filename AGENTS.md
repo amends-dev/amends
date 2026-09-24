@@ -22,7 +22,8 @@ language server, and installs the Git hooks. Before each commit, Lefthook runs
 dependency boundary, generated-icon, type, lint, and formatting checks in parallel across the working tree.
 The hook checks files without modifying or staging them. Fix failures before
 committing; `bun run lefthook run pre-commit --force` runs the same checks manually,
-even when no files are staged.
+even when no files are staged. CI runs these checks, the tests, and the frontend builds
+as parallel jobs; see [continuous integration](docs/testing.md#continuous-integration).
 Keep these diagnostics enabled in `tsconfig.base.json`: the pinned Oxlint version is
 newer than the versions supported by the Effect Oxlint patch, so Effect checks
 currently run through TypeScript. Check compatibility before changing this setup.

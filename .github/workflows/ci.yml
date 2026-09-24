@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # A new push supersedes a pull request's earlier run; every commit on main keeps its own.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+# Independent jobs run in parallel, so the run takes as long as its slowest job. PostgreSQL
+# suites are the largest, so they are sharded; small suites share a job to save setup time.
+jobs:
+  static:
+    name: Lint, format, and generated files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Lint
+        run: bun run lint
+      - name: Format
+        run: bun run format:check
+      - name: Package boundaries
+        run: bun run check:packages
+      - name: Generated icons
+        run: bun run check:icons
+      # Migrations are generated from the schema, never edited: regenerating must change nothing.
+      - name: PostgreSQL migration matches the schema
+        run: |
+          bun run --filter @amends/storage-postgresql generate --name=ci_check
+          if [ -n "$(git status --porcelain adapters/storage-postgresql/drizzle)" ]; then
+            echo "::error::The PostgreSQL migration is out of date. Replace the baseline as adapters/storage-postgresql/README.md describes."
+            git status --porcelain adapters/storage-postgresql/drizzle
+            exit 1
+          fi
+
+  types:
+    name: Type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Type check
+        run: bun run typecheck
+
+  tests:
+    name: Tests (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: backend
+            args: --project backend
+          - suite: postgresql 1/3
+            args: --project postgresql --shard=1/3
+          - suite: postgresql 2/3
+            args: --project postgresql --shard=2/3
+          - suite: postgresql 3/3
+            args: --project postgresql --shard=3/3
+          - suite: apps
+            args: >-
+              --project @amends/icons --project @amends/ui --project @amends/client
+              --project @amends/web --project @amends/desktop
+    env:
+      # Each PostgreSQL shard starts its own cluster from the runner's installation.
+      AMENDS_POSTGRES_REQUIRED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # The private repository's standard runner has two CPUs.
+      - name: Test
+        run: bun run test ${{ matrix.args }} --maxWorkers=2
+
+  build:
+    name: Frontend builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # Type checking has its own job, so these run the bundlers alone.
+      - name: Web
+        working-directory: apps/web
+        run: bun run --bun vite build
+      - name: Desktop frontend
+        working-directory: apps/desktop
+        run: bun run --bun vite build
+      - name: UI workshop
+        working-directory: apps/ui
+        run: bun run --bun storybook build --output-dir dist --disable-telemetry
+
+  # One required check that succeeds only when every job above succeeds.
+  check:
+    name: Check
+    if: always()
+    needs: [static, types, tests, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every job to pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: echo "$RESULTS" | jq -e 'all(.[]; .result == "success")'
