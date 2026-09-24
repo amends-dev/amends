@@ -2,7 +2,7 @@ import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread
 
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { threadActivities, threadMessages, threadParticipations } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -84,7 +84,8 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       function* (input, options) {
         const id = yield* Schema.decodeEffect(Thread.Id)(input);
         const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
-        return yield* guard(
+        const newest = request.from === "newest";
+        const rows = yield* guard(
           db
             .select()
             .from(threadActivities)
@@ -93,11 +94,16 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
                 inWorkspace,
                 eq(threadActivities.threadId, id),
                 gt(threadActivities.sequence, sql`${request.afterSequence ?? 0}::bigint`),
+                request.beforeSequence === undefined
+                  ? undefined
+                  : lt(threadActivities.sequence, sql`${request.beforeSequence}::bigint`),
               ),
             )
-            .orderBy(threadActivities.sequence)
+            // The newest end is read backwards through the sequence index, then put in order.
+            .orderBy(newest ? desc(threadActivities.sequence) : asc(threadActivities.sequence))
             .limit(request.limit),
         ).pipe(Effect.flatMap(decodeRows));
+        return newest ? rows.toReversed() : rows;
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
     ),

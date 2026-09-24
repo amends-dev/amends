@@ -157,12 +157,12 @@ Every thread read requires active workspace membership, current membership in it
 ownership, group management, `group.read`, and `thread.start` do not replace it. Humans and agents
 follow the same policy.
 
-| Operation                                           | Result                                                                                                                                                                                                       |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `get(threadId)`                                     | The thread's metadata.                                                                                                                                                                                       |
-| `listInGroup(groupId, { limit, before? })`          | A page of `Thread.ListItem` values, newest latest activity first: each readable thread with its latest message, the caller's read position, and `unread`. Threads without a covering read grant are skipped. |
-| `readTimeline(threadId, { limit, afterSequence? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject.                                                                                                            |
-| `listParticipants(threadId, { limit, after? })`     | A page of current `ThreadParticipation.Summary` values in participation-ID order, after the exclusive `after` participation ID.                                                                              |
+| Operation                                                                   | Result                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get(threadId)`                                                             | The thread's metadata.                                                                                                                                                                                       |
+| `listInGroup(groupId, { limit, before? })`                                  | A page of `Thread.ListItem` values, newest latest activity first: each readable thread with its latest message, the caller's read position, and `unread`. Threads without a covering read grant are skipped. |
+| `readTimeline(threadId, { limit, afterSequence?, beforeSequence?, from? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject, from the oldest or the newest end of the range.                                                            |
+| `listParticipants(threadId, { limit, after? })`                             | A page of current `ThreadParticipation.Summary` values in participation-ID order, after the exclusive `after` participation ID.                                                                              |
 
 `listInGroup` keeps reading until the page is full or the group has no older threads. Its
 exclusive `before` cursor is the last item's latest activity time and thread ID. A thread is
@@ -180,11 +180,16 @@ Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-
 
 ### Timeline pages
 
-`limit` is a positive safe integer. `afterSequence` is an optional nonnegative safe integer;
-omission or zero starts before the first activity. Pages hold at most `limit` items strictly after
-that sequence, ordered by sequence. Pass the last item's `activity.sequence` as the next cursor; an
-empty page means no later activity yet. The cursor belongs to the thread; it is not a journal or
-notification cursor.
+A page covers the activities strictly after `afterSequence` (a nonnegative safe integer; omitted or
+zero, from the first) and strictly before `beforeSequence` (a positive safe integer greater than
+`afterSequence`; omitted, through the latest), and holds at most `limit` of them, a positive safe
+integer. By default it takes the range's oldest; with `from: "newest"`, its newest. Either way the
+items are in ascending sequence order.
+
+A view opens at the latest activity with `{ limit, from: "newest" }`, pages back by passing the
+first item's `activity.sequence` as `beforeSequence` until a page comes back empty, and catches up
+by passing the last item's sequence as `afterSequence`, where an empty page means no later activity
+yet. Cursors belong to the thread; they are not journal or notification cursors.
 
 Message items contain `{ activity, message }`. Participation items contain
 `{ activity, participant }`, where `participant` is a public joining summary, even for a

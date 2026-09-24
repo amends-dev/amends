@@ -174,6 +174,7 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
         activity.workspaceId !== workspaceId ||
         activity.threadId !== thread.id ||
         activity.sequence <= afterSequence ||
+        (request.beforeSequence !== undefined && activity.sequence >= request.beforeSequence) ||
         seen.has(activity.id)
       )
         return yield* new InvalidResponse({

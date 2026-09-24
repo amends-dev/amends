@@ -398,6 +398,56 @@ export const threadReads = (harness: Harness) => {
     );
 
     it.effect(
+      "a view opens at the newest activity and pages back to the first, always oldest first",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, first } = yield* prepare();
+              const opening = { activity: first.activity, message: first.message };
+              const added = [opening];
+              for (const sequence of [2, 3, 4, 5])
+                added.push(yield* append(bound, first.thread, sequence));
+              const read = (options: ThreadActivityStore.ReadOptions) =>
+                run(bound, owner, timeline(first.thread.id, options));
+              expect(yield* read({ limit: 2, from: "newest" })).toEqual(added.slice(3));
+              expect(yield* read({ limit: 2, from: "newest", beforeSequence: 4 })).toEqual(
+                added.slice(1, 3),
+              );
+              expect(yield* read({ limit: 2, from: "newest", beforeSequence: 2 })).toEqual([
+                opening,
+              ]);
+              expect(yield* read({ limit: 2, from: "newest", beforeSequence: 1 })).toEqual([]);
+              // A range between two sequences, from either end.
+              expect(yield* read({ afterSequence: 1, beforeSequence: 5, limit: 2 })).toEqual(
+                added.slice(1, 3),
+              );
+              expect(
+                yield* read({ afterSequence: 1, beforeSequence: 5, limit: 2, from: "newest" }),
+              ).toEqual(added.slice(2, 4));
+              // More than the thread holds returns all of it, still oldest first.
+              expect(yield* read({ limit: 50, from: "newest" })).toEqual(added);
+              for (const options of [
+                { limit: 2, beforeSequence: 0 },
+                { limit: 2, afterSequence: 3, beforeSequence: 3 },
+                { limit: 2, from: "latest" },
+              ]) {
+                expect(
+                  yield* Effect.flip(
+                    run(bound, owner, timeline(first.thread.id, options as never)),
+                  ),
+                ).toMatchObject({ _tag: "SchemaError" });
+                expect(
+                  yield* Effect.flip(bound.activities.readPage(first.thread.id, options as never)),
+                ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+              }
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
       "timeline pages follow sequence rather than timestamps, with exclusive cursors and no repeats across later appends",
       () =>
         harness.withStorage((storage) =>
@@ -920,6 +970,16 @@ export const threadReads = (harness: Harness) => {
               expect(
                 yield* Effect.flip(
                   run(stale, owner, timeline(first.thread.id, { afterSequence: 1, limit: 10 })),
+                ),
+              ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
+              // An activity at or past the page's upper bound is refused as well.
+              expect(
+                yield* Effect.flip(
+                  run(
+                    stale,
+                    owner,
+                    timeline(first.thread.id, { beforeSequence: 1, limit: 10, from: "newest" }),
+                  ),
                 ),
               ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
               for (const message of [

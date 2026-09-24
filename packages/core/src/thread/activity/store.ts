@@ -6,11 +6,27 @@ import type { ThreadActivity } from "./activity.ts";
 
 import type { ThreadId } from "../id.ts";
 
-/** Exclusive sequence boundary within one thread. Zero or omission starts before its first activity. */
+/**
+ * One page of a thread's timeline, always in ascending sequence order. The range lies strictly
+ * after `afterSequence` (zero or omitted: from the first activity) and strictly before
+ * `beforeSequence` (omitted: through the latest). The page holds the range's oldest `limit`
+ * activities, or with `from: "newest"` its newest, so a view can open at the latest activity and
+ * page back by passing its first item's sequence as `beforeSequence`.
+ */
 export const ReadOptions = Schema.Struct({
   afterSequence: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  beforeSequence: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
+  from: Schema.optionalKey(Schema.Literals(["oldest", "newest"])),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+}).check(
+  Schema.makeFilter(
+    ({ afterSequence, beforeSequence }) =>
+      afterSequence === undefined ||
+      beforeSequence === undefined ||
+      beforeSequence > afterSequence ||
+      "beforeSequence must come after afterSequence",
+  ),
+);
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityStore.Failure", {
@@ -34,7 +50,10 @@ export interface Interface {
   readonly latest: (
     id: ThreadId.Id,
   ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
-  /** At most limit activities, strictly after the cursor, in ascending sequence order. No shared snapshot across pages. */
+  /**
+   * At most limit activities of the requested range, from its requested end, in ascending
+   * sequence order. No shared snapshot across pages.
+   */
   readonly readPage: (
     id: ThreadId.Id,
     options: ReadOptions,

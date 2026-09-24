@@ -75,9 +75,15 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       function* (input, options) {
         const id = yield* Schema.decodeEffect(Thread.Id)(input);
         const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
-        return (yield* inThread(id))
-          .filter((record) => record.sequence > (request.afterSequence ?? 0))
-          .slice(0, request.limit);
+        const before = request.beforeSequence;
+        const range = (yield* inThread(id)).filter(
+          (record) =>
+            record.sequence > (request.afterSequence ?? 0) &&
+            (before === undefined || record.sequence < before),
+        );
+        return request.from === "newest"
+          ? range.slice(Math.max(0, range.length - request.limit))
+          : range.slice(0, request.limit);
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
     ),
