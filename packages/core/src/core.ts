@@ -1,4 +1,7 @@
 import { AgentPermissions } from "./agent/permissions.ts";
+import type { BackgroundProcess } from "./background/process.ts";
+import { BackgroundRuns } from "./background/runs.ts";
+import { BackgroundWakes } from "./background/wakes.ts";
 import { ThreadApplication } from "./thread/application.ts";
 import { ThreadCreation } from "./thread/creation.ts";
 import { ThreadStart } from "./thread/start.ts";
@@ -131,10 +134,19 @@ export const TimelineItem = Schema.Union([
  */
 export const journalLog = Log.Id.make("journal");
 
-/** The domain journal and its log, over host storage. */
-const journal = Journal.layer({ logId: journalLog, projections }).pipe(
-  Layer.provideMerge(Log.layer),
-);
+/**
+ * Work the domains do outside requests, in each workspace. A process runs from what is stored, and
+ * a commit that publishes a fact it wakes on asks for it to run in that same commit. A domain that
+ * adds background work registers its process here.
+ */
+export const processes: ReadonlyArray<BackgroundProcess.Definition> = [];
+
+/** The domain journal and its log, over host storage; its commits ask for background work. */
+const journal = Journal.layer({
+  logId: journalLog,
+  projections,
+  reactions: BackgroundWakes.reactions(processes),
+}).pipe(Layer.provideMerge(Log.layer));
 
 /** Authorization for the acting member, with its grant resolution. */
 const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
@@ -202,19 +214,19 @@ const operations = Layer.mergeAll(
 );
 
 /**
- * Complete core for one workspace: application operations over the journal,
- * authorization, and the permission catalog.
+ * Complete core for one workspace: application operations and background runs over the
+ * journal, authorization, and the permission catalog.
  *
  * @category layers
  */
-export const layer = operations.pipe(
+export const layer = Layer.mergeAll(operations, BackgroundRuns.layer(processes)).pipe(
   Layer.provideMerge(Layer.mergeAll(journal, authorization)),
   Layer.provideMerge(PermissionCatalog.layer(permissions)),
 );
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
- * store, cryptography, and the workspace's signals. Adding a required store changes this type
+ * store, cryptography, the workspace's signals, and its background wakes. Adding a required store changes this type
  * and makes incomplete host compositions fail type checking.
  *
  * @category models

@@ -6,6 +6,7 @@ import { Fact } from "./fact.ts";
 import { Log } from "./log.ts";
 import { Projection } from "./projection.ts";
 import { Publication } from "./publication.ts";
+import type { Reaction } from "./reaction.ts";
 import { Store } from "./store.ts";
 import { Transaction } from "./transaction.ts";
 
@@ -47,7 +48,10 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/journal/Service",
 ) {}
 
-export interface Options<Requirements extends ReadonlyArray<unknown> = readonly []> {
+export interface Options<
+  Requirements extends ReadonlyArray<unknown> = readonly [],
+  ReactionRequirements = never,
+> {
   readonly logId: Log.Id;
   /** Infer each projection's requirements separately, then combine them at construction. */
   readonly projections: {
@@ -58,6 +62,8 @@ export interface Options<Requirements extends ReadonlyArray<unknown> = readonly 
       Requirements[Index]
     >;
   };
+  /** What a commit does when it publishes one of these facts, in registration order. */
+  readonly reactions?: ReadonlyArray<Reaction.Definition<ReactionRequirements>> | undefined;
 }
 
 /**
@@ -69,10 +75,16 @@ export interface Options<Requirements extends ReadonlyArray<unknown> = readonly 
  */
 export const make = Effect.fn("Journal.make")(function* <
   const Requirements extends ReadonlyArray<unknown>,
->(options: Options<Requirements>) {
+  ReactionRequirements = never,
+>(options: Options<Requirements, ReactionRequirements>) {
   const logs = yield* Log.Service;
   const transaction = yield* Transaction.Service;
   const checkpoints = yield* Checkpoint.Service;
+  // Captured outside any transaction; the publishing commit supplies its own.
+  const reactionServices = yield* Effect.context<ReactionRequirements>();
+  const reactions = new Map<string, Array<Reaction.Definition<ReactionRequirements>>>();
+  for (const reaction of options.reactions ?? [])
+    reactions.set(reaction.fact, [...(reactions.get(reaction.fact) ?? []), reaction]);
   const log = logs.open({
     id: options.logId,
     schema: Event.Envelope,
@@ -243,6 +255,14 @@ export const make = Effect.fn("Journal.make")(function* <
         );
         const event = yield* Event.decode(fact, entry);
         for (const runner of subscribers.get(fact.name) ?? []) yield* runner.apply(entry, event);
+        const native = yield* Store.Transaction;
+        for (const reaction of reactions.get(fact.name) ?? [])
+          yield* reaction
+            .react(event)
+            .pipe(
+              Effect.provide(reactionServices),
+              Effect.provideService(Store.Transaction, native),
+            );
         return event;
       }),
     );
@@ -287,8 +307,11 @@ export const make = Effect.fn("Journal.make")(function* <
  *
  * @category layers
  */
-export const layer = <const Requirements extends ReadonlyArray<unknown>>(
-  options: Options<Requirements>,
+export const layer = <
+  const Requirements extends ReadonlyArray<unknown>,
+  ReactionRequirements = never,
+>(
+  options: Options<Requirements, ReactionRequirements>,
 ) => Layer.effect(Service, make(options));
 
 export * as Journal from "./journal.ts";

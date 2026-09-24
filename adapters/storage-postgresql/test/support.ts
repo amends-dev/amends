@@ -19,7 +19,8 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import type { WorkspaceStorage } from "@amends/gateway";
+import { BackgroundWakes } from "@amends/core/background";
+import { type WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
@@ -43,7 +44,9 @@ export const workspaceId = Workspace.Id.make("workspace-one");
 export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
-export const bind = (context: Context.Context<WorkspaceStorage.Bindings | Signals.Service>) => ({
+export const bind = (
+  context: Context.Context<WorkspaceStorage.Bindings | Signals.Service | BackgroundWakes.Service>,
+) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
   participations: Context.get(context, ThreadParticipationStore.Service),
@@ -71,7 +74,13 @@ export const views = (options: PostgresStorage.Options = {}) =>
     return {
       forWorkspace: (workspaceId: Workspace.Id) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>
-          bind(Context.add(context, Signals.Service, hub.forWorkspace(workspaceId))),
+          bind(
+            Context.add(
+              Context.add(context, Signals.Service, hub.forWorkspace(workspaceId)),
+              BackgroundWakes.Service,
+              WorkspaceWakes.unavailable.forWorkspace(workspaceId),
+            ),
+          ),
         ),
     };
   });

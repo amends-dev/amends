@@ -1,5 +1,6 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
+import { BackgroundWakes } from "@amends/core/background";
 import { Journal } from "@amends/core/journal";
 import { Signals } from "@amends/core/signal";
 import { Workspace } from "@amends/core/workspace";
@@ -17,6 +18,7 @@ import {
 } from "effect";
 import { SignalHub } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
+import { WorkspaceWakes } from "./wakes.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
@@ -49,6 +51,7 @@ export interface Interface {
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const storage = yield* WorkspaceStorage.Service;
   const hub = yield* SignalHub.Service;
+  const wakes = yield* WorkspaceWakes.Service;
   const cryptography = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
 
@@ -60,6 +63,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, cryptography),
           Layer.succeed(Signals.Service, hub.forWorkspace(workspaceId)),
+          Layer.succeed(BackgroundWakes.Service, wakes.forWorkspace(workspaceId)),
         ),
       ),
       Layer.orDie,

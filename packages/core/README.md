@@ -27,6 +27,7 @@ The current domains contain these features:
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
 | `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
+| `background`    | Processes the domains run outside requests, the wakes commits ask for, and the runs hosts perform.               |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -392,6 +393,35 @@ missing and inaccessible threads alike. Repeats from the same member in the same
 seconds are dropped by the process that receives them, so a client may call it on each keystroke;
 clients hide their own member's typing. `ReadStateApplication` and
 `NotificationApplication.acknowledge` publish the read-state signals after their writes.
+
+## Background work
+
+`@amends/core/background` holds work the domains do outside any request, within one workspace.
+A domain defines a process beside its facts with `BackgroundProcess.make(name, { wakesOn, run })`
+and registers it in `Core.processes`; none is registered yet.
+
+- `name` is dotted and owned by the domain, such as `notification.settle`.
+- `run` finds what is outstanding from stored records, so a run after a restart is an ordinary
+  run, handles a bounded batch in commits of its own, and returns an outcome: `Idle` when nothing
+  remains, `Continue` when more is outstanding now, or `At` with when it is next due. A run can be
+  interrupted and repeated, so each commit rechecks what it acts on and is safe to redo.
+- `wakesOn` lists the facts whose publication asks for it to run, built with
+  `BackgroundProcess.on(fact, when?)`, which can accept only some payloads.
+
+A commit that publishes such a fact asks for the process to run through `BackgroundWakes.Service`,
+once per process per commit, in that same commit: the request is stored with the commit and
+discarded if it rolls back, and a request that cannot be stored fails the commit. This is a
+journal [reaction](../../docs/journal.md#reactions), so neither replay nor a retried publication
+that returns its original event asks again. `BackgroundWakes.Service` is a required host binding,
+bound to the workspace, which delivers each request to whichever process runs the workspace's
+background work.
+
+`BackgroundRuns.Service` is how that process runs one: `run(name)` runs a registered process once,
+attributed to it as a `System` performer named after it, and returns its outcome. An unregistered
+name fails with `BackgroundRuns.Unknown`, a process's own failure with `BackgroundRuns.Failure`,
+and two processes sharing a name stop the workspace's core from starting. It is part of `Core.layer`
+but not of `Core.Operations`, since no actor runs it. Hosts do not run background work yet; see
+[known limitations](../../docs/current-status.md).
 
 ## Module dependencies and exports
 

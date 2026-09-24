@@ -1,4 +1,4 @@
-import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import { Gateway, type WorkspaceDirectory, WorkspaceWakes } from "@amends/gateway";
 import { PostgresDatabase, layer as postgres } from "@amends/storage-postgresql";
 import { BunCrypto } from "@effect/platform-bun";
 import { Layer, type Redacted } from "effect";
@@ -24,6 +24,8 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
       Layer.mergeAll(
         PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 10 }),
         BunCrypto.layer,
+        // No background process is registered yet, so nothing asks for a wake.
+        WorkspaceWakes.layerUnavailable,
       ),
     ),
   );

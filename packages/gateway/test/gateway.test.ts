@@ -42,6 +42,7 @@ import { TestClock } from "effect/testing";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
 import { SignalHub } from "../src/signals.ts";
+import { WorkspaceWakes } from "../src/wakes.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
 import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
@@ -272,6 +273,7 @@ const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
     Layer.succeed(SignalHub.Service, quiet),
+    WorkspaceWakes.layerUnavailable,
     Layer.succeed(
       Crypto.Crypto,
       Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),

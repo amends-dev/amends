@@ -15,6 +15,7 @@ import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import type { SignalHub } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
+import type { WorkspaceWakes } from "./wakes.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
 export interface Interface {
@@ -115,7 +116,11 @@ export const make = Effect.fn("Gateway.make")(function* (
 ): Effect.fn.Return<
   Interface,
   never,
-  WorkspaceStorage.Service | SignalHub.Service | Crypto.Crypto | Scope.Scope
+  | WorkspaceStorage.Service
+  | SignalHub.Service
+  | WorkspaceWakes.Service
+  | Crypto.Crypto
+  | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options);
   const storage = yield* WorkspaceStorage.Service;

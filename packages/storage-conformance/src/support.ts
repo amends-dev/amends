@@ -31,7 +31,8 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Gateway, SignalHub, WorkspaceStorage } from "@amends/gateway";
+import { BackgroundWakes } from "@amends/core/background";
+import { Gateway, SignalHub, WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
@@ -46,7 +47,9 @@ export const otherWorkspaceId = Workspace.Id.make("workspace-two");
 export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
-export const bind = (context: Context.Context<WorkspaceStorage.Bindings | Signals.Service>) => ({
+export const bind = (
+  context: Context.Context<WorkspaceStorage.Bindings | Signals.Service | BackgroundWakes.Service>,
+) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
   participations: Context.get(context, ThreadParticipationStore.Service),
@@ -67,25 +70,34 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings | Signal
 });
 export type Bound = ReturnType<typeof bind>;
 
+/**
+ * A workspace's stores with its signals from the host, and wakes that no suite asks for: no
+ * background process is registered, so a commit asking for one would fail.
+ */
+const withHostServices = (
+  context: Context.Context<WorkspaceStorage.Bindings>,
+  hub: SignalHub.Interface,
+  id: Workspace.Id,
+) =>
+  bind(
+    Context.add(
+      Context.add(context, Signals.Service, hub.forWorkspace(id)),
+      BackgroundWakes.Service,
+      WorkspaceWakes.unavailable.forWorkspace(id),
+    ),
+  );
+
 /** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
   Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
-    bind(
-      Context.add(context, Signals.Service, Context.get(host, SignalHub.Service).forWorkspace(id)),
-    ),
+    withHostServices(context, Context.get(host, SignalHub.Service), id),
   );
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = (id: Workspace.Id) =>
   Effect.flatMap(Effect.context<WorkspaceStorage.Service | SignalHub.Service>(), (host) =>
     Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
-      bind(
-        Context.add(
-          context,
-          Signals.Service,
-          Context.get(host, SignalHub.Service).forWorkspace(id),
-        ),
-      ),
+      withHostServices(context, Context.get(host, SignalHub.Service), id),
     ),
   );
 
@@ -120,7 +132,9 @@ export const make = (harness: Harness) => {
   /** A gateway over a host. */
   const gateway = (host: Context.Context<Host>) =>
     Gateway.layer().pipe(
-      Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), harness.crypto)),
+      Layer.provideMerge(
+        Layer.mergeAll(Layer.succeedContext(host), harness.crypto, WorkspaceWakes.layerUnavailable),
+      ),
     );
   return {
     core,

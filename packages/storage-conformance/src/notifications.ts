@@ -11,8 +11,8 @@ import { BuiltinRoles } from "@amends/core/authorization";
 import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
 import { Thread, ThreadApplication, ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
-import { Array, Context, DateTime, Effect, Option } from "effect";
+import { Gateway, WorkspaceWakes } from "@amends/gateway";
+import { Array, Context, DateTime, Effect, Layer, Option } from "effect";
 import { acceptInvitation, createWorkspace, invite, removeMember } from "./operations.ts";
 import { boundTo, future, otherWorkspaceId, runHost, Support, workspaceId } from "./support.ts";
 import type { Harness } from "./harness.ts";
@@ -574,7 +574,9 @@ export const notifications = (harness: Harness) => {
               );
               yield* b.store.transaction(b.notifications.insert(foreign));
               const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 });
-              const gateway = yield* Gateway.make().pipe(Effect.provide(harness.crypto));
+              const gateway = yield* Gateway.make().pipe(
+                Effect.provide(Layer.mergeAll(harness.crypto, WorkspaceWakes.layerUnavailable)),
+              );
               yield* gateway.asMember(
                 workspaceId,
                 humanIdentity,

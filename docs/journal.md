@@ -580,6 +580,16 @@ transaction, its checkpoint moves to the head's last entry. Rebuilding it again 
 only the commits written while it was not live, never earlier ones over its read model a
 second time.
 
+## Reactions
+
+A reaction is what a commit does, in that same commit, when it publishes a fact: core uses them to
+ask for [background work](../packages/core/README.md#background-work). `Journal.layer` takes
+`reactions` beside its projections, each naming a fact by name, at any version. They run after
+the fact's projections, in registration order, with the publishing commit's transaction, and a
+reaction's failure fails the commit. Unlike a projection, a reaction leaves no record to rebuild,
+so replay never runs it, and a retried publication that returns its original event does not run
+it again.
+
 ## Rebuilding
 
 For individual control, `Projection.makeRunner({ definition, log: journal.log })` acquires

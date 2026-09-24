@@ -17,6 +17,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Notifications to agents stay pending: no turns, execution, silent completion, or channel
   delivery run, and contacts and triage have no inbox outside the store. Turn and task activity
   kinds remain design intent.
+- Core can define [background processes](../packages/core/README.md#background-work) and commits
+  can ask for them to run, but no host runs them: hosts refuse wakes, and no process is
+  registered.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping

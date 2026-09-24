@@ -30,16 +30,17 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`SignalHub.Service`, and `Crypto.Crypto`, in the host's scope. It captures
+`SignalHub.Service`, `WorkspaceWakes.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
-`WorkspaceStorage`, `SignalHub`, `Credentials`, `SignIn`, and `WorkspaceDirectory` declare
-host-owned contracts. Their implementations and construction APIs belong to
-adapters or hosts; they have no default `make` or `layer` here. `Service.of(...)`
+`WorkspaceStorage`, `SignalHub`, `WorkspaceWakes`, `Credentials`, `SignIn`, and
+`WorkspaceDirectory` declare host-owned contracts. Their implementations and construction APIs
+belong to adapters or hosts; they have no default `make` or `layer` here, except
+`WorkspaceWakes.layerUnavailable` for hosts that run no background work. `Service.of(...)`
 is sufficient to type-check a supplied implementation.
 
 ## Surface
@@ -69,7 +70,8 @@ is sufficient to type-check a supplied implementation.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
-`SignalHub.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`, and
+`SignalHub.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
+`WorkspaceWakes.Service`, whose `forWorkspace` returns its `BackgroundWakes.Service`, and
 `Crypto.Crypto`.
 Identities must come from a trusted ingress, never from client input.
 
@@ -129,6 +131,12 @@ each workspace's active member count, and its pending invitations. Both are
 host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
+
+`WorkspaceWakes.Service` supplies each workspace's `BackgroundWakes.Service`: it stores a
+commit's requests for [background work](../core/README.md#background-work) with that commit and
+delivers them to whichever process runs the workspace's background work. No host runs background
+work yet, so hosts provide `WorkspaceWakes.layerUnavailable`, whose requests fail the commit that
+makes them rather than accept work nothing would do; no process is registered to make one.
 
 `SignalHub.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because
