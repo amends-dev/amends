@@ -1,8 +1,8 @@
 import { Api, Principal } from "@amends/api-http";
-import { ChangeFeedApplication } from "@amends/core/change-feed";
+import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
 import { SignalApplication } from "@amends/core/signal";
 import { Gateway } from "@amends/gateway";
-import { Effect, Stream } from "effect";
+import { Cause, Effect, Stream } from "effect";
 import { HttpBody, HttpEffect, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
@@ -28,6 +28,23 @@ const prepareResponse: HttpEffect.PreResponseHandler = (_request, response) => {
   );
 };
 
+/**
+ * A change stream ends only with ChangeFeed.Unavailable, which tells the client to reconnect. The
+ * SSE encoder sends a stream's whole failure cause, defects included, so an unexpected failure is
+ * logged here and reaches the client as Unavailable alone.
+ */
+const contained = <A, R>(stream: Stream.Stream<A, ChangeFeed.Unavailable, R>) =>
+  stream.pipe(
+    Stream.catchCauseIf(Cause.hasDies, (cause) =>
+      Stream.unwrap(
+        Effect.as(
+          Effect.logError("Change stream failed", cause),
+          Stream.fail(new ChangeFeed.Unavailable({})),
+        ),
+      ),
+    ),
+  );
+
 /** Acquire the subscription in the HTTP response scope, which closes on disconnect. @category layers */
 export const layer = HttpApiBuilder.group(
   Api,
@@ -40,7 +57,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMemberScoped(
             params.workspaceId,
             principal,
-            Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch(query)),
+            Effect.flatMap(ChangeFeedApplication.Service, (changes) =>
+              Effect.map(changes.watch(query), contained),
+            ),
           ),
         ).pipe(HttpEffect.withPreResponseHandler(prepareResponse)),
       typing: ({ params }) =>

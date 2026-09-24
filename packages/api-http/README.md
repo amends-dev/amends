@@ -127,7 +127,7 @@ Five-second SSE comments keep idle connections open without producing applicatio
 and messages carry no SSE event IDs. Responses use `Cache-Control: no-store` and disable
 proxy buffering where supported. Missing/rejected credentials return 401; absent active
 membership returns 403. Failures after streaming starts use Effect's SSE failure encoding
-with `ChangeFeed.Unavailable`; reconnect with the last cursor to continue. A commit the server
+with `ChangeFeed.Unavailable` and no other detail; reconnect with the last cursor to continue. A commit the server
 cannot read, such as a fact version a newer server wrote during a deployment, also ends the
 stream, and reconnecting then resets. See
 [known limitations](../../docs/current-status.md) for delivery and edge controls.

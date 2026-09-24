@@ -23,6 +23,9 @@ to the response stream, keeping the workspace services and subscription alive un
 completion or disconnect. The `after` query resumes from a cursor. HTTP owns SSE
 encoding, cache headers, and comment heartbeats; core owns the Ready/Committed schemas,
 payload views, and per-event authorization. The handler sends no frontend query keys.
+Effect's SSE encoder would send a stream's whole failure cause to the client, defects included,
+so the handler logs an unexpected failure at error level and ends the stream with
+`ChangeFeed.Unavailable` alone.
 
 ## Organization
 
@@ -72,4 +75,5 @@ after membership removal. Host fixtures seed notification records because their
 generation projection is still empty.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
-resuming from a cursor, and rejection of invalid cursors.
+resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream
+failing unexpectedly is logged and reaches its client as `ChangeFeed.Unavailable` alone.
