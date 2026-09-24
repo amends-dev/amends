@@ -508,6 +508,7 @@ export const threadParticipation = (harness: Harness) => {
                   j.publish(AssignmentFacts.Revoked, {
                     workspaceId,
                     assignmentId: assignment.payload.assignmentId,
+                    memberId: assignment.payload.memberId,
                   }),
                 ),
               );
@@ -736,6 +737,7 @@ export const threadParticipation = (harness: Harness) => {
                     yield* j.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: assignment.payload.assignmentId,
+                      memberId: assignment.payload.memberId,
                     });
                     yield* asActor(follow(first.thread.id), human);
                   }).pipe(Publication.withActor),

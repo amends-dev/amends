@@ -131,7 +131,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
             _tag: "Committed",
             events: [{ payload: { id: missed.details.id } }],
           });
-          expect(yield* asBob.next).toEqual(missedEvent);
           // Resuming from the last commit it saw, the closed subscriber replays what it missed.
           const resumed = yield* listen(alice, workspace.id, accepted.cursor);
           expect(resumed.ready.cursor).toBe(accepted.cursor);
@@ -148,7 +147,24 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           expect(yield* second.next).toEqual(afterEvent);
           expect(yield* resumed.next).toEqual(afterEvent);
-          expect(yield* asBob.next).toEqual(afterEvent);
+          // A viewer never sees invitations, which only invitation managers may list, but sees
+          // the member an acceptance adds and their access.
+          const eve = yield* client("eve");
+          yield* eve.invitations.accept({
+            params: { workspaceId: workspace.id, invitationId: after.details.id },
+          });
+          const joined = yield* second.next;
+          if (joined._tag !== "Committed") return yield* Effect.die("Expected commit");
+          expect(joined.events.map((event) => event.name)).toContain(InvitationFacts.Accepted.name);
+          const seenByBob = yield* asBob.next;
+          if (seenByBob._tag !== "Committed") return yield* Effect.die("Expected commit");
+          expect(seenByBob.cursor).toBe(joined.cursor);
+          expect(seenByBob.events.map((event) => event.name).toSorted()).toEqual(
+            joined.events
+              .map((event) => event.name)
+              .filter((name) => !name.startsWith("workspace.invitation."))
+              .toSorted(),
+          );
           yield* asBob.close;
           yield* alice.members.remove({
             params: { workspaceId: workspace.id, memberId: member.id },

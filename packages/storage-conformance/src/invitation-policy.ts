@@ -156,6 +156,7 @@ export const invitationPolicy = (harness: Harness) => {
                     .publish(AssignmentFacts.Revoked, {
                       workspaceId: workspace.id,
                       assignmentId: assignment.id,
+                      memberId: assignment.memberId,
                     })
                     .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
                 ).pipe(Effect.provide(core(bound)));

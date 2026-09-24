@@ -24,7 +24,10 @@ import { WorkspaceFacts } from "../workspace/facts.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { InvitationFacts } from "../workspace/invitation/facts.ts";
 import { MemberFacts } from "../workspace/member/facts.ts";
-import type { Member } from "../workspace/member/member.ts";
+import { Member } from "../workspace/member/member.ts";
+import { MemberPermissions } from "../workspace/member/permissions.ts";
+import { InvitationPermissions } from "../workspace/invitation/permissions.ts";
+import { AssignmentPermissions } from "../authorization/assignment/permissions.ts";
 import { ChangeFeed } from "./change-feed.ts";
 
 /**
@@ -48,6 +51,8 @@ export interface Prepared {
   readonly audience: Audience.Value;
   /** The read permission a reader also needs, beyond holding one of the audience's scopes. */
   readonly requirement: Requirement.Value | undefined;
+  /** A scope whose holder needs no read permission: the member the fact is about. */
+  readonly exempt: Audience.Scope | undefined;
   readonly access: Access | undefined;
   readonly notifications: ReadonlyArray<Addressed>;
 }
@@ -87,6 +92,8 @@ const register = <F extends Standalone, View extends Schema.Constraint = F["payl
       readonly from: (payload: Fact.Payload<F>) => View["Type"];
     };
     readonly access?: (payload: Fact.Payload<F>) => Access | undefined;
+    /** The member the fact is about, who sees it without the read permission. */
+    readonly concerns?: (payload: Fact.Payload<F>) => Member.Id;
     /** The notifications the fact's projection creates, as their recipients' inboxes list them. */
     readonly notifications?: (
       event: Event.Metadata & { readonly payload: Fact.Payload<F> },
@@ -119,6 +126,8 @@ const register = <F extends Standalone, View extends Schema.Constraint = F["payl
         }),
         audience: yield* Fact.makeAudience(fact, payload),
         requirement: options.requirement?.(payload, workspaceId),
+        exempt:
+          options.concerns === undefined ? undefined : Member.audienceOf(options.concerns(payload)),
         access: options.access?.(payload),
         notifications: options.notifications?.(Object.assign({}, event, { payload })) ?? [],
       };
@@ -130,6 +139,12 @@ const readThread = (threadId: ThreadId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
 const readGroup = (groupId: Group.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId });
+const readMember = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(MemberPermissions.Read, { _tag: "Member", workspaceId, memberId });
+const readAccess = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId });
+const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
 /**
  * Every fact the feed may deliver, each version registered separately. Readers see an event
@@ -139,24 +154,37 @@ const readGroup = (groupId: Group.Id, workspaceId: WorkspaceId.Id) =>
 const registry: ReadonlyArray<Registered> = [
   register(WorkspaceFacts.Initialized),
   register(WorkspaceFacts.OwnershipTransferred),
-  register(MemberFacts.Added),
+  // Membership and access changes reach those who may read them, and always the member concerned.
+  register(MemberFacts.Added, {
+    requirement: ({ memberId }, workspaceId) => readMember(memberId, workspaceId),
+    concerns: ({ memberId }) => memberId,
+  }),
   register(MemberFacts.Removed, {
+    requirement: ({ memberId }, workspaceId) => readMember(memberId, workspaceId),
+    concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => ({ _tag: "Removed", memberId }),
   }),
-  register(InvitationFacts.Issued),
-  register(InvitationFacts.Accepted),
-  register(InvitationFacts.Revoked),
+  // Invitations name their recipient and role, which only invitation managers may list.
+  register(InvitationFacts.Issued, { requirement: manageInvitations }),
+  register(InvitationFacts.Accepted, {
+    requirement: manageInvitations,
+    concerns: ({ memberId }) => memberId,
+  }),
+  register(InvitationFacts.Revoked, { requirement: manageInvitations }),
   register(RoleFacts.Created),
   register(RoleFacts.Renamed),
   register(RoleFacts.PermissionsChanged, {
     access: () => ({ _tag: "Grants", memberId: undefined }),
   }),
   register(AssignmentFacts.Created, {
+    requirement: ({ memberId }, workspaceId) => readAccess(memberId, workspaceId),
+    concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => ({ _tag: "Grants", memberId }),
   }),
-  // A revocation does not name its member, so every reader rechecks their grants.
   register(AssignmentFacts.Revoked, {
-    access: () => ({ _tag: "Grants", memberId: undefined }),
+    requirement: ({ memberId }, workspaceId) => readAccess(memberId, workspaceId),
+    concerns: ({ memberId }) => memberId,
+    access: ({ memberId }) => ({ _tag: "Grants", memberId }),
   }),
   register(GroupFacts.Created, {
     requirement: ({ id }, workspaceId) => readGroup(id, workspaceId),

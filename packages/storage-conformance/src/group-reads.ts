@@ -581,6 +581,7 @@ export const groupReads = (harness: Harness) => {
                                 assignmentId: Assignment.Id.make(
                                   `${readerId}-${GroupPermissions.Read.name}-workspace`,
                                 ),
+                                memberId: readerId,
                               })
                               .pipe(Publication.withActor),
                             owner,
@@ -665,6 +666,7 @@ export const groupReads = (harness: Harness) => {
                       assignmentId: Assignment.Id.make(
                         `${readerId}-${GroupMembershipPermissions.Manage.name}-${hidden.id}`,
                       ),
+                      memberId: readerId,
                     }),
                   ),
                 );

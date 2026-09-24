@@ -161,6 +161,7 @@ it.effect(
               yield* journal.publish(AssignmentFacts.Revoked, {
                 assignmentId: roleAssignmentId,
                 workspaceId,
+                memberId: memberId,
               });
               expect((yield* assignments.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
                 directAssignmentId,
@@ -196,6 +197,7 @@ it.effect(
           yield* journal.publish(AssignmentFacts.Revoked, {
             assignmentId: roleAssignmentId,
             workspaceId,
+            memberId: memberId,
           });
           expect(yield* fixture.snapshot).toEqual(before);
           yield* journal.publish(
@@ -244,6 +246,7 @@ it.effect(
               return yield* writer.publish(AssignmentFacts.Revoked, {
                 assignmentId: roleAssignmentId,
                 workspaceId,
+                memberId: memberId,
               });
             }),
           );
@@ -346,6 +349,7 @@ it.effect(
               .publish(AssignmentFacts.Revoked, {
                 assignmentId: roleAssignmentId,
                 workspaceId: foreign,
+                memberId: memberId,
               })
               .pipe(Effect.asVoid),
         },
@@ -425,6 +429,32 @@ it.effect(
         }),
       );
     }),
+);
+
+it.effect("a revocation naming another member than its assignment fails without writing", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const journal = yield* setup;
+        yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));
+        const before = yield* fixture.snapshot;
+        const failure = yield* Effect.flip(
+          journal.publish(AssignmentFacts.Revoked, {
+            assignmentId: roleAssignmentId,
+            workspaceId,
+            memberId: Member.Id.make("someone-else"),
+          }),
+        );
+        expect(failure).toMatchObject({
+          _tag: "Projection.Failure",
+          cause: { _tag: "AssignmentStore.Conflict" },
+        });
+        expect(yield* fixture.snapshot).toEqual(before);
+      }),
+    );
+  }),
 );
 
 it.effect("a failure after both projection writes rolls back the entire live commit", () =>
@@ -508,6 +538,7 @@ it.effect(
               yield* writer.publish(AssignmentFacts.Revoked, {
                 assignmentId: roleAssignmentId,
                 workspaceId,
+                memberId: memberId,
               });
               yield* writer.publish(
                 AssignmentFacts.Created,
@@ -516,6 +547,7 @@ it.effect(
               yield* writer.publish(AssignmentFacts.Revoked, {
                 assignmentId: Assignment.Id.make("missing"),
                 workspaceId,
+                memberId: memberId,
               });
             }),
           );

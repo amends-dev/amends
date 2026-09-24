@@ -215,6 +215,7 @@ it.effect(
               .publish(AssignmentFacts.Revoked, {
                 assignmentId: directAssignmentId,
                 workspaceId,
+                memberId: memberId,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
             expect(yield* resolver.resolve(memberId)).toEqual([
@@ -229,6 +230,7 @@ it.effect(
           .publish(AssignmentFacts.Revoked, {
             assignmentId: roleAssignmentId,
             workspaceId,
+            memberId: memberId,
           })
           .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
         expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([]);

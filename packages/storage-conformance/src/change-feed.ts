@@ -1,4 +1,5 @@
-import { BuiltinRoles } from "@amends/core/authorization";
+import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
+import { Journal, Publication } from "@amends/core/journal";
 import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
 import { GroupApplication, GroupFacts } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
@@ -10,7 +11,16 @@ import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Queue, Stream } from "effect";
 import type { Scope } from "effect";
 import type { Harness } from "./harness.ts";
-import { alice, bob, boundTo, runHost, Support, workspaceId } from "./support.ts";
+import {
+  alice,
+  bob,
+  type Bound,
+  boundTo,
+  runHost,
+  Support,
+  testProvenance,
+  workspaceId,
+} from "./support.ts";
 
 const issue = (recipient: Identity.HumanId) =>
   InvitationApplication.Service.use((invitations) =>
@@ -53,6 +63,21 @@ const memberActor = (name: string) =>
 /** The change feed read from the journal: delivery across hosts, resumption, and audiences. */
 export const changeFeed = (harness: Harness) => {
   const { core, gateway, initialized, seed } = Support.make(harness);
+  /** Record a role every member may see, as a trusted fixture would. */
+  const marker = (bound: Bound) =>
+    Effect.flatMap(Journal.Service, (journal) =>
+      journal.commit(
+        journal.publish(RoleFacts.Created, {
+          roleId: Role.Id.make("marker"),
+          workspaceId,
+          name: "Marker",
+          permissions: [],
+        }),
+      ),
+    ).pipe(
+      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+      Effect.provide(core(bound)),
+    );
   describe.skipIf(!harness.available)(`${harness.name}: change feed`, () => {
     it.live("a subscriber receives commits made through its own host and through another", () =>
       harness.withStorage((storage) =>
@@ -178,7 +203,8 @@ export const changeFeed = (harness: Harness) => {
                 threads.startInGroup({ groupId: group.id, mentions: [], text: "Secret plan" }),
               ),
             );
-            yield* as(owner, issue(human("marker")));
+            // A role every member may see marks the end of what each reader receives.
+            yield* marker(bound);
             const [readerFeed, outsiderFeed, unpermittedFeed] = feeds;
             if (!readerFeed || !outsiderFeed || !unpermittedFeed)
               return yield* Effect.die("Expected three feeds");
@@ -187,11 +213,11 @@ export const changeFeed = (harness: Harness) => {
             const started = committed(yield* readerFeed);
             const text = started.events.find((e) => e.name === ThreadMessageFacts.Published.name);
             expect(text?.payload).toMatchObject({ text: "Secret plan", groupId: group.id });
-            expect(committed(yield* readerFeed).events[0]?.name).toBe(InvitationFacts.Issued.name);
+            expect(committed(yield* readerFeed).events[0]?.name).toBe(RoleFacts.Created.name);
             // Outside the group, or without read permission, only workspace facts arrive.
             for (const next of [outsiderFeed, unpermittedFeed])
               expect(committed(yield* next).events.map((e) => e.name)).toEqual([
-                InvitationFacts.Issued.name,
+                RoleFacts.Created.name,
               ]);
           }),
         ),

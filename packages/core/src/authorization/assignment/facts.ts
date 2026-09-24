@@ -28,6 +28,8 @@ export const Revoked = Fact.make("workspace.assignment.revoked", {
   payload: Schema.Struct({
     assignmentId: Assignment.Id,
     workspaceId: Workspace.Id,
+    /** The member whose access this ends, so readers need not look the assignment up. */
+    memberId: Member.Id,
   }),
   occurrence: (payload) => [payload.assignmentId],
 });

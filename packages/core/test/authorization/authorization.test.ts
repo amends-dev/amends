@@ -555,7 +555,7 @@ it.effect(
           })
           .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
         yield* journal
-          .publish(AssignmentFacts.Revoked, { assignmentId, workspaceId })
+          .publish(AssignmentFacts.Revoked, { assignmentId, workspaceId, memberId: alice.memberId })
           .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),

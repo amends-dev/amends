@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { Projection } from "../../journal/projection.ts";
 import { Workspace } from "../../workspace/workspace.ts";
 import { AssignmentFacts } from "./facts.ts";
@@ -39,6 +39,12 @@ export const definition = Projection.make("workspace.assignments", { version: 1 
     AssignmentFacts.Revoked,
     Effect.fn("AssignmentProjection.revoked")(function* ({ payload }) {
       const store = yield* requireStore(payload.workspaceId);
+      const recorded = yield* store.get(payload.assignmentId);
+      if (Option.isSome(recorded) && recorded.value.memberId !== payload.memberId)
+        return yield* new AssignmentStore.Conflict({
+          operation: "project",
+          message: "Revocation names another member than its assignment",
+        });
       yield* store.markRevoked(payload.assignmentId);
     }),
   );

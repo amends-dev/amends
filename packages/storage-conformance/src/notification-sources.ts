@@ -332,6 +332,7 @@ export const notificationSources = (harness: Harness) => {
                   j.publish(AssignmentFacts.Revoked, {
                     workspaceId,
                     assignmentId: assignment.payload.assignmentId,
+                    memberId: assignment.payload.memberId,
                   }),
                 ),
               );
@@ -749,6 +750,7 @@ export const notificationSources = (harness: Harness) => {
                     yield* journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: assignment.payload.assignmentId,
+                      memberId: assignment.payload.memberId,
                     });
                     return yield* asActor(resolve(latest.id), human);
                   }).pipe(Publication.withActor),

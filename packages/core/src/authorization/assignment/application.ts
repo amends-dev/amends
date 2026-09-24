@@ -187,7 +187,11 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
       if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
       if (record.status === "revoked") return record;
-      yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: id });
+      yield* journal.publish(AssignmentFacts.Revoked, {
+        workspaceId,
+        assignmentId: id,
+        memberId: record.memberId,
+      });
       return { ...record, status: "revoked" } satisfies Assignment.Record;
     },
     Publication.withActor,
@@ -213,7 +217,11 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       );
       if (current.length === 1 && same !== undefined) return same;
       for (const record of current)
-        yield* journal.publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: record.id });
+        yield* journal.publish(AssignmentFacts.Revoked, {
+          workspaceId,
+          assignmentId: record.id,
+          memberId: record.memberId,
+        });
       return yield* create(request);
     },
     Publication.withActor,

@@ -343,6 +343,7 @@ export const threadReads = (harness: Harness) => {
                   journal.publish(AssignmentFacts.Revoked, {
                     workspaceId,
                     assignmentId: assignment.payload.assignmentId,
+                    memberId: assignment.payload.memberId,
                   }),
                 ),
               );
@@ -683,6 +684,7 @@ export const threadReads = (harness: Harness) => {
                     yield* journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: assignment.payload.assignmentId,
+                      memberId: assignment.payload.memberId,
                     });
                     expect(yield* asActor(list(group.id), reader)).toEqual([]);
                     expect(

@@ -237,6 +237,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
             yield* journal.publish(AssignmentFacts.Revoked, {
               workspaceId,
               assignmentId: assignment.id,
+              memberId: assignment.memberId,
             });
         }
       }

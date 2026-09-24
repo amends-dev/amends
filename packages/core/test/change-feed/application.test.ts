@@ -42,12 +42,17 @@ import { Log } from "../../src/journal/log.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { Store } from "../../src/journal/store.ts";
 import { Invitation } from "../../src/workspace/invitation/invitation.ts";
+import { InvitationPermissions } from "../../src/workspace/invitation/permissions.ts";
+import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
+import { AssignmentPermissions } from "../../src/authorization/assignment/permissions.ts";
 import { InvitationFacts } from "../../src/workspace/invitation/facts.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { MemberFacts } from "../../src/workspace/member/facts.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
 import { Role } from "../../src/authorization/role/role.ts";
+import { RoleFacts } from "../../src/authorization/role/facts.ts";
+import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
 import { make, type Fixture } from "../memory-store.ts";
 import { testProvenance } from "../publication.ts";
 import { TestSignals } from "../signals.ts";
@@ -137,7 +142,10 @@ const Internal = Fact.make("test.internal", {
 
 interface Options {
   readonly source?: ChangeFeedSource.Options;
-  /** The actor's grants; by default thread and group reads across the workspace. */
+  /**
+   * The actor's grants; by default thread, group, and member reads and invitation management
+   * across the workspace, so every delivered fact reaches them.
+   */
   readonly grants?: ReadonlyArray<Assignment.Source>;
 }
 interface World {
@@ -158,6 +166,8 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     const grants = options.grants ?? [
       workspaceGrant(ThreadPermissions.Read),
       workspaceGrant(GroupPermissions.Read),
+      workspaceGrant(MemberPermissions.Read),
+      workspaceGrant(InvitationPermissions.Manage),
     ];
     yield* fixture.store.transaction(
       Effect.gen(function* () {
@@ -201,7 +211,13 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
       Layer.succeed(GroupMembershipStore.Service, memberships),
       TestSignals.layer(workspaceId),
-      PermissionCatalog.layer([ThreadPermissions.Read, GroupPermissions.Read]),
+      PermissionCatalog.layer([
+        ThreadPermissions.Read,
+        GroupPermissions.Read,
+        MemberPermissions.Read,
+        InvitationPermissions.Manage,
+        AssignmentPermissions.Read,
+      ]),
     );
     const services = Layer.mergeAll(
       Journal.layer({ logId: Log.Id.make("journal"), projections: [] }).pipe(
@@ -700,6 +716,117 @@ it.effect("signals follow the reader's access as commits change it, and are neve
       expect(committed(yield* late.next).cursor).toBe("1");
       expect(yield* signalsUntil(late.next, caughtUp(actor.memberId))).toEqual([]);
     }),
+  ),
+);
+
+/** A role every member may see, as a marker that everything before it was withheld. */
+const roleMarker = (id: string) =>
+  publish(RoleFacts.Created, {
+    roleId: Role.Id.make(id),
+    workspaceId,
+    name: `Role ${id}`,
+    permissions: [],
+  });
+const charlieMember = Member.Id.make("charlie-member");
+
+it.effect("workspace facts reach readers who may read them, and the member they concern", () =>
+  run(
+    () =>
+      Effect.gen(function* () {
+        const feed = yield* listen();
+        yield* feed.next;
+        // Without invitation management or member and access reads, none of these reach the reader.
+        yield* commit(publish(InvitationFacts.Issued, invitation("hidden")));
+        yield* commit(
+          publish(InvitationFacts.Revoked, {
+            _tag: "Revoked",
+            workspaceId,
+            invitationId: Invitation.Id.make("hidden"),
+            revokedBy: actor.memberId,
+            revokedAt: at,
+          }),
+        );
+        yield* commit(
+          publish(MemberFacts.Added, {
+            workspaceId,
+            memberId: bobMember,
+            identity: { _tag: "Human", id: Identity.HumanId.make("bob") },
+          }),
+        );
+        yield* commit(
+          publish(AssignmentFacts.Created, {
+            workspaceId,
+            assignmentId: Assignment.Id.make("bob-access"),
+            memberId: bobMember,
+            source: workspaceGrant(ThreadPermissions.Read),
+          }),
+        );
+        yield* commit(roleMarker("marker"));
+        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+          RoleFacts.Created.name,
+        ]);
+        // The member a fact concerns sees it anyway: their own access and their own removal.
+        yield* commit(
+          publish(AssignmentFacts.Created, {
+            workspaceId,
+            assignmentId: Assignment.Id.make("own-access"),
+            memberId: actor.memberId,
+            source: workspaceGrant(GroupPermissions.Read),
+          }),
+        );
+        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+          AssignmentFacts.Created.name,
+        ]);
+        yield* commit(
+          publish(AssignmentFacts.Revoked, {
+            workspaceId,
+            assignmentId: Assignment.Id.make("own-access"),
+            memberId: actor.memberId,
+          }),
+        );
+        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+          AssignmentFacts.Revoked.name,
+        ]);
+        yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId }));
+        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+          MemberFacts.Removed.name,
+        ]);
+      }),
+    { grants: [workspaceGrant(ThreadPermissions.Read)] },
+  ),
+);
+
+it.effect("an exact member-read grant shows that member's changes, and not others'", () =>
+  run(
+    () =>
+      Effect.gen(function* () {
+        const feed = yield* listen();
+        yield* feed.next;
+        for (const memberId of [charlieMember, bobMember])
+          yield* commit(
+            publish(MemberFacts.Added, {
+              workspaceId,
+              memberId,
+              identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+            }),
+          );
+        expect(committed(yield* feed.next).events[0]?.payload).toMatchObject({
+          memberId: bobMember,
+        });
+        expect(yield* Queue.size(feed.queue)).toBe(0);
+      }),
+    {
+      grants: [
+        Assignment.Source.cases.Direct.make({
+          grant: {
+            permission: MemberPermissions.Read.name,
+            scope: GrantScope.Value.cases.Target.make({
+              target: { _tag: "Member", workspaceId, memberId: bobMember },
+            }),
+          },
+        }),
+      ],
+    },
   ),
 );
 

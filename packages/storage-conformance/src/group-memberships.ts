@@ -424,6 +424,7 @@ export const groupMemberships = (harness: Harness) => {
                     yield* journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: Assignment.Id.make("group-management"),
+                      memberId: managerId,
                     });
                     return yield* add(group.id, humanId);
                   }).pipe(Publication.withActor),
@@ -643,6 +644,7 @@ export const groupMemberships = (harness: Harness) => {
                   journal.publish(AssignmentFacts.Revoked, {
                     workspaceId: workspace.id,
                     assignmentId: Assignment.Id.make("group-management"),
+                    memberId: managerId,
                   }),
                 ),
               );
@@ -1233,6 +1235,7 @@ export const groupMemberships = (harness: Harness) => {
                         yield* journal.publish(AssignmentFacts.Revoked, {
                           workspaceId,
                           assignmentId: Assignment.Id.make("group-management"),
+                          memberId: managerId,
                         });
                         return yield* remove(admission);
                       }).pipe(Publication.withActor),

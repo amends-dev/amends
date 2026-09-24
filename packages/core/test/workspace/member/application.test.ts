@@ -344,6 +344,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
               .publish(AssignmentFacts.Revoked, {
                 workspaceId,
                 assignmentId: readBob.id,
+                memberId: alice.memberId,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
             return yield* application.get(bob.id);

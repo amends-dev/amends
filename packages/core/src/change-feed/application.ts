@@ -53,13 +53,22 @@ const permits = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Va
       GrantScope.covers(grant.scope, requirement.target),
   );
 
-/** Whether a reader with this access holds a scope in the audience and any permission named. */
+/**
+ * Whether a reader with this access holds a scope in the audience and any permission named. The
+ * holder of an exempt scope, the member a fact is about, needs no permission.
+ */
 const reaches = (
   access: Access,
-  reach: { readonly audience: Audience.Value; readonly requirement: Requirement.Value | undefined },
+  reach: {
+    readonly audience: Audience.Value;
+    readonly requirement: Requirement.Value | undefined;
+    readonly exempt?: Audience.Scope | undefined;
+  },
 ) =>
   reach.audience.some((scope) => access.scopes.has(scope)) &&
-  (reach.requirement === undefined || permits(access.grants, reach.requirement));
+  (reach.requirement === undefined ||
+    permits(access.grants, reach.requirement) ||
+    (reach.exempt !== undefined && access.scopes.has(reach.exempt)));
 
 const visible = (access: Access) => (prepared: ChangeFeedEvents.Prepared) =>
   reaches(access, prepared);

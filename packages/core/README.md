@@ -293,9 +293,11 @@ behind, `Ready` has `reset: true` at the head and the consumer must refresh its 
 
 A reader sees an event when they hold a scope in its fact's
 [audience](../../docs/journal.md#fact-audiences) (the workspace, their membership or
-identity, or a group they belong to) and any read permission the registry names for it:
-`group.read` for group facts and `thread.read` for thread facts, the permissions the
-matching reads require. Their group admissions and grants are loaded when the
+identity, or a group they belong to) and any read permission the registry names for it, the
+permission the matching read requires: `invitation.manage` for invitations, `member.read` and
+`assignment.read` on the member for membership and access changes, `group.read` for group facts,
+and `thread.read` for thread facts. A registration can name the member a fact concerns, who sees it
+without the permission: their own membership, access, and accepted invitation. Their group admissions and grants are loaded when the
 subscription opens and reloaded before filtering a commit that changes them, so a
 commit that admits the reader delivers what it admits. The commit that removes the
 reader from the workspace is delivered, then the stream ends. Registry views give

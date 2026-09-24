@@ -46,7 +46,11 @@ export const authorization = (harness: Harness) => {
               const grants = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
               for (const grant of grants)
                 yield* journal
-                  .publish(AssignmentFacts.Revoked, { workspaceId, assignmentId: grant.id })
+                  .publish(AssignmentFacts.Revoked, {
+                    workspaceId,
+                    assignmentId: grant.id,
+                    memberId: grant.memberId,
+                  })
                   .pipe(publish);
               expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
                 [],

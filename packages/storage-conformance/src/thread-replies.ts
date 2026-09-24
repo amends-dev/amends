@@ -407,6 +407,7 @@ export const threadReplies = (harness: Harness) => {
                 j.publish(AssignmentFacts.Revoked, {
                   workspaceId,
                   assignmentId: assignment.payload.assignmentId,
+                  memberId: assignment.payload.memberId,
                 }),
               );
               yield* facts(bound, revoke);
