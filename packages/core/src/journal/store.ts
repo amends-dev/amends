@@ -184,7 +184,8 @@ export interface Interface {
   /**
    * Host transaction primitive. Provides Transaction and enlists all log writes
    * and domain projection stores and checkpoints in one serializable commit.
-   * The core transaction coordinator calls this once per outer commit. Do not
+   * The core transaction coordinator calls this once per outer commit, and issues the commit's
+   * log appends and reads one at a time, never concurrently. Do not
    * automatically retry the program. Roll back failures and interruption; report an unconfirmed
    * commit outcome as CommitUncertain with its identity for reconciliation.
    * Persistence across restarts depends on the adapter.

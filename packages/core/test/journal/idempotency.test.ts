@@ -119,7 +119,7 @@ it.effect(
     }),
 );
 
-it.effect("concurrent retries in one commit publish and project only one keyed occurrence", () =>
+it.effect("retries in one commit publish and project only one keyed occurrence", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* run(
@@ -129,7 +129,6 @@ it.effect("concurrent retries in one commit publish and project only one keyed o
         const events = yield* journal.commit(
           Effect.all(
             Array.from({ length: 8 }, () => journal.publish(Changed, 2, { idempotencyKey: key })),
-            { concurrency: "unbounded" },
           ),
         );
         expect(new Set(events.map((event) => event.id)).size).toBe(1);

@@ -374,9 +374,15 @@ not appear in that log's reads or advance its cursor.
 
 `Journal.publish` creates an implicit commit when needed. `journal.commit(program)` or
 `logs.commit(program)` groups operations.
-Nested commits join the current commit. Appends and their projection updates are
-serialized within that commit, including when publications originate in parallel
-fibers. Returned entry references are provisional until the outer commit succeeds.
+Nested commits join the current commit. Returned entry references are provisional until the
+outer commit succeeds.
+
+A commit runs its storage work one step at a time: await each publication, append, and log read
+before starting the next. A step nested in the running one on the same fiber, such as a
+publication's own append and projection updates, runs within it. Starting a step while another
+fiber's is running is a defect, `Commit.Concurrent`, that aborts the commit. Waiting instead could
+deadlock a forked fiber on its parent's step, and let a read interleave with writes the store has
+staged. Work outside storage can still run concurrently inside a commit's program.
 
 ```ts
 const incorporate = Effect.gen(function* () {
@@ -618,8 +624,8 @@ between projection versions.
 ## Verification
 
 `bun run test packages/core/test` exercises the portable implementation with a test-only
-memory adapter, including cross-log atomicity, rollback, nested and concurrent
-publication, interruption, cursor isolation, and uncertain outcomes. Projection tests
+memory adapter, including cross-log atomicity, rollback, nested publication, rejecting concurrent
+storage work in one commit, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version
 routing, going live after a rebuild, the live-version checks on commit, retired and
 replaced versions resuming from the last commit they applied, and live publication that

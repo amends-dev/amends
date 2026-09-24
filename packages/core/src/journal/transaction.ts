@@ -11,6 +11,12 @@ export class Foreign extends Schema.TaggedError<Foreign>()("Commit.Foreign", {})
 export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()("Commit.WriteForbidden", {
   reason: Schema.String,
 }) {}
+/**
+ * A commit's storage work began a step while another fiber's step was running. A commit runs its
+ * reads and writes one at a time, so await each before the next; concurrent work in one commit is
+ * a defect of the program that started it, raised as a defect and aborting the commit.
+ */
+export class Concurrent extends Schema.TaggedError<Concurrent>()("Commit.Concurrent", {}) {}
 
 export type Error =
   | Store.Failure
@@ -27,10 +33,19 @@ export interface Interface {
   readonly run: <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Error, Remaining<R>>;
-  /** Serializes one compound write, allowing same-fiber nested appends. */
+  /**
+   * Run one compound write as a step of the commit, joining or starting it. Nested steps in the
+   * same fiber run within it; a step from another fiber while it runs dies with Concurrent.
+   */
   readonly operation: <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | Error, Remaining<R>>;
+  /**
+   * Run a read as a step of the current commit, under the same rule as operation, so it never
+   * overlaps the commit's writes. Outside a commit, run it as it is; after the commit ends, the
+   * store rejects its expired handle.
+   */
+  readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/journal/transaction/Service",
@@ -132,6 +147,25 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     );
   });
 
+  /**
+   * One step at a time: a step nested in the running one, on the same fiber, runs within it; any
+   * other step while one runs is a concurrency defect rather than a wait, which could deadlock a
+   * child fiber on its parent's step or interleave a read with a write the store has staged.
+   */
+  const exclusive = Effect.fnUntraced(function* <A, E, R>(
+    state: State,
+    program: Effect.Effect<A, E, R>,
+  ) {
+    const fiberId = yield* Effect.fiberId;
+    const parent = yield* Effect.serviceOption(OperationOwner);
+    if (Option.isSome(parent) && parent.value === fiberId) return yield* program;
+    const result = yield* state.gate.withPermitsIfAvailable(1)(
+      Effect.provideService(program, OperationOwner, fiberId),
+    );
+    if (Option.isNone(result)) return yield* observe(Effect.die(new Concurrent({})), state);
+    return result.value;
+  });
+
   const operation = Effect.fn("Commit.operation")(function* <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) {
@@ -142,26 +176,31 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
         const state = current.value;
         const forbidden = yield* Effect.serviceOption(Forbidden);
         if (Option.isSome(forbidden)) return yield* new WriteForbidden({ reason: forbidden.value });
-        const fiberId = yield* Effect.fiberId;
-        const parent = yield* Effect.serviceOption(OperationOwner);
-        const execute = observe(
-          Effect.gen(function* () {
-            if (!state.active) return yield* new Closed({});
-            if (Option.isSome(state.failure))
-              return yield* new Aborted({ cause: state.failure.value });
-            return yield* program;
-          }),
+        return yield* exclusive(
           state,
-        );
-        if (Option.isSome(parent) && parent.value === fiberId) return yield* execute;
-        return yield* state.gate.withPermits(1)(
-          Effect.provideService(execute, OperationOwner, fiberId),
+          observe(
+            Effect.gen(function* () {
+              if (!state.active) return yield* new Closed({});
+              if (Option.isSome(state.failure))
+                return yield* new Aborted({ cause: state.failure.value });
+              return yield* program;
+            }),
+            state,
+          ),
         );
       }),
     );
   });
 
-  return Service.of({ workspaceId: store.workspaceId, run, operation });
+  const step = Effect.fn("Commit.step")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+    const current = yield* Effect.serviceOption(Current);
+    if (Option.isNone(current) || current.value.owner !== owner || !current.value.active)
+      return yield* program;
+    // A read's own failure leaves the commit as it was; only running concurrently aborts it.
+    return yield* exclusive(current.value, program);
+  });
+
+  return Service.of({ workspaceId: store.workspaceId, run, operation, step });
 });
 
 /**

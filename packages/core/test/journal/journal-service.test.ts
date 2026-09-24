@@ -192,15 +192,10 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
         .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
       expect(yield* Ref.get(finalized)).toBe(1);
       yield* journal.commit(
-        Effect.forEach(
-          [2, 3],
-          (amount) =>
-            journal
-              .publish(Changed, amount)
-              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
-          {
-            concurrency: "unbounded",
-          },
+        Effect.forEach([2, 3], (amount) =>
+          journal
+            .publish(Changed, amount)
+            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
         ),
       );
       expect(yield* Ref.get(finalized)).toBe(3);

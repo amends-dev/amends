@@ -84,7 +84,7 @@ it.effect(
 );
 
 it.effect(
-  "publication deduplicates concurrent attempts without explicit keys and rejects conflicting content",
+  "publication deduplicates repeated attempts without explicit keys and rejects conflicting content",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
@@ -93,10 +93,7 @@ it.effect(
         Effect.gen(function* () {
           const journal = yield* setup;
           const events = yield* journal.commit(
-            Effect.all(
-              Array.from({ length: 6 }, () => journal.publish(Received, input)),
-              { concurrency: "unbounded" },
-            ),
+            Effect.all(Array.from({ length: 6 }, () => journal.publish(Received, input))),
           );
           expect(new Set(events.map((event) => event.id)).size).toBe(1);
           expect(yield* fixture.counter.get).toBe(2);

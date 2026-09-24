@@ -2,7 +2,7 @@ import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Option, Schema, Stream } from "effect";
+import { Cause, Deferred, Effect, Exit, Fiber, Option, Result, Schema, Stream } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
@@ -146,7 +146,41 @@ it.effect("a caught projection failure still rolls back all logs and projection 
   }),
 );
 
-it.effect("parallel publications preserve append and projection order", () =>
+it.effect("storage work started concurrently in one commit is a defect, and writes nothing", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        const { journal, turn } = yield* setup;
+        const transaction = yield* Transaction.Service;
+        const concurrent = (exit: Exit.Exit<unknown, unknown>) =>
+          Exit.isFailure(exit) &&
+          Result.getOrUndefined(Cause.findDefect(exit.cause)) instanceof Transaction.Concurrent;
+        const publish = (amount: number) => journal.publish(Changed, { amount });
+        const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Publication.Service>> = [
+          // Publications side by side.
+          Effect.forEach([1, 2, 3, 4], publish, { concurrency: "unbounded" }),
+          // A read beside a write, which the store could interleave with what it has staged.
+          Effect.all([publish(1), journal.log.read({ limit: 1 })], { concurrency: "unbounded" }),
+          // A step forked inside another, which waiting would deadlock on its parent's step.
+          transaction.operation(
+            Effect.flatMap(Effect.forkChild(turn.append({ _tag: "Finished" })), (fiber) =>
+              Fiber.join(fiber),
+            ),
+          ),
+        ];
+        for (const attempt of attempts)
+          expect(concurrent(yield* Effect.exit(journal.commit(attempt)))).toBe(true);
+        expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
+        expect(yield* turn.read({ limit: 10 })).toEqual([]);
+        expect(yield* (yield* Counter).get).toBe(0);
+      }),
+    );
+  }),
+);
+
+it.effect("publications one after another in one commit share its batch in order", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* run(
@@ -154,9 +188,7 @@ it.effect("parallel publications preserve append and projection order", () =>
       Effect.gen(function* () {
         const { journal } = yield* setup;
         yield* journal.commit(
-          Effect.forEach([1, 2, 3, 4], (amount) => journal.publish(Changed, { amount }), {
-            concurrency: "unbounded",
-          }),
+          Effect.forEach([1, 2, 3, 4], (amount) => journal.publish(Changed, { amount })),
         );
         const batches = yield* journal.log.read({ limit: 10 });
         expect(batches).toHaveLength(1);

@@ -194,7 +194,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
             ),
           ),
         ),
-      )(yield* store.getAppend(id, validKey));
+      )(yield* transaction.step(store.getAppend(id, validKey)));
     });
     const getAppend = Effect.fn("Log.getAppend")(function* (key: IdempotencyKey) {
       const found = yield* receipt(key);
@@ -295,7 +295,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
             ),
           ),
         ),
-      )(yield* store.getEntry(id, requestedId));
+      )(yield* transaction.step(store.getEntry(id, requestedId)));
       if (Option.isNone(found)) return Option.none<Entry<S["Type"]>>();
       return Option.some(yield* decodeEntry(found.value));
     });
@@ -308,13 +308,15 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
           ),
         ),
       );
-      const result = yield* Schema.decodeEffect(resultSchema)(yield* store.get(id, requestedId));
+      const result = yield* Schema.decodeEffect(resultSchema)(
+        yield* transaction.step(store.get(id, requestedId)),
+      );
       if (Option.isNone(result)) return Option.none<Batch<S["Type"]>>();
       return Option.some(yield* decodeBatch(result.value));
     });
 
     const head = Effect.flatMap(
-      Effect.suspend(() => store.head(id)),
+      Effect.suspend(() => transaction.step(store.head(id))),
       (position) => Schema.decodeEffect(Schema.Option(Position))(position),
     ).pipe(Effect.withSpan("Log.head"));
 
@@ -340,7 +342,9 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
           return undefined;
         }),
       );
-      const batches = yield* Schema.decodeEffect(resultSchema)(yield* store.read(id, request));
+      const batches = yield* Schema.decodeEffect(resultSchema)(
+        yield* transaction.step(store.read(id, request)),
+      );
       return yield* Effect.forEach(batches, decodeBatch);
     });
 
@@ -409,7 +413,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
             return undefined;
           }),
         ),
-      )(yield* store.readFacts(id, request));
+      )(yield* transaction.step(store.readFacts(id, request)));
       return yield* Effect.forEach(entries, decodeEntry);
     });
     return {
