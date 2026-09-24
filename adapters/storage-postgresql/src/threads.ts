@@ -3,7 +3,7 @@ import { Group } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
-import { threads, groups, members } from "./schema.ts";
+import { threads } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -166,31 +166,6 @@ export const make = Effect.fn("Threads.make")(function* () {
           message: "Invalid initial record or workspace",
         });
       const creator = record.createdBy;
-      const related = yield* guard(
-        creator._tag === "Member"
-          ? db
-              .select({ id: groups.id })
-              .from(groups)
-              .innerJoin(members, eq(members.workspaceId, groups.workspaceId))
-              .where(
-                and(
-                  eq(groups.workspaceId, workspaceId),
-                  eq(groups.id, record.groupId),
-                  eq(members.id, creator.memberId),
-                ),
-              )
-          : db
-              .select({ id: groups.id })
-              .from(groups)
-              .where(and(eq(groups.workspaceId, workspaceId), eq(groups.id, record.groupId))),
-        true,
-      ).pipe(Effect.mapError(storeError(ThreadStore, "insert")));
-      if (related.length === 0)
-        return yield* new ThreadStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
-
       const { createdBy: _, ...fields } = record;
       yield* guard(
         db.insert(threads).values({

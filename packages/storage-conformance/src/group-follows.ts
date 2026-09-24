@@ -302,20 +302,13 @@ export const groupFollows = (harness: Harness) => {
     );
 
     it.effect(
-      "group follow storage keeps one active follow per admission and rejects inconsistent references",
+      "group follow storage keeps one active follow per admission and rejects invalid records",
       () =>
         harness.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
-              const { bound, team, owner } = yield* prepare();
-              const elsewhere = yield* run(
-                bound,
-                owner,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createPrivateTeam({ name: "Elsewhere", memberIds: [humanId] }),
-                ),
-              );
+              const { bound, team } = yield* prepare();
               const admission = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(team.id, humanId),
               );
@@ -343,13 +336,6 @@ export const groupFollows = (harness: Harness) => {
               for (const bad of [
                 record("second"),
                 record("first", { memberId: plainId, groupMembershipId: plainAdmission.id }),
-                record("mismatched", { memberId: plainId }),
-                // An admission to one group cannot follow another, even without a follow of its own.
-                record("other-group", {
-                  groupId: elsewhere.id,
-                  memberId: plainId,
-                  groupMembershipId: plainAdmission.id,
-                }),
                 record("foreign", { workspaceId: otherWorkspaceId }),
                 record("ended", { status: "ended", endedAt: followedAt }),
               ])

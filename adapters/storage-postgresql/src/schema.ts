@@ -3,6 +3,10 @@
  * the workspace, and every reference between tables carries the workspace, so
  * a join that starts scoped stays scoped. Tagged unions become a discriminator
  * column plus the columns each case needs, constrained to agree.
+ *
+ * Projection tables have no foreign keys to one another: each read model rebuilds alone, in any
+ * order, and core checks references when it publishes the facts they come from. The log's own
+ * tables keep theirs.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -58,7 +62,6 @@ export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   workspaceId: text("workspace_id").primaryKey(),
   createdBy: text("created_by").notNull(),
-  // Not a foreign key: the workspace record is projected before its owner's membership.
   ownerMemberId: text("owner_member_id").notNull(),
 });
 
@@ -73,11 +76,6 @@ export const members = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId],
-      foreignColumns: [workspaces.workspaceId],
-      name: "members_workspace",
-    }).onDelete("cascade"),
     check("members_identity_kind", sql`${table.identityKind} IN ('Human', 'Agent')`),
     uniqueIndex("active_member_identity")
       .on(table.workspaceId, table.identityKind, table.identityId)
@@ -110,11 +108,6 @@ export const groups = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId, table.createdBy],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "groups_creator",
-    }),
     check(
       "groups_kind",
       sql`(${table.kind} = 'Team' AND ${table.visibility} = 'Private' AND ${table.name} IS NOT NULL AND ${table.memberIds} IS NULL AND ${table.directKey} IS NULL) OR (${table.kind} = 'Direct' AND ${table.visibility} IS NULL AND ${table.name} IS NULL AND cardinality(${table.memberIds}) >= 2 AND ${table.directKey} IS NOT NULL)`,
@@ -138,16 +131,6 @@ export const groupMemberships = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId, table.groupId],
-      foreignColumns: [groups.workspaceId, groups.id],
-      name: "group_memberships_group",
-    }),
-    foreignKey({
-      columns: [table.workspaceId, table.memberId],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "group_memberships_member",
-    }),
     check("group_memberships_status", sql`${table.status} IN ('active', 'removed')`),
     uniqueIndex("active_group_membership")
       .on(table.workspaceId, table.groupId, table.memberId)
@@ -184,21 +167,6 @@ export const groupFollows = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
-    foreignKey({
-      columns: [t.workspaceId, t.groupId],
-      foreignColumns: [groups.workspaceId, groups.id],
-      name: "group_follows_group",
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.memberId],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "group_follows_member",
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.groupMembershipId],
-      foreignColumns: [groupMemberships.workspaceId, groupMemberships.id],
-      name: "group_follows_admission",
-    }),
     uniqueIndex("active_group_follow")
       .on(t.workspaceId, t.groupMembershipId)
       .where(sql`${t.status} = 'active'`),
@@ -218,14 +186,7 @@ export const roles = pgTable(
     name: text("name").notNull(),
     permissions: text("permissions").array().notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId],
-      foreignColumns: [workspaces.workspaceId],
-      name: "roles_workspace",
-    }).onDelete("cascade"),
-  ],
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })],
 );
 
 export const assignments = pgTable(
@@ -242,21 +203,6 @@ export const assignments = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId],
-      foreignColumns: [workspaces.workspaceId],
-      name: "assignments_workspace",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.workspaceId, table.memberId],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "assignments_member",
-    }),
-    foreignKey({
-      columns: [table.workspaceId, table.roleId],
-      foreignColumns: [roles.workspaceId, roles.id],
-      name: "assignments_role",
-    }),
     check(
       "assignments_source_agrees",
       sql`(${table.sourceKind} = 'Role' AND ${table.roleId} IS NOT NULL AND ${table.permission} IS NULL) OR (${table.sourceKind} = 'Direct' AND ${table.permission} IS NOT NULL AND ${table.roleId} IS NULL)`,
@@ -285,16 +231,6 @@ export const invitations = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId],
-      foreignColumns: [workspaces.workspaceId],
-      name: "invitations_workspace",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.workspaceId, table.inviterMemberId],
-      foreignColumns: [members.workspaceId, members.id],
-      name: "invitations_inviter",
-    }),
     check(
       "invitations_state_agrees",
       sql`(${table.state} = 'Pending' AND ${table.acceptedMemberId} IS NULL AND ${table.acceptedAt} IS NULL AND ${table.revokedByMemberId} IS NULL AND ${table.revokedAt} IS NULL) OR (${table.state} = 'Accepted' AND ${table.acceptedMemberId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL AND ${table.revokedByMemberId} IS NULL AND ${table.revokedAt} IS NULL) OR (${table.state} = 'Revoked' AND ${table.revokedByMemberId} IS NOT NULL AND ${table.revokedAt} IS NOT NULL AND ${table.acceptedMemberId} IS NULL AND ${table.acceptedAt} IS NULL)`,
@@ -326,11 +262,6 @@ export const notifications = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId],
-      foreignColumns: [workspaces.workspaceId],
-      name: "notifications_workspace",
-    }).onDelete("cascade"),
     check(
       "notification_state",
       sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
@@ -559,14 +490,6 @@ export const threads = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
-    foreignKey({
-      columns: [t.workspaceId, t.groupId],
-      foreignColumns: [groups.workspaceId, groups.id],
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.createdByMemberId],
-      foreignColumns: [members.workspaceId, members.id],
-    }),
     check(
       "thread_creator",
       sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
@@ -644,18 +567,6 @@ export const threadParticipations = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
-    foreignKey({
-      columns: [t.workspaceId, t.threadId],
-      foreignColumns: [threads.workspaceId, threads.id],
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.memberId],
-      foreignColumns: [members.workspaceId, members.id],
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.groupMembershipId],
-      foreignColumns: [groupMemberships.workspaceId, groupMemberships.id],
-    }),
     uniqueIndex("active_thread_participation")
       .on(
         t.workspaceId,
@@ -702,14 +613,6 @@ export const threadMessages = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
-    foreignKey({
-      columns: [t.workspaceId, t.threadId],
-      foreignColumns: [threads.workspaceId, threads.id],
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.authorMemberId],
-      foreignColumns: [members.workspaceId, members.id],
-    }),
     check(
       "thread_message_author",
       sql`(${t.authorKind} = 'Member' AND ${t.authorMemberId} IS NOT NULL AND ${t.authorContactId} IS NULL) OR (${t.authorKind} = 'Contact' AND ${t.authorMemberId} IS NULL AND ${t.authorContactId} IS NOT NULL)`,
@@ -739,20 +642,8 @@ export const threadActivities = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
-    foreignKey({
-      columns: [t.workspaceId, t.threadId],
-      foreignColumns: [threads.workspaceId, threads.id],
-    }),
-    foreignKey({
-      columns: [t.workspaceId, t.messageId],
-      foreignColumns: [threadMessages.workspaceId, threadMessages.id],
-    }),
     uniqueIndex("thread_activity_sequence").on(t.workspaceId, t.threadId, t.sequence),
     uniqueIndex("thread_message_activity").on(t.workspaceId, t.messageId),
-    foreignKey({
-      columns: [t.workspaceId, t.participationId],
-      foreignColumns: [threadParticipations.workspaceId, threadParticipations.id],
-    }),
     uniqueIndex("thread_participation_activity").on(t.workspaceId, t.participationId, t.kind),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
   ],

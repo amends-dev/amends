@@ -6,7 +6,7 @@ import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
-import { groupMemberships, groups, members } from "./schema.ts";
+import { groupMemberships } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(GroupMembership.Record));
 const decode = Schema.decodeUnknownEffect(
@@ -209,25 +209,6 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
         return yield* new GroupMembershipStore.Conflict({
           operation: "insert",
           message: "Expected an active group membership in this workspace",
-        });
-      const related = yield* guard(
-        db
-          .select({ id: groups.id })
-          .from(groups)
-          .innerJoin(members, eq(members.workspaceId, groups.workspaceId))
-          .where(
-            and(
-              eq(groups.workspaceId, workspaceId),
-              eq(groups.id, record.groupId),
-              eq(members.id, record.memberId),
-            ),
-          ),
-        true,
-      ).pipe(Effect.mapError(storeError(GroupMembershipStore, "insert")));
-      if (related.length === 0)
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "insert",
-          message: "Group or workspace membership is missing",
         });
       yield* guard(
         db

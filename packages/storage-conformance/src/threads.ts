@@ -14,7 +14,6 @@ import {
 import {
   Group,
   GroupApplication,
-  GroupMembership,
   GroupMembershipApplication,
   GroupMembershipFacts,
 } from "@amends/core/group";
@@ -703,13 +702,13 @@ export const threads = (harness: Harness) => {
     );
 
     it.effect(
-      "direct stores reject cross-thread and foreign references, duplicate admissions, and timeline gaps",
+      "direct stores reject foreign records, a second active participation, a message's second activity, and timeline gaps",
       () =>
         harness.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
-              const { bound, owner, group, hidden } = yield* prepare();
+              const { bound, owner, group } = yield* prepare();
               const first = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
               const second = yield* run(bound, owner, start(group.id, [humanId]));
               const participation = first.participants.find(
@@ -722,56 +721,38 @@ export const threads = (harness: Harness) => {
                   id: Thread.Id.make("wrong-workspace"),
                   workspaceId: otherWorkspaceId,
                 }),
-                Object.assign({}, first.thread, {
-                  id: Thread.Id.make("missing-group"),
-                  groupId: Group.Id.make("missing"),
-                }),
               ]) {
                 expect(
                   yield* Effect.flip(bound.store.transaction(bound.threads.insert(record))),
                 ).toMatchObject({ _tag: "ThreadStore.Conflict" });
               }
-              const otherAdmission = Option.getOrThrow(
-                yield* bound.groupMemberships.findActive(hidden.id, otherId),
-              );
+              expect(
+                yield* Effect.flip(
+                  bound.store.transaction(
+                    bound.participations.insert(
+                      Object.assign({}, participation, {
+                        id: ThreadParticipation.Id.make("duplicate-participation"),
+                      }),
+                    ),
+                  ),
+                ),
+              ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+              expect(
+                yield* Effect.flip(
+                  bound.store.transaction(
+                    bound.messages.insert(
+                      Object.assign({}, first.message, {
+                        id: ThreadMessage.Id.make("blank"),
+                        text: "  ",
+                      }),
+                    ),
+                  ),
+                ),
+              ).toMatchObject({ _tag: "ThreadMessageStore.Conflict" });
               for (const record of [
-                Object.assign({}, participation, {
-                  id: ThreadParticipation.Id.make("wrong-admission"),
-                  groupMembershipId: otherAdmission.id,
-                }),
-                Object.assign({}, participation, {
-                  id: ThreadParticipation.Id.make("duplicate-participation"),
-                }),
-                Object.assign({}, participation, {
-                  id: ThreadParticipation.Id.make("wrong-identity"),
-                  identity: humanIdentity,
-                }),
-              ]) {
-                expect(
-                  yield* Effect.flip(bound.store.transaction(bound.participations.insert(record))),
-                ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
-              }
-              for (const record of [
-                Object.assign({}, first.message, {
-                  id: ThreadMessage.Id.make("missing-author"),
-                  author: { _tag: "Member", memberId: otherId },
-                }),
-                Object.assign({}, first.message, {
-                  id: ThreadMessage.Id.make("outside-mention"),
-                  mentions: [otherId],
-                }),
-                Object.assign({}, first.message, {
-                  id: ThreadMessage.Id.make("blank"),
-                  text: "  ",
-                }),
-              ]) {
-                expect(
-                  yield* Effect.flip(bound.store.transaction(bound.messages.insert(record))),
-                ).toMatchObject({ _tag: "ThreadMessageStore.Conflict" });
-              }
-              for (const record of [
+                // A message has one activity, even in the next position of another thread.
                 Object.assign({}, first.activity, {
-                  id: ThreadActivity.Id.make("wrong-thread"),
+                  id: ThreadActivity.Id.make("same-message"),
                   threadId: second.thread.id,
                   sequence: 2,
                 }),
@@ -948,151 +929,119 @@ export const threads = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "direct stores refuse reused IDs, participants outside the thread's group, and misdescribed timeline entries",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, owner, group } = yield* prepare();
-              const first = yield* run(bound, owner, start(group.id, [agentId]));
-              const second = yield* run(bound, owner, start(group.id));
-              const elsewhere = yield* run(bound, owner, create([humanId], "Elsewhere"));
-              const admission = (groupId: Group.Id) =>
-                Effect.map(bound.groupMemberships.findActive(groupId, humanId), Option.getOrThrow);
-              const agentParticipation = first.participants.find(
-                (participant) => ThreadParticipation.memberOf(participant.participant) === agentId,
-              );
-              if (agentParticipation === undefined) return yield* Effect.die("Missing agent");
-              const write = <A, E, R>(program: Effect.Effect<A, E, R>) =>
-                bound.store.transaction(program);
-              const refused = <A, E, R>(program: Effect.Effect<A, E, R>) =>
-                Effect.flip(write(program));
+    it.effect("direct stores refuse reused IDs and misplaced timeline entries", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, group } = yield* prepare();
+            const first = yield* run(bound, owner, start(group.id, [agentId]));
+            const second = yield* run(bound, owner, start(group.id));
+            const admission = Option.getOrThrow(
+              yield* bound.groupMemberships.findActive(group.id, humanId),
+            );
+            const agentParticipation = first.participants.find(
+              (participant) => ThreadParticipation.memberOf(participant.participant) === agentId,
+            );
+            if (agentParticipation === undefined) return yield* Effect.die("Missing agent");
+            const write = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+              bound.store.transaction(program);
+            const refused = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+              Effect.flip(write(program));
 
-              // Threads: a reused ID, or a member creator the workspace does not have.
-              expect(yield* refused(bound.threads.insert(first.thread))).toMatchObject({
-                _tag: "ThreadStore.Conflict",
-              });
-              expect(
-                yield* refused(
-                  bound.threads.insert(
-                    Object.assign({}, first.thread, {
-                      id: Thread.Id.make("missing-creator"),
-                      createdBy: { _tag: "Member" as const, memberId: Member.Id.make("missing") },
-                    }),
-                  ),
+            // Threads: a reused ID.
+            expect(yield* refused(bound.threads.insert(first.thread))).toMatchObject({
+              _tag: "ThreadStore.Conflict",
+            });
+
+            // Participants: a reused ID.
+            const joined: ThreadParticipation.Record = {
+              id: ThreadParticipation.Id.make("joined"),
+              workspaceId,
+              threadId: second.thread.id,
+              participant: {
+                _tag: "Member",
+                memberId: humanId,
+                groupMembershipId: admission.id,
+                identity: humanIdentity,
+              },
+              joinedAt: second.thread.createdAt,
+              joinedAtSequence: 1,
+              status: "active",
+              endedAt: null,
+            };
+            yield* write(bound.participations.insert(joined));
+            expect(yield* bound.participations.get(joined.id)).toEqual(Option.some(joined));
+            expect(
+              yield* refused(
+                bound.participations.insert(
+                  Object.assign({}, joined, { threadId: first.thread.id }),
                 ),
-              ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+              ),
+            ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
 
-              // Participants: the admission must be to the thread's group, for the same identity.
-              const participation = (
-                id: string,
-                groupMembershipId: GroupMembership.Id,
-                identity: Identity.MemberReference = humanIdentity,
-              ): ThreadParticipation.Record => ({
-                id: ThreadParticipation.Id.make(id),
-                workspaceId,
-                threadId: second.thread.id,
-                participant: { _tag: "Member", memberId: humanId, groupMembershipId, identity },
-                joinedAt: second.thread.createdAt,
-                joinedAtSequence: 1,
-                status: "active",
-                endedAt: null,
-              });
-              for (const record of [
-                participation("other-group", (yield* admission(elsewhere.id)).id),
-                participation("other-kind", (yield* admission(group.id)).id, agentIdentity),
-                participation(
-                  "other-human",
-                  (yield* admission(group.id)).id,
-                  Identity.MemberReference.cases.Human.make({ id: Identity.HumanId.make("other") }),
-                ),
-              ])
-                expect(yield* refused(bound.participations.insert(record))).toMatchObject({
-                  _tag: "ThreadParticipationStore.Conflict",
-                });
-              const joined = participation("joined", (yield* admission(group.id)).id);
-              yield* write(bound.participations.insert(joined));
-              expect(yield* bound.participations.get(joined.id)).toEqual(Option.some(joined));
+            // Messages: a reused ID.
+            expect(yield* refused(bound.messages.insert(first.message))).toMatchObject({
+              _tag: "ThreadMessageStore.Conflict",
+            });
 
-              // Messages: a reused ID.
-              expect(yield* refused(bound.messages.insert(first.message))).toMatchObject({
-                _tag: "ThreadMessageStore.Conflict",
+            // Timeline: contiguous sequences and one entry per subject.
+            const message = Object.assign({}, first.message, {
+              id: ThreadMessage.Id.make("direct-message"),
+            });
+            yield* write(bound.messages.insert(message));
+            const published = (id: string, messageId: ThreadMessage.Id, sequence: number) =>
+              Object.assign({}, first.activity, {
+                id: ThreadActivity.Id.make(id),
+                messageId,
+                sequence,
               });
-
-              // Timeline: contiguous sequences, one entry per subject, and a subject in the state
-              // the entry describes.
-              const message = Object.assign({}, first.message, {
-                id: ThreadMessage.Id.make("direct-message"),
-              });
-              yield* write(bound.messages.insert(message));
-              const published = (id: string, messageId: ThreadMessage.Id, sequence: number) =>
-                Object.assign({}, first.activity, {
-                  id: ThreadActivity.Id.make(id),
-                  messageId,
-                  sequence,
-                });
-              for (const record of [
-                published("gap", message.id, 3),
-                published("same-subject", first.message.id, 2),
-              ])
-                expect(yield* refused(bound.activities.insert(record))).toMatchObject({
-                  _tag: "ThreadActivityStore.Conflict",
-                });
-              yield* write(bound.activities.insert(published("next", message.id, 2)));
-              const occurredAt = DateTime.makeUnsafe("2026-09-23T12:00:00.000Z");
-              const followed: ThreadActivity.Record = {
-                id: ThreadActivity.Id.make("followed"),
-                workspaceId,
-                threadId: first.thread.id,
-                sequence: 3,
-                occurredAt,
-                kind: "ParticipationFollowed",
-                participationId: agentParticipation.id,
-              };
-              // The agent joined at the opening, not at this position.
-              expect(yield* refused(bound.activities.insert(followed))).toMatchObject({
+            for (const record of [
+              published("gap", message.id, 3),
+              published("same-subject", first.message.id, 2),
+            ])
+              expect(yield* refused(bound.activities.insert(record))).toMatchObject({
                 _tag: "ThreadActivityStore.Conflict",
               });
-              const departure = {
-                workspaceId,
-                threadId: first.thread.id,
-                participationId: agentParticipation.id,
-              };
-              const ended = (at: DateTime.Utc): ThreadActivity.Record => ({
-                id: ThreadActivity.Id.make("ended"),
-                workspaceId,
-                threadId: first.thread.id,
-                sequence: 3,
-                occurredAt: at,
-                kind: "ParticipationEnded",
-                participationId: agentParticipation.id,
-                reason: "unfollowed",
-              });
-              // An ending must carry the time the participation ended.
-              expect(
-                yield* refused(
-                  Effect.andThen(
-                    bound.participations.end(departure, occurredAt),
-                    bound.activities.insert(ended(DateTime.add(occurredAt, { seconds: 1 }))),
-                  ),
+            yield* write(bound.activities.insert(published("next", message.id, 2)));
+            const occurredAt = DateTime.makeUnsafe("2026-09-23T12:00:00.000Z");
+            const departure = {
+              workspaceId,
+              threadId: first.thread.id,
+              participationId: agentParticipation.id,
+            };
+            const ended: ThreadActivity.Record = {
+              id: ThreadActivity.Id.make("ended"),
+              workspaceId,
+              threadId: first.thread.id,
+              sequence: 3,
+              occurredAt,
+              kind: "ParticipationEnded",
+              participationId: agentParticipation.id,
+              reason: "unfollowed",
+            };
+            yield* write(
+              Effect.andThen(
+                bound.participations.end(departure, occurredAt),
+                bound.activities.insert(ended),
+              ),
+            );
+            // A participation ends once.
+            expect(
+              yield* refused(
+                bound.activities.insert(
+                  Object.assign({}, ended, { id: ThreadActivity.Id.make("again"), sequence: 4 }),
                 ),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
-              yield* write(
-                Effect.andThen(
-                  bound.participations.end(departure, occurredAt),
-                  bound.activities.insert(ended(occurredAt)),
-                ),
-              );
-              expect(
-                (yield* bound.activities.listByThread(first.thread.id)).map(
-                  ({ sequence }) => sequence,
-                ),
-              ).toEqual([1, 2, 3]);
-            }),
-          ),
+              ),
+            ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
+            expect(
+              (yield* bound.activities.listByThread(first.thread.id)).map(
+                ({ sequence }) => sequence,
+              ),
+            ).toEqual([1, 2, 3]);
+          }),
         ),
+      ),
     );
   });
 };

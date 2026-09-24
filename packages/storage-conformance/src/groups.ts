@@ -460,7 +460,7 @@ export const groups = (harness: Harness) => {
     );
 
     it.effect(
-      "group stores reject invalid records and enforce admission uniqueness and workspace references",
+      "group stores reject invalid or foreign records and enforce admission uniqueness",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -491,7 +491,6 @@ export const groups = (harness: Harness) => {
                   for (const invalid of [
                     { ...group, name: "" },
                     { ...group, workspaceId: otherWorkspaceId },
-                    { ...group, createdBy: other.ownerMemberId },
                   ]) {
                     expect(yield* Effect.flip(bound.groups.insert(invalid))).toMatchObject({
                       _tag: "GroupStore.Conflict",
@@ -500,8 +499,6 @@ export const groups = (harness: Harness) => {
                   }
                   yield* bound.groups.insert(group);
                   for (const invalid of [
-                    { ...admission, memberId: other.ownerMemberId },
-                    { ...admission, groupId: Group.Id.make("missing") },
                     { ...admission, workspaceId: otherWorkspaceId },
                     { ...admission, status: "removed" as const },
                   ]) {

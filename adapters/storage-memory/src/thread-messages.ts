@@ -1,10 +1,9 @@
 import { Store } from "@amends/core/journal";
-import { ThreadMessage, ThreadMessageStore, ThreadParticipation } from "@amends/core/thread";
+import { ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
 import { Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
-import { ThreadParticipations } from "./thread-participations.ts";
 
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
 const rows = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
@@ -39,34 +38,6 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           message: "Invalid initial record or workspace",
         });
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadMessageStore, "insert")));
-      // The author and every mention took part in this thread at some point.
-      const participants = new Set(
-        (yield* ThreadParticipations.rows
-          .all(space.records.threadParticipations)
-          .pipe(Effect.mapError(storeFailure(ThreadMessageStore, "insert"))))
-          .filter((participation) => participation.threadId === record.threadId)
-          .map((participation) => ThreadParticipation.keyOf(participation.participant)),
-      );
-      const author = record.author;
-      const authorKey = ThreadParticipation.keyOf(
-        author._tag === "Member"
-          ? { _tag: "Member", memberId: author.memberId }
-          : { _tag: "Contact", contactId: author.contactId },
-      );
-      if (!participants.has(authorKey))
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
-      if (
-        !record.mentions.every((memberId) =>
-          participants.has(ThreadParticipation.keyOf({ _tag: "Member", memberId })),
-        )
-      )
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "insert",
-          message: "Mention has no participation in this thread",
-        });
       if (space.records.threadMessages.has(record.id))
         return yield* new ThreadMessageStore.Conflict({
           operation: "insert",

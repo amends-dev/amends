@@ -87,11 +87,6 @@ export const make = Effect.fn("Groups.make")(function* () {
           message: "Expected a group in this workspace",
         });
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupStore, "insert")));
-      if (!space.records.members.has(record.createdBy))
-        return yield* new GroupStore.Conflict({
-          operation: "insert",
-          message: "Creator membership is missing",
-        });
       if (space.records.groups.has(record.id))
         return yield* new GroupStore.Conflict({
           operation: "insert",

@@ -312,30 +312,6 @@ CREATE INDEX "active_participations_by_thread" ON "thread_participations" ("work
 CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_latest" ON "threads" ("workspace_id","group_id","latest_activity_at","id" COLLATE "C");--> statement-breakpoint
-ALTER TABLE "assignments" ADD CONSTRAINT "assignments_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "assignments" ADD CONSTRAINT "assignments_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "assignments" ADD CONSTRAINT "assignments_role" FOREIGN KEY ("workspace_id","role_id") REFERENCES "roles"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_group" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_follows" ADD CONSTRAINT "group_follows_admission" FOREIGN KEY ("workspace_id","group_membership_id") REFERENCES "group_memberships"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_group" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_member" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "groups" ADD CONSTRAINT "groups_creator" FOREIGN KEY ("workspace_id","created_by") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "invitations" ADD CONSTRAINT "invitations_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "invitations" ADD CONSTRAINT "invitations_inviter" FOREIGN KEY ("workspace_id","inviter_member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "log_append_keys" ADD CONSTRAINT "log_append_keys_batch" FOREIGN KEY ("workspace_id","log_id","commit_id") REFERENCES "log_batches"("workspace_id","log_id","commit_id");--> statement-breakpoint
 ALTER TABLE "log_batches" ADD CONSTRAINT "log_batches_commit" FOREIGN KEY ("workspace_id","commit_id") REFERENCES "commits"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "log_entries" ADD CONSTRAINT "log_entries_batch" FOREIGN KEY ("workspace_id","log_id","position") REFERENCES "log_batches"("workspace_id","log_id","position");--> statement-breakpoint
-ALTER TABLE "members" ADD CONSTRAINT "members_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "roles" ADD CONSTRAINT "roles_workspace" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("workspace_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "thread_activities" ADD CONSTRAINT "thread_activities_4Sa14SmdIuuD_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_activities" ADD CONSTRAINT "thread_activities_xyjglJJtxVz2_fkey" FOREIGN KEY ("workspace_id","message_id") REFERENCES "thread_messages"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_activities" ADD CONSTRAINT "thread_activities_87rvenxiiDk0_fkey" FOREIGN KEY ("workspace_id","participation_id") REFERENCES "thread_participations"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_messages" ADD CONSTRAINT "thread_messages_yFALzBzMcA1U_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_messages" ADD CONSTRAINT "thread_messages_VQN5uhaRX29u_fkey" FOREIGN KEY ("workspace_id","author_member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_WEmntEwuURKU_fkey" FOREIGN KEY ("workspace_id","thread_id") REFERENCES "threads"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_8KVJdQYMqP4s_fkey" FOREIGN KEY ("workspace_id","member_id") REFERENCES "members"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "thread_participations" ADD CONSTRAINT "thread_participations_6EfsFG5kMyiA_fkey" FOREIGN KEY ("workspace_id","group_membership_id") REFERENCES "group_memberships"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "threads" ADD CONSTRAINT "threads_workspace_id_group_id_groups_workspace_id_id_fkey" FOREIGN KEY ("workspace_id","group_id") REFERENCES "groups"("workspace_id","id");--> statement-breakpoint
-ALTER TABLE "threads" ADD CONSTRAINT "threads_ndK7bl58RVVt_fkey" FOREIGN KEY ("workspace_id","created_by_member_id") REFERENCES "members"("workspace_id","id");
+ALTER TABLE "log_entries" ADD CONSTRAINT "log_entries_batch" FOREIGN KEY ("workspace_id","log_id","position") REFERENCES "log_batches"("workspace_id","log_id","position");

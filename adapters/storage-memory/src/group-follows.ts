@@ -7,7 +7,6 @@ import { compareBinary, Rows } from "./rows.ts";
 
 const validate = Schema.decodeEffect(Schema.toType(GroupFollow.Record));
 const rows = Rows.make(Schema.fromJsonString(GroupFollow.Record));
-const admissions = Rows.make(Schema.fromJsonString(GroupMembership.Record));
 
 /** Group follows, active and ended; one active follow per group admission. @category constructors */
 export const make = Effect.fn("GroupFollows.make")(function* () {
@@ -63,20 +62,6 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
           message: "Expected an active follow in this workspace",
         });
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupFollowStore, "insert")));
-      // The admission must belong to the same group and member; whether it is current is the
-      // application's check, so replay can restore follows of later-ended admissions.
-      const admission = yield* admissions
-        .get(space.records.groupMemberships, record.groupMembershipId)
-        .pipe(Effect.mapError(storeFailure(GroupFollowStore, "insert")));
-      if (
-        Option.isNone(admission) ||
-        admission.value.groupId !== record.groupId ||
-        admission.value.memberId !== record.memberId
-      )
-        return yield* new GroupFollowStore.Conflict({
-          operation: "insert",
-          message: "Admission is missing or belongs to another group or member",
-        });
       const follows = yield* rows
         .all(space.records.groupFollows)
         .pipe(Effect.mapError(storeFailure(GroupFollowStore, "insert")));

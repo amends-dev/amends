@@ -15,10 +15,10 @@ their encoded form, keyed by ID, like SQL record columns. Stored values never
 change: writes replace them, and every read decodes a fresh record. Journal entries are copied
 on the way in and out, so callers never share bytes with storage.
 
-Stores check what the PostgreSQL adapter enforces with keys, unique indexes, and foreign keys: reused
-IDs, one active membership per identity, one direct group per member set, one active follow per
-admission, one active participation per participant, contiguous thread sequences, and the
-references between records. Lists order IDs by their UTF-8 bytes, matching binary collation.
+Stores check what the PostgreSQL adapter enforces with keys and unique indexes: reused IDs, one
+active membership per identity, one direct group per member set, one active follow per admission,
+one active participation per participant, and contiguous thread sequences. Like PostgreSQL, they
+take references to other read models as recorded, so each rebuilds alone. Lists order IDs by their UTF-8 bytes, matching binary collation.
 Commit and entry IDs come from a counter in each storage.
 
 ## Transactions

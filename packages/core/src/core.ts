@@ -63,8 +63,11 @@ import { WorkspaceProjection } from "./workspace/projection.ts";
 import { OwnershipApplication } from "./workspace/ownership/application.ts";
 import { OwnershipPermissions } from "./workspace/ownership/permissions.ts";
 
-/** Projections registered for journal publication, applied in this order. */
-const projections = [
+/**
+ * Projections registered for journal publication, applied in this order. Each derives its records
+ * from facts and its own store alone, so any order rebuilds the same read models.
+ */
+export const projections = [
   WorkspaceProjection.definition,
   MemberProjection.definition,
   RoleProjection.definition,

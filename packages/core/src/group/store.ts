@@ -30,8 +30,9 @@ export interface Interface {
     memberIds: ReadonlyArray<MemberId.Id>,
   ) => Effect.Effect<Option.Option<Group.DirectRecord>, Failure>;
   /**
-   * Reject invalid/foreign records, missing creator membership, reused IDs, and a second direct
-   * group for the same member set. Never upsert.
+   * Reject invalid/foreign records, reused IDs, and a second direct group for the same member set.
+   * The creator is recorded as given: references to other read models are checked when facts are
+   * published, so this one rebuilds alone. Never upsert.
    */
   readonly insert: (
     record: Group.Record,

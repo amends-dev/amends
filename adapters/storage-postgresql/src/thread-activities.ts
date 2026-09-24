@@ -3,7 +3,7 @@ import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
-import { threadActivities, threadMessages, threadParticipations } from "./schema.ts";
+import { threadActivities } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
@@ -116,42 +116,6 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         return yield* new ThreadActivityStore.Conflict({
           operation: "insert",
           message: "Invalid initial record or workspace",
-        });
-      const related = yield* guard(
-        record.kind === "MessagePublished"
-          ? db
-              .select({ id: threadMessages.id })
-              .from(threadMessages)
-              .where(
-                and(
-                  eq(threadMessages.workspaceId, workspaceId),
-                  eq(threadMessages.id, record.messageId),
-                  eq(threadMessages.threadId, record.threadId),
-                ),
-              )
-          : db
-              .select({ id: threadParticipations.id })
-              .from(threadParticipations)
-              .where(
-                and(
-                  eq(threadParticipations.workspaceId, workspaceId),
-                  eq(threadParticipations.id, record.participationId),
-                  eq(threadParticipations.threadId, record.threadId),
-                  record.kind === "ParticipationFollowed"
-                    ? eq(threadParticipations.joinedAtSequence, record.sequence)
-                    : and(
-                        lt(threadParticipations.joinedAtSequence, record.sequence),
-                        eq(threadParticipations.status, "ended"),
-                        eq(threadParticipations.endedAt, DateTime.toDate(record.occurredAt)),
-                      ),
-                ),
-              ),
-        true,
-      ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
-      if (related.length === 0)
-        return yield* new ThreadActivityStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
         });
       const sequenceRows = yield* guard(
         db

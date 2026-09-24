@@ -63,9 +63,9 @@ export interface Interface {
     memberId: MemberId.Id,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
   /**
-   * Insert an active admission. Reject malformed/foreign records, missing group or workspace
-   * member, reused admission IDs, and duplicate active group/member pairs. Current workspace
-   * member status is checked by the application, never during historical projection replay.
+   * Insert an active admission. Reject malformed/foreign records, reused admission IDs, and
+   * duplicate active group/member pairs. The group and member are recorded as given: the
+   * application checks that they exist and the member is current.
    */
   readonly insert: (
     record: GroupMembership.Record,

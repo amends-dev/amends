@@ -57,7 +57,11 @@ export interface Interface {
     departure: ThreadParticipation.Departure,
     endedAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
+  /**
+   * Reject malformed or foreign records, an ended one, reused IDs, and a second active participation
+   * for one participant in the thread. The thread and admission are recorded as given, checked when
+   * the participant is admitted. Preserve historical values on replay.
+   */
   readonly insert: (
     record: ThreadParticipation.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;

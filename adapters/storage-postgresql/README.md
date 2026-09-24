@@ -9,8 +9,9 @@ connection and every Drizzle statement inside it lands on that connection.
 
 `src/schema.ts` gives every record field its own column. Each table leads its
 primary key with `workspace_id`, and each reference between tables carries the
-workspace as part of a composite foreign key, so a join that starts scoped stays
-scoped. Tagged unions become a discriminator column plus the columns each case
+workspace, so a join that starts scoped stays scoped. Projection tables have no foreign keys to
+one another: each read model rebuilds alone, in any order, and core checks references when it
+publishes the facts they come from. The log's own tables keep theirs. Tagged unions become a discriminator column plus the columns each case
 needs, with a check constraint that they agree. Invitations store a required role ID; role permissions are a text array.
 
 `drizzle/` contains one generated baseline for fresh databases. During local
@@ -134,8 +135,8 @@ rows mixing them. `direct_groups_by_members` allows one direct group per member 
 Private team creation records its group and explicit initial admissions in the shared
 workspace commit. Group admissions reference workspace memberships and have distinct IDs;
 a unique index prevents competing active admissions for the same group/member pair.
-Stores validate records and workspace references before writes. Replay accepts historical
-references to removed workspace members; current eligibility belongs to application operations.
+Stores validate their own records before writes and take references to other read models as
+recorded; whether those exist and are current belongs to application operations.
 The group suite covers permission grants, rollback, reopening, replay, and direct-store
 constraints. See [group creation](../../docs/group-workflows.md) for the implemented scope.
 Later member additions reuse the same store and admission facts. The membership suite
@@ -158,8 +159,8 @@ triage, stored in `participant_kind` with its own columns: members fill `member_
 `group_membership_id`, and their identity; contacts fill a `Contact` identity; triage fills none.
 `participation_participant` rejects mixed rows, and `active_thread_participation` keeps one active
 participation per member, contact, or triage in a thread. Message authors use `author_kind` with a
-member or contact column, and thread creators `created_by_kind` likewise; every author must
-participate in the thread, while which authors may publish is a core workflow rule. Departure ends a
+member or contact column, and thread creators `created_by_kind` likewise; core requires every
+author to participate in the thread and decides which authors may publish. Departure ends a
 participation and discards pending agent input. Activity facts preserve recipient selection for
 replay. Thread reads enforce audience and action permissions in core. Timeline paging uses the
 existing workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new
@@ -170,10 +171,10 @@ workspace/thread/sequence index; insertion still rejects duplicate positions and
 cover scoped publishing grants, new and returning participants, addressing, concurrent
 replies/departures, rollback, reopening, and replay. Self-follow records a quiet activity
 referencing its participation, with no message or notifications. Activity rows keep nullable message
-and participation references with their foreign keys, at most one activity per message, and at most
-one per participation and lifecycle kind. Core validates each activity kind; the table has no
+and participation references, at most one activity per message, and at most one per participation
+and lifecycle kind. Core validates each activity kind; the table has no
 per-kind constraint, so a new kind adds nullable reference columns rather than rewriting one. Ending
-activity validates the participation’s terminal state and departure time and preserves its reason.
+activity follows the participation's ending in the same commit and preserves its reason.
 Unfollow, group departure, and workspace removal record the same per-participation ending facts and
 activity; pending agent input is discarded in the same commit. Every kind uses the common
 activity-recorded fact and notification generator. The participation suite covers scoped grants,

@@ -5,7 +5,7 @@ import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
-import { groupFollows, groupMemberships } from "./schema.ts";
+import { groupFollows } from "./schema.ts";
 
 const validate = Schema.decodeEffect(Schema.toType(GroupFollow.Record));
 const decode = Schema.decodeUnknownEffect(
@@ -106,27 +106,6 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
         return yield* new GroupFollowStore.Conflict({
           operation: "insert",
           message: "Expected an active follow in this workspace",
-        });
-      // The admission must belong to the same group and member; whether it is current is the
-      // application's check, so replay can restore follows of later-ended admissions.
-      const related = yield* guard(
-        db
-          .select({ id: groupMemberships.id })
-          .from(groupMemberships)
-          .where(
-            and(
-              eq(groupMemberships.workspaceId, workspaceId),
-              eq(groupMemberships.id, record.groupMembershipId),
-              eq(groupMemberships.groupId, record.groupId),
-              eq(groupMemberships.memberId, record.memberId),
-            ),
-          ),
-        true,
-      ).pipe(Effect.mapError(storeError(GroupFollowStore, "insert")));
-      if (related.length === 0)
-        return yield* new GroupFollowStore.Conflict({
-          operation: "insert",
-          message: "Admission is missing or belongs to another group or member",
         });
       yield* guard(
         db.insert(groupFollows).values({

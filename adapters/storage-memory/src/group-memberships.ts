@@ -153,11 +153,6 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       const space = yield* write.pipe(
         Effect.mapError(storeFailure(GroupMembershipStore, "insert")),
       );
-      if (!space.records.groups.has(record.groupId) || !space.records.members.has(record.memberId))
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "insert",
-          message: "Group or workspace membership is missing",
-        });
       const admissions = yield* rows
         .all(space.records.groupMemberships)
         .pipe(Effect.mapError(storeFailure(GroupMembershipStore, "insert")));

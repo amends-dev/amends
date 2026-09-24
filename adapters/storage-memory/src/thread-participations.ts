@@ -1,7 +1,6 @@
 import { GroupMembership } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { Thread, ThreadParticipation, ThreadParticipationStore } from "@amends/core/thread";
-import { Member } from "@amends/core/workspace";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
@@ -9,9 +8,6 @@ import { compareBinary, Rows } from "./rows.ts";
 
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
 export const rows = Rows.make(Schema.fromJsonString(ThreadParticipation.Record));
-const threads = Rows.make(Schema.fromJsonString(Thread.Record));
-const admissions = Rows.make(Schema.fromJsonString(GroupMembership.Record));
-const members = Rows.make(Schema.fromJsonString(Member.Record));
 const byId = (left: ThreadParticipation.Record, right: ThreadParticipation.Record) =>
   compareBinary(left.id, right.id);
 
@@ -19,30 +15,6 @@ const byId = (left: ThreadParticipation.Record, right: ThreadParticipation.Recor
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.threadParticipations));
-
-  /** A member's admission must belong to the thread's group; others need only the thread. */
-  const related = Effect.fnUntraced(function* (
-    space: Binding.TransactionState["space"],
-    record: ThreadParticipation.Record,
-  ) {
-    const thread = yield* threads.get(space.records.threads, record.threadId);
-    if (Option.isNone(thread)) return false;
-    const participant = record.participant;
-    if (participant._tag !== "Member") return true;
-    const admission = yield* admissions.get(
-      space.records.groupMemberships,
-      participant.groupMembershipId,
-    );
-    const member = yield* members.get(space.records.members, participant.memberId);
-    return (
-      Option.isSome(admission) &&
-      Option.isSome(member) &&
-      admission.value.groupId === thread.value.groupId &&
-      admission.value.memberId === participant.memberId &&
-      member.value.identity._tag === participant.identity._tag &&
-      member.value.identity.id === participant.identity.id
-    );
-  });
 
   return ThreadParticipationStore.Service.of({
     workspaceId,
@@ -163,15 +135,6 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       const space = yield* write.pipe(
         Effect.mapError(storeFailure(ThreadParticipationStore, "insert")),
       );
-      if (
-        !(yield* related(space, record).pipe(
-          Effect.mapError(storeFailure(ThreadParticipationStore, "insert")),
-        ))
-      )
-        return yield* new ThreadParticipationStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
       const participations = yield* rows
         .all(space.records.threadParticipations)
         .pipe(Effect.mapError(storeFailure(ThreadParticipationStore, "insert")));

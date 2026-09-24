@@ -109,15 +109,6 @@ export const make = Effect.fn("Threads.make")(function* () {
           message: "Invalid initial record or workspace",
         });
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadStore, "insert")));
-      const creator = record.createdBy;
-      if (
-        !space.records.groups.has(record.groupId) ||
-        (creator._tag === "Member" && !space.records.members.has(creator.memberId))
-      )
-        return yield* new ThreadStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
       if (space.records.threads.has(record.id))
         return yield* new ThreadStore.Conflict({
           operation: "insert",

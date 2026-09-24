@@ -32,9 +32,9 @@ export interface Interface {
     groupId: GroupId.Id,
   ) => Effect.Effect<ReadonlyArray<GroupFollow.Record>, Failure>;
   /**
-   * Insert an active follow. Reject malformed or foreign records, reused IDs, an admission that is
-   * missing or belongs to another group or member, and a second active follow for one admission.
-   * Whether the admission is still active is checked by the application, not during replay.
+   * Insert an active follow. Reject malformed or foreign records, reused IDs, and a second active
+   * follow for one admission. The admission is recorded as given: the application checks that it
+   * is current and belongs to the group and member.
    */
   readonly insert: (
     record: GroupFollow.Record,

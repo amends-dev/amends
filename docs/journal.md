@@ -588,8 +588,10 @@ updates from event data and the projection's own state, without depending on ano
 projection's progress. A handler requires only its own store; a read model that follows
 another domain's facts handles them itself, as the thread and group projections keep their
 latest activity from recorded thread activity. Validation against other read models belongs
-where a fact is published. Storage still links some read models'
-[records](current-status.md#references-between-read-models).
+where a fact is published: stores check their own records and take references to other read
+models as recorded, and the storage adapters keep no foreign keys between them. A journal
+may therefore register the projections in any order and rebuild them to the same read models,
+which the conformance suites check by rebuilding in reverse.
 
 Checkpoint reads and writes must participate in the same host transaction as domain
 updates, including when no checkpoint exists yet, with competing writes serialized. This

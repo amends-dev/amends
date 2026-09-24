@@ -1012,7 +1012,7 @@ export const threadParticipation = (harness: Harness) => {
       ),
     );
 
-    it.effect("stores and readers reject mismatched follow references and stale departures", () =>
+    it.effect("stores and readers reject inconsistent follow records and stale departures", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
@@ -1037,18 +1037,18 @@ export const threadParticipation = (harness: Harness) => {
             const activity = Option.getOrThrow(yield* bound.activities.latest(first.thread.id));
             if (activity.kind !== "ParticipationFollowed")
               return yield* Effect.die("Missing follow activity");
-            for (const bad of [
-              { ...activity, id: ThreadActivity.Id.make("bad-follow"), sequence: 3 },
-              {
-                ...activity,
-                id: ThreadActivity.Id.make("bad-follow"),
-                participationId: ThreadParticipation.Id.make("missing"),
-                sequence: 3,
-              },
-            ])
-              expect(
-                yield* Effect.flip(bound.store.transaction(bound.activities.insert(bad))),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
+            // A participation is followed once.
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  bound.activities.insert({
+                    ...activity,
+                    id: ThreadActivity.Id.make("bad-follow"),
+                    sequence: 3,
+                  }),
+                ),
+              ),
+            ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
             const departure = {
               workspaceId,
               threadId: first.thread.id,
@@ -1510,30 +1510,14 @@ export const threadParticipation = (harness: Harness) => {
                     (note) => [note.participationId, note.state._tag],
                   ),
                 ).toEqual([[recipient._tag === "Triage" ? triage.id : contact.id, "Pending"]]);
-              // One active participation per contact and per thread's triage; references are enforced.
+              // One active participation per contact and per thread's triage.
               for (const invalid of [
                 { ...contact, id: ThreadParticipation.Id.make("contact-again") },
                 { ...triage, id: ThreadParticipation.Id.make("triage-again") },
-                {
-                  ...contact,
-                  id: ThreadParticipation.Id.make("elsewhere"),
-                  threadId: Thread.Id.make("missing"),
-                },
               ])
                 expect(
                   yield* Effect.flip(bound.store.transaction(bound.participations.insert(invalid))),
                 ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
-              expect(
-                yield* Effect.flip(
-                  bound.store.transaction(
-                    bound.messages.insert({
-                      ...message,
-                      id: ThreadMessage.Id.make("stranger-message"),
-                      author: { _tag: "Contact", contactId: Identity.ContactId.make("stranger") },
-                    }),
-                  ),
-                ),
-              ).toMatchObject({ _tag: "ThreadMessageStore.Conflict" });
             }),
           ),
         ),

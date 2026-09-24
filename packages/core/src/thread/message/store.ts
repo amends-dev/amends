@@ -25,7 +25,10 @@ export interface Interface {
   readonly getMany: (
     ids: ReadonlyArray<ThreadMessage.Id>,
   ) => Effect.Effect<ReadonlyArray<ThreadMessage.Record>, Failure>;
-  /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
+  /**
+   * Reject malformed or foreign records and reused IDs. The author and mentions are recorded as
+   * given: publication checks that they take part. Preserve historical values on replay.
+   */
   readonly insert: (
     record: ThreadMessage.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;

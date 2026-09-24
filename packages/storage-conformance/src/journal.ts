@@ -1,4 +1,11 @@
+import * as Core from "@amends/core";
 import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
+import {
+  GroupApplication,
+  GroupFollowApplication,
+  GroupMembershipApplication,
+} from "@amends/core/group";
+import { Actor, Identity } from "@amends/core/identity";
 import {
   type Checkpoint,
   Fact,
@@ -9,16 +16,21 @@ import {
   Store,
   Subject,
 } from "@amends/core/journal";
-import { MemberPermissions } from "@amends/core/workspace";
+import { ThreadApplication, ThreadMessageApplication } from "@amends/core/thread";
+import { InvitationApplication, Member, MemberPermissions } from "@amends/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Deferred, Effect, Fiber, Option, Schema, Stream } from "effect";
+import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import type { Harness } from "./harness.ts";
 import {
   alice,
+  bob,
   type Bound,
+  charlie,
   forWorkspace,
+  future,
   journalLog,
   otherWorkspaceId,
+  request,
   Support,
   testProvenance,
   workspaceId,
@@ -29,7 +41,7 @@ const byName = (live: ReadonlyArray<Checkpoint.LiveVersion>) =>
 
 /** Logs across hosts and workspaces, live projections, and rebuilding them from the journal. */
 export const journal = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
+  const { core, initialized, seed } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: journal`, () => {
     it.live(
       "separate hosts observe live appends; identical log IDs stay isolated by workspace",
@@ -165,6 +177,167 @@ export const journal = (harness: Harness) => {
               assignments,
             );
             expect(yield* bound.store.read(journalLog, { limit: 10 })).toHaveLength(2);
+          }),
+        ),
+    );
+
+    it.effect(
+      "projections rebuild in any order to the same read models, each from facts and its own records",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const workspace = yield* initialized(bound);
+            const owner = Actor.Value.make({
+              workspaceId,
+              memberId: workspace.ownerMemberId,
+              identity: alice,
+            });
+            const human = Actor.Value.make({
+              workspaceId,
+              memberId: Member.Id.make("human"),
+              identity: bob,
+            });
+            const agent = Actor.Value.make({
+              workspaceId,
+              memberId: Member.Id.make("agent"),
+              identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
+            });
+            yield* seed(bound, [human, agent], [human, agent]);
+            const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+              program.pipe(
+                Effect.provideService(Actor.Service, actor),
+                Effect.provide(core(bound)),
+              );
+            // History that every projection records something from.
+            const group = yield* as(
+              owner,
+              Effect.flatMap(GroupApplication.Service, (groups) =>
+                groups.createPrivateTeam({
+                  name: "Team",
+                  memberIds: [owner.memberId, human.memberId, agent.memberId],
+                }),
+              ),
+            );
+            yield* as(
+              owner,
+              Effect.flatMap(GroupFollowApplication.Service, (follows) =>
+                follows.follow({ groupId: group.id, memberId: owner.memberId }),
+              ),
+            );
+            const started = yield* as(
+              owner,
+              Effect.flatMap(ThreadApplication.Service, (threads) =>
+                threads.startInGroup({
+                  groupId: group.id,
+                  text: "Hello",
+                  mentions: [owner.memberId, human.memberId, agent.memberId],
+                }),
+              ),
+            );
+            const reply = (mentions: ReadonlyArray<Member.Id>) =>
+              as(
+                owner,
+                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
+                  messages.publish({ threadId: started.thread.id, text: "Reply", mentions }),
+                ),
+              );
+            yield* reply([agent.memberId]);
+            const admission = Option.getOrThrow(
+              yield* bound.groupMemberships.findActive(group.id, agent.memberId),
+            );
+            yield* as(
+              agent,
+              Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
+                memberships.leave({ groupId: group.id, membershipId: admission.id }),
+              ),
+            );
+            const expiresAt = yield* future;
+            yield* as(
+              owner,
+              Effect.flatMap(InvitationApplication.Service, (invitations) =>
+                invitations.issue(request(expiresAt, charlie.id)),
+              ),
+            );
+            const byId = <A extends { readonly id: string }>(values: ReadonlyArray<A>) =>
+              values.toSorted((left, right) => (left.id < right.id ? -1 : 1));
+            const actors = [owner, human, agent];
+            const snapshot = Effect.gen(function* () {
+              const threads = byId(yield* bound.threads.listByGroup(group.id));
+              const threadIds = threads.map((thread) => thread.id);
+              const activities = yield* Effect.forEach(threadIds, (id) =>
+                bound.activities.listByThread(id),
+              );
+              return {
+                workspace: yield* bound.workspace.get,
+                members: byId(yield* bound.members.list),
+                roles: yield* Effect.forEach(
+                  [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId],
+                  (id) => bound.roles.get(id),
+                ),
+                assignments: yield* Effect.forEach(actors, (actor) =>
+                  Effect.map(bound.assignments.listActiveByMember(actor.memberId), byId),
+                ),
+                invitations: (yield* bound.invitations.list).toSorted((left, right) =>
+                  left.details.id < right.details.id ? -1 : 1,
+                ),
+                groups: yield* bound.groups.getMany([group.id]),
+                groupLatest: yield* bound.groups.getLatest([group.id]),
+                admissions: yield* bound.groupMemberships.listByGroup(group.id),
+                follows: yield* bound.groupFollows.listActiveByGroup(group.id),
+                threads,
+                threadLatest: yield* bound.threads.getLatest(threadIds),
+                participations: yield* Effect.forEach(threadIds, (id) =>
+                  bound.participations.listByThread(id),
+                ),
+                messages: byId(
+                  yield* bound.messages.getMany(
+                    activities
+                      .flat()
+                      .flatMap((activity) =>
+                        activity.kind === "MessagePublished" ? [activity.messageId] : [],
+                      ),
+                  ),
+                ),
+                activities,
+                notifications: yield* Effect.forEach(actors, (actor) =>
+                  bound.notifications.listByRecipient(actor.identity, { limit: 100 }),
+                ),
+              };
+            });
+            const live = yield* snapshot;
+            expect(live.follows).toHaveLength(1);
+            expect(live.invitations).toHaveLength(1);
+            expect(live.groupLatest).toHaveLength(1);
+            expect(live.threadLatest).toHaveLength(1);
+            expect(live.messages).toHaveLength(2);
+            expect(live.activities.flat().map((activity) => activity.kind)).toContain(
+              "ParticipationEnded",
+            );
+            // Leaving settled the agent's pending notifications.
+            expect(live.notifications[2]?.map((notification) => notification.state._tag)).toEqual([
+              "Discarded",
+              "Discarded",
+            ]);
+            const rebuild = (projections: ReadonlyArray<(typeof Core.projections)[number]>) =>
+              Effect.gen(function* () {
+                yield* storage.discardProjections;
+                yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                  Effect.provide(
+                    Journal.layer({ logId: journalLog, projections }).pipe(
+                      Layer.provideMerge(Log.layer),
+                      Layer.provide(Layer.succeedContext(bound.context)),
+                    ),
+                  ),
+                );
+                return { state: yield* snapshot, footprint: yield* storage.footprint };
+              });
+            const registered = yield* rebuild(Core.projections);
+            expect(registered.state).toEqual(live);
+            // Reversed, each projection rebuilds before those whose records it used to require.
+            expect(yield* rebuild(Core.projections.toReversed())).toEqual(registered);
+            // The registered journal accepts the rebuilt projections as live.
+            yield* reply([]);
           }),
         ),
     );

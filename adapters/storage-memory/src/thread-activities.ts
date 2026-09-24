@@ -1,41 +1,14 @@
 import { Store } from "@amends/core/journal";
-import { Thread, ThreadActivity, ThreadActivityStore, ThreadMessage } from "@amends/core/thread";
-import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Thread, ThreadActivity, ThreadActivityStore } from "@amends/core/thread";
+import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import type { MemoryDatabase } from "./database.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
-import { ThreadParticipations } from "./thread-participations.ts";
 
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
 const rows = Rows.make(Schema.fromJsonString(ThreadActivity.Record));
-const messages = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
 const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =>
   left.sequence - right.sequence;
-
-/** Does the activity's subject exist in its thread, in the state the activity describes? */
-const related = Effect.fnUntraced(function* (
-  space: MemoryDatabase.Space,
-  record: ThreadActivity.Record,
-) {
-  if (record.kind === "MessagePublished") {
-    const message = yield* messages.get(space.records.threadMessages, record.messageId);
-    return Option.isSome(message) && message.value.threadId === record.threadId;
-  }
-  const participation = yield* ThreadParticipations.rows.get(
-    space.records.threadParticipations,
-    record.participationId,
-  );
-  if (Option.isNone(participation) || participation.value.threadId !== record.threadId)
-    return false;
-  const value = participation.value;
-  return record.kind === "ParticipationFollowed"
-    ? value.joinedAtSequence === record.sequence
-    : value.joinedAtSequence < record.sequence &&
-        value.status === "ended" &&
-        value.endedAt !== null &&
-        DateTime.toEpochMillis(value.endedAt) === DateTime.toEpochMillis(record.occurredAt);
-});
 
 /** One activity per message, and one of each kind per participation. */
 const subjectOf = (record: ThreadActivity.Record) =>
@@ -98,15 +71,6 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
           message: "Invalid initial record or workspace",
         });
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadActivityStore, "insert")));
-      if (
-        !(yield* related(space, record).pipe(
-          Effect.mapError(storeFailure(ThreadActivityStore, "insert")),
-        ))
-      )
-        return yield* new ThreadActivityStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
       const activities = yield* rows
         .all(space.records.threadActivities)
         .pipe(Effect.mapError(storeFailure(ThreadActivityStore, "insert")));

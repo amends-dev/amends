@@ -3,7 +3,7 @@ import { GroupMembership } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq, sql } from "drizzle-orm";
-import { threadParticipations, threads, groupMemberships, members } from "./schema.ts";
+import { threadParticipations } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -233,48 +233,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
-      // A member's admission must belong to the thread's group; contacts and triage need only the thread.
       const participant = record.participant;
-      const related = yield* guard(
-        participant._tag !== "Member"
-          ? db
-              .select({ id: threads.id })
-              .from(threads)
-              .where(and(eq(threads.workspaceId, workspaceId), eq(threads.id, record.threadId)))
-          : db
-              .select({ id: threads.id })
-              .from(threads)
-              .innerJoin(
-                groupMemberships,
-                and(
-                  eq(groupMemberships.workspaceId, threads.workspaceId),
-                  eq(groupMemberships.groupId, threads.groupId),
-                ),
-              )
-              .innerJoin(
-                members,
-                and(
-                  eq(members.workspaceId, groupMemberships.workspaceId),
-                  eq(members.id, groupMemberships.memberId),
-                ),
-              )
-              .where(
-                and(
-                  eq(threads.workspaceId, workspaceId),
-                  eq(threads.id, record.threadId),
-                  eq(groupMemberships.id, participant.groupMembershipId),
-                  eq(groupMemberships.memberId, participant.memberId),
-                  eq(members.identityKind, participant.identity._tag),
-                  eq(members.identityId, participant.identity.id),
-                ),
-              ),
-        true,
-      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));
-      if (related.length === 0)
-        return yield* new ThreadParticipationStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
       const { participant: _, ...fields } = record;
       yield* guard(
         db.insert(threadParticipations).values({

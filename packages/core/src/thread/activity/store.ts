@@ -58,7 +58,11 @@ export interface Interface {
     id: ThreadId.Id,
     options: ReadOptions,
   ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
-  /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
+  /**
+   * Reject malformed or foreign records, reused IDs, a position other than the thread's next, and a
+   * second activity for one message or for one participation and kind. The message or participation
+   * is recorded as given, checked when the activity is recorded. Preserve historical values on replay.
+   */
   readonly insert: (
     record: ThreadActivity.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;

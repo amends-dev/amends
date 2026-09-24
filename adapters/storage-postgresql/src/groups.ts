@@ -5,7 +5,7 @@ import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
-import { groups, members } from "./schema.ts";
+import { groups } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
 const decodeRows = Schema.decodeUnknownEffect(
@@ -170,18 +170,6 @@ export const make = Effect.fn("Groups.make")(function* () {
         return yield* new GroupStore.Conflict({
           operation: "insert",
           message: "Expected a group in this workspace",
-        });
-      const creator = yield* guard(
-        db
-          .select({ id: members.id })
-          .from(members)
-          .where(and(eq(members.workspaceId, workspaceId), eq(members.id, record.createdBy))),
-        true,
-      ).pipe(Effect.mapError(storeError(GroupStore, "insert")));
-      if (creator.length === 0)
-        return yield* new GroupStore.Conflict({
-          operation: "insert",
-          message: "Creator membership is missing",
         });
       yield* guard(db.insert(groups).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(GroupStore, "insert")),

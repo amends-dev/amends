@@ -26,7 +26,10 @@ export interface Interface {
     id: GroupId.Id,
     options: Thread.ListOptions,
   ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
-  /** Validate schema and workspace references before insertion. Preserve historical values on replay. */
+  /**
+   * Reject malformed or foreign records and reused IDs. The group and creator are recorded as given,
+   * checked when the thread starts. Preserve historical values on replay.
+   */
   readonly insert: (
     record: Thread.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;

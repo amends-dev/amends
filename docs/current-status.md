@@ -185,15 +185,6 @@ fail their writes until they are replaced, and a host that boots with the older 
 newer projections, which newer hosts must rebuild. Rebuilding a retired version over its old
 rows is not supported.
 
-## References between read models
-
-Projection handlers read and write only their own stores, but storage still links read models.
-PostgreSQL keeps foreign keys between projection tables, such as a thread to its group, a
-participation to its thread and admission, and an activity to its message and participation. The
-memory adapter checks the same references, and the conformance suites require it. A full rebuild
-replays projections in registration order, which puts referenced records first, but one
-projection's records cannot be reset and rebuilt alone while another's reference them.
-
 ## Commit outcomes and PostgreSQL contention
 
 The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/binding.ts) returns

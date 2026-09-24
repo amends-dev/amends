@@ -2,8 +2,8 @@ import { ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
 
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { and, countDistinct, eq } from "drizzle-orm";
-import { threadMessages, threadParticipations } from "./schema.ts";
+import { and, eq } from "drizzle-orm";
+import { threadMessages } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -74,59 +74,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           operation: "insert",
           message: "Invalid initial record or workspace",
         });
-      // An author must participate in the thread; which authors may publish is a workflow rule.
       const author = record.author;
-      const related = yield* guard(
-        author._tag === "Contact"
-          ? db
-              .select({ id: threadParticipations.id })
-              .from(threadParticipations)
-              .where(
-                and(
-                  eq(threadParticipations.workspaceId, workspaceId),
-                  eq(threadParticipations.threadId, record.threadId),
-                  eq(threadParticipations.participantKind, "Contact"),
-                  eq(threadParticipations.identityId, author.contactId),
-                ),
-              )
-          : db
-              .select({ id: threadParticipations.id })
-              .from(threadParticipations)
-              .where(
-                and(
-                  eq(threadParticipations.workspaceId, workspaceId),
-                  eq(threadParticipations.threadId, record.threadId),
-                  eq(threadParticipations.memberId, author.memberId),
-                ),
-              ),
-        true,
-      ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
-      if (related.length === 0)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "insert",
-          message: "Missing or inconsistent references",
-        });
-      // Mentions are distinct, so each must match a member with a participation in this thread.
-      if (record.mentions.length > 0) {
-        const [mentioned] = yield* guard(
-          db
-            .select({ count: countDistinct(threadParticipations.memberId) })
-            .from(threadParticipations)
-            .where(
-              and(
-                eq(threadParticipations.workspaceId, workspaceId),
-                eq(threadParticipations.threadId, record.threadId),
-                inIds(threadParticipations.memberId, record.mentions),
-              ),
-            ),
-          true,
-        ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
-        if (mentioned?.count !== record.mentions.length)
-          return yield* new ThreadMessageStore.Conflict({
-            operation: "insert",
-            message: "Mention has no participation in this thread",
-          });
-      }
       const { author: _, ...fields } = record;
       yield* guard(
         db.insert(threadMessages).values({
