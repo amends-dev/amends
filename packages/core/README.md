@@ -218,8 +218,9 @@ pins them. `BuiltinRoleUpgrade.upgrade` brings a workspace at an earlier revisio
 in one commit attributed to the `builtin-roles` system: it creates a missing built-in role and
 records the names and permissions that differ, then the revision. It leaves a workspace at the
 same or a later revision alone, so an older host never reverts it. The gateway runs it when it
-boots a workspace. A recorded permission the catalog no longer declares grants nothing, since no
-requirement can name it, and its holder's other grants stand. `AssignmentApplication` provides listing, assignment,
+boots a workspace. A recorded permission the catalog does not declare, retired or added by a newer
+host, grants nothing, since no requirement can name it, and its holder's other grants stand;
+`Delegation` still loads the roles that record it. `AssignmentApplication` provides listing, assignment,
 revocation, and atomic workspace-role replacement. `Delegation` supplies the shared
 rules used by assignments, invitations, and member removal. Role definition editing
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)

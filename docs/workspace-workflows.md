@@ -157,8 +157,9 @@ workspace recorded at an earlier one, it records the new bundles as role facts a
 `builtin-roles` system, which open change feeds deliver like any role change. A host never reverts
 a later revision, so hosts on different versions during a deployment agree. If the upgrade cannot
 run, such as while another host writes, the workspace serves its recorded roles and a later load
-finishes it. A permission the code no longer declares grants nothing, leaving its holders' other
-grants intact.
+finishes it. A permission the code does not declare, retired or added by a newer host's bundles,
+grants nothing, leaving its holders' other grants intact, and roles that record it can still be
+listed, assigned, and offered in invitations.
 
 | Permission                     | Lowest role   | Target    | Authorizes                                                                        |
 | ------------------------------ | ------------- | --------- | --------------------------------------------------------------------------------- |

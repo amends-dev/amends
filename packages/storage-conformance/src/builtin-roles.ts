@@ -6,15 +6,22 @@ import {
   AssignmentFacts,
   BuiltinRoles,
   BuiltinRoleUpgrade,
-  type Permission,
+  Permission,
   RoleFacts,
   Scope,
 } from "@amends/core/authorization";
+import { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
-import { Member, MemberFacts, MemberPermissions, WorkspaceFacts } from "@amends/core/workspace";
+import {
+  InvitationApplication,
+  Member,
+  MemberFacts,
+  MemberPermissions,
+  WorkspaceFacts,
+} from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Exit, Option } from "effect";
+import { DateTime, Effect, Exit, Option } from "effect";
 import type { Harness } from "./harness.ts";
 import {
   alice,
@@ -38,6 +45,16 @@ const next: BuiltinRoleUpgrade.Target = {
         : permission,
     ];
   }),
+};
+/** A later revision that gives every role a permission this host does not declare yet. */
+const later: BuiltinRoleUpgrade.Target = {
+  revision: BuiltinRoles.revision + 1,
+  definitions: [
+    ...Core.permissions,
+    Permission.makeGroup("later", { targetKind: "Workspace" }).make("feature", {
+      builtinTier: "viewer",
+    }),
+  ],
 };
 /** Earlier declarations, before agent use existed. */
 const older = Core.permissions.filter(({ name }) => name !== AgentPermissions.Use.name);
@@ -180,6 +197,39 @@ export const builtinRoles = (harness: Harness) => {
             expect(yield* bound.roles.builtinRevision).toEqual(Option.some(next.revision));
           }),
         ),
+    );
+
+    it.effect("roles holding a permission only a newer host declares still work on this host", () =>
+      harness.withStorage((storage) =>
+        Effect.gen(function* () {
+          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          yield* initialized(bound);
+          // A newer host upgrades the bundles; this host, still on the current revision, loads them.
+          expect(yield* upgrade(bound, later)).toBe(true);
+          const [choices, invitation] = yield* Effect.flatMap(Gateway.Service, (g) =>
+            g.asMember(
+              workspaceId,
+              alice,
+              Effect.gen(function* () {
+                const choices = yield* (yield* AssignmentApplication.Service).roles;
+                const invitation = yield* (yield* InvitationApplication.Service).issue({
+                  recipientId: Identity.HumanId.make("recipient"),
+                  roleId: BuiltinRoles.ViewerId,
+                  expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
+                });
+                return [choices, invitation] as const;
+              }),
+            ),
+          ).pipe(Effect.provide(gateway(yield* storage.connect())));
+          expect(choices.map(({ role }) => role)).toEqual(
+            BuiltinRoles.make(workspaceId, later.definitions),
+          );
+          expect(invitation).toMatchObject({
+            details: { roleId: BuiltinRoles.ViewerId },
+            state: { _tag: "Pending" },
+          });
+        }),
+      ),
     );
 
     it.effect("hosts upgrading one workspace together record the upgrade once", () =>

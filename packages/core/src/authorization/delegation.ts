@@ -95,12 +95,18 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
       return yield* new InvalidResponse({
         message: "Role store returned a different role or workspace",
       });
+    // A permission this host does not declare, retired or added by a newer host's bundles, grants
+    // nothing here, as in GrantResolver; the role still loads, with every permission it records.
     for (const name of role.permissions) {
-      const definition = yield* catalog.get(name);
-      yield* Schema.decodeEffect(Grant.makeSchema(definition))({
-        permission: name,
-        scope: { _tag: "Workspace", workspaceId },
-      });
+      const definition = yield* catalog.get(name).pipe(
+        Effect.asSome,
+        Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
+      );
+      if (Option.isSome(definition))
+        yield* Schema.decodeEffect(Grant.makeSchema(definition.value))({
+          permission: name,
+          scope: { _tag: "Workspace", workspaceId },
+        });
     }
     return role;
   });
