@@ -1,15 +1,18 @@
-import { NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
+  ThreadActivity,
+  ThreadActivityFacts,
+  ThreadMessage,
   ThreadParticipation,
   ThreadParticipationFacts,
-  ThreadParticipationStore,
 } from "@amends/core/thread";
+import { Identity } from "@amends/core/identity";
 import { Subject } from "@amends/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
-import { Effect, Option, Schema } from "effect";
+import { DateTime, Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
@@ -34,6 +37,20 @@ const key = {
   name: NotificationProjection.definition.name,
   version: NotificationProjection.definition.version,
 };
+/** A notification store that refuses every call; tests replace the calls they expect. */
+const refusing: NotificationStore.Interface = {
+  workspaceId,
+  get: () => Effect.die("Unexpected notification read"),
+  listByRecipient: () => Effect.die("Unexpected notification read"),
+  listPendingByRecipient: () => Effect.die("Unexpected notification read"),
+  listPendingByThread: () => Effect.die("Unexpected notification read"),
+  countPendingByGroup: () => Effect.die("Unexpected notification read"),
+  insert: () => Effect.die("Unexpected notification write"),
+  insertMany: () => Effect.die("Unexpected notification write"),
+  discardPendingForParticipation: () => Effect.die("Unexpected notification write"),
+  markSeen: () => Effect.die("Unexpected notification write"),
+};
+/** Only the notification store is provided, so the projection can read no other read model. */
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
@@ -44,33 +61,11 @@ const run = <A, E>(
     | Transaction.Service
     | Checkpoint.Service
     | NotificationStore.Service
-    | ThreadParticipationStore.Service
   >,
+  notifications = refusing,
 ) =>
   program.pipe(
-    Effect.provideService(NotificationStore.Service, {
-      workspaceId,
-      get: () => Effect.die("Unexpected notification read"),
-      listByRecipient: () => Effect.die("Unexpected notification read"),
-      listPendingByRecipient: () => Effect.die("Unexpected notification read"),
-      listPendingByThread: () => Effect.die("Unexpected notification read"),
-      countPendingByGroup: () => Effect.die("Unexpected notification read"),
-      insert: () => Effect.die("Unexpected notification write"),
-      insertMany: () => Effect.die("Unexpected notification write"),
-      discardPendingForParticipation: () => Effect.die("Unexpected notification write"),
-      markSeen: () => Effect.die("Unexpected notification write"),
-    }),
-    Effect.provideService(ThreadParticipationStore.Service, {
-      workspaceId,
-      get: () => Effect.die("Unexpected participation read"),
-      getMany: () => Effect.die("Unexpected participation read"),
-      listByThread: () => Effect.die("Unexpected participation read"),
-      pageActiveByThread: () => Effect.die("Unexpected participation read"),
-      findActive: () => Effect.die("Unexpected participation read"),
-      listByAdmission: () => Effect.die("Unexpected participation read"),
-      insert: () => Effect.die("Unexpected participation write"),
-      end: () => Effect.die("Unexpected participation write"),
-    }),
+    Effect.provideService(NotificationStore.Service, notifications),
     Effect.provideService(Publication.Service, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
@@ -128,7 +123,7 @@ it.effect("participation domain facts publish without touching notifications", (
           logId,
           projections: [NotificationProjection.definition],
         });
-        // The fixture defects on every participation or notification read/write.
+        // The fixture defects on every notification read or write.
         yield* journal.publish(ThreadParticipationFacts.Ended, {
           workspaceId,
           groupId: Group.Id.make("group"),
@@ -139,6 +134,81 @@ it.effect("participation domain facts publish without touching notifications", (
         expect(yield* fixture.checkpoints.get(key)).toEqual(Option.none());
         yield* journal.replay;
       }),
+    );
+  }),
+);
+
+it.effect("notifications rebuild from recorded activity alone", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    const inserted: Array<Notification.Record> = [];
+    const discarded: Array<ThreadParticipation.Id> = [];
+    const notifications: NotificationStore.Interface = {
+      ...refusing,
+      insertMany: (records) => Effect.sync(() => void inserted.push(...records)),
+      discardPendingForParticipation: (id) => Effect.sync(() => void discarded.push(id)),
+    };
+    const groupId = Group.Id.make("group");
+    const threadId = Thread.Id.make("thread");
+    const occurredAt = DateTime.makeUnsafe("2026-09-20T12:00:00.000Z");
+    const agent = ThreadParticipation.Id.make("agent-participation");
+    const recipients = [
+      {
+        participationId: ThreadParticipation.Id.make("human-participation"),
+        recipient: { _tag: "Human" as const, id: Identity.HumanId.make("human") },
+      },
+      {
+        participationId: agent,
+        recipient: { _tag: "Agent" as const, id: Identity.AgentId.make("agent") },
+      },
+    ];
+    const published: ThreadActivity.Record = {
+      id: ThreadActivity.Id.make("published"),
+      workspaceId,
+      threadId,
+      sequence: 1,
+      kind: "MessagePublished",
+      messageId: ThreadMessage.Id.make("message"),
+      occurredAt,
+    };
+    yield* run(
+      fixture,
+      Effect.gen(function* () {
+        // History recorded before the projection existed, as a rebuild finds it.
+        const source = yield* Journal.make({ logId, projections: [] });
+        const message = yield* source.publish(ThreadActivityFacts.Recorded, {
+          groupId,
+          activity: published,
+          recipients,
+        });
+        yield* source.publish(ThreadActivityFacts.Recorded, {
+          groupId,
+          activity: {
+            id: ThreadActivity.Id.make("ended"),
+            workspaceId,
+            threadId,
+            sequence: 2,
+            kind: "ParticipationEnded",
+            participationId: agent,
+            reason: "unfollowed",
+            occurredAt,
+          },
+          recipients: [],
+        });
+        const journal = yield* Journal.make({
+          logId,
+          projections: [NotificationProjection.definition],
+        });
+        yield* journal.replay;
+        expect(inserted).toEqual(
+          recipients.map((recipient) =>
+            Notification.generated(message, { groupId, ...published }, recipient),
+          ),
+        );
+        // The store decides from its own records which of the participation's notifications settle.
+        expect(discarded).toEqual([agent]);
+      }),
+      notifications,
     );
   }),
 );

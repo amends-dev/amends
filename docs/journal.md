@@ -585,7 +585,11 @@ visible progress always ends at a complete source batch. Missing entries or part
 committed checkpoints fail with `Projection.InvalidCheckpoint`. Unrelated fact names are
 skipped and still advance progress. Different projections rebuild independently: derive
 updates from event data and the projection's own state, without depending on another
-projection's progress.
+projection's progress. A handler requires only its own store; a read model that follows
+another domain's facts handles them itself, as the thread and group projections keep their
+latest activity from recorded thread activity. Validation against other read models belongs
+where a fact is published. Storage still links some read models'
+[records](current-status.md#references-between-read-models).
 
 Checkpoint reads and writes must participate in the same host transaction as domain
 updates, including when no checkpoint exists yet, with competing writes serialized. This

@@ -41,7 +41,7 @@ participation ends, or `Acknowledged` once a human saw it. `NotificationApplicat
 acting human or agent's own inbox (`get`, `list`, `listPending`), `resolveSource`, and human
 `acknowledge`; contact and triage inboxes are read only through the store. `NotificationProjection`
 generates notifications from each recorded thread activity's recipients, and settles pending agent
-input when a participation ends. A human's `Seen` is private state the store keeps outside the
+input when a participation ends, from the activity and its own notifications alone. A human's `Seen` is private state the store keeps outside the
 journal. Internal `NotificationSource` resolves a notification's recorded activity for
 `resolveSource`. Notifications never create turns, accept their input, or execute work. See
 [resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source)
@@ -124,8 +124,8 @@ member's thread participations; workspace-member removal uses it for every admis
 
 `@amends/core/attention` holds private read state: `ReadStateApplication.markThreadRead` and
 `markGroupRead`, over the required `ReadStateStore` binding, which is kept outside the journal.
-Thread activity maintains each thread's and group's latest message through `ThreadStore.recordLatest`
-and `GroupStore.recordLatest`, and notifications from thread activity carry their thread and
+The thread and group projections keep each thread's and group's latest message from recorded
+thread activity, through `ThreadStore.recordLatest` and `GroupStore.recordLatest`, and notifications from thread activity carry their thread and
 sequence, so reading a thread settles exactly its notifications. See
 [marking conversations read](../../docs/thread-workflows.md#marking-conversations-read).
 
@@ -168,8 +168,8 @@ no action checks of their own; they are excluded from `Core.Operations`:
 | `ThreadActivityReading`        | Resolves timeline subjects under access, for timeline pages and notification sources                  |
 
 Every activity kind uses `ThreadActivityFacts.Recorded`, carrying a typed activity and its selected
-recipients; the notification projection consumes that one envelope. Domain facts own state, and
-activity owns timeline position.
+recipients; the activity, thread, group, and notification projections each consume that one
+envelope into their own store. Domain facts own state, and activity owns timeline position.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without
