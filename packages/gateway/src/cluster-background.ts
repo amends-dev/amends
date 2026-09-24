@@ -10,6 +10,7 @@ import { Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import {
   Cause,
+  Cron,
   Crypto,
   DateTime,
   Duration,
@@ -20,7 +21,7 @@ import {
   PrimaryKey,
   Schema,
 } from "effect";
-import { ClusterSchema, DeliverAt, Entity } from "effect/unstable/cluster";
+import { ClusterCron, ClusterSchema, DeliverAt, Entity } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
 import { Gateway } from "./gateway.ts";
 import { WorkspaceWakes } from "./wakes.ts";
@@ -163,5 +164,43 @@ export const layerWorker = WorkspaceProcess.toLayer(
 
 /** Stored wakes and the worker that runs them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerWakes);
+
+/** The job that prunes handled wakes. */
+export const pruning = "amends/prune-wakes";
+
+/**
+ * Remove the handled messages of these entity types stored before `before`, with anything
+ * Cluster kept for them, and return how many went; the host's storage knows how.
+ */
+export type Prune<E, R> = (
+  entityTypes: ReadonlyArray<string>,
+  before: DateTime.Utc,
+) => Effect.Effect<number, E, R>;
+
+/**
+ * Prune handled wakes, and the job's own past runs, once they are older than `keep` (seven days
+ * by default), every hour on one runner of the cluster. Cluster removes neither. A wake's key
+ * then no longer stops a repeat, which no longer arises: commits are not retried days later.
+ *
+ * @category layers
+ */
+export const layerPruning = <E, R>(options: {
+  readonly prune: Prune<E, R>;
+  readonly keep?: Duration.Input | undefined;
+}) => {
+  const keep = Duration.fromInputUnsafe(options.keep ?? "7 days");
+  return ClusterCron.make({
+    name: pruning,
+    cron: Cron.parseUnsafe("0 * * * *"),
+    execute: Effect.gen(function* () {
+      const before = DateTime.subtractDuration(yield* DateTime.now, keep);
+      const removed = yield* options.prune(
+        [WorkspaceProcess.type, `ClusterCron/${pruning}`],
+        before,
+      );
+      if (removed > 0) yield* Effect.logInfo("Pruned handled background wakes", { removed });
+    }),
+  });
+};
 
 export * as ClusterBackground from "./cluster-background.ts";

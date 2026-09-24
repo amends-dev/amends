@@ -3,6 +3,7 @@ import { PostgresDirectory } from "./directory.ts";
 import { PostgresSignals } from "./signals.ts";
 import { PostgresStorage } from "./storage.ts";
 
+export { PostgresClusterStorage } from "./cluster-storage.ts";
 export { PostgresDatabase } from "./database.ts";
 export { PostgresDirectory } from "./directory.ts";
 export { PostgresSignals } from "./signals.ts";

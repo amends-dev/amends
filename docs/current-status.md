@@ -18,8 +18,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   delivery run, and contacts and triage have no inbox outside the store. Turn and task activity
   kinds remain design intent.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them on an Effect Cluster runner, but no process is registered yet. Cluster's
-  tables keep every wake and reply: nothing removes them. The host runs one runner per database;
+  local host runs them on an Effect Cluster runner, but no process is registered yet. The host
+  runs one runner per database;
   several host processes over one database need Cluster's socket transport, which it does not
   configure. Two processes at one runner address must never overlap.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,

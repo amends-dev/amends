@@ -1,5 +1,9 @@
 import { ClusterBackground, Gateway, type WorkspaceDirectory } from "@amends/gateway";
-import { PostgresDatabase, layer as postgres } from "@amends/storage-postgresql";
+import {
+  PostgresClusterStorage,
+  PostgresDatabase,
+  layer as postgres,
+} from "@amends/storage-postgresql";
 import { BunCrypto } from "@effect/platform-bun";
 import { Duration, Layer, Option, type Redacted } from "effect";
 import { RunnerAddress, SingleRunner } from "effect/unstable/cluster";
@@ -43,13 +47,17 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 
 /**
  * The gateway and the workspace directory over one PostgreSQL database, through the
- * storage adapter, with the workspaces' background work running in this process. The HTTP
- * server resolves bearer tokens before entering the gateway.
+ * storage adapter, with the workspaces' background work running in this process and handled
+ * wakes pruned after seven days. The HTTP server resolves bearer tokens before entering the
+ * gateway.
  *
  * @category layers
  */
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer =>
-  ClusterBackground.layerWorker.pipe(
+  Layer.merge(
+    ClusterBackground.layerWorker,
+    ClusterBackground.layerPruning({ prune: PostgresClusterStorage.prune }),
+  ).pipe(
     Layer.provideMerge(
       Gateway.layer().pipe(
         Layer.provideMerge(postgres()),

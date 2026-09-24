@@ -162,6 +162,11 @@ resumes after a restart.
   never created at once. A wake it could not act on stays undelivered, so Cluster runs it again.
 - `layer` provides both. Every runner over the same storage runs the worker, as Cluster
   requires of every entity type.
+- `layerPruning({ prune, keep? })` removes handled wakes once they are older than `keep`
+  (seven days by default), with the job's own past runs, every hour on one runner, through
+  `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
+  supplies `prune`. By then a wake's key no longer needs to stop a repeat: commits are not
+  retried days later, and wakes not yet handled are kept however old.
 
 `SignalHub.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because

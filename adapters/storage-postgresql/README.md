@@ -102,8 +102,9 @@ identity, the transaction boundary, and the guard each statement runs under. `st
 workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing
 SQL client in `make` and acquires the pool in `layer`; `directory.ts` reads across workspaces, and
 `schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener,
-`signals.ts` the signal hub over it, and `turns.ts` the queue in which a process's writers to
-one workspace or log wait for each other. Bindings and raw tables are internal to the adapter's public package
+`signals.ts` the signal hub over it, `turns.ts` the queue in which a process's writers to
+one workspace or log wait for each other, and `cluster-storage.ts` the upkeep of Effect
+Cluster's tables. Bindings and raw tables are internal to the adapter's public package
 surface.
 
 Follow the [adapter naming and validation conventions](../README.md).
@@ -280,6 +281,16 @@ the workspace advisory lock. Tests do not cover arbitrary changed isolation
 defaults. Every failed COMMIT effect currently returns `Store.CommitUncertain`,
 including errors that could be classified as definite rollback. See the
 [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
+
+## Effect Cluster's tables
+
+A host that runs background work on Effect Cluster over this database keeps Cluster's tables
+beside the adapter's; Cluster creates them itself, with its default `cluster` prefix, and never
+removes a message or its reply. `PostgresClusterStorage.prune(entityTypes, before, options?)`
+removes the handled messages of those entity types stored before a time, with their replies, and
+returns how many went. A message's ID carries when Cluster stored it; messages not yet handled
+stay, however old, and so do other entity types'. Each statement removes at most `batch`
+messages, a thousand by default. `cluster-storage.test.ts` checks this over real wakes.
 
 ## Composition
 

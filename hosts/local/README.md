@@ -46,7 +46,8 @@ in its own process, on an Effect Cluster runner (`SingleRunner`) over the same d
 its storage, so a wake a commit asks for is stored in that commit's transaction. Cluster keeps
 its own tables beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
 `cluster_migrations`), creating them at startup; reads for due wakes every two seconds; and
-holds two of the pool's connections.
+holds two of the pool's connections. Every hour, one runner prunes wakes handled more than seven
+days ago.
 
 `AMENDS_RUNNER_ADDRESS` is the process's identity among the runners over the database. Only one
 process may run at an address at a time: two processes sharing one also share Cluster's machine
