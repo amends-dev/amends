@@ -152,7 +152,29 @@ interface World {
   readonly fixture: Fixture;
   /** The groups the actor currently belongs to, as the membership projection would report. */
   readonly admitted: Set<Group.Id>;
+  /** Run a program once, just after the next read of the reader's workspace membership. */
+  readonly afterMemberRead: (program: Effect.Effect<void>) => void;
+  /** Run a program once, just after the next read of the reader's group admissions. */
+  readonly afterAccessRead: (program: Effect.Effect<void>) => void;
 }
+
+/** A program that runs once after a store read, as a commit racing that read would. */
+const racing = () => {
+  let pending: Effect.Effect<void> | undefined;
+  return {
+    set: (program: Effect.Effect<void>) => {
+      pending = program;
+    },
+    after: <A, E>(read: Effect.Effect<A, E>) =>
+      Effect.tap(read, () =>
+        Effect.suspend(() => {
+          const program = pending ?? Effect.void;
+          pending = undefined;
+          return program;
+        }),
+      ),
+  };
+};
 type Services =
   | ChangeFeedApplication.Service
   | Journal.Service
@@ -188,6 +210,9 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       }),
     );
     const admitted = new Set<Group.Id>();
+    const memberRead = racing();
+    const accessRead = racing();
+    const members = fixture.members(workspaceId);
     const unexpected = () => Effect.die(new Error("Unexpected membership store use"));
     const memberships = GroupMembershipStore.Service.of({
       workspaceId,
@@ -199,14 +224,21 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       pageActiveByGroup: unexpected,
       pageActiveByMember: unexpected,
       listActiveByMember: (memberId) =>
-        Effect.succeed(memberId === actor.memberId ? [...admitted].map((id) => admission(id)) : []),
+        accessRead.after(
+          Effect.sync(() =>
+            memberId === actor.memberId ? [...admitted].map((id) => admission(id)) : [],
+          ),
+        ),
       insert: unexpected,
       markRemoved: unexpected,
     });
     const host = Layer.mergeAll(
       Layer.succeed(Store.Service, fixture.store),
       Layer.succeed(Checkpoint.Service, fixture.checkpoints),
-      Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
+      Layer.succeed(
+        MemberStore.Service,
+        Object.assign({}, members, { get: (id: Member.Id) => memberRead.after(members.get(id)) }),
+      ),
       Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
       Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
       Layer.succeed(GroupMembershipStore.Service, memberships),
@@ -230,10 +262,12 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       Layer.provide(ChangeFeedSource.layer(options.source)),
       Layer.provideMerge(services),
     );
-    return yield* use({ fixture, admitted }).pipe(
-      Effect.provide(configured),
-      Effect.provideService(Actor.Service, actor),
-    );
+    return yield* use({
+      fixture,
+      admitted,
+      afterMemberRead: memberRead.set,
+      afterAccessRead: accessRead.set,
+    }).pipe(Effect.provide(configured), Effect.provideService(Actor.Service, actor));
   }).pipe(Effect.scoped);
 
 /** Publish facts in one commit with trusted test attribution. */
@@ -850,6 +884,68 @@ it.effect("the reader's removal from the workspace is delivered, then the stream
       );
     }),
   ),
+);
+
+it.effect("a revocation that commits while the reader subscribes still applies to the stream", () =>
+  run(({ admitted, afterAccessRead }) =>
+    Effect.gen(function* () {
+      admitted.add(groupId);
+      const journal = yield* Journal.Service;
+      // The reader's admissions are read, and then their removal from the group commits.
+      afterAccessRead(
+        Effect.suspend(() => {
+          admitted.delete(groupId);
+          return commit(
+            publish(GroupMembershipFacts.Removed, {
+              groupId,
+              membershipId: admission(groupId).id,
+              workspaceId,
+              memberId: actor.memberId,
+              reason: "removed",
+            }),
+          );
+        }).pipe(Effect.asVoid, Effect.provideService(Journal.Service, journal)),
+      );
+      const feed = yield* listen();
+      yield* feed.next;
+      yield* commit(publish(ThreadMessageFacts.Published, message("after", threadId, groupId)));
+      yield* commit(roleMarker("marker"));
+      expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+        GroupMembershipFacts.Removed.name,
+      ]);
+      expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+        RoleFacts.Created.name,
+      ]);
+    }),
+  ),
+);
+
+it.effect(
+  "a workspace removal that commits while the reader subscribes still ends the stream",
+  () =>
+    run(({ fixture, afterMemberRead }) =>
+      Effect.gen(function* () {
+        const journal = yield* Journal.Service;
+        // The reader's active membership is checked, and then their removal commits.
+        afterMemberRead(
+          Effect.andThen(
+            fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId)),
+            commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId })),
+          ).pipe(Effect.asVoid, Effect.orDie, Effect.provideService(Journal.Service, journal)),
+        );
+        const feed = yield* listen();
+        yield* feed.next;
+        yield* commit(roleMarker("marker"));
+        expect(committed(yield* feed.next).events.map((e) => e.name)).toEqual([
+          MemberFacts.Removed.name,
+        ]);
+        const exit = yield* Fiber.await(feed.fiber);
+        expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
+          Option.some(new ChangeFeed.Unavailable({})),
+        );
+        expect(yield* Queue.size(feed.queue)).toBe(0);
+      }),
+    ),
 );
 
 it.effect("a slow subscriber catches up from the journal instead of losing commits", () =>

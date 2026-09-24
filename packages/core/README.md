@@ -305,8 +305,10 @@ identity, or a group they belong to) and any read permission the registry names 
 permission the matching read requires: `invitation.manage` for invitations, `member.read` and
 `assignment.read` on the member for membership and access changes, `group.read` for group facts,
 and `thread.read` for thread facts. A registration can name the member a fact concerns, who sees it
-without the permission: their own membership, access, and accepted invitation. Their group admissions and grants are loaded when the
-subscription opens and reloaded before filtering a commit that changes them, so a
+without the permission: their own membership, access, and accepted invitation. Their active
+membership, group admissions, and grants are read after the subscription registers and reads
+the head, so a change that commits while it opens is either already in what they read or
+delivered afterwards. They are reloaded before filtering a commit that changes them, so a
 commit that admits the reader delivers what it admits. The commit that removes the
 reader from the workspace is delivered, then the stream ends. Registry views give
 some facts their public shape: activity omits its notification recipients, and

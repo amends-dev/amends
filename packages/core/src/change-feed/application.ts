@@ -21,11 +21,12 @@ import { Signals } from "../signal/signals.ts";
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   /**
-   * Check active membership on entry and register before returning Ready. The caller owns the
-   * subscription scope. A reader sees an event when they hold a scope in its audience (the
-   * workspace, their membership or identity, or a group they belong to) and any read
-   * permission it names. Their scopes and grants are reloaded when a delivered fact changes
-   * them, and the stream ends after the fact that removes them from the workspace.
+   * Register, then check active membership and load the reader's access, before returning
+   * Ready. The caller owns the subscription scope. A reader sees an event when they hold a
+   * scope in its audience (the workspace, their membership or identity, or a group they belong
+   * to) and any read permission it names. Their scopes and grants are reloaded when a
+   * delivered fact changes them, and the stream ends after the fact that removes them from the
+   * workspace.
    */
   readonly watch: (
     options?: ChangeFeed.WatchOptions,
@@ -113,14 +114,17 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
     input: ChangeFeed.WatchOptions = {},
   ) {
     const options = yield* Schema.decodeEffect(ChangeFeed.WatchOptions)(input);
-    yield* authorization.require([]);
     const actor = yield* Actor.Service;
-    let access = yield* load(actor).pipe(Effect.mapError(() => new ChangeFeed.Unavailable({})));
     // Register for signals and commits before Ready, so neither misses what follows it.
     const live = yield* signals.subscribe;
     const subscription = yield* source.subscribe(
       Option.map(Option.fromUndefinedOr(options.after), ChangeFeed.positionOf),
     );
+    // Membership and access are read after the subscription has read the head: a change
+    // committed before it is in what they read, and one committed after it is delivered and
+    // reloads them. Read first, a change committed in between would be neither.
+    yield* authorization.require([]);
+    let access = yield* load(actor).pipe(Effect.mapError(() => new ChangeFeed.Unavailable({})));
     const ready = ChangeFeed.Message.cases.Ready.make({
       workspaceId,
       cursor: Option.getOrNull(Option.map(subscription.from, ChangeFeed.cursorOf)),
