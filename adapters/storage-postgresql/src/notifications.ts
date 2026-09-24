@@ -2,10 +2,12 @@ import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { and, asc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { inIds } from "./id-list.ts";
+import { insertChunked } from "./parameters.ts";
 import { notificationSeen, notifications } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
@@ -123,7 +125,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
   });
 
-  /** Validate every record, then write them in one statement. */
+  /** Validate every record, then write them in as few statements as fit. */
   const insert = Effect.fnUntraced(function* (
     input: ReadonlyArray<Notification.Record>,
     operation: string,
@@ -161,9 +163,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
       });
     }
     if (rows.length === 0) return;
-    yield* guard(db.insert(notifications).values(rows), true).pipe(
-      Effect.mapError(storeError(NotificationStore, operation)),
-    );
+    yield* guard(
+      insertChunked(notifications, rows, (chunk) => db.insert(notifications).values(chunk)),
+      true,
+    ).pipe(Effect.mapError(storeError(NotificationStore, operation)));
   });
 
   return NotificationStore.Service.of({
@@ -203,7 +206,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
                   target._tag === "Triage" ? "" : target.id,
                 ),
                 pendingOnly,
-                inArray(notifications.threadGroupId, [...groupIds]),
+                inIds(notifications.threadGroupId, groupIds),
               ),
             )
             .groupBy(notifications.threadGroupId),
@@ -252,7 +255,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       ).pipe(Effect.mapError(storeConflict(NotificationStore, "markSeen")));
       const unique = [...new Set(ids)];
       if (unique.length === 0) return;
-      // Check every notification, then record them in one statement.
+      // Check every notification, then record them in one statement, however many there are.
       const eligible = yield* guard(
         db
           .select({ id: notifications.id })
@@ -260,7 +263,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           .where(
             and(
               inWorkspace,
-              inArray(notifications.id, unique),
+              inIds(notifications.id, unique),
               eq(notifications.recipientKind, "Human"),
               eq(notifications.state, "Pending"),
             ),
@@ -271,15 +274,12 @@ export const make = Effect.fn("Notifications.make")(function* () {
           operation: "markSeen",
           message: "Expected a pending notification of a human recipient",
         });
+      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt);
       yield* guard(
         db
           .insert(notificationSeen)
-          .values(
-            unique.map((notificationId) => ({
-              workspaceId,
-              notificationId,
-              seenAt: DateTime.toDate(seenAt),
-            })),
+          .select(
+            sql`select ${workspaceId}::text, unnest(${sql.param(unique)}::text[]), ${seen}::timestamptz`,
           )
           .onConflictDoNothing(),
       ).pipe(Effect.mapError(storeError(NotificationStore, "markSeen")));

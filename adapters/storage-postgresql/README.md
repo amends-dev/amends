@@ -73,9 +73,12 @@ replaced the development baseline; recreate disposable PostgreSQL databases when
 
 Batch reads (`getMany` on members, group admissions, thread participations, and messages) match
 `id = any($1)` with the IDs bound as one array against each table's workspace/ID key, so every
-batch size shares one prepared statement. `NotificationStore.insertMany` writes its rows in one
-multi-row insert, and a message's mentions are checked against its thread's participations in
-one query.
+batch size shares one prepared statement. Notification pending counts and `markSeen` match their
+group and notification IDs the same way, `markSeen` records them from that array in one
+statement, and a message's mentions are checked against its thread's participations in one
+query. `@effect/sql-pg` binds at most 32767 parameters in one statement, fewer than PostgreSQL
+itself allows, so multi-row inserts, `NotificationStore.insertMany` and a commit's batches,
+entries, and append keys, use as few statements as stay within one parameter per column and row.
 
 `Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
 log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
@@ -191,8 +194,9 @@ projections](../../docs/journal.md#live-projections).
 Appends are staged in the transaction's session. A commit reads each log's last position once,
 the first time it appends to that log, and tracks the batch it opens and the next entry index in
 memory. Just before `COMMIT` it writes the commit row with its entry count, the new batches, the
-entries (in inserts of up to 500 rows), and the append keys, one statement each; a transaction
-that reads whole batches of the log writes what it has staged first. Key and entry lookups inside
+entries (in inserts of up to 500 rows), and the append keys, a statement each unless they exceed
+the driver's parameter limit; a transaction that reads whole batches of the log writes what it
+has staged first. Key and entry lookups inside
 the transaction answer staged appends from memory, and a transaction remembers the keys it has
 looked up, since it holds the log from its first lookup or append. A reply therefore spends one statement per
 fact on journal bookkeeping, for its idempotency key, plus a few per commit.

@@ -1,10 +1,11 @@
 import { Commit, Entry, Store } from "@amends/core/journal";
-import { and, asc, desc, eq, gt, gte, lt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";
 import { PostgresNotices } from "./notices.ts";
 import { Binding } from "./binding.ts";
 import { isContention, storeConflict, storeError, storeFailure } from "./errors.ts";
+import { insertChunked } from "./parameters.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
 
 const BatchHeaderRow = Schema.Struct({
@@ -43,8 +44,8 @@ interface Staging {
   entryCount: number;
 }
 
-/** Rows per multi-row insert, well inside PostgreSQL's limit on bound parameters. */
-const insertChunk = 500;
+/** Entries per insert, fewer than their parameters allow, since each carries its payload. */
+const entriesPerInsert = 500;
 
 const receiptKey = (logId: Entry.LogId, key: Store.IdempotencyKey) => JSON.stringify([logId, key]);
 const copyEntry = (entry: Store.Entry): Store.Entry =>
@@ -144,10 +145,9 @@ export const make = Effect.fn("Journal.make")(function* () {
         and(
           eq(logEntries.workspaceId, workspaceId),
           eq(logEntries.logId, selected[0].logId),
-          inArray(
-            logEntries.position,
-            selected.map((header) => header.position),
-          ),
+          // The selected batches are consecutive in the log, so their positions span a range.
+          gte(logEntries.position, selected[0].position),
+          lte(logEntries.position, Array.lastNonEmpty(selected).position),
         ),
       )
       .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
@@ -193,42 +193,42 @@ export const make = Effect.fn("Journal.make")(function* () {
           target: [commits.workspaceId, commits.id],
           set: { entryCount: staging.entryCount },
         });
-      if (batches.length > 0)
-        yield* db
-          .insert(logBatches)
-          .values(
-            batches.map((batch) =>
-              Object.assign({ workspaceId, commitId: session.commit.id }, batch),
-            ),
-          );
+      yield* insertChunked(
+        logBatches,
+        batches.map((batch) => Object.assign({ workspaceId, commitId: session.commit.id }, batch)),
+        (chunk) => db.insert(logBatches).values(chunk),
+      );
       // Delivered only if the transaction commits; repeats within it are delivered once.
       for (const logId of new Set(batches.map((batch) => batch.logId)))
         yield* database.sql.unsafe("SELECT pg_notify($1, $2)", [
           PostgresNotices.channel,
           PostgresNotices.appendNotice(workspaceId, logId),
         ]);
-      for (let start = 0; start < entries.length; start += insertChunk)
-        yield* db.insert(logEntries).values(
-          entries.slice(start, start + insertChunk).map((entry) =>
-            Object.assign(
-              {
-                workspaceId,
-                id: entry.id,
-                logId: entry.logId,
-                position: entry.position,
-                commitId: entry.commitId,
-                entryIndex: entry.index,
-                recordedAt: DateTime.toDate(entry.recordedAt),
-                payload: entry.payload,
-              },
-              JournalEntry.toColumns(entry),
-            ),
+      yield* insertChunked(
+        logEntries,
+        entries.map((entry) =>
+          Object.assign(
+            {
+              workspaceId,
+              id: entry.id,
+              logId: entry.logId,
+              position: entry.position,
+              commitId: entry.commitId,
+              entryIndex: entry.index,
+              recordedAt: DateTime.toDate(entry.recordedAt),
+              payload: entry.payload,
+            },
+            JournalEntry.toColumns(entry),
           ),
-        );
-      if (keys.length > 0)
-        yield* db
-          .insert(logAppendKeys)
-          .values(keys.map((receipt) => Object.assign({ workspaceId }, receipt)));
+        ),
+        (chunk) => db.insert(logEntries).values(chunk),
+        entriesPerInsert,
+      );
+      yield* insertChunked(
+        logAppendKeys,
+        keys.map((receipt) => Object.assign({ workspaceId }, receipt)),
+        (chunk) => db.insert(logAppendKeys).values(chunk),
+      );
       batches.length = 0;
       entries.length = 0;
       keys.length = 0;

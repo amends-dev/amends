@@ -13,6 +13,32 @@ const options = { idempotencyKey: key };
 export const idempotency = (harness: Harness) => {
   const { core, initialized } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: idempotency`, () => {
+    it.effect("one commit keeps every keyed append past the parameters a statement can bind", () =>
+      harness.withStorage((storage) =>
+        Effect.gen(function* () {
+          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          yield* initialized(bound);
+          yield* Effect.gen(function* () {
+            const journal = yield* Journal.Service;
+            const log = (yield* Log.Service).open({ id: executionId, schema: Schema.String });
+            const keyOf = (index: number) => Log.IdempotencyKey.make(`output/${index}`);
+            const count = 6_000;
+            yield* journal.commit(
+              Effect.gen(function* () {
+                for (let index = 0; index < count; index += 1)
+                  yield* log.append(`output ${index}`, { idempotencyKey: keyOf(index) });
+              }),
+            );
+            const [batch] = yield* log.read({ limit: 1 });
+            expect(batch?.entries).toHaveLength(count);
+            expect(yield* log.getAppend(keyOf(count - 1))).toEqual(
+              Option.some([batch?.entries.at(-1)]),
+            );
+          }).pipe(Effect.provide(core(bound)));
+        }),
+      ),
+    );
+
     it.effect(
       "keyed publications and append slices survive reopening with their original identities",
       () =>

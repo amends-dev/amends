@@ -10,7 +10,7 @@ import { Group } from "@amends/core/group";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
-import { Context, DateTime, Effect, Option } from "effect";
+import { Array, Context, DateTime, Effect, Option } from "effect";
 import { boundTo, otherWorkspaceId, runHost, Support, workspaceId } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -220,6 +220,44 @@ export const notifications = (harness: Harness) => {
             }),
           ),
         ),
+    );
+
+    it.effect("writes and reads keep every record past the parameters one statement can bind", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const bound = yield* boundTo(workspaceId);
+            yield* initialized(bound);
+            const groupId = Group.Id.make("crowded");
+            const thread = { threadId: Thread.Id.make("crowded-thread"), groupId, sequence: 1 };
+            // A reply without mentions notifies every participant of a crowded thread at once.
+            const many = Array.makeBy(12_000, (index) => record(`many-${index}`, { thread }));
+            yield* bound.store.transaction(bound.notifications.insertMany(many));
+            const groups = [
+              groupId,
+              ...Array.makeBy(40_000, (index) => Group.Id.make(`absent-${index}`)),
+            ];
+            expect(yield* bound.notifications.countPendingByGroup(human, groups)).toEqual([
+              { groupId, count: many.length },
+            ]);
+            yield* bound.notifications.markSeen(
+              many.map((notification) => notification.id),
+              recordedAt,
+            );
+            expect(yield* bound.notifications.countPendingByGroup(human, groups)).toEqual([]);
+            const absent = Array.makeBy(40_000, (index) => Notification.Id.make(`absent-${index}`));
+            expect(
+              yield* Effect.flip(
+                bound.notifications.markSeen(
+                  [...absent, Notification.Id.make("many-0")],
+                  recordedAt,
+                ),
+              ),
+            ).toMatchObject({ _tag: "NotificationStore.Conflict", operation: "markSeen" });
+          }),
+        ),
+      ),
     );
 
     it.effect("batch notification insertion writes every record or conflicts as a whole", () =>
