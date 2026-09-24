@@ -151,7 +151,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               current_setting('idle_in_transaction_session_timeout') AS idle`,
         ).pipe(Effect.provide(host.pool), Effect.orDie);
         expect(yield* bound.store.transaction(settings)).toEqual([
-          { statement: "10s", idle: "30s" },
+          { statement: "10s", idle: "1min" },
         ]);
         expect(yield* settings).toEqual([{ statement: "0", idle: "0" }]);
       }).pipe(Effect.scoped),

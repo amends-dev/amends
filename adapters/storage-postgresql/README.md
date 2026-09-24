@@ -237,10 +237,11 @@ writer holds its lock, so commit times follow commit order.
 
 Once it holds the lock, a transaction sets its own session limits, which end with it:
 `statement_timeout` (`statementTimeout`, ten seconds by default, at least `lockTimeout`)
-for each statement, and `idle_in_transaction_session_timeout` (`transactionTimeout`, thirty
-seconds by default). A program that runs past `transactionTimeout` rolls back and fails with a
-store failure; if the process itself stalls, PostgreSQL ends its session after that long idle,
-which releases its locks. Every duration must be finite and at least a millisecond, since
+for each statement, and `idle_in_transaction_session_timeout` at twice `transactionTimeout`
+(thirty seconds by default). A program that runs past `transactionTimeout` rolls back and fails
+with a store failure; if the process itself stalls, PostgreSQL ends its session after twice that
+long idle, which releases its locks. The margin keeps PostgreSQL from ending a live transaction's
+session as it rolls back, which would return a closed connection to the pool. Every duration must be finite and at least a millisecond, since
 PostgreSQL reads zero as no limit; `PostgresStorage.make` refuses others when the host starts.
 
 Reads outside a transaction see committed state, on any free pooled connection, and are

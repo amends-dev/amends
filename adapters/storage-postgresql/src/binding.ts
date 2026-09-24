@@ -37,8 +37,9 @@ export interface Options {
   readonly statementTimeout?: Duration.Input | undefined;
   /**
    * How long a transaction's program may run once it holds its lock before it rolls back.
-   * PostgreSQL also ends a session left idle inside a transaction this long, so a process that
-   * stalls cannot keep the workspace's lock. Thirty seconds by default.
+   * PostgreSQL also ends a session left idle inside a transaction for twice this long, so a
+   * process that stalls cannot keep the workspace's lock, while a live one always rolls back
+   * first and never has its connection ended under it. Thirty seconds by default.
    */
   readonly transactionTimeout?: Duration.Input | undefined;
   /**
@@ -162,7 +163,7 @@ export const make = Effect.fn("Binding.make")(function* (
   /** Session settings for one transaction: they end with it, whether it commits or not. */
   const limits = [
     String(Duration.toMillis(statementTimeout)),
-    String(Duration.toMillis(transactionTimeout)),
+    String(2 * Duration.toMillis(transactionTimeout)),
   ];
 
   const check = Effect.fnUntraced(function* (write: boolean) {
