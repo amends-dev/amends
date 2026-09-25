@@ -42,6 +42,11 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
 export const Recipient = Schema.Struct({
   participationId: ThreadParticipationId.Id,
   recipient: Notification.Recipient,
+  /**
+   * Whether the activity asks this recipient for work: an agent to take it into a turn. People
+   * are told, never asked, and an agent's own messages ask no work of other agents.
+   */
+  requestsWork: Schema.Boolean,
 });
 export interface Recipient extends Schema.Schema.Type<typeof Recipient> {}
 export * as ThreadActivity from "./activity.ts";

@@ -115,8 +115,13 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
             )
             .pipe(Publication.withOccurredAt(request.occurredAt));
           // Mentions address members; without them the message reaches every selected participant.
-          // A message never notifies its own author.
+          // A message never notifies its own author, and an agent's message asks no work of other
+          // agents, so agents cannot keep setting each other to work.
           const author = ThreadParticipation.keyOf(authorReference(request.author));
+          const writer = admitted.participants.find(
+            (p) => ThreadParticipation.keyOf(p.participant) === author,
+          )?.participant;
+          const byAgent = writer?._tag === "Member" && writer.identity._tag === "Agent";
           const recipients = admitted.participants
             .filter((p) => {
               if (ThreadParticipation.keyOf(p.participant) === author) return false;
@@ -126,10 +131,14 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
                 (memberId !== undefined && request.mentions.includes(memberId))
               );
             })
-            .map((p) => ({
-              participationId: p.id,
-              recipient: ThreadParticipation.recipientOf(p.participant),
-            }));
+            .map((p) => {
+              const recipient = ThreadParticipation.recipientOf(p.participant);
+              return {
+                participationId: p.id,
+                recipient,
+                requestsWork: recipient._tag === "Agent" && !byAgent,
+              };
+            });
           return {
             value: message,
             kind: ThreadMessageActivity.Published,

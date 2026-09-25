@@ -231,10 +231,15 @@ export const threadReads = (harness: Harness) => {
               );
               const recipients = (yield* bound.participations.listByThread(thread.id))
                 .filter((p) => p.status === "active")
-                .map((p) => ({
-                  participationId: p.id,
-                  recipient: ThreadParticipation.recipientOf(p.participant),
-                }));
+                .map((p) => {
+                  const recipient = ThreadParticipation.recipientOf(p.participant);
+                  // A person's message asks the agents it reaches for work.
+                  return {
+                    participationId: p.id,
+                    recipient,
+                    requestsWork: recipient._tag === "Agent",
+                  };
+                });
               yield* journal.publish(ThreadActivityFacts.Recorded, {
                 groupId: thread.groupId,
                 activity: record,

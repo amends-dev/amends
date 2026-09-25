@@ -661,6 +661,7 @@ export const notificationSources = (harness: Harness) => {
                         {
                           participationId: ownerPart.id,
                           recipient: ThreadParticipation.recipientOf(ownerPart.participant),
+                          requestsWork: false,
                         },
                       ];
                       const followed = yield* recorder.record({

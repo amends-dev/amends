@@ -67,6 +67,11 @@ export const State = Schema.TaggedUnion({
   Pending: {},
   Discarded: { reason: Schema.Literal("participation-ended") },
   Acknowledged: Acknowledgment.fields,
+  /**
+   * The source told this recipient something without asking anything of it, as another agent's
+   * message tells an agent: settled when created, so it never waits for handling.
+   */
+  Informational: {},
 });
 export type State = typeof State.Type;
 
@@ -97,9 +102,10 @@ export const Record = Schema.Struct({
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
 /**
- * The notification that recorded thread activity generates for one selected recipient, pending.
- * Everything comes from the activity's journal entry, so replay and the change feed reproduce the
- * record exactly: its ID is the entry and the recipient's participation.
+ * The notification that recorded thread activity generates for one selected recipient: pending,
+ * or informational for an agent the activity asks no work of. Everything comes from the
+ * activity's journal entry, so replay and the change feed reproduce the record exactly: its ID is
+ * the entry and the recipient's participation.
  */
 export const generated = (
   entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },
@@ -109,7 +115,11 @@ export const generated = (
     readonly threadId: ThreadId.Id;
     readonly sequence: number;
   },
-  selected: { readonly participationId: ThreadParticipationId.Id; readonly recipient: Recipient },
+  selected: {
+    readonly participationId: ThreadParticipationId.Id;
+    readonly recipient: Recipient;
+    readonly requestsWork: boolean;
+  },
 ): Record => ({
   id: Id.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
   workspaceId: activity.workspaceId,
@@ -118,7 +128,10 @@ export const generated = (
   thread: { threadId: activity.threadId, groupId: activity.groupId, sequence: activity.sequence },
   recipient: selected.recipient,
   recordedAt: entry.recordedAt,
-  state: { _tag: "Pending" },
+  state:
+    selected.recipient._tag === "Agent" && !selected.requestsWork
+      ? { _tag: "Informational" }
+      : { _tag: "Pending" },
 });
 
 export * as Notification from "./notification.ts";

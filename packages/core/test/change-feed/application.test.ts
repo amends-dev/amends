@@ -559,6 +559,7 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
               {
                 participationId: ThreadParticipation.Id.make("participation"),
                 recipient: Notification.ofMember(bobMember, bob),
+                requestsWork: false,
               },
             ],
           });
@@ -620,6 +621,7 @@ const notifying = publish(ThreadActivityFacts.Recorded, {
     {
       participationId: ThreadParticipation.Id.make("alice-participation"),
       recipient: Notification.ofMember(actor.memberId, alice),
+      requestsWork: false,
     },
     {
       participationId: ThreadParticipation.Id.make("bob-participation"),
@@ -627,8 +629,13 @@ const notifying = publish(ThreadActivityFacts.Recorded, {
         _tag: "Human",
         id: Identity.HumanId.make("bob"),
       }),
+      requestsWork: false,
     },
-    { participationId: ThreadParticipation.Id.make("triage"), recipient: { _tag: "Triage" } },
+    {
+      participationId: ThreadParticipation.Id.make("triage"),
+      recipient: { _tag: "Triage" },
+      requestsWork: false,
+    },
   ],
 });
 

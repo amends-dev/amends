@@ -116,6 +116,13 @@ Mentions do not remove existing participants, and an unmentioned reply does not 
 the group. Each mentioned agent requires `agent.use`; an unmentioned reply reaches agents already
 participating without it, since whoever brought them in authorized them to handle the thread.
 
+The activity records, for each recipient, whether it asks that recipient for work. A person's
+message asks every agent it reaches, whose notification stays `Pending` until a turn takes it up.
+An agent's message asks no other agent, so agents cannot keep setting each other to work: their
+notifications are created settled as `Informational`, never pending. People are told, never
+asked; their notifications are pending until they see them, whoever wrote. Only people can reply
+through `ThreadMessageApplication` today, so agents' messages will come from their turns.
+
 Missing, foreign, and outside-audience threads share `ThreadMessageApplication.NotFound`.
 Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`, and agent callers get
 `ThreadMessageApplication.HumanAuthorRequired`. Admission, the message, its timeline activity, and

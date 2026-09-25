@@ -164,6 +164,7 @@ it.effect("notifications rebuild from recorded activity alone", () =>
           id: Identity.HumanId.make("human"),
           memberId: Member.Id.make("human-member"),
         },
+        requestsWork: false,
       },
       {
         participationId: agent,
@@ -172,6 +173,7 @@ it.effect("notifications rebuild from recorded activity alone", () =>
           id: Identity.AgentId.make("agent"),
           memberId: Member.Id.make("agent-member"),
         },
+        requestsWork: true,
       },
     ];
     const published = ThreadActivityKind.makeRecordUnsafe(

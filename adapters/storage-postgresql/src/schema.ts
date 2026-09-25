@@ -44,7 +44,7 @@ export const scopeKinds = ["Workspace", "Target"] as const;
 export const targetKinds = ["Workspace", "Member", "Thread", "Group"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** What the journal settles; a human recipient's Seen is private state in notification_seen. */
-export const notificationStates = ["Pending", "Discarded"] as const;
+export const notificationStates = ["Pending", "Discarded", "Informational"] as const;
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -281,7 +281,7 @@ export const notifications = pgTable(
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "notification_state",
-      sql`(${table.state} = 'Pending' AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
+      sql`(${table.state} IN ('Pending', 'Informational') AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
     ),
     check(
       "notification_seen_state",

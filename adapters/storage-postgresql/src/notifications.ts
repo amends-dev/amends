@@ -22,6 +22,7 @@ const decodeRows = Schema.decodeUnknownEffect(
       state: Schema.Union([
         Notification.State.cases.Pending,
         Notification.State.cases.Discarded,
+        Notification.State.cases.Informational,
         Schema.Struct({
           ...Notification.State.cases.Acknowledged.fields,
           acknowledgedAt: Schema.DateTimeUtcFromDate,
@@ -63,11 +64,15 @@ const toEncodedRecord = (row: NotificationRow) => ({
   state:
     row.state === "Discarded"
       ? { _tag: "Discarded", reason: row.discardReason }
-      : row.discardReason !== null
-        ? undefined
-        : row.seenAt === null
-          ? { _tag: "Pending" }
-          : { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: row.seenAt },
+      : row.state === "Informational"
+        ? row.discardReason === null && row.seenAt === null
+          ? { _tag: "Informational" }
+          : undefined
+        : row.discardReason !== null
+          ? undefined
+          : row.seenAt === null
+            ? { _tag: "Pending" }
+            : { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: row.seenAt },
 });
 
 /** A membership for people and agents, a contact, or triage. */

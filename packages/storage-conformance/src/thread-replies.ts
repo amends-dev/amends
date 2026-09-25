@@ -33,6 +33,7 @@ import {
   ThreadApplication,
   ThreadAccess,
   ThreadActivityFacts,
+  ThreadActivityPublisher,
   ThreadActivityRecording,
   ThreadParticipationDeparture,
   ThreadActivityStore,
@@ -49,7 +50,7 @@ import {
 
 import { Gateway } from "@amends/gateway";
 
-import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
 
 import { TestClock } from "effect/testing";
 
@@ -1124,6 +1125,124 @@ export const threadReplies = (harness: Harness) => {
               ),
             );
           }),
+        ),
+    );
+
+    it.effect(
+      "an agent's message tells other agents without asking them for work, and people as usual",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const bound = yield* boundTo(workspaceId);
+              const workspace = yield* initialized(bound);
+              const owner = Actor.Value.make({
+                workspaceId,
+                memberId: workspace.ownerMemberId,
+                identity: { _tag: "Human", id: workspace.createdBy },
+              });
+              const helperId = Member.Id.make("helper");
+              const helper: Identity.MemberReference = {
+                _tag: "Agent",
+                id: Identity.AgentId.make("helper"),
+              };
+              yield* seed(bound);
+              yield* facts(
+                bound,
+                Effect.flatMap(Journal.Service, (j) =>
+                  j.publish(MemberFacts.Added, {
+                    workspaceId,
+                    memberId: helperId,
+                    identity: helper,
+                  }),
+                ),
+              );
+              const group = yield* run(bound, owner, create([owner.memberId, agentId, helperId]));
+              // A person's message asks each agent it reaches for work.
+              const first = yield* run(bound, owner, start(group.id, [agentId, helperId]));
+              const participants = (yield* bound.participations.listByThread(first.thread.id))
+                .filter((p) => p.status === "active")
+                .flatMap((p) => {
+                  const memberId = ThreadParticipation.memberOf(p.participant);
+                  return memberId === undefined ? [] : [{ _tag: "Member" as const, memberId }];
+                });
+              // Agents cannot reply through the application yet; their turns will publish this way.
+              const internal = ThreadMessagePublication.layer.pipe(
+                Layer.provide(
+                  ThreadActivityPublisher.layer.pipe(
+                    Layer.provide(
+                      Layer.mergeAll(
+                        ThreadParticipationAdmission.layer,
+                        ThreadActivityRecording.layer,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              yield* Effect.gen(function* () {
+                const journal = yield* Journal.Service;
+                const publication = yield* ThreadMessagePublication.Service;
+                yield* journal.commit(
+                  publication.publish({
+                    threadId: first.thread.id,
+                    author: { _tag: "Member", memberId: agentId },
+                    text: "Done",
+                    mentions: [],
+                    participants,
+                    occurredAt: yield* DateTime.now,
+                  }),
+                );
+              }).pipe(
+                Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                Effect.provide(internal.pipe(Layer.provideMerge(core(bound)))),
+              );
+              const inbox = Effect.fnUntraced(function* (
+                memberId: Member.Id,
+                identity: Identity.MemberReference,
+              ) {
+                const recipient = Notification.ofMember(memberId, identity);
+                return {
+                  // In timeline order, whatever order the inbox lists them in.
+                  all: (yield* bound.notifications.listByRecipient(recipient, { limit: 10 }))
+                    .toSorted((a, b) => (a.thread?.sequence ?? 0) - (b.thread?.sequence ?? 0))
+                    .map((n) => [n.thread?.sequence, n.state._tag]),
+                  pending: (yield* bound.notifications.listPendingByRecipient(recipient, {
+                    limit: 10,
+                  })).map((n) => n.thread?.sequence),
+                };
+              });
+              const inboxes = Effect.gen(function* () {
+                return {
+                  helper: yield* inbox(helperId, helper),
+                  agent: yield* inbox(agentId, identityFor(agentId)),
+                  owner: yield* inbox(owner.memberId, owner.identity),
+                };
+              });
+              const expected = {
+                // The other agent is told of the agent's message, settled, and has only the
+                // person's request to take up.
+                helper: {
+                  all: [
+                    [1, "Pending"],
+                    [2, "Informational"],
+                  ],
+                  pending: [1],
+                },
+                // An author is never notified of its own message.
+                agent: { all: [[1, "Pending"]], pending: [1] },
+                // People are told as usual, whoever writes.
+                owner: { all: [[2, "Pending"]], pending: [2] },
+              };
+              expect(yield* inboxes).toEqual(expected);
+              yield* storage.discardProjections;
+              yield* facts(
+                bound,
+                Effect.flatMap(Journal.Service, (j) => j.replay),
+              );
+              expect(yield* inboxes).toEqual(expected);
+            }),
+          ),
         ),
     );
   });

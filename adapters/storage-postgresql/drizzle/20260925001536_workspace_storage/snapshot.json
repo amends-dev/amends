@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "6b4ea5c7-db8a-490c-9ab2-173323131420",
+  "id": "a7eeac29-16fc-4510-b9ba-f03b89b1bc78",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -4047,7 +4047,7 @@
       "table": "members"
     },
     {
-      "value": "(\"state\" = 'Pending' AND \"discard_reason\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" = 'participation-ended')",
+      "value": "(\"state\" IN ('Pending', 'Informational') AND \"discard_reason\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" = 'participation-ended')",
       "name": "notification_state",
       "entityType": "checks",
       "schema": "public",

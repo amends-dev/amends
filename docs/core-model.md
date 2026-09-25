@@ -2849,14 +2849,17 @@ relevance, ask a question, do work, respond, or finish silently. Responsibility 
 sits with the recipient. Explicit mentions make a request direct and increase the expectation
 of handling it, but do not require a meaningless visible reply. A completed relevance evaluation
 with no response is a handled outcome, not unfinished input to retry. This recipient-processing
-behavior is design intent; the current implementation only generates pending notifications.
+behavior is design intent. The implementation records, per recipient, whether the activity asks
+it for work: a person's message asks the agents it reaches, and an agent's message asks no other
+agent. Notifications that ask for work stay pending; an agent's notification that asks for none is
+created settled as `Informational`, so no agent ever has to discard it.
 
 | Recipient          | Activity                                                        | Handling                                                                                          |
 | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Human using amends | Activity selected for notification                              | Receive and acknowledge the notification.                                                         |
 | External contact   | Published message selected for outward delivery                 | Create or reuse the channel delivery and acknowledge with its reference.                          |
 | Agent              | A person's message addressed to it                              | Accept the input into an existing turn or its next turn.                                          |
-| Agent              | An agent's message published                                    | Discard without starting a turn or adding input to one.                                           |
+| Agent              | An agent's message published                                    | Created settled as informational; it never starts a turn or adds input to one.                    |
 | Agent              | Informational turn status                                       | Acknowledge or discard as informational; do not start another turn merely because a turn started. |
 | Agent              | Explicit retry addressed to it                                  | Accept the retry request through normal batching; wait if cancellation is pending.                |
 | Agent              | Explicit work request addressed to it, or result of its request | Accept the request or result as new input through normal batching.                                |
@@ -2921,10 +2924,11 @@ delivery by the workflows that own them; the notification domain does not orches
 The human operation is available through core and the gateway, with HTTP/UI actions still pending.
 See [acknowledgment](thread-workflows.md#acknowledging-a-notification).
 
-Other recipients' storage, acknowledgment fields, and retry mechanics remain open. For discarded or
-informational notifications, recording acknowledgment with no work is a proposed
-representation; they must not remain pending or repeatedly trigger processing. The
-acknowledgment outcome for policy evaluation by triage remains to be defined.
+Other recipients' storage, acknowledgment fields, and retry mechanics remain open. Discarded and
+informational notifications must not remain pending or repeatedly trigger processing. An
+informational one is created settled, in its own `Informational` state rather than as an
+acknowledgment, since nobody handled it: the activity recorded, per recipient, that it asks for no
+work. The acknowledgment outcome for policy evaluation by triage remains to be defined.
 
 ### Turn creation and notification acknowledgment are atomic
 

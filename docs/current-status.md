@@ -14,9 +14,10 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Only member workflows exist. Task and channel workflows, which will start threads with contacts
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
-- Notifications to agents stay pending: no turns, execution, silent completion, or channel
-  delivery run, and contacts and triage have no inbox outside the store. Turn and task activity
-  kinds remain design intent.
+- Notifications that ask agents for work stay pending: no turns, execution, silent completion,
+  or channel delivery run, and contacts and triage have no inbox outside the store. Turn and task
+  activity kinds remain design intent. Only people author messages through the application, so
+  the agent-authored messages that notify agents as informational come from no workflow yet.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
   local host runs them on an Effect Cluster runner, but no process is registered yet. The host
   runs one runner per database;

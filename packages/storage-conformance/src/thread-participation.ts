@@ -1134,6 +1134,7 @@ export const threadParticipation = (harness: Harness) => {
                         {
                           participationId: ownerPart.id,
                           recipient: ThreadParticipation.recipientOf(ownerPart.participant),
+                          requestsWork: false,
                         },
                       ];
                       // Deliberately address non-message activity to exercise the generic generator.
@@ -1499,8 +1500,13 @@ export const threadParticipation = (harness: Harness) => {
                           {
                             participationId: contact.id,
                             recipient: { _tag: "Contact", id: contactId },
+                            requestsWork: false,
                           },
-                          { participationId: triage.id, recipient: { _tag: "Triage" } },
+                          {
+                            participationId: triage.id,
+                            recipient: { _tag: "Triage" },
+                            requestsWork: false,
+                          },
                         ],
                       });
                     }),

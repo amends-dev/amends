@@ -196,7 +196,7 @@ CREATE TABLE "notifications" (
 	"thread_group_id" text,
 	"thread_sequence" integer,
 	CONSTRAINT "notifications_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "notification_state" CHECK (("state" = 'Pending' AND "discard_reason" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" = 'participation-ended')),
+	CONSTRAINT "notification_state" CHECK (("state" IN ('Pending', 'Informational') AND "discard_reason" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" = 'participation-ended')),
 	CONSTRAINT "notification_seen_state" CHECK ("seen_at" IS NULL OR ("recipient_kind" = 'Human' AND "state" = 'Pending')),
 	CONSTRAINT "notification_recipient" CHECK (CASE "recipient_kind" WHEN 'Triage' THEN "recipient_id" IS NULL AND "recipient_member_id" IS NULL WHEN 'Contact' THEN "recipient_id" IS NOT NULL AND "recipient_member_id" IS NULL ELSE "recipient_id" IS NOT NULL AND "recipient_member_id" IS NOT NULL END),
 	CONSTRAINT "notification_thread" CHECK (("thread_id" IS NULL AND "thread_group_id" IS NULL AND "thread_sequence" IS NULL) OR ("thread_id" IS NOT NULL AND "thread_group_id" IS NOT NULL AND "thread_sequence" > 0)),
