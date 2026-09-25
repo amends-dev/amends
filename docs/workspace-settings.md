@@ -24,11 +24,13 @@ No SQL migration is needed. Both adapters update the directory name; pending
 invitations include `workspaceName` when available.
 
 Client owns typed requests and mounted intent state. Features connects them through
-`Settings.Root` and named parts. UI supplies SegmentedControl, KeyValue, ListDetail,
+`Settings.Root` and named parts. UI supplies SegmentedControl, KeyValue, ListDetail, PageColumns,
 ItemList rows/actions, and controlled name/invitation forms, using existing controls.
 The segmented section picker sits below the shared page header. Small labeled
 Divider rows identify lists and forms; the page title appears only in the header.
-The invitation history precedes the new-invite form. Pages and URL
+Workspace keeps name and ownership controls in the primary column and details in
+the aside. Invites keeps history in the primary column and the new-invite form in
+the aside. Both columns stack in that order on smaller screens. Pages and URL
 construction remain in web/desktop; ThemeProvider owns themes.
 
 Name edits carry the previously read name. Role changes carry the previous assignment

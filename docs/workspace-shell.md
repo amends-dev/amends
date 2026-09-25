@@ -25,15 +25,15 @@ repeated workspace page header has a location line (`Workspace / …` or
 pickers sit below the header as separate controls. Sign-in and workspace selection
 use standalone layouts.
 
-| Screens                                               | Content layout                                                                                                                              |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Home, Policy, Tasks                                   | One flowing column; cards or rows form internal grids and stack as space shrinks.                                                           |
-| Agents, Channels, Environments, Connections, Accounts | Full-width roster or list; a selected record replaces it with a full-width view.                                                            |
-| Settings                                              | Main list plus a 310px aside and 34px gap on desktop/laptop; one pane at a time on tablet/phone. Workspace forms align to the reading edge. |
-| Task detail, Session, Resource                        | Main reading column plus a 300px, 290px, or 310px aside respectively on desktop/laptop; one pane at a time on tablet/phone.                 |
-| Triage, Agent messages                                | Main queue or stream with an optional 400px session log or thread panel.                                                                    |
-| First run                                             | Dedicated onboarding content and setup cards.                                                                                               |
-| Sign in                                               | Standalone centered form outside the workspace shell.                                                                                       |
+| Screens                                               | Content layout                                                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home, Policy, Tasks                                   | One flowing column; cards or rows form internal grids and stack as space shrinks.                                                                               |
+| Agents, Channels, Environments, Connections, Accounts | Full-width roster or list; a selected record replaces it with a full-width view.                                                                                |
+| Settings                                              | Main content plus a 310px aside and 34px gap on desktop/laptop. Selected person details replace the list on tablet/phone; Workspace and Invites sections stack. |
+| Task detail, Session, Resource                        | Main reading column plus a 300px, 290px, or 310px aside respectively on desktop/laptop; one pane at a time on tablet/phone.                                     |
+| Triage, Agent messages                                | Main queue or stream with an optional 400px session log or thread panel.                                                                                        |
+| First run                                             | Dedicated onboarding content and setup cards.                                                                                                                   |
+| Sign in                                               | Standalone centered form outside the workspace shell.                                                                                                           |
 
 At 1280px and wider, the 256px sidebar, at least 560px of content, and the Shell
 v2 400px session log can coexist. From 1024px to 1279px, that log is a deliberate

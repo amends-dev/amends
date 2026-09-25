@@ -2,6 +2,7 @@ import { paths, type SettingsSection } from "@amends/client";
 import * as Settings from "@amends/features/settings";
 import { SegmentedControl } from "@amends/ui/compositions/segmented-control";
 import { ListDetail } from "@amends/ui/compositions/list-detail";
+import { PageColumns } from "@amends/ui/compositions/page-columns";
 import { Column, Container } from "@amends/ui/primitives/layout";
 import { useLocation, useNavigate, useParams, useSearchParams, Navigate } from "@solidjs/router";
 import { Show, type ParentProps } from "solid-js";
@@ -50,13 +51,19 @@ function Scope(props: ParentProps<{ section: SettingsSection }>) {
 export function WorkspaceSettingsPage() {
   return (
     <Scope section="workspace">
-      <Container maxWidth="40rem" gutter={0} align="start">
-        <Column gap={6}>
-          <Settings.WorkspaceName />
+      <PageColumns.Root>
+        <PageColumns.Primary>
+          <Container maxWidth="40rem" gutter={0} align="start">
+            <Column gap={6}>
+              <Settings.WorkspaceName />
+              <Settings.OwnershipTransfer />
+            </Column>
+          </Container>
+        </PageColumns.Primary>
+        <PageColumns.Aside aria-label="Workspace details">
           <Settings.WorkspaceDetails />
-          <Settings.OwnershipTransfer />
-        </Column>
-      </Container>
+        </PageColumns.Aside>
+      </PageColumns.Root>
     </Scope>
   );
 }
@@ -87,10 +94,14 @@ export function MembersSettingsPage() {
 export function InvitesSettingsPage() {
   return (
     <Scope section="invites">
-      <Settings.InvitationHistory />
-      <Container maxWidth="40rem" gutter={0} align="start">
-        <Settings.InviteForm />
-      </Container>
+      <PageColumns.Root>
+        <PageColumns.Primary>
+          <Settings.InvitationHistory />
+        </PageColumns.Primary>
+        <PageColumns.Aside aria-label="New invitation">
+          <Settings.InviteForm />
+        </PageColumns.Aside>
+      </PageColumns.Root>
     </Scope>
   );
 }

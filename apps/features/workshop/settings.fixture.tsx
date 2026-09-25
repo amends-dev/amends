@@ -10,6 +10,7 @@ import { WorkspacePicker } from "@amends/features/workspaces";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { SegmentedControl } from "@amends/ui/compositions/segmented-control";
 import { ListDetail } from "@amends/ui/compositions/list-detail";
+import { PageColumns } from "@amends/ui/compositions/page-columns";
 import { Column, Row, Container } from "@amends/ui/primitives/layout";
 import { Button } from "@amends/ui/primitives/button";
 import { Text } from "@amends/ui/primitives/text";
@@ -206,9 +207,17 @@ export function SettingsFixture(props: {
                               <Settings.Root workspaceId={workspaceId()} section={section()}>
                                 <Column gap={6}>
                                   <Show when={section() === "workspace"}>
-                                    <Settings.WorkspaceName />
-                                    <Settings.WorkspaceDetails />
-                                    <Settings.OwnershipTransfer />
+                                    <PageColumns.Root>
+                                      <PageColumns.Primary>
+                                        <Column gap={6}>
+                                          <Settings.WorkspaceName />
+                                          <Settings.OwnershipTransfer />
+                                        </Column>
+                                      </PageColumns.Primary>
+                                      <PageColumns.Aside aria-label="Workspace details">
+                                        <Settings.WorkspaceDetails />
+                                      </PageColumns.Aside>
+                                    </PageColumns.Root>
                                   </Show>
                                   <Show when={section() === "members"}>
                                     <div
@@ -244,8 +253,14 @@ export function SettingsFixture(props: {
                                     </div>
                                   </Show>
                                   <Show when={section() === "invites"}>
-                                    <Settings.InvitationHistory />
-                                    <Settings.InviteForm />
+                                    <PageColumns.Root>
+                                      <PageColumns.Primary>
+                                        <Settings.InvitationHistory />
+                                      </PageColumns.Primary>
+                                      <PageColumns.Aside aria-label="New invitation">
+                                        <Settings.InviteForm />
+                                      </PageColumns.Aside>
+                                    </PageColumns.Root>
                                   </Show>
                                   <Settings.Feedback />
                                 </Column>

@@ -275,7 +275,8 @@ SidebarUtility. The branded WorkspaceMark has shared palette tokens and contrast
 coverage. These remain presentation components; apps own routes and preferences.
 
 **Settings** adds [KeyValue](src/compositions/key-value/README.md),
-[ListDetail](src/compositions/list-detail/README.md), ItemList rows/actions, and
+[ListDetail](src/compositions/list-detail/README.md),
+[PageColumns](src/compositions/page-columns/README.md), ItemList rows/actions, and
 [controlled forms](src/features/settings/README.md). All use existing tokens;
 permission state and workflows remain in client/features, with app-owned pages.
 The [PageHeader](src/compositions/page-header/README.md) supplies the common title,
