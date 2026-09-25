@@ -6,7 +6,8 @@ in a workspace context, such as `Gateway.asMember`. The gateway preserves the ou
 and maps malformed input to `Gateway.InvalidInput`. Direct groups (DMs and group DMs) start with
 their first thread; see [starting a direct group](thread-workflows.md#starting-a-direct-group).
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
-broader design.
+broader design, and the [HTTP contract](../packages/api-http/README.md#conversations) exposes these
+operations, except the management reads `getForManagement` and `listCurrentForManagement`.
 
 ## Creating a group
 

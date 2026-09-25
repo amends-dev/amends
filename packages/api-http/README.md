@@ -64,14 +64,22 @@ so a client can import the complete contract without loading server code.
   `POST …/:invitationId/revoke` change state; accepting in a workspace that was never created
   returns 404 with `Gateway.WorkspaceNotFound`.
 
-`POST /workspaces` and `POST …/invitations` accept an optional `Idempotency-Key` header: a retry
-with the same key returns the first attempt's result, and the same key with a different body
-returns 422 `Request.Reused`. Clients generating the typed client pass it in `headers`.
+- `groups` and `threads`: conversations; see [Conversations](#conversations).
+
+`POST /workspaces`, `POST …/invitations`, `POST …/groups`, both thread starts, and
+`POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
+same key returns the first attempt's result, and the same key with a different body returns 422
+`Request.Reused`. Clients generating the typed client pass it in `headers`.
 
 - `notifications`: `GET /workspaces/:workspaceId/notifications` lists the inbox of the
   authenticated human or agent's membership. `GET …/:notificationId` reads one notification. Active
   membership is required, and a missing record or another recipient's notification
   returns the same 404. The caller cannot select a different recipient.
+  `GET …/:notificationId/source` returns the timeline item the notification points to, under the
+  caller's current access to it (404 `NotificationApplication.SourceUnavailable` without it).
+  `POST …/:notificationId/acknowledge` records that the person saw it and returns the
+  notification; acknowledging again returns the first acknowledgment, an agent's notification
+  is a 403, and one an agent's work already settled is a 409.
 - `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream of the
   commits and signals the caller may see, resumable from a cursor. Authentication and active
   membership are checked on entry. `POST /workspaces/:workspaceId/threads/:threadId/typing`
@@ -145,14 +153,64 @@ The generated client accepts the decoded cursor, including an Effect UTC date;
 on the wire, `after` is URL-encoded JSON with an ISO timestamp. The boundary is
 exclusive, and an empty page ends the traversal. Pages do not form a fixed snapshot.
 These reads neither acknowledge notifications nor grant access to their sources.
-Generation is not implemented yet, so normal workspaces have empty inboxes.
+Thread activity generates notifications for the participants it addresses, such as mentions.
 
 Workspace IDs travel in the path so a host can route a request to the right
 workspace before reading its body. Status codes follow `ApiErrors`: not a member,
 denied delegation and wrong recipients are 403; missing records are 404; ownership
-protection, stale assignment changes, inactive recipients, repeated removal, existing membership, and storage conflicts are 409;
+protection, stale assignment changes, inactive recipients, repeated removal, existing membership,
+members who cannot take part, fixed direct groups, and storage conflicts are 409;
 consumed or expired invitations are 410; rejected input, expiry, or permission
 names are 400; and an uncertain commit is 500 with its commit ID.
+
+### Conversations
+
+Group and thread paths sit under `/workspaces/:workspaceId`. Every operation requires active
+membership; reads of a group or its threads also require current membership of the group, and a
+group or thread the caller cannot read answers 404 exactly as a missing one does. The
+[group](../../docs/group-workflows.md) and [thread](../../docs/thread-workflows.md) workflows
+describe the rules behind each operation.
+
+| Endpoint                                             | Operation                                                                                      |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following. |
+| `POST …/groups`                                      | Create a private team from `{ name, memberIds }`; 201 with the group.                          |
+| `GET …/groups/:groupId`                              | One group.                                                                                     |
+| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                      |
+| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                  |
+| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                    |
+| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                    |
+| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.            |
+| `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                      |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.    |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread, message, and activity.          |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.   |
+| `GET …/threads/:threadId`                            | One thread.                                                                                    |
+| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                           |
+| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                |
+| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message and its activity.                        |
+| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.   |
+| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                   |
+| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                              |
+
+Every page takes an integer `limit` from 1 to 100 and an exclusive boundary from the last item of
+the previous page; an empty page ends the traversal. Groups, rosters, and participants pass that
+item's ID as `after`. Thread lists pass `before`, URL-encoded JSON of the last item's
+`{ latestActivityAt, threadId }`, as the typed client does from the decoded cursor. A timeline page
+is in ascending sequence order: `afterSequence` and `beforeSequence` bound it exclusively, and
+`from=newest` takes the page from the newest end of that range, so a view opens at the latest page
+and pages back with `beforeSequence` set to its first item's sequence. Timeline items are
+`{ activity, message }` for messages and `{ activity, participant }` for participants joining or
+leaving, with the activity's `kind` naming which.
+
+Message text keeps its whitespace and must contain a non-space character. Mentions name members
+of the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only
+people write messages and keep read positions: an agent principal gets 403. A read position past
+the thread's latest activity is a 409 `ReadStateApplication.BeyondTimeline` carrying the latest
+sequence. A direct group's members are fixed and it has nothing to follow, so adding, removing, and
+following there are 409s; unfollowing an ended participation or removing an ended admission is
+also a 409. Positions, caught-up times, and acknowledgments reach the caller's other sessions as
+signals on the change feed, and the conversation's facts reach the group's readers as commits.
 
 ## Authentication
 

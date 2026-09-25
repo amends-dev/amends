@@ -5,7 +5,8 @@ import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 /**
- * Register inbox reads, resolving the principal and workspace membership per request.
+ * Register inbox reads, source resolution, and acknowledgment, resolving the principal and
+ * workspace membership per request.
  *
  * @category layers
  */
@@ -32,6 +33,26 @@ export const layer = HttpApiBuilder.group(
             principal,
             Effect.flatMap(NotificationApplication.Service, (notifications) =>
               notifications.get(params.notificationId),
+            ),
+          ),
+        ),
+      source: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(NotificationApplication.Service, (notifications) =>
+              notifications.resolveSource(params.notificationId),
+            ),
+          ),
+        ),
+      acknowledge: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(NotificationApplication.Service, (notifications) =>
+              notifications.acknowledge(params.notificationId),
             ),
           ),
         ),

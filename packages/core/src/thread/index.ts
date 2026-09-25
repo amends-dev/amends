@@ -26,6 +26,7 @@ export { ThreadMessageActivity } from "./message/activity.ts";
 export { ThreadMessageTimeline } from "./message/timeline.ts";
 export { ThreadParticipationActivity } from "./participation/activity.ts";
 export { ThreadParticipationTimeline } from "./participation/timeline.ts";
+export { ThreadTimeline } from "./timeline.ts";
 export { ThreadActivityFacts } from "./activity/facts.ts";
 export { ThreadActivityStore } from "./activity/store.ts";
 export { ThreadActivityProjection } from "./activity/projection.ts";

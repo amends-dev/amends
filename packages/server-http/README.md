@@ -11,11 +11,17 @@ points; credential verification belongs to the authentication middleware, and
 domain rules belong to core.
 
 Notification handlers enter through `Gateway.asMember` and call
-`NotificationApplication.get`, `list`, or `listPending`. The contract decodes the
-page size, cursor, and optional pending-only filter; core derives the recipient
-from the actor and checks active membership and recipient ownership without opening
-a transaction. An existing caller transaction is honored. The HTTP layer adds no
-notification generation or delivery.
+`NotificationApplication.get`, `list`, `listPending`, `resolveSource`, or `acknowledge`. The
+contract decodes the page size, cursor, and optional pending-only filter; core derives the
+recipient from the actor and checks active membership and recipient ownership. The HTTP layer adds
+no notification generation or delivery.
+
+Group and thread handlers enter through `Gateway.asMember` and call one of `GroupApplication`,
+`GroupMembershipApplication`, `GroupFollowApplication`, `ThreadApplication`,
+`ThreadMessageApplication`, `ThreadParticipationApplication`, or `ReadStateApplication`. They
+combine the path's group or thread ID with the body into the operation's input and pass the
+`Idempotency-Key` header as its request key; core authorizes, validates, and chooses who takes
+part. Management reads of groups the caller does not belong to are not exposed.
 
 `ChangesHandlers.watch` enters through `Gateway.asMemberScoped` and calls
 `ChangeFeedApplication.watch`. Effect's HTTP server transfers the request scope
@@ -83,8 +89,14 @@ and grants, and compatibility of session and directory JSON fields. The local ho
 over real PostgreSQL storage, including through its spawned server entry point.
 Notification tests cover cursor and date round-trips, filter selection, malformed
 queries, human and agent inbox isolation, workspace boundaries, and loss of access
-after membership removal. Host fixtures seed notification records because their
-generation projection is still empty.
+after membership removal. Host fixtures seed notification records to reach agent
+recipients, whose admission is not implemented.
+A handler test checks that group and thread routes merge path parameters, cursors, and request
+keys into core inputs and keep each outcome's status. Conversation host tests run a team
+conversation over PostgreSQL: group creation and its retry, starts, mentions reaching the inbox
+and resolving to their source, replies, timeline pages from either end, participants, following,
+read positions, leaving, and the 404s after it; and direct threads, thread-list cursors, fixed
+direct groups, outsiders, malformed queries, and the OpenAPI document.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
 resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream

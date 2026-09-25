@@ -8,6 +8,21 @@ import { Actor, Identity } from "@amends/core/identity";
 import { Entry } from "@amends/core/journal";
 import { Notification, NotificationApplication } from "@amends/core/notification";
 import {
+  Group,
+  GroupApplication,
+  GroupFollowApplication,
+  GroupMembership,
+  GroupMembershipApplication,
+} from "@amends/core/group";
+import {
+  Thread,
+  ThreadApplication,
+  ThreadMessageApplication,
+  ThreadParticipation,
+  ThreadParticipationApplication,
+} from "@amends/core/thread";
+import { ReadStateApplication } from "@amends/core/attention";
+import {
   Invitation,
   InvitationApplication,
   Member,
@@ -56,13 +71,120 @@ const notification: Notification.Record = {
   recordedAt: DateTime.makeUnsafe("2026-01-01T00:00:00.123Z"),
   state: { _tag: "Pending" },
 };
+const groupId = Group.Id.make("group-one");
+const team: Group.TeamRecord = {
+  id: groupId,
+  workspaceId,
+  kind: "Team",
+  visibility: "Private",
+  name: "Studio",
+  createdBy: memberId,
+  createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+};
+const threadId = Thread.Id.make("thread-one");
+/** Conversation services record their inputs; failures show that each tag keeps its status. */
+const conversations = Layer.mergeAll(
+  Layer.succeed(
+    GroupApplication.Service,
+    GroupApplication.Service.of({
+      workspaceId,
+      createPrivateTeam: record("group.create", () => Effect.succeed(team)),
+      get: record("group.get", (id) => Effect.fail(new GroupApplication.NotFound({ groupId: id }))),
+      listMine: record("group.listMine", () => Effect.succeed([])),
+      getForManagement: () => Effect.die("unused"),
+    }),
+  ),
+  Layer.succeed(
+    GroupMembershipApplication.Service,
+    GroupMembershipApplication.Service.of({
+      workspaceId,
+      add: record("group.add", (input) =>
+        Effect.fail(new GroupMembershipApplication.AlreadyMember(input)),
+      ),
+      remove: record("group.remove", (input) =>
+        Effect.fail(new GroupMembershipApplication.FixedMembership({ groupId: input.groupId })),
+      ),
+      leave: record("group.leave", (input) =>
+        Effect.fail(new GroupMembershipApplication.AlreadyRemoved(input)),
+      ),
+      listCurrent: record("group.members", () => Effect.succeed([])),
+      listCurrentForManagement: () => Effect.die("unused"),
+    }),
+  ),
+  Layer.succeed(
+    GroupFollowApplication.Service,
+    GroupFollowApplication.Service.of({
+      workspaceId,
+      follow: record("group.follow", () => Effect.void),
+      unfollow: record("group.unfollow", (input) =>
+        Effect.fail(new GroupFollowApplication.NotFollowable({ groupId: input.groupId })),
+      ),
+    }),
+  ),
+  Layer.succeed(
+    ThreadApplication.Service,
+    ThreadApplication.Service.of({
+      workspaceId,
+      startInGroup: record("thread.start", () =>
+        Effect.fail(new ThreadApplication.ParticipantUnavailable({ memberId })),
+      ),
+      startDirect: record("thread.startDirect", () =>
+        Effect.fail(new ThreadApplication.DirectMembersRequired()),
+      ),
+      get: record("thread.get", (id) =>
+        Effect.fail(new ThreadApplication.NotFound({ threadId: id })),
+      ),
+      listInGroup: record("thread.list", () => Effect.succeed([])),
+      readTimeline: record("thread.timeline", () => Effect.succeed([])),
+      listParticipants: record("thread.participants", () => Effect.succeed([])),
+    }),
+  ),
+  Layer.succeed(
+    ThreadMessageApplication.Service,
+    ThreadMessageApplication.Service.of({
+      workspaceId,
+      publish: record("thread.publish", () =>
+        Effect.fail(new ThreadMessageApplication.HumanAuthorRequired({ memberId })),
+      ),
+    }),
+  ),
+  Layer.succeed(
+    ThreadParticipationApplication.Service,
+    ThreadParticipationApplication.Service.of({
+      workspaceId,
+      follow: record("thread.follow", (id) =>
+        Effect.fail(new ThreadParticipationApplication.ThreadNotFound({ threadId: id })),
+      ),
+      unfollow: record("thread.unfollow", (input) =>
+        Effect.fail(new ThreadParticipationApplication.AlreadyEnded(input)),
+      ),
+    }),
+  ),
+  Layer.succeed(
+    ReadStateApplication.Service,
+    ReadStateApplication.Service.of({
+      workspaceId,
+      markThreadRead: record("thread.markRead", ({ threadId, throughSequence }) =>
+        Effect.fail(
+          new ReadStateApplication.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
+        ),
+      ),
+      markGroupRead: record("group.markRead", () => Effect.void),
+    }),
+  ),
+);
 const operations = Layer.mergeAll(
+  conversations,
   Layer.succeed(
     NotificationApplication.Service,
     NotificationApplication.Service.of({
       workspaceId,
-      resolveSource: () => Effect.die("Source resolution is not exposed over HTTP yet"),
-      acknowledge: () => Effect.die("Acknowledgment is not exposed over HTTP yet"),
+      resolveSource: record("notification.resolveSource", (notificationId) =>
+        Effect.fail(new NotificationApplication.SourceUnavailable({ notificationId })),
+      ),
+      acknowledge: record("notification.acknowledge", (notificationId) =>
+        Effect.fail(new NotificationApplication.AlreadyHandled({ notificationId })),
+      ),
       get: record("notification.get", (notificationId) =>
         notificationId === notification.id
           ? Effect.succeed(notification)
@@ -198,6 +320,8 @@ const makeClient = HttpApiTest.groups(Api, [
   "members",
   "invitations",
   "notifications",
+  "groups",
+  "threads",
 ]);
 it.effect("notification queries decode cursors and select the requested application read", () =>
   Effect.gen(function* () {
@@ -434,4 +558,169 @@ it.effect("session and directory responses retain their existing JSON field name
     );
     expect(directory).toEqual({ memberships: [{ workspace, member, people: 1 }], invitations: [] });
   }),
+);
+
+it.effect(
+  "conversation routes pass path parameters, cursors, and request keys into core inputs",
+  () =>
+    Effect.gen(function* () {
+      calls.length = 0;
+      const before = {
+        latestActivityAt: DateTime.makeUnsafe("2026-01-02T03:04:05.678Z"),
+        threadId: Thread.Id.make("a + & é"),
+      };
+      const membershipId = GroupMembership.Id.make("admission-one");
+      const participationId = ThreadParticipation.Id.make("participation-one");
+      const key = Request.Key.make("start-1");
+      const statuses = yield* run("alice", (client) =>
+        Effect.all([
+          client.groups.create({
+            params: { workspaceId },
+            headers: { "idempotency-key": Request.Key.make("group-1") },
+            payload: { name: "Studio", memberIds: [memberId] },
+            responseMode: "response-only",
+          }),
+          client.groups.list({
+            params: { workspaceId },
+            query: { limit: 20, after: groupId },
+            responseMode: "response-only",
+          }),
+          client.groups.get({ params: { workspaceId, groupId }, responseMode: "response-only" }),
+          client.groups.members({
+            params: { workspaceId, groupId },
+            query: { limit: 5 },
+            responseMode: "response-only",
+          }),
+          client.groups.addMember({
+            params: { workspaceId, groupId },
+            payload: { memberId },
+            responseMode: "response-only",
+          }),
+          client.groups.removeMember({
+            params: { workspaceId, groupId, membershipId },
+            responseMode: "response-only",
+          }),
+          client.groups.leave({
+            params: { workspaceId, groupId, membershipId },
+            responseMode: "response-only",
+          }),
+          client.groups.follow({
+            params: { workspaceId, groupId },
+            payload: { memberId },
+            responseMode: "response-only",
+          }),
+          client.groups.unfollow({
+            params: { workspaceId, groupId },
+            payload: { memberId },
+            responseMode: "response-only",
+          }),
+          client.groups.markRead({
+            params: { workspaceId, groupId },
+            responseMode: "response-only",
+          }),
+          client.threads.list({
+            params: { workspaceId, groupId },
+            query: { limit: 10, before },
+            responseMode: "response-only",
+          }),
+          client.threads.start({
+            params: { workspaceId, groupId },
+            headers: { "idempotency-key": key },
+            payload: { text: "  Hello\n", mentions: [memberId] },
+            responseMode: "response-only",
+          }),
+          client.threads.startDirect({
+            params: { workspaceId },
+            headers: {},
+            payload: { memberIds: [memberId], text: "Hi", mentions: [] },
+            responseMode: "response-only",
+          }),
+          client.threads.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.threads.timeline({
+            params: { workspaceId, threadId },
+            query: { limit: 50, beforeSequence: 9, from: "newest" },
+            responseMode: "response-only",
+          }),
+          client.threads.participants({
+            params: { workspaceId, threadId },
+            query: { limit: 5, after: participationId },
+            responseMode: "response-only",
+          }),
+          client.threads.publish({
+            params: { workspaceId, threadId },
+            headers: { "idempotency-key": Request.Key.make("reply-1") },
+            payload: { text: "Reply", mentions: [] },
+            responseMode: "response-only",
+          }),
+          client.threads.follow({
+            params: { workspaceId, threadId },
+            responseMode: "response-only",
+          }),
+          client.threads.unfollow({
+            params: { workspaceId, threadId },
+            payload: { participationId },
+            responseMode: "response-only",
+          }),
+          client.threads.markRead({
+            params: { workspaceId, threadId },
+            payload: { throughSequence: 4 },
+            responseMode: "response-only",
+          }),
+          client.notifications.source({
+            params: { workspaceId, notificationId: notification.id },
+            responseMode: "response-only",
+          }),
+          client.notifications.acknowledge({
+            params: { workspaceId, notificationId: notification.id },
+            responseMode: "response-only",
+          }),
+        ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
+      );
+      expect(statuses).toEqual([
+        201, 200, 404, 200, 409, 409, 409, 204, 409, 204, 200, 409, 400, 404, 200, 200, 403, 404,
+        409, 409, 404, 409,
+      ]);
+      expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
+        {
+          operation: "group.create",
+          arguments: [{ name: "Studio", memberIds: [memberId] }, { requestKey: "group-1" }],
+        },
+        { operation: "group.listMine", arguments: [{ limit: 20, after: groupId }] },
+        { operation: "group.get", arguments: [groupId] },
+        { operation: "group.members", arguments: [groupId, { limit: 5 }] },
+        { operation: "group.add", arguments: [{ groupId, memberId }] },
+        { operation: "group.remove", arguments: [{ groupId, membershipId }] },
+        { operation: "group.leave", arguments: [{ groupId, membershipId }] },
+        { operation: "group.follow", arguments: [{ groupId, memberId }] },
+        { operation: "group.unfollow", arguments: [{ groupId, memberId }] },
+        { operation: "group.markRead", arguments: [{ groupId }] },
+        { operation: "thread.list", arguments: [groupId, { limit: 10, before }] },
+        {
+          operation: "thread.start",
+          arguments: [{ groupId, text: "  Hello\n", mentions: [memberId] }, { requestKey: key }],
+        },
+        {
+          operation: "thread.startDirect",
+          arguments: [{ memberIds: [memberId], text: "Hi", mentions: [] }, {}],
+        },
+        { operation: "thread.get", arguments: [threadId] },
+        {
+          operation: "thread.timeline",
+          arguments: [threadId, { limit: 50, beforeSequence: 9, from: "newest" }],
+        },
+        {
+          operation: "thread.participants",
+          arguments: [threadId, { limit: 5, after: participationId }],
+        },
+        {
+          operation: "thread.publish",
+          arguments: [{ threadId, text: "Reply", mentions: [] }, { requestKey: "reply-1" }],
+        },
+        { operation: "thread.follow", arguments: [threadId] },
+        { operation: "thread.unfollow", arguments: [{ threadId, participationId }] },
+        { operation: "thread.markRead", arguments: [{ threadId, throughSequence: 4 }] },
+        { operation: "notification.resolveSource", arguments: [notification.id] },
+        { operation: "notification.acknowledge", arguments: [notification.id] },
+      ]);
+    }),
 );

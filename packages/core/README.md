@@ -207,9 +207,9 @@ kind, details, and recipients. The activity is recorded at that position, caused
 A kind appears in timelines through a resolver its domain registers:
 `ThreadMessageTimeline.resolver` and `ThreadParticipationTimeline.resolver`. Each loads what its
 kinds reference in one batch per page and returns typed items; each timeline module adds its item
-type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers
-and exports `Core.TimelineItem`, the closed schema of every item, for protocols that encode
-timelines; a new kind adds its resolver and item schema there. Reading a kind without a resolver fails the read with
+type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers, and
+`ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new
+kind adds its resolver to the first and its item schema to the second. Reading a kind without a resolver fails the read with
 `ThreadActivityReading.InvalidResponse`.
 
 Starts and replies read only the admissions and participations of those they name, through

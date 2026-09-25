@@ -1,4 +1,5 @@
 export { BearerAuthentication } from "./authentication.ts";
+export { GroupsHandlers } from "./groups.ts";
 export { InvitationsHandlers } from "./invitations.ts";
 export { MeHandlers } from "./me.ts";
 export { MembersHandlers } from "./members.ts";
@@ -7,4 +8,5 @@ export { Routes } from "./routes.ts";
 export { ChangesHandlers } from "./changes.ts";
 export { Draining } from "./draining.ts";
 export { SessionHandlers } from "./session.ts";
+export { ThreadsHandlers } from "./threads.ts";
 export { WorkspacesHandlers } from "./workspaces.ts";

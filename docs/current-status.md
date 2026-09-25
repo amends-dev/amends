@@ -31,9 +31,11 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 ## HTTP coverage
 
 HTTP exposes sign-in, workspace creation and the directory, members, invitations, assignments, ownership,
-the notification inbox reads, the change feed, and typing. Groups, threads, read state,
-notification sources, and acknowledgment are available through core and the gateway only, and
-the web and desktop apps have no pages for those workflows yet.
+the notification inbox, its sources and acknowledgment, groups, threads, replies, following, read
+state, the change feed, and typing. The management reads of groups the caller does not belong to,
+`GroupApplication.getForManagement` and `GroupMembershipApplication.listCurrentForManagement`, are
+available through core and the gateway only. The client has no conversation reads or commands yet,
+and the web and desktop apps have no pages for conversations.
 
 ## Storage cost
 

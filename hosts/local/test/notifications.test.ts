@@ -102,7 +102,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           "foreign",
           Notification.ofMember(otherWorkspace.ownerMemberId, alice),
         );
-        // Notification generation and agent admission are not implemented yet; seed their read models.
+        // Agent admission is not implemented yet; seed the read models to reach an agent recipient.
         yield* Effect.gen(function* () {
           const storage = yield* PostgresStorage.make();
           const context = yield* storage.forWorkspace(workspace.id);

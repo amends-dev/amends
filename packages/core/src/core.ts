@@ -32,7 +32,7 @@ import { ThreadActivityProjection } from "./thread/activity/projection.ts";
  * workspace and supply cryptography; a gateway resolves the acting member and
  * runs the application operations.
  */
-import { Layer, Schema } from "effect";
+import { Layer } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
 import { SignalApplication } from "./signal/application.ts";
@@ -117,19 +117,12 @@ export const permissions = [
 
 /**
  * How each kind of thread activity appears in a timeline, one resolver per owning domain. A domain
- * that records a new kind adds its resolver here, and its timeline item schema below.
+ * that records a new kind adds its resolver here, and its timeline item schema to `ThreadTimeline`.
  */
 const activityResolvers = [
   ThreadMessageTimeline.resolver,
   ThreadParticipationTimeline.resolver,
 ] as const;
-
-/** Every kind of timeline item, for protocols that encode timelines. */
-export const TimelineItem = Schema.Union([
-  ThreadMessageTimeline.Item,
-  ThreadParticipationTimeline.FollowedItem,
-  ThreadParticipationTimeline.EndedItem,
-]);
 
 /**
  * The workspace journal's log. A workspace that was never created has no batch in it, which

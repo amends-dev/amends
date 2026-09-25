@@ -5,7 +5,8 @@ read state around them. The operations are `ThreadApplication`, `ThreadMessageAp
 `ThreadParticipationApplication`, `NotificationApplication`, `ReadStateApplication`, and
 `SignalApplication` in a workspace context, such as `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
-failures remain failures.
+failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
+each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
 
 ## Starting a conversation
 

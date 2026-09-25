@@ -11,7 +11,18 @@ import {
   WorkspaceSettingsApplication,
 } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
+import {
+  GroupApplication,
+  GroupFollowApplication,
+  GroupMembershipApplication,
+} from "@amends/core/group";
 import { NotificationApplication } from "@amends/core/notification";
+import { ReadStateApplication } from "@amends/core/attention";
+import {
+  ThreadApplication,
+  ThreadMessageApplication,
+  ThreadParticipationApplication,
+} from "@amends/core/thread";
 import { Request } from "@amends/core/request";
 import { SignalApplication } from "@amends/core/signal";
 import { Schema } from "effect";
@@ -62,6 +73,16 @@ export const MemberNotFound = MemberApplication.NotFound.pipe(HttpApiSchema.stat
 export const NotificationNotFound = NotificationApplication.NotFound.pipe(
   HttpApiSchema.status(404),
 );
+/** The notification is the caller's, but its source cannot be read now. */
+export const NotificationSourceUnavailable = NotificationApplication.SourceUnavailable.pipe(
+  HttpApiSchema.status(404),
+);
+/** Only a person acknowledges a notification; an agent's are handled by its work. */
+export const NotificationHumanRecipientRequired =
+  NotificationApplication.HumanRecipientRequired.pipe(HttpApiSchema.status(403));
+export const NotificationAlreadyHandled = NotificationApplication.AlreadyHandled.pipe(
+  HttpApiSchema.status(409),
+);
 export const TypingThreadNotFound = SignalApplication.ThreadNotFound.pipe(
   HttpApiSchema.status(404),
 );
@@ -95,6 +116,61 @@ export const ownership = [
   OwnershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
   OwnershipApplication.InvalidRecipient.pipe(HttpApiSchema.status(409)),
   OwnershipApplication.Changed.pipe(HttpApiSchema.status(409)),
+] as const;
+
+/**
+ * Group outcomes. A group the caller does not belong to is indistinguishable from a missing one;
+ * a named member who cannot take part is a 409, and a fixed direct group refuses changes with 409.
+ */
+export const group = [
+  GroupApplication.NotFound.pipe(HttpApiSchema.status(404)),
+  GroupApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  GroupApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
+] as const;
+export const groupMembership = [
+  GroupMembershipApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  GroupMembershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  GroupMembershipApplication.NotFound.pipe(HttpApiSchema.status(404)),
+  GroupMembershipApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
+  GroupMembershipApplication.AlreadyMember.pipe(HttpApiSchema.status(409)),
+  GroupMembershipApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409)),
+  GroupMembershipApplication.FixedMembership.pipe(HttpApiSchema.status(409)),
+] as const;
+export const groupFollow = [
+  GroupFollowApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  GroupFollowApplication.AgentRequired.pipe(HttpApiSchema.status(403)),
+  GroupFollowApplication.MemberUnavailable.pipe(HttpApiSchema.status(409)),
+  GroupFollowApplication.NotFollowable.pipe(HttpApiSchema.status(409)),
+] as const;
+
+/**
+ * Thread outcomes. Missing threads and threads outside the caller's groups share a 404; an agent
+ * principal writing where only people may is a 403; a named member who cannot take part is a 409.
+ */
+export const thread = [
+  ThreadApplication.NotFound.pipe(HttpApiSchema.status(404)),
+  ThreadApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadApplication.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  ThreadApplication.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+  ThreadApplication.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
+] as const;
+export const message = [
+  ThreadMessageApplication.NotFound.pipe(HttpApiSchema.status(404)),
+  ThreadMessageApplication.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  ThreadMessageApplication.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const;
+export const participation = [
+  ThreadParticipationApplication.ThreadNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadParticipationApplication.NotFound.pipe(HttpApiSchema.status(404)),
+  ThreadParticipationApplication.AlreadyEnded.pipe(HttpApiSchema.status(409)),
+] as const;
+
+/** Read-state outcomes: only people keep it, and a position cannot pass the latest activity. */
+export const readState = [
+  ReadStateApplication.HumanRequired.pipe(HttpApiSchema.status(403)),
+  ReadStateApplication.ThreadNotFound.pipe(HttpApiSchema.status(404)),
+  ReadStateApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  ReadStateApplication.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
