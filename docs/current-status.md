@@ -86,8 +86,10 @@ The Input primitive supports native text/email/password/search/tel/URL entry wit
 disabled, and caller-controlled invalid states. `line.invalid` supplies the reviewed invalid
 border. The Field composition provides a label, required marker, help, and error text with explicit
 reactive association props; form state and validation timing stay with the consuming feature.
-`text.invalid` adds a verified error-text role. Textarea, grouped controls, and specialized
-input types remain future pieces. The visible Radio primitive supports native selection and
+`text.invalid` adds a verified error-text role. CodeInput adds six-digit native text entry
+with decorative cells and a compact presentation for narrow containers; the sign-in forms
+and integration remain planned. Textarea and other specialized input types remain future
+pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
 behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),
 binary Switch, and styled single-choice Select primitives are available. Select uses Kobalte

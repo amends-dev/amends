@@ -21,6 +21,7 @@
     "./primitives/text": "./src/primitives/text/index.ts",
     "./primitives/button": "./src/primitives/button/index.ts",
     "./primitives/input": "./src/primitives/input/index.ts",
+    "./primitives/code-input": "./src/primitives/code-input/index.ts",
     "./compositions/field": "./src/compositions/field/index.ts",
     "./primitives/radio": "./src/primitives/radio/index.ts",
     "./compositions/radio-group": "./src/compositions/radio-group/index.ts",

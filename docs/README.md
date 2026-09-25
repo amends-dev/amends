@@ -35,6 +35,9 @@ drawings, generation, and visual review in the UI workshop.
 
 ## Design and historical references
 
+- [Feature development](feature-development.md) records the agreed workflow and
+  planned connected-feature boundary. [Sign-in](sign-in-design.md) applies it to
+  the first slice, including the UI pieces to introduce.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not

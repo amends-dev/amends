@@ -104,6 +104,12 @@ portable stories; browser review covers focus, native validation/submission, For
 placeholder contrast, long content, and enlarged text. `line.invalid` has independent
 control-color specimens and contrast tests. See the [Input contract](src/primitives/input/README.md).
 
+**Primitives / CodeInput** adds six-digit entry through one native text input with
+decorative cells, Field associations, and native editing/form behavior. It adapts
+to one field in narrow containers without remounting. Stories cover both themes,
+RTL, enlarged text, editing, forms, and resizing. See the
+[CodeInput contract](src/primitives/code-input/README.md).
+
 **Compositions / Field** combines a label, required marker, help, and error text around one
 control. A render function supplies reactive associations without coupling Input to Field.
 Labels use compact uppercase mono, supporting text uses smaller mono, and errors use

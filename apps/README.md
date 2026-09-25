@@ -17,6 +17,10 @@ that reset. Both apps compose the independent client and UI packages. They own r
 trees and placeholder-page wiring, while client owns session/API state. The sign-in page
 is the next slice; the full product workflows remain backend-only.
 
+The agreed [feature development flow](../docs/feature-development.md) adds a planned
+shared `features` package for connected interactions and their own workshop.
+The [sign-in design](../docs/sign-in-design.md) identifies the first UI pieces.
+
 ## Development
 
 From the repository root after `bun install`:

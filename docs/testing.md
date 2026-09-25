@@ -102,6 +102,12 @@ Controls specimens include the invalid-border role independently of Input.
 Field Comparison also checks the mock-aligned label/help/error typography and semantic
 colors in both themes. Reference shows the compact field treatments; the error prefix stays
 in accessible descriptions while its decorative dot supplies the visible marker.
+The [CodeInput primitive](../apps/ui/src/primitives/code-input/README.md) has DOM/type
+tests for native associations, validity, reset defaults, and reactive selection. Editing,
+Forms, and Layout run as portable stories; Comparison checks glyph alignment in the browser.
+Review real keyboard replacement, paste, undo, Enter/Tab, forced colors, RTL, and 320px
+layouts with enlarged text. Resizing between six cells and compact entry must retain the
+input, value, and selection. Device autofill and native desktop remain platform checks.
 The [Field composition](../apps/ui/src/compositions/field/README.md) has DOM/type tests for
 unique identities, native label/description associations, external-description deduplication,
 wrapper props, required/disabled/error changes, and control identity/focus/selection retention.
