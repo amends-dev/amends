@@ -1,9 +1,9 @@
 import { Api, Authentication, Unauthorized } from "@amends/api-http";
-import { Cause, Layer, Schema } from "effect";
-import { FetchHttpClient, type HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { Cause, Effect, Layer, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { HttpApiMiddleware } from "effect/unstable/httpapi";
 import { AtomHttpApi } from "effect/unstable/reactivity";
-import { sessionAtom } from "../session/state.ts";
+import { sessionAtom, signOutAtom } from "../session/state.ts";
 
 /** One endpoint configuration per app instance; each credential session owns its registry. */
 export function createApiClient(
@@ -15,8 +15,20 @@ export function createApiClient(
     baseUrl,
     httpClient: (get) => {
       const session = get(sessionAtom);
+      const signOut = get(signOutAtom);
+      // Any request the host rejects as unauthenticated signs out the credential it carried,
+      // so operations need no handling of their own.
+      const rejecting = Layer.effect(
+        HttpClient.HttpClient,
+        Effect.map(
+          HttpClient.HttpClient,
+          HttpClient.tap((response) =>
+            response.status === 401 ? Effect.sync(signOut) : Effect.void,
+          ),
+        ),
+      ).pipe(Layer.provide(transport));
       return Layer.mergeAll(
-        transport,
+        session ? rejecting : transport,
         HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
           next(session ? HttpClientRequest.bearerToken(request, session.token) : request),
         ),

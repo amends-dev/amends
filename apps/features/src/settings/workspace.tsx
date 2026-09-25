@@ -8,7 +8,7 @@ import { Button } from "@amends/ui/primitives/button";
 import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createEffect, createSignal, on, Show } from "solid-js";
-import { useSettingsScope } from "./settings.tsx";
+import { settingsMessage, useSettingsScope } from "./settings.tsx";
 /**
  * The name field follows the stored name until edited. A draft keeps the name it was made
  * against, so a rename saved elsewhere meanwhile conflicts instead of being overwritten.
@@ -150,7 +150,7 @@ export function OwnershipTransfer() {
               </Field>
               <Show when={open() && value.error()}>
                 <Text role="alert" tone="danger">
-                  {value.error()}
+                  {settingsMessage(value.error())}
                 </Text>
               </Show>
             </Dialog.Body>

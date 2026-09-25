@@ -35,7 +35,9 @@ construction remain in web/desktop; ThemeProvider owns themes.
 
 Name edits carry the name the draft started from. Role changes carry the assignment IDs the
 choice started from; ownership transfer carries the Owner assignment ID read when the dialog
-opened. Stale writes fail and require an explicit refresh/review. Refresh replaces form drafts
+opened. Stale writes fail and require an explicit refresh/review: a conflict, lost permission, or
+missing target locks the forms until the reader refreshes. A host failure or invalid input
+leaves them current, so the same action can be sent again at once. Refresh replaces form drafts
 with current data.
 A completed mutation followed by a failed refresh retries the read, not the write.
 Invitation retries retain the same key and expiry while mounted. After leaving or

@@ -2,6 +2,7 @@ import {
   useDirectory,
   useAcceptInvitation,
   formatInstant,
+  type AcceptInvitationError,
   type DirectoryScope,
 } from "@amends/client";
 import { ItemList } from "@amends/ui/compositions/item-list";
@@ -12,6 +13,14 @@ import { Text } from "@amends/ui/primitives/text";
 import { createContext, For, Show, useContext, type ParentProps } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
 
+const acceptMessages: { readonly [Error in AcceptInvitationError]: string } = {
+  changed: "This invitation changed while you were accepting it. Try again.",
+  denied: "This invitation isn’t addressed to this address.",
+  gone: "This invitation is no longer available.",
+  invalid: "This invitation can’t be accepted as it is.",
+  failed: "We couldn’t accept the invitation. Try again when the host is available.",
+  "refresh-failed": "Joined, but we couldn’t load your workspaces. Try again.",
+};
 const Context = createContext<DirectoryScope>();
 const directory = () => {
   const value = useContext(Context);
@@ -156,9 +165,11 @@ function InvitationEntry(props: {
             Expires {formatInstant(props.invitation.details.expiresAt)}
           </ItemList.Description>
           <Show when={value.error()}>
-            <Text role="alert" tone="danger">
-              {value.error()}
-            </Text>
+            {(error) => (
+              <Text role="alert" tone="danger">
+                {acceptMessages[error()]}
+              </Text>
+            )}
           </Show>
         </ItemList.Content>
         <ItemList.Actions>

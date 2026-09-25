@@ -3,7 +3,6 @@ import { Data } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import {
   createContext,
-  createEffect,
   createMemo,
   onCleanup,
   onMount,
@@ -12,7 +11,6 @@ import {
   type ParentProps,
 } from "solid-js";
 import type { WorkspaceDirectory } from "../api/contracts.ts";
-import { isUnauthorized } from "../api/client.ts";
 import { useApiClient } from "../api/context.tsx";
 import { directoryQuery } from "../api/directory.ts";
 import { watchWake } from "../live/wake.ts";
@@ -44,11 +42,6 @@ export function DirectoryProvider(props: ParentProps) {
   const read = session.session
     ? { result: useAtomValue(query), retry: useAtomRefresh(query) }
     : undefined;
-  createEffect(() => {
-    const current = read?.result();
-    if (current && AsyncResult.isFailure(current) && isUnauthorized(current.cause))
-      session.replace(undefined);
-  });
   // Workspace feeds refresh the directory for their own changes, but invitations from other
   // workspaces reach no feed this identity holds. Refresh when the page returns instead.
   onMount(() => {

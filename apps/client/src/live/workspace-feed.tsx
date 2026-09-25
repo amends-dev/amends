@@ -1,13 +1,6 @@
 import { useAtomValue } from "@effect/atom-solid";
 import { AsyncResult } from "effect/unstable/reactivity";
-import {
-  createContext,
-  createEffect,
-  createMemo,
-  useContext,
-  type Accessor,
-  type ParentProps,
-} from "solid-js";
+import { createContext, createMemo, useContext, type Accessor, type ParentProps } from "solid-js";
 import { workspaceFeed, WorkspaceFeedState } from "../api/changes.ts";
 import { useApiClient } from "../api/context.tsx";
 import { useSession } from "../session/provider.tsx";
@@ -19,8 +12,8 @@ const Context = createContext<WorkspaceFeedScope>();
 
 /**
  * Keep the workspace's reads current while mounted: its change stream refreshes the reads each
- * commit affects. Rejected credentials sign out; lost access refreshes the directory, whose
- * guard decides what the app shows. Mount once per workspace view, inside DirectoryProvider.
+ * commit affects. Rejected credentials end it (the HTTP layer signs them out); lost access
+ * refreshes the directory, whose guard decides what the app shows. Mount once per workspace view, inside DirectoryProvider.
  */
 export function WorkspaceFeedProvider(props: ParentProps<{ workspaceId: string }>) {
   const session = useSession();
@@ -33,11 +26,6 @@ export function WorkspaceFeedProvider(props: ParentProps<{ workspaceId: string }
     const current = result?.();
     if (!current) return WorkspaceFeedState.Ended({ reason: "unauthorized" });
     return AsyncResult.isSuccess(current) ? current.value : WorkspaceFeedState.Connecting();
-  });
-  createEffect(() => {
-    const current = state();
-    if (session.session && current._tag === "Ended" && current.reason === "unauthorized")
-      session.replace(undefined);
   });
   return <Context.Provider value={{ state }}>{props.children}</Context.Provider>;
 }

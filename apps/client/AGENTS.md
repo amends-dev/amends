@@ -13,6 +13,10 @@ Read [README.md](README.md) before changing this package.
   use named API modules. Backend implementations and Tauri APIs stay outside client.
 - Scope request state and atom registries to credentials. Replacing credentials must
   cancel old work and discard its data; stale completions cannot replace a newer session.
+- Run operations through `requestAtom` and `useRequest`; do not track attempts, owners, or
+  sessions by hand. Do not handle `401` in operations: the HTTP layer signs out. Classify
+  failures with typed contract errors (`workspaceFailure`, `Schema.is`), never by matching
+  tag strings, and expose codes rather than reader-facing text.
 - Use `@effect/vitest`, run tests on Bun, and follow the root Effect source rules.
   Test headless contracts here; each app tests its routing/UI integration, and UI owns
   presentation stories. Run root checks, relevant tests, and both app builds after changes.

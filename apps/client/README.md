@@ -61,8 +61,11 @@ clear, synchronize same-origin windows. Web and desktop have separate origins/se
 Blocked storage leaves the current provider usable in memory without persistence or
 cross-window synchronization.
 
-A typed `Api.Unauthorized` during directory validation clears the credential. The app
-observes that transition and chooses its redirect. Other failures retain the credential
+Any request the host answers with `401` signs out the credential it carried, in the HTTP
+layer, so operations never handle it. The sign-out belongs to the credential scope that made
+the request: once that scope is replaced it does nothing, and it clears storage only while
+storage still holds the rejected credential, adopting a newer one another window stored. The
+app observes the transition and chooses its redirect. Other failures retain the credential
 and expose `Failed` plus retry. Missing or removed workspace membership resolves to
 `undefined`; the app chooses how to explain unavailable access without logging out.
 
@@ -107,10 +110,29 @@ failures and platform listeners. Without a source, state stays in memory and sys
 appearance resolves to light. Dispose/remount to change the source. Client owns no
 palette, styling, or platform appearance API.
 
+## Operations
+
+A controller runs its requests through two helpers. `requestAtom(client, operation)` in
+`src/api/request.ts` builds a private request atom whose answer carries the operation's exit,
+failures included, tagged with the attempt that asked. `useRequest(atom, settle)` runs it for one
+mounted owner, one operation at a time: `run` starts it, `cancel` interrupts it, and `settle`
+receives only the latest attempt's outcome while the owner is mounted and its credential scope is
+current. Controllers keep their own state and never track attempts themselves.
+
+`workspaceFailure(cause)` classifies a workspace operation's failure as `changed`, `denied`,
+`gone`, `invalid`, or `failed`. The map is keyed by every failure tag the contract reports for
+workspace, member, access, and invitation endpoints, so a new or renamed failure fails to compile
+until it is placed. Readers' inputs decode through `command(schema)`, which reports a mismatch as
+`Client.InvalidCommand` (`invalid`); a malformed response is `failed`. `isStale` is true for
+`changed`, `denied`, and `gone`: what the reader sees is out of date. Controllers expose these
+codes; features own the reader-facing text.
+
 ## Settings
 
 `useSettings(workspaceId, section)` owns one mounted settings scope, with typed reads,
-mutations, stale-write feedback, and explicit refresh. Remount it when workspace or
+mutations, failure codes (`SettingsError`), and explicit refresh. Only stale failures set
+`needsRefresh`, as does a completed command whose result could not be read back
+(`refresh-failed`); after a failed request or invalid input the reader can send again at once. Remount it when workspace or
 section identity changes. Its reads are keyed atoms, so the workspace change feed refreshes
 them in the background without marking the scope pending; commands refresh them, and the
 directory, before reporting `saved`. Inside operations, `refreshResult` waits for the result a

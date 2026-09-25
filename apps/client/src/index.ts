@@ -26,7 +26,8 @@ export {
   type CreateWorkspaceController,
   type CreateWorkspaceState,
 } from "./workspaces/create.ts";
-export { useSettings, type SettingsController } from "./settings/controller.ts";
+export { useSettings, type SettingsController, type SettingsError } from "./settings/controller.ts";
+export type { WorkspaceFailure } from "./api/failures.ts";
 export {
   type SettingsData,
   type SettingsSection,
@@ -35,7 +36,7 @@ export {
   formatInstant,
   invitationStatus,
 } from "./api/settings.ts";
-export { useAcceptInvitation } from "./workspaces/accept-invitation.ts";
+export { useAcceptInvitation, type AcceptInvitationError } from "./workspaces/accept-invitation.ts";
 export {
   WorkspaceFeedProvider,
   useWorkspaceFeed,

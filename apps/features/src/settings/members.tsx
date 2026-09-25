@@ -13,7 +13,7 @@ import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createEffect, createSignal, For, on, Show, onMount } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
-import { useSettingsScope } from "./settings.tsx";
+import { settingsMessage, useSettingsScope } from "./settings.tsx";
 type Entry = SettingsData["members"][number];
 const workspaceRoles = (entry: Entry) =>
   entry.access?.assignments.filter(
@@ -226,7 +226,7 @@ function MemberEditor(props: { entry: Entry }) {
             <Dialog.Body>
               <Show when={removeOpen() && value.error()}>
                 <Text role="alert" tone="danger">
-                  {value.error()}
+                  {settingsMessage(value.error())}
                 </Text>
               </Show>
             </Dialog.Body>

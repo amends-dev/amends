@@ -1,29 +1,36 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-solid";
+import { useAtomValue } from "@effect/atom-solid";
 import { Cause, Exit, Option } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js";
+import { createMemo, createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { isUnauthorized } from "../api/client.ts";
+import { isStale, workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import {
   settingsReads,
   settingsRequest,
-  settingsFailure,
   type SettingsCommand,
   type SettingsData,
   type SettingsReads,
   type SettingsSection,
 } from "../api/settings.ts";
-import { useSession } from "../session/provider.tsx";
+import { useRequest } from "../request/use-request.ts";
 
+/**
+ * A failure to show the reader: why a command failed, `refresh-failed` when a command completed
+ * but its result could not be read back, or `outdated` when a live refresh failed.
+ */
+export type SettingsError = WorkspaceFailure | "refresh-failed" | "outdated";
 export interface SettingsController {
   /** The latest settings, kept while a refresh runs or fails. */
   readonly data: Accessor<SettingsData | undefined>;
   /** A command is running, or the first read has not arrived. */
   readonly pending: Accessor<boolean>;
-  readonly error: Accessor<string | undefined>;
+  readonly error: Accessor<SettingsError | undefined>;
   /** The last command completed and its results are shown. */
   readonly saved: Accessor<boolean>;
-  /** Commands wait until an explicit refresh shows the latest values. */
+  /**
+   * What the reader sees is known to be out of date, so commands wait for an explicit refresh.
+   * Only stale failures set it; a failed request or invalid input can be retried at once.
+   */
   readonly needsRefresh: Accessor<boolean>;
   /** Counts explicit refreshes, so editors can discard drafts made against older values. */
   readonly revision: Accessor<number>;
@@ -36,7 +43,7 @@ const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | un
 const unavailable: SettingsController = {
   data: () => undefined,
   pending: () => false,
-  error: () => "This workspace is unavailable.",
+  error: () => "gone",
   saved: () => false,
   needsRefresh: () => false,
   revision: () => 0,
@@ -59,10 +66,6 @@ function connect(
   workspaceId: string,
   section: SettingsSection,
 ): SettingsController {
-  const session = useSession();
-  const request = settingsRequest(useApiClient(), workspaceId, section);
-  const result = useAtomValue(() => request),
-    execute = useAtomSet(() => request);
   const settings = useAtomValue(() => reads.settings),
     ownership = useAtomValue(() => reads.ownership),
     members = useAtomValue(() => reads.members(section === "members"));
@@ -75,19 +78,10 @@ function connect(
   const invitations = useAtomValue(() =>
     reads.invitations(section === "invites" && canReadInvitations()),
   );
-  const [pending, setPending] = createSignal(false),
-    [error, setError] = createSignal<string>();
+  const [error, setError] = createSignal<SettingsError>();
   const [saved, setSaved] = createSignal(false),
     [needsRefresh, setNeedsRefresh] = createSignal(false),
     [revision, setRevision] = createSignal(0);
-  let alive = true,
-    sequence = 0,
-    active: number | undefined,
-    explicit = false;
-  onCleanup(() => {
-    alive = false;
-    active = undefined;
-  });
 
   // Keep the last complete view while reads refresh, so live updates never blank the page.
   const data = createMemo<SettingsData | undefined>((previous) => {
@@ -113,70 +107,43 @@ function connect(
     () =>
       settled(settings()) ?? settled(ownership()) ?? settled(members()) ?? settled(invitations()),
   );
-  createEffect(() => {
-    const cause = loadFailure();
-    if (alive && cause && isUnauthorized(cause)) session.replace(undefined);
-  });
 
+  const request = useRequest(
+    settingsRequest(useApiClient(), workspaceId, section),
+    (exit, command) => {
+      if (Exit.isFailure(exit)) {
+        const failure = workspaceFailure(exit.cause);
+        setError(failure);
+        if (isStale(failure)) setNeedsRefresh(true);
+        return;
+      }
+      const { refreshed } = exit.value;
+      if (Exit.isFailure(refreshed)) {
+        // A completed command's result is unknown here, so edits wait for it to load.
+        if (command.kind !== "refresh") {
+          setError("refresh-failed");
+          setNeedsRefresh(true);
+        } else setError(workspaceFailure(refreshed.cause));
+        return;
+      }
+      setNeedsRefresh(false);
+      setSaved(command.kind !== "refresh");
+      if (command.kind === "refresh") setRevision((value) => value + 1);
+    },
+  );
   const send = (command: SettingsCommand) => {
-    if (
-      !alive ||
-      !session.isCurrent() ||
-      pending() ||
-      (needsRefresh() && command.kind !== "refresh")
-    )
-      return;
-    setPending(true);
+    if (request.pending() || (needsRefresh() && command.kind !== "refresh")) return;
     setError(undefined);
     setSaved(false);
-    explicit = command.kind === "refresh";
-    active = ++sequence;
-    execute({ attempt: active, command });
+    request.run(command);
   };
-  createEffect(
-    on(result, (outcome) => {
-      if (
-        !alive ||
-        !session.isCurrent() ||
-        active === undefined ||
-        outcome.waiting ||
-        AsyncResult.isInitial(outcome)
-      )
-        return;
-      if (AsyncResult.isSuccess(outcome) && outcome.value.attempt !== active) return;
-      active = undefined;
-      setPending(false);
-      const exit = AsyncResult.isSuccess(outcome)
-        ? outcome.value.exit
-        : Exit.failCause(outcome.cause);
-      const completed = AsyncResult.isSuccess(outcome) && outcome.value.completed;
-      if (Exit.isFailure(exit)) {
-        if (isUnauthorized(exit.cause)) {
-          session.replace(undefined);
-          return;
-        }
-        setNeedsRefresh(true);
-        setError(
-          completed
-            ? "Saved, but the latest data could not be loaded. Refresh to continue."
-            : settingsFailure(exit.cause),
-        );
-      } else {
-        setNeedsRefresh(false);
-        setSaved(completed);
-        if (explicit) setRevision((value) => value + 1);
-      }
-    }),
-  );
   return {
     data,
-    pending: () => pending() || (data() === undefined && loadFailure() === undefined),
+    pending: () => request.pending() || (data() === undefined && loadFailure() === undefined),
     error: () => {
       const failure = loadFailure();
       if (error() !== undefined || failure === undefined) return error();
-      return data() === undefined
-        ? settingsFailure(failure)
-        : "The latest settings could not be loaded. Try again.";
+      return data() === undefined ? workspaceFailure(failure) : "outdated";
     },
     saved,
     needsRefresh: () => needsRefresh() || (data() === undefined && loadFailure() !== undefined),

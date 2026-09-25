@@ -102,3 +102,73 @@ for (const replacement of [false, true])
       fetch.mock.calls.filter(([input, init]) => new Request(input, init).method === "PUT"),
     ).toHaveLength(1);
   });
+
+it("retries at once after a failed request or invalid input, and waits for a refresh after a conflict", async () => {
+  const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+  const puts: Array<Request> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const request = new Request(input, init),
+      path = new URL(request.url).pathname;
+    if (request.method === "PUT") {
+      puts.push(request);
+      return Promise.resolve(
+        puts.length === 1
+          ? new Response("Host unavailable", { status: 503 })
+          : new Response(
+              JSON.stringify({ _tag: "WorkspaceSettings.Changed", workspaceId: "one" }),
+              {
+                status: 409,
+                headers: { "content-type": "application/json" },
+              },
+            ),
+      );
+    }
+    if (path.endsWith("/settings"))
+      return Promise.resolve(
+        json({ workspace, canRename: true, canReadInvitations: true, canInvite: true, roles: [] }),
+      );
+    if (path.endsWith("/ownership"))
+      return Promise.resolve(
+        json({ workspace, owner, ownerAssignmentId: "grant", canTransfer: true, candidates: [] }),
+      );
+    return Promise.resolve(json({ memberships: [], invitations: [] }));
+  });
+  let controller!: SettingsController;
+  function Consumer() {
+    controller = useSettings("one", "workspace");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={{ read: () => session, write: () => {}, subscribe: () => () => {} }}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(controller.data()?.settings.workspace.name).toBe("Studio"));
+  // A host failure leaves the values current: the same edit can be sent again at once.
+  controller.send({ kind: "rename", name: "Atelier", expectedName: "Studio" });
+  await waitFor(() => expect(controller.error()).toBe("failed"));
+  expect(controller.needsRefresh()).toBe(false);
+  // Invalid input fails before any request and does not lock either.
+  controller.send({ kind: "remove", memberId: "" });
+  await waitFor(() => expect(controller.error()).toBe("invalid"));
+  expect(controller.needsRefresh()).toBe(false);
+  expect(puts).toHaveLength(1);
+  // A conflict means the values are out of date: edits wait for an explicit refresh.
+  controller.send({ kind: "rename", name: "Atelier", expectedName: "Studio" });
+  await waitFor(() => expect(controller.error()).toBe("changed"));
+  expect(controller.needsRefresh()).toBe(true);
+  controller.send({ kind: "rename", name: "Again", expectedName: "Studio" });
+  expect(puts).toHaveLength(2);
+  controller.refresh();
+  await waitFor(() => expect(controller.needsRefresh()).toBe(false));
+  expect(controller.error()).toBeUndefined();
+  expect(controller.revision()).toBe(1);
+});

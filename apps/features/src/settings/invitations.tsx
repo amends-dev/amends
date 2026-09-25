@@ -14,7 +14,7 @@ import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
-import { useSettingsScope } from "./settings.tsx";
+import { settingsMessage, useSettingsScope } from "./settings.tsx";
 export function InviteForm() {
   const value = useSettingsScope(),
     [recipient, setRecipient] = createSignal(""),
@@ -119,7 +119,7 @@ function InvitationRow(props: { invitation: SettingsData["invitations"][number] 
                 <Dialog.Body>
                   <Show when={open() && value.error()}>
                     <Text role="alert" tone="danger">
-                      {value.error()}
+                      {settingsMessage(value.error())}
                     </Text>
                   </Show>
                 </Dialog.Body>

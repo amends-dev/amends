@@ -191,12 +191,10 @@ export const LostInvitationResponse = {
     await canvas.findByText(
       "The request could not be completed. Try again when the host is available.",
     );
-    await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
-    await canvas.findByText("new@example.test");
-    // The change feed may show the invitation before the refresh completes; wait for it.
-    await waitFor(() => expect(canvas.queryByRole("alert")).not.toBeInTheDocument());
-    await waitFor(() => expect(canvas.queryByText("Updating settings…")).not.toBeInTheDocument());
+    // A failed request leaves the form current: no refresh, just send it again.
+    await expect(canvas.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Create invitation" }));
+    // The retry carries the same key, so the host returns the invitation it already created.
     await canvas.findByText("Saved.");
     await expect(canvas.getAllByText("new@example.test")).toHaveLength(1);
     await userEvent.click(

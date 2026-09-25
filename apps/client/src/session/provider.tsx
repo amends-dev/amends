@@ -9,7 +9,7 @@ import {
   type ParentProps,
 } from "solid-js";
 import type { SignIn } from "../api/contracts.ts";
-import { sessionAtom } from "./state.ts";
+import { sessionAtom, signOutAtom } from "./state.ts";
 import type { SessionStore } from "./store.ts";
 
 export interface SessionScope {
@@ -36,25 +36,45 @@ export function SessionProvider(props: ParentProps<{ store: SessionStore }>) {
       }),
     );
   });
+  // The host rejected this scope's credential. Clear it only while storage still holds it: another
+  // window may already have stored a newer one, which this window then adopts.
+  const rejected = (current: { readonly session: SignIn.Session | undefined }) => {
+    if (!active || scope() !== current || !current.session) return;
+    const stored = props.store.read();
+    if (stored && stored.token !== current.session.token) {
+      setScope({ session: stored });
+      return;
+    }
+    props.store.write(undefined);
+    setScope({ session: undefined });
+  };
   return (
     <Show when={scope()} keyed>
-      {(current) => (
-        <SessionContext.Provider
-          value={{
-            session: current.session,
-            isCurrent: () => active && scope() === current,
-            replace: (session) => {
-              if (!active || scope() !== current) return;
-              props.store.write(session);
-              setScope({ session });
-            },
-          }}
-        >
-          <RegistryProvider initialValues={[[sessionAtom, current.session]]}>
-            {props.children}
-          </RegistryProvider>
-        </SessionContext.Provider>
-      )}
+      {(current) => {
+        const replace = (session: SignIn.Session | undefined) => {
+          if (!active || scope() !== current) return;
+          props.store.write(session);
+          setScope({ session });
+        };
+        return (
+          <SessionContext.Provider
+            value={{
+              session: current.session,
+              isCurrent: () => active && scope() === current,
+              replace,
+            }}
+          >
+            <RegistryProvider
+              initialValues={[
+                [sessionAtom, current.session],
+                [signOutAtom, () => rejected(current)],
+              ]}
+            >
+              {props.children}
+            </RegistryProvider>
+          </SessionContext.Provider>
+        );
+      }}
     </Show>
   );
 }

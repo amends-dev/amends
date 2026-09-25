@@ -1,20 +1,16 @@
-import { Cause, Data, Effect, type Exit, Schema } from "effect";
-import { Atom } from "effect/unstable/reactivity";
+import { Cause, Data, Effect, Schema } from "effect";
 import type { ApiClient } from "./client.ts";
-import { SignIn, type Session } from "./contracts.ts";
+import { SignIn } from "./contracts.ts";
+import { requestAtom } from "./request.ts";
 
 export const isSignInEmail = Schema.is(SignIn.Email);
 export const isSignInCode = Schema.is(SignIn.Code);
 
 export type SignInRequest = Data.TaggedEnum<{
-  RequestCode: { readonly attempt: number; readonly email: string };
-  VerifyCode: { readonly attempt: number; readonly email: string; readonly code: string };
+  RequestCode: { readonly email: string };
+  VerifyCode: { readonly email: string; readonly code: string };
 }>;
 export const SignInRequest = Data.taggedEnum<SignInRequest>();
-interface SignInResponse {
-  readonly attempt: number;
-  readonly exit: Exit.Exit<Session | undefined, unknown>;
-}
 
 const isRejected = Schema.is(SignIn.Rejected);
 export function signInRejection(
@@ -26,26 +22,16 @@ export function signInRejection(
   return undefined;
 }
 
-/** One request atom per controller, sharing only the credential-scoped API runtime. */
+/** One request atom per controller: requesting a code answers nothing, verifying a session. */
 export const createSignInRequest = (client: ApiClient) =>
-  client.runtime
-    .fn<SignInRequest>()(
-      Effect.fn("Client.SignIn.request")(function* (request): Effect.fn.Return<
-        SignInResponse,
-        never,
-        ApiClient["Identifier"]
-      > {
-        const api = yield* client;
-        if (request._tag === "VerifyCode") {
-          const exit = yield* Effect.exit(
-            api.session.complete({ payload: { email: request.email, code: request.code } }),
-          );
-          return { attempt: request.attempt, exit };
-        }
-        const exit = yield* Effect.exit(
-          api.session.start({ payload: { email: request.email } }).pipe(Effect.as(undefined)),
-        );
-        return { attempt: request.attempt, exit };
-      }),
-    )
-    .pipe(Atom.setIdleTTL(0));
+  requestAtom(client, (request: SignInRequest) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      if (request._tag === "VerifyCode")
+        return yield* api.session.complete({
+          payload: { email: request.email, code: request.code },
+        });
+      yield* api.session.start({ payload: { email: request.email } });
+      return undefined;
+    }),
+  );

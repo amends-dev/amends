@@ -1,19 +1,15 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-solid";
 import { Data, Exit } from "effect";
-import { AsyncResult } from "effect/unstable/reactivity";
-import { createEffect, createSignal, on, onCleanup, type Accessor } from "solid-js";
+import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { isUnauthorized } from "../api/client.ts";
 import {
   createWorkspaceRequest,
   isWorkspaceName,
   newWorkspaceRequestKey,
   workspaceRejection,
   type CreatedWorkspace,
-  type WorkspaceRequest,
 } from "../api/workspaces.ts";
+import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
-
 export type CreateWorkspaceState = Data.TaggedEnum<{
   Form: {
     readonly name: string;
@@ -38,46 +34,15 @@ export interface CreateWorkspaceController {
 /** A mounted creation intent. Retries of the same name retain its idempotency key. */
 export function useCreateWorkspace(): CreateWorkspaceController {
   const session = useSession();
-  const request = createWorkspaceRequest(useApiClient());
-  const result = useAtomValue(() => request);
-  const execute = useAtomSet(() => request);
   const [state, setState] = createSignal<CreateWorkspaceState>(
     State.Form({ name: "", pending: false, error: undefined }),
   );
-  let alive = true;
-  let sequence = 0;
-  let active: number | undefined;
   let intent: { name: string; key: ReturnType<typeof newWorkspaceRequestKey> } | undefined;
-  const current = () => alive && session.isCurrent() && !!session.session;
-  onCleanup(() => {
-    alive = false;
-    active = undefined;
-  });
-  const begin = (command: WorkspaceRequest) => {
-    active = command.attempt;
-    execute(command);
-  };
-  const refresh = () => {
-    const value = state();
-    if (!current() || value._tag !== "Created" || value.pending) return;
-    setState(State.Created({ ...value, pending: true, refreshFailed: false }));
-    begin({ attempt: ++sequence, kind: "refresh" });
-  };
-  createEffect(
-    on(result, (outcome) => {
-      if (!current() || active === undefined || outcome.waiting || AsyncResult.isInitial(outcome))
-        return;
-      if (AsyncResult.isSuccess(outcome) && outcome.value.attempt !== active) return;
-      active = undefined;
+  const request = useRequest(
+    createWorkspaceRequest(useApiClient()),
+    (exit, input) => {
       const snapshot = state();
-      const exit = AsyncResult.isSuccess(outcome)
-        ? outcome.value.exit
-        : Exit.failCause(outcome.cause);
       if (Exit.isFailure(exit)) {
-        if (isUnauthorized(exit.cause)) {
-          session.replace(undefined);
-          return;
-        }
         if (snapshot._tag === "Form")
           setState(
             State.Form({ ...snapshot, pending: false, error: workspaceRejection(exit.cause) }),
@@ -86,23 +51,31 @@ export function useCreateWorkspace(): CreateWorkspaceController {
           setState(State.Created({ ...snapshot, pending: false, refreshFailed: true }));
         return;
       }
-      if (snapshot._tag === "Form" && exit.value) {
+      if (input.kind === "create" && snapshot._tag === "Form" && exit.value) {
         setState(State.Created({ workspace: exit.value, pending: false, refreshFailed: false }));
         refresh();
-      } else if (snapshot._tag === "Created")
+      } else if (input.kind === "refresh" && snapshot._tag === "Created")
         setState(State.Ready({ workspace: snapshot.workspace }));
-    }),
+    },
+    { when: () => session.session !== undefined },
   );
+  function refresh() {
+    const value = state();
+    if (value._tag !== "Created" || value.pending || request.pending()) return;
+    setState(State.Created({ ...value, pending: true, refreshFailed: false }));
+    if (!request.run({ kind: "refresh" })) setState(value);
+  }
   return {
     state,
     setName: (name) => {
       const value = state();
-      if (current() && value._tag === "Form" && !value.pending)
+      if (value._tag === "Form" && !value.pending && session.isCurrent())
         setState(State.Form({ name, pending: false, error: undefined }));
     },
     submit: (name) => {
       const value = state();
-      if (!current() || value._tag !== "Form" || value.pending) return;
+      if (value._tag !== "Form" || value.pending || request.pending() || !session.isCurrent())
+        return;
       const submitted = (name ?? value.name).trim();
       if (!isWorkspaceName(submitted)) {
         setState(State.Form({ name: name ?? value.name, pending: false, error: "invalid-name" }));
@@ -110,7 +83,7 @@ export function useCreateWorkspace(): CreateWorkspaceController {
       }
       if (intent?.name !== submitted) intent = { name: submitted, key: newWorkspaceRequestKey() };
       setState(State.Form({ name: submitted, pending: true, error: undefined }));
-      begin({ attempt: ++sequence, kind: "create", ...intent });
+      if (!request.run({ kind: "create", ...intent })) setState(value);
     },
     retryRefresh: refresh,
   };
