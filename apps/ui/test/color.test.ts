@@ -48,6 +48,7 @@ for (const [theme, palette] of Object.entries(colors)) {
           [
             "action.hover",
             "action.pressed",
+            "action.selected",
             "action.disabled",
             "action.danger.hover",
             "action.danger.pressed",
@@ -131,7 +132,7 @@ for (const [theme, palette] of Object.entries(colors)) {
           });
         }
       }
-      for (const state of ["hover", "pressed"] as const) {
+      for (const state of ["hover", "pressed", "selected"] as const) {
         it(`keeps text and the strong border readable over action.${state} on surface.${surface}`, () => {
           const layer = new Color(palette.action[state]);
           expect(layer.alpha).toBeGreaterThan(0);

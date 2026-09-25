@@ -53,7 +53,10 @@
     "./compositions/section-nav": "./src/compositions/section-nav/index.ts",
     "./compositions/key-value": "./src/compositions/key-value/index.ts",
     "./compositions/list-detail": "./src/compositions/list-detail/index.ts",
-    "./features/settings": "./src/features/settings/index.ts"
+    "./features/settings": "./src/features/settings/index.ts",
+    "./compositions/segmented-control": "./src/compositions/segmented-control/index.ts",
+    "./primitives/filter-chip": "./src/primitives/filter-chip/index.ts",
+    "./primitives/combobox": "./src/primitives/combobox/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6007 --no-open --disable-telemetry",

@@ -298,3 +298,7 @@ shows the actual values and pairings; the primitive's stories show their shapes 
 persimmon identity treatment in both themes. Their 4.78:1 text contrast is tested;
 Foundations / Color / Workspace mark displays the actual variables. These roles
 are for workspace identity, not action or status colors.
+
+`action.selected` is the persistent 9% neutral tint for segmented controls and filter
+chips from Filters and pickers. It is distinct from hover and pointer press. Its
+text and strong-border pairings are checked on both surfaces in both themes.

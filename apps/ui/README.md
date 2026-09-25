@@ -279,3 +279,10 @@ coverage. These remain presentation components; apps own routes and preferences.
 [ListDetail](src/compositions/list-detail/README.md), ItemList rows/actions, and
 [controlled forms](src/features/settings/README.md). All use existing tokens;
 permission state and workflows remain in client/features, with app-owned pages.
+
+**Primitives / Filters and pickers** composes the Primitives v2 reference for review.
+[SegmentedControl](src/compositions/segmented-control/README.md) supplies a compact
+single choice, [FilterChip](src/primitives/filter-chip/README.md) independently toggles
+filters, and [Combobox](src/primitives/combobox/README.md) searches and selects rich
+options. The shared `action.selected` tint has color/contrast coverage in both themes.
+These pieces are available in UI and have not been substituted into application pages.

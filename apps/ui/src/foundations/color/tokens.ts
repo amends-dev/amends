@@ -72,6 +72,8 @@ export interface ColorTokens {
     /** Translucent backgrounds for text.primary, over canvas or panel. */
     readonly hover: string;
     readonly pressed: string;
+    /** Persistent selected state for compact choices, on canvas or panel. */
+    readonly selected: string;
     /** Translucent fill, supported on canvas and panel surfaces. */
     readonly disabled: string;
     readonly danger: ActionToneColors;
@@ -165,6 +167,7 @@ export const cotton = {
     onFill: "oklch(0.97 0.01 90)",
     hover: "oklch(0.24 0.014 84 / 0.05)",
     pressed: "oklch(0.24 0.014 84 / 0.12)",
+    selected: "oklch(0.24 0.014 84 / 0.09)",
     disabled: "oklch(0.24 0.014 84 / 0.08)",
     danger: {
       fill: cottonStatus.danger.text,
@@ -216,6 +219,7 @@ export const soot = {
     onFill: "oklch(0.17 0.008 84)",
     hover: "oklch(0.95 0.006 90 / 0.06)",
     pressed: "oklch(0.95 0.006 90 / 0.14)",
+    selected: "oklch(0.95 0.006 90 / 0.09)",
     disabled: "oklch(0.95 0.006 90 / 0.08)",
     danger: {
       fill: sootStatus.danger.text,
