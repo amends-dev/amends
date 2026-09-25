@@ -1,13 +1,14 @@
 # Sign-in slice
 
-Planned implementation of the [feature development flow](feature-development.md).
+Implementation of the [feature development flow](feature-development.md).
 The first slice requests an email code, verifies it, and establishes a session.
 Workspace selection is the next feature.
 
 [CodeInput](../apps/ui/src/primitives/code-input/README.md) and both
 [sign-in forms](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
 workshop. The [client controller](../apps/client/src/sign-in/README.md) implements
-the headless flow; the connected feature and page remain planned.
+the headless flow. The [connected feature](../apps/features/README.md) and live
+workshop are implemented; the page layout and app integration remain planned.
 
 ## UI pieces
 

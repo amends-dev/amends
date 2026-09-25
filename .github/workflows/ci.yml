@@ -71,6 +71,7 @@ jobs:
           - suite: apps
             args: >-
               --project @amends/icons --project @amends/ui --project @amends/client
+              --project @amends/features
               --project @amends/web --project @amends/desktop
     env:
       # Each PostgreSQL shard starts its own cluster from the runner's installation.
@@ -98,6 +99,9 @@ jobs:
         run: bun run --bun vite build
       - name: UI workshop
         working-directory: apps/ui
+        run: bun run --bun storybook build --output-dir dist --disable-telemetry
+      - name: Feature workshop
+        working-directory: apps/features
         run: bun run --bun storybook build --output-dir dist --disable-telemetry
 
   # One required check that succeeds only when every job above succeeds.

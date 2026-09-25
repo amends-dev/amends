@@ -6,7 +6,7 @@ Read [README.md](README.md) before changing this package.
   Do not render pages, controls, error/loading views, styles, or a route tree here.
 - Client and UI are independent peers. Do not depend on or import `@amends/ui`,
   icons, styling tools, a router, Storybook, or platform entry points in any dependency
-  section. Web and desktop import client and UI independently and compose them.
+  section. Features connects client and UI; web and desktop own application composition.
 - Solid providers/hooks are state bindings, not presentation. They may provide context
   and own resource lifetime; callers choose markup, navigation, and recovery actions.
 - Keep HTTP contract and gateway schema imports in `src/api/`. Other client modules

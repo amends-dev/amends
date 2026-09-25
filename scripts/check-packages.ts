@@ -65,6 +65,15 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
           `${path}: UI must remain presentation-only; ${section}.${name} belongs in client or a platform app.`,
         );
       if (
+        path === "apps/features/package.json" &&
+        ((name.startsWith("@amends/") && !["@amends/client", "@amends/ui"].includes(name)) ||
+          name === "@solidjs/router" ||
+          name.startsWith("@tauri-apps/"))
+      )
+        errors.push(
+          `${path}: features connect client and UI; routing and backend/platform implementations stay outside features (${section}.${name}).`,
+        );
+      if (
         path === "apps/client/package.json" &&
         ((name.startsWith("@amends/") && !["@amends/api-http", "@amends/gateway"].includes(name)) ||
           name.startsWith("@tauri-apps/") ||
@@ -83,7 +92,7 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
 
 // UI owns presentation; client/api owns shared client contract imports.
 for await (const path of new Bun.Glob(
-  "apps/{icons,ui,client,web,desktop}/{src,test,.storybook}/**/*.{ts,tsx}",
+  "apps/{icons,ui,client,features,web,desktop}/{src,test,workshop,.storybook}/**/*.{ts,tsx}",
 ).scan({
   cwd: root,
 })) {
@@ -138,6 +147,36 @@ for await (const path of new Bun.Glob(
     const uiImport = dependency === "@amends/ui" || dependency.startsWith("@amends/ui/");
     const clientImport =
       dependency === "@amends/client" || dependency.startsWith("@amends/client/");
+    const featureImport =
+      dependency === "@amends/features" || dependency.startsWith("@amends/features/");
+    if (
+      path.startsWith("apps/features/") &&
+      ((dependency.startsWith("@amends/") && !clientImport && !uiImport && !featureImport) ||
+        dependency === "@solidjs/router" ||
+        dependency.startsWith("@solidjs/router/") ||
+        dependency.startsWith("@tauri-apps/") ||
+        (target.startsWith(resolve(root, "apps") + "/") &&
+          !target.startsWith(resolve(root, "apps/features") + "/")) ||
+        target.startsWith(resolve(root, "packages") + "/") ||
+        target.startsWith(resolve(root, "adapters") + "/") ||
+        target.startsWith(resolve(root, "hosts") + "/"))
+    )
+      errors.push(
+        `${path}: features must consume client/UI without importing routes or backend/platform implementations (${dependency}).`,
+      );
+    if (
+      path.startsWith("apps/features/src/") &&
+      !(
+        uiImport ||
+        clientImport ||
+        dependency === "solid-js" ||
+        dependency.startsWith("solid-js/") ||
+        (dependency.startsWith(".") && target.startsWith(resolve(root, "apps/features/src") + "/"))
+      )
+    )
+      errors.push(
+        `${path}: feature runtime must exclude workshop/test code and depend only on client, UI, and Solid (${dependency}).`,
+      );
     const contractImport =
       path.startsWith("apps/client/src/api/") &&
       ["@amends/api-http", "@amends/gateway/sign-in", "@amends/gateway/directory"].includes(
@@ -191,6 +230,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and icons/ui/client/web/desktop import boundaries.`,
+    `Checked ${packages.length} shared packages and icons/ui/client/features/web/desktop import boundaries.`,
   );
 }

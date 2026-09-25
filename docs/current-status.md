@@ -90,8 +90,10 @@ reactive association props; form state and validation timing stay with the consu
 with decorative cells and a compact presentation for narrow containers. SignInEmailForm
 adds controlled email entry, validation feedback, pending guards, and request errors in
 the UI workshop. SignInCodeForm adds code verification/resend presentation, independent
-pending states, recovery feedback, and change-email callbacks. The connected flow
-remains planned. Textarea and other specialized input types remain future
+pending states, recovery feedback, and change-email callbacks. The
+[connected SignIn feature](../apps/features/README.md) runs against real HTTP and
+temporary PostgreSQL data in its own workshop. Page layout and web/desktop route
+integration remain planned. Textarea and other specialized input types remain future
 pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
 behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),

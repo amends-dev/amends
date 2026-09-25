@@ -28,6 +28,7 @@ remaining gaps with links to their owning code.
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                            |
 | [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                      |
 | [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, and route helpers.                                                     |
+| [Features](../apps/features/README.md)                               | Shared connected components and live backend workshop.                                                              |
 | [UI](../apps/ui/README.md)                                           | Shared UI workshop, foundations, primitives, and compositions.                                                      |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
@@ -36,7 +37,7 @@ drawings, generation, and visual review in the UI workshop.
 ## Design and historical references
 
 - [Feature development](feature-development.md) records the agreed workflow and
-  planned connected-feature boundary. [Sign-in](sign-in-design.md) applies it to
+  connected-feature boundary. [Sign-in](sign-in-design.md) applies it to
   the first slice, including the UI pieces to introduce.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.

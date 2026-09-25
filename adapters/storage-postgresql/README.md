@@ -358,3 +358,9 @@ between pools. `database.test.ts` covers construction,
 concurrent migration, and access paths, and `scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
 project's global setup owns the shared test cluster, and individual tests own their temporary
 databases.
+
+The development-only `@amends/storage-postgresql/testing/postgres` export shares
+cluster discovery and scoped temporary databases with the feature workshop. Its
+`database(serverUrl)` returns a URL and requires a Scope; closing that scope drops
+the database. `temporary(serverUrl, use)` runs a callback in that scope. Neither
+helper is part of the adapter's runtime entry point.

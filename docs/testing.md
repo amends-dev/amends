@@ -16,6 +16,7 @@ bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends/icons
 bun run test --project @amends/ui
+bun run test --project @amends/features
 bun run test --project @amends/client
 bun run test --project @amends/web
 bun run test --project @amends/desktop
@@ -113,7 +114,8 @@ drafts, native and caller-supplied validation, pending guards, retry, and reset 
 Validation, Request Recovery, and Layout run as portable stories. Browser review covers
 real Enter/Tab, focus retention, inherited disabled-fieldset submission, both themes,
 RTL, long content, enlarged text, and accessibility. These are presentation fixtures;
-the connected sign-in feature and real HTTP scenarios remain planned.
+the [feature workshop](../apps/features/README.md) verifies the connected flow
+through the real HTTP host and PostgreSQL.
 SignInCodeForm adds portable scenarios for validation, verification recovery, resend
 failure/retry, changing email while pending, and resizing. DOM/type checks cover
 exclusive pending actions, explicit submission, leading zeros, caller-owned feedback,
@@ -217,7 +219,7 @@ pushes to it, as parallel jobs, so a run takes as long as its slowest job:
 | Static         | Lint, format, package boundaries, generated icons, and the PostgreSQL migration          |
 | Types          | `bun run typecheck`                                                                      |
 | Tests          | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
-| Frontend build | The web and desktop bundles and the UI workshop                                          |
+| Frontend build | The web and desktop bundles and both workshops                                           |
 | Check          | Succeeds only when every job above does; require it for merging                          |
 
 Each job installs the pinned Bun and the locked dependencies through
@@ -344,7 +346,19 @@ abort. It covers contract validation, payloads, rejection reasons, malformed ses
 responses, explicit retry/resend, duplicate guards, and session installation. Explicit
 response resolvers and observable abort signals verify email changes, form disposal,
 credential replacement, and concurrent controllers without sleeps. These headless
-tests do not replace the planned live backend scenarios for the connected feature.
+tests complement the connected feature scenarios below.
+
+The features suite runs the same eight Storybook play scenarios against the real
+local HTTP handlers, gateway, development authentication, and PostgreSQL. Each
+scenario owns a temporary database, captured codes, and an in-memory session.
+Success also validates the credential against the directory. Request gates and an
+auth-only clock offset exercise pending work, expiry, and recovery without sleeps.
+The subprocess fixture disables environment-file loading and ignores
+`AMENDS_DATABASE_URL`; PostgreSQL discovery uses `AMENDS_POSTGRES_URL` or a local
+installation, and fails clearly if neither exists. Tests close scenarios before
+stopping the host. Run `bun run --filter @amends/features dev` for browser review
+at port 6008 (HMR 6009), and `bun run --filter @amends/features build` to verify its
+bundle. The static bundle needs the development backend/proxy to run live stories.
 
 The local host's HTTP tests exercise desktop CORS preflights and 401 response headers.
 After changing host runtime setup, also perform the temporary-port startup check.

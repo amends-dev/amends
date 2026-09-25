@@ -67,7 +67,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   at a time. It is UI-only and must not depend on client state, routing, or API
   contracts. `client` owns headless session lifetime, typed API access, query state,
   and pure route helpers. Client and UI must not depend on each other in any dependency
-  section or source import. `web` and `desktop` import them independently and own route
+  section or source import. `features` connects client and UI through reusable components
+  and a separate live-backend workshop; it owns no routes or platform APIs. `web` and
+  `desktop` consume these libraries and own route
   trees, page composition, API URL, and persistence configuration. `desktop` owns the
   Tauri shell; platform APIs stay in the entry apps.
   The legacy UI implementation and `design-system` package were removed; the current

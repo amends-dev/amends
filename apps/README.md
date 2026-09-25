@@ -6,6 +6,7 @@
   and compositions, verified in its standalone Storybook workshop.
 - [client](client/README.md) owns headless sessions, API/query state, and pure route
   helpers. It has no dependency on UI, styling, router libraries, or Storybook.
+- [features](features/README.md) connects client and UI, with a separate live backend workshop.
 - [web](web/README.md) composes client and UI with browser routing on port 4321.
 - [desktop](desktop/README.md) composes client and UI in Tauri 2 with hash routing and a
   Solid/Vite webview on development port 1420.
@@ -17,8 +18,8 @@ that reset. Both apps compose the independent client and UI packages. They own r
 trees and placeholder-page wiring, while client owns session/API state. The sign-in page
 is the next slice; the full product workflows remain backend-only.
 
-The agreed [feature development flow](../docs/feature-development.md) adds a planned
-shared `features` package for connected interactions and their own workshop.
+The [feature development flow](../docs/feature-development.md) uses the shared
+`features` package for connected interactions and their own workshop.
 The [sign-in design](../docs/sign-in-design.md) identifies the first UI pieces.
 
 ## Development
@@ -29,12 +30,13 @@ From the repository root after `bun install`:
 bun run --filter @amends/web dev
 bun run --filter @amends/desktop dev
 bun run --filter @amends/ui dev
+bun run --filter @amends/features dev
 ```
 
 Run each in its own terminal. The UI workshop serves at
-`http://127.0.0.1:6007/`. Client has no workshop.
-Desktop requires [native tools](desktop/README.md#run-and-verify); web and Storybook
-need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
+`http://127.0.0.1:6007/`; features uses port 6008 and requires PostgreSQL. Client has no workshop.
+Desktop requires [native tools](desktop/README.md#run-and-verify); web and UI
+Storybook need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
 
 ## Client and UI boundaries
 
@@ -43,7 +45,7 @@ operations. UI supplies presentation components, styles, and fonts. Neither impo
 the other in source, tests, or manifests; dependency checks enforce both directions.
 
 Web and desktop each own a route tree and application composition, importing both
-libraries through public exports. They map client state to UI props and actions. Web
+libraries through public exports. Features shares reusable mappings from client state to UI props and actions. Web
 uses browser routing and an API proxy; desktop uses hash routing and the existing Bun
 host at port 8787. Platform APIs remain in these apps. Shared path helpers live in
 client, but client does not decide what a route renders.

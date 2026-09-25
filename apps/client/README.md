@@ -6,9 +6,8 @@ directory validation, workspace lookup, and pure route-path helpers.
 
 Client and [UI](../ui/README.md) are independent peers. Neither package depends on
 the other, including in tests and development tooling. Client contains no page markup,
-CSS, router integration, or Storybook. [Web](../web/README.md) and
-[desktop](../desktop/README.md) each import both packages and decide how to render
-state, navigate, and present errors. Solid providers/hooks are headless state bindings.
+CSS, router integration, or Storybook. [Features](../features/README.md) connects
+client state to UI. Web and desktop own routes, navigation, and page composition. Solid providers/hooks are headless state bindings.
 The package lives under `apps/*` because these bindings use Solid and browser storage;
 portable backend packages under `packages/*` remain Effect-only.
 
@@ -34,7 +33,7 @@ portable backend packages under `packages/*` remain Effect-only.
 Only `src/api` imports the HTTP contract and gateway session/directory schemas.
 Client cannot import UI, icons, styling, Storybook, router libraries, platform entry
 points, or backend implementations. UI cannot import client or API code. The repository
-boundary check enforces source imports and all dependency sections. The app packages
+boundary check enforces source imports and all dependency sections. Features and the platform apps
 own the rendering boundary and may consume both public package surfaces.
 
 ## Session lifetime

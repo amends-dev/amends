@@ -94,10 +94,7 @@ export const acquire = async (): Promise<Server | undefined> => {
 };
 
 /** Fresh database per test, created on the server and dropped afterwards, with its connection URL. */
-export const temporary = Effect.fnUntraced(function* <A, E, R>(
-  serverUrl: string,
-  use: (url: string) => Effect.Effect<A, E, R>,
-) {
+export const database = Effect.fnUntraced(function* (serverUrl: string) {
   const name = `amends_test_${crypto.randomUUID().replaceAll("-", "")}`;
   const maintenance = PgClient.layer({ url: Redacted.make(serverUrl), maxConnections: 1 });
   const control = (statement: string) =>
@@ -111,5 +108,12 @@ export const temporary = Effect.fnUntraced(function* <A, E, R>(
   );
   const url = new URL(serverUrl);
   url.pathname = `/${name}`;
-  return yield* use(url.toString());
+  return url.toString();
+});
+
+export const temporary = Effect.fnUntraced(function* <A, E, R>(
+  serverUrl: string,
+  use: (url: string) => Effect.Effect<A, E, R>,
+) {
+  return yield* use(yield* database(serverUrl));
 }, Effect.scoped);

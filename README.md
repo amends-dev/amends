@@ -51,6 +51,7 @@ hosts/
 apps/
   icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
   ui/                 @amends/ui: shared Solid foundations, components, and Storybook
+  features/           @amends/features: connected components and live backend workshop
   client/             @amends/client: headless sessions, API/query state, and route helpers
   web/                @amends/web: browser routes and client/UI composition
   desktop/            @amends/desktop: Tauri 2 routes and client/UI composition

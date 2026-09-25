@@ -85,6 +85,29 @@
         "vite-plugin-solid": "^2.11.14",
       },
     },
+    "apps/features": {
+      "name": "@amends/features",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/client": "workspace:*",
+        "@amends/ui": "workspace:*",
+      },
+      "devDependencies": {
+        "@solidjs/testing-library": "^0.8.9",
+        "@storybook/addon-a11y": "10.6.0",
+        "@storybook/addon-docs": "10.6.0",
+        "@vanilla-extract/vite-plugin": "^5.2.6",
+        "happy-dom": "^20.10.6",
+        "solid-js": "^1.9.12",
+        "storybook": "10.6.0",
+        "storybook-solidjs-vite": "10.7.2",
+        "vite": "^7.0.0",
+        "vite-plugin-solid": "^2.11.14",
+      },
+      "peerDependencies": {
+        "solid-js": "^1.9.12",
+      },
+    },
     "apps/icons": {
       "name": "@amends/icons",
       "version": "0.0.0",
@@ -233,6 +256,8 @@
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
+
+    "@amends/features": ["@amends/features@workspace:apps/features"],
 
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 

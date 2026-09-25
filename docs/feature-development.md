@@ -1,6 +1,5 @@
 # Feature development
 
-Agreed direction; the connected features package and its workshop are planned.
 Build each feature through the stack and verify it independently before adding it
 to an application page. [Sign-in](sign-in-design.md) is the first slice.
 
@@ -11,13 +10,13 @@ to an application page. [Sign-in](sign-in-design.md) is the first slice.
 | Backend and HTTP packages  | Business rules, host capabilities, contracts, and handlers.                         |
 | `apps/client`              | Headless operations, validation, request state, and session lifetime.               |
 | `apps/ui`                  | Presentation components and page layouts, taking props and callbacks.               |
-| `apps/features` (planned)  | Reusable wiring between client and UI; connected feature stories.                   |
+| `apps/features`            | Reusable wiring between client and UI; connected feature stories.                   |
 | `apps/web`, `apps/desktop` | Route trees, page composition, navigation, configuration, and platform integration. |
 
 Client and UI remain independent. Features consume both without owning routes or
-platform APIs. This extends today's app-owned wiring with a shared composition
-layer. Stories and server fixtures stay outside production exports; adding the
-workspace must also extend boundary checks, test discovery, and CI builds.
+platform APIs. Its [workshop](../apps/features/README.md) exercises shared composition. Stories and
+server fixtures stay outside production exports; boundary checks, tests, and CI
+include the features workspace.
 
 ## Build and verify
 
