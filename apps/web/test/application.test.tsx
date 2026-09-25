@@ -149,10 +149,13 @@ it("resolves active workspace scope from the directory and updates it during nav
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, () =>
     Promise.resolve(response(listing)),
   );
-  await screen.findByRole("heading", { name: "First workspace" });
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+    "First workspace",
+  );
   history.set({ value: "/workspaces/two", scroll: false });
-  await screen.findByRole("heading", { name: "Second workspace" });
-  expect(screen.queryByRole("heading", { name: "First workspace" })).not.toBeInTheDocument();
+  await screen.findByText("Second workspace");
+  expect(screen.queryByText("First workspace")).not.toBeInTheDocument();
   history.set({ value: "/workspaces/removed", scroll: false });
   await screen.findByRole("heading", { name: "Workspace unavailable" });
 });
@@ -166,9 +169,9 @@ it("revalidates and replaces cached directory data when credentials change", asy
     )
     .mockImplementationOnce(() => pending.promise);
   mount("/workspaces/one", fixture.store, fetch);
-  await screen.findByRole("heading", { name: "Alice workspace" });
+  await screen.findByText("Alice workspace");
   fixture.change(session("bob"));
-  expect(screen.queryByRole("heading", { name: "Alice workspace" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Alice workspace")).not.toBeInTheDocument();
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("authorization")).toBe("Bearer bob");
   pending.resolve(response(directory));
@@ -183,7 +186,10 @@ it("resumes a safe return path only after a stored session validates", async () 
         response({ memberships: [membership("one", "First workspace")], invitations: [] }),
       ),
   );
-  await screen.findByRole("heading", { name: "First workspace" });
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+    "First workspace",
+  );
   expect(history.get()).toBe("/workspaces/one");
 });
 
@@ -221,7 +227,10 @@ it("signs in through the composed page and validates before resuming the intende
   checked.resolve(
     response({ memberships: [membership("one", "First workspace")], invitations: [] }),
   );
-  await screen.findByRole("heading", { name: "First workspace" });
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+    "First workspace",
+  );
   expect(history.get()).toBe("/workspaces/one?tab=members");
 });
 it("ignores an external return destination after signing in", async () => {
@@ -292,7 +301,10 @@ it("retains a created workspace through directory failure and navigates after re
   await screen.findByText(/Your workspace was created, but/);
   expect(history.get()).toBe("/workspaces/new");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  await screen.findByRole("heading", { name: "Studio" });
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+    "Studio",
+  );
   expect(history.get()).toBe("/workspaces/one");
   expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
@@ -330,17 +342,29 @@ it("keeps the sidebar and account trigger mounted across workspace pages and swi
   });
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByText("Workspace / Home")).toBeInTheDocument();
+  expect(screen.getByRole("main", { name: "Home" }).querySelector("h1, h2")).toBeNull();
   const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
   const trigger = screen.getByRole("button", { name: "Your account: alice" });
   fireEvent.click(screen.getByRole("link", { name: "Tasks" }));
   await screen.findByRole("heading", { name: "Tasks" });
+  expect(screen.getByText("Workspace / Tasks")).toBeInTheDocument();
   expect(history.get()).toBe("/workspaces/one/tasks");
   expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
   expect(screen.getByRole("button", { name: "Your account: alice" })).toBe(trigger);
+  for (const page of ["Triage", "Environments", "Connections"] as const) {
+    fireEvent.click(screen.getByRole("link", { name: page }));
+    await screen.findByRole("heading", { name: page });
+    expect(
+      screen.getByText(`${page === "Triage" ? "Workspace" : "Configure"} / ${page}`),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: page }).querySelector("h1, h2")).toBeNull();
+  }
   history.set({ value: "/workspaces/two/settings", scroll: false });
   await screen.findByRole("heading", { name: "Workspace" });
+  expect(screen.getByText("Configure / Settings")).toBeInTheDocument();
   expect(sidebar).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });

@@ -15,7 +15,7 @@ import {
   IconMarkSettings,
 } from "@amends/icons";
 import { useLocation, useParams } from "@solidjs/router";
-import { createEffect, on, Show, type JSX, type ParentProps } from "solid-js";
+import { createEffect, on, type JSX, type ParentProps } from "solid-js";
 
 const labels: Record<WorkspacePage, string> = {
   home: "Home",
@@ -101,6 +101,13 @@ export function WorkspaceLayout(props: ParentProps) {
     const section = location.pathname.split("/").at(-1);
     return section === "members" || section === "invites" ? section : "workspace";
   };
+  const page = () =>
+    (Object.keys(labels) as WorkspacePage[]).find(
+      (name) =>
+        paths.workspacePage(params.workspaceId, name) === location.pathname.replace(/\/$/, "") ||
+        (name === "settings" &&
+          location.pathname.startsWith(`${paths.workspacePage(params.workspaceId, name)}/`)),
+    );
   const title = () => {
     if (settings())
       return settingsSection() === "members"
@@ -108,13 +115,13 @@ export function WorkspaceLayout(props: ParentProps) {
         : settingsSection() === "invites"
           ? "Invites"
           : "Workspace";
-    const page = (Object.keys(labels) as WorkspacePage[]).find(
-      (page) =>
-        paths.workspacePage(params.workspaceId, page) === location.pathname.replace(/\/$/, "") ||
-        (page === "settings" &&
-          location.pathname.startsWith(`${paths.workspacePage(params.workspaceId, page)}/`)),
-    );
-    return page ? labels[page] : "Page not found";
+    const current = page();
+    return current ? labels[current] : "Page not found";
+  };
+  const crumbs = () => {
+    if (settings()) return "Configure / Settings";
+    const configure = page() === "environments" || page() === "connections";
+    return `${configure ? "Configure" : "Workspace"} / ${title()}`;
   };
   createEffect(
     on(
@@ -205,20 +212,13 @@ export function WorkspaceLayout(props: ParentProps) {
       <Shell.Body>
         <Shell.Header workspace>
           <PageHeader.Root>
-            <Show when={settings()}>
-              <PageHeader.Crumbs>
-                <PageHeader.Navigation>
-                  <Shell.NavigationToggle mode="phone" />
-                </PageHeader.Navigation>
-                Configure / Settings
-              </PageHeader.Crumbs>
-            </Show>
+            <PageHeader.Crumbs>
+              <PageHeader.Navigation>
+                <Shell.NavigationToggle mode="phone" />
+              </PageHeader.Navigation>
+              {crumbs()}
+            </PageHeader.Crumbs>
             <PageHeader.Heading>
-              <Show when={!settings()}>
-                <PageHeader.Navigation>
-                  <Shell.NavigationToggle mode="phone" />
-                </PageHeader.Navigation>
-              </Show>
               <PageHeader.Title>{title()}</PageHeader.Title>
             </PageHeader.Heading>
           </PageHeader.Root>

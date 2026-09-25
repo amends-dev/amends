@@ -117,7 +117,10 @@ it("signs in from the desktop page and resumes the workspace query through hash 
   expect(code).toHaveFocus();
   fireEvent.input(code, { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Desktop workspace" });
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+    "Desktop workspace",
+  );
   expect(window.location.hash).toBe("#/workspaces/one?tab=members");
   expect(store.read()?.token).toBe("jo@mercier.co");
   expect(new Headers(fetch.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
@@ -170,7 +173,10 @@ it("opens creation from the picker and enters the created workspace through hash
   expect(window.location.hash).toBe("#/workspaces/new");
   fireEvent.input(input, { target: { value: "Studio" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Studio" });
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+    "Studio",
+  );
   expect(window.location.hash).toBe("#/workspaces/one");
   fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));
   fireEvent.click(await screen.findByRole("link", { name: "Switch workspace" }));
@@ -198,9 +204,12 @@ it("navigates workspace sections with persistent chrome and retains appearance a
   };
   mount("/workspaces/one", "alice", () => Promise.resolve(response(listing)));
   await screen.findByRole("heading", { name: "Home" });
+  expect(screen.getByText("Workspace / Home")).toBeInTheDocument();
+  expect(screen.getByRole("main", { name: "Home" }).querySelector("h1, h2")).toBeNull();
   const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
   fireEvent.click(screen.getByRole("link", { name: "Triage" }));
   await screen.findByRole("heading", { name: "Triage" });
+  expect(screen.getByText("Workspace / Triage")).toBeInTheDocument();
   expect(window.location.hash).toBe("#/workspaces/one/triage");
   expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
   fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));

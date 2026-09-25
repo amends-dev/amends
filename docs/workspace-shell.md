@@ -19,7 +19,8 @@ outside the workspace layout. Sign-in preserves supported nested destinations.
 
 The `Amends Shell v2` and `Amends Screen · …` mocks in `design-system/` use 30px
 horizontal gutters beside the workspace navigation and 18px on phones. The
-repeated page header has optional breadcrumbs, a 34px Instrument Serif title
+repeated workspace page header has a location line (`Workspace / …` or
+`Configure / …`) above its 34px Instrument Serif title
 (26px on phones), optional actions, and compact mono metadata. Page section
 pickers sit below the header as separate controls. Sign-in and workspace selection
 use standalone layouts.

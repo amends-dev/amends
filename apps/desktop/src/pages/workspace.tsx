@@ -1,19 +1,7 @@
-import { useWorkspace } from "@amends/client";
-import { useParams } from "@solidjs/router";
-import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 
 export function HomePage() {
-  const params = useParams<{ workspaceId: string }>();
-  const membership = useWorkspace(() => params.workspaceId);
-  return (
-    <Column gap={3}>
-      <Text as="h2" variant="heading">
-        {membership()?.workspace.name}
-      </Text>
-      <Text tone="secondary">Your workspace is ready. Work and activity will appear here.</Text>
-    </Column>
-  );
+  return <Text tone="secondary">Your workspace is ready. Work and activity will appear here.</Text>;
 }
 export function TriagePage() {
   return <Text tone="secondary">A place to review what needs your attention.</Text>;
