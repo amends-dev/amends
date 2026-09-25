@@ -33,6 +33,12 @@ a host provides its own to change them. A stream holds its place from before the
 it until its response ends; a stream beyond either limit fails with `Api.TooManyStreams` (429),
 naming which limit it met.
 
+`Draining.Service` is the server beginning to shut down. Where a host provides it, open change
+streams end with `ChangeFeed.Unavailable` as it completes, so their clients reconnect, to another
+process if one runs, and the HTTP server's graceful stop waits only for ordinary requests rather
+than for every open stream. `Draining.layer` creates it, and a host builds
+`Draining.layerOnRelease` after its HTTP server so that releasing it, first, begins the drain.
+
 ## Organization
 
 Keep one focused handler module per HTTP group, with filenames matching

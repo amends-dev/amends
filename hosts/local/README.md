@@ -37,7 +37,9 @@ writers wait for each other in memory rather than each holding a connection, and
 most three at once; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
 
 The server refuses request bodies over one mebibyte with 413, and serves at most a thousand
-live-update streams per workspace and twenty per member of it, answering 429 beyond them.
+live-update streams per workspace and twenty per member of it, answering 429 beyond them. When
+the host stops, open live-update streams end first, telling their clients to reconnect, so the
+process exits once ordinary requests finish rather than waiting for them.
 
 The database must exist; startup applies pending migrations to it before serving, one
 process at a time when several start together.

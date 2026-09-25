@@ -343,4 +343,35 @@ describe.skipIf(!available)("PostgreSQL", () => {
       }),
     ),
   );
+
+  it.live("stopping the host ends open change streams at once, telling them to reconnect", () =>
+    temporary(async (url) =>
+      withServer(url, async (call, base, stop) => {
+        const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+          (await call(alice.id, "POST", "/workspaces", { name: "Streams" })).body,
+        );
+        const response = await fetch(`${base}/workspaces/${workspace.id}/changes`, {
+          headers: { authorization: `Bearer ${alice.id}` },
+        });
+        const reader = response.body?.getReader();
+        if (reader === undefined) throw new Error("Expected a stream");
+        const decoder = new TextDecoder();
+        let received = "";
+        while (!received.includes("Ready")) {
+          const chunk = await reader.read();
+          if (chunk.done) throw new Error("The stream ended before it was ready");
+          received += decoder.decode(chunk.value, { stream: true });
+        }
+        const elapsed = await stop();
+        // The server's graceful stop would otherwise wait twenty seconds for the open stream.
+        expect(elapsed).toBeLessThan(5_000);
+        while (true) {
+          const chunk = await reader.read().catch(() => ({ done: true, value: undefined }));
+          if (chunk.done) break;
+          received += decoder.decode(chunk.value, { stream: true });
+        }
+        expect(received).toContain("ChangeFeed.Unavailable");
+      }),
+    ),
+  );
 });

@@ -9,7 +9,7 @@ interface Options {
 /** One lifetime of the real server entry point over a PostgreSQL database, on an ephemeral port. */
 export const withServer = async <A>(
   databaseUrl: string,
-  run: (call: Call, base: string) => Promise<A>,
+  run: (call: Call, base: string, stop: Stop) => Promise<A>,
   options: Options = {},
 ): Promise<A> => {
   const env: Record<string, string | undefined> = {
@@ -73,7 +73,13 @@ export const withServer = async <A>(
       const text = await response.text();
       return { status: response.status, body: text === "" ? undefined : JSON.parse(text) };
     };
-    return await run(call, base);
+    const stop: Stop = async () => {
+      const started = performance.now();
+      child.kill("SIGTERM");
+      await child.exited;
+      return performance.now() - started;
+    };
+    return await run(call, base, stop);
   } finally {
     clearTimeout(timeout);
     child.kill();
@@ -86,6 +92,9 @@ export const withServer = async <A>(
     }
   }
 };
+
+/** Stop the server as its process manager would, and say how long it took, in milliseconds. */
+export type Stop = () => Promise<number>;
 
 export type Call = (
   token: string,

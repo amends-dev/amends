@@ -4,9 +4,10 @@ import type { Workspace } from "@amends/core/workspace";
 import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
 import { SignalApplication } from "@amends/core/signal";
 import { Gateway } from "@amends/gateway";
-import { Cause, Context, Effect, Stream } from "effect";
+import { Cause, Context, Deferred, Effect, Option, Stream } from "effect";
 import { HttpBody, HttpEffect, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { Draining } from "./draining.ts";
 
 const heartbeat = Stream.tick("5 seconds").pipe(
   Stream.map(() => ": keepalive\n\n"),
@@ -100,6 +101,17 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     const hold = counting(yield* StreamLimits);
+    // As the server starts shutting down, streams end and tell their clients to reconnect.
+    const draining = yield* Effect.serviceOption(Draining.Service);
+    const untilDraining = <A, R>(stream: Stream.Stream<A, ChangeFeed.Unavailable, R>) =>
+      Option.match(draining, {
+        onNone: () => stream,
+        onSome: (signal) =>
+          stream.pipe(
+            Stream.interruptWhen(Deferred.await(signal)),
+            Stream.concat(Stream.fail(new ChangeFeed.Unavailable({}))),
+          ),
+      });
     return handlers.handleAll({
       watch: ({ params, query }) =>
         Effect.flatMap(Principal, (principal) =>
@@ -109,7 +121,7 @@ export const layer = HttpApiBuilder.group(
                 params.workspaceId,
                 principal,
                 Effect.flatMap(ChangeFeedApplication.Service, (changes) =>
-                  Effect.map(changes.watch(query), contained),
+                  Effect.map(changes.watch(query), (stream) => untilDraining(contained(stream))),
                 ),
               ),
             ),

@@ -1,4 +1,4 @@
-import { Routes } from "@amends/server-http";
+import { Draining, Routes } from "@amends/server-http";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Layer } from "effect";
 import { HttpRouter } from "effect/unstable/http";
@@ -35,11 +35,21 @@ export const maxRequestBodySize = 1024 * 1024;
  * @category layers
  */
 export const layer = (host: LocalHost.HostLayer, port: number) =>
-  HttpRouter.serve(layerRoutes).pipe(
+  // Built after the server, the drain is released first as the host stops, ending open change
+  // streams so the server's graceful stop waits only for ordinary requests.
+  Draining.layerOnRelease.pipe(
     Layer.provide(
-      Layer.mergeAll(host, DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer))),
+      HttpRouter.serve(layerRoutes).pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            host,
+            DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer)),
+          ),
+        ),
+        Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port, maxRequestBodySize })),
+      ),
     ),
-    Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port, maxRequestBodySize })),
+    Layer.provide(Draining.layer),
   );
 
 export * as LocalServer from "./server.ts";
