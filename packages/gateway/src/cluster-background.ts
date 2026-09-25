@@ -46,9 +46,20 @@ export class Wake extends Schema.Class<Wake>("amends/background/Wake")({
   }
 }
 
+/**
+ * A wake the worker gave up on: its process is one this host does not run, even after retries,
+ * or its workspace was never created. Cluster keeps it as the wake's reply, where operators find
+ * it until handled wakes are pruned.
+ */
+export const droppedTag = "amends/background/Dropped";
+export class Dropped extends Schema.TaggedError<Dropped>()(droppedTag, {
+  reason: Schema.Literals(["unknown-process", "workspace-not-found"]),
+  attempt: Schema.Int,
+}) {}
+
 /** One workspace's process: runs of it take turns, and its wakes survive the runner. */
 export const WorkspaceProcess = Entity.make("amends/WorkspaceProcess", [
-  Rpc.make("Wake", { payload: Wake }).annotate(ClusterSchema.Persisted, true),
+  Rpc.make("Wake", { payload: Wake, error: Dropped }).annotate(ClusterSchema.Persisted, true),
 ]);
 
 /** The entity for a workspace's process. */
@@ -141,7 +152,10 @@ export const layerWorker = WorkspaceProcess.toLayer(
               process: wake.process,
               cause: exit.cause,
             });
-            return;
+            return yield* new Dropped({
+              reason: notFound ? "workspace-not-found" : "unknown-process",
+              attempt: wake.attempt,
+            });
           }
           const attempt = wake.attempt + 1;
           yield* Effect.logWarning("Background process failed; running it again later", {

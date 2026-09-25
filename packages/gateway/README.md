@@ -163,7 +163,10 @@ resumes after a restart.
   for the next run: at once after `Continue`, at the due time after `At`, and after a backoff
   that doubles from two seconds up to five minutes after a failure. A process this host does
   not register is dropped after `unknownAttempts` (ten) failed runs, and a workspace that was
-  never created at once. A wake it could not act on stays undelivered, so Cluster runs it again.
+  never created at once. It fails a wake it drops with `ClusterBackground.Dropped`, naming the
+  reason and the retries before it, so Cluster keeps the drop as the wake's reply, where
+  operators find it until handled wakes are pruned. A wake it could not act on stays
+  undelivered, so Cluster runs it again.
 - `layer` provides both. Every runner over the same storage runs the worker, as Cluster
   requires of every entity type.
 - `layerPruning({ prune, keep? })` removes handled wakes once they are older than `keep`

@@ -67,6 +67,12 @@ process, so a host restarted after a crash takes its address back at once, and i
 wakes run again. Restart a host by stopping the old process before starting the new one; wakes
 sent meanwhile wait in the database.
 
+`bun run --filter @amends/host-local status` reports the background work of the database at
+`AMENDS_DATABASE_URL`: per process, the wakes due, scheduled, retrying, and dropped, then the
+latest retries and drops with their workspaces. For output to process further, run
+`bun hosts/local/src/status.ts --json` from the repository root, which prefixes no lines.
+Failures and drops are also logged as they happen.
+
 With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes coordinate through the database
 alone, so a wake for a workspace another process runs arrives at that process's next read,
 within two seconds. With `socket`, each process also listens at its runner address and tells the
@@ -98,6 +104,7 @@ constructor and layer; related authentication modules share one directory.
 | `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool. |
 | `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                |
 | `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                      |
+| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                      |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires

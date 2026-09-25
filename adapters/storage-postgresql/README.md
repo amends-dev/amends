@@ -295,11 +295,17 @@ returns how many went. A message's ID carries when Cluster stored it; messages n
 stay, however old, and so do other entity types'. Each statement removes at most `batch`
 messages, a thousand by default.
 
+`PostgresClusterStorage.backgroundStatus(options?)` reports the workspaces' background work from
+those tables: per process, the wakes due, scheduled, and retrying, when the longest-waiting due
+wake became due, and how many wakes were dropped; then the latest retries and drops, with their
+workspaces. It reports nothing before any host has run background work over the database.
+
 `PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
 processes over the database never run Cluster at one address: it fails with `AddressTaken`
 while another process holds it. The claim is a session-level advisory lock on a connection it
 keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
-dies. `cluster-storage.test.ts` checks pruning over real wakes and the claim across pools.
+dies. `cluster-storage.test.ts` checks pruning and the status over real wakes, and the claim
+across pools.
 
 ## Composition
 

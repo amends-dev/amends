@@ -1,7 +1,7 @@
-import { BackgroundProcess } from "@amends/core/background";
+import { BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { ClusterBackground, Gateway, WorkspaceWakes } from "@amends/gateway";
+import { ClusterBackground, Gateway, GatewayErrors, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";
@@ -38,15 +38,17 @@ const cluster = (url: string) => {
   );
 };
 
-const wake = (commit: string, at?: DateTime.Utc) =>
+const wakeIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
   Effect.flatMap(WorkspaceWakes.Service, (wakes) =>
-    wakes.forWorkspace(workspaceId).request(process, { at }),
+    wakes.forWorkspace(id).request(process, { at }),
   ).pipe(
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),
       append: () => Effect.die("Unexpected append"),
     }),
   );
+
+const wake = (commit: string, at?: DateTime.Utc) => wakeIn(workspaceId, commit, at);
 
 const count = (query: string) =>
   Effect.flatMap(SqlClient.SqlClient, (sql) => sql.unsafe<{ readonly count: number }>(query)).pipe(
@@ -126,5 +128,81 @@ describe.skipIf(!available)("PostgreSQL", () => {
         yield* Effect.scoped(claim(first, "runner-a:1"));
       }).pipe(Effect.scoped),
     ),
+  );
+
+  it.live(
+    "background status counts what waits, retries, and was dropped, per process",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const empty = yield* Layer.build(database(url));
+          // Before any host ran background work, there is nothing to report.
+          expect(
+            yield* PostgresClusterStorage.backgroundStatus().pipe(Effect.provide(empty)),
+          ).toEqual({ processes: [], retries: [], drops: [] });
+          const unexpected = () => Effect.die("Only background runs are expected");
+          const gateway = Gateway.Service.of({
+            createWorkspace: unexpected,
+            inWorkspace: unexpected,
+            asMember: unexpected,
+            asMemberScoped: unexpected,
+            runBackground: (id) =>
+              id === "missing"
+                ? Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId: id }))
+                : id === "failing"
+                  ? Effect.fail(new BackgroundRuns.Failure({ process, cause: "Not yet" }))
+                  : Effect.succeed(BackgroundProcess.idle),
+          });
+          // Reading rarely, so the retry a failed run schedules stays waiting through the test.
+          const context = yield* Layer.build(
+            ClusterBackground.layer.pipe(
+              Layer.provide(
+                Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
+              ),
+              Layer.provideMerge(
+                SingleRunner.layer({
+                  shardingConfig: {
+                    runnerAddress: Option.some(RunnerAddress.make("localhost", 34431)),
+                    entityMessagePollInterval: Duration.seconds(30),
+                  },
+                }).pipe(Layer.provide(BunCrypto.layer)),
+              ),
+              Layer.provideMerge(database(url)),
+            ),
+          );
+          const now = yield* DateTime.now;
+          yield* Effect.gen(function* () {
+            for (const id of ["missing", "failing", "fine"])
+              yield* wakeIn(Workspace.Id.make(id), `commit-${id}`);
+            yield* wakeIn(
+              Workspace.Id.make("later"),
+              "commit-later",
+              DateTime.add(now, { hours: 1 }),
+            );
+            const deadline = (yield* Clock.currentTimeMillis) + 10_000;
+            while (
+              (yield* PostgresClusterStorage.backgroundStatus()).retries.length === 0 &&
+              (yield* Clock.currentTimeMillis) < deadline
+            )
+              yield* Effect.sleep("100 millis");
+            const status = yield* PostgresClusterStorage.backgroundStatus();
+            expect(status.processes).toEqual([
+              {
+                process,
+                due: 0,
+                scheduled: 2,
+                retrying: 1,
+                oldestDue: Option.none(),
+                dropped: 1,
+              },
+            ]);
+            expect(status.retries).toMatchObject([{ process, workspaceId: "failing", attempt: 1 }]);
+            expect(status.drops).toMatchObject([
+              { process, workspaceId: "missing", reason: "workspace-not-found", attempt: 0 },
+            ]);
+          }).pipe(Effect.provide(context));
+        }).pipe(Effect.scoped),
+      ),
+    30_000,
   );
 });
