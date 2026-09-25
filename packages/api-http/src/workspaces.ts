@@ -1,4 +1,5 @@
-import { Ownership, Workspace } from "@amends/core/workspace";
+import { Ownership, Workspace, WorkspaceSettings } from "@amends/core/workspace";
+import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { Authentication } from "./authentication.ts";
 import { ApiErrors } from "./errors.ts";
@@ -6,6 +7,43 @@ import { ApiErrors } from "./errors.ts";
 /** Workspace creation and ownership operations. Creation entitlement checks belong to the host. */
 export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
   .add(
+    HttpApiEndpoint.get("settings", "/:workspaceId/settings", {
+      params: { workspaceId: Workspace.Id },
+      success: WorkspaceSettings.View,
+      error: [
+        ...ApiErrors.member,
+        ...ApiErrors.assignment,
+        ApiErrors.MemberNotFound,
+        ApiErrors.OwnerProtected,
+        ApiErrors.AlreadyRemoved,
+        ApiErrors.WorkspaceChanged,
+      ],
+    }),
+    HttpApiEndpoint.put("rename", "/:workspaceId/name", {
+      params: { workspaceId: Workspace.Id },
+      payload: WorkspaceSettings.RenameInput,
+      success: Workspace.Record,
+      error: [
+        ...ApiErrors.member,
+        ...ApiErrors.assignment,
+        ApiErrors.MemberNotFound,
+        ApiErrors.OwnerProtected,
+        ApiErrors.AlreadyRemoved,
+        ApiErrors.WorkspaceChanged,
+      ],
+    }),
+    HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
+      params: { workspaceId: Workspace.Id },
+      success: Schema.Array(WorkspaceSettings.MemberEntry),
+      error: [
+        ...ApiErrors.member,
+        ...ApiErrors.assignment,
+        ApiErrors.MemberNotFound,
+        ApiErrors.OwnerProtected,
+        ApiErrors.AlreadyRemoved,
+        ApiErrors.WorkspaceChanged,
+      ],
+    }),
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,
       payload: Workspace.CreateInput,

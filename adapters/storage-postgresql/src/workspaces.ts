@@ -1,5 +1,5 @@
 import { Store } from "@amends/core/journal";
-import { Ownership, Workspace, WorkspaceStore } from "@amends/core/workspace";
+import { Ownership, Workspace, WorkspaceSettings, WorkspaceStore } from "@amends/core/workspace";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -52,6 +52,30 @@ export const make = Effect.fn("Workspaces.make")(function* () {
         }),
         true,
       ).pipe(Effect.mapError(storeError(WorkspaceStore, "insert")));
+    }),
+    rename: Effect.fn("Workspaces.rename")(function* (input) {
+      yield* Store.Transaction;
+      const change = yield* Schema.decodeEffect(WorkspaceSettings.NameChange)(input).pipe(
+        Effect.mapError(storeConflict(WorkspaceStore, "rename")),
+      );
+      if (change.workspaceId !== workspaceId)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "rename",
+          message: "Change belongs to another workspace",
+        });
+      const rows = yield* guard(
+        db
+          .update(workspaces)
+          .set({ name: change.name })
+          .where(and(own, eq(workspaces.name, change.previousName)))
+          .returning({ id: workspaces.workspaceId }),
+        true,
+      ).pipe(Effect.mapError(storeError(WorkspaceStore, "rename")));
+      if (rows.length === 0)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "rename",
+          message: "Workspace is missing or name has changed",
+        });
     }),
     transferOwnership: Effect.fn("Workspaces.transferOwnership")(function* (input) {
       yield* Store.Transaction;

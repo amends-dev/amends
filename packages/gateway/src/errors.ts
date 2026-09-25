@@ -22,6 +22,7 @@ import {
   MemberApplication,
   OwnershipApplication,
   Workspace,
+  WorkspaceSettingsApplication,
 } from "@amends/core/workspace";
 import { ReadStateApplication } from "@amends/core/attention";
 import { SignalApplication } from "@amends/core/signal";
@@ -62,6 +63,7 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.In
  * their original cause for host logging.
  */
 export const PublicError = Schema.Union([
+  WorkspaceSettingsApplication.Changed,
   ChangeFeed.Unavailable,
   NotMember,
   WorkspaceNotFound,

@@ -6,7 +6,8 @@
   "exports": {
     "./account": "./src/account/index.ts",
     "./workspaces": "./src/workspaces/index.ts",
-    "./sign-in": "./src/sign-in/index.ts"
+    "./sign-in": "./src/sign-in/index.ts",
+    "./settings": "./src/settings/index.ts"
   },
   "scripts": {
     "dev": "bun run ../../scripts/features-dev.ts",

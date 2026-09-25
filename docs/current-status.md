@@ -33,7 +33,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 HTTP exposes sign-in, workspace creation and the directory, members, invitations, assignments, ownership,
 the notification inbox reads, the change feed, and typing. Groups, threads, read state,
 notification sources, and acknowledgment are available through core and the gateway only, and
-the web and desktop apps have no domain pages yet.
+the web and desktop apps have no pages for those workflows yet.
 
 ## Storage cost
 
@@ -139,7 +139,7 @@ are persisted per app origin; System follows operating-system appearance.
 [Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
 compose headless session/API state from [client](../apps/client/README.md) and
 presentation from [UI](../apps/ui/README.md). Each app owns its route tree and
-maps query state to placeholder pages, errors, and navigation. Web uses browser routing and
+maps query state to pages, errors, and navigation. Web uses browser routing and
 an API proxy; Tauri uses hash routing and connects to the existing local host.
 Client and UI have no dependency on each other in source, tests, or manifests.
 Stored credentials are scoped by API URL and validated before protected content mounts.
@@ -157,8 +157,10 @@ Workspace picker and creation are implemented in both apps over shared connected
 features. [Workspace entry](workspace-entry.md) records composition and recovery.
 The picker lists active memberships and total members; creation refreshes the directory
 before navigation and retries uncertain submissions with the same key while mounted.
-Invitations have a count only; actions, richer directory metadata, remembered-workspace
-navigation, and domain page content remain unimplemented. The app-owned
+[Workspace settings](workspace-settings.md) now supports rename, role editing, removal,
+ownership transfer, invitation creation/revocation, and recipient acceptance from the picker.
+Recipient decline, direct/scoped grant editing, richer directory metadata, remembered-workspace
+navigation, and work/activity pages remain unimplemented. The app-owned
 [workspace shell](workspace-shell.md) now provides persistent navigation, nested
 page boundaries, and an account popup with appearance and sign-out controls.
 Only local sign-out exists; server revocation,

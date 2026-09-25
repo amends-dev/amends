@@ -1,4 +1,9 @@
-import { useDirectory, type DirectoryScope } from "@amends/client";
+import {
+  useDirectory,
+  useAcceptInvitation,
+  formatInstant,
+  type DirectoryScope,
+} from "@amends/client";
 import { ItemList } from "@amends/ui/compositions/item-list";
 import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
 import { Button } from "@amends/ui/primitives/button";
@@ -107,5 +112,57 @@ export function Status() {
         {failed() ? "Try again" : "Refresh workspaces"}
       </Button>
     </Column>
+  );
+}
+function InvitationEntry(props: {
+  invitation: NonNullable<
+    ReturnType<DirectoryScope["state"]> & { _tag: "Ready" }
+  >["listing"]["invitations"][number];
+}) {
+  const invitation = props.invitation;
+  const value = useAcceptInvitation(invitation.details.workspaceId, invitation.details.id);
+  return (
+    <ItemList.Item>
+      <ItemList.Row>
+        <ItemList.Content>
+          <ItemList.Title>{invitation.workspaceName ?? "Workspace invitation"}</ItemList.Title>
+          <ItemList.Description>For {invitation.details.recipientId}</ItemList.Description>
+          <ItemList.Description>
+            Expires {formatInstant(invitation.details.expiresAt)}
+          </ItemList.Description>
+          <Show when={value.error()}>
+            <Text role="alert" tone="danger">
+              {value.error()}
+            </Text>
+          </Show>
+        </ItemList.Content>
+        <ItemList.Actions>
+          <Button pending={value.pending()} onClick={value.accept}>
+            {value.completed() ? "Refresh workspaces" : "Accept invitation"}
+          </Button>
+        </ItemList.Actions>
+      </ItemList.Row>
+    </ItemList.Item>
+  );
+}
+export function Invitations() {
+  const value = directory();
+  const invitations = createMemo(() => {
+    const state = value.state();
+    return state._tag === "Ready" ? state.listing.invitations : [];
+  });
+  return (
+    <Show when={invitations().length}>
+      <Column gap={3}>
+        <Text as="h2" variant="heading">
+          Invitations
+        </Text>
+        <ItemList.Root aria-label="Your invitations">
+          <For each={invitations()}>
+            {(invitation) => <InvitationEntry invitation={invitation} />}
+          </For>
+        </ItemList.Root>
+      </Column>
+    </Show>
   );
 }

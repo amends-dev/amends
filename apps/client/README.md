@@ -96,3 +96,11 @@ the provider owns preference and resolved light/dark state. The source handles s
 failures and platform listeners. Without a source, state stays in memory and system
 appearance resolves to light. Dispose/remount to change the source. Client owns no
 palette, styling, or platform appearance API.
+
+## Settings
+
+`useSettings(workspaceId, section)` owns one mounted settings scope, with typed reads,
+mutations, stale-write feedback, and explicit refresh. Remount it when workspace or
+section identity changes. `useAcceptInvitation` joins and refreshes the directory.
+Requests are credential-scoped and cancelled on disposal. See
+[workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.

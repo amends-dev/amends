@@ -168,6 +168,7 @@ listed, assigned, and offered in invitations.
 | `invitation.manage`            | Administrator | Workspace | Listing invitations; with `assignment.manage`, issuing and revoking them          |
 | `assignment.read`              | Viewer        | Member    | Reading a member's access                                                         |
 | `assignment.manage`            | Administrator | Workspace | Adding, replacing, and revoking roles, within delegation limits                   |
+| `workspace.rename`             | Owner         | Workspace | Renaming workspace metadata                                                       |
 | `workspace.transfer-ownership` | Owner         | Workspace | Transferring ownership                                                            |
 | `group.create`                 | Administrator | Workspace | [Creating a private team group](group-workflows.md#creating-a-group)              |
 | `group.read`                   | Viewer        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                |
@@ -180,3 +181,17 @@ listed, assigned, and offered in invitations.
 | `agent.use`                    | Viewer        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group |
 
 Group and thread permissions also need current membership in the group; see each guide.
+
+## Settings and names
+
+`GET /workspaces/:id/settings` exposes workspace metadata, rename/invitation flags,
+and assignable roles. `GET …/member-management` returns readable members with
+access summaries and server-computed removal flags. Denied access summaries are null.
+
+`PUT …/name` accepts `{ name, expectedName }`, requires `workspace.rename`, and
+records `workspace.renamed` with the old and new name. A different current name
+returns 409 `WorkspaceSettings.Changed`; retrying an already-applied name succeeds
+without another fact. This compares names, not a version: a rename away and back
+is not detected. Creation attribution and ownership remain unchanged. Built-in
+Owner bundle revision 2 includes rename permission. The directory reads the updated
+name. See the [Settings UI guide](workspace-settings.md) for connected behavior.

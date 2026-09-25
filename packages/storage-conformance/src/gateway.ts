@@ -127,6 +127,7 @@ export const gateway = (harness: Harness) => {
                     workspaceId: workspace.id,
                     name,
                     permissions: [
+                      ...(id === BuiltinRoles.OwnerId ? ["workspace.rename"] : []),
                       MemberPermissions.Read.name,
                       MemberPermissions.Remove.name,
                       InvitationPermissions.Manage.name,
@@ -238,7 +239,13 @@ export const gateway = (harness: Harness) => {
           );
           expect(outcome.crossed).toMatchObject({ _tag: "Gateway.NotMember" });
           expect(outcome.listing.memberships.map((m) => m.workspace.id)).toEqual([outcome.b.id]);
-          expect(outcome.listing.invitations).toEqual([outcome.invitation]);
+          expect(outcome.listing.invitations).toEqual([
+            {
+              details: outcome.invitation.details,
+              state: outcome.invitation.state,
+              workspaceName: outcome.a.name,
+            },
+          ]);
           expect(outcome.joined).toMatchObject({ identity: bob, status: "active" });
           expect(outcome.afterJoin.invitations).toEqual([]);
           const activeMemberCounts = new Map(

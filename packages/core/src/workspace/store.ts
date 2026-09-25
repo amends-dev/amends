@@ -3,6 +3,7 @@ import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { Workspace } from "./workspace.ts";
 import type { Ownership } from "./ownership/ownership.ts";
+import type { WorkspaceSettings } from "./settings/settings.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("WorkspaceStore.Failure", {
   operation: Schema.String,
@@ -16,6 +17,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("WorkspaceStore.Con
 /** Workspace metadata shares the native transaction used by journal projections. */
 export interface Interface {
   readonly workspaceId: Workspace.Id;
+  /** Change only the name, requiring matching workspace and previous name inside a transaction. */
+  readonly rename: (
+    change: WorkspaceSettings.NameChange,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** Read the current transaction, or committed state when called outside one. */
   readonly get: Effect.Effect<Option.Option<Workspace.Record>, Failure>;
   /** Insert once; invalid records, duplicate creation, and a different workspace conflict. Never overwrite ownership. */

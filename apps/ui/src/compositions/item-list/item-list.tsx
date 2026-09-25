@@ -38,3 +38,12 @@ export function Description(props: JSX.HTMLAttributes<HTMLSpanElement>) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <span {...native} class={classes(s.description, local.class, local.classList)} />;
 }
+/** Non-interactive row for content with independent actions. Never nests a button in a link. */
+export function Row(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.row, local.class, local.classList)} />;
+}
+export function Actions(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.actions, local.class, local.classList)} />;
+}

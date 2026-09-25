@@ -1,3 +1,4 @@
+import { Button } from "@amends/ui/primitives/button";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { For, createSignal } from "solid-js";
@@ -91,4 +92,25 @@ export const Activation = {
     await userEvent.click(canvas.getByRole("link", { name: /New workspace/ }));
     await expect(canvas.getByLabelText("Opened")).toHaveTextContent("Create");
   },
+} satisfies Story;
+export const Actions = {
+  render: () => (
+    <ThemeProvider theme="cotton">
+      <Column style={{ padding: "1rem", "max-width": "30rem" }}>
+        <ItemList.Root aria-label="Invitations">
+          <ItemList.Item>
+            <ItemList.Row>
+              <ItemList.Content>
+                <ItemList.Title>member@example.test</ItemList.Title>
+                <ItemList.Description>Pending · Viewer</ItemList.Description>
+              </ItemList.Content>
+              <ItemList.Actions>
+                <Button variant="secondary">Revoke invitation</Button>
+              </ItemList.Actions>
+            </ItemList.Row>
+          </ItemList.Item>
+        </ItemList.Root>
+      </Column>
+    </ThemeProvider>
+  ),
 } satisfies Story;

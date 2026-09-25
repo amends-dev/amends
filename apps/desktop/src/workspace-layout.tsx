@@ -34,7 +34,12 @@ function WorkspaceLink(props: ParentProps<{ page: WorkspacePage; label: string }
   return (
     <Navigation.Link
       href={href(path())}
-      aria-current={location.pathname.replace(/\/$/, "") === path() ? "page" : undefined}
+      aria-current={
+        location.pathname.replace(/\/$/, "") === path() ||
+        (props.page === "settings" && location.pathname.startsWith(`${path()}/`))
+          ? "page"
+          : undefined
+      }
       onClick={(event) => {
         if (ordinary(event)) shell.closeNavigation();
       }}
@@ -63,7 +68,9 @@ export function WorkspaceLayout(props: ParentProps) {
   const title = () => {
     const page = (Object.keys(labels) as WorkspacePage[]).find(
       (page) =>
-        paths.workspacePage(params.workspaceId, page) === location.pathname.replace(/\/$/, ""),
+        paths.workspacePage(params.workspaceId, page) === location.pathname.replace(/\/$/, "") ||
+        (page === "settings" &&
+          location.pathname.startsWith(`${paths.workspacePage(params.workspaceId, page)}/`)),
     );
     return page ? labels[page] : "Page not found";
   };

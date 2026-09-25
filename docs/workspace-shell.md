@@ -1,8 +1,9 @@
 # Workspace shell
 
 Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout.
-Nested routes provide Triage, Tasks, Environments, Connections, and Settings. Their
-content is currently scaffolding; task data, activity, configuration operations,
+Nested routes provide Triage, Tasks, Environments, Connections, and
+[Settings](workspace-settings.md). Settings manages workspace metadata, members, and
+invitations. The other pages remain scaffolding; task data, activity, configuration operations,
 dynamic Channels/Agents sections, and keyboard-shortcut help remain separate features.
 
 Both apps compose Shell and Navigation through children. SidebarUtility holds one

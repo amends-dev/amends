@@ -64,6 +64,7 @@ Mount them inside the existing ClientProvider and DirectoryProvider.
 <WorkspacePicker.Root>
   <WorkspacePicker.Summary />
   <WorkspacePicker.List workspaceHref={workspaceHref} />
+  <WorkspacePicker.Invitations />
   <WorkspacePicker.Empty />
   <WorkspacePicker.Status />
 </WorkspacePicker.Root>
@@ -75,8 +76,8 @@ Mount them inside the existing ClientProvider and DirectoryProvider.
 ```
 
 The app supplies URLs and navigation callbacks, headings, creation entry, account
-actions, and Shell layout. The picker shows only active memberships; a pending
-invitation count does not imply invitation actions are implemented.
+actions, and Shell layout. The picker shows active memberships and addressed invitations
+with acceptance.
 
 Workspace stories cover populated/empty directories, creation, lost-response retry,
 directory refresh failure, duplicate submissions, and unmounting. Controls also
@@ -93,3 +94,12 @@ Appearance, Actions, Link, and SignOut inside. Mount under ClientProvider and
 AppearanceProvider. The apps supply destination hrefs and Shell placement. The
 account workshop signs in through the real backend and verifies that sign-out
 retains appearance. See [workspace shell](../../docs/workspace-shell.md).
+
+## Settings
+
+`@amends/features/settings` exports Root and Feedback, WorkspaceName, WorkspaceDetails,
+OwnershipTransfer, MemberList, MemberDetail, InviteForm, and InvitationHistory.
+Compose the required parts under `Root workspaceId={id} section="workspace"` (or
+`members` / `invites`). The app supplies member URLs and selected identity; features
+owns no routes or styles. See [workspace settings](../../docs/workspace-settings.md)
+for permissions, conflict handling, invitation retry, and workshop coverage.

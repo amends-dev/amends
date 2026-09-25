@@ -8,6 +8,7 @@ import {
   InvitationApplication,
   MemberApplication,
   OwnershipApplication,
+  WorkspaceSettingsApplication,
 } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
 import { NotificationApplication } from "@amends/core/notification";
@@ -38,6 +39,9 @@ export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
  * concerns, so the status lives on the contract's view of each error.
  */
 export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403));
+export const WorkspaceChanged = WorkspaceSettingsApplication.Changed.pipe(
+  HttpApiSchema.status(409),
+);
 export const WorkspaceNotFound = GatewayErrors.WorkspaceNotFound.pipe(HttpApiSchema.status(404));
 /** The request key was already used for a different request. */
 export const RequestReused = Request.Reused.pipe(HttpApiSchema.status(422));

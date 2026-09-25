@@ -1,5 +1,5 @@
 import { Store } from "@amends/core/journal";
-import { Ownership, Workspace, WorkspaceStore } from "@amends/core/workspace";
+import { Ownership, Workspace, WorkspaceSettings, WorkspaceStore } from "@amends/core/workspace";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
@@ -41,6 +41,30 @@ export const make = Effect.fn("Workspaces.make")(function* () {
       const row = yield* rows
         .encode(record)
         .pipe(Effect.mapError(storeFailure(WorkspaceStore, "insert")));
+      space.records.workspace.set(workspaceId, row);
+    }),
+    rename: Effect.fn("Workspaces.rename")(function* (input) {
+      yield* Store.Transaction;
+      const change = yield* Schema.decodeEffect(WorkspaceSettings.NameChange)(input).pipe(
+        Effect.mapError(storeConflict(WorkspaceStore, "rename")),
+      );
+      if (change.workspaceId !== workspaceId)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "rename",
+          message: "Change belongs to another workspace",
+        });
+      const space = yield* writable("rename");
+      const current = yield* rows
+        .get(space.records.workspace, workspaceId)
+        .pipe(Effect.mapError(storeFailure(WorkspaceStore, "rename")));
+      if (Option.isNone(current) || current.value.name !== change.previousName)
+        return yield* new WorkspaceStore.Conflict({
+          operation: "rename",
+          message: "Workspace is missing or name has changed",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, name: change.name })
+        .pipe(Effect.mapError(storeFailure(WorkspaceStore, "rename")));
       space.records.workspace.set(workspaceId, row);
     }),
     transferOwnership: Effect.fn("Workspaces.transferOwnership")(function* (input) {

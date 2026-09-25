@@ -1,3 +1,4 @@
+import type { SettingsSection } from "../api/settings.ts";
 export type WorkspacePage =
   | "home"
   | "triage"
@@ -6,6 +7,8 @@ export type WorkspacePage =
   | "connections"
   | "settings";
 export const paths = {
+  settingsSection: (id: string, section: SettingsSection) =>
+    `/workspaces/${encodeURIComponent(id)}/settings/${section}`,
   signIn: "/sign-in",
   workspaces: "/workspaces",
   createWorkspace: "/workspaces/new",
@@ -23,7 +26,7 @@ export function returnPath(value: string | undefined): string {
     url.origin !== "https://amends.invalid" ||
     !(
       url.pathname === paths.workspaces ||
-      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings))?$/.test(
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?))?$/.test(
         url.pathname,
       )
     )

@@ -27,13 +27,6 @@ export function EnvironmentsPage() {
 export function ConnectionsPage() {
   return <Text tone="secondary">Manage the services your workspace connects to.</Text>;
 }
-export function SettingsPage() {
-  return (
-    <Text tone="secondary">
-      Workspace settings will appear here. Appearance is available from your account menu.
-    </Text>
-  );
-}
 export function MissingWorkspacePage() {
   return <Text>This page does not exist in the workspace.</Text>;
 }

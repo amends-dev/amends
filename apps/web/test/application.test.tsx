@@ -298,14 +298,36 @@ it("retains a created workspace through directory failure and navigates after re
 });
 
 it("keeps the sidebar and account trigger mounted across workspace pages and switches", async () => {
-  const fetch = vi.fn<typeof globalThis.fetch>(() =>
-    Promise.resolve(
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    const entry = membership("two", "Other studio");
+    if (path.endsWith("/settings"))
+      return Promise.resolve(
+        response({
+          workspace: entry.workspace,
+          canRename: true,
+          canReadInvitations: true,
+          canInvite: true,
+          roles: [],
+        }),
+      );
+    if (path.endsWith("/ownership"))
+      return Promise.resolve(
+        response({
+          workspace: entry.workspace,
+          owner: entry.member,
+          ownerAssignmentId: "grant",
+          canTransfer: true,
+          candidates: [],
+        }),
+      );
+    return Promise.resolve(
       response({
         memberships: [membership("one", "Studio"), membership("two", "Other studio")],
         invitations: [],
       }),
-    ),
-  );
+    );
+  });
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("heading", { name: "Home" });
   const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
@@ -323,7 +345,8 @@ it("keeps the sidebar and account trigger mounted across workspace pages and swi
   await screen.findByRole("heading", { name: "Settings" });
   expect(sidebar).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
-  expect(fetch).toHaveBeenCalledTimes(1);
+  await screen.findByRole("textbox", { name: "Workspace name" });
+  expect(fetch).toHaveBeenCalledTimes(4);
 });
 it("preserves a nested destination through sign-in and denies unavailable workspace children", async () => {
   const fixture = memoryStore();
@@ -338,4 +361,53 @@ it("preserves a nested destination through sign-in and denies unavailable worksp
     screen.queryByRole("complementary", { name: "Workspace sidebar" }),
   ).not.toBeInTheDocument();
   expect(history.get()).toBe("/workspaces/one/tasks?filter=mine");
+});
+
+it("redirects the Settings entry to its workspace section and keeps sidebar selection on descendants", async () => {
+  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
+  const member = {
+    id: "owner",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "alice" },
+    status: "active",
+  };
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    if (path.endsWith("/settings"))
+      return Promise.resolve(
+        response({
+          workspace,
+          canRename: true,
+          canReadInvitations: true,
+          canInvite: true,
+          roles: [],
+        }),
+      );
+    if (path.endsWith("/ownership"))
+      return Promise.resolve(
+        response({
+          workspace,
+          owner: member,
+          ownerAssignmentId: "grant",
+          canTransfer: true,
+          candidates: [],
+        }),
+      );
+    return Promise.resolve(
+      response({ memberships: [{ workspace, member, people: 1 }], invitations: [] }),
+    );
+  });
+  const history = mount("/workspaces/one/settings", memoryStore(session("alice")).store, fetch);
+  await screen.findByRole("textbox", { name: "Workspace name" });
+  expect(history.get()).toBe("/workspaces/one/settings/workspace");
+  expect(
+    screen
+      .getByRole("navigation", { name: "Workspace settings" })
+      .querySelector("a[aria-current=page]"),
+  ).toHaveTextContent("Settings");
+  expect(
+    screen
+      .getByRole("navigation", { name: "Settings sections" })
+      .querySelector("a[aria-current=page]"),
+  ).toHaveTextContent("Workspace");
 });

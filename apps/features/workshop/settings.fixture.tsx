@@ -1,0 +1,274 @@
+import {
+  ClientProvider,
+  DirectoryProvider,
+  Session,
+  type SessionStore,
+  type SettingsSection,
+} from "@amends/client";
+import * as Settings from "@amends/features/settings";
+import { WorkspacePicker } from "@amends/features/workspaces";
+import { ThemeProvider } from "@amends/ui/foundations/theme";
+import { SectionNav } from "@amends/ui/compositions/section-nav";
+import { ListDetail } from "@amends/ui/compositions/list-detail";
+import { Column, Row, Container } from "@amends/ui/primitives/layout";
+import { Button } from "@amends/ui/primitives/button";
+import { Text } from "@amends/ui/primitives/text";
+import { Schema } from "effect";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { openScenario, type Scenario } from "./scenario.ts";
+import { api } from "./workspaces.fixture.tsx";
+export async function signIn(scenario: Scenario, email: string) {
+  await api(scenario, "/session/email", undefined, { email });
+  const code = (await scenario.snapshot()).delivered.at(-1)?.code;
+  return Schema.decodeUnknownSync(Session)(
+    await api(scenario, "/session/code", undefined, { email, code }),
+  );
+}
+export function SettingsFixture(props: {
+  baseUrl?: string;
+  section?: SettingsSection;
+  as?: "Owner" | "Administrator" | "Viewer";
+  theme?: "cotton" | "soot";
+}) {
+  const [scenario, setScenario] = createSignal<Scenario>(),
+    [credential, setCredential] = createSignal<Session>(),
+    [workspaceId, setWorkspaceId] = createSignal(""),
+    [error, setError] = createSignal<string>();
+  const [section, setSection] = createSignal<SettingsSection>(props.section ?? "workspace"),
+    [member, setMember] = createSignal(""),
+    [picker, setPicker] = createSignal(false),
+    [mounted, setMounted] = createSignal(true);
+  const listeners = new Set<() => void>();
+  const store: SessionStore = {
+    read: credential,
+    write: setCredential,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+  const replaceCredential = (value: Session | undefined) => {
+    setCredential(value);
+    listeners.forEach((listener) => listener());
+  };
+  let current: Scenario | undefined,
+    alive = true;
+  const credentials = new Map<string, Session>();
+  const [external, setExternal] = createSignal("");
+  const renameElsewhere = async () => {
+    const scenario = current,
+      owner = credentials.get("Owner");
+    if (!scenario || !owner) return;
+    const data = await api(scenario, `/workspaces/${workspaceId()}/settings`, owner.token);
+    const result = await fetch(`${scenario.apiBaseUrl}/workspaces/${workspaceId()}/name`, {
+      method: "PUT",
+      headers: { authorization: `Bearer ${owner.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ name: "Changed elsewhere", expectedName: data.workspace.name }),
+    });
+    if (!result.ok) throw new Error("External rename failed");
+    setExternal("External rename complete");
+  };
+  onMount(() => {
+    void (async () => {
+      current = await openScenario(props.baseUrl);
+      if (!alive) {
+        await current.dispose();
+        return;
+      }
+      for (const [role, email] of [
+        ["Owner", "owner@example.test"],
+        ["Administrator", "admin@example.test"],
+        ["Viewer", "viewer@example.test"],
+        ["Recipient", "new@example.test"],
+      ] as const)
+        credentials.set(role, await signIn(current, email));
+      const owner = credentials.get("Owner")!;
+      const workspace = await api(current, "/workspaces", owner.token, { name: "Mercier & Co" });
+      const roles = (await api(
+        current,
+        `/workspaces/${workspace.id}/roles`,
+        owner.token,
+      )) as Array<{ role: { id: string; name: string } }>;
+      for (const role of ["Administrator", "Viewer"]) {
+        const signed = credentials.get(role)!;
+        const invitation = await api(
+          current,
+          `/workspaces/${workspace.id}/invitations`,
+          owner.token,
+          {
+            recipientId: signed.humanId,
+            roleId: roles.find((choice) => choice.role.name === role)?.role.id,
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+          },
+        );
+        await api(
+          current,
+          `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`,
+          signed.token,
+          {},
+        );
+      }
+      if (!alive) return;
+      setWorkspaceId(workspace.id);
+      setCredential(credentials.get(props.as ?? "Owner"));
+      setScenario(current);
+    })().catch((cause) => {
+      if (alive) setError(String(cause));
+    });
+  });
+  onCleanup(() => {
+    alive = false;
+    void current?.dispose().catch(console.error);
+  });
+  return (
+    <ThemeProvider theme={props.theme ?? "cotton"}>
+      <main data-scenario-url={scenario()?.url} data-workspace-id={workspaceId()}>
+        <Container>
+          <Column gap={6}>
+            <Show when={error()}>
+              <Text role="alert">{error()}</Text>
+            </Show>
+            <Show
+              when={scenario()}
+              fallback={<Text role="status">Starting isolated backend…</Text>}
+            >
+              {(s) => (
+                <>
+                  <Row as="aside" aria-label="Workshop controls">
+                    <For each={["Owner", "Administrator", "Viewer", "Recipient"]}>
+                      {(role) => (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            replaceCredential(credentials.get(role));
+                            setPicker(role === "Recipient");
+                            setMember("");
+                          }}
+                        >
+                          Act as {role}
+                        </Button>
+                      )}
+                    </For>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        void s().command("fail-directory");
+                      }}
+                    >
+                      Fail next directory read
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        void renameElsewhere().catch((cause) => setError(String(cause)));
+                      }}
+                    >
+                      Rename elsewhere
+                    </Button>
+                    <output aria-label="External change">{external()}</output>
+                    <Button variant="ghost" onClick={() => setMounted(!mounted())}>
+                      {mounted() ? "Unmount feature" : "Mount feature"}
+                    </Button>
+                  </Row>
+                  <ClientProvider apiBaseUrl={s().apiBaseUrl} sessionStore={store}>
+                    <DirectoryProvider>
+                      <Show when={mounted()}>
+                        <Show
+                          when={picker()}
+                          fallback={
+                            <>
+                              <SectionNav.Root aria-label="Settings sections">
+                                <For each={["workspace", "members", "invites"] as const}>
+                                  {(name) => (
+                                    <SectionNav.Link
+                                      href={`#${name}`}
+                                      aria-current={section() === name ? "page" : undefined}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        setSection(name);
+                                        setMember("");
+                                      }}
+                                    >
+                                      {name === "workspace"
+                                        ? "Workspace"
+                                        : name === "members"
+                                          ? "Members"
+                                          : "Invites"}
+                                    </SectionNav.Link>
+                                  )}
+                                </For>
+                              </SectionNav.Root>
+                              <Settings.Root workspaceId={workspaceId()} section={section()}>
+                                <Column gap={6}>
+                                  <Show when={section() === "workspace"}>
+                                    <Settings.WorkspaceName />
+                                    <Settings.WorkspaceDetails />
+                                    <Settings.OwnershipTransfer />
+                                  </Show>
+                                  <Show when={section() === "members"}>
+                                    <div
+                                      onClick={(event) => {
+                                        const href = (event.target as Element)
+                                          .closest("a")
+                                          ?.getAttribute("href");
+                                        if (href?.startsWith("#member:")) {
+                                          event.preventDefault();
+                                          setMember(href.slice(8));
+                                        } else if (href === "#members") {
+                                          event.preventDefault();
+                                          setMember("");
+                                        }
+                                      }}
+                                    >
+                                      <ListDetail.Root selected={!!member()}>
+                                        <ListDetail.List>
+                                          <Settings.MemberList
+                                            memberHref={(id) => `#member:${id}`}
+                                            selectedId={member()}
+                                          />
+                                        </ListDetail.List>
+                                        <Show when={member()}>
+                                          <ListDetail.Detail aria-label="Member details">
+                                            <Settings.MemberDetail
+                                              memberId={member()}
+                                              backHref="#members"
+                                            />
+                                          </ListDetail.Detail>
+                                        </Show>
+                                      </ListDetail.Root>
+                                    </div>
+                                  </Show>
+                                  <Show when={section() === "invites"}>
+                                    <Settings.InviteForm />
+                                    <Settings.InvitationHistory />
+                                  </Show>
+                                  <Settings.Feedback />
+                                </Column>
+                              </Settings.Root>
+                            </>
+                          }
+                        >
+                          <WorkspacePicker.Root>
+                            <Column>
+                              <WorkspacePicker.Summary />
+                              <WorkspacePicker.List workspaceHref={(id) => `#workspace:${id}`} />
+                              <WorkspacePicker.Invitations />
+                              <WorkspacePicker.Empty />
+                              <WorkspacePicker.Status />
+                            </Column>
+                          </WorkspacePicker.Root>
+                        </Show>
+                      </Show>
+                    </DirectoryProvider>
+                  </ClientProvider>
+                </>
+              )}
+            </Show>
+          </Column>
+        </Container>
+      </main>
+    </ThemeProvider>
+  );
+}

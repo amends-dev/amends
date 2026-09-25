@@ -1,6 +1,6 @@
 import { Api, ApiErrors, Principal } from "@amends/api-http";
 import { Gateway } from "@amends/gateway";
-import { OwnershipApplication } from "@amends/core/workspace";
+import { OwnershipApplication, WorkspaceSettingsApplication } from "@amends/core/workspace";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
@@ -15,6 +15,32 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     return handlers.handleAll({
+      settings: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(WorkspaceSettingsApplication.Service, (settings) => settings.get),
+          ),
+        ),
+      members: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(WorkspaceSettingsApplication.Service, (settings) => settings.members),
+          ),
+        ),
+      rename: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(WorkspaceSettingsApplication.Service, (settings) =>
+              settings.rename(payload),
+            ),
+          ),
+        ),
       ownership: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

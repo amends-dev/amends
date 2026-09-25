@@ -8,3 +8,13 @@ export { MembersGroup } from "./members.ts";
 export { NotificationsGroup } from "./notifications.ts";
 export { SessionGroup } from "./session.ts";
 export { WorkspacesGroup } from "./workspaces.ts";
+
+// Shared wire schemas for typed clients; implementations stay in core.
+export {
+  Workspace,
+  WorkspaceSettings,
+  Ownership,
+  Member,
+  Invitation,
+} from "@amends/core/workspace";
+export { Assignment } from "@amends/core/authorization";

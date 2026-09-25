@@ -35,6 +35,7 @@ export function WorkspacePickerPage() {
                 <WorkspacePicker.Summary />
               </Column>
               <WorkspacePicker.List workspaceHref={paths.workspace} />
+              <WorkspacePicker.Invitations />
               <WorkspacePicker.Empty />
               <ItemList.Root variant="outline" aria-label="Workspace actions">
                 <ItemList.Item>

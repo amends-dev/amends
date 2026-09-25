@@ -273,3 +273,9 @@ coverage; connected state remains in features and pages remain in the apps.
 [AccountMenu](src/features/account/README.md), Popover's wide size, and Shell's
 SidebarUtility. The branded WorkspaceMark has shared palette tokens and contrast
 coverage. These remain presentation components; apps own routes and preferences.
+
+**Settings** adds [SectionNav](src/compositions/section-nav/README.md),
+[KeyValue](src/compositions/key-value/README.md),
+[ListDetail](src/compositions/list-detail/README.md), ItemList rows/actions, and
+[controlled forms](src/features/settings/README.md). All use existing tokens;
+permission state and workflows remain in client/features, with app-owned pages.

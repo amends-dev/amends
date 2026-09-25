@@ -1,3 +1,10 @@
+import {
+  SettingsLayout,
+  SettingsIndex,
+  WorkspaceSettingsPage,
+  MembersSettingsPage,
+  InvitesSettingsPage,
+} from "./pages/settings.tsx";
 import { A, Navigate, Route, useLocation, useParams, useSearchParams } from "@solidjs/router";
 import {
   DirectoryProvider,
@@ -22,7 +29,6 @@ import {
   TasksPage,
   EnvironmentsPage,
   ConnectionsPage,
-  SettingsPage,
   MissingWorkspacePage,
 } from "./pages/workspace.tsx";
 
@@ -122,7 +128,12 @@ export function ApplicationRoutes() {
           <Route path="/tasks" component={TasksPage} />
           <Route path="/environments" component={EnvironmentsPage} />
           <Route path="/connections" component={ConnectionsPage} />
-          <Route path="/settings" component={SettingsPage} />
+          <Route path="/settings" component={SettingsLayout}>
+            <Route path="/" component={SettingsIndex} />
+            <Route path="/workspace" component={WorkspaceSettingsPage} />
+            <Route path="/members" component={MembersSettingsPage} />
+            <Route path="/invites" component={InvitesSettingsPage} />
+          </Route>
           <Route path="*missing" component={MissingWorkspacePage} />
         </Route>
       </Route>

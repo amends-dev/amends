@@ -91,10 +91,11 @@ content and enlarged text stay reachable. Visual gaps are evaluated and verified
 in UI before app consumption; `check:packages` rejects app-local styles.
 
 The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
-composition, idempotent retry, directory refresh, and the remaining invitation scope.
+composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
-routes and the account popup. Home, Triage, Tasks, Environments, Connections, and
-Settings have page boundaries with placeholder content. `src/appearance.ts` supplies
+routes and the account popup. Home, Triage, Tasks, Environments, and Connections
+remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings.md)
+compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved theme through ThemeProvider.

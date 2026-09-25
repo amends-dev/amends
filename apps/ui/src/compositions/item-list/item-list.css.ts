@@ -35,6 +35,7 @@ export const link = style([
     textDecoration: "none",
     overflowWrap: "anywhere",
     selectors: {
+      '&[aria-current="page"]': { background: colorVars.action.pressed },
       "&:hover": { background: colorVars.action.hover },
       "&:active": { background: colorVars.action.pressed },
     },
@@ -49,3 +50,20 @@ export const content = style({
 });
 export const title = style([typographyStyles.body, { fontWeight: 600 }]);
 export const description = style([typographyStyles.mono, { color: colorVars.text.secondary }]);
+export const row = style({
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: space[4],
+  padding: space[4],
+  minHeight: "4rem",
+  minWidth: 0,
+  boxSizing: "border-box",
+  overflowWrap: "anywhere",
+});
+export const actions = style({
+  display: "flex",
+  flexWrap: "wrap",
+  gap: space[2],
+  alignItems: "center",
+});

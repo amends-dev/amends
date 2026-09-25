@@ -11,7 +11,7 @@ directory, and replaces the creation route with `/workspaces/:id`.
 - UI owns `WorkspaceMark`, declarative `ItemList` parts, and `CreateWorkspaceForm`.
   They use reviewed tokens and controls. Shell's medium width fits the picker;
   its narrow width fits creation. Theme remains inherited from ThemeProvider.
-- Features connects `WorkspacePicker.Root` with `Summary`, `List`, `Empty`, and
+- Features connects `WorkspacePicker.Root` with `Summary`, `List`, `Invitations`, `Empty`, and
   `Status`; `CreateWorkspace.Root` with `Form` and `Result`. URLs and the
   `onCreated(workspaceId)` navigation callback belong to the app.
 - Web and desktop own both pages and their browser/hash routes, with no local styles.
@@ -19,8 +19,9 @@ directory, and replaces the creation route with `/workspaces/:id`.
 The picker shows active memberships, total active members (humans and agents), and
 owner status. Removed memberships are not selectable. Unknown or removed workspace
 URLs reach the existing unavailable-access presentation. Active workspaces open the
-[workspace shell](workspace-shell.md). Pending invitations are
-counted but have no actions in this slice.
+[workspace shell](workspace-shell.md). Pending invitations show their workspace name
+and recipient, with acceptance that refreshes the directory before showing the membership.
+See [workspace settings](workspace-settings.md) for issuance and recovery.
 
 ## Creation and recovery
 
@@ -40,8 +41,8 @@ navigation and recovery before entering the created workspace.
 ## Following slices
 
 The [picker reference](<../design-system/Amends Screen · Sign in.dc.html>) also shows
-invitations and activity. Invitation display names and recipient decline need backend
-contracts; separate human/agent counts, general role labels, and activity indicators
+invitations and activity. Recipient decline needs a backend contract;
+separate human/agent counts, general role labels, and activity indicators
 need richer directory data. Remembering the last workspace and arrow-key shortcuts
 are not implemented. Links use native Tab/Enter and modifier-key behavior.
 

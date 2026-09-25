@@ -14,10 +14,14 @@ export const Membership = Schema.Struct({
   .annotate({ identifier: "WorkspaceDirectoryMembership" });
 export interface Membership extends Schema.Schema.Type<typeof Membership> {}
 
+export const PendingInvitation = Invitation.Record.pipe(
+  Schema.fieldsAssign({ workspaceName: Schema.optionalKey(Workspace.Name) }),
+);
+
 /** Everything an identity can reach: active and removed memberships, and pending invitations. */
 export const Listing = Schema.Struct({
   memberships: Schema.Array(Membership),
-  invitations: Schema.Array(Invitation.Record),
+  invitations: Schema.Array(PendingInvitation),
 }).annotate({ identifier: "WorkspaceDirectoryListing" });
 export interface Listing extends Schema.Schema.Type<typeof Listing> {}
 

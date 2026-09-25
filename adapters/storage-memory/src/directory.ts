@@ -45,7 +45,11 @@ export const make = Effect.fn("MemoryDirectory.make")(function* () {
               invitation.state._tag === "Pending" &&
               DateTime.isGreaterThan(invitation.details.expiresAt, now),
           )
-          .toSorted((left, right) => compareBinary(left.details.id, right.details.id)),
+          .toSorted((left, right) => compareBinary(left.details.id, right.details.id))
+          .map((invitation) => ({
+            ...invitation,
+            ...(Option.isSome(workspace) ? { workspaceName: workspace.value.name } : {}),
+          })),
       );
     }
     return { memberships, invitations };

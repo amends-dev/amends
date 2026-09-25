@@ -6,6 +6,12 @@ import { WorkspaceStore } from "./store.ts";
 /** Replays workspace metadata without repeating authorization or role-assignment workflows. */
 export const definition = Projection.make("workspace.metadata", { version: 1 })
   .on(
+    WorkspaceFacts.Renamed,
+    Effect.fn("WorkspaceProjection.renamed")(function* ({ payload }) {
+      yield* (yield* WorkspaceStore.Service).rename(payload);
+    }),
+  )
+  .on(
     WorkspaceFacts.Initialized,
     Effect.fn("WorkspaceInitialization.project")(function* ({ payload }) {
       yield* (yield* WorkspaceStore.Service).insert(payload);

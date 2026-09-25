@@ -1,7 +1,7 @@
 import type { Identity } from "@amends/core/identity";
 import { Member, Workspace } from "@amends/core/workspace";
 import { WorkspaceDirectory } from "@amends/gateway";
-import { and, asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { PostgresDatabase } from "./database.ts";
@@ -72,11 +72,27 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
       and(eq(invitations.recipientId, identity.id), eq(invitations.state, "Pending")),
       [asc(invitations.workspaceId), asc(invitations.id)],
     ).pipe(Effect.orDie);
+    const visible = pending.filter((invitation) =>
+      DateTime.isGreaterThan(invitation.details.expiresAt, now),
+    );
+    const names = visible.length
+      ? yield* db
+          .select({ id: workspaces.workspaceId, name: workspaces.name })
+          .from(workspaces)
+          .where(
+            inArray(
+              workspaces.workspaceId,
+              visible.map((invitation) => invitation.details.workspaceId),
+            ),
+          )
+          .pipe(Effect.orDie)
+      : [];
     return {
       memberships,
-      invitations: pending.filter((invitation) =>
-        DateTime.isGreaterThan(invitation.details.expiresAt, now),
-      ),
+      invitations: visible.map((invitation) => {
+        const name = names.find((row) => row.id === invitation.details.workspaceId)?.name;
+        return { ...invitation, ...(name === undefined ? {} : { workspaceName: name }) };
+      }),
     };
   });
   return WorkspaceDirectory.Service.of({ list });

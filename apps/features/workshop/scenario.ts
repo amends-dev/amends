@@ -11,7 +11,8 @@ export type Command =
   | "fail"
   | "release"
   | "fail-directory"
-  | "lose-creation-response";
+  | "lose-creation-response"
+  | "lose-invitation-response";
 
 const live = new Set<() => Promise<void>>();
 const closing = new Set<Promise<void>>();

@@ -101,6 +101,7 @@ const configured = (
       ownerMemberId: alice.memberId,
     }),
     insert: () => Effect.die("Workspace insertion is not used by membership operations"),
+    rename: () => Effect.die("Unexpected workspace rename"),
     transferOwnership: () => Effect.die("Ownership transfer is not used by membership operations"),
     ...workspaceOverrides,
   });
@@ -569,6 +570,7 @@ it.effect("removal fails closed when ownership cannot be read reliably", () =>
               workspaceId: foreignWorkspaceId,
               get: Effect.succeedNone,
               insert: () => Effect.die("Unexpected workspace insertion"),
+              rename: () => Effect.die("Unexpected workspace rename"),
               transferOwnership: () => Effect.die("Unexpected ownership transfer"),
             }),
           ),

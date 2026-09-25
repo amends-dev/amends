@@ -103,6 +103,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         // Booting checks the built-in roles of an initialized workspace; these boot none.
         get: Effect.succeedNone,
         insert: unexpected,
+        rename: () => Effect.die("Unexpected workspace rename"),
         transferOwnership: unexpected,
       }),
     ),

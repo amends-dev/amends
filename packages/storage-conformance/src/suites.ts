@@ -36,3 +36,4 @@ export { threads } from "./threads.ts";
 export { transactions } from "./transactions.ts";
 
 export * as Suites from "./suites.ts";
+export { workspaceSettings } from "./workspace-settings.ts";

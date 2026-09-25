@@ -86,6 +86,7 @@ export function WorkspacesFixture(props: {
                             </Text>
                             <WorkspacePicker.Summary />
                             <WorkspacePicker.List workspaceHref={(id) => `#workspace-${id}`} />
+                            <WorkspacePicker.Invitations />
                             <WorkspacePicker.Empty />
                             <WorkspacePicker.Status />
                             <Button onClick={() => setCreating(true)}>New workspace</Button>

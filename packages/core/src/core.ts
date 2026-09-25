@@ -69,6 +69,8 @@ import { MemberProjection } from "./workspace/member/projection.ts";
 import { WorkspaceProjection } from "./workspace/projection.ts";
 import { OwnershipApplication } from "./workspace/ownership/application.ts";
 import { OwnershipPermissions } from "./workspace/ownership/permissions.ts";
+import { WorkspaceSettingsApplication } from "./workspace/settings/application.ts";
+import { WorkspaceSettingsPermissions } from "./workspace/settings/permissions.ts";
 
 /**
  * Projections registered for journal publication, applied in this order. Each derives its records
@@ -95,6 +97,7 @@ export const projections = [
  * make the built-in role bundles, pinned by revision.
  */
 export const permissions = [
+  WorkspaceSettingsPermissions.Rename,
   MemberPermissions.Read,
   MemberPermissions.Remove,
   InvitationPermissions.Manage,
@@ -178,6 +181,9 @@ const changeFeed = ChangeFeedApplication.layer.pipe(
  * are what hosts and protocols call; stores and the journal stay internal.
  */
 const operations = Layer.mergeAll(
+  WorkspaceSettingsApplication.layer.pipe(
+    Layer.provide(Layer.mergeAll(MemberApplication.layer, AssignmentApplication.layer)),
+  ),
   MemberApplication.layer,
   InvitationApplication.layer,
   AssignmentApplication.layer,

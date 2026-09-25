@@ -16,7 +16,7 @@ The current domains contain these features:
 
 | Domain          | Ownership                                                                                                        |
 | --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, and `ownership/` features.                 |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.    |
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |

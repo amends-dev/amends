@@ -219,3 +219,52 @@ it("navigates workspace sections with persistent chrome and retains appearance a
     ),
   ).not.toBeNull();
 });
+
+it("redirects the Settings entry to its workspace section and keeps sidebar selection on descendants", async () => {
+  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
+  const member = {
+    id: "owner",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "alice" },
+    status: "active",
+  };
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    if (path.endsWith("/settings"))
+      return Promise.resolve(
+        response({
+          workspace,
+          canRename: true,
+          canReadInvitations: true,
+          canInvite: true,
+          roles: [],
+        }),
+      );
+    if (path.endsWith("/ownership"))
+      return Promise.resolve(
+        response({
+          workspace,
+          owner: member,
+          ownerAssignmentId: "grant",
+          canTransfer: true,
+          candidates: [],
+        }),
+      );
+    return Promise.resolve(
+      response({ memberships: [{ workspace, member, people: 1 }], invitations: [] }),
+    );
+  });
+  mount("/workspaces/one/settings", "alice", fetch);
+  await screen.findByRole("textbox", { name: "Workspace name" });
+  expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
+  expect(
+    screen
+      .getByRole("navigation", { name: "Workspace settings" })
+      .querySelector("a[aria-current=page]"),
+  ).toHaveTextContent("Settings");
+  expect(
+    screen
+      .getByRole("navigation", { name: "Settings sections" })
+      .querySelector("a[aria-current=page]"),
+  ).toHaveTextContent("Workspace");
+});

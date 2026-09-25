@@ -8,7 +8,11 @@ link. Destination URLs and routing belong to the caller.
 Panel groups rows with dashed seams; outline supports a separate creation entry.
 Both use reviewed surfaces, radius, spacing, focus, and action colors. Unlike the
 picker mock's ellipsis, long names wrap. Navigation remains the sidebar composition;
-this list has no compact mode, selection state, or arrow-key shortcuts.
+this list has no compact mode or arrow-key shortcuts. `aria-current="page"` marks
+a selected destination.
 
 Comparison, Narrow, Enlarged RTL, and Activation cover both themes, wrapping,
 semantics, and activation. Tab/Enter and browser link modifiers work natively.
+
+`Row` replaces Link when a row has independent controls. Place them in `Actions`,
+alongside `Content`; this avoids nested links/buttons. The Actions story covers this shape.

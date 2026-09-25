@@ -10,6 +10,7 @@ const Command = Schema.Literals([
   "release",
   "fail-directory",
   "lose-creation-response",
+  "lose-invitation-response",
 ]);
 
 BunRuntime.runMain(

@@ -62,6 +62,7 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
   let next: "hold" | "fail" | undefined;
   let failDirectory = false;
   let loseCreationResponse = false;
+  let loseInvitationResponse = false;
   let release: (() => void) | undefined;
   let requests = 0;
   let completed = 0;
@@ -76,11 +77,19 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
       held: !!release,
     }),
     command: (
-      command: "expire" | "hold" | "fail" | "release" | "fail-directory" | "lose-creation-response",
+      command:
+        | "expire"
+        | "hold"
+        | "fail"
+        | "release"
+        | "fail-directory"
+        | "lose-creation-response"
+        | "lose-invitation-response",
     ) => {
       if (command === "expire") offset += 600_001;
       else if (command === "fail-directory") failDirectory = true;
       else if (command === "lose-creation-response") loseCreationResponse = true;
+      else if (command === "lose-invitation-response") loseInvitationResponse = true;
       else if (command === "release") release?.();
       else next = command;
     },
@@ -94,7 +103,8 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
         path === "/session/email" ||
         path === "/session/code" ||
         path === "/workspaces" ||
-        path === "/me/workspaces"
+        path === "/me/workspaces" ||
+        path.startsWith("/workspaces/")
       ) {
         requests++;
         const action = next;
@@ -123,6 +133,15 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
         loseCreationResponse = false;
         await response.arrayBuffer();
         return new Response("Workshop lost creation response", { status: 503 });
+      }
+      if (
+        /^\/workspaces\/[^/]+\/invitations$/.test(path) &&
+        request.method === "POST" &&
+        loseInvitationResponse
+      ) {
+        loseInvitationResponse = false;
+        await response.arrayBuffer();
+        return new Response("Workshop lost invitation response", { status: 503 });
       }
       return response;
     },
