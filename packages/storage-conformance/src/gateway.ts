@@ -1,8 +1,9 @@
 import { AgentPermissions } from "@amends/core/agent";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
-import { GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
+import { GroupApplication, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
 import type { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
+import * as Core from "@amends/core";
 import {
   ThreadMessagePermissions,
   ThreadParticipationPermissions,
@@ -20,7 +21,7 @@ import {
 } from "@amends/core/workspace";
 import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends/gateway";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -36,7 +37,7 @@ import {
 
 /** Workspace creation, isolation, boot, and the directory through the gateway. */
 export const gateway = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
+  const { core, runGateway, gateway: gatewayOn } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: gateway`, () => {
     it.effect(
       "one host creates two isolated workspaces and uses each operation's authenticated identity",
@@ -280,6 +281,55 @@ export const gateway = (harness: Harness) => {
           ]);
         }),
       ),
+    );
+
+    it.effect(
+      "a host whose projection another host retired rebuilds it for the next request, not a restart",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const host = yield* Layer.build(gatewayOn(yield* storage.connect()));
+            const workspace = yield* Operations.createWorkspace(alice.id).pipe(
+              Effect.provide(host),
+            );
+            const createGroup = (name: string) =>
+              Effect.flatMap(Gateway.Service, (gateway) =>
+                gateway.asMember(
+                  workspace.id,
+                  alice,
+                  Effect.flatMap(GroupApplication.Service, (groups) =>
+                    groups.createPrivateTeam({ name, memberIds: [workspace.ownerMemberId] }),
+                  ),
+                ),
+              ).pipe(Effect.provide(host));
+            const before = yield* createGroup("Before");
+            // A host running without the groups projection boots, retiring it at the head.
+            const other = yield* forWorkspace(yield* storage.connect(), workspace.id);
+            const live = yield* other.checkpoints.listLive(Core.journalLog);
+            yield* Effect.flatMap(
+              Journal.make({
+                logId: Core.journalLog,
+                projections: Core.projections.filter((projection) => projection.name !== "groups"),
+              }),
+              (older) => older.replay,
+            ).pipe(Effect.provide(core(other)));
+            expect((yield* other.checkpoints.listLive(Core.journalLog)).length).toBe(
+              live.length - 1,
+            );
+            // The write this host was about to make did not commit, and may simply be retried.
+            expect(yield* Effect.flip(createGroup("During"))).toMatchObject({
+              _tag: "Gateway.Conflict",
+              operation: "commit",
+            });
+            const retried = yield* createGroup("During");
+            expect(yield* other.checkpoints.listLive(Core.journalLog)).toEqual(
+              expect.arrayContaining([...live]),
+            );
+            // The rebuilt projection holds the group from before the retirement and the new one.
+            expect(yield* other.groups.get(before.id)).toEqual(Option.some(before));
+            expect(yield* other.groups.get(retried.id)).toEqual(Option.some(retried));
+          }).pipe(Effect.scoped),
+        ),
     );
 
     it.effect(

@@ -14,6 +14,7 @@ import {
   LayerMap,
   RcMap,
   Schema,
+  Schedule,
   Scope,
 } from "effect";
 import { SignalHub } from "./signals.ts";
@@ -38,6 +39,11 @@ export interface Interface {
   ) => Effect.Effect<Context.Context<Provided>, never, Scope.Scope>;
   /** Whether the workspace is prepared or being prepared, so a lease on it would not boot it. */
   readonly prepared: (workspaceId: Workspace.Id) => Effect.Effect<boolean>;
+  /**
+   * Stop sharing the workspace's prepared runtime: leases already open keep it until they close,
+   * and the next lease prepares the workspace again from storage, replaying what it needs.
+   */
+  readonly invalidate: (workspaceId: Workspace.Id) => Effect.Effect<void>;
 }
 
 /**
@@ -71,10 +77,23 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     const context = yield* Layer.build(services);
     yield* Effect.orDie(Context.get(context, Journal.Service).replay);
     // Bring built-in roles recorded by older code to this host's bundles. Recorded roles still
-    // serve if it cannot run now, such as while another host writes; a later boot finishes it.
-    yield* BuiltinRoleUpgrade.upgrade().pipe(
-      Effect.provide(context),
-      Effect.catch((error) => Effect.logWarning("Built-in role upgrade did not run", error)),
+    // serve if it cannot run now, such as while another host writes; it then tries again in the
+    // background, backing off to once a minute, for as long as the workspace stays prepared.
+    const upgrade = BuiltinRoleUpgrade.upgrade().pipe(Effect.provide(context));
+    yield* upgrade.pipe(
+      Effect.catch((error) =>
+        Effect.logWarning("Built-in role upgrade did not run; trying again later", error).pipe(
+          Effect.andThen(
+            upgrade.pipe(
+              Effect.retry(
+                Schedule.min([Schedule.exponential("1 second"), Schedule.spaced("1 minute")]),
+              ),
+              Effect.andThen(Effect.logInfo("Built-in role upgrade ran")),
+              Effect.forkScoped,
+            ),
+          ),
+        ),
+      ),
     );
     return context;
   });
@@ -108,7 +127,9 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
 
   const prepared = (workspaceId: Workspace.Id) => RcMap.has(runtimes.rcMap, workspaceId);
 
-  return { forWorkspace, prepared } satisfies Interface;
+  const invalidate = (workspaceId: Workspace.Id) => runtimes.invalidate(workspaceId);
+
+  return { forWorkspace, prepared, invalidate } satisfies Interface;
 });
 
 export * as WorkspaceRuntime from "./workspace-runtime.ts";

@@ -115,12 +115,16 @@ boot. A failed boot closes acquired resources, evicts the failed acquisition, an
 fails its waiting requests as a defect. A later acquisition can retry; no operation
 runs before successful boot. After replay, boot brings built-in roles recorded at an earlier bundle
 revision to this host's with `BuiltinRoleUpgrade`; a workspace it cannot upgrade yet, such as
-while another host writes, boots with its recorded roles.
+while another host writes, boots with its recorded roles and tries again in the background,
+backing off to once a minute, while it stays prepared.
 
 Workspace creation remains core's atomic initialization operation. A new workspace
 has no history to replay. After boot, commits persist events and projection records
 together; `Projection.Behind` rejects writes while a registered projection is not
-live, and `Projection.Unregistered` while one this host does not run is. Deliberate
+live, and `Projection.Unregistered` while one this host does not run is, as when another host
+with a different projection set booted. Either one, from an operation or a background run, stops
+sharing the prepared runtime: the next request prepares the workspace again and replays it, and
+the failed request, which committed nothing, returns `Gateway.Conflict` to retry. Deliberate
 rebuilds run replay explicitly with fresh targets or a domain-managed migration,
 while dependent reads and writes are unavailable. The cross-workspace directory
 reads projection tables directly, so boot is not an online migration mechanism for

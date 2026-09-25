@@ -1,4 +1,17 @@
-import { Context, Effect, Layer, Option, PubSub, RcRef, Schema, Semaphore, Stream } from "effect";
+import {
+  Cause,
+  Context,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  PubSub,
+  RcRef,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect";
 import type { Scope } from "effect";
 import type { Commit } from "../journal/commit.ts";
 import type { Entry } from "../journal/entry.ts";
@@ -70,8 +83,17 @@ type Item =
 interface Follower {
   readonly hub: PubSub.PubSub<Item>;
   readonly gate: Semaphore.Semaphore;
-  readonly state: { sequence: bigint; stopped: boolean };
+  readonly state: {
+    sequence: bigint;
+    stopped: boolean;
+    /** The last commit delivered, where following resumes after a failed read. */
+    position: Option.Option<Entry.Position>;
+  };
 }
+
+/** How long the follower waits before following again after its reads failed this many times. */
+const backoff = (failures: number) =>
+  Duration.millis(Math.min(5_000, 100 * 2 ** Math.min(failures - 1, 6)));
 
 const unavailable = () => new ChangeFeed.Unavailable({});
 const readable = (delivery: Prepared) => delivery.unreadable.length === 0;
@@ -79,7 +101,9 @@ const readable = (delivery: Prepared) => delivery.unreadable.length === 0;
 /**
  * Share one follower of the workspace journal among this runtime's subscribers. It starts with
  * the first subscriber at the journal's head, decodes each commit once, and stops when the last
- * subscriber leaves; any process holding the workspace follows the same journal.
+ * subscriber leaves; any process holding the workspace follows the same journal. When reading the
+ * journal fails, it logs the failure and follows again from the last commit it delivered, after a
+ * backoff, so its subscribers see a delay rather than an end.
  *
  * @category constructors
  */
@@ -115,14 +139,20 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     const hub = yield* PubSub.sliding<Item>(capacity);
     yield* Effect.addFinalizer(() => PubSub.shutdown(hub));
     const gate = yield* Semaphore.make(1);
-    const state = { sequence: 0n, stopped: false };
-    const start = yield* log.head;
-    const from = Option.match(start, {
-      onNone: () => ({ limit: pageSize }),
-      onSome: (after) => ({ after, limit: pageSize }),
-    });
+    const state: Follower["state"] = {
+      sequence: 0n,
+      stopped: false,
+      position: yield* log.head,
+    };
     // A commit this host cannot read ends its subscribers' streams, but the follower continues.
-    yield* log.tail(from).pipe(
+    const pass = Stream.suspend(() =>
+      log.tail(
+        Option.match(state.position, {
+          onNone: () => ({ limit: pageSize }),
+          onSome: (after) => ({ after, limit: pageSize }),
+        }),
+      ),
+    ).pipe(
       Stream.mapEffect(prepare),
       Stream.tap((delivery) =>
         readable(delivery)
@@ -136,11 +166,25 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         gate.withPermits(1)(
           Effect.suspend(() => {
             state.sequence += 1n;
+            state.position = Option.some(delivery.position);
             return PubSub.publish(hub, { _tag: "Delivery", sequence: state.sequence, delivery });
           }),
         ),
       ),
-      Effect.tapCause((cause) => Effect.logWarning("Change feed follower stopped", cause)),
+    );
+    const following = Effect.gen(function* () {
+      let failures = 0;
+      while (true) {
+        const delivered = state.sequence;
+        const exit = yield* Effect.exit(pass);
+        if (Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)) return;
+        // Reads that delivered something before failing start the backoff over.
+        failures = state.sequence === delivered ? failures + 1 : 1;
+        yield* Effect.logWarning("Change feed follower failed; following again", exit.cause);
+        yield* Effect.sleep(backoff(failures));
+      }
+    });
+    yield* following.pipe(
       Effect.ensuring(
         gate.withPermits(1)(
           Effect.suspend(() => {
@@ -166,10 +210,8 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         return Option.some({ subscription, expected: follower.state.sequence + 1n });
       }),
     );
-    if (Option.isNone(registered)) {
-      yield* RcRef.invalidate(followers);
-      return yield* unavailable();
-    }
+    // A follower stops only as its runtime closes, so there is no other to follow instead.
+    if (Option.isNone(registered)) return yield* unavailable();
     const { subscription } = registered.value;
     let expected = registered.value.expected;
     const head = yield* log.head.pipe(Effect.mapError(unavailable));
@@ -207,10 +249,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     );
     const live = Stream.fromEffectRepeat(PubSub.take(subscription)).pipe(
       Stream.flatMap((item): Stream.Stream<Prepared, ChangeFeed.Unavailable> => {
-        if (item._tag === "Stopped")
-          return Stream.fromEffect(RcRef.invalidate(followers)).pipe(
-            Stream.flatMap(() => Stream.fail(unavailable())),
-          );
+        if (item._tag === "Stopped") return Stream.fail(unavailable());
         const lagged = item.sequence !== expected;
         expected = item.sequence + 1n;
         const current = Stream.suspend(() =>

@@ -2,7 +2,7 @@ import * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
 import { type BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Store } from "@amends/core/journal";
+import { Checkpoint, Projection, Store } from "@amends/core/journal";
 import {
   type Member,
   MemberStore,
@@ -12,6 +12,7 @@ import {
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
 import { Context, Crypto, Effect, Encoding, Layer, Option, Result, Schema } from "effect";
+import type { Cause } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import type { SignalHub } from "./signals.ts";
@@ -81,6 +82,22 @@ const isPublic = Schema.is(GatewayErrors.PublicError);
 const isConflict = Schema.is(Store.Conflict);
 const isUncertain = Schema.is(Store.CommitUncertain);
 const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
+const isBehind = Schema.is(Projection.Behind);
+const isUnregistered = Schema.is(Projection.Unregistered);
+const isRunFailure = Schema.is(BackgroundRuns.Failure);
+
+/**
+ * Another host changed which projection versions are live, so this prepared runtime's commits no
+ * longer match them, whether an operation failed with it or a background process did.
+ */
+const staleError = (error: unknown): boolean =>
+  isBehind(error) || isUnregistered(error) || (isRunFailure(error) && staleError(error.cause));
+const stale = (cause: Cause.Cause<unknown>) =>
+  cause.reasons.some(
+    (reason) =>
+      (reason._tag === "Fail" && staleError(reason.error)) ||
+      (reason._tag === "Die" && staleError(reason.defect)),
+  );
 
 /** A string's UTF-8 bytes; hex encoding reads strings as UTF-8, and valid hex always decodes. */
 const utf8 = (text: string) => Result.getOrThrow(Encoding.decodeHex(Encoding.encodeHex(text)));
@@ -107,6 +124,15 @@ const expose = <A, E, R>(
       return Effect.fail(new GatewayErrors.Uncertain({ workspaceId, commitId: error.commitId }));
     if (Schema.isSchemaError(error))
       return Effect.fail(new GatewayErrors.InvalidInput({ message: error.message }));
+    // The runtime is prepared again for the next request, so this one may simply be retried.
+    if (isBehind(error) || isUnregistered(error))
+      return Effect.fail(
+        new GatewayErrors.Conflict({
+          workspaceId,
+          operation: "commit",
+          message: "Another host changed this workspace's read models; retry once they are rebuilt",
+        }),
+      );
     if (isMismatch(error))
       return Effect.fail(
         new GatewayErrors.InvalidInput({
@@ -137,6 +163,16 @@ export const make = Effect.fn("Gateway.make")(function* (
   | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options);
+  /**
+   * When another host changed the live projection versions, prepare the workspace again, which
+   * replays it, for the next request; the failed one did not commit.
+   */
+  const heal = <A, E, R>(workspaceId: Workspace.Id, effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.tapCause((cause) => (stale(cause) ? runtimes.invalidate(workspaceId) : Effect.void)),
+    );
+  const exposed = <A, E, R>(workspaceId: Workspace.Id, effect: Effect.Effect<A, E, R>) =>
+    expose(workspaceId, heal(workspaceId, effect));
   const storage = yield* WorkspaceStorage.Service;
   // Admission reads storage as the host, never inside a request's actor or transaction.
   const environment = yield* Effect.context<never>();
@@ -203,7 +239,7 @@ export const make = Effect.fn("Gateway.make")(function* (
       : yield* Effect.orDie((yield* MemberStore.Service).findActive(identity));
     if (Option.isNone(membership)) return yield* new GatewayErrors.NotMember({ workspaceId });
     const actor = Actor.Value.make({ workspaceId, memberId: membership.value.id, identity });
-    return yield* expose(workspaceId, Effect.provideService(program, Actor.Service, actor));
+    return yield* exposed(workspaceId, Effect.provideService(program, Actor.Service, actor));
   });
 
   /**
@@ -245,7 +281,7 @@ export const make = Effect.fn("Gateway.make")(function* (
       if (key === undefined) {
         const id = Workspace.Id.make(yield* Effect.orDie(cryptography.randomUUIDv4));
         return yield* Effect.scoped(
-          bind(id, expose(id, WorkspaceInitialization.initialize(creator, input))),
+          bind(id, exposed(id, WorkspaceInitialization.initialize(creator, input))),
         );
       }
       const id = yield* keyedId(creator, key);
@@ -259,7 +295,7 @@ export const make = Effect.fn("Gateway.make")(function* (
       return yield* Effect.scoped(
         bind(
           id,
-          expose(
+          exposed(
             id,
             WorkspaceInitialization.initialize(creator, input).pipe(
               // A concurrent attempt with the same key initialized it first.
@@ -290,7 +326,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     // A workspace that was never created has no history, and is refused before it is prepared.
     if (!(yield* runtimes.prepared(workspaceId)) && !(yield* created(workspaceId)))
       return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
-    return yield* Effect.scoped(bind(workspaceId, expose(workspaceId, operation)));
+    return yield* Effect.scoped(bind(workspaceId, exposed(workspaceId, operation)));
   });
 
   const asMemberScoped: Interface["asMemberScoped"] = Effect.fn("Gateway.asMemberScoped")(
@@ -320,7 +356,10 @@ export const make = Effect.fn("Gateway.make")(function* (
     return yield* Effect.scoped(
       bind(
         workspaceId,
-        Effect.flatMap(BackgroundRuns.Service, (runs) => runs.run(process)),
+        heal(
+          workspaceId,
+          Effect.flatMap(BackgroundRuns.Service, (runs) => runs.run(process)),
+        ),
       ),
     );
   });

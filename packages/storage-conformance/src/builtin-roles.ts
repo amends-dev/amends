@@ -21,7 +21,7 @@ import {
 } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Effect, Exit, Option } from "effect";
+import { Clock, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";
 import {
   alice,
@@ -116,6 +116,45 @@ export const builtinRoles = (harness: Harness) => {
     );
 
   describe.skipIf(!harness.available)(`${harness.name}: built-in roles`, () => {
+    // Real time: the host tries again a second after the first attempt failed.
+    it.live(
+      "a host that cannot upgrade the roles as it loads the workspace upgrades them once it can",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            yield* recordedBeforeRevisions(bound);
+            // Another host holds the workspace, so the upgrade cannot run as this host loads it.
+            const held = yield* Deferred.make<void>();
+            const release = yield* Deferred.make<void>();
+            const holder = yield* Effect.forkChild(
+              bound.store.transaction(
+                Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))),
+              ),
+            );
+            yield* Deferred.await(held);
+            const host = yield* Layer.build(gateway(yield* storage.connect({ failFast: true })));
+            // The workspace still loads and admits its members, with the roles it recorded.
+            yield* Effect.flatMap(Gateway.Service, (g) =>
+              g.asMember(workspaceId, alice, Effect.void),
+            ).pipe(Effect.provide(host));
+            expect(yield* bound.roles.builtinRevision).toEqual(Option.none());
+            yield* Deferred.succeed(release, undefined);
+            yield* Fiber.join(holder);
+            // It tries again in the background while the workspace stays prepared.
+            const deadline = (yield* Clock.currentTimeMillis) + 10_000;
+            while (
+              Option.isNone(yield* bound.roles.builtinRevision) &&
+              (yield* Clock.currentTimeMillis) < deadline
+            )
+              yield* Effect.sleep("100 millis");
+            expect(yield* bound.roles.builtinRevision).toEqual(Option.some(BuiltinRoles.revision));
+            expect(yield* roles(bound)).toEqual(current.map(Option.some));
+          }).pipe(Effect.scoped),
+        ),
+      20_000,
+    );
+
     it.effect("a new workspace holds the current revision, and upgrading it records nothing", () =>
       harness.withStorage((storage) =>
         Effect.gen(function* () {

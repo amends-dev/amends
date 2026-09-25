@@ -330,7 +330,9 @@ subscriber leaves. It decodes each commit once through the registry in
 commit uses `Store.waitForAppend`, whatever the storage. A subscriber registers with
 the follower before reading the journal, so no commit falls between the two. A
 subscriber that falls behind its buffer (256 commits by default) reads the commits it
-lost from the journal instead of failing.
+lost from the journal instead of failing. When reading the journal fails, the follower logs it
+and follows again from the last commit it delivered, backing off up to five seconds, so its
+subscribers wait rather than disconnect.
 
 `watch` checks active membership, then emits `Ready { workspaceId, cursor, reset }`
 followed by `Committed { workspaceId, cursor, commitId, events }` for each later commit

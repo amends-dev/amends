@@ -549,7 +549,8 @@ commit reads them once, before its first publication, and may publish only when 
 exactly the journal's registered projections:
 
 - A registered projection that is not live fails with `Projection.Behind`, rolling back
-  the append. `journal.replay` rebuilds it; then retry the command as appropriate.
+  the append. `journal.replay` rebuilds it; then retry the command as appropriate. The gateway
+  does this for hosts by preparing the workspace again.
 - A live version the journal does not register fails with `Projection.Unregistered`: its
   commits would skip that projection and leave it silently behind.
 - A log with no entries has nothing to rebuild, so its first commit makes every registered
