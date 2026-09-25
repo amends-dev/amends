@@ -39,3 +39,9 @@ export const label = style({
     },
   },
 });
+export const note = style({
+  minWidth: 0,
+  maxWidth: "100%",
+  overflowWrap: "anywhere",
+  selectors: { "&&": { fontSize: "0.6875rem" } },
+});

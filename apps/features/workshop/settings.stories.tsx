@@ -40,7 +40,7 @@ export const ReadOnly = {
     await expect(canvas.queryByRole("button", { name: "Save name" })).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("radio", { name: "People" }));
     await userEvent.click(await canvas.findByRole("link", { name: /owner@example.test/ }));
-    await canvas.findByRole("heading", { name: "owner@example.test" });
+    await canvas.findByRole("heading", { name: "Person" });
     await expect(canvas.queryByRole("button", { name: "Remove member" })).not.toBeInTheDocument();
   },
 } satisfies Story;

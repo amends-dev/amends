@@ -7,6 +7,7 @@ import { Field } from "@amends/ui/compositions/field";
 import { Select } from "@amends/ui/primitives/select";
 import { Avatar } from "@amends/ui/primitives/avatar";
 import { Status } from "@amends/ui/primitives/status";
+import { Divider } from "@amends/ui/primitives/divider";
 import { Button } from "@amends/ui/primitives/button";
 import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
@@ -31,69 +32,78 @@ const roleNames = (entry: Entry) =>
 export function MemberList(props: { memberHref: (id: string) => string; selectedId?: string }) {
   const value = useSettingsScope();
   const membership = useWorkspace(() => value.data()?.settings.workspace.id ?? "");
+  const entries = (status: "active" | "removed") =>
+    value.data()?.members.filter((entry) => entry.member.status === status) ?? [];
   return (
     <Show when={value.data()}>
       <Column gap={6}>
         <For each={["active", "removed"] as const}>
           {(status) => (
-            <Column gap={3}>
-              <Text as="h2" variant="heading">
-                {status === "active" ? "Members" : "Removed members"}
-              </Text>
-              <Show
-                when={value.data()?.members.some((entry) => entry.member.status === status)}
-                fallback={
-                  <Text tone="secondary">
-                    {status === "active" ? "No visible members." : "No removed members."}
-                  </Text>
-                }
-              >
-                <ItemList.Root
-                  aria-label={status === "active" ? "Active members" : "Removed members"}
+            <Show when={status === "active" || entries(status).length}>
+              <Column gap={3}>
+                <Divider.Root>
+                  <Divider.Label as="h2">
+                    {status === "active" ? "People" : "Removed"}
+                  </Divider.Label>
+                  <Divider.Note>
+                    {status === "active"
+                      ? `${entries(status).length} ${entries(status).length === 1 ? "person" : "people"}`
+                      : entries(status).length}
+                  </Divider.Note>
+                  <Divider.Line />
+                  <Show when={status === "active"}>
+                    <Divider.Note>1 owner</Divider.Note>
+                  </Show>
+                </Divider.Root>
+                <Show
+                  when={entries(status).length}
+                  fallback={<Text tone="secondary">No visible members.</Text>}
                 >
-                  <For
-                    each={value.data()?.members.filter((entry) => entry.member.status === status)}
+                  <ItemList.Root
+                    aria-label={status === "active" ? "Active members" : "Removed members"}
                   >
-                    {(entry) => (
-                      <ItemList.Item>
-                        <ItemList.Link
-                          href={props.memberHref(entry.member.id)}
-                          aria-current={props.selectedId === entry.member.id ? "page" : undefined}
-                        >
-                          <ItemList.Leading>
-                            <Avatar.Root
-                              kind={entry.member.identity._tag === "Human" ? "human" : "agent"}
-                              decorative
-                            >
-                              <Avatar.Fallback>
-                                {entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
-                              </Avatar.Fallback>
-                            </Avatar.Root>
-                          </ItemList.Leading>
-                          <ItemList.Content>
-                            <ItemList.Title>
-                              {entry.member.identity.id}
-                              {entry.member.id === membership()?.member.id ? " · You" : ""}
-                            </ItemList.Title>
-                            <ItemList.Description>
-                              {entry.access ? roleNames(entry) : "Access details unavailable"}
-                            </ItemList.Description>
-                          </ItemList.Content>
-                          <ItemList.Meta>
-                            <Status.Root tone={status === "active" ? "success" : "idle"}>
-                              <Status.Indicator />
-                              <Status.Label>
-                                {status === "active" ? "Active" : "Removed"}
-                              </Status.Label>
-                            </Status.Root>
-                          </ItemList.Meta>
-                        </ItemList.Link>
-                      </ItemList.Item>
-                    )}
-                  </For>
-                </ItemList.Root>
-              </Show>
-            </Column>
+                    <For each={entries(status)}>
+                      {(entry) => (
+                        <ItemList.Item>
+                          <ItemList.Link
+                            href={props.memberHref(entry.member.id)}
+                            aria-current={props.selectedId === entry.member.id ? "page" : undefined}
+                          >
+                            <ItemList.Leading>
+                              <Avatar.Root
+                                kind={entry.member.identity._tag === "Human" ? "human" : "agent"}
+                                decorative
+                              >
+                                <Avatar.Fallback>
+                                  {entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
+                                </Avatar.Fallback>
+                              </Avatar.Root>
+                            </ItemList.Leading>
+                            <ItemList.Content>
+                              <ItemList.Title>
+                                {entry.member.identity.id}
+                                {entry.member.id === membership()?.member.id ? " · You" : ""}
+                              </ItemList.Title>
+                              <ItemList.Description>
+                                {entry.access ? roleNames(entry) : "Access details unavailable"}
+                              </ItemList.Description>
+                            </ItemList.Content>
+                            <ItemList.Meta>
+                              <Status.Root tone={status === "active" ? "success" : "idle"}>
+                                <Status.Indicator />
+                                <Status.Label>
+                                  {status === "active" ? "Active" : "Removed"}
+                                </Status.Label>
+                              </Status.Root>
+                            </ItemList.Meta>
+                          </ItemList.Link>
+                        </ItemList.Item>
+                      )}
+                    </For>
+                  </ItemList.Root>
+                </Show>
+              </Column>
+            </Show>
           )}
         </For>
       </Column>
@@ -218,16 +228,31 @@ function MemberContent(props: { entry: Entry }) {
   onMount(() => heading.focus());
   return (
     <Column gap={5}>
-      <Text
-        ref={(element) => {
-          heading = element;
-        }}
-        tabIndex={-1}
-        as="h2"
-        variant="heading"
-      >
-        {props.entry.member.identity.id}
-      </Text>
+      <Column gap={3}>
+        <Divider.Root>
+          <Divider.Label
+            as="h2"
+            ref={(element) => {
+              heading = element;
+            }}
+            tabIndex={-1}
+          >
+            {props.entry.member.identity._tag === "Human" ? "Person" : "Agent"}
+          </Divider.Label>
+          <Divider.Line />
+        </Divider.Root>
+        <Row gap={2} wrap={false}>
+          <Avatar.Root
+            kind={props.entry.member.identity._tag === "Human" ? "human" : "agent"}
+            decorative
+          >
+            <Avatar.Fallback>
+              {props.entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
+            </Avatar.Fallback>
+          </Avatar.Root>
+          <Text as="span">{props.entry.member.identity.id}</Text>
+        </Row>
+      </Column>
       <KeyValue.Root>
         <KeyValue.Row>
           <KeyValue.Label>Kind</KeyValue.Label>
@@ -249,9 +274,10 @@ function MemberContent(props: { entry: Entry }) {
       >
         {(access) => (
           <Column gap={3}>
-            <Text as="h3" variant="heading">
-              Access
-            </Text>
+            <Divider.Root>
+              <Divider.Label as="h3">Access</Divider.Label>
+              <Divider.Line />
+            </Divider.Root>
             <Show
               when={access().assignments.length}
               fallback={<Text tone="secondary">No active assignments.</Text>}

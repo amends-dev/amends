@@ -1,5 +1,6 @@
 import { WorkspaceNameForm } from "@amends/ui/features/settings";
 import { KeyValue } from "@amends/ui/compositions/key-value";
+import { Divider } from "@amends/ui/primitives/divider";
 import { Dialog } from "@amends/ui/compositions/dialog";
 import { Field } from "@amends/ui/compositions/field";
 import { Select } from "@amends/ui/primitives/select";
@@ -23,9 +24,10 @@ export function WorkspaceName() {
     <Show when={value.data()}>
       {(data) => (
         <Column gap={4}>
-          <Text as="h2" variant="heading">
-            Workspace
-          </Text>
+          <Divider.Root>
+            <Divider.Label as="h2">Name</Divider.Label>
+            <Divider.Line />
+          </Divider.Root>
           <Show
             when={data().settings.canRename}
             fallback={<Text>Only an authorized owner can rename this workspace.</Text>}
@@ -50,24 +52,30 @@ export function WorkspaceDetails() {
   return (
     <Show when={value.data()}>
       {(data) => (
-        <KeyValue.Root>
-          <KeyValue.Row>
-            <KeyValue.Label>Name</KeyValue.Label>
-            <KeyValue.Value>{data().settings.workspace.name}</KeyValue.Value>
-          </KeyValue.Row>
-          <KeyValue.Row>
-            <KeyValue.Label>Created by</KeyValue.Label>
-            <KeyValue.Value>{data().settings.workspace.createdBy}</KeyValue.Value>
-          </KeyValue.Row>
-          <KeyValue.Row>
-            <KeyValue.Label>Owner</KeyValue.Label>
-            <KeyValue.Value>{data().ownership.owner.identity.id}</KeyValue.Value>
-          </KeyValue.Row>
-          <KeyValue.Row>
-            <KeyValue.Label>Workspace ID</KeyValue.Label>
-            <KeyValue.Value>{data().settings.workspace.id}</KeyValue.Value>
-          </KeyValue.Row>
-        </KeyValue.Root>
+        <Column gap={3}>
+          <Divider.Root>
+            <Divider.Label as="h2">Details</Divider.Label>
+            <Divider.Line />
+          </Divider.Root>
+          <KeyValue.Root>
+            <KeyValue.Row>
+              <KeyValue.Label>Name</KeyValue.Label>
+              <KeyValue.Value>{data().settings.workspace.name}</KeyValue.Value>
+            </KeyValue.Row>
+            <KeyValue.Row>
+              <KeyValue.Label>Created by</KeyValue.Label>
+              <KeyValue.Value>{data().settings.workspace.createdBy}</KeyValue.Value>
+            </KeyValue.Row>
+            <KeyValue.Row>
+              <KeyValue.Label>Owner</KeyValue.Label>
+              <KeyValue.Value>{data().ownership.owner.identity.id}</KeyValue.Value>
+            </KeyValue.Row>
+            <KeyValue.Row>
+              <KeyValue.Label>Workspace ID</KeyValue.Label>
+              <KeyValue.Value>{data().settings.workspace.id}</KeyValue.Value>
+            </KeyValue.Row>
+          </KeyValue.Root>
+        </Column>
       )}
     </Show>
   );
@@ -86,9 +94,10 @@ export function OwnershipTransfer() {
   return (
     <Show when={value.data()?.ownership.canTransfer}>
       <Column gap={3}>
-        <Text as="h3" variant="heading">
-          Ownership
-        </Text>
+        <Divider.Root>
+          <Divider.Label as="h2">Ownership</Divider.Label>
+          <Divider.Line />
+        </Divider.Root>
         <Text tone="secondary">
           A workspace has one owner. Transferring ownership makes you an administrator.
         </Text>

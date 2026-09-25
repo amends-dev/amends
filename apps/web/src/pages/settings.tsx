@@ -15,7 +15,7 @@ export function SettingsLayout(props: ParentProps) {
     return segment === "members" || segment === "invites" ? segment : "workspace";
   };
   return (
-    <Column gap={6}>
+    <Column gap={4}>
       <SegmentedControl.Root
         aria-label="Settings sections"
         value={section()}
@@ -87,10 +87,10 @@ export function MembersSettingsPage() {
 export function InvitesSettingsPage() {
   return (
     <Scope section="invites">
+      <Settings.InvitationHistory />
       <Container maxWidth="40rem" gutter={0} align="start">
         <Settings.InviteForm />
       </Container>
-      <Settings.InvitationHistory />
     </Scope>
   );
 }

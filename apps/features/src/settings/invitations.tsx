@@ -8,6 +8,7 @@ import { InviteMemberForm } from "@amends/ui/features/settings";
 import { ItemList } from "@amends/ui/compositions/item-list";
 import { Dialog } from "@amends/ui/compositions/dialog";
 import { Status } from "@amends/ui/primitives/status";
+import { Divider } from "@amends/ui/primitives/divider";
 import { Button } from "@amends/ui/primitives/button";
 import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
@@ -29,9 +30,10 @@ export function InviteForm() {
     <Show when={value.data()}>
       {(data) => (
         <Column gap={4}>
-          <Text as="h2" variant="heading">
-            Invites
-          </Text>
+          <Divider.Root>
+            <Divider.Label as="h2">New invite</Divider.Label>
+            <Divider.Line />
+          </Divider.Root>
           <Show
             when={data().settings.canInvite}
             fallback={
@@ -155,9 +157,12 @@ export function InvitationHistory() {
           }
         >
           <Column gap={3}>
-            <Text as="h3" variant="heading">
-              Invitation history
-            </Text>
+            <Divider.Root>
+              <Divider.Label as="h2">Invites</Divider.Label>
+              <Divider.Note>{data().invitations.length} in total</Divider.Note>
+              <Divider.Line />
+              <Divider.Note>single use</Divider.Note>
+            </Divider.Root>
             <Show
               when={data().invitations.length}
               fallback={<Text tone="secondary">No invitations yet.</Text>}

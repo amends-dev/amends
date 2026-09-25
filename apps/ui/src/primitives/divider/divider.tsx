@@ -41,3 +41,17 @@ export function Label<T extends TextElement = "span">(props: LabelProps<T>) {
     />
   );
 }
+
+/** Small mono count or note beside a labeled section seam. */
+export function Note(props: Omit<TextProps<"span">, "as" | "variant" | "tone">) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return (
+    <Text
+      {...native}
+      as="span"
+      variant="mono"
+      tone="secondary"
+      class={classes(s.note, local.class, local.classList)}
+    />
+  );
+}

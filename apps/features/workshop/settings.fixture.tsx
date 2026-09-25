@@ -244,8 +244,8 @@ export function SettingsFixture(props: {
                                     </div>
                                   </Show>
                                   <Show when={section() === "invites"}>
-                                    <Settings.InviteForm />
                                     <Settings.InvitationHistory />
+                                    <Settings.InviteForm />
                                   </Show>
                                   <Settings.Feedback />
                                 </Column>

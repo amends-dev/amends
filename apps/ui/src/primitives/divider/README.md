@@ -12,6 +12,7 @@ import { IconMarkNew } from "@amends/icons";
 
 <Divider.Root>
   <Divider.Label as="h2">Channels</Divider.Label>
+  <Divider.Note>3 channels</Divider.Note>
   <Divider.Line />
   <IconButton aria-label="Create channel" variant="ghost">
     <IconMarkNew />
@@ -25,7 +26,8 @@ import { IconMarkNew } from "@amends/icons";
 </Divider.Root>;
 ```
 
-Root is a full-width wrapping flex row with a spacing-step-3 gap. It adds no outer margins or
+Root is a full-width wrapping flex row with a spacing-step-3 gap. `Note` supplies
+compact, sentence-case mono counts or trailing context. It adds no outer margins or
 vertical spacing; the surrounding layout owns those. Lines share remaining space equally,
 starting from a one-rem flex basis so the seam remains visible beside wrapped text.
 A centered Label reserves room for the two adjacent lines; other content can move to a

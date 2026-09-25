@@ -33,6 +33,12 @@ function Specimen(props: { theme: ColorTheme }) {
           <Divider.Label as="h3">Channels</Divider.Label>
           <Divider.Line />
         </Divider.Root>
+        <Divider.Root>
+          <Divider.Label as="h3">People</Divider.Label>
+          <Divider.Note>5 people</Divider.Note>
+          <Divider.Line />
+          <Divider.Note>1 owner</Divider.Note>
+        </Divider.Root>
         <Divider.Root data-testid="center-label">
           <Divider.Line />
           <Divider.Label>Today</Divider.Label>
