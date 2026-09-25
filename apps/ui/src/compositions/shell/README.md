@@ -2,44 +2,48 @@
 
 A declarative application frame for the shared web and desktop frontend. The shell owns
 the sidebar, header, main scrolling area, and optional footer. Page content uses the existing
-Container, Row, Column, and Grid primitives.
+Container, Row, Column, and Grid primitives, with `Shell.Content` for a named width
+and optional vertical centering inside Main. Theme and body typography come from
+an enclosing [ThemeProvider](../../foundations/theme/README.md); Shell inherits them.
 
 ```tsx
 import { Shell } from "@amends/ui/compositions/shell";
 import { Navigation } from "@amends/ui/compositions/navigation";
 import { Container } from "@amends/ui/primitives/layout";
-import { colorThemes } from "@amends/ui/foundations/color/styles";
+import { ThemeProvider } from "@amends/ui/foundations/theme";
 
-<Shell.Root class={colorThemes.cotton}>
-  <Shell.Sidebar>
-    <Shell.SidebarHeader>
-      <Shell.SidebarLabel>Acme workspace</Shell.SidebarLabel>
-    </Shell.SidebarHeader>
-    <Shell.SidebarContent>
-      <Navigation.Root aria-label="Workspace">
-        <Navigation.Link href="/threads" aria-current="page">
-          <Navigation.Icon>
-            <span>◎</span>
-          </Navigation.Icon>
-          <Navigation.Label>Threads</Navigation.Label>
-          <Navigation.Count aria-label="3 unread">3</Navigation.Count>
-        </Navigation.Link>
-      </Navigation.Root>
-    </Shell.SidebarContent>
-    <Shell.SidebarFooter>
-      <Shell.SidebarLabel>Acme account</Shell.SidebarLabel>
-    </Shell.SidebarFooter>
-  </Shell.Sidebar>
-  <Shell.Body>
-    <Shell.Header>
-      <Shell.NavigationToggle />
-      <h1>Threads</h1>
-    </Shell.Header>
-    <Shell.Main>
-      <Container>Page content</Container>
-    </Shell.Main>
-  </Shell.Body>
-</Shell.Root>;
+<ThemeProvider theme="cotton">
+  <Shell.Root>
+    <Shell.Sidebar>
+      <Shell.SidebarHeader>
+        <Shell.SidebarLabel>Acme workspace</Shell.SidebarLabel>
+      </Shell.SidebarHeader>
+      <Shell.SidebarContent>
+        <Navigation.Root aria-label="Workspace">
+          <Navigation.Link href="/threads" aria-current="page">
+            <Navigation.Icon>
+              <span>◎</span>
+            </Navigation.Icon>
+            <Navigation.Label>Threads</Navigation.Label>
+            <Navigation.Count aria-label="3 unread">3</Navigation.Count>
+          </Navigation.Link>
+        </Navigation.Root>
+      </Shell.SidebarContent>
+      <Shell.SidebarFooter>
+        <Shell.SidebarLabel>Acme account</Shell.SidebarLabel>
+      </Shell.SidebarFooter>
+    </Shell.Sidebar>
+    <Shell.Body>
+      <Shell.Header>
+        <Shell.NavigationToggle />
+        <h1>Threads</h1>
+      </Shell.Header>
+      <Shell.Main>
+        <Container>Page content</Container>
+      </Shell.Main>
+    </Shell.Body>
+  </Shell.Root>
+</ThemeProvider>;
 ```
 
 Slots accept children and native attributes; there are no navigation-item, sidebar, header,
@@ -72,6 +76,44 @@ layout so it leaves room for Main at narrow sizes and enlarged text.
 
 ## Interaction and application ownership
 
+For a form, onboarding step, empty state, or status message:
+
+```tsx
+<ThemeProvider theme="cotton">
+  <Shell.Root>
+    <Shell.Body scroll="page">
+      <Shell.Header>
+        <Text as="span" variant="heading">
+          amends
+        </Text>
+      </Shell.Header>
+      <Shell.Main>
+        <Shell.Content width="narrow" centered>
+          {content}
+        </Shell.Content>
+      </Shell.Main>
+      <Shell.Footer>
+        <Text variant="mono">Optional footer content</Text>
+      </Shell.Footer>
+    </Shell.Body>
+  </Shell.Root>
+</ThemeProvider>
+```
+
+Content composes Container: `standard` (default) uses its 67.5rem outer limit;
+`narrow` uses 28.25rem, leaving a 26.25rem column after the existing 1rem gutters.
+Without `centered`, content starts at the top. Centering uses free space only:
+long content starts at the top. `Body scroll="page"` keeps header, main, and footer
+in one scrollable flow, so tall chrome cannot crowd out the content at enlarged
+text sizes. The default `scroll="regions"` retains the existing independent Main
+scrolling and fixed header/footer behavior. Theme, scrolling mode, width, and
+centering updates keep children mounted. Content does not add a landmark or own
+page headings, branding, forms, routes, or feature state.
+
+This extends the existing frame for a general content-layout need. Sign-in needs
+no separate page shell or invented brand badge; application pages compose these
+parts and reviewed Text, rather than defining their own styles.
+
 The shell provides a skip link, generated main target, labelled toggle, current-link initial
 focus in the mobile drawer, Escape/backdrop/close dismissal, and focus return. The native
 modal makes the background inert; Drawer handles reduced motion and scroll-lock cleanup.
@@ -97,4 +139,6 @@ and sidebar fields are review fixtures, not product features.
 DOM tests verify instance preservation and independent desktop/mobile state. Portable stories
 cover desktop interaction; mobile interaction requires the browser viewport preset. Browser
 review checks the native modal, nested Select, focus, viewport transitions, scroll regions,
-themes, and geometry. Tauri integration and other browser engines remain future validation.
+themes, and geometry. **Compositions / Shell / Content** adds narrow, short-window,
+enlarged-text, RTL, and both-theme geometry checks, including both overflow edges.
+Tauri integration and other browser engines remain future validation.

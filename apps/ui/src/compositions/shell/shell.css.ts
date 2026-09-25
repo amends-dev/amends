@@ -70,8 +70,12 @@ export const body = style({
   display: "grid",
   gridTemplateRows: "auto minmax(0, 1fr) auto",
   gridTemplateColumns: "minmax(0, 1fr)",
+  selectors: {
+    '&[data-scroll="page"]': { display: "flex", flexDirection: "column", overflow: "auto" },
+  },
 });
 export const header = style({
+  flexShrink: 0,
   gridRow: 1,
   padding: space[4],
   paddingTop: `max(${space[4]}, env(safe-area-inset-top))`,
@@ -86,13 +90,34 @@ export const main = style([
     overscrollBehavior: "contain",
     paddingBlock: space[4],
     paddingBottom: `max(${space[4]}, env(safe-area-inset-bottom))`,
-    selectors: { "&:focus-visible": { outlineOffset: "-2px" } },
+    selectors: {
+      "&:focus-visible": { outlineOffset: "-2px" },
+      [`${body}[data-scroll="page"] > &`]: {
+        flex: "1 0 auto",
+        minHeight: "auto",
+        overflow: "visible",
+      },
+    },
   },
 ]);
 export const footer = style({
+  flexShrink: 0,
   gridRow: 3,
   padding: space[3],
   borderTop: `1px dashed ${colorVars.line.seam}`,
+});
+export const content = style({
+  boxSizing: "border-box",
+  minHeight: "100%",
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  overflowWrap: "anywhere",
+});
+export const contentInner = style({
+  flexShrink: 0,
+  // Auto margins become zero when content is taller than Main, preserving its start edge.
+  selectors: { [`${content}[data-centered="true"] > &`]: { marginBlock: "auto" } },
 });
 export const skip = style([
   typographyStyles.body,

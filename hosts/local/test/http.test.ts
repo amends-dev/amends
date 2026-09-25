@@ -277,13 +277,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
               headers: {
                 origin,
                 "access-control-request-method": "POST",
-                "access-control-request-headers": "authorization,content-type",
+                "access-control-request-headers": "authorization,content-type,traceparent,b3",
               },
             });
             expect(preflight.status).toBe(204);
             expect(preflight.headers["access-control-allow-origin"]).toBe(origin);
             expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
               "authorization",
+            );
+            expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
+              "b3",
             );
             const denied = yield* client.get("/me/workspaces", { headers: { origin } });
             expect(denied.status).toBe(401);

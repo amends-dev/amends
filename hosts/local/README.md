@@ -90,7 +90,8 @@ reachable on a private network.
 The web development server proxies `/api` to this host. Desktop connects directly to
 `http://127.0.0.1:8787`; it does not start a host process. The local server's CORS layer
 allows `http://127.0.0.1:1420`, `tauri://localhost`, `http://tauri.localhost`, and
-`https://tauri.localhost`, with authorization/content-type and tracing headers.
+`https://tauri.localhost`, with authorization/content-type and tracing headers
+(`traceparent`, `tracestate`, and the Effect client's compact `b3` header).
 It also applies to authentication failures so clients can handle a 401. Other origins
 receive no allow-origin header. Cookies are not used; requests carry bearer tokens.
 Different web origins require a same-origin proxy or an explicit host CORS change.

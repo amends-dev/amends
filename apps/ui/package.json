@@ -18,6 +18,7 @@
     "./foundations/typography": "./src/foundations/typography/tokens.ts",
     "./foundations/typography/styles": "./src/foundations/typography/styles.css.ts",
     "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts",
+    "./foundations/theme": "./src/foundations/theme/index.ts",
     "./primitives/text": "./src/primitives/text/index.ts",
     "./primitives/button": "./src/primitives/button/index.ts",
     "./primitives/input": "./src/primitives/input/index.ts",

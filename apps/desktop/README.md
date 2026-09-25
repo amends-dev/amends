@@ -3,8 +3,8 @@
 Tauri 2 desktop application composing the independent [client](../client/README.md)
 and [UI](../ui/README.md) packages.
 It uses hash routing, webview session persistence, and the existing Bun host over HTTP.
-The sign-in/workspace routes are placeholders awaiting product pages. Desktop does not
-start a backend process or use native commands/plugins.
+The app owns its sign-in page over shared `SignIn` feature parts; workspace routes
+remain placeholders. Desktop does not start a backend process or use native commands/plugins.
 
 ## Run and verify
 
@@ -29,9 +29,9 @@ bun run --filter @amends/desktop dev
 ```
 
 Tauri starts Vite at `http://127.0.0.1:1420/`, compiles Rust, and opens the window.
-Web uses port 4321, so both can run together. Guests reach the sign-in placeholder
-without an API request. Start the [existing host](../../hosts/local/README.md#run)
-separately for restored-session validation and future sign-in operations.
+Web uses port 4321, so both can run together. Guests reach the sign-in form
+without an API request. Requesting a code calls the host, which logs it in its terminal. Start the [existing host](../../hosts/local/README.md#run)
+separately for sign-in and session validation.
 The [Vite integration](https://v2.tauri.app/start/frontend/vite/) uses a fixed dev
 port and bundles `dist` through `src-tauri/tauri.conf.json`.
 
@@ -63,9 +63,11 @@ The window currently has no native command permissions. Add capabilities only as
 features need them. The production content security policy permits bundled assets and the configured local
 API; development additionally permits the local Vite connection.
 
-`src/app.tsx` supplies `HashRouter` to this app's `src/application.tsx` composition.
-That composition applies the theme and connects the headless `ClientProvider`,
-router, and error boundary. `src/placeholder-page.tsx` composes UI primitives for
+`src/app.tsx` nests `HashRouter` and the routes inside `Application`.
+That composition applies the theme, headless `ClientProvider`, and error boundary.
+`src/pages/sign-in.tsx` owns the page header, main, and footer, composing UI
+primitives with nested `SignIn.Root`, `SignIn.EmailForm`, and `SignIn.CodeForm`.
+The route validates new credentials before following a safe hash return path. `src/placeholder-page.tsx` composes UI primitives for
 the temporary bootstrap screens.
 `src/routes.tsx` owns routes, guard presentations, and redirects. Both platform apps
 import `@amends/client` and `@amends/ui` independently: client supplies headless state,
@@ -80,3 +82,10 @@ host's CORS policy. API URLs cannot contain credentials, query parameters, or fr
 Credentials are scoped to the normalized API URL and this webview origin. Web and
 desktop do not automatically share a login. OS credential storage and host selection
 UI remain later work.
+
+Page compositions contain no inline styles or local stylesheets. `ThemeProvider`
+owns the theme scope, `Shell.Root` owns the application frame, and page-local
+`Shell.Body`, `Header`, `Main`, `Content`, and `Footer` declarations compose it.
+Sign-in uses `Content width="narrow" centered` with `Body scroll="page"` so long
+content and enlarged text stay reachable. Visual gaps are evaluated and verified
+in UI before app consumption; `check:packages` rejects app-local styles.

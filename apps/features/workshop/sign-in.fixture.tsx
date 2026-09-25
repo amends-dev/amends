@@ -90,7 +90,10 @@ export function SignInFixture(props: { baseUrl?: string; theme?: "cotton" | "soo
               <ClientProvider apiBaseUrl={current().apiBaseUrl} sessionStore={store}>
                 <DirectoryProvider>
                   <Show when={mounted()}>
-                    <SignIn deliveryHint="In this workshop, refresh delivery below to find your code." />
+                    <SignIn.Root>
+                      <SignIn.EmailForm />
+                      <SignIn.CodeForm deliveryHint="In this workshop, refresh delivery below to find your code." />
+                    </SignIn.Root>
                   </Show>
                   <SessionResult />
                 </DirectoryProvider>

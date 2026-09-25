@@ -21,7 +21,7 @@ export const layerRoutes = Layer.mergeAll(
       "https://tauri.localhost",
     ],
     allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Authorization", "Content-Type", "traceparent", "tracestate"],
+    allowedHeaders: ["Authorization", "Content-Type", "traceparent", "tracestate", "b3"],
     credentials: false,
   }),
 );

@@ -20,8 +20,8 @@ through the API.
 
 Run `bun run --filter @amends/web dev` and open `http://127.0.0.1:4321/`, or run
 `bun run --filter @amends/desktop dev` to open the Tauri app after installing its
-[native prerequisites](apps/desktop/README.md#run-and-verify). Both independently compose headless client state and UI components in their own route trees. Guests see the sign-in
-placeholder; restored sessions require the API. The sign-in page is the next step.
+[native prerequisites](apps/desktop/README.md#run-and-verify). Both independently compose headless client state and UI components in their own route trees. Guests see the email/code sign-in page. Successful and restored sessions are validated
+before protected routes render. Workspace pages remain placeholders.
 The API independently exposes OpenAPI at `/openapi.json` and documentation at `/docs`;
 development sign-in prints the one-time code in the host terminal.
 

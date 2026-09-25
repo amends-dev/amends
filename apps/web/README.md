@@ -3,8 +3,8 @@
 Solid/Vite browser application composing the independent [client](../client/README.md)
 and [UI](../ui/README.md) packages.
 It supplies browser-history routing, API configuration, and browser session persistence.
-The sign-in and workspace routes currently contain placeholders; their product pages
-will be introduced separately.
+The app owns its sign-in page, composing UI primitives and the shared `SignIn`
+feature parts. Workspace routes still contain placeholders.
 
 ## Run and verify
 
@@ -24,8 +24,8 @@ In another terminal:
 bun run --filter @amends/web dev
 ```
 
-Open `http://127.0.0.1:4321/`. Guests reach the sign-in placeholder without contacting
-the host. Restored sessions are validated before protected routes render. Vite proxies
+Open `http://127.0.0.1:4321/`. Guests reach the sign-in form without contacting
+the host. Requesting a code calls the host, which logs it in its terminal. Restored sessions are validated before protected routes render. Vite proxies
 `/api` to `http://127.0.0.1:8787`; the local host remains a separate process.
 
 ```sh
@@ -45,10 +45,21 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 
 `src/main.tsx` mounts Solid and loads shared fonts/global styles. `src/app.tsx` chooses
 `Router`, resolves the endpoint (default `/api`), and supplies the session store.
+It nests the router and routes declaratively inside `Application`.
 `src/application.tsx` applies the theme and connects the headless `ClientProvider`
-to the browser router and error boundary. `src/placeholder-page.tsx` composes UI
+to its children and error boundary. `src/placeholder-page.tsx` composes UI
 primitives for the temporary bootstrap screens. `src/routes.tsx` owns routes,
 redirects, guard presentations, and client-to-UI wiring.
+`src/pages/sign-in.tsx` declares the page header, main, and footer using UI primitives,
+with `SignIn.Root`, `SignIn.EmailForm`, and `SignIn.CodeForm` nested in the content.
+The route validates the new credential before following a safe return path.
 Client supplies session/API/query state; UI supplies presentation.
 Neither library imports the other. Route integration tests live in this app.
 Vite deduplicates Solid and compiles the shared vanilla-extract styles.
+
+Page compositions contain no inline styles or local stylesheets. `ThemeProvider`
+owns the theme scope, `Shell.Root` owns the application frame, and page-local
+`Shell.Body`, `Header`, `Main`, `Content`, and `Footer` declarations compose it.
+Sign-in uses `Content width="narrow" centered` with `Body scroll="page"` so long
+content and enlarged text stay reachable. Visual gaps are evaluated and verified
+in UI before app consumption; `check:packages` rejects app-local styles.

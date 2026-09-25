@@ -33,6 +33,21 @@ export function examples() {
       <Shell.Main>Content</Shell.Main>
     </Shell.Body>
   </Shell.Root>;
+  <Shell.Root>
+    <Shell.Body scroll="page">
+      <Shell.Main>
+        <Shell.Content width="narrow" centered>
+          Content
+        </Shell.Content>
+      </Shell.Main>
+    </Shell.Body>
+  </Shell.Root>;
+  // @ts-expect-error Shell inherits its theme from a surrounding provider.
+  <Shell.Root theme="cotton" />;
+  // @ts-expect-error Page compositions choose a named width rather than supplying CSS lengths.
+  <Shell.Content width="420px" />;
+  // @ts-expect-error The shell owns scrolling implementations.
+  <Shell.Body scroll="auto" />;
   <Drawer.Root>
     <Drawer.Trigger>Open</Drawer.Trigger>
     <Drawer.Content>

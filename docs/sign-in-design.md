@@ -8,7 +8,8 @@ Workspace selection is the next feature.
 [sign-in forms](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
 workshop. The [client controller](../apps/client/src/sign-in/README.md) implements
 the headless flow. The [connected feature](../apps/features/README.md) and live
-workshop are implemented; the page layout and app integration remain planned.
+workshop are implemented. Web and desktop now own their sign-in pages, composing
+UI primitives and the shared feature with their existing session guards.
 
 ## UI pieces
 
@@ -22,7 +23,13 @@ Existing tokens, field errors, and Button pending behavior cover their basic sta
 | `CodeInput`       | `primitives/code-input`   | One native text input with six visual cells, one value, and one tab stop. Supports paste, selection, leading zeros, numeric input mode, and one-time-code autocomplete. Accepts Field associations; owns no verification or submission. |
 | `SignInEmailForm` | `features/sign-in`        | Heading, email field, submit action, and inline request feedback.                                                                                                                                                                       |
 | `SignInCodeForm`  | `features/sign-in`        | Heading, delivery guidance, code field, verify action, resend, change email, and inline feedback.                                                                                                                                       |
-| `SignInPage`      | `pages/sign-in`           | Brand/header, responsive content column, and optional footer around caller-supplied children. Owns no form or flow state.                                                                                                               |
+
+The `SignInPage` compositions live in `apps/web/src/pages` and
+`apps/desktop/src/pages`; UI supplies reusable visual pieces. The app's
+`ThemeProvider` wraps `Shell.Root`. Pages use Shell's existing header/main/footer
+parts; `Shell.Content` supplies a named narrow column and optional centering.
+`Shell.Body scroll="page"` keeps enlarged content and chrome in one scrollable flow.
+The custom badge is omitted in favor of reviewed Text. Apps define no styles.
 
 Each form is independently renderable. Values, pending/error state, and action
 callbacks come from its caller; forms own native submission, focus, and accessible
@@ -34,13 +41,14 @@ stays readable; the native input and its value remain mounted.
 
 ```text
 Web/desktop sign-in route
-└─ SignInPage (UI layout)
-   └─ SignIn (connected feature)
-      ├─ SignInEmailForm
-      └─ SignInCodeForm → Field + CodeInput
+└─ SignInPage (owned by web or desktop)
+   └─ SignIn.Root (shared controller context)
+      ├─ SignIn.EmailForm → UI SignInEmailForm
+      └─ SignIn.CodeForm → UI SignInCodeForm → Field + CodeInput
 ```
 
-The connected feature renders the active form. Client owns drafts, the accepted
+The connected parts render their active forms; nested children declare their
+structure without passing complete components through custom props. Client owns drafts, the accepted
 email, step transitions, requests, validation, duplicate/stale request protection,
 and session replacement. Features map client outcomes into UI props; UI imports
 no client or HTTP types. App guards validate the resulting session and navigate

@@ -13,7 +13,7 @@ import {
   type Accessor,
   type JSX,
 } from "solid-js";
-import { Row, Column } from "../../primitives/layout/index.ts";
+import { Row, Column, Container } from "../../primitives/layout/index.ts";
 import { IconButton, type IconButtonProps } from "../../primitives/icon-button/index.ts";
 import { IconMenu, IconSidebarLeftOpen, IconSidebarLeftClose } from "@amends/icons";
 import { OverlayHostContext } from "../../primitives/overlay/scope.ts";
@@ -337,10 +337,20 @@ export function NavigationToggle(
     </Show>
   );
 }
-export function Body(props: JSX.HTMLAttributes<HTMLDivElement>) {
+export type BodyProps = JSX.HTMLAttributes<HTMLDivElement> & {
+  /** Independent main scrolling by default; page keeps tall chrome and content in one flow. */
+  scroll?: "regions" | "page";
+};
+export function Body(props: BodyProps) {
   context();
-  const [local, native] = splitProps(props, ["class", "classList"]);
-  return <div {...native} class={classes(s.body, local.class, local.classList)} />;
+  const [local, native] = splitProps(props, ["scroll", "class", "classList"]);
+  return (
+    <div
+      {...native}
+      data-scroll={local.scroll ?? "regions"}
+      class={classes(s.body, local.class, local.classList)}
+    />
+  );
 }
 export function Header(props: JSX.HTMLAttributes<HTMLElement>) {
   context();
@@ -369,6 +379,37 @@ export function Main(props: Omit<JSX.HTMLAttributes<HTMLElement>, "id">) {
       }}
       class={classes(s.main, local.class, local.classList)}
     />
+  );
+}
+export type ContentProps = JSX.HTMLAttributes<HTMLDivElement> & {
+  /** Standard page content or a narrow form/message column, including its gutters. */
+  width?: "standard" | "narrow";
+  /** Center short content vertically; overflow starts at the top and scrolls in Main. */
+  centered?: boolean;
+};
+/** Optional content boundary inside Main, composed from the shared Container primitive. */
+export function Content(props: ContentProps) {
+  context();
+  const [local, native] = splitProps(props, [
+    "width",
+    "centered",
+    "children",
+    "class",
+    "classList",
+  ]);
+  return (
+    <div
+      {...native}
+      class={classes(s.content, local.class, local.classList)}
+      data-centered={local.centered ?? false}
+    >
+      <Container
+        maxWidth={local.width === "narrow" ? "28.25rem" : "67.5rem"}
+        class={s.contentInner}
+      >
+        {local.children}
+      </Container>
+    </div>
   );
 }
 export function Footer(props: JSX.HTMLAttributes<HTMLElement>) {

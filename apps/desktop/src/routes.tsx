@@ -12,6 +12,7 @@ import { Button } from "@amends/ui/primitives/button";
 import { Row } from "@amends/ui/primitives/layout";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
 import { PlaceholderPage as Page } from "./placeholder-page.tsx";
+import { SignInPage } from "./pages/sign-in.tsx";
 
 function SessionActions() {
   const session = useSession();
@@ -64,14 +65,16 @@ function SignInRoute() {
   const session = useSession();
   const [search] = useSearchParams<{ returnTo?: string }>();
   return (
-    <Show
-      when={session.session}
-      fallback={<Page title="Sign in" message="The sign-in page is coming next." />}
-    >
-      <RequireSession>
-        <Navigate href={returnPath(search.returnTo)} />
-      </RequireSession>
-    </Show>
+    <Switch>
+      <Match when={!session.session}>
+        <SignInPage />
+      </Match>
+      <Match when={session.session}>
+        <RequireSession>
+          <Navigate href={returnPath(search.returnTo)} />
+        </RequireSession>
+      </Match>
+    </Switch>
   );
 }
 function WorkspaceRoute() {

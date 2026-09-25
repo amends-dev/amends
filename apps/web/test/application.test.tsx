@@ -4,6 +4,7 @@ import { createMemoryHistory, MemoryRouter } from "@solidjs/router";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { Application } from "../src/application.tsx";
+import { ApplicationRoutes } from "../src/routes.tsx";
 import { Session, type SessionStore } from "@amends/client";
 
 const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });
@@ -39,12 +40,11 @@ function mount(path: string, store: SessionStore, fetch: typeof globalThis.fetch
     Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
   );
   render(() => (
-    <Application
-      router={(props) => <MemoryRouter {...props} history={history} />}
-      apiBaseUrl="https://host.test"
-      sessionStore={store}
-      transport={transport}
-    />
+    <Application apiBaseUrl="https://host.test" sessionStore={store} transport={transport}>
+      <MemoryRouter history={history}>
+        <ApplicationRoutes />
+      </MemoryRouter>
+    </Application>
   ));
   return history;
 }
@@ -58,9 +58,12 @@ afterEach(() => {
 it("redirects guests without making authenticated requests and retains the intended route", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
   const history = mount("/workspaces/one?tab=members", memoryStore().store, fetch);
-  await screen.findByRole("heading", { name: "Sign in" });
+  await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%3Ftab%3Dmembers");
   expect(fetch).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("link", { name: "Skip to content" }));
+  expect(screen.getByRole("main")).toHaveFocus();
+  expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%3Ftab%3Dmembers");
 });
 it("validates a restored credential before mounting protected content and supports sign-out", async () => {
   const pending = deferred<Response>();
@@ -77,7 +80,7 @@ it("validates a restored credential before mounting protected content and suppor
   pending.resolve(response(directory));
   await screen.findByRole("heading", { name: "Workspaces" });
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-  await screen.findByRole("heading", { name: "Sign in" });
+  await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(fixture.store.read()).toBeUndefined();
   expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces");
 });
@@ -86,7 +89,7 @@ it("clears rejected credentials while preserving the intended route", async () =
   const history = mount("/workspaces/one", fixture.store, () =>
     Promise.resolve(response({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401)),
   );
-  await screen.findByRole("heading", { name: "Sign in" });
+  await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(fixture.store.read()).toBeUndefined();
   expect(history.get()).toContain("returnTo=%2Fworkspaces%2Fone");
 });
@@ -117,7 +120,7 @@ it("aborts old requests on cross-window logout and never renders their late data
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const signal = fetch.mock.calls[0]?.[1]?.signal;
   fixture.change();
-  await screen.findByRole("heading", { name: "Sign in" });
+  await screen.findByRole("heading", { name: "Sign in to amends" });
   await waitFor(() => expect(signal?.aborted).toBe(true));
   pending.resolve(response(directory));
   expect(screen.queryByRole("heading", { name: "Workspaces" })).not.toBeInTheDocument();
@@ -182,4 +185,78 @@ it("resumes a safe return path only after a stored session validates", async () 
   );
   await screen.findByRole("heading", { name: "First workspace" });
   expect(history.get()).toBe("/workspaces/one");
+});
+
+async function submitEmail() {
+  fireEvent.input(await screen.findByRole("textbox", { name: "Email" }), {
+    target: { value: "jo@mercier.co" },
+  });
+  fireEvent.submit(screen.getByRole("form"));
+  return screen.findByRole("textbox", { name: "Six-digit code" });
+}
+it("signs in through the composed page and validates before resuming the intended route", async () => {
+  const checked = deferred<Response>();
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(new Response(null, { status: 202 }))
+    .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
+    .mockImplementation(() => checked.promise);
+  const fixture = memoryStore();
+  const history = mount("/workspaces/one?tab=members", fixture.store, fetch);
+  const code = await submitEmail();
+  expect(screen.getAllByRole("main")).toHaveLength(1);
+  expect(code).toHaveFocus();
+  expect(code).toHaveAccessibleDescription(
+    "Find your code in the terminal running the local host.",
+  );
+  fireEvent.input(code, { target: { value: "001234" } });
+  fireEvent.submit(screen.getByRole("form"));
+  await screen.findByRole("heading", { name: "Checking session" });
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+  expect(history.get()).toContain("/sign-in?returnTo=");
+  expect(fixture.store.read()?.token).toBe("jo@mercier.co");
+  expect(new Headers(fetch.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
+    "Bearer jo@mercier.co",
+  );
+  checked.resolve(
+    response({ memberships: [membership("one", "First workspace")], invitations: [] }),
+  );
+  await screen.findByRole("heading", { name: "First workspace" });
+  expect(history.get()).toBe("/workspaces/one?tab=members");
+});
+it("ignores an external return destination after signing in", async () => {
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(new Response(null, { status: 202 }))
+    .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
+    .mockResolvedValue(response(directory));
+  const history = mount(
+    "/sign-in?returnTo=https%3A%2F%2Fother.invalid",
+    memoryStore().store,
+    fetch,
+  );
+  fireEvent.input(await submitEmail(), { target: { value: "001234" } });
+  fireEvent.submit(screen.getByRole("form"));
+  await screen.findByRole("heading", { name: "Workspaces" });
+  expect(history.get()).toBe("/workspaces");
+});
+it("disposes sign-in when navigation leaves the page, even if verification resolves later", async () => {
+  const pending = deferred<Response>();
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(new Response(null, { status: 202 }))
+    .mockImplementationOnce(() => pending.promise);
+  const fixture = memoryStore();
+  const history = mount("/sign-in", fixture.store, fetch);
+  fireEvent.input(await submitEmail(), { target: { value: "001234" } });
+  fireEvent.submit(screen.getByRole("form"));
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  const signal = fetch.mock.calls[1]?.[1]?.signal;
+  history.set({ value: "/missing", scroll: false });
+  await screen.findByRole("heading", { name: "Page not found" });
+  await waitFor(() => expect(signal?.aborted).toBe(true));
+  pending.resolve(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }));
+  await pending.promise;
+  expect(fixture.store.read()).toBeUndefined();
+  expect(history.get()).toBe("/missing");
 });

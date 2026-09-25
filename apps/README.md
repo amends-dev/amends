@@ -15,8 +15,8 @@ The legacy UI implementation and `design-system` workspace were removed. The cur
 `ui` workspace is the renamed `frontend` workshop. The old web
 screens, routes, sessions, API integrations, and their tests were removed with
 that reset. Both apps compose the independent client and UI packages. They own route
-trees and placeholder-page wiring, while client owns session/API state. The sign-in page
-is the next slice; the full product workflows remain backend-only.
+trees and page composition, while client owns session/API state. Each app has its own
+sign-in page over the shared declarative feature. Workspace pages remain placeholders.
 
 The [feature development flow](../docs/feature-development.md) uses the shared
 `features` package for connected interactions and their own workshop.

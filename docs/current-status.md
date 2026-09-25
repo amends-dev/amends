@@ -92,8 +92,8 @@ adds controlled email entry, validation feedback, pending guards, and request er
 the UI workshop. SignInCodeForm adds code verification/resend presentation, independent
 pending states, recovery feedback, and change-email callbacks. The
 [connected SignIn feature](../apps/features/README.md) runs against real HTTP and
-temporary PostgreSQL data in its own workshop. Page layout and web/desktop route
-integration remain planned. Textarea and other specialized input types remain future
+temporary PostgreSQL data in its own workshop. Web and desktop own the sign-in
+pages, composing shared feature parts and UI primitives. Textarea and other specialized input types remain future
 pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
 behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),
@@ -131,6 +131,11 @@ layer. Both apps compose headless client state and UI presentation independently
 
 ## Shared client foundation
 
+`ThemeProvider` supplies the shared color and body typography scope. Shell inherits
+it and provides page/region scrolling plus named content widths and centering.
+Web and desktop compose those parts without local styles; theme preferences and
+persistence remain application work.
+
 [Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
 compose headless session/API state from [client](../apps/client/README.md) and
 presentation from [UI](../apps/ui/README.md). Each app owns its route tree and
@@ -145,10 +150,10 @@ The headless [sign-in controller](../apps/client/src/sign-in/README.md) owns ema
 drafts, shared-schema validation, typed HTTP requests, explicit retry/resend, and
 session installation. Each mounted controller owns its requests; changing email,
 unmounting, and credential replacement cancel old work and ignore late responses.
-It is verified with isolated transports and has not yet been connected to the UI forms.
+The declarative `SignIn.Root`, `EmailForm`, and `CodeForm` parts connect it to UI,
+with live HTTP scenarios and app-owned pages in web and desktop.
 
-The sign-in page, connected email/code flow, workspace picker/creation, application shell,
-and domain pages remain unimplemented. Only local sign-out exists; server revocation,
+Workspace picker/creation, the application shell, and domain pages remain unimplemented. Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work. The removed legacy web screens remain available in Git history.
 Theme preferences, route focus management, Tauri signing/updates, production artwork,

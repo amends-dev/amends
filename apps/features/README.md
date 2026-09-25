@@ -4,12 +4,24 @@
 own presentation mappings, while client owns operations/state and UI owns forms.
 Routes, page layouts, navigation, API URL, and persistence remain caller-owned.
 
-`@amends/features/sign-in` exports `SignIn` and `SignInProps`. Mount it inside
-`ClientProvider`; optionally pass `deliveryHint` and `headingAs`. It renders the
-email/code forms and maps errors, pending actions, and resend feedback. Editing
+`@amends/features/sign-in` exports the `SignIn` parts. Mount one `SignIn.Root`
+inside `ClientProvider`, with `SignIn.EmailForm` and `SignIn.CodeForm` as children.
+Root owns one controller and the parts render their active step. They map errors,
+pending actions, and resend feedback. `headingAs` belongs on either form;
+`deliveryHint` belongs on CodeForm. Editing
 preserves the active input; changing steps focuses the next field. When a credential
-exists it renders no form. The app's directory guard validates that credential and
+exists the parts render no form. The app's directory guard validates that credential and
 chooses navigation. No page layout or success route is built into this component.
+
+```tsx
+<SignIn.Root>
+  <SignIn.EmailForm />
+  <SignIn.CodeForm deliveryHint="Find your code in the host's terminal." />
+</SignIn.Root>
+```
+
+Compose each form once inside the same Root, optionally within ordinary layout
+children. Root creates no DOM wrapper. Unmount Root to dispose the flow.
 
 ## Workshop
 
@@ -40,4 +52,5 @@ stopping the launcher releases remaining databases and its temporary cluster. A
 crashed tab may retain a scenario until shutdown; the host limits active scenarios
 to twelve. A static Storybook build needs this backend/proxy to run live stories.
 
-Next: introduce the sign-in page layout in UI, then mount this feature in web and desktop.
+Web and desktop compose their own sign-in pages from these parts and UI primitives.
+Page layout and navigation remain in those apps.

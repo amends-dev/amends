@@ -332,6 +332,14 @@ tests do not prove that startup works against a database you configure. Follow t
 
 ## Application foundation
 
+Web and desktop declare their router trees as children of `Application`. Each
+owns a sign-in page built from UI primitives and declarative `SignIn` parts.
+Their tests exercise real form submission through the generated client, directory
+validation before navigation, persistence, safe return destinations, and explicit
+recovery. Web also verifies disposal when navigation interrupts verification.
+Live backend behavior is covered by the shared feature scenarios below; browser
+and native review verify the actual app origins and layouts.
+
 Client's session and directory suites verify headless storage, scope lifetime, query
 state, authorization failure, and retry with isolated transports. They require no UI
 package or router. Web's application suite verifies safe redirects, route guards,
@@ -360,6 +368,13 @@ stopping the host. Run `bun run --filter @amends/features dev` for browser revie
 at port 6008 (HMR 6009), and `bun run --filter @amends/features build` to verify its
 bundle. The static bundle needs the development backend/proxy to run live stories.
 
-The local host's HTTP tests exercise desktop CORS preflights and 401 response headers.
+The local host's HTTP tests exercise desktop CORS preflights, including the generated
+client's `b3` tracing header, and 401 response headers.
 After changing host runtime setup, also perform the temporary-port startup check.
 Verify both app builds and native hash navigation after changing app composition.
+
+Shell's Content stories verify centering, narrow widths, both overflow edges, RTL,
+and enlarged text. Whole-page scrolling is tested alongside the existing independent
+regions. Theme stories verify nested CSS scopes, font/color-scheme inheritance,
+and retained input state. App route tests also check that the skip link focuses
+Main without changing the browser route or desktop hash.

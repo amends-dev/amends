@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { Shell } from "@amends/ui/compositions/shell";
+import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { Navigation } from "@amends/ui/compositions/navigation";
 import { Divider } from "@amends/ui/primitives/divider";
 import { Drawer } from "@amends/ui/compositions/drawer";
@@ -25,6 +26,38 @@ function viewport(initial: boolean) {
     media.dispatchEvent(new Event("change"));
   };
 }
+it("preserves content, selection, and focus while its shell theme and content layout change", () => {
+  const [centered, setCentered] = createSignal(true);
+  const [width, setWidth] = createSignal<"narrow" | "standard">("narrow");
+  const [theme, setTheme] = createSignal<"cotton" | "soot">("cotton");
+  const [scroll, setScroll] = createSignal<"regions" | "page">("regions");
+  render(() => (
+    <ThemeProvider theme={theme()}>
+      <Shell.Root>
+        <Shell.Body scroll={scroll()}>
+          <Shell.Main>
+            <Shell.Content width={width()} centered={centered()}>
+              <Input aria-label="Draft" value="Keep this draft" />
+            </Shell.Content>
+          </Shell.Main>
+        </Shell.Body>
+      </Shell.Root>
+    </ThemeProvider>
+  ));
+  const input = screen.getByRole("textbox") as HTMLInputElement;
+  input.focus();
+  input.setSelectionRange(2, 5);
+  setCentered(false);
+  setWidth("standard");
+  setTheme("soot");
+  setScroll("page");
+  expect(screen.getByRole("textbox")).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Keep this draft");
+  expect([input.selectionStart, input.selectionEnd]).toEqual([2, 5]);
+  fireEvent.click(screen.getByRole("link", { name: "Skip to content" }));
+  expect(screen.getByRole("main")).toHaveFocus();
+});
 it("IconButton preserves native form/disabled/ref behavior and a stable accessible name", () => {
   let ref: HTMLButtonElement | undefined;
   const click = vi.fn(),

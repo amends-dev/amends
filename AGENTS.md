@@ -84,6 +84,18 @@ Root `tsconfig.json` checks repository scripts, shared-package tests, and the Vi
 configuration; `bun run typecheck` checks these and every workspace. Use declared
 package names for cross-workspace imports, not relative paths into another workspace.
 
+Compose pages, features, and UI declaratively through nested children and named
+parts. Use props for data, options, and callbacks rather than custom slots carrying
+whole components or JSX trees. Follow framework-required render APIs where needed.
+Pages live in `apps/web` and `apps/desktop`; UI owns reusable visual pieces, and
+features owns connected interactions. Neither shared package owns application pages.
+
+Web and desktop compose UI; they do not define styles, inline style objects, or
+local stylesheets. Shared UI stylesheet/font imports and component options are
+allowed. Before filling a visual gap, inspect the existing components (including
+Shell), evaluate whether a reusable addition fits the design system, and verify
+that UI component in its workshop before composing it into an app page.
+
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.
 `bun run check:packages` checks shared-package dependency declarations.

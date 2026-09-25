@@ -19,6 +19,11 @@ The apps compose their bootstrap screens from UI's foundations and primitives.
 `@amends/ui/styles` supplies an opt-in document reset. This package was renamed from `@amends/frontend`;
 it replaces the removed legacy UI implementation. The `design-system` package remains retired.
 
+[ThemeProvider](src/foundations/theme/README.md) applies the reviewed color and
+body typography scope. Shell and other components inherit it; application code
+selects the theme without defining styles. Shell's named Content width, centering,
+and whole-page scrolling mode cover standalone pages as well as workspace layouts.
+
 ## Run and verify
 
 From the repository root:
@@ -202,7 +207,7 @@ enlarged root text, and reactive accessibility specimens cover the full package.
 import `@amends/icons`; catalog lookup stays in story code.
 
 The build produces a static workshop in `apps/ui/dist`. Production exports point
-to the foundations, primitives, compositions, and features, separately from the workshop. Stories are discovered
+to the foundations, primitives, compositions, and feature presentations, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
 
 **Features / Sign in / Email form** introduces `SignInEmailForm`, a controlled
@@ -232,8 +237,7 @@ These are the intended layers, created only as their first piece is introduced:
 | `foundations`  | Tokens, themes, typography, and global styles | Color palettes, spacing, radius, type specimens, and themes |
 | `primitives`   | Individual controls and elements              | Button, text, and input variants and states                 |
 | `compositions` | Reusable structures                           | Shell, page headers, and form layouts                       |
-| `features`     | Complete product interactions                 | Invitation forms and thread interactions                    |
-| `pages`        | Features composed into screens                | Representative screen states                                |
+| `features`     | Product-specific presentations                | Invitation forms and thread interactions                    |
 
 For each addition:
 
@@ -246,6 +250,10 @@ For each addition:
    consistency, accessibility, and relevant viewport sizes. When a foundation changes,
    revisit existing consumers too, including Button Comparison for color changes.
 5. Review that slice before starting another piece or changing an app to consume it.
+
+Application pages belong in web and desktop. Compose reusable UI with nested
+children and named parts, while props carry data, options, and callbacks. Shared
+features bind those parts to client state; UI does not own a page or route tree.
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
 a design reference. Reading-color specimens retain their system-font scaffolding; typography specimens

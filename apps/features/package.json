@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./sign-in": "./src/sign-in/sign-in.tsx"
+    "./sign-in": "./src/sign-in/index.ts"
   },
   "scripts": {
     "dev": "bun run ../../scripts/features-dev.ts",
