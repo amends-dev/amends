@@ -11,7 +11,7 @@ export function NotFoundPage() {
   const navigate = useNavigate();
   return (
     <StandalonePage>
-      <EmptyState.Root>
+      <EmptyState.Root size="page">
         <Drawing.Bare />
         <EmptyState.Text>
           <EmptyState.Title as="h1">Nothing at this address</EmptyState.Title>

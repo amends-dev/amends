@@ -71,6 +71,7 @@ action), where failure reads through the drawing, never red:
 | Unknown address      | `Bare`         | Nothing at this address         | Your workspaces, or Sign in     |
 | Crashed view         | `Snapped`      | Something went wrong            | Reload                          |
 
-The crashed view sits outside ClientProvider, so it shows no account. An unknown page inside a
+These states use EmptyState's page size, whose title matches the other standalone page
+headings. The crashed view sits outside ClientProvider, so it shows no account. An unknown page inside a
 workspace keeps the workspace layout and shows the same `Bare` state with a way back to the
 workspace home. Unavailable workspaces use the Sign in reference's Notice, described above.

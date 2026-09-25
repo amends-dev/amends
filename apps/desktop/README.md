@@ -56,6 +56,13 @@ Cargo's lockfile is committed; build output and generated schemas are ignored.
 The generated Tauri icons are temporary scaffold assets. Distribution signing,
 application artwork, installers on other operating systems, and updates are future work.
 
+The webview must be at least as new as Safari 16.2: the styles use `color-mix()`, container
+queries, and `oklch()` colors, and the scripts use `Array.prototype.toReversed` and
+`Object.hasOwn`. Vite targets `safari16.2`, which lowers syntax but adds no polyfills, and the
+bundle declares macOS 11 as its minimum, the oldest release that receives Safari 16. A Mac on
+macOS 11 or 12 needs its Safari updates installed, because the webview is the system WebKit.
+Windows uses the evergreen WebView2. Raise both settings when the code needs a newer feature.
+
 ## Shared frontend and host connection
 
 `src/main.tsx` owns webview startup; `src-tauri` owns the native window and permissions.

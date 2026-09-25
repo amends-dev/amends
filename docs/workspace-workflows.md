@@ -186,7 +186,9 @@ Group and thread permissions also need current membership in the group; see each
 
 `GET /workspaces/:id/settings` exposes workspace metadata, rename/invitation flags,
 and assignable roles. `GET …/member-management` returns readable members with
-access summaries and server-computed removal flags. Denied access summaries are null.
+access summaries and server-computed removal flags. Denied access summaries are null. The
+listing decides every member from one resolution of the reader's grants and the same delegation
+rule (`Delegation.recipientDenial`) that role changes and removals enforce.
 
 `PUT …/name` accepts `{ name, expectedName }`, requires `workspace.rename`, and
 records `workspace.renamed` with the old and new name. A different current name

@@ -89,6 +89,13 @@ const verifyTypography: NonNullable<StoryObj["play"]> = async ({ canvasElement, 
       await expect(document.fonts.check(font, samples[role])).toBe(true);
     }
   });
+  await step("Load the sans emphasis weight, not a synthesized bold", async () => {
+    const font = `600 16px ${typography.body.fontFamily}`;
+    const faces = await document.fonts.load(font, samples.body);
+    await expect(faces.some((face) => face.weight === "600" && face.status === "loaded")).toBe(
+      true,
+    );
+  });
   await step("Verify rendered metrics and wrapping", async () => {
     const rootSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
     for (const role of roles) {

@@ -1,6 +1,8 @@
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
+import { Assignment } from "../../authorization/assignment/assignment.ts";
 import { AssignmentApplication } from "../../authorization/assignment/application.ts";
+import { AssignmentPermissions } from "../../authorization/assignment/permissions.ts";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
@@ -101,26 +103,51 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   const listing = Effect.gen(function* () {
     const visible = yield* members.list;
     const workspace = yield* load;
-    return yield* Effect.forEach(visible, (member) =>
+    const actorId = (yield* Actor.Service).memberId;
+    // One grant resolution answers every permission, and role choices load once, so the reads
+    // grow with the member count only by each member's assignments.
+    const [canManageAny = false, ...permissions] = yield* authorization.permitted([
+      Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId }),
+      ...visible.flatMap(({ id: memberId }) => [
+        Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId }),
+        Requirement.make(MemberPermissions.Remove, { _tag: "Member", workspaceId, memberId }),
+      ]),
+    ]);
+    const roles = yield* assignments.roles;
+    return yield* Effect.forEach(visible, (member, index) =>
       Effect.gen(function* () {
-        const access = yield* assignments
-          .list(member.id)
-          .pipe(Effect.catchTag("Authorization.Denied", () => Effect.succeed(null)));
+        const readable = permissions[index * 2] ?? false,
+          removable = permissions[index * 2 + 1] ?? false;
+        const active = member.status === "active";
+        const change: Delegation.Recipient = {
+          workspaceId,
+          memberId: member.id,
+          ownerId: workspace.ownerMemberId,
+          actorId,
+          selfRemoval: false,
+        };
+        const removal: Delegation.Recipient = { ...change, selfRemoval: true };
+        const records =
+          readable ||
+          (active &&
+            ((canManageAny && Delegation.recipientNeedsAssignments(change)) ||
+              (removable && Delegation.recipientNeedsAssignments(removal))))
+            ? yield* delegation.assignmentsFor(member.id)
+            : [];
+        const canManage =
+          active && canManageAny && Delegation.recipientDenial(change, records) === undefined;
         const canRemove =
-          member.status === "active" &&
+          active &&
           member.id !== workspace.ownerMemberId &&
-          (yield* allowed(
-            authorization
-              .require([
-                Requirement.make(MemberPermissions.Remove, {
-                  _tag: "Member",
-                  workspaceId,
-                  memberId: member.id,
-                }),
-              ])
-              .pipe(Effect.andThen(delegation.requireRemoval(member.id))),
-          ));
-        return { member, access, canRemove };
+          removable &&
+          Delegation.recipientDenial(removal, records) === undefined;
+        return {
+          member,
+          access: readable
+            ? Assignment.Access.make({ assignments: records, roles, canManage })
+            : null,
+          canRemove,
+        };
       }),
     );
   });

@@ -1,16 +1,18 @@
 import { Actor, type Identity } from "@amends/core/identity";
 import { Journal, Store } from "@amends/core/journal";
-import { BuiltinRoles } from "@amends/core/authorization";
+import { BuiltinRoles, type Role } from "@amends/core/authorization";
+import { Identity as Identities } from "@amends/core/identity";
 import { Workspace, WorkspaceSettingsApplication } from "@amends/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, Tracer } from "effect";
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
   bob,
   boundTo,
+  charlie,
   failingLate,
   future,
   journalLog,
@@ -49,6 +51,8 @@ const rename = (
       ),
     ),
   );
+const dave = Identities.Reference.cases.Human.make({ id: Identities.HumanId.make("dave") });
+const erin = Identities.Reference.cases.Human.make({ id: Identities.HumanId.make("erin") });
 export const workspaceSettings = (harness: Harness) => {
   const { core, runGateway } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: workspace settings`, () => {
@@ -148,6 +152,116 @@ export const workspaceSettings = (harness: Harness) => {
             }),
           ),
         ),
+    );
+    it.effect("member actions follow the delegation policy for every actor and target", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* Operations.createWorkspace(alice.id);
+            const join = Effect.fnUntraced(function* (identity: Identity.HumanId, roleId: Role.Id) {
+              const invitation = yield* Operations.invite(
+                workspace.id,
+                alice,
+                request(yield* future, identity, roleId),
+              );
+              return yield* Operations.acceptInvitation(
+                workspace.id,
+                identity,
+                invitation.details.id,
+              );
+            });
+            yield* join(bob.id, BuiltinRoles.AdministratorId);
+            yield* join(charlie.id, BuiltinRoles.ViewerId);
+            yield* join(dave.id, BuiltinRoles.AdministratorId);
+            const removed = yield* join(erin.id, BuiltinRoles.ViewerId);
+            yield* Operations.removeMember(workspace.id, alice, removed.id);
+            const summary = Effect.fnUntraced(function* (actor: Identity.MemberReference) {
+              const entries = yield* listing(workspace.id, actor);
+              return Object.fromEntries(
+                entries.map((entry) => [
+                  entry.member.identity.id,
+                  [
+                    entry.access ? "read" : "hidden",
+                    entry.access?.canManage ? "manage" : "",
+                    entry.canRemove ? "remove" : "",
+                    entry.access?.roles
+                      .filter((choice) => choice.assignable)
+                      .map((choice) => choice.role.id)
+                      .join("+") ?? "",
+                  ]
+                    .filter(Boolean)
+                    .join(" "),
+                ]),
+              );
+            });
+            const viewer = BuiltinRoles.ViewerId,
+              both = `${BuiltinRoles.ViewerId}+${BuiltinRoles.AdministratorId}`;
+            expect({
+              owner: yield* summary(alice),
+              administrator: yield* summary(bob),
+              viewer: yield* summary(charlie),
+            }).toEqual({
+              // The owner manages and removes everyone but themselves and closed memberships.
+              owner: {
+                alice: `read ${both}`,
+                bob: `read manage remove ${both}`,
+                charlie: `read manage remove ${both}`,
+                dave: `read manage remove ${both}`,
+                erin: `read ${both}`,
+              },
+              // An administrator manages Viewers only, may leave, and grants only Viewer.
+              administrator: {
+                alice: `read ${viewer}`,
+                bob: `read remove ${viewer}`,
+                charlie: `read manage remove ${viewer}`,
+                dave: `read ${viewer}`,
+                erin: `read ${viewer}`,
+              },
+              viewer: { alice: "read", bob: "read", charlie: "read", dave: "read", erin: "read" },
+            });
+          }),
+        ),
+      ),
+    );
+    it.effect("lists members with one assignment read each and a fixed number of other reads", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* Operations.createWorkspace(alice.id);
+            // Count core spans by name, whatever the adapter underneath.
+            const counted = Effect.fnUntraced(function* () {
+              const counts = new Map<string, number>();
+              yield* listing(workspace.id, alice).pipe(
+                Effect.withTracer(
+                  Tracer.make({
+                    span(options) {
+                      counts.set(options.name, (counts.get(options.name) ?? 0) + 1);
+                      return Tracer.nativeTracer.span(options);
+                    },
+                  }),
+                ),
+              );
+              return (name: string) => counts.get(name) ?? 0;
+            });
+            const small = yield* counted();
+            for (const index of [1, 2, 3, 4, 5, 6]) {
+              const identity = Identities.HumanId.make(`member-${index}`);
+              const invitation = yield* Operations.invite(
+                workspace.id,
+                alice,
+                request(yield* future, identity),
+              );
+              yield* Operations.acceptInvitation(workspace.id, identity, invitation.details.id);
+            }
+            const large = yield* counted();
+            expect(large("Delegation.assignmentsFor") - small("Delegation.assignmentsFor")).toBe(6);
+            for (const name of ["GrantResolver.resolve", "Delegation.loadRole"])
+              expect({ name, reads: large(name) }).toEqual({ name, reads: small(name) });
+          }),
+        ),
+      ),
     );
     it.effect("guards store updates and rolls back a failed rename with its fact", () =>
       harness.withStorage((storage) =>

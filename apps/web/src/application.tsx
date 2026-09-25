@@ -37,7 +37,7 @@ function ThemedApplication(props: ApplicationProps) {
         <ErrorBoundary
           fallback={
             <StandalonePage account={false}>
-              <EmptyState.Root>
+              <EmptyState.Root size="page">
                 <Drawing.Snapped />
                 <EmptyState.Text>
                   <EmptyState.Title as="h1">Something went wrong</EmptyState.Title>

@@ -57,7 +57,7 @@ function ValidatedSession(props: ParentProps) {
       <Match when={directory.state()._tag === "Ready"}>{props.children}</Match>
       <Match when={directory.state()._tag === "Failed"}>
         <StandalonePage>
-          <EmptyState.Root>
+          <EmptyState.Root size="page">
             <Drawing.Disconnected />
             <EmptyState.Text>
               <EmptyState.Title as="h1">Can’t reach your workspace host</EmptyState.Title>
@@ -73,7 +73,7 @@ function ValidatedSession(props: ParentProps) {
       </Match>
       <Match when={true}>
         <StandalonePage>
-          <EmptyState.Root>
+          <EmptyState.Root size="page">
             <EmptyState.Text>
               <EmptyState.Title as="h1">Checking your session</EmptyState.Title>
               <EmptyState.Description role="status">

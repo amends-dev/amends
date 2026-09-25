@@ -20,6 +20,7 @@ it("composes a decorative drawing, a heading at the caller's level, and actions"
     </EmptyState.Root>
   ));
   expect(container.firstElementChild).toHaveClass("consumer");
+  expect(container.firstElementChild).toHaveAttribute("data-size", "region");
   expect(container.firstElementChild).not.toHaveAttribute("role");
   expect(screen.getByRole("heading", { level: 1, name: "Nothing at this address" })).toBeVisible();
   const drawing = container.querySelector("svg");
@@ -43,4 +44,14 @@ it("defaults titles to h2 and names a drawing only when it carries meaning", () 
 });
 it("keeps its announced description and focused action through updates", async () => {
   await definePreview(preview).meta(meta).story(ReactiveRecovery).run();
+});
+it("marks a page-sized state for the heading scale", () => {
+  const { container } = render(() => (
+    <EmptyState.Root size="page">
+      <EmptyState.Text>
+        <EmptyState.Title as="h1">Checking your session</EmptyState.Title>
+      </EmptyState.Text>
+    </EmptyState.Root>
+  ));
+  expect(container.firstElementChild).toHaveAttribute("data-size", "page");
 });

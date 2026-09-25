@@ -12,14 +12,8 @@
       "@effect/platform-bun": "4.0.0-rc.115",
       "@effect/sql-pg": "4.0.0-rc.115",
       "effect": "4.0.0-rc.115",
-      "@effect/atom-react": "4.0.0-rc.115",
       "@effect/atom-solid": "4.0.0-rc.115",
       "@solidjs/router": "0.15.4",
-      "@solidjs/meta": "0.29.4",
-      "@solid-primitives/event-listener": "2.4.5",
-      "@solid-primitives/keyed": "1.5.3",
-      "@solid-primitives/map": "0.7.4",
-      "@solid-primitives/resize-observer": "2.1.5",
       "@effect/vitest": "4.0.0-rc.115"
     }
   },

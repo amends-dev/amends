@@ -51,6 +51,39 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/authorization/delegation/Service",
 ) {}
 
+/** One member an actor would change the roles of, or remove when `selfRemoval` is set. */
+export interface Recipient {
+  readonly workspaceId: Workspace.Id;
+  readonly memberId: Member.Id;
+  readonly ownerId: Member.Id;
+  readonly actorId: Member.Id;
+  readonly selfRemoval: boolean;
+}
+/** Whether the rule depends on the recipient's assignments, so callers read them only then. */
+export const recipientNeedsAssignments = (recipient: Recipient) =>
+  recipient.memberId !== recipient.ownerId &&
+  recipient.actorId !== recipient.ownerId &&
+  !(recipient.selfRemoval && recipient.actorId === recipient.memberId);
+/**
+ * The delegation rule `requireRecipient` enforces, for callers deciding many members at once.
+ * The owner is never a recipient. The owner may act on anyone else, and a member may leave.
+ * Otherwise only Viewer-only or unassigned members are ordinary recipients: direct grants and
+ * unfamiliar roles require the owner, rather than guessing their authority.
+ */
+export const recipientDenial = (
+  recipient: Recipient,
+  assignments: ReadonlyArray<Assignment.Record>,
+): OwnerProtected | Denied | undefined => {
+  if (recipient.memberId === recipient.ownerId)
+    return new OwnerProtected({ workspaceId: recipient.workspaceId });
+  if (!recipientNeedsAssignments(recipient)) return undefined;
+  return assignments.some(
+    ({ source }) => source._tag !== "Role" || source.roleId !== BuiltinRoles.ViewerId,
+  )
+    ? new Denied({ reason: "protected-member" })
+    : undefined;
+};
+
 /** @category constructors */
 export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   Interface,
@@ -147,19 +180,18 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     selfRemoval = false,
   ) {
     yield* authorization.require([]);
-    const ownerId = yield* owner();
-    if (memberId === ownerId) return yield* new OwnerProtected({ workspaceId });
-    const actorId = (yield* Actor.Service).memberId;
-    if (actorId === ownerId || (selfRemoval && actorId === memberId)) return;
-    // Only Viewer-only or unassigned members are ordinary recipients. Direct
-    // grants and unfamiliar roles require the owner, rather than guessing their authority.
-    const records = yield* assignmentsFor(memberId);
-    if (
-      records.some(
-        ({ source }) => source._tag !== "Role" || source.roleId !== BuiltinRoles.ViewerId,
-      )
-    )
-      return yield* new Denied({ reason: "protected-member" });
+    const recipient: Recipient = {
+      workspaceId,
+      memberId,
+      ownerId: yield* owner(),
+      actorId: (yield* Actor.Service).memberId,
+      selfRemoval,
+    };
+    const denial = recipientDenial(
+      recipient,
+      recipientNeedsAssignments(recipient) ? yield* assignmentsFor(memberId) : [],
+    );
+    if (denial) return yield* denial;
   });
   const requireRemoval = Effect.fn("Delegation.requireRemoval")(function* (memberId: Member.Id) {
     yield* requireRecipient(memberId, true);

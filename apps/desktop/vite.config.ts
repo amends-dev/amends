@@ -13,8 +13,9 @@ export default defineConfig({
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
   },
-  // Use a WebKit-compatible baseline for the native webview.
-  build: { target: "safari13" },
+  // The oldest WebKit the bundle runs on: CSS color-mix() needs Safari 16.2. esbuild lowers syntax
+  // to this target but adds no API polyfills, so it must match what the code actually uses.
+  build: { target: "safari16.2" },
   test: {
     name: "@amends/desktop",
     environment: "happy-dom",

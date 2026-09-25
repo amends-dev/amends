@@ -10,8 +10,10 @@ in `em` so the definitions can also be consumed as CSS.
 | `heading` | Instrument Serif | `1.875rem` (30px at a 16px root)  | 400    | 1.1         | `-0.015em`     |
 | `mono`    | IBM Plex Mono    | `0.8125rem` (13px at a 16px root) | 400    | 1.5         | `0em`          |
 
-All three styles are normal, not italic. This slice loads only the Latin subset at weight
-400 for each family. Additional roles, weights, italics, and language subsets remain future
+All three styles are normal, not italic. This slice loads the Latin subset at weight 400 for
+each family, plus IBM Plex Sans at 600, the emphasis weight that ItemList titles, Shell sidebar
+labels, Popover titles, and human Avatar initials use. Without that face the browser would
+synthesize bold from 400. Additional roles, weights, italics, and language subsets remain future
 additions. The sans, serif, and mono stacks include system fallbacks for unavailable fonts
 and glyphs not covered by the selected subset.
 
@@ -65,6 +67,8 @@ Each story's browser `play` checks:
 
 - Load the three matching font faces through `document.fonts.load`, assert nonempty loaded
   results, and check their availability. A CSS family name alone does not prove font loading.
+  Also load IBM Plex Sans at 600 and require a face whose weight is 600, since a 400 face
+  also satisfies a 600 request.
 - Compare actual computed families, weights, sizes, line heights, and tracking with the
   exported definitions, using the current root size.
 - Check that the sample elements fit their containers without clipping or horizontal overflow.

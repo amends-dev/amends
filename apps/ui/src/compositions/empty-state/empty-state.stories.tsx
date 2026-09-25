@@ -81,6 +81,27 @@ function Recovery() {
     </Frame>
   );
 }
+/** A whole page's content, as the apps' unreachable-host state. */
+function Page(props: { theme?: "cotton" | "soot" }) {
+  return (
+    <ThemeProvider theme={props.theme ?? "cotton"}>
+      <Column style={{ padding: "3rem 1.5rem", "max-width": "28.25rem" }}>
+        <EmptyState.Root size="page">
+          <Drawing.Disconnected />
+          <EmptyState.Text>
+            <EmptyState.Title as="h1">Can’t reach your workspace host</EmptyState.Title>
+            <EmptyState.Description>
+              You’re still signed in. Try again once the host is running.
+            </EmptyState.Description>
+          </EmptyState.Text>
+          <EmptyState.Actions>
+            <Button>Try again</Button>
+          </EmptyState.Actions>
+        </EmptyState.Root>
+      </Column>
+    </ThemeProvider>
+  );
+}
 const meta = { title: "Compositions/EmptyState", render: () => <Failure /> } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -92,6 +113,14 @@ export const Comparison = {
       <Empty />
       <Failure theme="soot" />
       <Empty theme="soot" />
+    </Row>
+  ),
+} satisfies Story;
+export const PageSize = {
+  render: () => (
+    <Row align="start">
+      <Page />
+      <Page theme="soot" />
     </Row>
   ),
 } satisfies Story;

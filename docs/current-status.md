@@ -42,6 +42,10 @@ messages in batches, so their store reads do not grow with group size or page le
 reads only those it addresses. A start still publishes one participation fact per starting
 participant, so its storage work grows with its participants, by a few statements each.
 
+Member lists and the member-management listing resolve the reader's grants once for every
+member, and the listing loads role choices once. The listing still reads each listed member's
+assignments, one read per member; a batched assignment read across members would remove that.
+
 ## Design-system coverage
 
 The new [UI workshop](../apps/ui/README.md) contains four surface/text color

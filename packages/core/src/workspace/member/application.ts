@@ -155,24 +155,22 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const readable: Array<Member.Record> = [];
+    const all: Array<Member.Record> = [];
     for (const found of yield* members.list) {
       const member = yield* decodeMember(found);
       yield* requireWorkspace(workspaceId, member.workspaceId);
-      const allowed = yield* authorization
-        .require([
-          Requirement.make(
-            MemberPermissions.Read,
-            Target.Reference.cases.Member.make({ workspaceId, memberId: member.id }),
-          ),
-        ])
-        .pipe(
-          Effect.as(true),
-          Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
-        );
-      if (allowed) readable.push(member);
+      all.push(member);
     }
-    return readable;
+    // One grant resolution decides every member, rather than one per member.
+    const allowed = yield* authorization.permitted(
+      all.map((member) =>
+        Requirement.make(
+          MemberPermissions.Read,
+          Target.Reference.cases.Member.make({ workspaceId, memberId: member.id }),
+        ),
+      ),
+    );
+    return all.filter((_, index) => allowed[index]);
   }).pipe(Effect.withSpan("MemberApplication.list"));
 
   const remove = Effect.fn("MemberApplication.remove")(
