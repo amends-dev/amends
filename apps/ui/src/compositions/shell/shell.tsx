@@ -251,6 +251,18 @@ export function SidebarContent(props: JSX.HTMLAttributes<HTMLDivElement>) {
     <Column gap={4} {...native} class={classes(s.sidebarContent, local.class, local.classList)} />
   );
 }
+/** One mounted utility control: beside the expanded header, below the collapsed rail. */
+export function SidebarUtility(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  context();
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return (
+    <div
+      {...native}
+      data-shell-utility=""
+      class={classes(s.sidebarUtility, local.class, local.classList)}
+    />
+  );
+}
 export function SidebarFooter(props: JSX.HTMLAttributes<HTMLElement>) {
   context();
   const [local, native] = splitProps(props, ["class", "classList"]);

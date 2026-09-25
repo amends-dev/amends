@@ -53,6 +53,11 @@ inspector and mobile bottom bar are not included in this slice.
 
 ## Responsive behavior
 
+`SidebarUtility` is an optional direct child of Sidebar alongside Header, Content,
+and Footer. It holds one mounted control beside the expanded header and below the
+collapsed footer. The shared grid owns placement; app code supplies ordinary children.
+The same utility moves with the sidebar into its mobile drawer.
+
 - At 48rem and wider, the sidebar is 16rem wide; collapse leaves a 3.75rem icon rail.
   `defaultCollapsed` initializes the preference. `collapsed` with `onCollapsedChange`
   lets an application own or persist it. The shell itself stores nothing between mounts.

@@ -268,3 +268,8 @@ desktop validation are not configured. Tauri integration remains a later step.
 compound [ItemList](src/compositions/item-list/README.md), and controlled
 [CreateWorkspaceForm](src/features/workspaces/README.md). Each has isolated workshop
 coverage; connected state remains in features and pages remain in the apps.
+
+**Workspace shell** adds [ThemeChoice](src/features/appearance/README.md) and
+[AccountMenu](src/features/account/README.md), Popover's wide size, and Shell's
+SidebarUtility. The branded WorkspaceMark has shared palette tokens and contrast
+coverage. These remain presentation components; apps own routes and preferences.

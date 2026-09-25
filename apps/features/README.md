@@ -84,3 +84,12 @@ apply to creation/directory requests; losing a creation response lets the real
 commit finish before withholding its response. Fixtures create temporary data through
 HTTP and sign in through the normal development flow. See
 [workspace entry](../../docs/workspace-entry.md) for the ownership and recovery contract.
+
+## Account
+
+`@amends/features/account` connects the UI AccountMenu parts to session and
+appearance state. Compose Account.Root with Trigger and Content; place Identity,
+Appearance, Actions, Link, and SignOut inside. Mount under ClientProvider and
+AppearanceProvider. The apps supply destination hrefs and Shell placement. The
+account workshop signs in through the real backend and verifies that sign-out
+retains appearance. See [workspace shell](../../docs/workspace-shell.md).

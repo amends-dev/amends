@@ -122,8 +122,8 @@ descriptions, scrolling bodies, and actions. Controlled form recovery is demonst
 Toast provides provider-scoped queues, polite feedback, persistent actions, paused timers,
 and keyboard access, with dedicated dark-surface color pairings. Modal feedback uses a
 viewport inside that modal. Neither component is integrated into product flows or backend
-notifications. Product-shell integration, theme/collapse preference persistence, and
-component-level Tauri validation remain pending.
+notifications. Workspace-shell integration and theme persistence are implemented. Collapse preference
+persistence and component-level Tauri validation remain pending.
 Other foundations, additional font weights/subsets, and other production components remain
 unimplemented in UI.
 Each needed piece is introduced and verified separately, with Storybook coverage at every
@@ -133,8 +133,8 @@ layer. Both apps compose headless client state and UI presentation independently
 
 `ThemeProvider` supplies the shared color and body typography scope. Shell inherits
 it and provides page/region scrolling plus named content widths and centering.
-Web and desktop compose those parts without local styles; theme preferences and
-persistence remain application work.
+Web and desktop compose those parts without local styles. Appearance preferences
+are persisted per app origin; System follows operating-system appearance.
 
 [Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
 compose headless session/API state from [client](../apps/client/README.md) and
@@ -158,11 +158,13 @@ features. [Workspace entry](workspace-entry.md) records composition and recovery
 The picker lists active memberships and total members; creation refreshes the directory
 before navigation and retries uncertain submissions with the same key while mounted.
 Invitations have a count only; actions, richer directory metadata, remembered-workspace
-navigation, the workspace application shell, and domain pages remain unimplemented.
+navigation, and domain page content remain unimplemented. The app-owned
+[workspace shell](workspace-shell.md) now provides persistent navigation, nested
+page boundaries, and an account popup with appearance and sign-out controls.
 Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work. The removed legacy web screens remain available in Git history.
-Theme preferences, route focus management, Tauri signing/updates, production artwork,
+Route focus management, Tauri signing/updates, production artwork,
 and cross-platform installer verification are pending.
 
 ## Development data

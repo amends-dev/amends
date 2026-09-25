@@ -15,6 +15,16 @@ import { PlaceholderPage as Page } from "./placeholder-page.tsx";
 import { SignInPage } from "./pages/sign-in.tsx";
 import { WorkspacePickerPage } from "./pages/workspace-picker.tsx";
 import { CreateWorkspacePage } from "./pages/create-workspace.tsx";
+import { WorkspaceLayout } from "./workspace-layout.tsx";
+import {
+  HomePage,
+  TriagePage,
+  TasksPage,
+  EnvironmentsPage,
+  ConnectionsPage,
+  SettingsPage,
+  MissingWorkspacePage,
+} from "./pages/workspace.tsx";
 
 function SessionActions() {
   const session = useSession();
@@ -79,13 +89,12 @@ function SignInRoute() {
     </Switch>
   );
 }
-function WorkspaceRoute() {
+function WorkspaceRoute(props: ParentProps) {
   const params = useParams<{ workspaceId: string }>();
   const workspace = useWorkspace(() => params.workspaceId);
   return (
     <Show
-      when={workspace()}
-      keyed
+      when={workspace() !== undefined}
       fallback={
         <Page
           title="Workspace unavailable"
@@ -95,14 +104,7 @@ function WorkspaceRoute() {
         </Page>
       }
     >
-      {(membership) => (
-        <Page
-          title={membership.workspace.name}
-          message="This workspace is ready for its application pages."
-        >
-          <SessionActions />
-        </Page>
-      )}
+      <WorkspaceLayout>{props.children}</WorkspaceLayout>
     </Show>
   );
 }
@@ -114,7 +116,15 @@ export function ApplicationRoutes() {
       <Route component={RequireSession}>
         <Route path={paths.workspaces} component={WorkspacePickerPage} />
         <Route path={paths.createWorkspace} component={CreateWorkspacePage} />
-        <Route path="/workspaces/:workspaceId" component={WorkspaceRoute} />
+        <Route path="/workspaces/:workspaceId" component={WorkspaceRoute}>
+          <Route path="/" component={HomePage} />
+          <Route path="/triage" component={TriagePage} />
+          <Route path="/tasks" component={TasksPage} />
+          <Route path="/environments" component={EnvironmentsPage} />
+          <Route path="/connections" component={ConnectionsPage} />
+          <Route path="/settings" component={SettingsPage} />
+          <Route path="*missing" component={MissingWorkspacePage} />
+        </Route>
       </Route>
       <Route
         path="*unmatched"

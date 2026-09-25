@@ -67,6 +67,11 @@ for (const [theme, palette] of Object.entries(colors)) {
         expect(new Color(pair.text).contrastWCAG21(pair.surface)).toBeGreaterThanOrEqual(4.5);
       });
     }
+    it("keeps branded workspace initials readable", () => {
+      expect(
+        new Color(palette.workspaceMark.text).contrastWCAG21(palette.workspaceMark.surface),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
     for (const state of ["fill", "fillHover", "fillPressed"] as const) {
       it(`keeps danger action labels readable on ${state}`, () => {
         const action = palette.action.danger;

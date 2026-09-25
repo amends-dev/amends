@@ -12,12 +12,20 @@ export type WorkspaceMarkProps = Omit<
   Name & {
     /** Caller-owned initials. The full workspace name belongs in adjacent text or aria-label. */
     children: string;
+    variant?: "neutral" | "brand";
   };
 export function WorkspaceMark(props: WorkspaceMarkProps) {
-  const [local, native] = splitProps(props, ["children", "decorative", "class", "classList"]);
+  const [local, native] = splitProps(props, [
+    "children",
+    "decorative",
+    "class",
+    "classList",
+    "variant",
+  ]);
   return (
     <span
       {...native}
+      data-variant={local.variant ?? "neutral"}
       role={local.decorative ? undefined : "img"}
       aria-hidden={local.decorative ? true : undefined}
       class={classes(s.root, local.class, local.classList)}

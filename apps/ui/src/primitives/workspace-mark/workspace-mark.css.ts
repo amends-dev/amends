@@ -20,6 +20,13 @@ export const root = style({
   lineHeight: 1,
   overflow: "hidden",
   whiteSpace: "nowrap",
-  selectors: { "&[hidden]": { display: "none" } },
+  selectors: {
+    "&[hidden]": { display: "none" },
+    '&[data-variant="brand"]': {
+      backgroundColor: colorVars.workspaceMark.surface,
+      color: colorVars.workspaceMark.text,
+      borderColor: "transparent",
+    },
+  },
   "@media": { "(forced-colors: active)": { borderColor: "CanvasText" } },
 });

@@ -32,6 +32,8 @@ export interface ActionToneColors {
 
 /** Semantic colors. Disabled text is only for inactive controls; seams are decorative. */
 export interface ColorTokens {
+  /** The sole branded identity surface, shared by both themes. */
+  readonly workspaceMark: { readonly surface: string; readonly text: string };
   /** Neutral identity treatments. Agent avatars use text.secondary and line.control on the parent surface. */
   readonly avatar: Readonly<
     Record<"human" | "contact" | "system", { readonly surface: string; readonly text: string }>
@@ -130,6 +132,7 @@ const toastColors = {
 } as const;
 
 export const cotton = {
+  workspaceMark: { surface: "oklch(0.56 0.13 42)", text: "oklch(0.99 0.01 90)" },
   avatar: {
     human: { surface: "oklch(0.88 0.018 86)", text: "oklch(0.32 0.014 84)" },
     contact: { surface: "oklch(0.9 0.014 88)", text: "oklch(0.4 0.014 84)" },
@@ -180,6 +183,7 @@ export const cotton = {
 } as const satisfies ColorTokens;
 
 export const soot = {
+  workspaceMark: cotton.workspaceMark,
   avatar: {
     human: { surface: "oklch(0.31 0.012 86)", text: "oklch(0.95 0.006 90)" },
     contact: { surface: "oklch(0.29 0.012 88)", text: "oklch(0.9 0.008 86)" },

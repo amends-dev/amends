@@ -4,7 +4,7 @@ Tauri 2 desktop application composing the independent [client](../client/README.
 and [UI](../ui/README.md) packages.
 It uses hash routing, webview session persistence, and the existing Bun host over HTTP.
 The app owns sign-in, workspace picker, and creation pages over shared feature parts.
-Workspace content remains a placeholder. Desktop does not start a backend process or use native commands/plugins.
+Workspace pages share the persistent sidebar layout. Desktop does not start a backend process or use native commands/plugins.
 
 ## Run and verify
 
@@ -92,3 +92,9 @@ in UI before app consumption; `check:packages` rejects app-local styles.
 
 The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
 composition, idempotent retry, directory refresh, and the remaining invitation scope.
+
+The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
+routes and the account popup. Home, Triage, Tasks, Environments, Connections, and
+Settings have page boundaries with placeholder content. `src/appearance.ts` supplies
+local preference persistence and system appearance; Application wraps the session
+with AppearanceProvider and applies the resolved theme through ThemeProvider.

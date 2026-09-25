@@ -4,7 +4,7 @@ Solid/Vite browser application composing the independent [client](../client/READ
 and [UI](../ui/README.md) packages.
 It supplies browser-history routing, API configuration, and browser session persistence.
 The app owns its sign-in page, composing UI primitives and the shared `SignIn`
-feature parts. The workspace picker and creation pages use shared feature parts; workspace content remains a placeholder.
+feature parts. The workspace picker and creation pages use shared feature parts; workspace pages share the persistent sidebar layout.
 
 ## Run and verify
 
@@ -66,3 +66,9 @@ in UI before app consumption; `check:packages` rejects app-local styles.
 
 The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
 composition, idempotent retry, directory refresh, and the remaining invitation scope.
+
+The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
+routes and the account popup. Home, Triage, Tasks, Environments, Connections, and
+Settings have page boundaries with placeholder content. `src/appearance.ts` supplies
+local preference persistence and system appearance; Application wraps the session
+with AppearanceProvider and applies the resolved theme through ThemeProvider.

@@ -1,5 +1,6 @@
 import { Router } from "@solidjs/router";
 import { createBrowserSessionStore, resolveApiBaseUrl } from "@amends/client";
+import { createAppearanceSource } from "./appearance.ts";
 import { Application } from "./application.tsx";
 import { ApplicationRoutes } from "./routes.tsx";
 
@@ -9,7 +10,11 @@ export function App() {
     window.location.href,
   );
   return (
-    <Application apiBaseUrl={apiBaseUrl} sessionStore={createBrowserSessionStore(apiBaseUrl)}>
+    <Application
+      appearanceSource={createAppearanceSource()}
+      apiBaseUrl={apiBaseUrl}
+      sessionStore={createBrowserSessionStore(apiBaseUrl)}
+    >
       <Router>
         <ApplicationRoutes />
       </Router>

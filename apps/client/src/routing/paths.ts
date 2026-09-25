@@ -1,8 +1,17 @@
+export type WorkspacePage =
+  | "home"
+  | "triage"
+  | "tasks"
+  | "environments"
+  | "connections"
+  | "settings";
 export const paths = {
   signIn: "/sign-in",
   workspaces: "/workspaces",
   createWorkspace: "/workspaces/new",
   workspace: (id: string) => `/workspaces/${encodeURIComponent(id)}`,
+  workspacePage: (id: string, page: WorkspacePage) =>
+    `/workspaces/${encodeURIComponent(id)}${page === "home" ? "" : `/${page}`}`,
 } as const;
 
 /** Only internal protected destinations can be resumed after authentication. */
@@ -12,7 +21,12 @@ export function returnPath(value: string | undefined): string {
   const url = new URL(value, "https://amends.invalid");
   if (
     url.origin !== "https://amends.invalid" ||
-    !(url.pathname === paths.workspaces || /^\/workspaces\/[^/]+$/.test(url.pathname))
+    !(
+      url.pathname === paths.workspaces ||
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings))?$/.test(
+        url.pathname,
+      )
+    )
   )
     return paths.workspaces;
   return `${url.pathname}${url.search}${url.hash}`;

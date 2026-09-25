@@ -66,7 +66,7 @@ export function Trigger<T extends ValidComponent = "button">(
 export type ContentProps = Omit<
   PolymorphicProps<"div", Primitive.PopoverContentProps<"div">>,
   "tabIndex"
->;
+> & { size?: "regular" | "wide" };
 /** Portaled surface that inherits its trigger's colors and direction. Give it a Title or aria-label. */
 export function Content(props: ContentProps) {
   const context = Primitive.usePopoverContext();
@@ -74,12 +74,13 @@ export function Content(props: ContentProps) {
   if (!anchor) throw new Error("Popover.Content requires Popover.Root");
   const scope = createOverlayScope(anchor.anchor);
   createEffect(on(scope.mount, () => context.close(), { defer: true }));
-  const [local, native] = splitProps(props, ["class", "classList"]);
+  const [local, native] = splitProps(props, ["class", "classList", "size"]);
   return (
     <Primitive.Portal mount={scope.mount()}>
       <div style={scope.style()} dir={scope.direction()}>
         <Primitive.Content
           {...native}
+          data-size={local.size ?? "regular"}
           tabIndex={0}
           class={classes(s.content, local.class, local.classList)}
         />

@@ -25,6 +25,7 @@ export const content = style([
     fontFamily: fontFamilies.sans,
     boxShadow: "0 2px 4px oklch(0.24 0.014 84 / 0.06), 0 10px 28px oklch(0.24 0.014 84 / 0.1)",
     outline: "none",
+    selectors: { '&[data-size="wide"]': { width: "18.75rem" } },
     "@media": {
       "(forced-colors: active)": {
         backgroundColor: "Canvas",

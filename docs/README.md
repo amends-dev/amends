@@ -40,6 +40,7 @@ drawings, generation, and visual review in the UI workshop.
   connected-feature boundary. [Sign-in](sign-in-design.md) applies it to
   the first slice, including the UI pieces to introduce.
   [Workspace entry](workspace-entry.md) describes picker/creation ownership and recovery.
+  [Workspace shell](workspace-shell.md) covers nested routes, account controls, and appearance.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not

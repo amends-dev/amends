@@ -4,6 +4,7 @@ import { HashRouter } from "@solidjs/router";
 import { Session, type SessionStore } from "@amends/client";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
+import { colorThemes } from "@amends/ui/foundations/color/styles";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
 
@@ -171,9 +172,50 @@ it("opens creation from the picker and enters the created workspace through hash
   fireEvent.submit(screen.getByRole("form"));
   await screen.findByRole("heading", { name: "Studio" });
   expect(window.location.hash).toBe("#/workspaces/one");
-  fireEvent.click(screen.getByRole("link", { name: "Workspaces" }));
+  fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));
+  fireEvent.click(await screen.findByRole("link", { name: "Switch workspace" }));
   expect(await screen.findByRole("link", { name: "Studio 1 member · Owner" })).toHaveAttribute(
     "href",
     "#/workspaces/one",
   );
+});
+
+it("navigates workspace sections with persistent chrome and retains appearance after sign-out", async () => {
+  const listing = {
+    memberships: [
+      {
+        workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" },
+        member: {
+          id: "owner",
+          workspaceId: "one",
+          identity: { _tag: "Human", id: "alice" },
+          status: "active",
+        },
+        people: 1,
+      },
+    ],
+    invitations: [],
+  };
+  mount("/workspaces/one", "alice", () => Promise.resolve(response(listing)));
+  await screen.findByRole("heading", { name: "Home" });
+  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
+  fireEvent.click(screen.getByRole("link", { name: "Triage" }));
+  await screen.findByRole("heading", { name: "Triage" });
+  expect(window.location.hash).toBe("#/workspaces/one/triage");
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
+  fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));
+  const dark = await screen.findByRole("radio", { name: "Soot" });
+  fireEvent.click(dark);
+  expect(dark).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  await screen.findByRole("heading", { name: "Sign in to amends" });
+  expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftriage");
+  expect(
+    document.querySelector(
+      colorThemes.soot
+        .split(" ")
+        .map((name) => `.${name}`)
+        .join(""),
+    ),
+  ).not.toBeNull();
 });

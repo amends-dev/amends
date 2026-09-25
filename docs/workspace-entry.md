@@ -18,7 +18,8 @@ directory, and replaces the creation route with `/workspaces/:id`.
 
 The picker shows active memberships, total active members (humans and agents), and
 owner status. Removed memberships are not selectable. Unknown or removed workspace
-URLs reach the existing unavailable-access presentation. Pending invitations are
+URLs reach the existing unavailable-access presentation. Active workspaces open the
+[workspace shell](workspace-shell.md). Pending invitations are
 counted but have no actions in this slice.
 
 ## Creation and recovery

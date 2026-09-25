@@ -21,6 +21,8 @@ import { Button } from "@amends/ui/primitives/button";
 ```
 
 `Root` accepts controlled `open`/`onOpenChange`, uncontrolled `defaultOpen`, and placement.
+Content accepts `size="wide"` for a 300px panel at the default root size; the existing
+262px panel remains the default. Both sizes retain viewport constraints.
 The default placement is `bottom-start` with an 8px gutter. `Trigger` renders as the supplied
 Button or IconButton, or as a native button, producing one interactive element. Content should
 have a `Title` or an explicit `aria-label`; `Description` adds accessible supporting text.

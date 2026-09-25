@@ -149,3 +149,12 @@ it("remounts credential owners and ignores completions from obsolete or disposed
   current.replace(session("disposed"));
   expect(fixture.store.read()?.token).toBe("alice");
 });
+
+it("keeps only known nested workspace destinations in sign-in return paths", () => {
+  expect(returnPath("/workspaces/one/tasks?filter=mine#work")).toBe(
+    "/workspaces/one/tasks?filter=mine#work",
+  );
+  expect(returnPath("/workspaces/one/unknown")).toBe(paths.workspaces);
+  expect(returnPath("/workspaces/one/tasks/../../../sign-in")).toBe(paths.workspaces);
+  expect(paths.workspacePage("a/b", "triage")).toBe("/workspaces/a%2Fb/triage");
+});

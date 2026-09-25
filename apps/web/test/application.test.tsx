@@ -296,3 +296,46 @@ it("retains a created workspace through directory failure and navigates after re
   expect(history.get()).toBe("/workspaces/one");
   expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
+
+it("keeps the sidebar and account trigger mounted across workspace pages and switches", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(() =>
+    Promise.resolve(
+      response({
+        memberships: [membership("one", "Studio"), membership("two", "Other studio")],
+        invitations: [],
+      }),
+    ),
+  );
+  const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
+  await screen.findByRole("heading", { name: "Home" });
+  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
+  const trigger = screen.getByRole("button", { name: "Your account: alice" });
+  fireEvent.click(screen.getByRole("button", { name: "Collapse navigation" }));
+  fireEvent.click(screen.getByRole("link", { name: "Tasks" }));
+  await screen.findByRole("heading", { name: "Tasks" });
+  expect(history.get()).toBe("/workspaces/one/tasks");
+  expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
+  expect(screen.getByRole("button", { name: "Your account: alice" })).toBe(trigger);
+  expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
+  history.set({ value: "/workspaces/two/settings", scroll: false });
+  await screen.findByRole("heading", { name: "Settings" });
+  expect(sidebar).toHaveTextContent("Other studio");
+  expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+it("preserves a nested destination through sign-in and denies unavailable workspace children", async () => {
+  const fixture = memoryStore();
+  const history = mount("/workspaces/one/tasks?filter=mine", fixture.store, () =>
+    Promise.resolve(response(directory)),
+  );
+  await screen.findByRole("heading", { name: "Sign in to amends" });
+  expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftasks%3Ffilter%3Dmine");
+  fixture.change(session("alice"));
+  await screen.findByRole("heading", { name: "Workspace unavailable" });
+  expect(
+    screen.queryByRole("complementary", { name: "Workspace sidebar" }),
+  ).not.toBeInTheDocument();
+  expect(history.get()).toBe("/workspaces/one/tasks?filter=mine");
+});

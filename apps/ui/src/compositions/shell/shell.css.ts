@@ -31,8 +31,22 @@ export const sidebarFrame = style({
   height: "100%",
   minHeight: 0,
   backgroundColor: colorVars.surface.canvas,
+  selectors: {
+    "&:has(> [data-shell-utility])": {
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 1fr) auto",
+      gridTemplateRows: "auto minmax(0, 1fr) auto",
+      gridTemplateAreas: '"header utility" "content content" "footer footer"',
+    },
+    '&[data-compact="true"]:has(> [data-shell-utility])': {
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gridTemplateRows: "auto minmax(0, 1fr) auto auto",
+      gridTemplateAreas: '"header" "content" "footer" "utility"',
+    },
+  },
 });
 export const sidebarHeader = style({
+  gridArea: "header",
   flexShrink: 0,
   padding: space[2],
   paddingTop: `max(${space[3]}, env(safe-area-inset-top))`,
@@ -41,6 +55,7 @@ export const sidebarHeader = style({
 });
 export const headerContent = style({ flex: 1, minWidth: 0 });
 export const sidebarContent = style({
+  gridArea: "content",
   flex: 1,
   minHeight: 0,
   overflowY: "auto",
@@ -48,10 +63,18 @@ export const sidebarContent = style({
   padding: space[2],
 });
 export const sidebarFooter = style({
+  gridArea: "footer",
   flexShrink: 0,
   padding: space[2],
   paddingBottom: `max(${space[2]}, env(safe-area-inset-bottom))`,
   borderTop: `1px dashed ${colorVars.line.seam}`,
+});
+export const sidebarUtility = style({
+  gridArea: "utility",
+  alignSelf: "center",
+  minWidth: 0,
+  padding: space[2],
+  selectors: { "&[hidden]": { display: "none" } },
 });
 export const sidebarLabel = style({
   minWidth: 0,

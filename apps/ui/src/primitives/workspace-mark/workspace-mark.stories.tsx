@@ -26,6 +26,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Comparison = {} satisfies Story;
+export const Brand = {
+  render: () => (
+    <For each={["cotton", "soot"] as const}>
+      {(theme) => (
+        <ThemeProvider theme={theme}>
+          <Row gap={4} style={{ padding: "1.5rem" }}>
+            <WorkspaceMark variant="brand" decorative>
+              A
+            </WorkspaceMark>
+            <Text>Acme Finance</Text>
+          </Row>
+        </ThemeProvider>
+      )}
+    </For>
+  ),
+} satisfies Story;
 export const Enlarged = {
   render: () => (
     <ThemeProvider theme="cotton">

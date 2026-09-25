@@ -16,7 +16,10 @@ The legacy UI implementation and `design-system` workspace were removed. The cur
 screens, routes, sessions, API integrations, and their tests were removed with
 that reset. Both apps compose the independent client and UI packages. They own route
 trees and page composition, while client owns session/API state. Each app has its own
-sign-in page over the shared declarative feature. Workspace pages remain placeholders.
+sign-in, workspace picker, and creation pages over shared declarative features.
+Workspace pages use the persistent Shell/Navigation layout and connected account popup;
+their domain content remains scaffolding. Appearance state is headless, with platform
+persistence and system appearance supplied by each app. See [workspace shell](../docs/workspace-shell.md).
 
 The [feature development flow](../docs/feature-development.md) uses the shared
 `features` package for connected interactions and their own workshop.

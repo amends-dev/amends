@@ -293,3 +293,8 @@ Human/contact fills are soft silhouettes; system uses inverse ink. Agent avatars
 transparent and use the existing control border and secondary text. Both themes' filled
 text pairs are tested at 4.5:1 and checked for sRGB gamut. **Foundations / Color / Avatar**
 shows the actual values and pairings; the primitive's stories show their shapes and usage.
+
+`workspaceMark.surface` and `workspaceMark.text` carry the Shell reference's
+persimmon identity treatment in both themes. Their 4.78:1 text contrast is tested;
+Foundations / Color / Workspace mark displays the actual variables. These roles
+are for workspace identity, not action or status colors.

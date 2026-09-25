@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./account": "./src/account/index.ts",
     "./workspaces": "./src/workspaces/index.ts",
     "./sign-in": "./src/sign-in/index.ts"
   },
