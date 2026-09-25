@@ -1,13 +1,22 @@
-import { splitProps, type JSX } from "solid-js";
+import { createSignal, onCleanup, onMount, splitProps, type JSX } from "solid-js";
 import { classes } from "../../primitives/internal/props.ts";
 import * as s from "./list-detail.css.ts";
 /** Selection belongs to the caller. At narrow widths only the selected detail is displayed. */
 export function Root(props: JSX.HTMLAttributes<HTMLDivElement> & { selected: boolean }) {
   const [local, native] = splitProps(props, ["selected", "children", "class", "classList"]);
+  const [narrow, setNarrow] = createSignal(false);
+  onMount(() => {
+    const media = window.matchMedia("(max-width: 63.999rem)");
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    onCleanup(() => media.removeEventListener("change", update));
+  });
   return (
     <div
       {...native}
       data-selected={local.selected}
+      data-narrow={narrow()}
       class={classes(s.root, local.class, local.classList)}
     >
       <div class={s.grid}>{local.children}</div>

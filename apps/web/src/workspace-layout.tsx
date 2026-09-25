@@ -1,11 +1,11 @@
 import { paths, useWorkspace, type WorkspacePage } from "@amends/client";
 import { Account } from "@amends/features/account";
 import { Shell } from "@amends/ui/compositions/shell";
+import { PageHeader } from "@amends/ui/compositions/page-header";
 import { Navigation } from "@amends/ui/compositions/navigation";
 import { Divider } from "@amends/ui/primitives/divider";
 import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
-import { Text } from "@amends/ui/primitives/text";
-import { Row } from "@amends/ui/primitives/layout";
+import { Column, Row } from "@amends/ui/primitives/layout";
 import {
   IconMarkHome,
   IconMarkTriage,
@@ -15,7 +15,7 @@ import {
   IconMarkSettings,
 } from "@amends/icons";
 import { useLocation, useParams } from "@solidjs/router";
-import { createEffect, on, type JSX, type ParentProps } from "solid-js";
+import { createEffect, on, Show, type JSX, type ParentProps } from "solid-js";
 
 const labels: Record<WorkspacePage, string> = {
   home: "Home",
@@ -59,13 +59,55 @@ function ordinary(event: MouseEvent) {
     !event.altKey
   );
 }
+function AccountControl() {
+  const params = useParams<{ workspaceId: string }>();
+  const shell = Shell.useShell();
+  const close: JSX.EventHandler<HTMLAnchorElement, MouseEvent> = (event) => {
+    if (ordinary(event)) shell.closeNavigation();
+  };
+  return (
+    <Account.Root>
+      <Account.Trigger />
+      <Account.Content>
+        <Account.Identity />
+        <Divider.Line />
+        <Account.Appearance />
+        <Divider.Line />
+        <Account.Actions>
+          <Account.Link href={href(paths.workspaces)} onClick={close}>
+            Switch workspace
+          </Account.Link>
+          <Account.Link
+            href={href(paths.workspacePage(params.workspaceId, "settings"))}
+            onClick={close}
+          >
+            Settings
+          </Account.Link>
+          <Account.SignOut />
+        </Account.Actions>
+      </Account.Content>
+    </Account.Root>
+  );
+}
 /** App-owned composition. The route guard keeps this instance alive while membership remains active. */
 export function WorkspaceLayout(props: ParentProps) {
   const params = useParams<{ workspaceId: string }>(),
     location = useLocation(),
     shell = Shell.useShell();
   const membership = useWorkspace(() => params.workspaceId);
+  const settings = () =>
+    location.pathname.startsWith(paths.workspacePage(params.workspaceId, "settings"));
+  const settingsSection = () => {
+    const section = location.pathname.split("/").at(-1);
+    return section === "members" || section === "invites" ? section : "workspace";
+  };
   const title = () => {
+    if (settings())
+      return settingsSection() === "members"
+        ? "People"
+        : settingsSection() === "invites"
+          ? "Invites"
+          : "Workspace";
     const page = (Object.keys(labels) as WorkspacePage[]).find(
       (page) =>
         paths.workspacePage(params.workspaceId, page) === location.pathname.replace(/\/$/, "") ||
@@ -81,9 +123,6 @@ export function WorkspaceLayout(props: ParentProps) {
       { defer: true },
     ),
   );
-  const close: JSX.EventHandler<HTMLAnchorElement, MouseEvent> = (event) => {
-    if (ordinary(event)) shell.closeNavigation();
-  };
   return (
     <>
       <Shell.Sidebar aria-label="Workspace sidebar">
@@ -92,31 +131,14 @@ export function WorkspaceLayout(props: ParentProps) {
             <WorkspaceMark variant="brand" decorative>
               {Array.from(membership()?.workspace.name ?? "?")[0]?.toLocaleUpperCase() ?? "?"}
             </WorkspaceMark>
-            <Shell.SidebarLabel>{membership()?.workspace.name}</Shell.SidebarLabel>
+            <Column gap={0}>
+              <Shell.SidebarLabel>{membership()?.workspace.name}</Shell.SidebarLabel>
+              <Shell.SidebarSubtitle>workspace</Shell.SidebarSubtitle>
+            </Column>
           </Row>
         </Shell.SidebarHeader>
         <Shell.SidebarUtility>
-          <Account.Root>
-            <Account.Trigger />
-            <Account.Content>
-              <Account.Identity />
-              <Divider.Line />
-              <Account.Appearance />
-              <Divider.Line />
-              <Account.Actions>
-                <Account.Link href={href(paths.workspaces)} onClick={close}>
-                  Switch workspace
-                </Account.Link>
-                <Account.Link
-                  href={href(paths.workspacePage(params.workspaceId, "settings"))}
-                  onClick={close}
-                >
-                  Settings
-                </Account.Link>
-                <Account.SignOut />
-              </Account.Actions>
-            </Account.Content>
-          </Account.Root>
+          <AccountControl />
         </Shell.SidebarUtility>
         <Shell.SidebarContent>
           <Navigation.Root aria-label="Workspace">
@@ -142,27 +164,66 @@ export function WorkspaceLayout(props: ParentProps) {
               <WorkspaceLink page="connections" label="Connections">
                 <IconMarkConnections />
               </WorkspaceLink>
+              <WorkspaceLink page="settings" label="Settings">
+                <IconMarkSettings />
+              </WorkspaceLink>
             </Navigation.Section>
           </Navigation.Root>
         </Shell.SidebarContent>
-        <Shell.SidebarFooter>
-          <Navigation.Root aria-label="Workspace settings">
+      </Shell.Sidebar>
+      <Shell.Rail aria-label="Workspace rail">
+        <WorkspaceMark variant="brand" decorative>
+          {Array.from(membership()?.workspace.name ?? "?")[0]?.toLocaleUpperCase() ?? "?"}
+        </WorkspaceMark>
+        <Shell.NavigationToggle mode="tablet" />
+        <Shell.RailContent>
+          <Navigation.Root compact aria-label="Workspace shortcuts">
+            <WorkspaceLink page="home" label="Home">
+              <IconMarkHome />
+            </WorkspaceLink>
+            <WorkspaceLink page="triage" label="Triage">
+              <IconMarkTriage />
+            </WorkspaceLink>
+            <WorkspaceLink page="tasks" label="Tasks">
+              <IconMarkTasks />
+            </WorkspaceLink>
+            <WorkspaceLink page="environments" label="Environments">
+              <IconMarkEnvironments />
+            </WorkspaceLink>
+            <WorkspaceLink page="connections" label="Connections">
+              <IconMarkConnections />
+            </WorkspaceLink>
             <WorkspaceLink page="settings" label="Settings">
               <IconMarkSettings />
             </WorkspaceLink>
           </Navigation.Root>
-        </Shell.SidebarFooter>
-      </Shell.Sidebar>
+        </Shell.RailContent>
+        <Shell.RailFooter>
+          <AccountControl />
+        </Shell.RailFooter>
+      </Shell.Rail>
       <Shell.Body>
-        <Shell.Header>
-          <Row gap={3}>
-            <Shell.NavigationToggle />
-            <Text as="h1" variant="heading">
-              {title()}
-            </Text>
-          </Row>
+        <Shell.Header workspace>
+          <PageHeader.Root>
+            <Show when={settings()}>
+              <PageHeader.Crumbs>
+                <PageHeader.Navigation>
+                  <Shell.NavigationToggle mode="phone" />
+                </PageHeader.Navigation>
+                Configure / Settings
+              </PageHeader.Crumbs>
+            </Show>
+            <PageHeader.Heading>
+              <Show when={!settings()}>
+                <PageHeader.Navigation>
+                  <Shell.NavigationToggle mode="phone" />
+                </PageHeader.Navigation>
+              </Show>
+              <PageHeader.Title>{title()}</PageHeader.Title>
+            </PageHeader.Heading>
+          </PageHeader.Root>
         </Shell.Header>
-        <Shell.Main aria-label={title()}>
+        <Shell.Main workspace aria-label={title()}>
           <Shell.Content>{props.children}</Shell.Content>
         </Shell.Main>
       </Shell.Body>

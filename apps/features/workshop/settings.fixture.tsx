@@ -8,7 +8,7 @@ import {
 import * as Settings from "@amends/features/settings";
 import { WorkspacePicker } from "@amends/features/workspaces";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
-import { SectionNav } from "@amends/ui/compositions/section-nav";
+import { SegmentedControl } from "@amends/ui/compositions/segmented-control";
 import { ListDetail } from "@amends/ui/compositions/list-detail";
 import { Column, Row, Container } from "@amends/ui/primitives/layout";
 import { Button } from "@amends/ui/primitives/button";
@@ -179,27 +179,30 @@ export function SettingsFixture(props: {
                           when={picker()}
                           fallback={
                             <>
-                              <SectionNav.Root aria-label="Settings sections">
-                                <For each={["workspace", "members", "invites"] as const}>
-                                  {(name) => (
-                                    <SectionNav.Link
-                                      href={`#${name}`}
-                                      aria-current={section() === name ? "page" : undefined}
-                                      onClick={(event) => {
-                                        event.preventDefault();
-                                        setSection(name);
-                                        setMember("");
-                                      }}
-                                    >
-                                      {name === "workspace"
-                                        ? "Workspace"
-                                        : name === "members"
-                                          ? "Members"
-                                          : "Invites"}
-                                    </SectionNav.Link>
-                                  )}
-                                </For>
-                              </SectionNav.Root>
+                              <SegmentedControl.Root
+                                aria-label="Settings sections"
+                                value={section()}
+                                onValueChange={(name) => {
+                                  if (
+                                    name !== "workspace" &&
+                                    name !== "members" &&
+                                    name !== "invites"
+                                  )
+                                    return;
+                                  setSection(name);
+                                  setMember("");
+                                }}
+                              >
+                                <SegmentedControl.Item value="members">
+                                  People
+                                </SegmentedControl.Item>
+                                <SegmentedControl.Item value="invites">
+                                  Invites
+                                </SegmentedControl.Item>
+                                <SegmentedControl.Item value="workspace">
+                                  Workspace
+                                </SegmentedControl.Item>
+                              </SegmentedControl.Root>
                               <Settings.Root workspaceId={workspaceId()} section={section()}>
                                 <Column gap={6}>
                                   <Show when={section() === "workspace"}>

@@ -2,7 +2,7 @@
 
 A declarative application frame for the shared web and desktop frontend. The shell owns
 the sidebar, header, main scrolling area, and optional footer. Page content uses the existing
-Container, Row, Column, and Grid primitives, with `Shell.Content` for a named width
+Container, Row, Column, and Grid primitives, with `Shell.Content` for a fluid page or named width
 and optional vertical centering inside Main. Theme and body typography come from
 an enclosing [ThemeProvider](../../foundations/theme/README.md); Shell inherits them.
 
@@ -49,7 +49,7 @@ import { ThemeProvider } from "@amends/ui/foundations/theme";
 Slots accept children and native attributes; there are no navigation-item, sidebar, header,
 or content props. Load typography fonts at the application entry point. The sidebar uses Soot
 even when the main content uses Cotton, following the Shell v2 reference. The reference's
-inspector and mobile bottom bar are not included in this slice.
+inspector is not included in this slice.
 
 ## Responsive behavior
 
@@ -58,12 +58,21 @@ and Footer. It holds one mounted control beside the expanded header and below th
 collapsed footer. The shared grid owns placement; app code supplies ordinary children.
 The same utility moves with the sidebar into its mobile drawer.
 
-- At 48rem and wider, the sidebar is 16rem wide; collapse leaves a 3.75rem icon rail.
+`Inspector` is an optional sibling after Body. Compose its content as children and
+control `open`/`onOpenChange` from the owning page. At 1280px and wider it reserves
+400px beside the content. Below 1280px the same mounted content moves into a modal
+sheet at the inline end; on phones the sheet fills the width. The page supplies a
+visible close action. Its `title` names the aside and modal, and `returnFocus` can
+point to the page's opener.
+
+- At 64rem and wider, the sidebar is 16rem wide; optional manual collapse leaves a 3.75rem icon rail.
   `defaultCollapsed` initializes the preference. `collapsed` with `onCollapsedChange`
   lets an application own or persist it. The shell itself stores nothing between mounts.
-- Below 48rem, the same toggle becomes a hamburger and opens a modal Drawer from the
-  inline start edge. Returning to desktop closes the drawer and restores the desktop
-  preference. RTL puts the sidebar and drawer on the right.
+- From 48rem to below 64rem, a persistent 3.75rem rail accompanies the content.
+  Its toggle opens the full navigation in a modal Drawer. Below 48rem, the rail
+  leaves and a phone header toggle opens the drawer. The drawer has no close icon
+  or bottom navigation; backdrop, Escape, and destination links dismiss it. Returning to desktop closes the
+  drawer and restores the desktop preference. RTL reverses the sidebar and drawer.
 - One sidebar content tree moves between its desktop dock and the drawer. Inputs, selection,
   and component instances survive mode changes. Open Select/Tooltip overlays dismiss when
   their host changes; subsequent overlays mount in the current host and retain the theme.
@@ -108,7 +117,10 @@ For a form, onboarding step, empty state, or status message:
 Content composes Container: `standard` (default) uses its 67.5rem outer limit;
 `medium` uses 37rem, leaving 35rem for a readable list;
 `narrow` uses 28.25rem, leaving a 26.25rem column after the existing 1rem gutters.
-Without `centered`, content starts at the top. Centering uses free space only:
+The default `fluid` width fills workspace content with 30px gutters, or 18px on
+phones, aligned with `Header workspace`. Use `Main workspace` to keep the body
+directly below that header. Other named widths remain centered for standalone
+pages. Without `centered`, content starts at the top. Centering uses free space only:
 long content starts at the top. `Body scroll="page"` keeps header, main, and footer
 in one scrollable flow, so tall chrome cannot crowd out the content at enlarged
 text sizes. The default `scroll="regions"` retains the existing independent Main
@@ -121,7 +133,7 @@ no separate page shell or invented brand badge; application pages compose these
 parts and reviewed Text, rather than defining their own styles.
 
 The shell provides a skip link, generated main target, labelled toggle, current-link initial
-focus in the mobile drawer, Escape/backdrop/close dismissal, and focus return. The native
+focus in the mobile drawer, Escape/backdrop dismissal, and focus return. The native
 modal makes the background inert; Drawer handles reduced motion and scroll-lock cleanup.
 
 Navigation uses real anchors. Ordinary link activation dismisses the mobile drawer; modified,
@@ -147,4 +159,8 @@ cover desktop interaction; mobile interaction requires the browser viewport pres
 review checks the native modal, nested Select, focus, viewport transitions, scroll regions,
 themes, and geometry. **Compositions / Shell / Content** adds narrow, short-window,
 enlarged-text, RTL, and both-theme geometry checks, including both overflow edges.
+**Compositions / Shell / Workspace layout** shows the shared header and navigation
+at desktop, laptop, tablet, and phone widths, plus the optional inspector inline
+and in sheets. [PageHeader](../page-header/README.md)
+supplies the repeated heading parts; app-owned segmented page navigation sits below it.
 Tauri integration and other browser engines remain future validation.

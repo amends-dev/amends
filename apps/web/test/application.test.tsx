@@ -332,7 +332,6 @@ it("keeps the sidebar and account trigger mounted across workspace pages and swi
   await screen.findByRole("heading", { name: "Home" });
   const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
   const trigger = screen.getByRole("button", { name: "Your account: alice" });
-  fireEvent.click(screen.getByRole("button", { name: "Collapse navigation" }));
   fireEvent.click(screen.getByRole("link", { name: "Tasks" }));
   await screen.findByRole("heading", { name: "Tasks" });
   expect(history.get()).toBe("/workspaces/one/tasks");
@@ -340,9 +339,8 @@ it("keeps the sidebar and account trigger mounted across workspace pages and swi
   expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
   expect(screen.getByRole("button", { name: "Your account: alice" })).toBe(trigger);
-  expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
   history.set({ value: "/workspaces/two/settings", scroll: false });
-  await screen.findByRole("heading", { name: "Settings" });
+  await screen.findByRole("heading", { name: "Workspace" });
   expect(sidebar).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
@@ -401,13 +399,10 @@ it("redirects the Settings entry to its workspace section and keeps sidebar sele
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(history.get()).toBe("/workspaces/one/settings/workspace");
   expect(
-    screen
-      .getByRole("navigation", { name: "Workspace settings" })
-      .querySelector("a[aria-current=page]"),
+    screen.getByRole("navigation", { name: "Workspace" }).querySelector("a[aria-current=page]"),
   ).toHaveTextContent("Settings");
-  expect(
-    screen
-      .getByRole("navigation", { name: "Settings sections" })
-      .querySelector("a[aria-current=page]"),
-  ).toHaveTextContent("Workspace");
+  expect(screen.getByRole("radio", { name: "Workspace" })).toBeChecked();
+  fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/settings/members"));
+  expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
 });

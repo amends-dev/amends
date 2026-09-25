@@ -37,15 +37,17 @@ export function Feedback() {
         {value.pending() ? "Updating settings…" : value.saved() ? "Saved." : ""}
       </Text>
       <Show when={value.error()}>
-        <Text role="alert" tone="danger">
-          {value.error()}
-        </Text>
+        <Column gap={2}>
+          <Text role="alert" tone="danger">
+            {value.error()}
+          </Text>
+          <Row>
+            <Button variant="ghost" pending={value.pending()} onClick={value.refresh}>
+              Try again
+            </Button>
+          </Row>
+        </Column>
       </Show>
-      <Row>
-        <Button variant="ghost" pending={value.pending()} onClick={value.refresh}>
-          Refresh settings
-        </Button>
-      </Row>
     </Column>
   );
 }

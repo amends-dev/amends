@@ -41,10 +41,6 @@ function Specimen(props: { collapsed?: boolean; rtl?: boolean }) {
                 </Navigation.Icon>
                 <Navigation.Label>Home</Navigation.Label>
               </Navigation.Link>
-            </Navigation.Root>
-          </Shell.SidebarContent>
-          <Shell.SidebarFooter>
-            <Navigation.Root aria-label="Workspace settings">
               <Navigation.Link href="#settings">
                 <Navigation.Icon>
                   <IconMarkSettings />
@@ -52,7 +48,7 @@ function Specimen(props: { collapsed?: boolean; rtl?: boolean }) {
                 <Navigation.Label>Settings</Navigation.Label>
               </Navigation.Link>
             </Navigation.Root>
-          </Shell.SidebarFooter>
+          </Shell.SidebarContent>
         </Shell.Sidebar>
         <Shell.Body>
           <Shell.Header>

@@ -18,7 +18,7 @@ function Specimen(props: { narrow?: boolean }) {
           <Show when={selected()}>
             <ListDetail.Detail aria-label="Member details">
               <Column>
-                <a
+                <ListDetail.Back
                   href="#members"
                   onClick={(e) => {
                     e.preventDefault();
@@ -26,7 +26,7 @@ function Specimen(props: { narrow?: boolean }) {
                   }}
                 >
                   Back to members
-                </a>
+                </ListDetail.Back>
                 <Text as="h2" variant="heading">
                   Member details
                 </Text>

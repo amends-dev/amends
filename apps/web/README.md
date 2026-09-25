@@ -68,7 +68,7 @@ The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creatio
 composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
-routes and the account popup. Home, Triage, Tasks, Environments, and Connections
+routes, four responsive layouts, page headers, and the account popup. Home, Triage, Tasks, Environments, and Connections
 remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session

@@ -4,6 +4,7 @@ import { typographyStyles } from "../../foundations/typography/styles.css.ts";
 import { focusVisible } from "../../foundations/focus/styles.css.ts";
 import { space } from "../../foundations/spacing/tokens.ts";
 import { hiddenText } from "../navigation/navigation.css.ts";
+import { fontFamilies } from "../../foundations/typography/tokens.ts";
 
 export const root = style({
   display: "flex",
@@ -22,7 +23,8 @@ export const sidebar = style({
   minHeight: 0,
   selectors: {
     '&[data-collapsed="true"]': { flexBasis: "3.75rem" },
-    '&[data-mobile="true"]': { display: "none" },
+    '&[data-overlay="true"]': { display: "none" },
+    "&[hidden]": { display: "none" },
   },
 });
 export const dock = style({ display: "flex", flex: 1, minWidth: 0, minHeight: 0 });
@@ -43,15 +45,32 @@ export const sidebarFrame = style({
       gridTemplateRows: "auto minmax(0, 1fr) auto auto",
       gridTemplateAreas: '"header" "content" "footer" "utility"',
     },
+    "&:has(> [data-shell-utility])::after": {
+      content: '""',
+      gridRow: 1,
+      gridColumn: "1 / -1",
+      alignSelf: "end",
+      marginInline: "0.875rem",
+      borderBottom: `1px dashed ${colorVars.line.seam}`,
+      pointerEvents: "none",
+    },
   },
 });
 export const sidebarHeader = style({
   gridArea: "header",
   flexShrink: 0,
-  padding: space[2],
-  paddingTop: `max(${space[3]}, env(safe-area-inset-top))`,
-  minHeight: "4rem",
+  padding: "1rem 0.875rem 0.75rem",
+  paddingTop: "max(1rem, env(safe-area-inset-top))",
+  minHeight: "4.25rem",
   boxSizing: "border-box",
+  borderBottom: `1px dashed ${colorVars.line.seam}`,
+  selectors: {
+    [`${sidebarFrame}:has(> [data-shell-utility]) &`]: { borderBottom: 0 },
+    [`${sidebarFrame}[data-compact="true"] &`]: {
+      justifyContent: "center",
+      paddingInline: "0.75rem",
+    },
+  },
 });
 export const headerContent = style({ flex: 1, minWidth: 0 });
 export const sidebarContent = style({
@@ -60,12 +79,12 @@ export const sidebarContent = style({
   minHeight: 0,
   overflowY: "auto",
   overscrollBehavior: "contain",
-  padding: space[2],
+  padding: "0.625rem 0.5rem",
 });
 export const sidebarFooter = style({
   gridArea: "footer",
   flexShrink: 0,
-  padding: space[2],
+  padding: "0.5rem",
   paddingBottom: `max(${space[2]}, env(safe-area-inset-bottom))`,
   borderTop: `1px dashed ${colorVars.line.seam}`,
 });
@@ -73,12 +92,24 @@ export const sidebarUtility = style({
   gridArea: "utility",
   alignSelf: "center",
   minWidth: 0,
-  padding: space[2],
+  padding: "0.5rem",
   selectors: { "&[hidden]": { display: "none" } },
 });
 export const sidebarLabel = style({
   minWidth: 0,
-  overflowWrap: "anywhere",
+  fontSize: "0.875rem",
+  fontWeight: 600,
+  lineHeight: 1.2,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  selectors: { [`${sidebarFrame}[data-compact="true"] &`]: hiddenText },
+});
+export const sidebarSubtitle = style({
+  fontFamily: fontFamilies.mono,
+  fontSize: "0.65625rem",
+  lineHeight: 1.3,
+  color: colorVars.text.secondary,
   selectors: { [`${sidebarFrame}[data-compact="true"] &`]: hiddenText },
 });
 export const expanded = style({ minWidth: 0, selectors: { "&[hidden]": { display: "none" } } });
@@ -102,6 +133,17 @@ export const header = style({
   gridRow: 1,
   padding: space[4],
   paddingTop: `max(${space[4]}, env(safe-area-inset-top))`,
+  selectors: {
+    '&[data-workspace="true"]': {
+      display: "block",
+      padding: "1.5rem 1.875rem 0.875rem",
+    },
+  },
+  "@media": {
+    "screen and (max-width: 47.999rem)": {
+      selectors: { '&[data-workspace="true"]': { padding: "1rem 1.125rem 0.75rem" } },
+    },
+  },
 });
 export const main = style([
   focusVisible,
@@ -120,6 +162,7 @@ export const main = style([
         minHeight: "auto",
         overflow: "visible",
       },
+      '&[data-workspace="true"]': { paddingBlock: 0 },
     },
   },
 ]);
@@ -136,6 +179,14 @@ export const content = style({
   display: "flex",
   flexDirection: "column",
   overflowWrap: "anywhere",
+  selectors: {
+    '&[data-width="fluid"]': { padding: "0.375rem 1.875rem 1.75rem" },
+  },
+  "@media": {
+    "screen and (max-width: 47.999rem)": {
+      selectors: { '&[data-width="fluid"]': { padding: "0.375rem 1.125rem 1.375rem" } },
+    },
+  },
 });
 export const contentInner = style({
   flexShrink: 0,
@@ -157,3 +208,48 @@ export const skip = style([
     selectors: { "&:focus": { transform: "none" } },
   },
 ]);
+
+export const rail = style({
+  display: "none",
+  flex: "0 0 3.75rem",
+  minWidth: 0,
+  minHeight: 0,
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "0.375rem",
+  padding: "0.875rem 0 0.5rem",
+  boxSizing: "border-box",
+  backgroundColor: colorVars.surface.canvas,
+  selectors: { "&[hidden]": { display: "none" } },
+  "@media": { "screen and (min-width: 48rem) and (max-width: 63.999rem)": { display: "flex" } },
+});
+export const railContent = style({
+  flex: 1,
+  minHeight: 0,
+  width: "100%",
+  overflowY: "auto",
+  padding: "0 0.5rem",
+  boxSizing: "border-box",
+});
+export const railFooter = style({ width: "100%", padding: "0 0.5rem", boxSizing: "border-box" });
+/** The Shell v2 session log is 400px inline only when content retains 560px. */
+export const inspector = style({
+  display: "flex",
+  flex: "0 0 25rem",
+  minWidth: 0,
+  minHeight: 0,
+  borderInlineStart: `1px dashed ${colorVars.line.seam}`,
+  backgroundColor: colorVars.surface.panel,
+  selectors: { "&[hidden]": { display: "none" } },
+});
+export const inspectorDock = style({ display: "flex", flex: 1, minWidth: 0, minHeight: 0 });
+export const inspectorFrame = style({ flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" });
+export const inspectorDrawer = style({
+  insetInlineStart: "auto",
+  insetInlineEnd: 0,
+  width: "min(25rem, 100%)",
+  backgroundColor: colorVars.surface.panel,
+  animation: "none !important",
+  "@media": { "screen and (max-width: 47.999rem)": { width: "100%" } },
+});
+export const inspectorDrawerHost = style({ display: "flex", flex: 1, minWidth: 0, minHeight: 0 });

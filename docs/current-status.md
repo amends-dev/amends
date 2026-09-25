@@ -113,10 +113,12 @@ Divider provides shared horizontal dashed lines and composable labels/actions, u
 existing seam and typography foundations. Navigation section headers reuse it; collapsed
 headers retain accessible names, hide action controls, and recover focus to a link when needed.
 Declarative Navigation, Drawer, and Shell compositions add native destination links, a
-desktop expanded sidebar/icon rail, and mobile modal navigation. The sidebar remains mounted
+desktop expanded sidebar, tablet icon rail, phone header toggle, and modal navigation sheets. The sidebar remains mounted
 through viewport changes, preserving drafts and selection. Desktop collapse preference is
 independent of mobile open state. Native dialog behavior, modal-aware Select/Tooltip portals,
 focus return, reduced motion, and independent sidebar/main scroll regions are available.
+An optional 400px Shell inspector moves from an inline desktop column to a
+right-side laptop/tablet sheet and full-width phone sheet; no product page feeds it yet.
 Centered Dialog shares the native modal implementation with Drawer and composes titles,
 descriptions, scrolling bodies, and actions. Controlled form recovery is demonstrated.
 Toast provides provider-scoped queues, polite feedback, persistent actions, paused timers,

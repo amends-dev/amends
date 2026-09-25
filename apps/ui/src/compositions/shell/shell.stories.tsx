@@ -118,6 +118,17 @@ export function ShellFixture(props: Args) {
                 </Navigation.Link>
               )}
             </For>
+            <Navigation.Link
+              target="_self"
+              href="#settings"
+              aria-current={page() === "Settings" ? "page" : undefined}
+              onClick={() => setPage("Settings")}
+            >
+              <Navigation.Icon>
+                <DemoIcon name="settings" />
+              </Navigation.Icon>
+              <Navigation.Label>Settings</Navigation.Label>
+            </Navigation.Link>
           </Navigation.Root>
           <Shell.SidebarExpanded>
             <Column gap={4} class={s.note}>
@@ -142,17 +153,6 @@ export function ShellFixture(props: Args) {
         </Shell.SidebarContent>
         <Shell.SidebarFooter>
           <Navigation.Root aria-label="Account">
-            <Navigation.Link
-              target="_self"
-              href="#settings"
-              aria-current={page() === "Settings" ? "page" : undefined}
-              onClick={() => setPage("Settings")}
-            >
-              <Navigation.Icon>
-                <DemoIcon name="settings" />
-              </Navigation.Icon>
-              <Navigation.Label>Settings</Navigation.Label>
-            </Navigation.Link>
             <Navigation.Link target="_self" href="#account" onClick={() => setPage("Account")}>
               <Navigation.Icon>
                 <DemoIcon name="account" />
@@ -363,8 +363,8 @@ export const MobileInteraction = {
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveTextContent("Groups");
     await expect(trigger).toHaveFocus();
     await userEvent.click(trigger);
-    await userEvent.click(canvas.getByRole("button", { name: "Close navigation" }));
-    await waitFor(() => expect(canvas.queryByRole("dialog")).toBeNull());
+    await expect(canvas.queryByRole("button", { name: "Close navigation" })).toBeNull();
+    await expect(canvas.getByRole("dialog", { name: "Navigation" })).toBeVisible();
   },
 } satisfies Story;
 export const WithoutSidebar = {

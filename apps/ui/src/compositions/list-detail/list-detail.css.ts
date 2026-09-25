@@ -1,44 +1,43 @@
-import { focusVisible } from "../../foundations/focus/styles.css.ts";
 import { style } from "@vanilla-extract/css";
 import { colorVars } from "../../foundations/color/theme.css.ts";
-import { space } from "../../foundations/spacing/tokens.ts";
+import { focusVisible } from "../../foundations/focus/styles.css.ts";
+
 export const root = style({ containerType: "inline-size", minWidth: 0 });
 export const grid = style({
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",
-  gap: space[6],
+  minWidth: 0,
+  gap: 0,
   "@container": {
-    "(min-width: 48rem)": {
+    "(min-width: 42rem)": {
       selectors: {
         [`${root}[data-selected="true"] &`]: {
-          gridTemplateColumns: "minmax(0, 1fr) minmax(18rem, 1fr)",
+          gridTemplateColumns: "minmax(0, 1fr) 19.375rem",
+          gap: "2.125rem",
         },
       },
+    },
+  },
+  selectors: {
+    [`${root}[data-selected="true"][data-narrow="true"] &`]: {
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gap: 0,
     },
   },
 });
 export const list = style({
   minWidth: 0,
-  selectors: { [`${root}[data-selected="true"] &`]: { display: "none" } },
   "@container": {
-    "(min-width: 48rem)": {
+    "(min-width: 42rem)": {
       selectors: { [`${root}[data-selected="true"] &`]: { display: "block" } },
     },
   },
-});
-export const detail = style({
-  minWidth: 0,
-  borderTop: `1px dashed ${colorVars.line.seam}`,
-  paddingTop: space[5],
-  "@container": {
-    "(min-width: 48rem)": {
-      borderTop: 0,
-      paddingTop: 0,
-      borderInlineStart: `1px dashed ${colorVars.line.seam}`,
-      paddingInlineStart: space[6],
-    },
+  selectors: {
+    [`${root}[data-selected="true"] &`]: { display: "none" },
+    [`${root}[data-selected="true"][data-narrow="true"] &`]: { display: "none" },
   },
 });
+export const detail = style({ minWidth: 0 });
 export const back = style([
   focusVisible,
   {
@@ -47,5 +46,7 @@ export const back = style([
     display: "inline-flex",
     alignItems: "center",
     minHeight: "2.75rem",
+    "@container": { "(min-width: 42rem)": { display: "none" } },
+    selectors: { [`${root}[data-narrow="true"] &`]: { display: "inline-flex" } },
   },
 ]);

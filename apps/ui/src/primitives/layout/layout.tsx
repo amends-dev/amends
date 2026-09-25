@@ -30,6 +30,8 @@ export type ContainerProps<T extends LayoutElement = "div"> = NativeLayoutProps<
   maxWidth?: LayoutLength | "none";
   /** Inline padding from the spacing scale. Defaults to step 4. */
   gutter?: SpaceStep;
+  /** Align a bounded region to the reading edge instead of centering it. */
+  align?: "start" | "center";
 };
 type StackOptions = { gap?: SpaceStep; align?: LayoutAlign; justify?: LayoutJustify };
 export type RowProps<T extends LayoutElement = "div"> = NativeLayoutProps<T> &
@@ -102,11 +104,12 @@ const justify = (value: LayoutJustify) => (value === "between" ? "space-between"
 
 /** Centered width boundary with token-based inline gutters; no surface or vertical spacing. */
 export function Container<T extends LayoutElement = "div">(props: ContainerProps<T>): JSX.Element {
-  const [local, native] = splitProps(props, ["maxWidth", "gutter"]);
+  const [local, native] = splitProps(props, ["maxWidth", "gutter", "align"]);
   return (
     <Box
       {...(native as BoxNative)}
       layoutClass={s.container}
+      data-align={local.align ?? "center"}
       variables={{
         [s.properties.maxWidth]: local.maxWidth ?? "67.5rem",
         [s.properties.gutter]: space[local.gutter ?? 4],

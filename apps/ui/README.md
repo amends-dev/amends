@@ -171,7 +171,7 @@ retaining its existing square default. Tooltip matches the compact dark monospac
 reference, with top-start placement, a soft shadow, and wrapping for long content. Reference,
 both-theme, and enlarged-text stories support visual comparison.
 **Compositions / Navigation**, **Drawer**, and **Shell** compose them into
-an expanded sidebar, desktop icon rail, and mobile modal drawer. Content is supplied through
+an expanded desktop sidebar, tablet icon rail, phone header toggle, and navigation drawer. Content is supplied through
 declarative child slots. One mounted sidebar tree preserves local state through collapse and
 viewport changes, including nested Select controls. Stories cover each supporting piece as
 well as themes, mobile/desktop, long navigation, RTL, enlarged text, and independent scroll regions.
@@ -274,11 +274,13 @@ coverage; connected state remains in features and pages remain in the apps.
 SidebarUtility. The branded WorkspaceMark has shared palette tokens and contrast
 coverage. These remain presentation components; apps own routes and preferences.
 
-**Settings** adds [SectionNav](src/compositions/section-nav/README.md),
-[KeyValue](src/compositions/key-value/README.md),
+**Settings** adds [KeyValue](src/compositions/key-value/README.md),
 [ListDetail](src/compositions/list-detail/README.md), ItemList rows/actions, and
 [controlled forms](src/features/settings/README.md). All use existing tokens;
 permission state and workflows remain in client/features, with app-owned pages.
+The [PageHeader](src/compositions/page-header/README.md) supplies the common title,
+breadcrumbs, actions, and metadata structure. Settings section choices use the
+shared SegmentedControl as a separate page-content row.
 
 **Primitives / Filters and pickers** composes the Primitives v2 reference for review.
 [SegmentedControl](src/compositions/segmented-control/README.md) supplies a compact

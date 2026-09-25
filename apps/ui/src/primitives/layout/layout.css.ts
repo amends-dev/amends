@@ -18,6 +18,7 @@ export const container = style([
     maxWidth: `var(${properties.maxWidth})`,
     marginInline: "auto",
     paddingInline: `var(${properties.gutter})`,
+    selectors: { '&[data-align="start"]': { marginInline: 0 } },
   },
 ]);
 const flex = style([

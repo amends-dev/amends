@@ -1,37 +1,33 @@
 import { paths, type SettingsSection } from "@amends/client";
 import * as Settings from "@amends/features/settings";
-import { SectionNav } from "@amends/ui/compositions/section-nav";
+import { SegmentedControl } from "@amends/ui/compositions/segmented-control";
 import { ListDetail } from "@amends/ui/compositions/list-detail";
 import { Column, Container } from "@amends/ui/primitives/layout";
-import { useLocation, useParams, useSearchParams, Navigate } from "@solidjs/router";
-import { For, Show, type ParentProps } from "solid-js";
+import { useLocation, useNavigate, useParams, useSearchParams, Navigate } from "@solidjs/router";
+import { Show, type ParentProps } from "solid-js";
 const href = (path: string) => `#${path}`;
 export function SettingsLayout(props: ParentProps) {
   const params = useParams<{ workspaceId: string }>(),
-    location = useLocation();
+    location = useLocation(),
+    navigate = useNavigate();
+  const section = () => {
+    const segment = location.pathname.split("/").at(-1);
+    return segment === "members" || segment === "invites" ? segment : "workspace";
+  };
   return (
     <Column gap={6}>
-      <SectionNav.Root aria-label="Settings sections">
-        <For each={["workspace", "members", "invites"] as const}>
-          {(section) => (
-            <SectionNav.Link
-              href={href(paths.settingsSection(params.workspaceId, section))}
-              aria-current={
-                location.pathname.replace(/\/$/, "") ===
-                paths.settingsSection(params.workspaceId, section)
-                  ? "page"
-                  : undefined
-              }
-            >
-              {section === "workspace"
-                ? "Workspace"
-                : section === "members"
-                  ? "Members"
-                  : "Invites"}
-            </SectionNav.Link>
-          )}
-        </For>
-      </SectionNav.Root>
+      <SegmentedControl.Root
+        aria-label="Settings sections"
+        value={section()}
+        onValueChange={(next) => {
+          if (next === "workspace" || next === "members" || next === "invites")
+            navigate(paths.settingsSection(params.workspaceId, next));
+        }}
+      >
+        <SegmentedControl.Item value="members">People</SegmentedControl.Item>
+        <SegmentedControl.Item value="invites">Invites</SegmentedControl.Item>
+        <SegmentedControl.Item value="workspace">Workspace</SegmentedControl.Item>
+      </SegmentedControl.Root>
       {props.children}
     </Column>
   );
@@ -54,7 +50,7 @@ function Scope(props: ParentProps<{ section: SettingsSection }>) {
 export function WorkspaceSettingsPage() {
   return (
     <Scope section="workspace">
-      <Container maxWidth="40rem" gutter={0}>
+      <Container maxWidth="40rem" gutter={0} align="start">
         <Column gap={6}>
           <Settings.WorkspaceName />
           <Settings.WorkspaceDetails />
@@ -91,7 +87,7 @@ export function MembersSettingsPage() {
 export function InvitesSettingsPage() {
   return (
     <Scope section="invites">
-      <Container maxWidth="40rem" gutter={0}>
+      <Container maxWidth="40rem" gutter={0} align="start">
         <Settings.InviteForm />
       </Container>
       <Settings.InvitationHistory />

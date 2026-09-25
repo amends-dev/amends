@@ -38,7 +38,7 @@ export const ReadOnly = {
       { timeout: 15000 },
     );
     await expect(canvas.queryByRole("button", { name: "Save name" })).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("link", { name: "Members" }));
+    await userEvent.click(canvas.getByRole("radio", { name: "People" }));
     await userEvent.click(await canvas.findByRole("link", { name: /owner@example.test/ }));
     await canvas.findByRole("heading", { name: "owner@example.test" });
     await expect(canvas.queryByRole("button", { name: "Remove member" })).not.toBeInTheDocument();
@@ -130,7 +130,7 @@ export const RefreshRecovery = {
     await userEvent.type(input, "Studio");
     await userEvent.click(canvas.getByRole("button", { name: "Save name" }));
     await canvas.findByText("Saved, but the latest data could not be loaded. Refresh to continue.");
-    await userEvent.click(canvas.getByRole("button", { name: "Refresh settings" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(canvas.getByText("Studio")).toBeVisible());
   },
 } satisfies Story;
@@ -151,7 +151,7 @@ export const StaleRename = {
       "This changed while you were editing. Refresh, review the latest values, and try again.",
     );
     await expect(input).toHaveValue("My draft");
-    await userEvent.click(canvas.getByRole("button", { name: "Refresh settings" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(input).toHaveValue("Changed elsewhere"));
   },
 } satisfies Story;
@@ -177,7 +177,7 @@ export const LostInvitationResponse = {
     await canvas.findByText(
       "The request could not be completed. Try again when the host is available.",
     );
-    await userEvent.click(canvas.getByRole("button", { name: "Refresh settings" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
     await canvas.findByText("new@example.test");
     await userEvent.click(canvas.getByRole("button", { name: "Create invitation" }));
     await canvas.findByText("Saved.");

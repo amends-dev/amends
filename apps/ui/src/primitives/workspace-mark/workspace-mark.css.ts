@@ -23,6 +23,9 @@ export const root = style({
   selectors: {
     "&[hidden]": { display: "none" },
     '&[data-variant="brand"]': {
+      width: "2.25rem",
+      height: "2.25rem",
+      borderRadius: "0.5rem",
       backgroundColor: colorVars.workspaceMark.surface,
       color: colorVars.workspaceMark.text,
       borderColor: "transparent",

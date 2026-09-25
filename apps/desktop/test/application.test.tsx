@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { HashRouter } from "@solidjs/router";
 import { Session, type SessionStore } from "@amends/client";
 import { Layer, Schema } from "effect";
@@ -258,13 +258,10 @@ it("redirects the Settings entry to its workspace section and keeps sidebar sele
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
   expect(
-    screen
-      .getByRole("navigation", { name: "Workspace settings" })
-      .querySelector("a[aria-current=page]"),
+    screen.getByRole("navigation", { name: "Workspace" }).querySelector("a[aria-current=page]"),
   ).toHaveTextContent("Settings");
-  expect(
-    screen
-      .getByRole("navigation", { name: "Settings sections" })
-      .querySelector("a[aria-current=page]"),
-  ).toHaveTextContent("Workspace");
+  expect(screen.getByRole("radio", { name: "Workspace" })).toBeChecked();
+  fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/settings/members"));
+  expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
 });

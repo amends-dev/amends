@@ -25,6 +25,8 @@ import * as s from "./shell.css.ts";
 
 interface State {
   mobile: Accessor<boolean>;
+  tablet: Accessor<boolean>;
+  overlay: Accessor<boolean>;
   collapsed: Accessor<boolean>;
   drawerOpen: Accessor<boolean>;
   setDrawerOpen: (open: boolean) => void;
@@ -64,8 +66,10 @@ export function Root(props: RootProps) {
   );
   const collapsed = () => local.collapsed ?? internalCollapsed();
   const [mobile, setMobile] = createSignal(false),
+    [tablet, setTablet] = createSignal(false),
     [drawerOpen, setDrawerOpen] = createSignal(false);
-  const modalOpen = createMemo(() => mobile() && drawerOpen());
+  const overlay = createMemo(() => mobile() || tablet());
+  const modalOpen = createMemo(() => overlay() && drawerOpen());
   const [main, setMain] = createSignal<HTMLElement>(),
     [sidebar, setSidebar] = createSignal<HTMLElement>(),
     [toggleElement, setToggleElement] = createSignal<HTMLButtonElement>();
@@ -74,16 +78,22 @@ export function Root(props: RootProps) {
     mainId = `shell-${id}-main`;
   onMount(() => {
     const media = window.matchMedia("(max-width: 47.999rem)");
+    const tabletMedia = window.matchMedia("(min-width: 48rem) and (max-width: 63.999rem)");
     const update = () => {
       setMobile(media.matches);
+      setTablet(tabletMedia.matches);
       setDrawerOpen(false);
     };
     update();
     media.addEventListener("change", update);
-    onCleanup(() => media.removeEventListener("change", update));
+    tabletMedia.addEventListener("change", update);
+    onCleanup(() => {
+      media.removeEventListener("change", update);
+      tabletMedia.removeEventListener("change", update);
+    });
   });
   const toggle = () => {
-    if (mobile()) setDrawerOpen(!drawerOpen());
+    if (overlay()) setDrawerOpen(!drawerOpen());
     else {
       const next = !collapsed();
       if (local.collapsed === undefined) setCollapsed(next);
@@ -94,6 +104,8 @@ export function Root(props: RootProps) {
     <Context.Provider
       value={{
         mobile,
+        tablet,
+        overlay,
         collapsed,
         drawerOpen,
         setDrawerOpen,
@@ -112,7 +124,7 @@ export function Root(props: RootProps) {
         id={`${sidebarId}-drawer`}
         open={modalOpen()}
         onOpenChange={setDrawerOpen}
-        animated={mobile()}
+        animated={overlay()}
         initialFocus={() =>
           sidebar()?.querySelector<HTMLElement>('a[aria-current="page"]') ??
           sidebar()?.querySelector<HTMLElement>("a[href]") ??
@@ -124,6 +136,7 @@ export function Root(props: RootProps) {
           {...native}
           class={classes(s.root, local.class, local.classList)}
           data-mobile={mobile()}
+          data-tablet={tablet()}
           data-collapsed={collapsed()}
         >
           <a
@@ -146,6 +159,7 @@ export function useShell() {
   const state = context();
   return {
     mobile: state.mobile,
+    tablet: state.tablet,
     collapsed: state.collapsed,
     drawerOpen: state.drawerOpen,
     closeNavigation: () => state.setDrawerOpen(false),
@@ -155,7 +169,7 @@ export function useShell() {
 export function useSidebar() {
   const state = context();
   return {
-    compact: () => !state.mobile() && state.collapsed(),
+    compact: () => !state.overlay() && state.collapsed(),
     closeNavigation: () => state.setDrawerOpen(false),
   };
 }
@@ -167,9 +181,9 @@ export function Sidebar(props: JSX.HTMLAttributes<HTMLElement>) {
     [drawerHost, setDrawerHost] = createSignal<HTMLDivElement>();
   const [content, setContent] = createSignal<HTMLDivElement>(),
     [overlayHost, setOverlayHost] = createSignal<HTMLElement>();
-  const compact = () => !shell.mobile() && shell.collapsed();
+  const compact = () => !shell.overlay() && shell.collapsed();
   createEffect(() => {
-    const target = shell.mobile() ? drawerHost() : dock(),
+    const target = shell.overlay() ? drawerHost() : dock(),
       node = content();
     if (!target || !node || node.parentElement === target) return;
     const active = node.ownerDocument.activeElement;
@@ -178,7 +192,7 @@ export function Sidebar(props: JSX.HTMLAttributes<HTMLElement>) {
     setOverlayHost(target.closest("dialog") ?? target.ownerDocument.body);
     if (focused)
       queueMicrotask(() => {
-        if (shell.mobile() && !shell.drawerOpen())
+        if (shell.overlay() && !shell.drawerOpen())
           shell.toggleElement()?.focus({ preventScroll: true });
         else if (focused.isConnected && !focused.closest("[hidden], [inert]"))
           focused.focus({ preventScroll: true });
@@ -201,7 +215,8 @@ export function Sidebar(props: JSX.HTMLAttributes<HTMLElement>) {
           {...native}
           id={shell.sidebarId}
           class={classes(`${colorThemes.soot} ${s.sidebar}`, local.class, local.classList)}
-          data-mobile={shell.mobile()}
+          data-overlay={shell.overlay()}
+          hidden={shell.overlay()}
           data-collapsed={shell.collapsed()}
         >
           <div ref={setDock} class={s.dock}>
@@ -227,7 +242,7 @@ export function Sidebar(props: JSX.HTMLAttributes<HTMLElement>) {
   );
 }
 export function SidebarHeader(props: JSX.HTMLAttributes<HTMLElement>) {
-  const shell = context();
+  context();
   const [local, native] = splitProps(props, ["class", "classList", "children"]);
   return (
     <Row
@@ -238,9 +253,6 @@ export function SidebarHeader(props: JSX.HTMLAttributes<HTMLElement>) {
       class={classes(s.sidebarHeader, local.class, local.classList)}
     >
       <div class={s.headerContent}>{local.children}</div>
-      <Show when={shell.mobile()}>
-        <Drawer.Close aria-label="Close navigation" />
-      </Show>
     </Row>
   );
 }
@@ -275,6 +287,11 @@ export function SidebarFooter(props: JSX.HTMLAttributes<HTMLElement>) {
     />
   );
 }
+export function SidebarSubtitle(props: JSX.HTMLAttributes<HTMLSpanElement>) {
+  context();
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <span {...native} class={classes(s.sidebarSubtitle, local.class, local.classList)} />;
+}
 /** Noninteractive text that remains part of an accessible name when the rail hides it visually. */
 export function SidebarLabel(props: JSX.HTMLAttributes<HTMLSpanElement>) {
   context();
@@ -307,12 +324,21 @@ export function SidebarExpanded(props: JSX.HTMLAttributes<HTMLDivElement>) {
 export function NavigationToggle(
   props: Omit<IconButtonProps, "aria-label" | "aria-labelledby" | "children"> & {
     "aria-label"?: string;
+    mode?: "any" | "phone" | "tablet" | "desktop";
   },
 ) {
   const shell = context();
-  const [local, native] = splitProps(props, ["onClick", "ref", "aria-label"]);
+  const [local, native] = splitProps(props, ["onClick", "ref", "aria-label", "mode"]);
+  const visible = () =>
+    local.mode === "phone"
+      ? shell.mobile()
+      : local.mode === "tablet"
+        ? shell.tablet()
+        : local.mode === "desktop"
+          ? !shell.overlay()
+          : true;
   return (
-    <Show when={shell.sidebar()}>
+    <Show when={shell.sidebar() && visible()}>
       <IconButton
         {...native}
         ref={(element) => {
@@ -321,22 +347,22 @@ export function NavigationToggle(
         }}
         aria-label={
           local["aria-label"] ??
-          (shell.mobile()
+          (shell.overlay()
             ? "Open navigation"
             : shell.collapsed()
               ? "Expand navigation"
               : "Collapse navigation")
         }
-        aria-controls={shell.mobile() ? `${shell.sidebarId}-drawer` : shell.sidebarId}
-        aria-expanded={shell.mobile() ? shell.drawerOpen() : !shell.collapsed()}
-        aria-haspopup={shell.mobile() ? "dialog" : undefined}
+        aria-controls={shell.overlay() ? `${shell.sidebarId}-drawer` : shell.sidebarId}
+        aria-expanded={shell.overlay() ? shell.drawerOpen() : !shell.collapsed()}
+        aria-haspopup={shell.overlay() ? "dialog" : undefined}
         onClick={(event) => {
           callHandler(local.onClick, event);
           if (!event.defaultPrevented) shell.toggle();
         }}
       >
         <Show
-          when={shell.mobile()}
+          when={shell.overlay()}
           fallback={
             <Show when={shell.collapsed()} fallback={<IconSidebarLeftClose class={s.toggleIcon} />}>
               <IconSidebarLeftOpen class={s.toggleIcon} />
@@ -364,27 +390,29 @@ export function Body(props: BodyProps) {
     />
   );
 }
-export function Header(props: JSX.HTMLAttributes<HTMLElement>) {
+export function Header(props: JSX.HTMLAttributes<HTMLElement> & { workspace?: boolean }) {
   context();
-  const [local, native] = splitProps(props, ["class", "classList"]);
+  const [local, native] = splitProps(props, ["workspace", "class", "classList"]);
   return (
     <Row
       as="header"
       gap={4}
       justify="between"
       {...native}
+      data-workspace={local.workspace ?? false}
       class={classes(s.header, local.class, local.classList)}
     />
   );
 }
-export function Main(props: Omit<JSX.HTMLAttributes<HTMLElement>, "id">) {
+export function Main(props: Omit<JSX.HTMLAttributes<HTMLElement>, "id"> & { workspace?: boolean }) {
   const shell = context();
-  const [local, native] = splitProps(props, ["class", "classList", "ref"]);
+  const [local, native] = splitProps(props, ["workspace", "class", "classList", "ref"]);
   return (
     <main
       {...native}
       id={shell.mainId}
       tabIndex={-1}
+      data-workspace={local.workspace ?? false}
       ref={(element) => {
         shell.setMain(element);
         if (typeof local.ref === "function") local.ref(element);
@@ -395,7 +423,7 @@ export function Main(props: Omit<JSX.HTMLAttributes<HTMLElement>, "id">) {
 }
 export type ContentProps = JSX.HTMLAttributes<HTMLDivElement> & {
   /** Standard page content or a narrow form/message column, including its gutters. */
-  width?: "standard" | "medium" | "narrow";
+  width?: "fluid" | "standard" | "medium" | "narrow";
   /** Center short content vertically; overflow starts at the top and scrolls in Main. */
   centered?: boolean;
 };
@@ -414,16 +442,116 @@ export function Content(props: ContentProps) {
       {...native}
       class={classes(s.content, local.class, local.classList)}
       data-centered={local.centered ?? false}
+      data-width={local.width ?? "fluid"}
     >
       <Container
         maxWidth={
-          local.width === "narrow" ? "28.25rem" : local.width === "medium" ? "37rem" : "67.5rem"
+          local.width === "narrow"
+            ? "28.25rem"
+            : local.width === "medium"
+              ? "37rem"
+              : local.width === "standard"
+                ? "67.5rem"
+                : "none"
         }
+        gutter={local.width === undefined || local.width === "fluid" ? 0 : 4}
+        align={local.width === undefined || local.width === "fluid" ? "start" : "center"}
         class={s.contentInner}
       >
         {local.children}
       </Container>
     </div>
+  );
+}
+/** Persistent tablet rail; the full sidebar moves into a drawer at this width. */
+export function Rail(props: JSX.HTMLAttributes<HTMLElement>) {
+  const shell = context();
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return (
+    <aside
+      {...native}
+      hidden={!shell.tablet()}
+      class={classes(`${colorThemes.soot} ${s.rail}`, local.class, local.classList)}
+    />
+  );
+}
+export function RailContent(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  context();
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.railContent, local.class, local.classList)} />;
+}
+export function RailFooter(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  context();
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.railFooter, local.class, local.classList)} />;
+}
+export type InspectorProps = Omit<JSX.HTMLAttributes<HTMLElement>, "title"> & {
+  title: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  returnFocus?: () => HTMLElement | undefined;
+};
+/** Optional 400px session/detail column, using the same content in a smaller-screen sheet. */
+export function Inspector(props: InspectorProps) {
+  const shell = context();
+  const [local, native] = splitProps(props, [
+    "title",
+    "open",
+    "onOpenChange",
+    "returnFocus",
+    "children",
+    "class",
+    "classList",
+  ]);
+  const [narrow, setNarrow] = createSignal(false),
+    [dock, setDock] = createSignal<HTMLDivElement>(),
+    [drawerHost, setDrawerHost] = createSignal<HTMLDivElement>(),
+    [content, setContent] = createSignal<HTMLDivElement>();
+  onMount(() => {
+    const media = window.matchMedia("(max-width: 79.999rem)");
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    onCleanup(() => media.removeEventListener("change", update));
+  });
+  createEffect(() => {
+    const target = narrow() ? drawerHost() : dock(),
+      node = content();
+    if (target && node && node.parentElement !== target) target.appendChild(node);
+  });
+  onCleanup(() => {
+    const node = content(),
+      home = dock();
+    if (node && home && node.parentElement !== home) home.appendChild(node);
+  });
+  return (
+    <Drawer.Root
+      open={narrow() && local.open}
+      onOpenChange={local.onOpenChange}
+      animated={false}
+      initialFocus={() =>
+        content()?.querySelector<HTMLElement>("button,a,input,select,textarea,[tabindex]") ??
+        undefined
+      }
+      returnFocus={() => local.returnFocus?.() ?? shell.main()}
+    >
+      <aside
+        {...native}
+        aria-label={local.title}
+        hidden={!local.open || narrow()}
+        class={classes(s.inspector, local.class, local.classList)}
+      >
+        <div ref={setDock} class={s.inspectorDock}>
+          <div ref={setContent} class={s.inspectorFrame}>
+            {local.children}
+          </div>
+        </div>
+      </aside>
+      <Drawer.Content class={s.inspectorDrawer}>
+        <Drawer.Title class={s.hidden}>{local.title}</Drawer.Title>
+        <div ref={setDrawerHost} class={s.inspectorDrawerHost} />
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 export function Footer(props: JSX.HTMLAttributes<HTMLElement>) {

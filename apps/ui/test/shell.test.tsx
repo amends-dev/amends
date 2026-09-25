@@ -236,8 +236,15 @@ it("Shell preserves one sidebar tree and desktop preference through mobile drawe
   const trigger = screen.getByRole("button", { name: "Open navigation" });
   trigger.focus();
   fireEvent.click(trigger);
-  expect(screen.getByRole("dialog", { name: "Navigation" })).toContainElement(draft);
+  const dialog = screen.getByRole("dialog", { name: "Navigation" });
+  expect(dialog).toContainElement(draft);
+  expect(screen.queryByRole("button", { name: "Close navigation" })).toBeNull();
   expect(draft).toHaveValue("preserved");
+  fireEvent.pointerDown(dialog, { clientX: -1, clientY: -1 });
+  fireEvent.click(dialog, { clientX: -1, clientY: -1 });
+  await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
+  expect(trigger).toHaveFocus();
+  fireEvent.click(trigger);
   setMobile(false);
   await waitFor(() => expect(container.querySelector("dialog")).not.toHaveAttribute("open"));
   expect(screen.getByRole("button", { name: "Expand navigation" })).toBe(trigger);
@@ -262,4 +269,45 @@ it("Shell supports a page without navigation and does not display a toggle or dr
   expect(screen.getByRole("main")).toHaveTextContent("Page content");
   expect(screen.queryByRole("button")).toBeNull();
   expect(document.querySelector("dialog")).toBeNull();
+});
+it("keeps inspector content mounted when its 400px column becomes a sheet", async () => {
+  const media = new EventTarget() as MediaQueryList;
+  Object.defineProperty(media, "matches", { value: false, writable: true });
+  const original = window.matchMedia.bind(window);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) =>
+    query.includes("79.999") ? media : original(query),
+  );
+  const setNarrow = (value: boolean) => {
+    Object.defineProperty(media, "matches", { value, writable: true });
+    media.dispatchEvent(new Event("change"));
+  };
+  const [open, setOpen] = createSignal(true),
+    mounted = vi.fn(),
+    disposed = vi.fn();
+  function Draft() {
+    onMount(mounted);
+    onCleanup(disposed);
+    return <Input aria-label="Log note" />;
+  }
+  render(() => (
+    <Shell.Root>
+      <Shell.Body>
+        <Shell.Main>Work</Shell.Main>
+      </Shell.Body>
+      <Shell.Inspector title="Session log" open={open()} onOpenChange={setOpen}>
+        <Draft />
+      </Shell.Inspector>
+    </Shell.Root>
+  ));
+  const note = screen.getByRole("textbox", { name: "Log note" });
+  fireEvent.input(note, { target: { value: "keep this" } });
+  setNarrow(true);
+  expect(screen.getByRole("dialog", { name: "Session log" })).toContainElement(note);
+  expect(note).toHaveValue("keep this");
+  setNarrow(false);
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Session log" })).toBeNull());
+  expect(screen.getByRole("textbox", { name: "Log note" })).toBe(note);
+  expect(open()).toBe(true);
+  expect(mounted).toHaveBeenCalledOnce();
+  expect(disposed).not.toHaveBeenCalled();
 });
