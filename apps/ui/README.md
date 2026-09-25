@@ -202,8 +202,15 @@ enlarged root text, and reactive accessibility specimens cover the full package.
 import `@amends/icons`; catalog lookup stays in story code.
 
 The build produces a static workshop in `apps/ui/dist`. Production exports point
-to the foundations, primitives, and compositions, separately from the workshop. Stories are discovered
+to the foundations, primitives, compositions, and features, separately from the workshop. Stories are discovered
 under `src/**/*.stories.tsx` and import the public source exports.
+
+**Features / Sign in / Email form** introduces `SignInEmailForm`, a controlled
+presentation built from Field, Input, Button, Text, and Column. It handles native
+validation feedback, pending submission guards, and request-error presentation;
+the caller owns the request and next step. Stories cover themes, validation,
+retry, RTL, and narrow/enlarged layouts. See the
+[sign-in presentation contract](src/features/sign-in/README.md).
 
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.
 The builder loads the Solid and vanilla-extract plugins from `vite.config.ts`. Tests use the public `/next`

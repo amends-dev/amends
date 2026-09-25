@@ -87,8 +87,9 @@ disabled, and caller-controlled invalid states. `line.invalid` supplies the revi
 border. The Field composition provides a label, required marker, help, and error text with explicit
 reactive association props; form state and validation timing stay with the consuming feature.
 `text.invalid` adds a verified error-text role. CodeInput adds six-digit native text entry
-with decorative cells and a compact presentation for narrow containers; the sign-in forms
-and integration remain planned. Textarea and other specialized input types remain future
+with decorative cells and a compact presentation for narrow containers. SignInEmailForm
+adds controlled email entry, validation feedback, pending guards, and request errors in
+the UI workshop; the code form and connected flow remain planned. Textarea and other specialized input types remain future
 pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
 behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),
@@ -136,7 +137,7 @@ Stored credentials are scoped by API URL and validated before protected content 
 Changing credentials disposes the previous registry and requests. Session rejection,
 host failures, missing workspace access, and unknown routes have separate states.
 
-The sign-in page, email/code interaction, workspace picker/creation, application shell,
+The sign-in page, connected email/code flow, workspace picker/creation, application shell,
 and domain pages remain unimplemented. Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work. The removed legacy web screens remain available in Git history.

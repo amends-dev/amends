@@ -4,8 +4,9 @@ Planned implementation of the [feature development flow](feature-development.md)
 The first slice requests an email code, verifies it, and establishes a session.
 Workspace selection is the next feature.
 
-[CodeInput](../apps/ui/src/primitives/code-input/README.md) is implemented in the UI
-workshop. The forms, connected feature, and page remain planned.
+[CodeInput](../apps/ui/src/primitives/code-input/README.md) and
+[SignInEmailForm](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
+workshop. The code form, connected feature, and page remain planned.
 
 ## UI pieces
 

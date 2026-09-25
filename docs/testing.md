@@ -108,6 +108,12 @@ Forms, and Layout run as portable stories; Comparison checks glyph alignment in 
 Review real keyboard replacement, paste, undo, Enter/Tab, forced colors, RTL, and 320px
 layouts with enlarged text. Resizing between six cells and compact entry must retain the
 input, value, and selection. Device autofill and native desktop remain platform checks.
+The [SignInEmailForm](../apps/ui/src/features/sign-in/README.md) tests cover controlled
+drafts, native and caller-supplied validation, pending guards, retry, and reset ownership.
+Validation, Request Recovery, and Layout run as portable stories. Browser review covers
+real Enter/Tab, focus retention, inherited disabled-fieldset submission, both themes,
+RTL, long content, enlarged text, and accessibility. These are presentation fixtures;
+the connected sign-in feature and real HTTP scenarios remain planned.
 The [Field composition](../apps/ui/src/compositions/field/README.md) has DOM/type tests for
 unique identities, native label/description associations, external-description deduplication,
 wrapper props, required/disabled/error changes, and control identity/focus/selection retention.
