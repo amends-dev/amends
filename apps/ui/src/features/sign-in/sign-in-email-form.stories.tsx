@@ -7,7 +7,7 @@ import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { colorThemes } from "@amends/ui/foundations/color/styles";
 import "@amends/ui/foundations/typography/fonts";
-import * as s from "./sign-in-email-form.stories.css.ts";
+import * as s from "./sign-in.stories.css.ts";
 
 function RequestFixture() {
   const [email, setEmail] = createSignal("");

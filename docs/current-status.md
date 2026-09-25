@@ -89,7 +89,9 @@ reactive association props; form state and validation timing stay with the consu
 `text.invalid` adds a verified error-text role. CodeInput adds six-digit native text entry
 with decorative cells and a compact presentation for narrow containers. SignInEmailForm
 adds controlled email entry, validation feedback, pending guards, and request errors in
-the UI workshop; the code form and connected flow remain planned. Textarea and other specialized input types remain future
+the UI workshop. SignInCodeForm adds code verification/resend presentation, independent
+pending states, recovery feedback, and change-email callbacks. The connected flow
+remains planned. Textarea and other specialized input types remain future
 pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
 behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),

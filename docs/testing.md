@@ -114,6 +114,12 @@ Validation, Request Recovery, and Layout run as portable stories. Browser review
 real Enter/Tab, focus retention, inherited disabled-fieldset submission, both themes,
 RTL, long content, enlarged text, and accessibility. These are presentation fixtures;
 the connected sign-in feature and real HTTP scenarios remain planned.
+SignInCodeForm adds portable scenarios for validation, verification recovery, resend
+failure/retry, changing email while pending, and resizing. DOM/type checks cover
+exclusive pending actions, explicit submission, leading zeros, caller-owned feedback,
+reset, and isolated instances. Browser review checks native keyboard/paste, focus,
+inherited disabled-fieldset guards, RTL, and enlarged text. Resend must bypass code
+validation; changing email must remain available during either request.
 The [Field composition](../apps/ui/src/compositions/field/README.md) has DOM/type tests for
 unique identities, native label/description associations, external-description deduplication,
 wrapper props, required/disabled/error changes, and control identity/focus/selection retention.

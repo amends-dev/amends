@@ -5,7 +5,7 @@ import { Input } from "../../primitives/input/index.ts";
 import { Column } from "../../primitives/layout/index.ts";
 import { Text } from "../../primitives/text/index.ts";
 import { callHandler, classes } from "../../primitives/internal/props.ts";
-import * as s from "./sign-in-email-form.css.ts";
+import * as s from "./sign-in-form.css.ts";
 
 export type SignInEmailFormProps = Omit<
   JSX.FormHTMLAttributes<HTMLFormElement>,

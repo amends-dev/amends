@@ -2,6 +2,7 @@ import { style } from "@vanilla-extract/css";
 import { colorVars } from "@amends/ui/foundations/color/styles";
 import { space } from "@amends/ui/foundations/spacing";
 
+// Shared workshop framing; not part of either form's production presentation.
 export const comparison = style({
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 30rem), 1fr))",

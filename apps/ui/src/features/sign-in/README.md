@@ -1,8 +1,8 @@
 # Sign-in presentation
 
-`SignInEmailForm` is the email step, exported from `@amends/ui/features/sign-in`.
-It composes Field, Input, Button, Text, and Column. It owns no client, HTTP,
-session, navigation, or theme state. The code form remains a separate planned piece.
+`SignInEmailForm` and `SignInCodeForm` are independent steps, exported from
+`@amends/ui/features/sign-in`. They compose the existing controls and layout
+primitives. Neither owns client, HTTP, session, navigation, or theme state.
 
 ```tsx
 <SignInEmailForm
@@ -15,7 +15,7 @@ session, navigation, or theme state. The code form remains a separate planned pi
 />
 ```
 
-## Contract
+## Email step
 
 The caller owns the email draft, request lifetime, external errors, and next step.
 `onEmailChange` receives the edited string; `onSubmit` receives the native field's
@@ -40,6 +40,46 @@ Native reset is prevented to preserve the controlled draft; an optional `onReset
 handler can update it. Do not nest the component inside another form. Its parent
 owns width, page layout, branding, and any surrounding content.
 
+## Code step
+
+```tsx
+<SignInCodeForm
+  email={email()}
+  code={code()}
+  onCodeChange={setCode}
+  onSubmit={verifyCode}
+  onResend={requestAnotherCode}
+  onChangeEmail={returnToEmail}
+  pending={pending()}
+  codeError={codeError()}
+  requestError={requestError()}
+  notice={notice()}
+/>
+```
+
+The caller owns the code draft and all three actions. Verification requires an
+explicit submit and six ASCII digits, preserving leading zeros. Inline native
+validation focuses the code input; `codeError` adds caller-owned feedback such as
+wrong, expired, or unavailable codes. `requestError` is a separate alert and never
+marks the code invalid. The caller clears external errors when appropriate.
+
+`pending` is `undefined`, `"verifying"`, or `"resending"`. The active action retains focus and shows the
+Button pending treatment; the other request action is disabled and the code is
+read-only. Form and action guards also prevent direct duplicate requests. Change
+email stays available, including while pending; the caller must cancel obsolete
+work and choose the next view.
+
+Resend does not require a valid code. It clears native validation feedback but
+does not clear the draft or external errors. After a successful resend, the caller
+can clear the code and supply a `notice`, announced in the persistent status region.
+Pending progress takes precedence over that notice. Code and feedback updates keep
+the input mounted. Native reset follows the email form's controlled-reset contract.
+
+`deliveryHint` supplies retrieval guidance; its default is “Use your most recent
+code.” The component makes no claim about email delivery, device binding, expiry
+times, or resend cooldowns. The connected feature must supply guidance for its host.
+The email is isolated with `bdi` so it remains readable within RTL copy.
+
 ## Design and review
 
 The [sign-in reference](<../../../../../design-system/Amends Screen · Sign in.dc.html>)
@@ -53,3 +93,11 @@ Validation, Request Recovery, and Layout also run as portable stories. Workshop
 controls simulate outcomes without HTTP and are not exported with the component.
 Browser checks cover native Enter/Tab, focus retention, repeated pending activation,
 disabled fieldsets, narrow layouts, accessibility, and reduced motion.
+
+**Features / Sign in / Code form** covers verification, resend, wrong/expired/
+unavailable codes, request failure, resend notices, delivery guidance, and pending
+email changes. Validation, Verify Recovery, Resend Recovery, Change Email, and Layout
+run as portable stories. Browser review adds native paste/selection, disabled-fieldset
+guards, RTL, both themes, and CodeInput's compact layout with enlarged text.
+CodeInput's clipped area can produce an inconclusive axe contrast result; the
+rendered code text/surface pairs are also checked directly in the browser.

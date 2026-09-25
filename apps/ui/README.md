@@ -212,6 +212,12 @@ the caller owns the request and next step. Stories cover themes, validation,
 retry, RTL, and narrow/enlarged layouts. See the
 [sign-in presentation contract](src/features/sign-in/README.md).
 
+**Features / Sign in / Code form** adds `SignInCodeForm` over Field, CodeInput, and
+Button. Verification and resend have distinct pending states; change email stays
+available while either request runs. The caller owns requests, code/error updates,
+delivery guidance, and resend notices. Stories cover recovery, validation, themes,
+RTL, and narrow/enlarged layouts using the same production form.
+
 Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.
 The builder loads the Solid and vanilla-extract plugins from `vite.config.ts`. Tests use the public `/next`
 portable-story factory and the repository's explicit DOM-matcher setup. No Storybook
