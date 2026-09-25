@@ -6,6 +6,7 @@ import { FetchHttpClient } from "effect/unstable/http";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
 import { Session, type SessionStore } from "@amends/client";
+import { committed, withChangeFeed } from "./change-feed.ts";
 
 const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });
 function memoryStore(initial?: Session) {
@@ -33,11 +34,19 @@ const deferred = <A,>() => Promise.withResolvers<A>();
 const directory = { memberships: [], invitations: [] };
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-function mount(path: string, store: SessionStore, fetch: typeof globalThis.fetch) {
+let feed: ReturnType<typeof withChangeFeed>;
+/** Change-feed requests reach controllable streams; `fetch` sees every other request. */
+function mount(
+  path: string,
+  store: SessionStore,
+  fetch: typeof globalThis.fetch,
+  open?: (request: Request) => Response | undefined,
+) {
   const history = createMemoryHistory();
   history.set({ value: path, scroll: false, replace: true });
+  feed = withChangeFeed(fetch, open);
   const transport = FetchHttpClient.layer.pipe(
-    Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+    Layer.provide(Layer.succeed(FetchHttpClient.Fetch, feed.fetch)),
   );
   render(() => (
     <Application apiBaseUrl="https://host.test" sessionStore={store} transport={transport}>
@@ -70,7 +79,9 @@ it("validates a restored credential before mounting protected content and suppor
   const fetch = vi.fn<typeof globalThis.fetch>(() => pending.promise);
   const fixture = memoryStore(session("alice"));
   const history = mount("/workspaces", fixture.store, fetch);
-  expect(screen.getByRole("heading", { name: "Checking session" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Checking your session" })).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Connecting to your workspace host…");
+  expect(screen.getByText("alice")).toBeInTheDocument();
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const call = fetch.mock.calls[0];
   if (!call) throw new Error("Missing request");
@@ -100,7 +111,7 @@ it("preserves credentials on a temporary host failure and retries explicitly", a
     .mockResolvedValueOnce(response({}, 503))
     .mockResolvedValueOnce(response(directory));
   mount("/workspaces", fixture.store, fetch);
-  await screen.findByRole("heading", { name: "Unable to connect" });
+  await screen.findByRole("heading", { name: "Can’t reach your workspace host" });
   expect(fixture.store.read()?.token).toBe("alice");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   await screen.findByRole("heading", { name: "Where are you working?" });
@@ -109,8 +120,16 @@ it("preserves credentials on a temporary host failure and retries explicitly", a
 it("denies unknown workspaces without treating membership loss as logout", async () => {
   const fixture = memoryStore(session("alice"));
   mount("/workspaces/missing", fixture.store, () => Promise.resolve(response(directory)));
-  await screen.findByRole("heading", { name: "Workspace unavailable" });
+  await screen.findByRole("heading", { name: "That workspace is closed to you" });
   expect(fixture.store.read()?.token).toBe("alice");
+  expect(screen.getByText("No access")).toBeInTheDocument();
+  expect(
+    screen.getByText("This workspace doesn’t exist, or it hasn’t been shared with alice."),
+  ).toBeInTheDocument();
+  // The same account header as the picker, and a way back to it.
+  expect(screen.getByText("alice")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
+  await screen.findByRole("heading", { name: "Where are you working?" });
 });
 it("aborts old requests on cross-window logout and never renders their late data", async () => {
   const fixture = memoryStore(session("alice"));
@@ -127,9 +146,53 @@ it("aborts old requests on cross-window logout and never renders their late data
 });
 it("renders the not-found route without starting a session request", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
-  mount("/missing", memoryStore().store, fetch);
-  await screen.findByRole("heading", { name: "Page not found" });
+  const history = mount("/missing", memoryStore().store, fetch);
+  await screen.findByRole("heading", { name: "Nothing at this address" });
   expect(fetch).not.toHaveBeenCalled();
+  // Guests get no account controls, and a way to sign in.
+  expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await screen.findByRole("heading", { name: "Sign in to amends" });
+  expect(history.get()).toBe("/sign-in");
+});
+it("offers a signed-in reader their workspaces from an unknown address", async () => {
+  const history = mount("/nowhere", memoryStore(session("alice")).store, () =>
+    Promise.resolve(response(directory)),
+  );
+  await screen.findByRole("heading", { name: "Nothing at this address" });
+  expect(screen.getByText("alice")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
+  await screen.findByRole("heading", { name: "Where are you working?" });
+  expect(history.get()).toBe("/workspaces");
+});
+it("keeps an unknown workspace page inside the workspace, with a way back home", async () => {
+  const history = mount("/workspaces/one/nope", memoryStore(session("alice")).store, () =>
+    Promise.resolve(response({ memberships: [membership("one", "Studio")], invitations: [] })),
+  );
+  await screen.findByRole("heading", { name: "Nothing on this page" });
+  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Workspace home" }));
+  await screen.findByRole("heading", { name: "Home" });
+  expect(history.get()).toBe("/workspaces/one");
+});
+it("replaces a crashed view with a reload, without account controls", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const reload = vi.fn();
+  // The fallback only reloads, so the stand-in location needs nothing else.
+  vi.spyOn(window, "location", "get").mockReturnValue({ reload } as unknown as Location);
+  function Broken(): never {
+    throw new Error("Unexpected view failure");
+  }
+  render(() => (
+    <Application apiBaseUrl="https://host.test" sessionStore={memoryStore(session("alice")).store}>
+      <Broken />
+    </Application>
+  ));
+  await screen.findByRole("heading", { name: "Something went wrong" });
+  expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+  expect(reload).toHaveBeenCalledTimes(1);
 });
 
 const membership = (id: string, name: string, status = "active") => ({
@@ -157,7 +220,10 @@ it("resolves active workspace scope from the directory and updates it during nav
   await screen.findByText("Second workspace");
   expect(screen.queryByText("First workspace")).not.toBeInTheDocument();
   history.set({ value: "/workspaces/removed", scroll: false });
-  await screen.findByRole("heading", { name: "Workspace unavailable" });
+  await screen.findByRole("heading", { name: "That workspace is closed to you" });
+  expect(screen.getByText("No longer a member")).toBeInTheDocument();
+  expect(screen.getByText(/Your membership of Removed workspace has ended/)).toBeInTheDocument();
+  expect(screen.getByText("Rejoining needs a fresh invitation.")).toBeInTheDocument();
 });
 it("revalidates and replaces cached directory data when credentials change", async () => {
   const fixture = memoryStore(session("alice"));
@@ -175,7 +241,7 @@ it("revalidates and replaces cached directory data when credentials change", asy
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("authorization")).toBe("Bearer bob");
   pending.resolve(response(directory));
-  await screen.findByRole("heading", { name: "Workspace unavailable" });
+  await screen.findByRole("heading", { name: "That workspace is closed to you" });
 });
 it("resumes a safe return path only after a stored session validates", async () => {
   const history = mount(
@@ -217,7 +283,7 @@ it("signs in through the composed page and validates before resuming the intende
   );
   fireEvent.input(code, { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Checking session" });
+  await screen.findByRole("heading", { name: "Checking your session" });
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
   expect(history.get()).toContain("/sign-in?returnTo=");
   expect(fixture.store.read()?.token).toBe("jo@mercier.co");
@@ -262,7 +328,7 @@ it("disposes sign-in when navigation leaves the page, even if verification resol
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   const signal = fetch.mock.calls[1]?.[1]?.signal;
   history.set({ value: "/missing", scroll: false });
-  await screen.findByRole("heading", { name: "Page not found" });
+  await screen.findByRole("heading", { name: "Nothing at this address" });
   await waitFor(() => expect(signal?.aborted).toBe(true));
   pending.resolve(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }));
   await pending.promise;
@@ -369,7 +435,13 @@ it("keeps the sidebar and account trigger mounted across workspace pages and swi
   expect(sidebar).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
-  expect(fetch).toHaveBeenCalledTimes(4);
+  // The directory, then the second workspace's settings and ownership; the feed stays separate.
+  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(feed.streams.map((stream) => new URL(stream.request.url).pathname)).toEqual([
+    "/workspaces/one/changes",
+    "/workspaces/two/changes",
+  ]);
+  await waitFor(() => expect(feed.streams[0]?.request.signal.aborted).toBe(true));
 });
 it("preserves a nested destination through sign-in and denies unavailable workspace children", async () => {
   const fixture = memoryStore();
@@ -379,7 +451,7 @@ it("preserves a nested destination through sign-in and denies unavailable worksp
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftasks%3Ffilter%3Dmine");
   fixture.change(session("alice"));
-  await screen.findByRole("heading", { name: "Workspace unavailable" });
+  await screen.findByRole("heading", { name: "That workspace is closed to you" });
   expect(
     screen.queryByRole("complementary", { name: "Workspace sidebar" }),
   ).not.toBeInTheDocument();
@@ -430,4 +502,138 @@ it("redirects the Settings entry to its workspace section and keeps sidebar sele
   fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/settings/members"));
   expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
+});
+
+function liveWorkspace(options: { name: () => string; status?: () => string }) {
+  return vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    const entry = membership("one", options.name(), options.status?.() ?? "active");
+    if (path.endsWith("/settings"))
+      return Promise.resolve(
+        response({
+          workspace: entry.workspace,
+          canRename: true,
+          canReadInvitations: true,
+          canInvite: true,
+          roles: [],
+        }),
+      );
+    if (path.endsWith("/ownership"))
+      return Promise.resolve(
+        response({
+          workspace: entry.workspace,
+          owner: entry.member,
+          ownerAssignmentId: "grant",
+          canTransfer: true,
+          candidates: [],
+        }),
+      );
+    return Promise.resolve(response({ memberships: [entry], invitations: [] }));
+  });
+}
+it("shows a rename committed elsewhere without a reload, keeping the draft being edited", async () => {
+  let name = "Studio";
+  mount(
+    "/workspaces/one/settings/workspace",
+    memoryStore(session("alice")).store,
+    liveWorkspace({ name: () => name }),
+  );
+  const input = await screen.findByRole("textbox", { name: "Workspace name" });
+  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
+  expect(input).toHaveValue("Studio");
+  fireEvent.input(input, { target: { value: "My draft" } });
+  name = "Atelier";
+  feed.streams[0]?.send(
+    committed("one", "2", [
+      {
+        name: "workspace.renamed",
+        payload: { workspaceId: "one", previousName: "Studio", name: "Atelier" },
+      },
+    ]),
+  );
+  await waitFor(() => expect(sidebar).toHaveTextContent("Atelier"));
+  await waitFor(() =>
+    expect(screen.getByRole("complementary", { name: "Workspace details" })).toHaveTextContent(
+      "Atelier",
+    ),
+  );
+  expect(screen.getByRole("textbox", { name: "Workspace name" })).toBe(input);
+  expect(input).toHaveValue("My draft");
+});
+it("leaves a workspace once a commit removes the member, without signing out", async () => {
+  let status = "active";
+  const fixture = memoryStore(session("alice"));
+  mount(
+    "/workspaces/one",
+    fixture.store,
+    liveWorkspace({ name: () => "Studio", status: () => status }),
+    () =>
+      status === "removed"
+        ? response({ _tag: "Gateway.NotMember", workspaceId: "one" }, 403)
+        : undefined,
+  );
+  await screen.findByRole("heading", { name: "Home" });
+  status = "removed";
+  feed.streams[0]?.send(
+    committed("one", "2", [
+      { name: "workspace.member.removed", payload: { workspaceId: "one", memberId: "owner-one" } },
+    ]),
+  );
+  feed.streams[0]?.unavailable();
+  await screen.findByRole("heading", { name: "That workspace is closed to you" });
+  expect(fixture.store.read()?.token).toBe("alice");
+  await waitFor(() => expect(feed.streams[0]?.request.signal.aborted).toBe(true));
+});
+it("tells the reader when changes stop arriving, and clears once they resume", async () => {
+  let down = false;
+  mount(
+    "/workspaces/one",
+    memoryStore(session("alice")).store,
+    liveWorkspace({ name: () => "Studio" }),
+    () => (down ? response({ _tag: "ChangeFeed.Unavailable" }, 503) : undefined),
+  );
+  await screen.findByRole("heading", { name: "Home" });
+  const announcer = screen.getByRole("status");
+  expect(announcer).toBeEmptyDOMElement();
+  down = true;
+  feed.streams[0]?.unavailable();
+  // A brief drop, such as a host restart, stays silent.
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+  expect(announcer).toBeEmptyDOMElement();
+  await waitFor(() => expect(announcer).toHaveTextContent("Reconnecting…"), { timeout: 3_000 });
+  down = false;
+  window.dispatchEvent(new Event("online"));
+  await waitFor(() => expect(announcer).toBeEmptyDOMElement());
+  expect(screen.getByRole("status")).toBe(announcer);
+}, 10_000);
+
+it("points an invited identity to its invitation instead of reporting no access", async () => {
+  const fixture = memoryStore(session("alice"));
+  mount("/workspaces/one/settings", fixture.store, () =>
+    Promise.resolve(
+      response({
+        memberships: [],
+        invitations: [
+          {
+            details: {
+              id: "invitation-one",
+              workspaceId: "one",
+              recipientId: "alice",
+              roleId: "builtin:viewer",
+              inviterMemberId: "owner-one",
+              issuedAt: "2026-09-25T12:00:00.000Z",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+            state: { _tag: "Pending" },
+            workspaceName: "Fold Studio",
+          },
+        ],
+      }),
+    ),
+  );
+  await screen.findByRole("heading", { name: "You haven’t joined this workspace yet" });
+  expect(screen.getByText("Invitation waiting")).toBeInTheDocument();
+  expect(screen.getByText(/You’ve been invited to Fold Studio/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
+  await screen.findByRole("button", { name: "Accept invitation" });
 });

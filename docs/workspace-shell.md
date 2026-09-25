@@ -12,8 +12,8 @@ dark rail from 768px to 1023px. Below 768px, a header toggle opens the full
 navigation drawer. The drawer closes from its backdrop, Escape, or a destination link;
 it has no close button or bottom navigation. The sidebar content remains mounted while
 moving into that drawer. Ordinary navigation closes it; modifier clicks retain
-native link behavior. A missing or removed membership shows unavailable access
-outside the workspace layout. Sign-in preserves supported nested destinations.
+native link behavior. A missing or removed membership shows the
+[unavailable page](workspace-entry.md) outside the workspace layout. Sign-in preserves supported nested destinations.
 
 ## Screen layout reference
 

@@ -11,7 +11,8 @@ import { Divider } from "@amends/ui/primitives/divider";
 import { Button } from "@amends/ui/primitives/button";
 import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
-import { createEffect, createMemo, createSignal, For, Show, onMount } from "solid-js";
+import { createEffect, createSignal, For, on, Show, onMount } from "solid-js";
+import { keyed } from "../internal/keyed.ts";
 import { useSettingsScope } from "./settings.tsx";
 type Entry = SettingsData["members"][number];
 const workspaceRoles = (entry: Entry) =>
@@ -29,11 +30,49 @@ const roleNames = (entry: Entry) =>
       assignment.source._tag === "Role" ? roleName(entry, assignment.source.roleId) : "",
     )
     .join(", ") || "No workspace role";
+function MemberRow(props: { entry: Entry; href: string; selected: boolean; you: boolean }) {
+  const active = () => props.entry.member.status === "active";
+  return (
+    <ItemList.Item>
+      <ItemList.Link href={props.href} aria-current={props.selected ? "page" : undefined}>
+        <ItemList.Leading>
+          <Avatar.Root
+            kind={props.entry.member.identity._tag === "Human" ? "human" : "agent"}
+            decorative
+          >
+            <Avatar.Fallback>
+              {props.entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
+            </Avatar.Fallback>
+          </Avatar.Root>
+        </ItemList.Leading>
+        <ItemList.Content>
+          <ItemList.Title>
+            {props.entry.member.identity.id}
+            {props.you ? " · You" : ""}
+          </ItemList.Title>
+          <ItemList.Description>
+            {props.entry.access ? roleNames(props.entry) : "Access details unavailable"}
+          </ItemList.Description>
+        </ItemList.Content>
+        <ItemList.Meta>
+          <Status.Root tone={active() ? "success" : "idle"}>
+            <Status.Indicator />
+            <Status.Label>{active() ? "Active" : "Removed"}</Status.Label>
+          </Status.Root>
+        </ItemList.Meta>
+      </ItemList.Link>
+    </ItemList.Item>
+  );
+}
 export function MemberList(props: { memberHref: (id: string) => string; selectedId?: string }) {
   const value = useSettingsScope();
   const membership = useWorkspace(() => value.data()?.settings.workspace.id ?? "");
+  const members = keyed(
+    () => value.data()?.members ?? [],
+    (entry) => entry.member.id,
+  );
   const entries = (status: "active" | "removed") =>
-    value.data()?.members.filter((entry) => entry.member.status === status) ?? [];
+    members.ids().filter((id) => members.get(id)?.member.status === status);
   return (
     <Show when={value.data()}>
       <Column gap={6}>
@@ -63,41 +102,17 @@ export function MemberList(props: { memberHref: (id: string) => string; selected
                     aria-label={status === "active" ? "Active members" : "Removed members"}
                   >
                     <For each={entries(status)}>
-                      {(entry) => (
-                        <ItemList.Item>
-                          <ItemList.Link
-                            href={props.memberHref(entry.member.id)}
-                            aria-current={props.selectedId === entry.member.id ? "page" : undefined}
-                          >
-                            <ItemList.Leading>
-                              <Avatar.Root
-                                kind={entry.member.identity._tag === "Human" ? "human" : "agent"}
-                                decorative
-                              >
-                                <Avatar.Fallback>
-                                  {entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
-                                </Avatar.Fallback>
-                              </Avatar.Root>
-                            </ItemList.Leading>
-                            <ItemList.Content>
-                              <ItemList.Title>
-                                {entry.member.identity.id}
-                                {entry.member.id === membership()?.member.id ? " · You" : ""}
-                              </ItemList.Title>
-                              <ItemList.Description>
-                                {entry.access ? roleNames(entry) : "Access details unavailable"}
-                              </ItemList.Description>
-                            </ItemList.Content>
-                            <ItemList.Meta>
-                              <Status.Root tone={status === "active" ? "success" : "idle"}>
-                                <Status.Indicator />
-                                <Status.Label>
-                                  {status === "active" ? "Active" : "Removed"}
-                                </Status.Label>
-                              </Status.Root>
-                            </ItemList.Meta>
-                          </ItemList.Link>
-                        </ItemList.Item>
+                      {(id) => (
+                        <Show when={members.get(id)}>
+                          {(entry) => (
+                            <MemberRow
+                              entry={entry()}
+                              href={props.memberHref(id)}
+                              selected={props.selectedId === id}
+                              you={id === membership()?.member.id}
+                            />
+                          )}
+                        </Show>
                       )}
                     </For>
                   </ItemList.Root>
@@ -110,17 +125,33 @@ export function MemberList(props: { memberHref: (id: string) => string; selected
     </Show>
   );
 }
+/**
+ * The role follows the member's current assignment until chosen. A choice keeps the assignments
+ * it was made against, so a change saved elsewhere meanwhile conflicts instead of being replaced.
+ */
 function MemberEditor(props: { entry: Entry }) {
   const value = useSettingsScope(),
-    [role, setRole] = createSignal<string | null>(null),
+    [draft, setDraft] = createSignal<{ role: string | null; expected: ReadonlyArray<string> }>(),
     [removeOpen, setRemoveOpen] = createSignal(false);
-  const current = workspaceRoles(props.entry),
-    expectedAssignmentIds = current.map((record) => record.id);
-  const first = current[0];
-  if (first?.source._tag === "Role") setRole(first.source.roleId);
+  const assigned = () => workspaceRoles(props.entry);
+  const stored = () => {
+    const first = assigned()[0];
+    return first?.source._tag === "Role" ? first.source.roleId : null;
+  };
+  const role = () => {
+    const chosen = draft();
+    return chosen ? chosen.role : stored();
+  };
+  const expectedAssignmentIds = () => draft()?.expected ?? assigned().map((record) => record.id);
+  const setRole = (next: string | null) =>
+    setDraft({ role: next, expected: expectedAssignmentIds() });
   createEffect(() => {
-    if (value.saved()) setRemoveOpen(false);
+    if (value.saved()) {
+      setRemoveOpen(false);
+      setDraft(undefined);
+    }
   });
+  createEffect(on(value.revision, () => setDraft(undefined), { defer: true }));
   return (
     <Column gap={5}>
       <Show when={props.entry.access?.canManage}>
@@ -136,7 +167,7 @@ function MemberEditor(props: { entry: Entry }) {
                 kind: "role",
                 memberId: props.entry.member.id,
                 roleId,
-                expectedAssignmentIds,
+                expectedAssignmentIds: expectedAssignmentIds(),
               });
           }}
         >
@@ -312,24 +343,25 @@ function MemberContent(props: { entry: Entry }) {
     </Column>
   );
 }
+/** Selecting another member starts over; refreshes of the same member keep its focus and drafts. */
 export function MemberDetail(props: { memberId: string; backHref: string }) {
   const value = useSettingsScope();
-  const selected = createMemo(() =>
-    value.data()?.members.find((entry) => entry.member.id === props.memberId),
-  );
   return (
     <Column gap={4}>
       <ListDetail.Back href={props.backHref}>Back to members</ListDetail.Back>
-      <Show
-        when={selected()}
-        keyed
-        fallback={
-          <Show when={value.data()}>
-            <Text role="status">This member is unavailable or you cannot view them.</Text>
+      <Show when={props.memberId} keyed>
+        {(memberId) => (
+          <Show
+            when={value.data()?.members.find((entry) => entry.member.id === memberId)}
+            fallback={
+              <Show when={value.data()}>
+                <Text role="status">This member is unavailable or you cannot view them.</Text>
+              </Show>
+            }
+          >
+            {(entry) => <MemberContent entry={entry()} />}
           </Show>
-        }
-      >
-        {(entry) => <MemberContent entry={entry} />}
+        )}
       </Show>
     </Column>
   );

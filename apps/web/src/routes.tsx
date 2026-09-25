@@ -5,7 +5,7 @@ import {
   MembersSettingsPage,
   InvitesSettingsPage,
 } from "./pages/settings.tsx";
-import { A, Navigate, Route, useLocation, useParams, useSearchParams } from "@solidjs/router";
+import { Navigate, Route, useLocation, useParams, useSearchParams } from "@solidjs/router";
 import {
   DirectoryProvider,
   paths,
@@ -14,14 +14,18 @@ import {
   useDirectory,
   useSession,
   useWorkspace,
+  WorkspaceFeedProvider,
 } from "@amends/client";
 import { Button } from "@amends/ui/primitives/button";
-import { Row } from "@amends/ui/primitives/layout";
+import { EmptyState } from "@amends/ui/compositions/empty-state";
+import { Drawing } from "@amends/ui/primitives/drawing";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
-import { PlaceholderPage as Page } from "./placeholder-page.tsx";
+import { StandalonePage } from "./standalone-page.tsx";
+import { NotFoundPage } from "./pages/not-found.tsx";
 import { SignInPage } from "./pages/sign-in.tsx";
 import { WorkspacePickerPage } from "./pages/workspace-picker.tsx";
 import { CreateWorkspacePage } from "./pages/create-workspace.tsx";
+import { WorkspaceUnavailablePage } from "./pages/workspace-unavailable.tsx";
 import { WorkspaceLayout } from "./workspace-layout.tsx";
 import {
   HomePage,
@@ -32,17 +36,6 @@ import {
   MissingWorkspacePage,
 } from "./pages/workspace.tsx";
 
-function SessionActions() {
-  const session = useSession();
-  return (
-    <Row gap={4}>
-      <A href={paths.workspaces}>Workspaces</A>
-      <Button variant="secondary" onClick={() => session.replace(undefined)}>
-        Sign out
-      </Button>
-    </Row>
-  );
-}
 function RequireSession(props: ParentProps) {
   const session = useSession();
   const location = useLocation();
@@ -63,18 +56,32 @@ function ValidatedSession(props: ParentProps) {
     <Switch>
       <Match when={directory.state()._tag === "Ready"}>{props.children}</Match>
       <Match when={directory.state()._tag === "Failed"}>
-        <Page
-          title="Unable to connect"
-          message="Your session could not be checked. Try again when the host is available."
-        >
-          <Button onClick={directory.retry}>Try again</Button>
-          <SessionActions />
-        </Page>
+        <StandalonePage>
+          <EmptyState.Root>
+            <Drawing.Disconnected />
+            <EmptyState.Text>
+              <EmptyState.Title as="h1">Can’t reach your workspace host</EmptyState.Title>
+              <EmptyState.Description>
+                You’re still signed in. Try again once the host is running.
+              </EmptyState.Description>
+            </EmptyState.Text>
+            <EmptyState.Actions>
+              <Button onClick={directory.retry}>Try again</Button>
+            </EmptyState.Actions>
+          </EmptyState.Root>
+        </StandalonePage>
       </Match>
       <Match when={true}>
-        <Page title="Checking session" message="Connecting to your workspace host.">
-          <span role="status">Loading…</span>
-        </Page>
+        <StandalonePage>
+          <EmptyState.Root>
+            <EmptyState.Text>
+              <EmptyState.Title as="h1">Checking your session</EmptyState.Title>
+              <EmptyState.Description role="status">
+                Connecting to your workspace host…
+              </EmptyState.Description>
+            </EmptyState.Text>
+          </EmptyState.Root>
+        </StandalonePage>
       </Match>
     </Switch>
   );
@@ -101,16 +108,11 @@ function WorkspaceRoute(props: ParentProps) {
   return (
     <Show
       when={workspace() !== undefined}
-      fallback={
-        <Page
-          title="Workspace unavailable"
-          message="This workspace is unavailable or you no longer have access."
-        >
-          <SessionActions />
-        </Page>
-      }
+      fallback={<WorkspaceUnavailablePage workspaceId={params.workspaceId} />}
     >
-      <WorkspaceLayout>{props.children}</WorkspaceLayout>
+      <WorkspaceFeedProvider workspaceId={params.workspaceId}>
+        <WorkspaceLayout>{props.children}</WorkspaceLayout>
+      </WorkspaceFeedProvider>
     </Show>
   );
 }
@@ -137,10 +139,7 @@ export function ApplicationRoutes() {
           <Route path="*missing" component={MissingWorkspacePage} />
         </Route>
       </Route>
-      <Route
-        path="*unmatched"
-        component={() => <Page title="Page not found" message="This page does not exist." />}
-      />
+      <Route path="*unmatched" component={NotFoundPage} />
     </>
   );
 }

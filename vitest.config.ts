@@ -1,10 +1,12 @@
 import { defineConfig } from "vitest/config";
+import { onUnhandledError } from "./scripts/testing/unhandled-errors.ts";
 
 export default defineConfig({
   test: {
     // Separate processes preserve Bun's native server APIs.
     pool: "forks",
     maxWorkers: 4,
+    onUnhandledError,
     projects: [
       {
         test: {

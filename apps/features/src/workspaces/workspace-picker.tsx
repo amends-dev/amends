@@ -9,7 +9,8 @@ import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
 import { Button } from "@amends/ui/primitives/button";
 import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
-import { createContext, createMemo, For, Show, useContext, type ParentProps } from "solid-js";
+import { createContext, For, Show, useContext, type ParentProps } from "solid-js";
+import { keyed } from "../internal/keyed.ts";
 
 const Context = createContext<DirectoryScope>();
 const directory = () => {
@@ -34,35 +35,50 @@ export function Summary() {
   };
   return <Text tone="secondary">{summary()}</Text>;
 }
+type Membership = Extract<
+  ReturnType<DirectoryScope["state"]>,
+  { _tag: "Ready" }
+>["listing"]["memberships"][number];
+function WorkspaceRow(props: { entry: Membership; href: string }) {
+  return (
+    <ItemList.Item>
+      <ItemList.Link href={props.href}>
+        <ItemList.Leading>
+          <WorkspaceMark decorative>
+            {Array.from(props.entry.workspace.name)[0]?.toLocaleUpperCase() ?? "?"}
+          </WorkspaceMark>
+        </ItemList.Leading>
+        <ItemList.Content>
+          <ItemList.Title>{props.entry.workspace.name}</ItemList.Title>
+          <ItemList.Description>
+            {props.entry.activeMemberCount}{" "}
+            {props.entry.activeMemberCount === 1 ? "member" : "members"}
+            {props.entry.member.id === props.entry.workspace.ownerMemberId ? " · Owner" : ""}
+          </ItemList.Description>
+        </ItemList.Content>
+      </ItemList.Link>
+    </ItemList.Item>
+  );
+}
 export function List(props: { workspaceHref: (workspaceId: string) => string }) {
   const value = directory();
-  const memberships = createMemo(() => {
-    const state = value.state();
-    return state._tag === "Ready"
-      ? state.listing.memberships.filter((entry) => entry.member.status === "active")
-      : [];
-  });
+  const memberships = keyed(
+    () => {
+      const state = value.state();
+      return state._tag === "Ready"
+        ? state.listing.memberships.filter((entry) => entry.member.status === "active")
+        : [];
+    },
+    (entry) => entry.workspace.id,
+  );
   return (
-    <Show when={memberships().length}>
+    <Show when={memberships.ids().length}>
       <ItemList.Root aria-label="Your workspaces">
-        <For each={memberships()}>
-          {(entry) => (
-            <ItemList.Item>
-              <ItemList.Link href={props.workspaceHref(entry.workspace.id)}>
-                <ItemList.Leading>
-                  <WorkspaceMark decorative>
-                    {Array.from(entry.workspace.name)[0]?.toLocaleUpperCase() ?? "?"}
-                  </WorkspaceMark>
-                </ItemList.Leading>
-                <ItemList.Content>
-                  <ItemList.Title>{entry.workspace.name}</ItemList.Title>
-                  <ItemList.Description>
-                    {entry.activeMemberCount} {entry.activeMemberCount === 1 ? "member" : "members"}
-                    {entry.member.id === entry.workspace.ownerMemberId ? " · Owner" : ""}
-                  </ItemList.Description>
-                </ItemList.Content>
-              </ItemList.Link>
-            </ItemList.Item>
+        <For each={memberships.ids()}>
+          {(id) => (
+            <Show when={memberships.get(id)}>
+              {(entry) => <WorkspaceRow entry={entry()} href={props.workspaceHref(id)} />}
+            </Show>
           )}
         </For>
       </ItemList.Root>
@@ -118,20 +134,26 @@ export function Status() {
   );
 }
 function InvitationEntry(props: {
-  invitation: NonNullable<
-    ReturnType<DirectoryScope["state"]> & { _tag: "Ready" }
+  invitation: Extract<
+    ReturnType<DirectoryScope["state"]>,
+    { _tag: "Ready" }
   >["listing"]["invitations"][number];
 }) {
-  const invitation = props.invitation;
-  const value = useAcceptInvitation(invitation.details.workspaceId, invitation.details.id);
+  // A row is keyed by invitation, so its identity is fixed; its details may still refresh.
+  const value = useAcceptInvitation(
+    props.invitation.details.workspaceId,
+    props.invitation.details.id,
+  );
   return (
     <ItemList.Item>
       <ItemList.Row>
         <ItemList.Content>
-          <ItemList.Title>{invitation.workspaceName ?? "Workspace invitation"}</ItemList.Title>
-          <ItemList.Description>For {invitation.details.recipientId}</ItemList.Description>
+          <ItemList.Title>
+            {props.invitation.workspaceName ?? "Workspace invitation"}
+          </ItemList.Title>
+          <ItemList.Description>For {props.invitation.details.recipientId}</ItemList.Description>
           <ItemList.Description>
-            Expires {formatInstant(invitation.details.expiresAt)}
+            Expires {formatInstant(props.invitation.details.expiresAt)}
           </ItemList.Description>
           <Show when={value.error()}>
             <Text role="alert" tone="danger">
@@ -150,19 +172,26 @@ function InvitationEntry(props: {
 }
 export function Invitations() {
   const value = directory();
-  const invitations = createMemo(() => {
-    const state = value.state();
-    return state._tag === "Ready" ? state.listing.invitations : [];
-  });
+  const invitations = keyed(
+    () => {
+      const state = value.state();
+      return state._tag === "Ready" ? state.listing.invitations : [];
+    },
+    (invitation) => invitation.details.id,
+  );
   return (
-    <Show when={invitations().length}>
+    <Show when={invitations.ids().length}>
       <Column gap={3}>
         <Text as="h2" variant="heading">
           Invitations
         </Text>
         <ItemList.Root aria-label="Your invitations">
-          <For each={invitations()}>
-            {(invitation) => <InvitationEntry invitation={invitation} />}
+          <For each={invitations.ids()}>
+            {(id) => (
+              <Show when={invitations.get(id)}>
+                {(invitation) => <InvitationEntry invitation={invitation()} />}
+              </Show>
+            )}
           </For>
         </ItemList.Root>
       </Column>

@@ -8,6 +8,15 @@ const meta = {
 } satisfies Meta<typeof SettingsFixture>;
 export default meta;
 type Story = StoryObj<typeof meta>;
+const control = async (canvasElement: HTMLElement, command: string) => {
+  const url = canvasElement.querySelector<HTMLElement>("[data-scenario-url]")?.dataset.scenarioUrl;
+  const response = await fetch(`${url}/control`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(command),
+  });
+  if (!response.ok) throw new Error("Control failed.");
+};
 export const Workspace = {} satisfies Story;
 export const Members = { args: { section: "members" } } satisfies Story;
 export const Invites = { args: { section: "invites" } } satisfies Story;
@@ -119,17 +128,13 @@ export const RefreshRecovery = {
       { name: "Workspace name" },
       { timeout: 15000 },
     );
-    const url =
-      canvasElement.querySelector<HTMLElement>("[data-scenario-url]")?.dataset.scenarioUrl;
-    await fetch(`${url}/control`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify("fail-directory"),
-    });
+    // Live updates also refresh the directory, so it stays failed until the story restores it.
+    await control(canvasElement, "break-directory");
     await userEvent.clear(input);
     await userEvent.type(input, "Studio");
     await userEvent.click(canvas.getByRole("button", { name: "Save name" }));
     await canvas.findByText("Saved, but the latest data could not be loaded. Refresh to continue.");
+    await control(canvasElement, "restore-directory");
     await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(canvas.getByText("Studio")).toBeVisible());
   },
@@ -146,6 +151,15 @@ export const StaleRename = {
     await userEvent.type(input, "My draft");
     await userEvent.click(canvas.getByRole("button", { name: "Rename elsewhere" }));
     await canvas.findByText("External rename complete");
+    // The live rename reaches the details but not the draft, which still targets the old name.
+    await waitFor(
+      () =>
+        expect(canvas.getByRole("complementary", { name: "Workspace details" })).toHaveTextContent(
+          "Changed elsewhere",
+        ),
+      { timeout: 5000 },
+    );
+    await expect(input).toHaveValue("My draft");
     await userEvent.click(canvas.getByRole("button", { name: "Save name" }));
     await canvas.findByText(
       "This changed while you were editing. Refresh, review the latest values, and try again.",
@@ -179,6 +193,9 @@ export const LostInvitationResponse = {
     );
     await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
     await canvas.findByText("new@example.test");
+    // The change feed may show the invitation before the refresh completes; wait for it.
+    await waitFor(() => expect(canvas.queryByRole("alert")).not.toBeInTheDocument());
+    await waitFor(() => expect(canvas.queryByText("Updating settings…")).not.toBeInTheDocument());
     await userEvent.click(canvas.getByRole("button", { name: "Create invitation" }));
     await canvas.findByText("Saved.");
     await expect(canvas.getAllByText("new@example.test")).toHaveLength(1);
@@ -194,5 +211,53 @@ export const LostInvitationResponse = {
     await expect(
       canvas.queryByRole("button", { name: "Accept invitation" }),
     ).not.toBeInTheDocument();
+  },
+} satisfies Story;
+export const LiveRename = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = await canvas.findByRole(
+      "textbox",
+      { name: "Workspace name" },
+      { timeout: 15000 },
+    );
+    await expect(input).toHaveValue("Mercier & Co");
+    await userEvent.click(canvas.getByRole("button", { name: "Rename elsewhere" }));
+    await canvas.findByText("External rename complete");
+    // Nothing here asked for a refresh: the change feed delivered the commit.
+    await waitFor(() => expect(input).toHaveValue("Changed elsewhere"), { timeout: 5000 });
+    await expect(
+      canvas.getByRole("complementary", { name: "Workspace details" }),
+    ).toHaveTextContent("Changed elsewhere");
+    await expect(canvas.queryByText("Saved.")).not.toBeInTheDocument();
+  },
+} satisfies Story;
+export const LiveInvitation = {
+  args: { section: "invites" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("list", { name: "Invitation history" }, { timeout: 15000 });
+    await userEvent.type(canvas.getByRole("textbox", { name: "Recipient" }), "draft@example.test");
+    await userEvent.click(canvas.getByRole("button", { name: "Invite elsewhere" }));
+    await canvas.findByText("External invitation complete");
+    await canvas.findByText("elsewhere@example.test", {}, { timeout: 5000 });
+    await expect(canvas.getByRole("textbox", { name: "Recipient" })).toHaveValue(
+      "draft@example.test",
+    );
+  },
+} satisfies Story;
+export const ResumeAfterDrop = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = await canvas.findByRole(
+      "textbox",
+      { name: "Workspace name" },
+      { timeout: 15000 },
+    );
+    // Commits made while disconnected replay from the last one received.
+    await control(canvasElement, "drop-changes");
+    await userEvent.click(canvas.getByRole("button", { name: "Rename elsewhere" }));
+    await canvas.findByText("External rename complete");
+    await waitFor(() => expect(input).toHaveValue("Changed elsewhere"), { timeout: 10000 });
   },
 } satisfies Story;

@@ -13,6 +13,7 @@ import { Button } from "@amends/ui/primitives/button";
 import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { keyed } from "../internal/keyed.ts";
 import { useSettingsScope } from "./settings.tsx";
 export function InviteForm() {
   const value = useSettingsScope(),
@@ -147,6 +148,10 @@ function InvitationRow(props: { invitation: SettingsData["invitations"][number] 
 }
 export function InvitationHistory() {
   const value = useSettingsScope();
+  const invitations = keyed(
+    () => value.data()?.invitations.toReversed() ?? [],
+    (invitation) => invitation.details.id,
+  );
   return (
     <Show when={value.data()}>
       {(data) => (
@@ -168,8 +173,12 @@ export function InvitationHistory() {
               fallback={<Text tone="secondary">No invitations yet.</Text>}
             >
               <ItemList.Root aria-label="Invitation history">
-                <For each={data().invitations.toReversed()}>
-                  {(invitation) => <InvitationRow invitation={invitation} />}
+                <For each={invitations.ids()}>
+                  {(id) => (
+                    <Show when={invitations.get(id)}>
+                      {(invitation) => <InvitationRow invitation={invitation()} />}
+                    </Show>
+                  )}
                 </For>
               </ItemList.Root>
             </Show>

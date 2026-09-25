@@ -7,19 +7,20 @@ import { Select } from "@amends/ui/primitives/select";
 import { Button } from "@amends/ui/primitives/button";
 import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, on, Show } from "solid-js";
 import { useSettingsScope } from "./settings.tsx";
+/**
+ * The name field follows the stored name until edited. A draft keeps the name it was made
+ * against, so a rename saved elsewhere meanwhile conflicts instead of being overwritten.
+ */
 export function WorkspaceName() {
   const value = useSettingsScope();
-  const [name, setName] = createSignal(""),
-    [expectedName, setExpectedName] = createSignal("");
+  const [draft, setDraft] = createSignal<{ name: string; expected: string }>();
+  const stored = () => value.data()?.settings.workspace.name ?? "";
   createEffect(() => {
-    const data = value.data();
-    if (data) {
-      setName(data.settings.workspace.name);
-      setExpectedName(data.settings.workspace.name);
-    }
+    if (value.saved()) setDraft(undefined);
   });
+  createEffect(on(value.revision, () => setDraft(undefined), { defer: true }));
   return (
     <Show when={value.data()}>
       {(data) => (
@@ -33,10 +34,10 @@ export function WorkspaceName() {
             fallback={<Text>Only an authorized owner can rename this workspace.</Text>}
           >
             <WorkspaceNameForm
-              name={name()}
-              onNameChange={setName}
+              name={draft()?.name ?? stored()}
+              onNameChange={(name) => setDraft({ name, expected: draft()?.expected ?? stored() })}
               onSubmit={(name) =>
-                value.send({ kind: "rename", name, expectedName: expectedName() })
+                value.send({ kind: "rename", name, expectedName: draft()?.expected ?? stored() })
               }
               pending={value.pending()}
               disabled={value.needsRefresh()}

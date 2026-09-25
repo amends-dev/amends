@@ -33,14 +33,20 @@ the aside. Invites keeps history in the primary column and the new-invite form i
 the aside. Both columns stack in that order on smaller screens. Pages and URL
 construction remain in web/desktop; ThemeProvider owns themes.
 
-Name edits carry the previously read name. Role changes carry the previous assignment
-IDs; ownership transfer carries the previous Owner assignment ID. Stale writes fail
-and require an explicit refresh/review. Refresh replaces form drafts with current data.
+Name edits carry the name the draft started from. Role changes carry the assignment IDs the
+choice started from; ownership transfer carries the Owner assignment ID read when the dialog
+opened. Stale writes fail and require an explicit refresh/review. Refresh replaces form drafts
+with current data.
 A completed mutation followed by a failed refresh retries the read, not the write.
 Invitation retries retain the same key and expiry while mounted. After leaving or
 reloading an interrupted invitation form, check history before creating another.
 Unmounting or credential replacement cancels requests and ignores late responses;
-a server commit may already have completed. Settings uses explicit refresh, not live updates.
+a server commit may already have completed.
+
+Sections stay current through the workspace change feed, which the app mounts around the
+workspace layout: changes made elsewhere refresh the affected reads without locking forms or
+replacing drafts. Rows are keyed by ID, so refreshes keep focus and open dialogs. See
+[live updates](live-updates.md).
 
 UI stories cover shared presentation. Connected stories run against isolated HTTP
 and PostgreSQL data; conformance tests cover rename permissions, stale writes,

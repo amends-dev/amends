@@ -47,8 +47,11 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 `Router`, resolves the endpoint (default `/api`), and supplies the session store.
 It nests the router and routes declaratively inside `Application`.
 `src/application.tsx` applies the theme and connects the headless `ClientProvider`
-to its children and error boundary. `src/placeholder-page.tsx` composes UI
-primitives for the temporary bootstrap screens. `src/routes.tsx` owns routes,
+to its children and error boundary. `src/standalone-page.tsx` frames pages outside a workspace like the picker: the brand, the
+signed-in account with Sign out, and centered content. Session checking, an unreachable host,
+unknown addresses, unavailable workspaces, and the error boundary use it, with the UI
+[EmptyState](../ui/src/compositions/empty-state/README.md) and its drawings, or a Notice for
+unavailable workspaces. See [workspace entry](../../docs/workspace-entry.md#standalone-states). `src/routes.tsx` owns routes,
 redirects, guard presentations, and client-to-UI wiring.
 `src/pages/sign-in.tsx` declares the page header, main, and footer using UI primitives,
 with `SignIn.Root`, `SignIn.EmailForm`, and `SignIn.CodeForm` nested in the content.
@@ -73,3 +76,6 @@ remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings
 compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved theme through ThemeProvider.
+`src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
+stay current over the change feed; the layout shows `Live.Status` in the page header's
+actions. See [live updates](../../docs/live-updates.md).

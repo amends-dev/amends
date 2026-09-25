@@ -20,6 +20,8 @@ portable backend packages under `packages/*` remain Effect-only.
 - `DirectoryProvider` validates a credential through `GET /me/workspaces` and exposes
   `SignedOut`, `Loading`, `Ready { listing }`, or `Failed` through `useDirectory()`.
   `retry` lets the consuming app decide when to repeat a failed read. Guests make no request.
+  The directory also refreshes when the page wakes, since invitations from other workspaces
+  reach no workspace feed.
 - `useWorkspace(() => workspaceId)` resolves an active membership from the directory.
   The caller supplies identity; the hook does not read a router or render an access page.
 - `useApiClient()` gives named API modules access to the generated Effect client.
@@ -30,6 +32,11 @@ portable backend packages under `packages/*` remain Effect-only.
   and shared directory refresh. Its `Ready` state follows a successful refresh;
   `Created` preserves the result when only the refresh needs retry. Keys last for
   the mounted intent, not across reloads. See [workspace entry](../../docs/workspace-entry.md).
+- `WorkspaceFeedProvider` keeps one workspace's reads current over its change feed while
+  mounted, and `useWorkspaceFeed()` exposes `Connecting`, `Live`, `Reconnecting`, or `Ended`.
+  Commits invalidate the reads they affect; see [live updates](../../docs/live-updates.md).
+- `useSettings(workspaceId, section)` composes keyed settings reads with commands that refresh
+  them before reporting. `revision` counts explicit refreshes so editors can discard drafts.
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
@@ -79,7 +86,10 @@ package or router. They verify storage isolation/corruption/synchronization, sta
 scope completion, directory states, authorization failure, and retry.
 Sign-in tests cover shared-schema validation, typed wire payloads, rejection reasons,
 explicit retries, resend behavior, late responses, independent controller owners,
-and cancellation on unmount or credential replacement. Web tests cover
+and cancellation on unmount or credential replacement. Feed tests drive
+`WorkspaceFeedProvider` over a fake SSE transport: per-commit invalidation, reset,
+cursor resume, wake restarts, lost membership, rejected credentials, and closing
+on unmount or credential change. Web tests cover
 route guards, safe redirects, workspace changes, and cache/request disposal. Desktop
 tests verify its independent composition with the real hash router. UI owns component
 stories and portable interaction tests at port 6007; client has no workshop.
@@ -101,6 +111,10 @@ palette, styling, or platform appearance API.
 
 `useSettings(workspaceId, section)` owns one mounted settings scope, with typed reads,
 mutations, stale-write feedback, and explicit refresh. Remount it when workspace or
-section identity changes. `useAcceptInvitation` joins and refreshes the directory.
+section identity changes. Its reads are keyed atoms, so the workspace change feed refreshes
+them in the background without marking the scope pending; commands refresh them, and the
+directory, before reporting `saved`. Inside operations, `refreshResult` waits for the result a
+refresh produces, because keyed reads can still show their previous settled value when the
+refresh starts. `useAcceptInvitation` joins and refreshes the directory.
 Requests are credential-scoped and cancelled on disposal. See
 [workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.

@@ -2,9 +2,11 @@ import {
   ClientProvider,
   DirectoryProvider,
   Session,
+  WorkspaceFeedProvider,
   type SessionStore,
   type SettingsSection,
 } from "@amends/client";
+import { Live } from "@amends/features/live";
 import * as Settings from "@amends/features/settings";
 import { WorkspacePicker } from "@amends/features/workspaces";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
@@ -58,6 +60,24 @@ export function SettingsFixture(props: {
     alive = true;
   const credentials = new Map<string, Session>();
   const [external, setExternal] = createSignal("");
+  const inviteElsewhere = async () => {
+    const scenario = current,
+      owner = credentials.get("Owner");
+    if (!scenario || !owner) return;
+    const roles = (await api(
+      scenario,
+      `/workspaces/${workspaceId()}/roles`,
+      owner.token,
+    )) as Array<{
+      role: { id: string; name: string };
+    }>;
+    await api(scenario, `/workspaces/${workspaceId()}/invitations`, owner.token, {
+      recipientId: "elsewhere@example.test",
+      roleId: roles.find((choice) => choice.role.name === "Viewer")?.role.id,
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    });
+    setExternal("External invitation complete");
+  };
   const renameElsewhere = async () => {
     const scenario = current,
       owner = credentials.get("Owner");
@@ -168,6 +188,22 @@ export function SettingsFixture(props: {
                     >
                       Rename elsewhere
                     </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        void inviteElsewhere().catch((cause) => setError(String(cause)));
+                      }}
+                    >
+                      Invite elsewhere
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        void s().command("drop-changes");
+                      }}
+                    >
+                      Drop live connection
+                    </Button>
                     <output aria-label="External change">{external()}</output>
                     <Button variant="ghost" onClick={() => setMounted(!mounted())}>
                       {mounted() ? "Unmount feature" : "Mount feature"}
@@ -179,7 +215,8 @@ export function SettingsFixture(props: {
                         <Show
                           when={picker()}
                           fallback={
-                            <>
+                            <WorkspaceFeedProvider workspaceId={workspaceId()}>
+                              <Live.Status />
                               <SegmentedControl.Root
                                 aria-label="Settings sections"
                                 value={section()}
@@ -265,7 +302,7 @@ export function SettingsFixture(props: {
                                   <Settings.Feedback />
                                 </Column>
                               </Settings.Root>
-                            </>
+                            </WorkspaceFeedProvider>
                           }
                         >
                           <WorkspacePicker.Root>

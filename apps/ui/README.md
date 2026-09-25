@@ -290,6 +290,16 @@ filters, and [Combobox](src/primitives/combobox/README.md) searches and selects 
 options. The shared `action.selected` tint has color/contrast coverage in both themes.
 These pieces are available in UI and have not been substituted into application pages.
 
+**Compositions / Notice** is the Component Inventory's soft status panel, the only
+component filled with a status tint. Danger, pending, and success tones pair a toned mono
+label with primary body text; the Sign in reference's ended-membership state sets its
+dimensions. See [Notice](src/compositions/notice/README.md).
+
+**Compositions / EmptyState** and **Primitives / Drawing** supply the Inventory's house state
+for empty regions and failures: a drawing, a serif line, a sentence, and one action. Failures
+read through the drawing, never red. See [EmptyState](src/compositions/empty-state/README.md)
+and [Drawing](src/primitives/drawing/README.md).
+
 **Compositions / KeyValue** follows the Primitives v2 Key and value reference:
 compact mono keys/values at opposite edges, content-driven wrapping, and seams
 between rows. Reference, Comparison, Narrow, Long Content, RTL, Enlarged Text, and

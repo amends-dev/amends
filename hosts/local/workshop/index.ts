@@ -11,6 +11,9 @@ const Command = Schema.Literals([
   "fail-directory",
   "lose-creation-response",
   "lose-invitation-response",
+  "drop-changes",
+  "break-directory",
+  "restore-directory",
 ]);
 
 BunRuntime.runMain(

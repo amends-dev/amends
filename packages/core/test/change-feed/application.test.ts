@@ -52,6 +52,7 @@ import { Member } from "../../src/workspace/member/member.ts";
 import { MemberFacts } from "../../src/workspace/member/facts.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
+import { WorkspaceFacts } from "../../src/workspace/facts.ts";
 import { Role } from "../../src/authorization/role/role.ts";
 import { RoleFacts } from "../../src/authorization/role/facts.ts";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
@@ -882,6 +883,21 @@ it.effect("an exact member-read grant shows that member's changes, and not other
         }),
       ],
     },
+  ),
+);
+
+it.effect("a rename reaches every member without a read grant, with both names", () =>
+  run(() =>
+    Effect.gen(function* () {
+      const feed = yield* listen();
+      yield* feed.next;
+      yield* commit(
+        publish(WorkspaceFacts.Renamed, { workspaceId, previousName: "Studio", name: "Atelier" }),
+      );
+      const [event] = committed(yield* feed.next).events;
+      expect(event?.name).toBe(WorkspaceFacts.Renamed.name);
+      expect(event?.payload).toEqual({ workspaceId, previousName: "Studio", name: "Atelier" });
+    }),
   ),
 );
 

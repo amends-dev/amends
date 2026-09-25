@@ -4,6 +4,7 @@ import { Atom } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
 import { WorkspaceDirectory } from "./contracts.ts";
 import { directoryQuery } from "./directory.ts";
+import { refreshResult } from "./refresh.ts";
 
 export type CreatedWorkspace = WorkspaceDirectory.Membership["workspace"];
 export const isWorkspaceName = Schema.is(
@@ -46,9 +47,7 @@ export const createWorkspaceRequest = (client: ApiClient) =>
                 headers: { "idempotency-key": request.key },
               });
             }
-            const query = directoryQuery(client);
-            get.refresh(query);
-            yield* get.result(query, { suspendOnWaiting: true });
+            yield* refreshResult(get, directoryQuery(client));
             return undefined;
           }),
         );

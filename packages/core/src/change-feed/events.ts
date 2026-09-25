@@ -152,6 +152,7 @@ const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
  */
 const registry: ReadonlyArray<Registered> = [
   register(WorkspaceFacts.Initialized),
+  register(WorkspaceFacts.Renamed),
   register(WorkspaceFacts.OwnershipTransferred),
   // Membership and access changes reach those who may read them, and always the member concerned.
   register(MemberFacts.Added, {

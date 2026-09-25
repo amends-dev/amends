@@ -8,7 +8,10 @@ import {
 import { Shell } from "@amends/ui/compositions/shell";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { ErrorBoundary, type ParentProps } from "solid-js";
-import { PlaceholderPage } from "./placeholder-page.tsx";
+import { EmptyState } from "@amends/ui/compositions/empty-state";
+import { Button } from "@amends/ui/primitives/button";
+import { Drawing } from "@amends/ui/primitives/drawing";
+import { StandalonePage } from "./standalone-page.tsx";
 
 export type ApplicationProps = ParentProps<
   ClientProviderProps & { appearanceSource?: AppearanceSource }
@@ -33,7 +36,20 @@ function ThemedApplication(props: ApplicationProps) {
       <Shell.Root>
         <ErrorBoundary
           fallback={
-            <PlaceholderPage title="Something went wrong" message="Reload the app to try again." />
+            <StandalonePage account={false}>
+              <EmptyState.Root>
+                <Drawing.Snapped />
+                <EmptyState.Text>
+                  <EmptyState.Title as="h1">Something went wrong</EmptyState.Title>
+                  <EmptyState.Description>
+                    amends stopped on an unexpected error. Reloading usually fixes it.
+                  </EmptyState.Description>
+                </EmptyState.Text>
+                <EmptyState.Actions>
+                  <Button onClick={() => window.location.reload()}>Reload</Button>
+                </EmptyState.Actions>
+              </EmptyState.Root>
+            </StandalonePage>
           }
         >
           <ClientProvider

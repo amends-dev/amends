@@ -7,9 +7,12 @@ import { FetchHttpClient } from "effect/unstable/http";
 import { colorThemes } from "@amends/ui/foundations/color/styles";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
+import { committed, withChangeFeed } from "./change-feed.ts";
 
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+let feed: ReturnType<typeof withChangeFeed>;
+/** Change-feed requests reach controllable streams; `fetch` sees every other request. */
 function mount(path: string, token: string | undefined, fetch: typeof globalThis.fetch) {
   window.history.replaceState(null, "", `/#${path}`);
   let stored = token ? Schema.decodeSync(Session)({ token, identity: token }) : undefined;
@@ -20,8 +23,9 @@ function mount(path: string, token: string | undefined, fetch: typeof globalThis
     },
     subscribe: () => () => {},
   };
+  feed = withChangeFeed(fetch);
   const transport = FetchHttpClient.layer.pipe(
-    Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+    Layer.provide(Layer.succeed(FetchHttpClient.Fetch, feed.fetch)),
   );
   render(() => (
     <Application apiBaseUrl="http://127.0.0.1:8787" sessionStore={store} transport={transport}>
@@ -73,7 +77,7 @@ it("clears a rejected session and renders the desktop sign-in form", async () =>
 it("owns its not-found presentation without making an API request", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
   mount("/missing", undefined, fetch);
-  await screen.findByRole("heading", { name: "Page not found" });
+  await screen.findByRole("heading", { name: "Nothing at this address" });
   expect(fetch).not.toHaveBeenCalled();
 });
 
@@ -137,7 +141,7 @@ it("keeps a new credential through directory failure and safely resumes after re
   const store = mount("/sign-in?returnTo=%2F%2Fevil.invalid", undefined, fetch);
   fireEvent.input(await submitEmail(), { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Unable to connect" });
+  await screen.findByRole("heading", { name: "Can’t reach your workspace host" });
   expect(store.read()?.token).toBe("jo@mercier.co");
   expect(window.location.hash).toContain("#/sign-in");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -273,4 +277,74 @@ it("redirects the Settings entry to its workspace section and keeps sidebar sele
   fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/settings/members"));
   expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
+});
+
+it("keeps a workspace current through its change feed over the desktop host connection", async () => {
+  let name = "Studio";
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    const workspace = { id: "one", name, createdBy: "jo", ownerMemberId: "owner-one" };
+    const member = {
+      id: "owner-one",
+      workspaceId: "one",
+      identity: { _tag: "Human", id: "jo" },
+      status: "active",
+    };
+    if (path.endsWith("/settings"))
+      return Promise.resolve(
+        response({
+          workspace,
+          canRename: true,
+          canReadInvitations: true,
+          canInvite: true,
+          roles: [],
+        }),
+      );
+    if (path.endsWith("/ownership"))
+      return Promise.resolve(
+        response({
+          workspace,
+          owner: member,
+          ownerAssignmentId: "grant",
+          canTransfer: true,
+          candidates: [],
+        }),
+      );
+    return Promise.resolve(
+      response({ memberships: [{ workspace, member, people: 1 }], invitations: [] }),
+    );
+  });
+  mount("/workspaces/one/settings/workspace", "jo", fetch);
+  await screen.findByRole("textbox", { name: "Workspace name" });
+  const stream = feed.streams[0];
+  expect(stream?.request.url).toBe("http://127.0.0.1:8787/workspaces/one/changes");
+  expect(stream?.request.headers.get("authorization")).toBe("Bearer jo");
+  name = "Atelier";
+  stream?.send(
+    committed("one", "2", [
+      { name: "workspace.renamed", payload: { workspaceId: "one", previousName: "Studio", name } },
+    ]),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+      "Atelier",
+    ),
+  );
+  expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue("Atelier");
+  expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
+});
+
+it("explains an unavailable workspace under the account header and returns to the picker", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(() =>
+    Promise.resolve(response({ memberships: [], invitations: [] })),
+  );
+  const store = mount("/workspaces/missing/settings", "jo", fetch);
+  await screen.findByRole("heading", { name: "That workspace is closed to you" });
+  expect(screen.getByText("No access")).toBeInTheDocument();
+  expect(screen.getByText("jo")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
+  await screen.findByRole("heading", { name: "Where are you working?" });
+  expect(window.location.hash).toBe("#/workspaces");
+  expect(store.read()?.token).toBe("jo");
 });

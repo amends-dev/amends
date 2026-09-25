@@ -194,4 +194,5 @@ returns 409 `WorkspaceSettings.Changed`; retrying an already-applied name succee
 without another fact. This compares names, not a version: a rename away and back
 is not detected. Creation attribution and ownership remain unchanged. Built-in
 Owner bundle revision 2 includes rename permission. The directory reads the updated
-name. See the [Settings UI guide](workspace-settings.md) for connected behavior.
+name. The change feed delivers `workspace.renamed` to every member. See the
+[Settings UI guide](workspace-settings.md) for connected behavior.

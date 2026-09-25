@@ -67,8 +67,11 @@ API; development additionally permits the local Vite connection.
 That composition applies the theme, headless `ClientProvider`, and error boundary.
 `src/pages/sign-in.tsx` owns the page header, main, and footer, composing UI
 primitives with nested `SignIn.Root`, `SignIn.EmailForm`, and `SignIn.CodeForm`.
-The route validates new credentials before following a safe hash return path. `src/placeholder-page.tsx` composes UI primitives for
-the temporary bootstrap screens.
+The route validates new credentials before following a safe hash return path. `src/standalone-page.tsx` frames pages outside a workspace like the picker: the brand, the
+signed-in account with Sign out, and centered content. Session checking, an unreachable host,
+unknown addresses, unavailable workspaces, and the error boundary use it, with the UI
+[EmptyState](../ui/src/compositions/empty-state/README.md) and its drawings, or a Notice for
+unavailable workspaces. See [workspace entry](../../docs/workspace-entry.md#standalone-states).
 `src/routes.tsx` owns routes, guard presentations, and redirects. Both platform apps
 import `@amends/client` and `@amends/ui` independently: client supplies headless state,
 and UI supplies presentation. Each app loads UI fonts and `@amends/ui/styles` explicitly.
@@ -99,3 +102,6 @@ remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings
 compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved theme through ThemeProvider.
+`src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
+stay current over the change feed; the layout shows `Live.Status` in the page header's
+actions. The content security policy's `connect-src` already covers the stream, which uses the same API origin. See [live updates](../../docs/live-updates.md).

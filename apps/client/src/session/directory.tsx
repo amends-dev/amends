@@ -5,6 +5,8 @@ import {
   createContext,
   createEffect,
   createMemo,
+  onCleanup,
+  onMount,
   useContext,
   type Accessor,
   type ParentProps,
@@ -13,6 +15,7 @@ import type { WorkspaceDirectory } from "../api/contracts.ts";
 import { isUnauthorized } from "../api/client.ts";
 import { useApiClient } from "../api/context.tsx";
 import { directoryQuery } from "../api/directory.ts";
+import { watchWake } from "../live/wake.ts";
 import { useSession } from "./provider.tsx";
 
 export type DirectoryState = Data.TaggedEnum<{
@@ -45,6 +48,16 @@ export function DirectoryProvider(props: ParentProps) {
     const current = read?.result();
     if (current && AsyncResult.isFailure(current) && isUnauthorized(current.cause))
       session.replace(undefined);
+  });
+  // Workspace feeds refresh the directory for their own changes, but invitations from other
+  // workspaces reach no feed this identity holds. Refresh when the page returns instead.
+  onMount(() => {
+    if (read)
+      onCleanup(
+        watchWake(window, () => {
+          if (!read.result().waiting) read.retry();
+        }),
+      );
   });
   const state = createMemo<DirectoryState>((previous) => {
     if (!read) return DirectoryState.SignedOut();

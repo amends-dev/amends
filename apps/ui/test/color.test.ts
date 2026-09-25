@@ -125,6 +125,10 @@ for (const [theme, palette] of Object.entries(colors)) {
           it(`keeps status.${tone} readable on its soft background over surface.${surface}`, () => {
             const effective = compositeOnSurface(status.soft, background);
             expect(new Color(status.text).contrastWCAG21(effective)).toBeGreaterThanOrEqual(4.5);
+            // Notice bodies set primary text on the tint.
+            expect(
+              new Color(palette.text.primary).contrastWCAG21(effective),
+            ).toBeGreaterThanOrEqual(4.5);
             expect(new Color(status.indicator).contrastWCAG21(effective)).toBeGreaterThanOrEqual(3);
             expect(new Color(palette.focus.ring).contrastWCAG21(effective)).toBeGreaterThanOrEqual(
               3,

@@ -1,11 +1,18 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router";
-import { DirectoryProvider, Session, useDirectory, type DirectoryScope } from "@amends/client";
+import {
+  DirectoryProvider,
+  Session,
+  useDirectory,
+  WorkspaceFeedProvider,
+  type DirectoryScope,
+} from "@amends/client";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { Application } from "../src/application.tsx";
 import { WorkspaceLayout } from "../src/workspace-layout.tsx";
+import { withChangeFeed } from "./change-feed.ts";
 afterEach(cleanup);
 const listing = (name: string) => ({
   memberships: [
@@ -47,7 +54,7 @@ it("retains shell, open popup, and appearance controls through directory refresh
         subscribe: () => () => {},
       }}
       transport={FetchHttpClient.layer.pipe(
-        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, withChangeFeed(fetch).fetch)),
       )}
     >
       <DirectoryProvider>
@@ -55,7 +62,11 @@ it("retains shell, open popup, and appearance controls through directory refresh
         <MemoryRouter history={history}>
           <Route
             path="/workspaces/:workspaceId"
-            component={() => <WorkspaceLayout>Content</WorkspaceLayout>}
+            component={() => (
+              <WorkspaceFeedProvider workspaceId="one">
+                <WorkspaceLayout>Content</WorkspaceLayout>
+              </WorkspaceFeedProvider>
+            )}
           />
         </MemoryRouter>
       </DirectoryProvider>

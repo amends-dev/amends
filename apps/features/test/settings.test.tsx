@@ -12,6 +12,9 @@ import meta, {
   RemoveMember,
   TransferOwner,
   RefreshRecovery,
+  LiveRename,
+  LiveInvitation,
+  ResumeAfterDrop,
 } from "../workshop/settings.stories.tsx";
 import { closeScenarios } from "../workshop/scenario.ts";
 afterEach(async () => {
@@ -29,6 +32,9 @@ for (const [name, story] of Object.entries({
   RemoveMember,
   TransferOwner,
   RefreshRecovery,
+  LiveRename,
+  LiveInvitation,
+  ResumeAfterDrop,
 }))
   it(`runs settings ${name} through HTTP and PostgreSQL`, async () => {
     await stories.story(story).run();

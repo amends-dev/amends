@@ -12,7 +12,10 @@ export type Command =
   | "release"
   | "fail-directory"
   | "lose-creation-response"
-  | "lose-invitation-response";
+  | "lose-invitation-response"
+  | "drop-changes"
+  | "break-directory"
+  | "restore-directory";
 
 const live = new Set<() => Promise<void>>();
 const closing = new Set<Promise<void>>();

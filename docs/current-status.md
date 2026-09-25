@@ -165,6 +165,9 @@ Recipient decline, direct/scoped grant editing, richer directory metadata, remem
 navigation, and work/activity pages remain unimplemented. The app-owned
 [workspace shell](workspace-shell.md) now provides persistent navigation, nested
 page boundaries, and an account popup with appearance and sign-out controls.
+[Live updates](live-updates.md) keep workspace views current over the change feed. Invitations
+from other workspaces appear only when the page wakes or reloads, since no identity-level feed
+exists; typing, read-state signals, and delivered notifications are not consumed yet.
 Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work. The removed legacy web screens remain available in Git history.

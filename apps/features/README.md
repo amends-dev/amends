@@ -79,6 +79,11 @@ The app supplies URLs and navigation callbacks, headings, creation entry, accoun
 actions, and Shell layout. The picker shows active memberships and addressed invitations
 with acceptance.
 
+`WorkspaceUnavailable` explains why a workspace route cannot open, from the directory. Compose
+`Heading`, `Reason`, and `Hint` under `Root workspaceId={id}`; Reason is a Notice for a pending
+invitation, an ended membership, or no access. The app supplies the header and navigation. Its
+stories set up each case through the real host: Removed, Invited, NoAccess, and Soot.
+
 Workspace stories cover populated/empty directories, creation, lost-response retry,
 directory refresh failure, duplicate submissions, and unmounting. Controls also
 apply to creation/directory requests; losing a creation response lets the real
@@ -103,3 +108,17 @@ Compose the required parts under `Root workspaceId={id} section="workspace"` (or
 `members` / `invites`). The app supplies member URLs and selected identity; features
 owns no routes or styles. See [workspace settings](../../docs/workspace-settings.md)
 for permissions, conflict handling, invitation retry, and workshop coverage.
+
+Mount Root under the app's `WorkspaceFeedProvider` to keep sections current. Lists key their
+rows by ID, and name and role editors keep a draft's starting value, so live refreshes keep
+focus, dialogs, and drafts, and a stale draft conflicts on save. Live stories rename or invite
+through another member's credential and wait for the change without refreshing; `ResumeAfterDrop`
+uses the workshop's `drop-changes` control, and `RefreshRecovery` uses `break-directory` and
+`restore-directory`, because background refreshes also read the directory.
+
+## Live
+
+`@amends/features/live` exports `Live.Status`, which maps `useWorkspaceFeed()` to a Status in a
+persistent live region. It is empty while live and for two seconds after a drop, then shows
+"Connecting…" or "Reconnecting…". Mount it inside `WorkspaceFeedProvider`; the apps place it in
+the page header's actions. See [live updates](../../docs/live-updates.md).

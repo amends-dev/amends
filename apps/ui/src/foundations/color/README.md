@@ -136,7 +136,8 @@ WCAG conformance, which also depends on semantics, keyboard behavior, layout, an
 Use `status.*.soft` as a background and its matching `text`/`indicator` above it. Do not use
 an indicator as arbitrary small text or as a filled button with an untested foreground.
 Button and IconButton now provide a danger action tone using the dedicated action palette
-below. Text provides success/warning/danger/pending tones. Alert components remain a future slice.
+below. Text provides success/warning/danger/pending tones. [Notice](../../compositions/notice/README.md)
+is the one component filled with a soft tint.
 Browser forced-colors mode must remain enabled: do not preserve author colors with
 `forced-color-adjust: none`. Visible words and SVG shapes keep the status meaningful when
 the user's system palette replaces the colors.

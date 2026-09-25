@@ -1,8 +1,10 @@
 import { Assignment, Invitation, Ownership, Workspace, WorkspaceSettings } from "@amends/api-http";
-import { Cause, DateTime, Effect, Exit, Schema } from "effect";
-import { Atom } from "effect/unstable/reactivity";
+import { Cause, DateTime, Effect, Exit, Option, Schema } from "effect";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
 import { directoryQuery } from "./directory.ts";
+import { refreshResult } from "./refresh.ts";
+import { workspaceKey } from "./keys.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
 export type SettingsSection = "workspace" | "members" | "invites";
@@ -60,6 +62,49 @@ export function settingsFailure(cause: Cause.Cause<unknown>): string {
     return "Check the values and try again.";
   return "The request could not be completed. Try again when the host is available.";
 }
+/** A read left unmounted: it reports nothing and makes no request. */
+const idle = <A>(atom: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>) =>
+  Atom.make(AsyncResult.success([])) as unknown as typeof atom;
+const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
+  const params = { workspaceId };
+  const members = client.query("workspaces", "members", {
+    params,
+    reactivityKeys: [workspaceKey(workspaceId, "members")],
+  });
+  const invitations = client.query("invitations", "list", {
+    params,
+    reactivityKeys: [workspaceKey(workspaceId, "invitations")],
+  });
+  const idleMembers = idle(members),
+    idleInvitations = idle(invitations);
+  return {
+    settings: client.query("workspaces", "settings", {
+      params,
+      reactivityKeys: [workspaceKey(workspaceId, "settings")],
+    }),
+    ownership: client.query("workspaces", "ownership", {
+      params,
+      reactivityKeys: [workspaceKey(workspaceId, "ownership")],
+    }),
+    members: (enabled: boolean) => (enabled ? members : idleMembers),
+    invitations: (enabled: boolean) => (enabled ? invitations : idleInvitations),
+  };
+};
+/**
+ * The credential-scoped reads behind the settings sections. Each registers its invalidation key,
+ * so the workspace change feed and writes refresh whichever are mounted. Undefined for an
+ * invalid workspace ID.
+ */
+export const settingsReads = (client: ApiClient, workspaceId: string) =>
+  Option.getOrUndefined(
+    Option.map(Schema.decodeOption(Workspace.Id)(workspaceId), (id) => reads(client, id)),
+  );
+export type SettingsReads = ReturnType<typeof reads>;
+
+/**
+ * Run one command, then refresh the section's reads and the directory before reporting, so a
+ * completed write is always followed by the state it produced. A refresh command only refreshes.
+ */
 export const settingsRequest = (client: ApiClient, workspace: string, section: SettingsSection) =>
   client.runtime
     .fn<{ attempt: number; command: SettingsCommand }>()(
@@ -117,20 +162,22 @@ export const settingsRequest = (client: ApiClient, workspace: string, section: S
           );
           if (Exit.isFailure(mutation))
             return { completed: false, exit: Exit.failCause(mutation.cause) };
+          const current = reads(client, workspaceId);
+          const refresh = <A, E>(atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>) =>
+            refreshResult(get, atom);
           const exit = yield* Effect.exit(
             Effect.gen(function* () {
-              const query = directoryQuery(client);
-              get.refresh(query);
-              yield* get.result(query, { suspendOnWaiting: true });
-              const settings = yield* api.workspaces.settings({ params });
-              const ownership = yield* api.workspaces.ownership({ params });
-              const members =
-                section === "members" ? yield* api.workspaces.members({ params }) : [];
-              const invitations =
-                section === "invites" && settings.canReadInvitations
-                  ? yield* api.invitations.list({ params })
-                  : [];
-              return { settings, ownership, members, invitations } satisfies SettingsData;
+              const [settings] = yield* Effect.all(
+                [
+                  refresh(current.settings),
+                  refresh(current.ownership),
+                  refresh(directoryQuery(client)),
+                  section === "members" ? refresh(current.members(true)) : Effect.void,
+                ],
+                { concurrency: "unbounded" },
+              );
+              if (section === "invites" && settings.canReadInvitations)
+                yield* refresh(current.invitations(true));
             }),
           );
           return { completed: command.kind !== "refresh", exit };
@@ -165,13 +212,7 @@ export const acceptInvitationRequest = (client: ApiClient) =>
             completed: false,
             exit: Exit.failCause(mutation.cause),
           };
-        const exit = yield* Effect.exit(
-          Effect.gen(function* () {
-            const query = directoryQuery(client);
-            get.refresh(query);
-            yield* get.result(query, { suspendOnWaiting: true });
-          }),
-        );
+        const exit = yield* Effect.exit(Effect.asVoid(refreshResult(get, directoryQuery(client))));
         return { attempt: request.attempt, completed: true, exit };
       }),
     )

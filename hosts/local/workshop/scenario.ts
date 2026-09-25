@@ -61,13 +61,26 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
   yield* Effect.promise(() => app.handler(new Request("http://localhost/me/workspaces")));
   let next: "hold" | "fail" | undefined;
   let failDirectory = false;
+  // Background refreshes also read the directory, so a story can hold it failed until restored.
+  let brokenDirectory = false;
   let loseCreationResponse = false;
   let loseInvitationResponse = false;
   let release: (() => void) | undefined;
   let requests = 0;
   let completed = 0;
   let cancelled = 0;
-  yield* Effect.addFinalizer(() => Effect.sync(() => release?.()));
+  // Change streams stay open for a view's lifetime, so request gates and counts ignore them.
+  const streams = new Set<AbortController>();
+  const dropStreams = () => {
+    for (const stream of streams) stream.abort();
+    streams.clear();
+  };
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      release?.();
+      dropStreams();
+    }),
+  );
   return {
     snapshot: () => ({
       delivered: [...delivered],
@@ -84,9 +97,15 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
         | "release"
         | "fail-directory"
         | "lose-creation-response"
-        | "lose-invitation-response",
+        | "lose-invitation-response"
+        | "drop-changes"
+        | "break-directory"
+        | "restore-directory",
     ) => {
       if (command === "expire") offset += 600_001;
+      else if (command === "break-directory") brokenDirectory = true;
+      else if (command === "restore-directory") brokenDirectory = false;
+      else if (command === "drop-changes") dropStreams();
       else if (command === "fail-directory") failDirectory = true;
       else if (command === "lose-creation-response") loseCreationResponse = true;
       else if (command === "lose-invitation-response") loseInvitationResponse = true;
@@ -95,7 +114,18 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
     },
     handle: async (request: Request) => {
       const path = new URL(request.url).pathname;
-      if (path === "/me/workspaces" && failDirectory) {
+      if (/^\/workspaces\/[^/]+\/changes$/.test(path)) {
+        const stream = new AbortController();
+        const abort = () => stream.abort();
+        request.signal.addEventListener("abort", abort, { once: true });
+        stream.signal.addEventListener("abort", () => {
+          streams.delete(stream);
+          request.signal.removeEventListener("abort", abort);
+        });
+        streams.add(stream);
+        return app.handler(new Request(request, { signal: stream.signal }));
+      }
+      if (path === "/me/workspaces" && (failDirectory || brokenDirectory)) {
         failDirectory = false;
         return new Response("Workshop directory failure", { status: 503 });
       }

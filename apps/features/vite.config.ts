@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 import solid from "vite-plugin-solid";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
+import { onUnhandledError } from "../../scripts/testing/unhandled-errors.ts";
 
 export default defineConfig({
   plugins: [solid(), vanillaExtractPlugin()],
@@ -16,6 +17,7 @@ export default defineConfig({
     ],
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
     include: ["test/**/*.test.tsx"],
+    onUnhandledError,
     testTimeout: 20000,
     hookTimeout: 20000,
   },

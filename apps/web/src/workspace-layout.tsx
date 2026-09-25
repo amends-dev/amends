@@ -1,5 +1,6 @@
 import { paths, useWorkspace, type WorkspacePage } from "@amends/client";
 import { Account } from "@amends/features/account";
+import { Live } from "@amends/features/live";
 import { Shell } from "@amends/ui/compositions/shell";
 import { PageHeader } from "@amends/ui/compositions/page-header";
 import { Navigation } from "@amends/ui/compositions/navigation";
@@ -220,6 +221,9 @@ export function WorkspaceLayout(props: ParentProps) {
             </PageHeader.Crumbs>
             <PageHeader.Heading>
               <PageHeader.Title>{title()}</PageHeader.Title>
+              <PageHeader.Actions>
+                <Live.Status />
+              </PageHeader.Actions>
             </PageHeader.Heading>
           </PageHeader.Root>
         </Shell.Header>

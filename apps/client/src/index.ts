@@ -36,3 +36,9 @@ export {
   invitationStatus,
 } from "./api/settings.ts";
 export { useAcceptInvitation } from "./workspaces/accept-invitation.ts";
+export {
+  WorkspaceFeedProvider,
+  useWorkspaceFeed,
+  type WorkspaceFeedScope,
+} from "./live/workspace-feed.tsx";
+export type { WorkspaceFeedState } from "./api/changes.ts";
