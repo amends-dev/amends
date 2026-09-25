@@ -4,6 +4,8 @@ import { Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import {
   Cause,
+  Clock,
+  Context,
   DateTime,
   Deferred,
   Duration,
@@ -15,6 +17,7 @@ import {
   Redacted,
 } from "effect";
 import { SqlClient, SqlError } from "effect/unstable/sql";
+import { Binding } from "../src/binding.ts";
 import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { harness } from "./harness.ts";
 import type { Bound } from "./support.ts";
@@ -178,6 +181,41 @@ describe.skipIf(!available)("PostgreSQL", () => {
     ),
   );
 
+  it.live(
+    "one workspace's reads use at most their share of the pool, leaving the rest to others",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const pool = yield* Layer.build(
+            PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 }),
+          );
+          const { sql } = Context.get(pool, PostgresDatabase.Service);
+          const binding = (id: Workspace.Id) =>
+            Binding.make(id, { readConnections: 2 }).pipe(Effect.provide(pool));
+          const busy = yield* binding(first);
+          const other = yield* binding(second);
+          const sleeping = yield* Effect.forkChild(
+            Effect.all(
+              Array.from({ length: 6 }, () => busy.guard(sql`SELECT pg_sleep(0.5)`)),
+              { concurrency: "unbounded" },
+            ),
+          );
+          yield* Effect.sleep("150 millis");
+          const asked = yield* Clock.currentTimeMillis;
+          const [running] = yield* other.guard(
+            sql<{ readonly count: number }>`
+            SELECT count(*)::int AS count FROM pg_stat_activity
+            WHERE state = 'active' AND query LIKE 'SELECT pg_sleep%'`,
+          );
+          // The busy workspace holds two connections, so the other found one free at once, long
+          // before any of the busy workspace's reads ended.
+          expect((yield* Clock.currentTimeMillis) - asked).toBeLessThan(250);
+          expect(running?.count).toBe(2);
+          yield* Fiber.join(sleeping);
+        }).pipe(Effect.scoped),
+      ),
+  );
+
   it.effect("durations PostgreSQL would read as no limit stop the storage from starting", () =>
     withDatabase((url) =>
       inDatabase(
@@ -243,6 +281,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 sql: failing,
                 notices: real.notices,
                 turns: real.turns,
+                reads: real.reads,
               }),
             );
             const bound = yield* storage.forWorkspace(workspaceId);

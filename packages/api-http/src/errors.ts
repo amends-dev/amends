@@ -24,6 +24,16 @@ export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
 ) {}
 
 /**
+ * The caller cannot open another live-update stream on this server now: the workspace, or the
+ * caller within it, already has as many as it may. Retry after closing one.
+ */
+export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
+  "Api.TooManyStreams",
+  { limit: Schema.Literals(["workspace", "member"]) },
+  { httpApiStatus: 429 },
+) {}
+
+/**
  * HTTP statuses for gateway and core outcomes. Core declares no transport
  * concerns, so the status lives on the contract's view of each error.
  */

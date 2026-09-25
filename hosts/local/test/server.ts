@@ -9,7 +9,7 @@ interface Options {
 /** One lifetime of the real server entry point over a PostgreSQL database, on an ephemeral port. */
 export const withServer = async <A>(
   databaseUrl: string,
-  run: (call: Call) => Promise<A>,
+  run: (call: Call, base: string) => Promise<A>,
   options: Options = {},
 ): Promise<A> => {
   const env: Record<string, string | undefined> = {
@@ -73,7 +73,7 @@ export const withServer = async <A>(
       const text = await response.text();
       return { status: response.status, body: text === "" ? undefined : JSON.parse(text) };
     };
-    return await run(call);
+    return await run(call, base);
   } finally {
     clearTimeout(timeout);
     child.kill();

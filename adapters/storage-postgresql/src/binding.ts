@@ -47,6 +47,12 @@ export interface Options {
    * notification is lost or `LISTEN` is unavailable, as behind a transaction-pooling proxy.
    */
   readonly pollInterval?: Duration.Input | undefined;
+  /**
+   * The most pooled connections this process's statements for one workspace use at once outside
+   * its transactions, so one busy workspace leaves the rest of the pool to others. Three by
+   * default.
+   */
+  readonly readConnections?: number | undefined;
 }
 
 /** Options with their defaults, each a whole number of milliseconds. */
@@ -55,6 +61,7 @@ export interface Settings {
   readonly statementTimeout: Duration.Duration;
   readonly transactionTimeout: Duration.Duration;
   readonly pollInterval: Duration.Duration;
+  readonly readConnections: number;
 }
 
 /**
@@ -79,7 +86,10 @@ export const settings = (options: Options = {}): Effect.Effect<Settings> =>
         "30 seconds",
       ),
       pollInterval: yield* resolve("pollInterval", options.pollInterval, "5 seconds"),
+      readConnections: options.readConnections ?? 3,
     };
+    if (!Number.isSafeInteger(resolved.readConnections) || resolved.readConnections < 1)
+      return yield* Effect.die(new Error("readConnections must be a whole number of at least 1"));
     if (Duration.isLessThan(resolved.statementTimeout, resolved.lockTimeout))
       return yield* Effect.die(new Error("statementTimeout must be at least lockTimeout"));
     return resolved;
@@ -156,8 +166,8 @@ export const make = Effect.fn("Binding.make")(function* (
   options: Options = {},
 ) {
   const database = yield* PostgresDatabase.Service;
-  const { sql, turns } = database;
-  const { lockTimeout, statementTimeout, transactionTimeout, pollInterval } =
+  const { sql, turns, reads } = database;
+  const { lockTimeout, statementTimeout, transactionTimeout, pollInterval, readConnections } =
     yield* settings(options);
   const lockMillis = Duration.toMillis(lockTimeout);
   /** Session settings for one transaction: they end with it, whether it commits or not. */
@@ -187,8 +197,15 @@ export const make = Effect.fn("Binding.make")(function* (
       });
     }
   });
+  const readKey = JSON.stringify(["reads", workspaceId]);
+  // Outside a transaction a statement takes its own pooled connection, within the workspace's cap.
   const guard: Interface["guard"] = (program, write = false) =>
-    check(write).pipe(Effect.andThen(program));
+    check(write).pipe(
+      Effect.andThen(Effect.serviceOption(CurrentTransaction)),
+      Effect.flatMap((current) =>
+        Option.isSome(current) ? program : reads.run(readKey, readConnections, program),
+      ),
+    );
 
   const transaction: Interface["transaction"] = Effect.fn("Binding.transaction")(function* <
     A,

@@ -7,7 +7,19 @@ import { InvitationFacts, MemberFacts, Workspace } from "@amends/core/workspace"
 import { Gateway } from "@amends/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Effect, Exit, Layer, Queue, Redacted, Schema, Scope, Stream } from "effect";
+import {
+  Context,
+  DateTime,
+  Effect,
+  Exit,
+  Layer,
+  Queue,
+  Redacted,
+  Schema,
+  Scope,
+  Stream,
+} from "effect";
+import { ChangesHandlers } from "@amends/server-http";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
@@ -20,8 +32,11 @@ const asToken = (token: string) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
-/** The HTTP server over a host; the host's gateway stays available to seed what HTTP cannot. */
-const server = (url: string) =>
+/**
+ * The HTTP server over a host; the host's gateway stays available to seed what HTTP cannot. Limits
+ * on open streams default to the server's own.
+ */
+const server = (url: string, limits?: Context.Service.Shape<typeof ChangesHandlers.StreamLimits>) =>
   HttpRouter.serve(LocalServer.layerRoutes, {
     disableLogger: true,
     disableListenLog: true,
@@ -30,6 +45,7 @@ const server = (url: string) =>
       Layer.mergeAll(
         LocalHost.layer(Redacted.make(url)),
         DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer)),
+        limits === undefined ? Layer.empty : Layer.succeed(ChangesHandlers.StreamLimits, limits),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
@@ -279,5 +295,59 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
       ),
+  );
+
+  it.live("each workspace, and each member of it, may hold only so many open streams", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const alice = yield* client("alice");
+        const bob = yield* client("bob");
+        const carol = yield* client("carol");
+        const workspace = yield* alice.workspaces.create({
+          headers: {},
+          payload: { name: "Busy" },
+        });
+        for (const [api, id] of [
+          [bob, "bob"],
+          [carol, "carol"],
+        ] as const) {
+          const invitation = yield* alice.invitations.issue({
+            headers: {},
+            params: { workspaceId: workspace.id },
+            payload: {
+              recipientId: Identity.HumanId.make(id),
+              roleId: BuiltinRoles.ViewerId,
+              expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), { days: 1 }),
+            },
+          });
+          yield* api.invitations.accept({
+            params: { workspaceId: workspace.id, invitationId: invitation.details.id },
+          });
+        }
+        const refused = (api: typeof alice) =>
+          Effect.flip(
+            Effect.scoped(api.changes.watch({ params: { workspaceId: workspace.id }, query: {} })),
+          );
+        const first = yield* listen(alice, workspace.id);
+        yield* listen(alice, workspace.id);
+        expect(yield* refused(alice)).toMatchObject({
+          _tag: "Api.TooManyStreams",
+          limit: "member",
+        });
+        yield* listen(bob, workspace.id);
+        expect(yield* refused(carol)).toMatchObject({
+          _tag: "Api.TooManyStreams",
+          limit: "workspace",
+        });
+        // Closing a stream gives its place back, to its member and to the workspace.
+        yield* first.close;
+        yield* Effect.sleep("200 millis");
+        yield* listen(carol, workspace.id);
+      }).pipe(
+        Effect.timeout("10 seconds"),
+        Effect.scoped,
+        Effect.provide(server(url, { perWorkspace: 3, perMember: 2 })),
+      ),
+    ),
   );
 });

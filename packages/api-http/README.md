@@ -126,7 +126,8 @@ The feed follows the journal, so commits from every host over the same database 
 Five-second SSE comments keep idle connections open without producing application messages,
 and messages carry no SSE event IDs. Responses use `Cache-Control: no-store` and disable
 proxy buffering where supported. Missing/rejected credentials return 401; absent active
-membership returns 403. Failures after streaming starts use Effect's SSE failure encoding
+membership returns 403; a caller at the server's limit of open streams for the workspace, or
+for itself within it, gets 429 `Api.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE failure encoding
 with `ChangeFeed.Unavailable` and no other detail; reconnect with the last cursor to continue. A commit the server
 cannot read, such as a fact version a newer server wrote during a deployment, also ends the
 stream, and reconnecting then resets. See

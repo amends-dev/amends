@@ -26,6 +26,9 @@ export const layerRoutes = Layer.mergeAll(
   }),
 );
 
+/** The largest request body the server reads, in bytes: one mebibyte. Bun answers 413 beyond it. */
+export const maxRequestBodySize = 1024 * 1024;
+
 /**
  * Serve the routes over a host on the loopback interface; the web development proxy targets this.
  *
@@ -36,7 +39,7 @@ export const layer = (host: LocalHost.HostLayer, port: number) =>
     Layer.provide(
       Layer.mergeAll(host, DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer))),
     ),
-    Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port })),
+    Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port, maxRequestBodySize })),
   );
 
 export * as LocalServer from "./server.ts";

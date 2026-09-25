@@ -27,6 +27,12 @@ Effect's SSE encoder would send a stream's whole failure cause to the client, de
 so the handler logs an unexpected failure at error level and ends the stream with
 `ChangeFeed.Unavailable` alone.
 
+Each process serves a limited number of streams at once: `ChangesHandlers.StreamLimits`, a
+context reference, allows a thousand per workspace and twenty per member of it by default, and
+a host provides its own to change them. A stream holds its place from before the gateway admits
+it until its response ends; a stream beyond either limit fails with `Api.TooManyStreams` (429),
+naming which limit it met.
+
 ## Organization
 
 Keep one focused handler module per HTTP group, with filenames matching

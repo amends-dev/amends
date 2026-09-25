@@ -5,6 +5,7 @@ import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { fileURLToPath } from "node:url";
 import { PostgresNotices } from "./notices.ts";
+import { PostgresReads } from "./reads.ts";
 import { PostgresTurns } from "./turns.ts";
 
 /** Migrations generated from the schema by `bun run generate`; applied during construction. */
@@ -25,6 +26,8 @@ export interface Interface {
   readonly notices: PostgresNotices.Interface;
   /** Turns among this process's writers to one workspace or log, before they take a connection. */
   readonly turns: PostgresTurns.Interface;
+  /** The cap on connections one workspace's statements outside its transactions use at once. */
+  readonly reads: PostgresReads.Interface;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -49,7 +52,13 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
     ),
   );
   const notices = yield* PostgresNotices.make();
-  return Service.of({ db, sql, notices, turns: PostgresTurns.make() });
+  return Service.of({
+    db,
+    sql,
+    notices,
+    turns: PostgresTurns.make(),
+    reads: PostgresReads.make(),
+  });
 });
 
 /**

@@ -72,7 +72,7 @@ const runnerTakeover = Config.schema(
 const poolSize = Config.schema(
   Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 1000 })),
   "AMENDS_DATABASE_POOL_SIZE",
-).pipe(Config.withDefault(10));
+).pipe(Config.withDefault(20));
 
 /** Read and validate startup options without opening a database or server. */
 export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<

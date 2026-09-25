@@ -11,11 +11,11 @@ const load = (values: Record<string, unknown>) =>
   );
 const databaseUrl = "postgres://user:secret@localhost/database";
 
-it.effect("configuration defaults to port 8787 and a pool of ten connections", () =>
+it.effect("configuration defaults to port 8787 and a pool of twenty connections", () =>
   Effect.gen(function* () {
     const options = yield* load({ AMENDS_DATABASE_URL: databaseUrl });
     expect(options.port).toBe(8787);
-    expect(options.poolSize).toBe(10);
+    expect(options.poolSize).toBe(20);
     expect(Redacted.value(options.databaseUrl)).toBe(databaseUrl);
   }),
 );

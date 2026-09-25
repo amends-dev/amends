@@ -245,8 +245,11 @@ long idle, which releases its locks. The margin keeps PostgreSQL from ending a l
 session as it rolls back, which would return a closed connection to the pool. Every duration must be finite and at least a millisecond, since
 PostgreSQL reads zero as no limit; `PostgresStorage.make` refuses others when the host starts.
 
-Reads outside a transaction see committed state, on any free pooled connection, and are
-not queued or bounded. A statement PostgreSQL
+Reads outside a transaction see committed state, each on a pooled connection of its own. A
+process's statements for one workspace outside its transactions use at most `readConnections`
+connections at once (three by default, queued in `reads.ts`), so a burst of reads for one busy
+workspace leaves the rest of the pool to the others; the reads beyond it wait for the workspace's
+own. A statement PostgreSQL
 refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the

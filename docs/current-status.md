@@ -218,10 +218,10 @@ timeouts, serialization failures, and deadlocks as contention, a retryable confl
 COMMIT they fall under the broad uncertain-outcome mapping above.
 
 A process's writers to one workspace wait for each other in memory, so they hold at most one
-pooled connection while PostgreSQL makes them wait, and every wait is bounded. Reads outside a
-transaction are not: they wait for a free pooled connection as long as it takes, and one
-workspace's reads can occupy all of a process's connections. Limits on the connections one
-workspace may use are not implemented.
+pooled connection while PostgreSQL makes them wait, and every wait is bounded. Its reads for one
+workspace outside a transaction use at most three connections at once, so one busy workspace
+cannot occupy all of a process's connections; those waits are not bounded in time, and reads
+outside a transaction have no statement timeout.
 
 ## PostgreSQL isolation
 
@@ -244,12 +244,11 @@ updates, provide a stable-connection threshold and retry budget: the former cons
 reset its backoff after every Ready message, allowing repeated Ready/disconnect cycles
 to continually refresh queries near the initial delay.
 
-The [local server](../hosts/local/src/server.ts) configures the listener without an
-application body-size limit or SSE connection/admission policy. Effect's
-[MaxBodySize](../repos/effect/packages/effect/src/unstable/http/HttpIncomingMessage.ts)
-defaults to undefined. Runtime defaults are not a documented, tested application
-limit. Explicit body limits, oversized-request coverage, and server-side controls
-for reconnect load remain outstanding.
+The [local server](../hosts/local/src/server.ts) refuses request bodies over one mebibyte with
+413, through Bun's own limit. Each process serves at most a thousand live-update streams per
+workspace and twenty per member of it, refusing more with 429 (`Api.TooManyStreams`). Message
+text has no length limit of its own beyond the body limit, and no server-side control paces
+clients that reconnect repeatedly.
 
 ## Payload-format compatibility
 

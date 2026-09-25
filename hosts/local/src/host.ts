@@ -19,7 +19,7 @@ import type { SqlClient } from "effect/unstable/sql";
 export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
 
 export interface Options {
-  /** The most connections to open to the database, ten by default. */
+  /** The most connections to open to the database, twenty by default. */
   readonly poolSize?: number | undefined;
   /**
    * This process's address among the processes running background work over the database,
@@ -68,7 +68,7 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
       : SingleRunner.layer({ shardingConfig }).pipe(Layer.provide(BunCrypto.layer));
   return cluster.pipe(
     Layer.provide(Layer.effectDiscard(PostgresClusterStorage.claimAddress(`${host}:${port}`))),
-    Layer.provideMerge(PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 10 })),
+    Layer.provideMerge(PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 20 })),
   );
 };
 

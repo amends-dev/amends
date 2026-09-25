@@ -26,14 +26,18 @@ server proxies `/api` here. `bun run dev` restarts the host when its source chan
 | --------------------------- | ----------------- | ---------------------------------------------------------- |
 | `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port. |
 | `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                    |
-| `AMENDS_DATABASE_POOL_SIZE` | `10`              | Integer from `2` through `1000`.                           |
+| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `2` through `1000`.                           |
 | `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.         |
 | `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                     |
 | `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.              |
 
-The pool size is the most connections the host opens. One of them listens for notifications
-while readers wait, and a busy workspace's writers wait for each other in memory rather than
-each holding a connection; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
+The pool size is the most connections the host opens. Four are the host's own: one listens for
+notifications, two run background work, and one holds the runner address. A busy workspace's
+writers wait for each other in memory rather than each holding a connection, and its reads use at
+most three at once; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
+
+The server refuses request bodies over one mebibyte with 413, and serves at most a thousand
+live-update streams per workspace and twenty per member of it, answering 429 beyond them.
 
 The database must exist; startup applies pending migrations to it before serving, one
 process at a time when several start together.

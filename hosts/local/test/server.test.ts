@@ -323,4 +323,24 @@ describe.skipIf(!available)("PostgreSQL", () => {
       });
     }),
   );
+
+  it.live("a request body over a mebibyte is refused before the host reads it", () =>
+    temporary(async (url) =>
+      withServer(url, async (call, base) => {
+        const post = (name: string) =>
+          fetch(`${base}/workspaces`, {
+            method: "POST",
+            headers: { authorization: `Bearer ${alice.id}`, "content-type": "application/json" },
+            body: JSON.stringify({ name }),
+          });
+        expect((await post("x".repeat(2 * 1024 * 1024))).status).toBe(413);
+        // A body within the limit is read as usual, and the refused one created nothing.
+        expect((await post("Small")).status).toBe(201);
+        const me = (await call(alice.id, "GET", "/me/workspaces")).body as {
+          readonly memberships: ReadonlyArray<unknown>;
+        };
+        expect(me.memberships).toHaveLength(1);
+      }),
+    ),
+  );
 });

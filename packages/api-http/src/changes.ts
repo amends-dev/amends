@@ -21,7 +21,11 @@ export class ChangesGroup extends HttpApiGroup.make("changes")
         }),
       },
       success: HttpApiSchema.StreamSse({ data: ChangeFeed.Message, error: ChangeFeed.Unavailable }),
-      error: [...ApiErrors.member, ChangeFeed.Unavailable.pipe(HttpApiSchema.status(503))],
+      error: [
+        ...ApiErrors.member,
+        ChangeFeed.Unavailable.pipe(HttpApiSchema.status(503)),
+        ApiErrors.TooManyStreams,
+      ],
     }),
   )
   .add(
