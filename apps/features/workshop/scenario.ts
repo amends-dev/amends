@@ -5,7 +5,13 @@ export interface Snapshot {
   readonly cancelled: number;
   readonly held: boolean;
 }
-export type Command = "expire" | "hold" | "fail" | "release";
+export type Command =
+  | "expire"
+  | "hold"
+  | "fail"
+  | "release"
+  | "fail-directory"
+  | "lose-creation-response";
 
 const live = new Set<() => Promise<void>>();
 const closing = new Set<Promise<void>>();

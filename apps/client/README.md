@@ -26,6 +26,10 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useSignIn()` owns the email/code drafts, typed requests, pending/error state,
   cancellation, and successful session installation. It has no presentation or
   navigation behavior; see the [controller contract](src/sign-in/README.md).
+- `useCreateWorkspace()` owns the name draft, schema validation, idempotent creation,
+  and shared directory refresh. Its `Ready` state follows a successful refresh;
+  `Created` preserves the result when only the refresh needs retry. Keys last for
+  the mounted intent, not across reloads. See [workspace entry](../../docs/workspace-entry.md).
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
@@ -79,3 +83,7 @@ and cancellation on unmount or credential replacement. Web tests cover
 route guards, safe redirects, workspace changes, and cache/request disposal. Desktop
 tests verify its independent composition with the real hash router. UI owns component
 stories and portable interaction tests at port 6007; client has no workshop.
+
+After validation, directory refresh retains `Ready` with the last listing,
+`refreshing`, and `refreshFailed`, so consumers keep their drafts mounted. A failed
+initial read still exposes `Failed`; a rejected credential still clears the session.

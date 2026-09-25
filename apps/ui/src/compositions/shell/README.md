@@ -101,6 +101,7 @@ For a form, onboarding step, empty state, or status message:
 ```
 
 Content composes Container: `standard` (default) uses its 67.5rem outer limit;
+`medium` uses 37rem, leaving 35rem for a readable list;
 `narrow` uses 28.25rem, leaving a 26.25rem column after the existing 1rem gutters.
 Without `centered`, content starts at the top. Centering uses free space only:
 long content starts at the top. `Body scroll="page"` keeps header, main, and footer

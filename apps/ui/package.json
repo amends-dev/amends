@@ -9,6 +9,9 @@
     "./src/foundations/typography/fonts.ts"
   ],
   "exports": {
+    "./features/workspaces": "./src/features/workspaces/index.ts",
+    "./compositions/item-list": "./src/compositions/item-list/index.ts",
+    "./primitives/workspace-mark": "./src/primitives/workspace-mark/index.ts",
     "./foundations/color": "./src/foundations/color/tokens.ts",
     "./foundations/color/styles": "./src/foundations/color/theme.css.ts",
     "./foundations/focus": "./src/foundations/focus/tokens.ts",

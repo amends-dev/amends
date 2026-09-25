@@ -78,7 +78,7 @@ it("validates a restored credential before mounting protected content and suppor
   expect(url instanceof Request ? url.url : url.toString()).toBe("https://host.test/me/workspaces");
   expect(new Headers(options?.headers).get("authorization")).toBe("Bearer alice");
   pending.resolve(response(directory));
-  await screen.findByRole("heading", { name: "Workspaces" });
+  await screen.findByRole("heading", { name: "Where are you working?" });
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(fixture.store.read()).toBeUndefined();
@@ -103,7 +103,7 @@ it("preserves credentials on a temporary host failure and retries explicitly", a
   await screen.findByRole("heading", { name: "Unable to connect" });
   expect(fixture.store.read()?.token).toBe("alice");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  await screen.findByRole("heading", { name: "Workspaces" });
+  await screen.findByRole("heading", { name: "Where are you working?" });
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 it("denies unknown workspaces without treating membership loss as logout", async () => {
@@ -123,7 +123,7 @@ it("aborts old requests on cross-window logout and never renders their late data
   await screen.findByRole("heading", { name: "Sign in to amends" });
   await waitFor(() => expect(signal?.aborted).toBe(true));
   pending.resolve(response(directory));
-  expect(screen.queryByRole("heading", { name: "Workspaces" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Where are you working?" })).not.toBeInTheDocument();
 });
 it("renders the not-found route without starting a session request", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
@@ -237,7 +237,7 @@ it("ignores an external return destination after signing in", async () => {
   );
   fireEvent.input(await submitEmail(), { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Workspaces" });
+  await screen.findByRole("heading", { name: "Where are you working?" });
   expect(history.get()).toBe("/workspaces");
 });
 it("disposes sign-in when navigation leaves the page, even if verification resolves later", async () => {
@@ -259,4 +259,40 @@ it("disposes sign-in when navigation leaves the page, even if verification resol
   await pending.promise;
   expect(fixture.store.read()).toBeUndefined();
   expect(history.get()).toBe("/missing");
+});
+
+it("lists only active workspaces and links creation to the app-owned page", async () => {
+  const history = mount("/workspaces", memoryStore(session("alice")).store, () =>
+    Promise.resolve(
+      response({
+        memberships: [membership("one", "Studio"), membership("old", "Former studio", "removed")],
+        invitations: [],
+      }),
+    ),
+  );
+  const link = await screen.findByRole("link", { name: "Studio 1 member · Owner" });
+  expect(link).toHaveAttribute("href", "/workspaces/one");
+  expect(screen.queryByRole("link", { name: /Former studio/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("link", { name: /New workspace/ }));
+  await screen.findByRole("heading", { name: "Name your workspace" });
+  expect(history.get()).toBe("/workspaces/new");
+});
+it("retains a created workspace through directory failure and navigates after refresh recovery", async () => {
+  const created = membership("one", "Studio");
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(response(directory))
+    .mockResolvedValueOnce(response(created.workspace, 201))
+    .mockResolvedValueOnce(response({}, 503))
+    .mockResolvedValueOnce(response({ memberships: [created], invitations: [] }));
+  const history = mount("/workspaces/new", memoryStore(session("alice")).store, fetch);
+  const input = await screen.findByRole("textbox", { name: "Workspace name" });
+  fireEvent.input(input, { target: { value: "Studio" } });
+  fireEvent.submit(screen.getByRole("form"));
+  await screen.findByText(/Your workspace was created, but/);
+  expect(history.get()).toBe("/workspaces/new");
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await screen.findByRole("heading", { name: "Studio" });
+  expect(history.get()).toBe("/workspaces/one");
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });

@@ -98,6 +98,7 @@
         "@storybook/addon-a11y": "10.6.0",
         "@storybook/addon-docs": "10.6.0",
         "@vanilla-extract/vite-plugin": "^5.2.6",
+        "effect": "catalog:",
         "happy-dom": "^20.10.6",
         "solid-js": "^1.9.12",
         "storybook": "10.6.0",

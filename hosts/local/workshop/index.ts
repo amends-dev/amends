@@ -3,7 +3,14 @@ import { BunRuntime } from "@effect/platform-bun";
 import { Effect, Schema } from "effect";
 import { openScenario } from "./scenario.ts";
 
-const Command = Schema.Literals(["expire", "hold", "fail", "release"]);
+const Command = Schema.Literals([
+  "expire",
+  "hold",
+  "fail",
+  "release",
+  "fail-directory",
+  "lose-creation-response",
+]);
 
 BunRuntime.runMain(
   Effect.gen(function* () {

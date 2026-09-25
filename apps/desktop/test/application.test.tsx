@@ -50,8 +50,11 @@ it("composes validated client state with UI and signs out through the desktop ro
     Promise.resolve(response({ memberships: [], invitations: [] })),
   );
   const store = mount("/workspaces", "alice", fetch);
-  await screen.findByRole("heading", { name: "Workspaces" });
-  expect(screen.getByRole("link", { name: "Workspaces" })).toHaveAttribute("href", "#/workspaces");
+  await screen.findByRole("heading", { name: "Where are you working?" });
+  expect(screen.getByRole("link", { name: /New workspace/ })).toHaveAttribute(
+    "href",
+    "#/workspaces/new",
+  );
   expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe("Bearer alice");
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
@@ -134,6 +137,43 @@ it("keeps a new credential through directory failure and safely resumes after re
   expect(store.read()?.token).toBe("jo@mercier.co");
   expect(window.location.hash).toContain("#/sign-in");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  await screen.findByRole("heading", { name: "Workspaces" });
+  await screen.findByRole("heading", { name: "Where are you working?" });
   expect(window.location.hash).toBe("#/workspaces");
+});
+
+it("opens creation from the picker and enters the created workspace through hash routes", async () => {
+  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
+  const listing = {
+    memberships: [
+      {
+        workspace,
+        member: {
+          id: "owner",
+          workspaceId: "one",
+          identity: { _tag: "Human", id: "alice" },
+          status: "active",
+        },
+        people: 1,
+      },
+    ],
+    invitations: [],
+  };
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(response({ memberships: [], invitations: [] }))
+    .mockResolvedValueOnce(response(workspace, 201))
+    .mockResolvedValueOnce(response(listing));
+  mount("/workspaces", "alice", fetch);
+  fireEvent.click(await screen.findByRole("link", { name: /New workspace/ }));
+  const input = await screen.findByRole("textbox", { name: "Workspace name" });
+  expect(window.location.hash).toBe("#/workspaces/new");
+  fireEvent.input(input, { target: { value: "Studio" } });
+  fireEvent.submit(screen.getByRole("form"));
+  await screen.findByRole("heading", { name: "Studio" });
+  expect(window.location.hash).toBe("#/workspaces/one");
+  fireEvent.click(screen.getByRole("link", { name: "Workspaces" }));
+  expect(await screen.findByRole("link", { name: "Studio 1 member · Owner" })).toHaveAttribute(
+    "href",
+    "#/workspaces/one",
+  );
 });

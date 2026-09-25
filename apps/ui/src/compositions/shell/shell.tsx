@@ -383,7 +383,7 @@ export function Main(props: Omit<JSX.HTMLAttributes<HTMLElement>, "id">) {
 }
 export type ContentProps = JSX.HTMLAttributes<HTMLDivElement> & {
   /** Standard page content or a narrow form/message column, including its gutters. */
-  width?: "standard" | "narrow";
+  width?: "standard" | "medium" | "narrow";
   /** Center short content vertically; overflow starts at the top and scrolls in Main. */
   centered?: boolean;
 };
@@ -404,7 +404,9 @@ export function Content(props: ContentProps) {
       data-centered={local.centered ?? false}
     >
       <Container
-        maxWidth={local.width === "narrow" ? "28.25rem" : "67.5rem"}
+        maxWidth={
+          local.width === "narrow" ? "28.25rem" : local.width === "medium" ? "37rem" : "67.5rem"
+        }
         class={s.contentInner}
       >
         {local.children}

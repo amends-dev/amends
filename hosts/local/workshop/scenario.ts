@@ -60,6 +60,8 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
   // A real directory request eagerly builds the host before publishing this fixture.
   yield* Effect.promise(() => app.handler(new Request("http://localhost/me/workspaces")));
   let next: "hold" | "fail" | undefined;
+  let failDirectory = false;
+  let loseCreationResponse = false;
   let release: (() => void) | undefined;
   let requests = 0;
   let completed = 0;
@@ -73,14 +75,27 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
       cancelled,
       held: !!release,
     }),
-    command: (command: "expire" | "hold" | "fail" | "release") => {
+    command: (
+      command: "expire" | "hold" | "fail" | "release" | "fail-directory" | "lose-creation-response",
+    ) => {
       if (command === "expire") offset += 600_001;
+      else if (command === "fail-directory") failDirectory = true;
+      else if (command === "lose-creation-response") loseCreationResponse = true;
       else if (command === "release") release?.();
       else next = command;
     },
     handle: async (request: Request) => {
       const path = new URL(request.url).pathname;
-      if (path === "/session/email" || path === "/session/code") {
+      if (path === "/me/workspaces" && failDirectory) {
+        failDirectory = false;
+        return new Response("Workshop directory failure", { status: 503 });
+      }
+      if (
+        path === "/session/email" ||
+        path === "/session/code" ||
+        path === "/workspaces" ||
+        path === "/me/workspaces"
+      ) {
         requests++;
         const action = next;
         next = undefined;
@@ -104,6 +119,11 @@ const make = Effect.fn("Workshop.make")(function* (serverUrl: string) {
       }
       const response = await app.handler(request);
       completed++;
+      if (path === "/workspaces" && request.method === "POST" && loseCreationResponse) {
+        loseCreationResponse = false;
+        await response.arrayBuffer();
+        return new Response("Workshop lost creation response", { status: 503 });
+      }
       return response;
     },
   };

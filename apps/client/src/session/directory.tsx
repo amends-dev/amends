@@ -18,7 +18,11 @@ import { useSession } from "./provider.tsx";
 export type DirectoryState = Data.TaggedEnum<{
   SignedOut: {};
   Loading: {};
-  Ready: { readonly listing: WorkspaceDirectory.Listing };
+  Ready: {
+    readonly listing: WorkspaceDirectory.Listing;
+    readonly refreshing: boolean;
+    readonly refreshFailed: boolean;
+  };
   Failed: {};
 }>;
 const DirectoryState = Data.taggedEnum<DirectoryState>();
@@ -42,10 +46,22 @@ export function DirectoryProvider(props: ParentProps) {
     if (current && AsyncResult.isFailure(current) && isUnauthorized(current.cause))
       session.replace(undefined);
   });
-  const state = createMemo<DirectoryState>(() => {
+  const state = createMemo<DirectoryState>((previous) => {
     if (!read) return DirectoryState.SignedOut();
     const current = read.result();
-    if (AsyncResult.isSuccess(current)) return DirectoryState.Ready({ listing: current.value });
+    if (AsyncResult.isSuccess(current))
+      return DirectoryState.Ready({
+        listing: current.value,
+        refreshing: current.waiting,
+        refreshFailed: false,
+      });
+    // A refresh must not unmount validated pages or discard their local drafts.
+    if (previous?._tag === "Ready")
+      return DirectoryState.Ready({
+        ...previous,
+        refreshing: current.waiting,
+        refreshFailed: AsyncResult.isFailure(current) && !current.waiting,
+      });
     if (AsyncResult.isFailure(current)) return DirectoryState.Failed();
     return DirectoryState.Loading();
   });

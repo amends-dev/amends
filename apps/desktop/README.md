@@ -3,8 +3,8 @@
 Tauri 2 desktop application composing the independent [client](../client/README.md)
 and [UI](../ui/README.md) packages.
 It uses hash routing, webview session persistence, and the existing Bun host over HTTP.
-The app owns its sign-in page over shared `SignIn` feature parts; workspace routes
-remain placeholders. Desktop does not start a backend process or use native commands/plugins.
+The app owns sign-in, workspace picker, and creation pages over shared feature parts.
+Workspace content remains a placeholder. Desktop does not start a backend process or use native commands/plugins.
 
 ## Run and verify
 
@@ -89,3 +89,6 @@ owns the theme scope, `Shell.Root` owns the application frame, and page-local
 Sign-in uses `Content width="narrow" centered` with `Body scroll="page"` so long
 content and enlarged text stay reachable. Visual gaps are evaluated and verified
 in UI before app consumption; `check:packages` rejects app-local styles.
+
+The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
+composition, idempotent retry, directory refresh, and the remaining invitation scope.

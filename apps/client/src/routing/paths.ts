@@ -1,6 +1,7 @@
 export const paths = {
   signIn: "/sign-in",
   workspaces: "/workspaces",
+  createWorkspace: "/workspaces/new",
   workspace: (id: string) => `/workspaces/${encodeURIComponent(id)}`,
 } as const;
 

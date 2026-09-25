@@ -263,3 +263,8 @@ Color.js is a development
 dependency used by the contrast tests and specimens, not the production exports.
 The accessibility addon is available; automated screenshot-baseline testing and native
 desktop validation are not configured. Tauri integration remains a later step.
+
+**Workspace entry** adds the neutral [WorkspaceMark](src/primitives/workspace-mark/README.md),
+compound [ItemList](src/compositions/item-list/README.md), and controlled
+[CreateWorkspaceForm](src/features/workspaces/README.md). Each has isolated workshop
+coverage; connected state remains in features and pages remain in the apps.

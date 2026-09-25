@@ -13,6 +13,8 @@ import { Row } from "@amends/ui/primitives/layout";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
 import { PlaceholderPage as Page } from "./placeholder-page.tsx";
 import { SignInPage } from "./pages/sign-in.tsx";
+import { WorkspacePickerPage } from "./pages/workspace-picker.tsx";
+import { CreateWorkspacePage } from "./pages/create-workspace.tsx";
 
 function SessionActions() {
   const session = useSession();
@@ -110,14 +112,8 @@ export function ApplicationRoutes() {
       <Route path="/" component={() => <Navigate href={paths.workspaces} />} />
       <Route path={paths.signIn} component={SignInRoute} />
       <Route component={RequireSession}>
-        <Route
-          path={paths.workspaces}
-          component={() => (
-            <Page title="Workspaces" message="Your workspace pages will appear here.">
-              <SessionActions />
-            </Page>
-          )}
-        />
+        <Route path={paths.workspaces} component={WorkspacePickerPage} />
+        <Route path={paths.createWorkspace} component={CreateWorkspacePage} />
         <Route path="/workspaces/:workspaceId" component={WorkspaceRoute} />
       </Route>
       <Route

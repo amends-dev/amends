@@ -54,3 +54,33 @@ to twelve. A static Storybook build needs this backend/proxy to run live stories
 
 Web and desktop compose their own sign-in pages from these parts and UI primitives.
 Page layout and navigation remain in those apps.
+
+## Workspace entry
+
+`@amends/features/workspaces` exports `WorkspacePicker` and `CreateWorkspace`.
+Mount them inside the existing ClientProvider and DirectoryProvider.
+
+```tsx
+<WorkspacePicker.Root>
+  <WorkspacePicker.Summary />
+  <WorkspacePicker.List workspaceHref={workspaceHref} />
+  <WorkspacePicker.Empty />
+  <WorkspacePicker.Status />
+</WorkspacePicker.Root>
+
+<CreateWorkspace.Root onCreated={openWorkspace}>
+  <CreateWorkspace.Form />
+  <CreateWorkspace.Result />
+</CreateWorkspace.Root>
+```
+
+The app supplies URLs and navigation callbacks, headings, creation entry, account
+actions, and Shell layout. The picker shows only active memberships; a pending
+invitation count does not imply invitation actions are implemented.
+
+Workspace stories cover populated/empty directories, creation, lost-response retry,
+directory refresh failure, duplicate submissions, and unmounting. Controls also
+apply to creation/directory requests; losing a creation response lets the real
+commit finish before withholding its response. Fixtures create temporary data through
+HTTP and sign in through the normal development flow. See
+[workspace entry](../../docs/workspace-entry.md) for the ownership and recovery contract.

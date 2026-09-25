@@ -13,3 +13,8 @@ export { paths, returnPath, signInPath } from "./routing/paths.ts";
 export { resolveApiBaseUrl } from "./configuration.ts";
 export { createBrowserSessionStore, type SessionStore } from "./session/store.ts";
 export { useSignIn, type SignInController, type SignInState } from "./sign-in/controller.ts";
+export {
+  useCreateWorkspace,
+  type CreateWorkspaceController,
+  type CreateWorkspaceState,
+} from "./workspaces/create.ts";

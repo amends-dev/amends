@@ -39,6 +39,7 @@ drawings, generation, and visual review in the UI workshop.
 - [Feature development](feature-development.md) records the agreed workflow and
   connected-feature boundary. [Sign-in](sign-in-design.md) applies it to
   the first slice, including the UI pieces to introduce.
+  [Workspace entry](workspace-entry.md) describes picker/creation ownership and recovery.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not

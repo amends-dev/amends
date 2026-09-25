@@ -153,7 +153,13 @@ unmounting, and credential replacement cancel old work and ignore late responses
 The declarative `SignIn.Root`, `EmailForm`, and `CodeForm` parts connect it to UI,
 with live HTTP scenarios and app-owned pages in web and desktop.
 
-Workspace picker/creation, the application shell, and domain pages remain unimplemented. Only local sign-out exists; server revocation,
+Workspace picker and creation are implemented in both apps over shared connected
+features. [Workspace entry](workspace-entry.md) records composition and recovery.
+The picker lists active memberships and total members; creation refreshes the directory
+before navigation and retries uncertain submissions with the same key while mounted.
+Invitations have a count only; actions, richer directory metadata, remembered-workspace
+navigation, the workspace application shell, and domain pages remain unimplemented.
+Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work. The removed legacy web screens remain available in Git history.
 Theme preferences, route focus management, Tauri signing/updates, production artwork,

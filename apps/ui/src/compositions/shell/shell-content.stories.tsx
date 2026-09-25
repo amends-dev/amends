@@ -193,3 +193,26 @@ export const EmptyState = {
     </ThemeProvider>
   ),
 } satisfies Story;
+export const Medium = {
+  render: () => (
+    <ThemeProvider theme="cotton">
+      <Shell.Root>
+        <Shell.Body scroll="page">
+          <Shell.Main>
+            <Shell.Content width="medium">
+              <Column gap={3}>
+                <Text as="h1" variant="heading">
+                  Choose a workspace
+                </Text>
+                <Text>
+                  Medium content leaves room for a readable list while keeping it centered
+                  horizontally.
+                </Text>
+              </Column>
+            </Shell.Content>
+          </Shell.Main>
+        </Shell.Body>
+      </Shell.Root>
+    </ThemeProvider>
+  ),
+} satisfies Story;

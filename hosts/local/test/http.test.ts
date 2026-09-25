@@ -273,11 +273,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             "http://tauri.localhost",
             "https://tauri.localhost",
           ]) {
-            const preflight = yield* client.options("/session/code", {
+            const preflight = yield* client.options("/workspaces", {
               headers: {
                 origin,
                 "access-control-request-method": "POST",
-                "access-control-request-headers": "authorization,content-type,traceparent,b3",
+                "access-control-request-headers":
+                  "authorization,content-type,idempotency-key,traceparent,b3",
               },
             });
             expect(preflight.status).toBe(204);
@@ -287,6 +288,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
               "b3",
+            );
+            expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
+              "idempotency-key",
             );
             const denied = yield* client.get("/me/workspaces", { headers: { origin } });
             expect(denied.status).toBe(401);

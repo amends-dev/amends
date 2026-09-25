@@ -4,7 +4,7 @@ Solid/Vite browser application composing the independent [client](../client/READ
 and [UI](../ui/README.md) packages.
 It supplies browser-history routing, API configuration, and browser session persistence.
 The app owns its sign-in page, composing UI primitives and the shared `SignIn`
-feature parts. Workspace routes still contain placeholders.
+feature parts. The workspace picker and creation pages use shared feature parts; workspace content remains a placeholder.
 
 ## Run and verify
 
@@ -63,3 +63,6 @@ owns the theme scope, `Shell.Root` owns the application frame, and page-local
 Sign-in uses `Content width="narrow" centered` with `Body scroll="page"` so long
 content and enlarged text stay reachable. Visual gaps are evaluated and verified
 in UI before app consumption; `check:packages` rejects app-local styles.
+
+The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
+composition, idempotent retry, directory refresh, and the remaining invitation scope.
