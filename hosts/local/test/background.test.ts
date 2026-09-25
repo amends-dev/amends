@@ -1,11 +1,11 @@
 import { BackgroundProcess } from "@amends/core/background";
-import { Store } from "@amends/core/journal";
+import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import { ClusterBackground, Gateway, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { PostgresStorage } from "@amends/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Exit, Layer, Redacted } from "effect";
+import { Clock, Context, Duration, Effect, Exit, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { LocalHost } from "../src/host.ts";
 import { setup } from "./database.ts";
@@ -69,5 +69,108 @@ describe.skipIf(!available)("background work on the local host", () => {
         }).pipe(Effect.scoped),
       ),
     30_000,
+  );
+
+  it.effect("a process refuses to start at a runner address another process holds", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const at = (port: number) =>
+          LocalHost.layerDatabase(Redacted.make(url), {
+            runnerAddress: { host: "localhost", port },
+          });
+        yield* Layer.build(at(34461));
+        expect(yield* Effect.flip(Effect.scoped(Layer.build(at(34461))))).toMatchObject({
+          _tag: "PostgresClusterStorage.AddressTaken",
+          address: "localhost:34461",
+        });
+        // A process at its own address runs beside it.
+        yield* Effect.scoped(Layer.build(at(34462)));
+      }).pipe(Effect.scoped),
+    ),
+  );
+
+  // Two processes over one database, linked by sockets: a wake for a workspace the other process
+  // runs reaches it at once, well before its next read of the database.
+  it.live(
+    "over sockets, a wake reaches the process that runs its workspace without waiting for a read",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const runs: Array<{ readonly runner: string; readonly key: string }> = [];
+          const unexpected = () => Effect.die("Only background runs are expected");
+          const runner = (name: string, port: number) =>
+            ClusterBackground.layer.pipe(
+              Layer.provide(
+                Layer.mergeAll(
+                  Layer.succeed(
+                    Gateway.Service,
+                    Gateway.Service.of({
+                      createWorkspace: unexpected,
+                      inWorkspace: unexpected,
+                      asMember: unexpected,
+                      asMemberScoped: unexpected,
+                      runBackground: (id) =>
+                        Effect.sync(() => {
+                          runs.push({ runner: name, key: id });
+                          return BackgroundProcess.idle;
+                        }),
+                    }),
+                  ),
+                  BunCrypto.layer,
+                ),
+              ),
+              Layer.provideMerge(
+                LocalHost.layerDatabase(Redacted.make(url), {
+                  runnerAddress: { host: "localhost", port },
+                  runnerTransport: "socket",
+                  pollInterval: "5 seconds",
+                }),
+              ),
+            );
+          const first = yield* Layer.build(runner("first", 34471));
+          yield* Layer.build(runner("second", 34472));
+          const wakes = Context.get(first, WorkspaceWakes.Service);
+          const workspaces = Array.from({ length: 20 }, (_, index) =>
+            Workspace.Id.make(`workspace-${index}`),
+          );
+          const round = (name: string) =>
+            Effect.forEach(
+              workspaces,
+              (id) =>
+                wakes
+                  .forWorkspace(id)
+                  .request(process)
+                  .pipe(
+                    Effect.provideService(Store.Transaction, {
+                      id: Commit.Id.make(`${name}:${id}`),
+                      append: () => Effect.die("Unexpected append"),
+                    }),
+                  ),
+              { discard: true },
+            );
+          const ran = (count: number, within: Duration.Input) =>
+            Effect.gen(function* () {
+              const deadline = (yield* Clock.currentTimeMillis) + Duration.toMillis(within);
+              while (runs.length < count && (yield* Clock.currentTimeMillis) < deadline)
+                yield* Effect.sleep("20 millis");
+              return runs.length;
+            });
+          // The processes share out the workspaces once both run, a few seconds after starting.
+          const deadline = (yield* Clock.currentTimeMillis) + 30_000;
+          for (let attempt = 0; !runs.some((run) => run.runner === "second"); attempt++) {
+            if ((yield* Clock.currentTimeMillis) > deadline)
+              return expect.fail("The second process never took a workspace");
+            runs.length = 0;
+            yield* round(`warm-${attempt}`);
+            yield* ran(20, "10 seconds");
+            yield* Effect.sleep("1 second");
+          }
+          runs.length = 0;
+          yield* round("warmed");
+          expect(yield* ran(20, "1 second")).toBe(20);
+          expect(runs.some((run) => run.runner === "second")).toBe(true);
+        }).pipe(Effect.scoped),
+      ),
+    60_000,
   );
 });

@@ -1,4 +1,4 @@
-import { Config, Effect, Schema } from "effect";
+import { Config, Duration, Effect, Schema } from "effect";
 import type { Redacted } from "effect";
 
 export interface Options {
@@ -9,6 +9,13 @@ export interface Options {
   readonly poolSize: number;
   /** This process's address among those running background work over the database. */
   readonly runnerAddress: { readonly host: string; readonly port: number };
+  /**
+   * How processes running background work reach each other: through the database alone, or also
+   * directly over sockets at their runner addresses.
+   */
+  readonly runnerTransport: "storage" | "socket";
+  /** How long a process that stops answering keeps its workspaces before another takes them. */
+  readonly runnerTakeover: Duration.Duration;
 }
 
 const port = Config.schema(
@@ -47,6 +54,21 @@ const runnerAddress = Config.schema(
     return { host: value.slice(0, separator), port: Number(value.slice(separator + 1)) };
   }),
 );
+const runnerTransport = Config.schema(
+  Schema.Literals(["storage", "socket"]),
+  "AMENDS_RUNNER_TRANSPORT",
+).pipe(Config.withDefault("storage" as const));
+const runnerTakeover = Config.schema(
+  Schema.DurationFromString.check(
+    Schema.makeFilter(
+      (duration) =>
+        (Duration.isGreaterThanOrEqualTo(duration, Duration.seconds(6)) &&
+          Duration.isLessThanOrEqualTo(duration, Duration.minutes(10))) ||
+        "Expected a duration from 6 seconds through 10 minutes",
+    ),
+  ),
+  "AMENDS_RUNNER_TAKEOVER",
+).pipe(Config.withDefault(Duration.seconds(35)));
 const poolSize = Config.schema(
   Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 1000 })),
   "AMENDS_DATABASE_POOL_SIZE",
@@ -62,6 +84,8 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
     databaseUrl: yield* databaseUrl,
     poolSize: yield* poolSize,
     runnerAddress: yield* runnerAddress,
+    runnerTransport: yield* runnerTransport,
+    runnerTakeover: yield* runnerTakeover,
   };
 });
 

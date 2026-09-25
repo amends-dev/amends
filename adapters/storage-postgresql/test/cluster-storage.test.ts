@@ -4,7 +4,7 @@ import { Workspace } from "@amends/core/workspace";
 import { ClusterBackground, Gateway, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, DateTime, Duration, Effect, Layer, Option } from "effect";
+import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";
 import { RunnerAddress, SingleRunner } from "effect/unstable/cluster";
 import { SqlClient } from "effect/unstable/sql";
 import { PostgresClusterStorage } from "../src/index.ts";
@@ -102,5 +102,29 @@ describe.skipIf(!available)("PostgreSQL", () => {
         }).pipe(Effect.scoped),
       ),
     30_000,
+  );
+
+  it.effect("a runner address is held by one process at a time, and freed when it stops", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const first = yield* Layer.build(database(url));
+        const second = yield* Layer.build(database(url));
+        const claim = (pool: typeof first, address: string) =>
+          Layer.build(Layer.effectDiscard(PostgresClusterStorage.claimAddress(address))).pipe(
+            Effect.provide(pool),
+          );
+        const held = yield* Scope.make();
+        yield* claim(first, "runner-a:1").pipe(Scope.provide(held));
+        expect(yield* Effect.flip(Effect.scoped(claim(second, "runner-a:1")))).toEqual(
+          new PostgresClusterStorage.AddressTaken({ address: "runner-a:1" }),
+        );
+        // Another address is free, and so is this one once the process holding it stops.
+        yield* Effect.scoped(claim(second, "runner-b:1"));
+        yield* Scope.close(held, Exit.void);
+        yield* Effect.scoped(claim(second, "runner-a:1"));
+        // The first pool's connection went back without the lock: it can claim it again too.
+        yield* Effect.scoped(claim(first, "runner-a:1"));
+      }).pipe(Effect.scoped),
+    ),
   );
 });

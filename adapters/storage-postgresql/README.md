@@ -290,7 +290,13 @@ removes a message or its reply. `PostgresClusterStorage.prune(entityTypes, befor
 removes the handled messages of those entity types stored before a time, with their replies, and
 returns how many went. A message's ID carries when Cluster stored it; messages not yet handled
 stay, however old, and so do other entity types'. Each statement removes at most `batch`
-messages, a thousand by default. `cluster-storage.test.ts` checks this over real wakes.
+messages, a thousand by default.
+
+`PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
+processes over the database never run Cluster at one address: it fails with `AddressTaken`
+while another process holds it. The claim is a session-level advisory lock on a connection it
+keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
+dies. `cluster-storage.test.ts` checks pruning over real wakes and the claim across pools.
 
 ## Composition
 

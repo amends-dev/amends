@@ -28,6 +28,8 @@ server proxies `/api` here. `bun run dev` restarts the host when its source chan
 | `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                    |
 | `AMENDS_DATABASE_POOL_SIZE` | `10`              | Integer from `2` through `1000`.                           |
 | `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.         |
+| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                     |
+| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.              |
 
 The pool size is the most connections the host opens. One of them listens for notifications
 while readers wait, and a busy workspace's writers wait for each other in memory rather than
@@ -42,18 +44,29 @@ redacted in configuration errors.
 ## Background work
 
 The host runs its workspaces' [background work](../../packages/gateway/README.md#background-work-on-effect-cluster)
-in its own process, on an Effect Cluster runner (`SingleRunner`) over the same database pool as
-its storage, so a wake a commit asks for is stored in that commit's transaction. Cluster keeps
-its own tables beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
-`cluster_migrations`), creating them at startup; reads for due wakes every two seconds; and
-holds two of the pool's connections. Every hour, one runner prunes wakes handled more than seven
-days ago.
+in its own process, on an Effect Cluster runner over the same database pool as its storage, so a
+wake a commit asks for is stored in that commit's transaction. Cluster keeps its own tables
+beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
+`cluster_migrations`), creating them at startup; reads for due wakes every two seconds; and holds
+two of the pool's connections. Every hour, one runner prunes wakes handled more than seven days
+ago.
 
-`AMENDS_RUNNER_ADDRESS` is the process's identity among the runners over the database. Only one
-process may run at an address at a time: two processes sharing one also share Cluster's machine
-ID, and the first to stop removes the other's registration. Restart a host by stopping the old
-process before starting the new one; wakes sent meanwhile wait in the database. Several host
-processes over one database need Cluster's socket transport, which this host does not configure.
+Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
+share out the workspaces' background work, and when one stops answering, the others take its
+workspaces after `AMENDS_RUNNER_TAKEOVER`, which every process over the database sets alike. A
+process claims its address as it starts, holding one more pooled connection, and refuses to
+start while another process holds it: two processes at one address would share Cluster's machine
+ID, and the first to stop would remove the other's registration. The claim ends with its
+process, so a host restarted after a crash takes its address back at once, and its unfinished
+wakes run again. Restart a host by stopping the old process before starting the new one; wakes
+sent meanwhile wait in the database.
+
+With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes coordinate through the database
+alone, so a wake for a workspace another process runs arrives at that process's next read,
+within two seconds. With `socket`, each process also listens at its runner address and tells the
+process that runs a workspace about its wake at once, and checks that the others answer.
+Cluster's socket messages are not authenticated: use `socket` only where runner addresses are
+reachable on a private network.
 
 ## Browser and desktop access
 
@@ -140,10 +153,12 @@ bun run test
 
 Authentication tests cover constructor and layer behavior, state isolation,
 single-use codes, exact expiry, repeated requests, concurrent completion, and
-failed or interrupted delivery. Configuration tests cover defaults, port, pool-size, and runner-address bounds,
-the required database URL, empty values, and redacted errors. `background.test.ts` checks, over
-the host's database composition, that a wake asked for inside a commit is stored with it, reaches
-the worker, and is absent if the commit rolls back.
+failed or interrupted delivery. Configuration tests cover defaults, port, pool-size, runner-address, transport, and takeover
+bounds, the required database URL, empty values, and redacted errors. `background.test.ts` checks,
+over the host's database composition, that a wake asked for inside a commit is stored with it,
+reaches the worker, and is absent if the commit rolls back; that a process refuses to start at a
+runner address another process holds; and that over sockets a wake reaches the process running
+its workspace well before that process's next read.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

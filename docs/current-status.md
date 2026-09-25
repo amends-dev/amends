@@ -19,10 +19,10 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   activity kinds remain design intent. Only people author messages through the application, so
   the agent-authored messages that notify agents as informational come from no workflow yet.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them on an Effect Cluster runner, but no process is registered yet. The host
-  runs one runner per database;
-  several host processes over one database need Cluster's socket transport, which it does not
-  configure. Two processes at one runner address must never overlap.
+  local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
+  processes over one database share the work; one that stops answering keeps its workspaces for
+  the takeover time, 35 seconds by default. Cluster's socket transport, which delivers wakes
+  between processes at once, is not authenticated and belongs on a private network.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping

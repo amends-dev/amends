@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { ConfigProvider, Effect, Redacted } from "effect";
+import { ConfigProvider, Duration, Effect, Redacted } from "effect";
 import { LocalConfig } from "../src/config.ts";
 
 const load = (values: Record<string, unknown>) =>
@@ -54,6 +54,35 @@ it.effect("background work runs at localhost:34431 unless told otherwise", () =>
       AMENDS_RUNNER_ADDRESS: "runner-2.internal:40001",
     });
     expect(options.runnerAddress).toEqual({ host: "runner-2.internal", port: 40001 });
+  }),
+);
+
+it.effect("background work coordinates through the database, and hands over after 35 seconds", () =>
+  Effect.gen(function* () {
+    const defaults = yield* load({ AMENDS_DATABASE_URL: databaseUrl });
+    expect(defaults.runnerTransport).toBe("storage");
+    expect(Duration.toMillis(defaults.runnerTakeover)).toBe(35_000);
+    const options = yield* load({
+      AMENDS_DATABASE_URL: databaseUrl,
+      AMENDS_RUNNER_TRANSPORT: "socket",
+      AMENDS_RUNNER_TAKEOVER: "15 seconds",
+    });
+    expect(options.runnerTransport).toBe("socket");
+    expect(Duration.toMillis(options.runnerTakeover)).toBe(15_000);
+  }),
+);
+
+it.effect.each([
+  ["AMENDS_RUNNER_TRANSPORT", "http"],
+  ["AMENDS_RUNNER_TAKEOVER", "5 seconds"],
+  ["AMENDS_RUNNER_TAKEOVER", "11 minutes"],
+  ["AMENDS_RUNNER_TAKEOVER", "soon"],
+] as const)("configuration rejects %s=%j", ([name, value]) =>
+  Effect.gen(function* () {
+    const error = yield* load({ AMENDS_DATABASE_URL: databaseUrl, [name]: value }).pipe(
+      Effect.flip,
+    );
+    expect(error.message).toContain(name);
   }),
 );
 
