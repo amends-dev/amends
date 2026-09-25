@@ -49,9 +49,11 @@ export function List(props: { workspaceHref: (workspaceId: string) => string }) 
           {(entry) => (
             <ItemList.Item>
               <ItemList.Link href={props.workspaceHref(entry.workspace.id)}>
-                <WorkspaceMark decorative>
-                  {Array.from(entry.workspace.name)[0]?.toLocaleUpperCase() ?? "?"}
-                </WorkspaceMark>
+                <ItemList.Leading>
+                  <WorkspaceMark decorative>
+                    {Array.from(entry.workspace.name)[0]?.toLocaleUpperCase() ?? "?"}
+                  </WorkspaceMark>
+                </ItemList.Leading>
                 <ItemList.Content>
                   <ItemList.Title>{entry.workspace.name}</ItemList.Title>
                   <ItemList.Description>
@@ -59,7 +61,6 @@ export function List(props: { workspaceHref: (workspaceId: string) => string }) 
                     {entry.member.id === entry.workspace.ownerMemberId ? " · Owner" : ""}
                   </ItemList.Description>
                 </ItemList.Content>
-                <span aria-hidden="true">›</span>
               </ItemList.Link>
             </ItemList.Item>
           )}

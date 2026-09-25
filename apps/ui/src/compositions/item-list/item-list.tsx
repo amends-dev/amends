@@ -3,14 +3,14 @@ import { classes } from "../../primitives/internal/props.ts";
 import * as s from "./item-list.css.ts";
 
 export function Root(
-  props: JSX.HTMLAttributes<HTMLUListElement> & { variant?: "panel" | "outline" },
+  props: JSX.HTMLAttributes<HTMLUListElement> & { variant?: "plain" | "outline" },
 ) {
   const [local, native] = splitProps(props, ["variant", "class", "classList"]);
   return (
     <ul
       {...native}
       class={classes(
-        `${s.root} ${s.variants[local.variant ?? "panel"]}`,
+        `${s.root} ${s.variants[local.variant ?? "plain"]}`,
         local.class,
         local.classList,
       )}
@@ -26,6 +26,16 @@ export function Link(props: JSX.AnchorHTMLAttributes<HTMLAnchorElement> & { href
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <a {...native} class={classes(s.link, local.class, local.classList)} />;
 }
+export function Leading(props: JSX.HTMLAttributes<HTMLSpanElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return (
+    <span
+      {...native}
+      data-item-list-leading=""
+      class={classes(s.leading, local.class, local.classList)}
+    />
+  );
+}
 export function Content(props: JSX.HTMLAttributes<HTMLSpanElement>) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <span {...native} class={classes(s.content, local.class, local.classList)} />;
@@ -37,6 +47,10 @@ export function Title(props: JSX.HTMLAttributes<HTMLSpanElement>) {
 export function Description(props: JSX.HTMLAttributes<HTMLSpanElement>) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <span {...native} class={classes(s.description, local.class, local.classList)} />;
+}
+export function Meta(props: JSX.HTMLAttributes<HTMLSpanElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <span {...native} class={classes(s.meta, local.class, local.classList)} />;
 }
 /** Non-interactive row for content with independent actions. Never nests a button in a link. */
 export function Row(props: JSX.HTMLAttributes<HTMLDivElement>) {

@@ -9,7 +9,8 @@ directory, and replaces the creation route with `/workspaces/:id`.
 - Client reuses `GET /me/workspaces` and owns `useCreateWorkspace`. A refresh keeps
   validated pages mounted. Rejected credentials still clear the session.
 - UI owns `WorkspaceMark`, declarative `ItemList` parts, and `CreateWorkspaceForm`.
-  They use reviewed tokens and controls. Shell's medium width fits the picker;
+  Memberships use the same flat, seam-separated rows as the workspace rosters;
+  the new-workspace action keeps a separate dashed outline. Shell's medium width fits the picker;
   its narrow width fits creation. Theme remains inherited from ThemeProvider.
 - Features connects `WorkspacePicker.Root` with `Summary`, `List`, `Invitations`, `Empty`, and
   `Status`; `CreateWorkspace.Root` with `Form` and `Result`. URLs and the

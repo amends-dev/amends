@@ -60,14 +60,16 @@ export function MemberList(props: { memberHref: (id: string) => string; selected
                           href={props.memberHref(entry.member.id)}
                           aria-current={props.selectedId === entry.member.id ? "page" : undefined}
                         >
-                          <Avatar.Root
-                            kind={entry.member.identity._tag === "Human" ? "human" : "agent"}
-                            decorative
-                          >
-                            <Avatar.Fallback>
-                              {entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
-                            </Avatar.Fallback>
-                          </Avatar.Root>
+                          <ItemList.Leading>
+                            <Avatar.Root
+                              kind={entry.member.identity._tag === "Human" ? "human" : "agent"}
+                              decorative
+                            >
+                              <Avatar.Fallback>
+                                {entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
+                              </Avatar.Fallback>
+                            </Avatar.Root>
+                          </ItemList.Leading>
                           <ItemList.Content>
                             <ItemList.Title>
                               {entry.member.identity.id}
@@ -77,12 +79,14 @@ export function MemberList(props: { memberHref: (id: string) => string; selected
                               {entry.access ? roleNames(entry) : "Access details unavailable"}
                             </ItemList.Description>
                           </ItemList.Content>
-                          <Status.Root tone={status === "active" ? "success" : "idle"}>
-                            <Status.Indicator />
-                            <Status.Label>
-                              {status === "active" ? "Active" : "Removed"}
-                            </Status.Label>
-                          </Status.Root>
+                          <ItemList.Meta>
+                            <Status.Root tone={status === "active" ? "success" : "idle"}>
+                              <Status.Indicator />
+                              <Status.Label>
+                                {status === "active" ? "Active" : "Removed"}
+                              </Status.Label>
+                            </Status.Root>
+                          </ItemList.Meta>
                         </ItemList.Link>
                       </ItemList.Item>
                     )}

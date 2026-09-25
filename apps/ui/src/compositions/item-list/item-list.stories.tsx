@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { For, createSignal } from "solid-js";
 import { ItemList } from "@amends/ui/compositions/item-list";
+import { Avatar } from "@amends/ui/primitives/avatar";
+import { Status } from "@amends/ui/primitives/status";
 import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { Column } from "@amends/ui/primitives/layout";
@@ -30,12 +32,13 @@ function Specimen(props: { theme?: "cotton" | "soot"; narrow?: boolean; rtl?: bo
                     setOpened(name);
                   }}
                 >
-                  <WorkspaceMark decorative>{name.slice(0, 1)}</WorkspaceMark>
+                  <ItemList.Leading>
+                    <WorkspaceMark decorative>{name.slice(0, 1)}</WorkspaceMark>
+                  </ItemList.Leading>
                   <ItemList.Content>
                     <ItemList.Title>{name}</ItemList.Title>
                     <ItemList.Description>3 members · Owner</ItemList.Description>
                   </ItemList.Content>
-                  <span aria-hidden="true">›</span>
                 </ItemList.Link>
               </ItemList.Item>
             )}
@@ -50,7 +53,9 @@ function Specimen(props: { theme?: "cotton" | "soot"; narrow?: boolean; rtl?: bo
                 setOpened("Create");
               }}
             >
-              <WorkspaceMark decorative>+</WorkspaceMark>
+              <ItemList.Leading>
+                <WorkspaceMark decorative>+</WorkspaceMark>
+              </ItemList.Leading>
               <ItemList.Content>
                 <ItemList.Title>New workspace</ItemList.Title>
                 <ItemList.Description>A shared place for your work.</ItemList.Description>
@@ -63,17 +68,107 @@ function Specimen(props: { theme?: "cotton" | "soot"; narrow?: boolean; rtl?: bo
     </ThemeProvider>
   );
 }
+function RosterSpecimen(props: { theme?: "cotton" | "soot"; narrow?: boolean }) {
+  return (
+    <ThemeProvider theme={props.theme ?? "cotton"}>
+      <Column gap={6} style={{ padding: "1.5rem", "max-width": props.narrow ? "19rem" : "50rem" }}>
+        <ItemList.Root aria-label="People">
+          <ItemList.Item>
+            <ItemList.Link href="#jo">
+              <ItemList.Leading>
+                <Avatar.Root kind="human" decorative>
+                  <Avatar.Fallback>JM</Avatar.Fallback>
+                </Avatar.Root>
+              </ItemList.Leading>
+              <ItemList.Content>
+                <ItemList.Title>Jo Mercer</ItemList.Title>
+                <ItemList.Description>jo@acme.test</ItemList.Description>
+              </ItemList.Content>
+              <ItemList.Meta>
+                <span>owner</span>
+                <span>own</span>
+                <span>joined 12 Jul</span>
+              </ItemList.Meta>
+            </ItemList.Link>
+          </ItemList.Item>
+          <ItemList.Item>
+            <ItemList.Link href="#kit">
+              <ItemList.Leading>
+                <Avatar.Root kind="human" decorative>
+                  <Avatar.Fallback>KN</Avatar.Fallback>
+                </Avatar.Root>
+              </ItemList.Leading>
+              <ItemList.Content>
+                <ItemList.Title>Kit Nakano</ItemList.Title>
+                <ItemList.Description>kit@acme.test</ItemList.Description>
+              </ItemList.Content>
+              <ItemList.Meta>
+                <span>admin</span>
+                <span>manage</span>
+                <span>joined 19 Jul</span>
+              </ItemList.Meta>
+            </ItemList.Link>
+          </ItemList.Item>
+        </ItemList.Root>
+        <ItemList.Root aria-label="Agents">
+          <ItemList.Item>
+            <ItemList.Link href="#ada">
+              <ItemList.Leading>
+                <Avatar.Root kind="agent" decorative>
+                  <Avatar.Fallback>a</Avatar.Fallback>
+                </Avatar.Root>
+              </ItemList.Leading>
+              <ItemList.Content>
+                <ItemList.Title>Ada</ItemList.Title>
+                <ItemList.Description>finance</ItemList.Description>
+              </ItemList.Content>
+              <ItemList.Meta>
+                <span>2 of 3 running</span>
+                <span>work tier</span>
+                <span>claude-sonnet-4-6</span>
+              </ItemList.Meta>
+            </ItemList.Link>
+          </ItemList.Item>
+        </ItemList.Root>
+        <ItemList.Root aria-label="Environments">
+          <ItemList.Item>
+            <ItemList.Link href="#node20-finance">
+              <ItemList.Leading>
+                <Status.Root tone="success">
+                  <Status.Indicator />
+                </Status.Root>
+              </ItemList.Leading>
+              <ItemList.Content>
+                <ItemList.Title>node20-finance</ItemList.Title>
+                <ItemList.Description>opencode · opencode acp</ItemList.Description>
+              </ItemList.Content>
+              <ItemList.Meta>
+                <span>amends/opencode:1.18</span>
+                <span>2 sources · 1 tool</span>
+                <span>2 agents</span>
+              </ItemList.Meta>
+            </ItemList.Link>
+          </ItemList.Item>
+        </ItemList.Root>
+      </Column>
+    </ThemeProvider>
+  );
+}
 const meta = { title: "Compositions/ItemList", render: () => <Specimen /> } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Comparison = {
   render: () => (
     <>
+      <RosterSpecimen />
       <Specimen />
-      <Specimen theme="soot" />
+      <RosterSpecimen theme="soot" />
     </>
   ),
 } satisfies Story;
+export const Roster = { render: () => <RosterSpecimen /> } satisfies Story;
+export const RosterNarrow = { render: () => <RosterSpecimen narrow /> } satisfies Story;
+export const Picker = {} satisfies Story;
 export const Narrow = { render: () => <Specimen narrow /> } satisfies Story;
 export const EnlargedRTL = {
   render: () => (

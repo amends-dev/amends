@@ -40,7 +40,9 @@ export function WorkspacePickerPage() {
               <ItemList.Root variant="outline" aria-label="Workspace actions">
                 <ItemList.Item>
                   <ItemList.Link href={`#${paths.createWorkspace}`}>
-                    <WorkspaceMark decorative>+</WorkspaceMark>
+                    <ItemList.Leading>
+                      <WorkspaceMark decorative>+</WorkspaceMark>
+                    </ItemList.Leading>
                     <ItemList.Content>
                       <ItemList.Title>New workspace</ItemList.Title>
                       <ItemList.Description>A shared place for your work.</ItemList.Description>
