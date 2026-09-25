@@ -286,3 +286,8 @@ single choice, [FilterChip](src/primitives/filter-chip/README.md) independently 
 filters, and [Combobox](src/primitives/combobox/README.md) searches and selects rich
 options. The shared `action.selected` tint has color/contrast coverage in both themes.
 These pieces are available in UI and have not been substituted into application pages.
+
+**Compositions / KeyValue** follows the Primitives v2 Key and value reference:
+compact mono keys/values at opposite edges, content-driven wrapping, and seams
+between rows. Reference, Comparison, Narrow, Long Content, RTL, Enlarged Text, and
+Composed Values demonstrate reuse through semantic `dl`/`dt`/`dd` parts.
