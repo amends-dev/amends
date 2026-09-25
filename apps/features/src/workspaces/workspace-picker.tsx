@@ -100,19 +100,21 @@ export function Status() {
     return state._tag === "Failed" || (state._tag === "Ready" && state.refreshFailed);
   };
   return (
-    <Column gap={2}>
-      <Show when={busy()}>
-        <Text role="status">Loading workspaces…</Text>
-      </Show>
-      <Show when={failed()}>
-        <Text role="alert" tone="danger">
-          Couldn’t refresh your workspaces. Try again.
-        </Text>
-      </Show>
-      <Button variant="ghost" pending={busy()} onClick={value.retry}>
-        {failed() ? "Try again" : "Refresh workspaces"}
-      </Button>
-    </Column>
+    <Show when={busy() || failed()}>
+      <Column gap={2}>
+        <Show when={busy()}>
+          <Text role="status">Loading workspaces…</Text>
+        </Show>
+        <Show when={failed()}>
+          <Text role="alert" tone="danger">
+            Couldn’t refresh your workspaces. Try again.
+          </Text>
+          <Button variant="ghost" onClick={value.retry}>
+            Try again
+          </Button>
+        </Show>
+      </Column>
+    </Show>
   );
 }
 function InvitationEntry(props: {
@@ -139,7 +141,7 @@ function InvitationEntry(props: {
         </ItemList.Content>
         <ItemList.Actions>
           <Button pending={value.pending()} onClick={value.accept}>
-            {value.completed() ? "Refresh workspaces" : "Accept invitation"}
+            {value.completed() ? "Try again" : "Accept invitation"}
           </Button>
         </ItemList.Actions>
       </ItemList.Row>

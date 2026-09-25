@@ -281,6 +281,7 @@ it("lists only active workspaces and links creation to the app-owned page", asyn
   );
   const link = await screen.findByRole("link", { name: "Studio 1 member · Owner" });
   expect(link).toHaveAttribute("href", "/workspaces/one");
+  expect(screen.queryByRole("button", { name: /Refresh workspaces/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Former studio/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("link", { name: /New workspace/ }));
   await screen.findByRole("heading", { name: "Name your workspace" });

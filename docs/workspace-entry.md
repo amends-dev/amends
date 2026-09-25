@@ -22,6 +22,7 @@ owner status. Removed memberships are not selectable. Unknown or removed workspa
 URLs reach the existing unavailable-access presentation. Active workspaces open the
 [workspace shell](workspace-shell.md). Pending invitations show their workspace name
 and recipient, with acceptance that refreshes the directory before showing the membership.
+The picker has no manual refresh button; failed directory reads offer `Try again`.
 See [workspace settings](workspace-settings.md) for issuance and recovery.
 
 ## Creation and recovery

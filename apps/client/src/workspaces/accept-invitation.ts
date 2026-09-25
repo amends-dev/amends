@@ -40,7 +40,7 @@ export function useAcceptInvitation(workspaceId: string, invitationId: string) {
         else
           setError(
             completed()
-              ? "Joined. Refresh your workspaces to continue."
+              ? "Joined, but we couldn’t load your workspaces. Try again."
               : settingsFailure(exit.cause),
           );
       }

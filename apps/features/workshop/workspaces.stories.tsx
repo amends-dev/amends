@@ -45,6 +45,9 @@ export const Populated = {
       s.canvas.getByRole("link", { name: "Mercier & Co 1 member · Owner" }),
     ).toBeVisible();
     await expect(s.canvas.queryByText("No workspaces yet")).not.toBeInTheDocument();
+    await expect(
+      s.canvas.queryByRole("button", { name: "Refresh workspaces" }),
+    ).not.toBeInTheDocument();
   },
 } satisfies Story;
 export const Soot = { args: { populated: true, theme: "soot" } } satisfies Story;
