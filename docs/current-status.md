@@ -139,6 +139,12 @@ Stored credentials are scoped by API URL and validated before protected content 
 Changing credentials disposes the previous registry and requests. Session rejection,
 host failures, missing workspace access, and unknown routes have separate states.
 
+The headless [sign-in controller](../apps/client/src/sign-in/README.md) owns email/code
+drafts, shared-schema validation, typed HTTP requests, explicit retry/resend, and
+session installation. Each mounted controller owns its requests; changing email,
+unmounting, and credential replacement cancel old work and ignore late responses.
+It is verified with isolated transports and has not yet been connected to the UI forms.
+
 The sign-in page, connected email/code flow, workspace picker/creation, application shell,
 and domain pages remain unimplemented. Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are

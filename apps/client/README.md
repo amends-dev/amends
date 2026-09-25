@@ -24,6 +24,9 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useWorkspace(() => workspaceId)` resolves an active membership from the directory.
   The caller supplies identity; the hook does not read a router or render an access page.
 - `useApiClient()` gives named API modules access to the generated Effect client.
+- `useSignIn()` owns the email/code drafts, typed requests, pending/error state,
+  cancellation, and successful session installation. It has no presentation or
+  navigation behavior; see the [controller contract](src/sign-in/README.md).
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
@@ -70,7 +73,10 @@ bun run test
 
 Client tests use native test harnesses and isolated transports/stores without a UI
 package or router. They verify storage isolation/corruption/synchronization, stale
-scope completion, directory states, authorization failure, and retry. Web tests cover
+scope completion, directory states, authorization failure, and retry.
+Sign-in tests cover shared-schema validation, typed wire payloads, rejection reasons,
+explicit retries, resend behavior, late responses, independent controller owners,
+and cancellation on unmount or credential replacement. Web tests cover
 route guards, safe redirects, workspace changes, and cache/request disposal. Desktop
 tests verify its independent composition with the real hash router. UI owns component
 stories and portable interaction tests at port 6007; client has no workshop.

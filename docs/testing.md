@@ -338,6 +338,14 @@ its independent composition with the real hash router. Each app composes its boo
 screens from UI primitives. UI's workshop at port 6007 covers the shared foundations
 and components; client has no Storybook dependency or workshop.
 
+Client's [sign-in suite](../apps/client/test/sign-in.test.tsx) exercises the generated
+HTTP client through isolated fetch transports, including one that resolves after
+abort. It covers contract validation, payloads, rejection reasons, malformed session
+responses, explicit retry/resend, duplicate guards, and session installation. Explicit
+response resolvers and observable abort signals verify email changes, form disposal,
+credential replacement, and concurrent controllers without sleeps. These headless
+tests do not replace the planned live backend scenarios for the connected feature.
+
 The local host's HTTP tests exercise desktop CORS preflights and 401 response headers.
 After changing host runtime setup, also perform the temporary-port startup check.
 Verify both app builds and native hash navigation after changing app composition.

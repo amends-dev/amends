@@ -23,7 +23,7 @@ current value. The component performs no trimming or case conversion of its own.
 
 Native required/email validation produces inline Field feedback and focuses the
 input on submission. Native validation messages clear when editing or when the
-caller replaces the email. The future client controller owns validation against
+caller replaces the email. The client controller owns validation against
 the HTTP contract; browser email validity does not establish backend acceptance.
 `emailError` supplies that caller-owned field feedback and blocks submission until
 cleared. `requestError` appears in a persistent alert and does not mark the address

@@ -6,7 +6,8 @@ Workspace selection is the next feature.
 
 [CodeInput](../apps/ui/src/primitives/code-input/README.md) and both
 [sign-in forms](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
-workshop. The client controller, connected feature, and page remain planned.
+workshop. The [client controller](../apps/client/src/sign-in/README.md) implements
+the headless flow; the connected feature and page remain planned.
 
 ## UI pieces
 
