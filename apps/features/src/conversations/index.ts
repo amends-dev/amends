@@ -20,3 +20,4 @@ export {
   type MessageTarget,
   type NewMessageDialogProps,
 } from "./direct.tsx";
+export { GroupRenameAction, type GroupRenameProps } from "./rename.tsx";

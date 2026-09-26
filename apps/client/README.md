@@ -217,6 +217,10 @@ follow needs the participation the read returns.
 `members` chosen, always adding the reader. A retry of the same group keeps its idempotency key,
 failures keep the input, `created` receives the new group's ID, and `reset` clears it.
 
+`useRenameGroup(workspaceId, groupId, renamed)` renames a team group where the list says the reader
+may (`renamable`): `reset` starts from the current name, `ready` holds for a different valid name,
+and saving refreshes the groups.
+
 `useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster and the reader's
 own admission, says whether they may manage it (`manageable`) and leave it (`leavable`), and adds
 several members, removes one, or leaves, one change at a time, with `changing` naming the change in

@@ -89,6 +89,7 @@ const conversations = Layer.mergeAll(
     GroupApplication.Service.of({
       workspaceId,
       createPrivateTeam: record("group.create", () => Effect.succeed(team)),
+      rename: record("group.rename", () => Effect.succeed(team)),
       get: record("group.get", (id) => Effect.fail(new GroupApplication.NotFound({ groupId: id }))),
       listMine: record("group.listMine", () => Effect.succeed([])),
       getForManagement: () => Effect.die("unused"),

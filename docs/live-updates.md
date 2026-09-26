@@ -17,7 +17,8 @@ and cache invalidation; apps mount it once per workspace view; features show its
 3. Each `Committed` message maps its events to the keys they affect
    (`apps/client/src/api/changes.ts`) and invalidates each once, so every affected read
    refreshes once. Thread activity names its thread and group in its payload, so it refreshes
-   that thread's timeline and that group's stream, and the groups list; group membership
+   that thread's timeline and that group's stream, and the groups list; a group's rename refreshes
+   the groups list; group membership
    refreshes the groups and that group's stream and roster, joining or leaving a thread its
    participants, workspace membership every roster,
    and grant changes every stream and roster. Group membership and grant changes also refresh the

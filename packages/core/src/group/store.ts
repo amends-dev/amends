@@ -38,6 +38,13 @@ export interface Interface {
     record: Group.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
+   * Projection write that sets a team group's name. A missing, foreign, or direct group conflicts;
+   * the same name again changes nothing.
+   */
+  readonly rename: (
+    renamed: Group.Renamed,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
    * Latest content activity of several groups in one read. Groups without any, and absent IDs,
    * are omitted; order is unspecified.
    */

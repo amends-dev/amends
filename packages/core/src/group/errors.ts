@@ -20,4 +20,10 @@ export class NotFound extends Schema.TaggedError<NotFound>()("GroupApplication.N
   groupId: Group.Id,
 }) {}
 
+/** A direct group is named by its members, so it has no name to change. */
+export class NotRenamable extends Schema.TaggedError<NotRenamable>()(
+  "GroupApplication.NotRenamable",
+  { groupId: Group.Id },
+) {}
+
 export * as GroupErrors from "./errors.ts";

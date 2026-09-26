@@ -137,6 +137,7 @@ export const gateway = (harness: Harness) => {
                       GroupPermissions.Create.name,
                       GroupPermissions.Read.name,
                       GroupPermissions.Follow.name,
+                      GroupPermissions.Rename.name,
                       GroupMembershipPermissions.Manage.name,
                       ThreadPermissions.Start.name,
                       ThreadPermissions.Read.name,

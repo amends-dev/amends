@@ -384,6 +384,23 @@ export const createGroupRequest = (client: ApiClient, workspace: string) =>
     }),
   );
 
+/** Give a team group a new name, then invalidate the groups that show it. */
+export const renameGroupRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (rename: { readonly groupId: string; readonly name: string }) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const renamed = yield* api.groups.rename({
+        params: {
+          workspaceId: yield* command(Workspace.Id)(workspace),
+          groupId: yield* command(Group.Id)(rename.groupId),
+        },
+        payload: { name: yield* command(Group.Name)(rename.name.trim()) },
+      });
+      yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
+      return renamed;
+    }),
+  );
+
 /** A change to who belongs to a team group: adding members, removing one, or leaving. */
 export type MembershipChange =
   | { readonly kind: "add"; readonly groupId: string; readonly memberIds: ReadonlyArray<string> }

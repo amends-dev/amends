@@ -12,6 +12,7 @@ import {
   GroupFollowNote,
   GroupMembersAction,
   GroupName,
+  GroupRenameAction,
   GroupsNavigation,
   ThreadPanel,
 } from "@amends/features/conversations";
@@ -299,21 +300,26 @@ export function WorkspaceLayout(props: ParentProps) {
               {crumbs()}
             </PageHeader.Crumbs>
             <PageHeader.Heading>
-              <PageHeader.Title>
-                <Show
-                  when={groupId()}
-                  fallback={
-                    <Show when={drafting()} fallback={title()}>
-                      <DirectDraftName
-                        workspaceId={params.workspaceId}
-                        memberIds={(search.to ?? "").split(",").filter(Boolean)}
-                      />
-                    </Show>
-                  }
-                >
-                  {(id) => <GroupName workspaceId={params.workspaceId} groupId={id()} />}
+              <PageHeader.Lead>
+                <PageHeader.Title>
+                  <Show
+                    when={groupId()}
+                    fallback={
+                      <Show when={drafting()} fallback={title()}>
+                        <DirectDraftName
+                          workspaceId={params.workspaceId}
+                          memberIds={(search.to ?? "").split(",").filter(Boolean)}
+                        />
+                      </Show>
+                    }
+                  >
+                    {(id) => <GroupName workspaceId={params.workspaceId} groupId={id()} />}
+                  </Show>
+                </PageHeader.Title>
+                <Show when={groupId()} keyed>
+                  {(id) => <GroupRenameAction workspaceId={params.workspaceId} groupId={id} />}
                 </Show>
-              </PageHeader.Title>
+              </PageHeader.Lead>
               <PageHeader.Actions>
                 <Show when={groupId()} keyed>
                   {(id) => (

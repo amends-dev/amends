@@ -37,6 +37,16 @@ export const title = style({
   color: colorVars.text.primary,
   "@media": { "screen and (max-width: 47.999rem)": { fontSize: "1.625rem" } },
 });
+/** The title with a quiet action right beside it; Actions stay at the end of the row. */
+export const lead = style({
+  display: "flex",
+  flex: "1 1 auto",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "0.5rem 0.75rem",
+  minWidth: 0,
+});
+globalStyle(`${lead} > ${title}`, { flex: "0 1 auto" });
 export const actions = style({
   display: "flex",
   flexWrap: "wrap",

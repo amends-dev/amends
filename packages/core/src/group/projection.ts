@@ -18,6 +18,18 @@ export const definition = Projection.make("groups", { version: 1 })
     }),
   )
   .on(
+    GroupFacts.Renamed,
+    Effect.fn("GroupProjection.renamed")(function* ({ payload }) {
+      const store = yield* GroupStore.Service;
+      if (store.workspaceId !== payload.workspaceId)
+        return yield* new GroupStore.Conflict({
+          operation: "project",
+          message: "Fact belongs to another workspace",
+        });
+      yield* store.rename(payload);
+    }),
+  )
+  .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("GroupProjection.activity")(function* ({ payload: { groupId, activity } }) {
       const store = yield* GroupStore.Service;

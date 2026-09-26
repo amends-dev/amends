@@ -68,6 +68,7 @@ it.effect(
         findDirect: () => Effect.die("Unexpected group read"),
         getLatest: () => Effect.die("Unexpected group read"),
         insert: (record) => Effect.sync(() => void inserted.push(record)),
+        rename: () => Effect.die("Unexpected group rename"),
         recordLatest: (latest) => Effect.sync(() => void groupLatest.push(latest)),
       };
       const journal = <R>(program: Effect.Effect<void, unknown, R>) =>

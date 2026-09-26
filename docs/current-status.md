@@ -66,7 +66,12 @@ click; anyone may leave a team group the same way, which returns them to the wor
 Direct groups list their members without changes. Members of groups the reader does not belong to
 cannot be managed from the apps, since the management reads have no HTTP route. After leaving, the
 reader's pending notifications from the group stay in the inbox but no longer count in the
-sidebar, which counts per group. Renaming a group has no backend operation or UI.
+sidebar, which counts per group.
+
+A team group's name has a quiet "Rename" beside it on its page for readers with `group.rename`
+(administrators and owners by default), opening a dialog focused on the current name. The new name
+shows in the header, sidebar, and composer, and reaches other members over the change feed.
+Renames are last-write-wins, with no check against a name changed meanwhile.
 
 Direct groups have their own Direct section in the sidebar, whose "+" offers everyone a New message
 dialog. Choosing people opens the conversation the reader already has with exactly them, or a

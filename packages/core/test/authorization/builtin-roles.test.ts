@@ -117,11 +117,20 @@ const revisionOne = {
     "agent.use",
   ],
 };
+/** A bundle with `group.rename` in its declaration place, after `group.follow`. */
+const withRename = (permissions: ReadonlyArray<string> = []) =>
+  permissions.flatMap((name) => (name === "group.follow" ? [name, "group.rename"] : [name]));
 const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<string>>>>> = {
   1: revisionOne,
   2: {
     ...revisionOne,
     [BuiltinRoles.OwnerId]: ["workspace.rename", ...(revisionOne[BuiltinRoles.OwnerId] ?? [])],
+  },
+  // Revision 3 lets administrators and owners rename team groups.
+  3: {
+    ...revisionOne,
+    [BuiltinRoles.AdministratorId]: withRename(revisionOne[BuiltinRoles.AdministratorId]),
+    [BuiltinRoles.OwnerId]: ["workspace.rename", ...withRename(revisionOne[BuiltinRoles.OwnerId])],
   },
 };
 

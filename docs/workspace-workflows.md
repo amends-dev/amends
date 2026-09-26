@@ -173,6 +173,7 @@ listed, assigned, and offered in invitations.
 | `group.create`                 | Administrator | Workspace | [Creating a private team group](group-workflows.md#creating-a-group)              |
 | `group.read`                   | Viewer        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                |
 | `group.follow`                 | Viewer        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself             |
+| `group.rename`                 | Administrator | Group     | [Renaming a team group](group-workflows.md#renaming-a-group); bundles revision 3  |
 | `group.membership.manage`      | Administrator | Group     | Adding and removing members, and management reads                                 |
 | `thread.start`                 | Viewer        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                  |
 | `thread.read`                  | Viewer        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read |

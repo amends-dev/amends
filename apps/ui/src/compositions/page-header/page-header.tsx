@@ -23,6 +23,11 @@ export function Title(props: JSX.HTMLAttributes<HTMLHeadingElement>) {
   const p = part(props, s.title);
   return <h1 {...p.native} class={p.className} />;
 }
+/** Keeps the Title and one quiet action, such as renaming what the page shows, together. */
+export function Lead(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const p = part(props, s.lead);
+  return <div {...p.native} class={p.className} />;
+}
 export function Actions(props: JSX.HTMLAttributes<HTMLDivElement>) {
   const p = part(props, s.actions);
   return <div {...p.native} class={p.className} />;

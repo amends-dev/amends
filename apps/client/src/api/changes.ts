@@ -77,6 +77,8 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "permissions",
   ],
   "group.created": ["groups"],
+  // A team group's name shows in the sidebar and on its page.
+  "group.renamed": ["groups"],
   // Group access decides the same for the group's threads.
   "group.membership.added": ["groups", "inbox"],
   "group.membership.removed": ["groups", "inbox"],

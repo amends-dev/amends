@@ -180,6 +180,7 @@ describe the rules behind each operation.
 | `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following. |
 | `POST …/groups`                                      | Create a private team from `{ name, memberIds }`; 201 with the group.                          |
 | `GET …/groups/:groupId`                              | One group.                                                                                     |
+| `POST …/groups/:groupId/rename`                      | Give a team group `{ name }` under `group.rename`; returns it. A direct group is 409.          |
 | `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                      |
 | `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                  |
 | `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                    |

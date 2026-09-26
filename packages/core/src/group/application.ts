@@ -25,9 +25,9 @@ import { GroupFollow } from "./follow/follow.ts";
 import { GroupFollowStore } from "./follow/store.ts";
 import { ReadStateStore } from "../attention/store.ts";
 import { NotificationStore } from "../notification/store.ts";
-import { InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
+import { InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
 import { Notification } from "../notification/notification.ts";
-export { InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
+export { InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupApplication.InvalidResponse",
@@ -48,6 +48,7 @@ export type Error =
   | InvalidResponse;
 /** Creating can also meet a request key used before for a different group. */
 export type CreateError = Error | RequestReceipts.Error | GroupStore.Failure | NotFound;
+export type RenameError = Error | GroupStore.Failure | NotFound | NotRenamable;
 
 export type ReadError =
   | Authorization.Error
@@ -72,6 +73,14 @@ export interface Interface {
     input: Group.CreatePrivateTeamInput,
     options?: Request.Options,
   ) => Effect.Effect<Group.Record, CreateError, Actor.Service>;
+  /**
+   * Require group.rename on the group, then give a team group a new name. Renaming needs no
+   * membership of the group; a missing or foreign group is NotFound after that check, and a direct
+   * group, named by its members, is NotRenamable. The same name again records nothing.
+   */
+  readonly rename: (
+    input: Group.RenameInput,
+  ) => Effect.Effect<Group.Record, RenameError, Actor.Service>;
   /** Require group.read and current audience membership; no transaction or publication. */
   readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Service>;
   /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
@@ -228,6 +237,30 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     ]);
     return yield* load(id);
   });
+  const rename = Effect.fn("GroupApplication.rename")(
+    function* (input: Group.RenameInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Group.RenameInput))(input);
+      yield* authorization.require([
+        Requirement.make(GroupPermissions.Rename, {
+          _tag: "Group",
+          workspaceId,
+          groupId: request.groupId,
+        }),
+      ]);
+      const group = yield* load(request.groupId);
+      if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
+      if (group.name === request.name) return group;
+      yield* journal.publish(GroupFacts.Renamed, {
+        workspaceId,
+        groupId: group.id,
+        name: request.name,
+      });
+      return { ...group, name: request.name };
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
   const getForManagement = Effect.fn("GroupApplication.getForManagement")(function* (
     groupId: Group.Id,
   ) {
@@ -260,10 +293,12 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
           workspaceId,
           groupId,
         }),
+        Requirement.make(GroupPermissions.Rename, { _tag: "Group", workspaceId, groupId }),
       ]),
     );
-    const ids = candidates.filter((_, index) => allowed[index * 2] === true);
-    const managed = new Set(candidates.filter((_, index) => allowed[index * 2 + 1] === true));
+    const ids = candidates.filter((_, index) => allowed[index * 3] === true);
+    const managed = new Set(candidates.filter((_, index) => allowed[index * 3 + 1] === true));
+    const renamers = new Set(candidates.filter((_, index) => allowed[index * 3 + 2] === true));
     const records = new Map<Group.Id, Group.Record>();
     for (const found of yield* groups.getMany(ids)) {
       const group = yield* Schema.decodeEffect(Schema.toType(Group.Record))(found).pipe(
@@ -339,8 +374,9 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
           DateTime.isGreaterThan(latestActivityAt, caughtUpAt ?? admission.admittedAt),
         following: following.has(admission.id),
         pending: pending.get(groupId) ?? 0,
-        // Direct groups keep the members they started with.
+        // Direct groups keep the members they started with, and are named by them.
         manageable: group.kind === "Team" && managed.has(groupId),
+        renamable: group.kind === "Team" && renamers.has(groupId),
       });
     }
     return items;
@@ -389,7 +425,14 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     return items;
   });
 
-  return Service.of({ workspaceId, createPrivateTeam, get, listMine, getForManagement });
+  return Service.of({
+    workspaceId,
+    createPrivateTeam,
+    rename,
+    get,
+    listMine,
+    getForManagement,
+  });
 });
 
 /** Provide group creation and authorized reads over the workspace's services. @category layers */

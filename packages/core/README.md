@@ -263,7 +263,8 @@ records the names and permissions that differ, then the revision. It leaves a wo
 same or a later revision alone, so an older host never reverts it. The gateway runs it when it
 boots a workspace. A recorded permission the catalog does not declare, retired or added by a newer
 host, grants nothing, since no requirement can name it, and its holder's other grants stand;
-`Delegation` still loads the roles that record it. `AssignmentApplication` provides listing, assignment,
+`Delegation` still loads the roles that record it. Bundle revision 3 adds `group.rename` for
+administrators and owners. `AssignmentApplication` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
 clients can offer just the actions the member may take. `Delegation` supplies the shared

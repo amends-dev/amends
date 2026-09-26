@@ -11,7 +11,8 @@ for them even before they belong to any group. Direct groups have their own Dire
 whose "+" starts a New message; `/workspaces/:workspaceId/direct?to=…` drafts the first message to
 people with no conversation yet, and sending it replaces the draft with their group. A group's
 header shows its member count, which
-opens its members to add, remove, or leave; leaving returns to Home. Inbox, after Home, counts what is pending for the
+opens its members to add, remove, or leave; leaving returns to Home. A team group's name has a
+"Rename" beside it for readers who may rename it. Inbox, after Home, counts what is pending for the
 reader and lists their notifications; `/inbox/groups/:groupId/threads/:threadId` opens a thread
 beside it, and Inbox stays the current destination. The other pages remain scaffolding; task data,
 activity, configuration operations, dynamic Channels/Agents sections, and keyboard-shortcut

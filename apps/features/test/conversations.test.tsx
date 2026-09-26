@@ -10,6 +10,7 @@ import meta, {
   InboxView,
   Members,
   Reading,
+  Rename,
   Typing,
   Writing,
 } from "../workshop/conversations.stories.tsx";
@@ -47,4 +48,7 @@ it("adds and removes a group's members and leaves it", async () => {
 });
 it("messages someone new, creating the conversation with the first message, and finds it again", async () => {
   await stories.story(DirectMessage).run();
+});
+it("renames a group, which shows everywhere it is named", async () => {
+  await stories.story(Rename).run();
 });

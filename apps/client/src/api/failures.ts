@@ -73,6 +73,7 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ThreadMessageApplication.HumanAuthorRequired": "denied",
   "NotificationApplication.HumanRecipientRequired": "denied",
   "GroupApplication.NotFound": "gone",
+  "GroupApplication.NotRenamable": "invalid",
   "GroupApplication.MemberNotFound": "gone",
   "GroupApplication.InactiveMember": "gone",
   "GroupMembershipApplication.GroupNotFound": "gone",

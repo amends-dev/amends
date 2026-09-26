@@ -51,6 +51,30 @@ export const make = Effect.fn("Groups.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupStore, "getLatest")),
     ),
+    rename: Effect.fn("Groups.rename")(function* (input) {
+      yield* Store.Transaction;
+      const renamed = yield* Schema.decodeEffect(Schema.toType(Group.Renamed))(input).pipe(
+        Effect.mapError(storeConflict(GroupStore, "rename")),
+      );
+      if (renamed.workspaceId !== workspaceId)
+        return yield* new GroupStore.Conflict({
+          operation: "rename",
+          message: "Expected a group in this workspace",
+        });
+      const space = yield* write.pipe(Effect.mapError(storeFailure(GroupStore, "rename")));
+      const found = yield* rows
+        .get(space.records.groups, renamed.groupId)
+        .pipe(Effect.mapError(storeFailure(GroupStore, "rename")));
+      if (Option.isNone(found) || found.value.kind !== "Team")
+        return yield* new GroupStore.Conflict({
+          operation: "rename",
+          message: "Expected a team group",
+        });
+      const row = yield* rows
+        .encode({ ...found.value, name: renamed.name })
+        .pipe(Effect.mapError(storeFailure(GroupStore, "rename")));
+      space.records.groups.set(renamed.groupId, row);
+    }),
     recordLatest: Effect.fn("Groups.recordLatest")(function* (input) {
       yield* Store.Transaction;
       const latest = yield* Schema.decodeEffect(Schema.toType(Group.Latest))(input).pipe(

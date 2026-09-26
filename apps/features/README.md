@@ -145,6 +145,9 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
 - `NewGroupDialog` names a private team group and chooses its active people and agents with the
   UI ChipPicker, the reader fixed as "you". Create stays disabled until the name has text, failures
   explain themselves and keep the input, and closing clears it.
+- `GroupRenameAction` is a quiet "Rename" for beside a team group's name, shown to readers who may
+  rename it. Its dialog opens on the current name, focused and selected, and saves only a
+  different valid name.
 - `GroupMembersAction` is a group header's member count, opening its members: the reader first,
   then everyone by name, keyed by admission so live refreshes keep rows and focus. Managers add
   people with the ChipPicker and remove members; anyone leaves a team group. Removing and leaving
@@ -191,6 +194,7 @@ typing in the open thread and its row until their reply arrives. **Following** f
 and sees the member's next thread reach the owner, then follows and unfollows a thread.
 **CreateGroup** creates a group with the other member from the sidebar and opens it empty.
 **Members** adds a third person to the group, removes the member, and leaves.
+**Rename** renames the group and sees the new name wherever it is named.
 **DirectMessage** messages the member for the first time from Direct, lands in the new
 conversation, and finds it again from New message.
 **Inbox** shows the owner's inbox with the member's mention and reply newest first, marks one

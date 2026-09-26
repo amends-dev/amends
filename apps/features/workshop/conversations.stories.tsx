@@ -357,5 +357,32 @@ export const DirectMessage = {
     await expect(link).toHaveAttribute("aria-current", "page");
   },
 } satisfies Story;
+export const Rename = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      body = within(document.body);
+    // The owner may rename the group; the dialog starts from its name.
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Rename" }, { timeout: 20000 }),
+    );
+    const dialog = await body.findByRole("dialog", { name: "Rename group" });
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    await waitFor(() => expect(name).toHaveValue("Design"));
+    // The name takes focus, ready to retype.
+    await waitFor(() => expect(name).toHaveFocus());
+    const save = within(dialog).getByRole("button", { name: "Save name" });
+    // The same name, or none, saves nothing.
+    await expect(save).toBeDisabled();
+    await userEvent.clear(name);
+    await expect(save).toBeDisabled();
+    await userEvent.type(name, "Product design{Enter}");
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "Rename group" })).toBeNull());
+    // The new name shows wherever the group is named.
+    await waitFor(() =>
+      expect(canvas.getByTestId("group-name")).toHaveTextContent("Product design"),
+    );
+    await canvas.findByRole("link", { name: /Product design/ });
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

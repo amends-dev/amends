@@ -842,6 +842,7 @@ const managed = {
   following: false,
   pending: 0,
   manageable: true,
+  renamable: true,
 };
 it("manages a group's members from its header, and leaving returns to the workspace", async () => {
   const admission = (id: string, memberId: string) => ({
@@ -929,4 +930,30 @@ it("drafts a first message to someone new and opens the conversation it starts",
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g9"));
   expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }]);
+});
+
+it("renames a group from beside its name", async () => {
+  let name = "Design";
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/groups/g1/rename") {
+      name = ((await request.json()) as { name: string }).name;
+      return response({ ...managed.group, name });
+    }
+    if (path === "/workspaces/one/groups/g1/members") return response([]);
+    const answer = conversation(path);
+    return response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] });
+  });
+  mount("/workspaces/one/groups/g1", memoryStore(session("alice")).store, fetch, undefined, {
+    groups: [managed],
+  });
+  await screen.findByRole("heading", { name: "Design" });
+  fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
+  const dialog = await screen.findByRole("dialog", { name: "Rename group" });
+  const field = within(dialog).getByRole("textbox", { name: "Name" });
+  expect(field).toHaveValue("Design");
+  fireEvent.input(field, { target: { value: "Product design" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save name" }));
+  await waitFor(() => expect(name).toBe("Product design"));
 });

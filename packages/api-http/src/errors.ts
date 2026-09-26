@@ -127,6 +127,8 @@ export const group = [
   GroupApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
   GroupApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
 ] as const;
+/** A direct group is named by its members and refuses a name with 409. */
+export const NotRenamable = GroupApplication.NotRenamable.pipe(HttpApiSchema.status(409));
 export const groupMembership = [
   GroupMembershipApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
   GroupMembershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),

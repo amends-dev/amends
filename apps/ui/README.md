@@ -280,7 +280,8 @@ coverage. These remain presentation components; apps own routes and preferences.
 [controlled forms](src/features/settings/README.md). All use existing tokens;
 permission state and workflows remain in client/features, with app-owned pages.
 The [PageHeader](src/compositions/page-header/README.md) supplies the common title,
-breadcrumbs, actions, and metadata structure. Settings section choices use the
+breadcrumbs, actions, and metadata structure; its Lead keeps one quiet action, such as Rename,
+beside the title. Settings section choices use the
 shared SegmentedControl as a separate page-content row.
 
 **Primitives / Filters and pickers** composes the Primitives v2 reference for review.

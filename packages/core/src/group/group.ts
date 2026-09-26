@@ -92,8 +92,17 @@ export const ListItem = Schema.Struct({
   pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   /** The reader may add and remove the group's members: a team group they manage. */
   manageable: Schema.Boolean,
+  /** The reader may rename the group: a team group whose name they may change. */
+  renamable: Schema.Boolean,
 });
 export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
+
+/** A team group's new name. */
+export const RenameInput = Schema.Struct({ groupId: Id, name: Name });
+export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
+/** What renaming a team group records. */
+export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name });
+export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
 
 export const CreatePrivateTeamInput = Schema.Struct({
   name: Name,

@@ -10,6 +10,8 @@ import {
   GroupFollowAction,
   GroupFollowNote,
   GroupMembersAction,
+  GroupName,
+  GroupRenameAction,
   GroupStream,
   GroupsNavigation,
   Inbox,
@@ -196,6 +198,13 @@ export function ConversationsFixture(props: {
                   <Shell.Body>
                     <Shell.Header workspace>
                       <Row gap={2}>
+                        <Text variant="mono" data-testid="group-name">
+                          <GroupName workspaceId={value().workspaceId} groupId={value().groupId} />
+                        </Text>
+                        <GroupRenameAction
+                          workspaceId={value().workspaceId}
+                          groupId={value().groupId}
+                        />
                         <GroupMembersAction
                           workspaceId={value().workspaceId}
                           groupId={value().groupId}

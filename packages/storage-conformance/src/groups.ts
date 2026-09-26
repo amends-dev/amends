@@ -640,6 +640,91 @@ export const groups = (harness: Harness) => {
       ),
     );
 
+    it.effect("renaming a team group records one attributed fact that replay applies", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, actor } = yield* prepare();
+            const group = yield* asActor(create([memberId]), owner).pipe(
+              Effect.provide(core(bound)),
+            );
+            const rename = (by: Actor.Value, groupId: Group.Id, name: string) =>
+              asActor(
+                Effect.flatMap(GroupApplication.Service, (service) =>
+                  service.rename({ groupId, name }),
+                ),
+                by,
+              ).pipe(Effect.provide(core(bound)));
+            const before = yield* history(bound);
+            // Only a member granted group.rename may rename; belonging to the group is not enough.
+            expect(yield* Effect.flip(rename(actor, group.id, "Platform"))).toMatchObject({
+              _tag: "Authorization.Denied",
+            });
+            const renamed = yield* rename(owner, group.id, "Platform");
+            expect(renamed).toEqual({ ...group, name: "Platform" });
+            expect(yield* bound.groups.get(group.id)).toEqual(Option.some(renamed));
+            const batches = yield* Effect.flatMap(Journal.Service, (journal) =>
+              journal.log.read({ limit: 100 }),
+            ).pipe(Effect.provide(core(bound)));
+            expect(batches).toHaveLength(before.length + 1);
+            const entry = batches.at(-1)?.entries[0];
+            expect(entry?.payload.name).toBe(GroupFacts.Renamed.name);
+            expect(entry?.payload.provenance.performedBy).toMatchObject({
+              _tag: "Member",
+              memberId: owner.memberId,
+            });
+            // The same name again records nothing.
+            expect(yield* rename(owner, group.id, "Platform")).toEqual(renamed);
+            expect(yield* history(bound)).toHaveLength(before.length + 1);
+            // A name must have text without surrounding space, and the group must exist.
+            for (const name of ["", " Platform"])
+              expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("SchemaError");
+            expect(
+              yield* Effect.flip(rename(owner, Group.Id.make("missing"), "Platform")),
+            ).toMatchObject({ _tag: "GroupApplication.NotFound" });
+            // A direct group is named by its members.
+            const direct = {
+              id: Group.Id.make("direct-group"),
+              workspaceId,
+              kind: "Direct",
+              memberIds: Group.directMembers([memberId, owner.memberId]),
+              createdBy: owner.memberId,
+              createdAt: group.createdAt,
+            } satisfies Group.Record;
+            yield* bound.store.transaction(bound.groups.insert(direct));
+            expect(yield* Effect.flip(rename(owner, direct.id, "Pair"))).toMatchObject({
+              _tag: "GroupApplication.NotRenamable",
+            });
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  bound.groups.rename({ workspaceId, groupId: direct.id, name: "Pair" }),
+                ),
+              ),
+            ).toMatchObject({ _tag: "GroupStore.Conflict", operation: "rename" });
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  bound.groups.rename({
+                    workspaceId: otherWorkspaceId,
+                    groupId: group.id,
+                    name: "Elsewhere",
+                  }),
+                ),
+              ),
+            ).toMatchObject({ _tag: "GroupStore.Conflict", operation: "rename" });
+            // Rebuilding from the journal keeps the latest name.
+            yield* storage.discardProjections;
+            yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+              Effect.provide(core(bound)),
+            );
+            expect(yield* bound.groups.get(group.id)).toEqual(Option.some(renamed));
+          }),
+        ),
+      ),
+    );
+
     it.effect("group latest activity only moves forward and belongs to an existing group", () =>
       harness.withStorage((storage) =>
         runHost(

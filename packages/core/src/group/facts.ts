@@ -10,4 +10,12 @@ export const Created = Fact.make("group.created", {
   payload: Group.Record,
 });
 
+/** A team group's name changed; each rename is its own fact. */
+export const Renamed = Fact.make("group.renamed", {
+  audience: (payload) => [Group.audienceOf(payload.groupId)],
+  version: 1,
+  subject: (payload) => Subject.make("group", payload.groupId),
+  payload: Group.Renamed,
+});
+
 export * as GroupFacts from "./facts.ts";

@@ -200,6 +200,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         getMany: unexpected,
         findDirect: unexpected,
         insert: unexpected,
+        rename: unexpected,
         getLatest: unexpected,
         recordLatest: unexpected,
       }),

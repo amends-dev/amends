@@ -126,6 +126,36 @@ export const make = Effect.fn("Groups.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupStore, "getLatest")),
     ),
+    rename: Effect.fn("Groups.rename")(function* (input) {
+      yield* Store.Transaction;
+      const renamed = yield* Schema.decodeEffect(Schema.toType(Group.Renamed))(input).pipe(
+        Effect.mapError(storeConflict(GroupStore, "rename")),
+      );
+      if (renamed.workspaceId !== workspaceId)
+        return yield* new GroupStore.Conflict({
+          operation: "rename",
+          message: "Expected a group in this workspace",
+        });
+      const updated = yield* guard(
+        db
+          .update(groups)
+          .set({ name: renamed.name })
+          .where(
+            and(
+              eq(groups.workspaceId, workspaceId),
+              eq(groups.id, renamed.groupId),
+              eq(groups.kind, "Team"),
+            ),
+          )
+          .returning({ id: groups.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(GroupStore, "rename")));
+      if (updated.length === 0)
+        return yield* new GroupStore.Conflict({
+          operation: "rename",
+          message: "Expected a team group",
+        });
+    }),
     recordLatest: Effect.fn("Groups.recordLatest")(function* (input) {
       yield* Store.Transaction;
       const latest = yield* Schema.decodeEffect(Schema.toType(Group.Latest))(input).pipe(

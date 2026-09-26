@@ -15,6 +15,7 @@ import {
   useInboxPending,
   useCreateGroup,
   useDirectMessage,
+  useRenameGroup,
   useGroupMembers,
   useWorkspacePermission,
   useMarkGroupRead,
@@ -24,6 +25,7 @@ import {
   useThreadTimeline,
   type ComposerController,
   type CreateGroupController,
+  type RenameGroupController,
   type GroupMembersController,
   type NotificationInbox,
   type PagedView,
@@ -162,6 +164,10 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/timelines",
   ]);
   expect(keys([{ name: "workspace.assignment.revoked" }])).toContain("workspace/one/streams");
+  // A new name shows wherever the groups list names the group.
+  expect(keys([{ name: "group.renamed", payload: { groupId: "group" } }])).toEqual([
+    "workspace/one/groups",
+  ]);
   // Each read refreshes once: a notification repeats no key, and a collection covers its items.
   expect(
     affectedKeys(
@@ -383,6 +389,7 @@ it("the inbox's pending count adds up what each group holds for the reader", asy
     following: false,
     pending,
     manageable: false,
+    renamable: false,
   });
   const fetch = vi.fn<typeof globalThis.fetch>(() =>
     Promise.resolve(json([group("a", 2), group("b", 0), group("c", 3)])),
@@ -548,6 +555,7 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
           following: false,
           pending: 0,
           manageable: true,
+          renamable: true,
         },
       ]);
     if (path === "/workspaces/one/groups/g1/members" && request.method === "GET")
@@ -670,6 +678,75 @@ it("a first direct message starts the conversation and hands over its group", as
     },
   ]);
   expect(composer.draft()).toBe("");
+});
+
+it("renames a group it may rename, starting from its name and saving only a change", async () => {
+  let name = "Design";
+  const renames: Array<unknown> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    const group = {
+      id: "g1",
+      workspaceId: "one",
+      kind: "Team",
+      visibility: "Private",
+      name,
+      createdBy: "alice-one",
+      createdAt: minute(0),
+    };
+    if (path === "/workspaces/one/groups/g1/rename") {
+      const body = (await request.json()) as { name: string };
+      renames.push(body);
+      name = body.name;
+      return json({ ...group, name });
+    }
+    if (path === "/workspaces/one/groups")
+      return json([
+        {
+          group,
+          latestActivityAt: null,
+          caughtUpAt: null,
+          newActivity: false,
+          following: false,
+          pending: 0,
+          manageable: true,
+          renamable: true,
+        },
+      ]);
+    return json([]);
+  });
+  const saved: Array<string> = [];
+  let rename!: RenameGroupController;
+  function Consumer() {
+    rename = useRenameGroup("one", "g1", () => saved.push("saved"));
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(rename.renamable()).toBe(true));
+  rename.reset();
+  expect(rename.name()).toBe("Design");
+  // The same name, or none, is nothing to save.
+  expect(rename.ready()).toBe(false);
+  rename.setName("   ");
+  expect(rename.ready()).toBe(false);
+  rename.setName("  Product design ");
+  expect(rename.ready()).toBe(true);
+  rename.save();
+  await waitFor(() => expect(saved).toEqual(["saved"]));
+  expect(renames).toEqual([{ name: "Product design" }]);
+  // Saving refreshes the groups, so the new name is the current one.
+  await waitFor(() => expect(rename.current()).toBe("Product design"));
 });
 
 it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {
@@ -912,6 +989,7 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
           following,
           pending: 0,
           manageable: true,
+          renamable: true,
         },
       ]);
     const body = request.method === "POST" ? await request.text() : "";

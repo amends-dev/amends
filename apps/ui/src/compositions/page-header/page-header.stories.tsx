@@ -44,9 +44,39 @@ function Specimen(props: { theme?: "cotton" | "soot"; narrow?: boolean }) {
     </ThemeProvider>
   );
 }
+/** A group page: a quiet rename beside its name, and the page's actions at the end. */
+function Lead(props: { theme?: "cotton" | "soot"; narrow?: boolean }) {
+  return (
+    <ThemeProvider theme={props.theme ?? "cotton"}>
+      <div
+        style={{
+          padding: props.narrow ? "1rem 1.125rem" : "1.5rem 1.875rem",
+          "max-width": props.narrow ? "24rem" : "70rem",
+        }}
+      >
+        <PageHeader.Root>
+          <PageHeader.Crumbs>Workspace / Groups</PageHeader.Crumbs>
+          <PageHeader.Heading>
+            <PageHeader.Lead>
+              <PageHeader.Title>Product design</PageHeader.Title>
+              <Button variant="ghost">Rename</Button>
+            </PageHeader.Lead>
+            <PageHeader.Actions>
+              <Button variant="secondary">3 members</Button>
+              <Button variant="secondary">Follow</Button>
+            </PageHeader.Actions>
+          </PageHeader.Heading>
+          <PageHeader.Meta>Follow to take part in new threads here.</PageHeader.Meta>
+        </PageHeader.Root>
+      </div>
+    </ThemeProvider>
+  );
+}
 const meta = { title: "Compositions/PageHeader", render: () => <Specimen /> } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Settings = {} satisfies Story;
 export const Phone = { render: () => <Specimen narrow /> } satisfies Story;
 export const Soot = { render: () => <Specimen theme="soot" /> } satisfies Story;
+export const WithLead = { render: () => <Lead /> } satisfies Story;
+export const WithLeadPhone = { render: () => <Lead narrow theme="soot" /> } satisfies Story;

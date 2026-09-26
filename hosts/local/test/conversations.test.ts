@@ -94,13 +94,29 @@ describe.skipIf(!available)("PostgreSQL", () => {
               following: false,
               pending: 0,
               manageable: false,
+              renamable: false,
             },
           ],
         );
         // Alice owns the workspace, so she manages the group's members; Bob only reads it.
         expect(
           yield* asAlice.groups.list({ params: { workspaceId }, query: { limit: 10 } }),
-        ).toMatchObject([{ group: { id: group.id }, manageable: true }]);
+        ).toMatchObject([{ group: { id: group.id }, manageable: true, renamable: true }]);
+        // Alice renames it; Bob, a viewer, may not.
+        const renamed = yield* asAlice.groups.rename({
+          params: { workspaceId, groupId: group.id },
+          payload: { name: "Product design" },
+        });
+        expect(renamed).toEqual({ ...group, name: "Product design" });
+        expect(
+          yield* asBob.groups
+            .rename({ params: { workspaceId, groupId: group.id }, payload: { name: "Mine" } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "Authorization.Denied" });
+        yield* asAlice.groups.rename({
+          params: { workspaceId, groupId: group.id },
+          payload: { name: "Design" },
+        });
         const roster = yield* asBob.groups.members({
           params: { workspaceId, groupId },
           query: { limit: 10 },

@@ -674,6 +674,19 @@ export const groupReads = (harness: Harness) => {
             expect(yield* manageable(reader)).toEqual({ Engineering: true, Design: false });
             yield* grant(bound, readerId, GroupMembershipPermissions.Manage);
             expect(yield* manageable(reader)).toEqual({ Engineering: true, Design: true });
+            // Renaming is its own permission, listed beside managing members.
+            const renamable = run(
+              bound,
+              reader,
+              Effect.flatMap(GroupApplication.Service, (service) =>
+                Effect.map(service.listMine({ limit: 100 }), (items) =>
+                  items.map((item) => item.renamable),
+                ),
+              ),
+            );
+            expect(yield* renamable).toEqual([false, false]);
+            yield* grant(bound, readerId, GroupPermissions.Rename, first.id);
+            expect((yield* renamable).filter(Boolean)).toHaveLength(1);
             // Nobody manages a direct group's members, owners included.
             yield* run(
               bound,
