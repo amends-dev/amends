@@ -153,11 +153,14 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/timelines:thread",
   ]);
   // Leaving a group also changes which notification sources the reader can still read.
+  // Every open thread checks its access again, since the fact names no threads.
   expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
     "workspace/one/groups",
     "workspace/one/inbox",
+    "workspace/one/participants",
     "workspace/one/rosters:group",
     "workspace/one/streams:group",
+    "workspace/one/timelines",
   ]);
   // A payload without the expected field refreshes the whole collection rather than none.
   expect(keys([{ name: "thread.activity.recorded", payload: {} }])).toEqual([
@@ -188,11 +191,12 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/inbox",
     "workspace/one/members",
     "workspace/one/ownership",
+    "workspace/one/participants",
     "workspace/one/permissions",
     "workspace/one/rosters",
     "workspace/one/settings",
     "workspace/one/streams",
-    "workspace/one/timelines:thread",
+    "workspace/one/timelines",
   ]);
   // Reading a thread settles notifications from it.
   expect(signalKeys("one", { _tag: "ThreadRead" })).toEqual([

@@ -15,6 +15,7 @@ import { Drawing } from "@amends/ui/primitives/drawing";
 import { IconButton } from "@amends/ui/primitives/icon-button";
 import { Text } from "@amends/ui/primitives/text";
 import { createEffect, Match, Show, Switch } from "solid-js";
+import { lostAccess } from "../internal/lost.ts";
 import { ReplyComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
 import { memberName, typingText } from "./presentation.ts";
@@ -40,6 +41,9 @@ const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in
  */
 export function ThreadPanel(props: ThreadPanelProps) {
   const timeline = useThreadTimeline(props.workspaceId, props.threadId);
+  // Losing access, as by leaving its group, replaces what was shown rather than keeping it.
+  const lost = lostAccess(timeline);
+  const problem = () => lost() ?? (timeline.value() === undefined ? timeline.failure() : undefined);
   const members = useMembers(props.workspaceId);
   const typing = useTyping(props.workspaceId);
   const typists = () =>
@@ -73,7 +77,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
   const follow = useThreadFollow(props.workspaceId, props.threadId);
   const meta = () => {
     const count = posts().length;
-    if (timeline.value() === undefined) return "";
+    if (timeline.value() === undefined || lost()) return "";
     const messages = timeline.complete()
       ? `${count} ${count === 1 ? "message" : "messages"}`
       : "Latest messages";
@@ -87,7 +91,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
           <Shell.InspectorTitle>Thread</Shell.InspectorTitle>
           <Shell.InspectorMeta>{meta()}</Shell.InspectorMeta>
         </Shell.InspectorHeading>
-        <Show when={follow.following() !== undefined}>
+        <Show when={follow.following() !== undefined && !lost()}>
           <Button variant="secondary" pending={follow.pending()} onClick={() => follow.toggle()}>
             {follow.following() ? "Unfollow" : "Follow"}
           </Button>
@@ -104,7 +108,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
       </Shell.InspectorHeader>
       <Shell.InspectorBody>
         <Switch>
-          <Match when={timeline.value() === undefined && timeline.failure()}>
+          <Match when={problem()}>
             {(failure) => (
               <EmptyState.Root>
                 <Drawing.Snapped />

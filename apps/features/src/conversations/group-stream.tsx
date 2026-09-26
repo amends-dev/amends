@@ -15,6 +15,7 @@ import { Button } from "@amends/ui/primitives/button";
 import { Drawing } from "@amends/ui/primitives/drawing";
 import { Text } from "@amends/ui/primitives/text";
 import { Match, Show, Switch } from "solid-js";
+import { lostAccess } from "../internal/lost.ts";
 import { NewThreadComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
 import { memberName, timeOf, typingText } from "./presentation.ts";
@@ -40,6 +41,9 @@ const replies = (count: number) => `${count} ${count === 1 ? "reply" : "replies"
  */
 export function GroupStream(props: GroupStreamProps) {
   const stream = useGroupStream(props.workspaceId, props.groupId);
+  // Losing access, as by being removed from the group, replaces what was shown.
+  const lost = lostAccess(stream);
+  const problem = () => lost() ?? (stream.value() === undefined ? stream.failure() : undefined);
   const members = useMembers(props.workspaceId);
   const groups = useGroups(props.workspaceId);
   const typing = useTyping(props.workspaceId);
@@ -67,7 +71,7 @@ export function GroupStream(props: GroupStreamProps) {
   );
   return (
     <Switch>
-      <Match when={stream.value() === undefined && stream.failure()}>
+      <Match when={problem()}>
         {(failure) => (
           <EmptyState.Root>
             <Drawing.Snapped />

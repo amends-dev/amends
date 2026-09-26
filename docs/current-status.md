@@ -66,8 +66,9 @@ click; anyone may leave a team group the same way, which returns them to the wor
 Direct groups list their members without changes. Members of groups the reader does not belong to
 cannot be managed from the apps, since the management reads have no HTTP route. After leaving, the
 reader's pending notifications from the group stay in the inbox, and in its count, as
-notifications whose thread they can no longer see. A thread already open beside the inbox or
-stream keeps showing what it last read after the reader loses access to it.
+notifications whose thread they can no longer see. A stream or thread open when the reader loses
+access, from any session, turns into an unavailable state rather than showing what it last read,
+and comes back if access returns.
 
 A team group's name has a quiet "Rename" beside it on its page for readers with `group.rename`
 (administrators and owners by default), opening a dialog focused on the current name. The new name

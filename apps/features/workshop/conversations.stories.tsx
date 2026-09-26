@@ -394,5 +394,26 @@ export const Rename = {
     await canvas.findByRole("link", { name: /Product design/ });
   },
 } satisfies Story;
+export const LosingAccess = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const stream = await canvas.findByRole("region", { name: "Design" }, { timeout: 20000 });
+    await userEvent.click(within(stream).getByRole("link", { name: /^2 replies/ }));
+    const thread = await canvas.findByRole("region", { name: "Thread messages" });
+    await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(3));
+    // Leaving the group elsewhere takes away what this session shows, rather than keeping it.
+    await userEvent.click(canvas.getByRole("button", { name: "Leave elsewhere as owner" }));
+    await canvas.findByText("This group isn’t available", {}, { timeout: 10000 });
+    await canvas.findByText("This thread isn’t available", {}, { timeout: 10000 });
+    await expect(canvas.queryByRole("region", { name: "Thread messages" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: /^(Follow|Unfollow)$/ })).toBeNull();
+    await waitFor(() => expect(canvas.queryByRole("button", { name: /members$/ })).toBeNull());
+    // Access back, both show again.
+    await userEvent.click(canvas.getByRole("button", { name: "Rejoin elsewhere as owner" }));
+    await canvas.findByRole("region", { name: "Design" }, { timeout: 10000 });
+    await canvas.findByRole("region", { name: "Thread messages" }, { timeout: 10000 });
+    await canvas.findByRole("button", { name: "2 members" }, { timeout: 10000 });
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

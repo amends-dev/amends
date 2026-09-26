@@ -8,6 +8,7 @@ import meta, {
   Following,
   Group,
   InboxView,
+  LosingAccess,
   Members,
   Reading,
   Rename,
@@ -51,4 +52,7 @@ it("messages someone new, creating the conversation with the first message, and 
 });
 it("renames a group, which shows everywhere it is named", async () => {
   await stories.story(Rename).run();
+});
+it("stops showing a thread and its group once the reader loses access elsewhere", async () => {
+  await stories.story(LosingAccess).run();
 });

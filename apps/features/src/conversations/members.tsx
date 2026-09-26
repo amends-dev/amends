@@ -9,6 +9,7 @@ import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createSignal, For, Show } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
+import { lostAccess } from "../internal/lost.ts";
 import { GroupName } from "./group-name.tsx";
 import { initials, memberName } from "./presentation.ts";
 
@@ -53,7 +54,9 @@ export function GroupMembersAction(props: GroupMembersProps) {
         nameOf(left.memberId).localeCompare(nameOf(right.memberId)),
     );
   const rows = keyed(ordered, (admission) => admission.id);
-  const count = () => group.roster()?.length;
+  // A reader who lost access to the group no longer sees who is in it.
+  const lost = lostAccess({ value: group.roster, failure: group.rosterFailure });
+  const count = () => (lost() ? undefined : group.roster()?.length);
   const current = () =>
     new Set<string>((group.roster() ?? []).map((admission) => admission.memberId));
   // Anyone active in the workspace who is not in the group yet can be added.

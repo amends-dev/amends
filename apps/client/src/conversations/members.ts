@@ -11,6 +11,8 @@ import { useGroupRoster, useGroups } from "./reads.ts";
 export interface GroupMembersController {
   /** The group's current admissions, live while mounted, once loaded. */
   readonly roster: Accessor<ReadonlyArray<GroupMembership.Record> | undefined>;
+  /** Why the latest roster read failed, such as the reader no longer belonging to the group. */
+  readonly rosterFailure: Accessor<WorkspaceFailure | undefined>;
   /** The reader may add and remove members: a team group they manage. */
   readonly manageable: Accessor<boolean>;
   /** The reader's own admission, which leaving ends; direct groups cannot be left. */
@@ -66,6 +68,7 @@ export function useGroupMembers(
   };
   return {
     roster: roster.value,
+    rosterFailure: roster.failure,
     manageable: () => item()?.manageable ?? false,
     own,
     leavable: () => item()?.group.kind === "Team" && own() !== undefined,

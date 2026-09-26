@@ -19,13 +19,16 @@ and cache invalidation; apps mount it once per workspace view; features show its
    refreshes once. Thread activity names its thread and group in its payload, so it refreshes
    that thread's timeline and that group's stream, and the groups list; a group's rename refreshes
    the groups list; group membership
-   refreshes the groups and that group's stream and roster, joining or leaving a thread its
-   participants, workspace membership every roster,
-   and grant changes every stream and roster. Group membership and grant changes also refresh the
+   refreshes the groups and that group's stream and roster, and every open timeline and participant
+   list, since the fact names no threads and each must check its access again; joining or leaving a
+   thread refreshes its participants, workspace membership every roster, and grant changes every
+   stream, roster, timeline, and participant list. Group membership and grant changes also refresh the
    inbox, since they decide which notification sources the reader can still read, and grant and
    ownership changes refresh what the reader may do. A commit that
    carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
-   refetch; unmounted reads refetch when next mounted. Facts with no mapping refresh nothing. Add
+   refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
+   value, so the stream and thread panel replace what they show with an unavailable state once a
+   refresh answers gone or denied, until a later refresh succeeds. Facts with no mapping refresh nothing. Add
    a mapping when a read starts depending on a fact.
 4. `Ready` with `reset` invalidates every key for the workspace and the directory. A first
    connection always resets, because reads loaded before it may have missed commits.

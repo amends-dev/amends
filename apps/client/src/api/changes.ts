@@ -109,14 +109,19 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     { collection: "timelines", id: text(payload, "activity", "threadId") },
     { collection: "streams", id: text(payload, "groupId") },
   ],
-  // Who belongs to a group, and which of its threads the reader may see.
+  // Who belongs to a group, and which of its threads the reader may see. A fact names its group
+  // but not its threads, so every open timeline and participant list checks its access again.
   "group.membership.added": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
+    { collection: "timelines", id: undefined },
+    { collection: "participants", id: undefined },
   ],
   "group.membership.removed": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
+    { collection: "timelines", id: undefined },
+    { collection: "participants", id: undefined },
   ],
   // Who takes part in a thread, and so follows it.
   "thread.participation.added": (payload) => [
@@ -129,7 +134,7 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
   "workspace.member.added": () => [{ collection: "rosters", id: undefined }],
   "workspace.member.removed": () => [{ collection: "rosters", id: undefined }],
 };
-/** Grants decide which threads each stream shows and which rosters are readable. */
+/** Grants decide which threads each stream shows, which threads and rosters are readable. */
 const everyStream = new Set([
   "workspace.role.permissions-changed",
   "workspace.assignment.created",
@@ -154,10 +159,8 @@ export const affectedKeys = (
     for (const target of targets[event.name]?.(event.payload) ?? [])
       if (target.id === undefined) collections.add(target.collection);
       else items.add(itemKey(workspaceId, target.collection, target.id));
-    if (everyStream.has(event.name)) {
-      collections.add("streams");
-      collections.add("rosters");
-    }
+    if (everyStream.has(event.name))
+      for (const collection of workspaceCollections) collections.add(collection);
   }
   const whole = [...collections].map((collection) => collectionKey(workspaceId, collection));
   return [

@@ -166,6 +166,10 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   messages". Given a `focus` position, such as the message that notified the reader, it reads back
   until that message is loaded, sets it apart, and opens at it. While visible, it reads the thread through the newest activity it shows, and it shows who else
   is typing under the messages. The app places it in `Shell.Inspector` and owns where closing leads.
+  Once a refresh says the reader can no longer read the thread, it shows that instead of the
+  messages it last read, and the stream does the same for its group, as does the header's member
+  count, until access returns.
+  **LosingAccess** covers both, leaving and rejoining from another session.
 - `GroupName` renders a group's name as text, the same way the navigation names it.
 - `Inbox` renders the reader's inbox newest first with the UI Inbox cards: why each notification
   came (who mentioned them, replied in a thread they follow, or started a thread in a group they

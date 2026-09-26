@@ -243,7 +243,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
               ),
             ),
         );
-        return yield* Schema.decodeUnknownEffect(Schema.Int)(row?.count ?? 0);
+        return yield* Schema.decodeEffect(Schema.Int)(row?.count ?? 0);
       },
       Effect.mapError(storeFailure(NotificationStore, "countPendingByRecipient")),
     ),

@@ -168,6 +168,31 @@ export function ConversationsFixture(props: {
       body,
     ).catch((cause) => setError(String(cause)));
   };
+  /** The owner leaves the group from another session, so this one hears of it live. */
+  const leaveElsewhere = () => {
+    const value = setup();
+    if (!value) return;
+    const path = `/workspaces/${value.workspaceId}/groups/${value.groupId}/members`;
+    void (async () => {
+      const roster = (await api(value.scenario, `${path}?limit=100`, value.owner.token)) as Array<{
+        readonly id: string;
+        readonly memberId: string;
+      }>;
+      const own = roster.find((admission) => admission.memberId === value.ownerMemberId);
+      if (own) await api(value.scenario, `${path}/${own.id}/leave`, value.owner.token, {});
+    })().catch((cause) => setError(String(cause)));
+  };
+  /** The owner, who manages the workspace's groups, adds themselves back from another session. */
+  const rejoinElsewhere = () => {
+    const value = setup();
+    if (!value) return;
+    void api(
+      value.scenario,
+      `/workspaces/${value.workspaceId}/groups/${value.groupId}/members`,
+      value.owner.token,
+      { memberId: value.ownerMemberId },
+    ).catch((cause) => setError(String(cause)));
+  };
   return (
     <ThemeProvider theme={props.theme ?? "cotton"}>
       <Show when={error()}>
@@ -264,6 +289,12 @@ export function ConversationsFixture(props: {
                           }
                         >
                           Mention owner as member
+                        </Button>
+                        <Button variant="secondary" onClick={leaveElsewhere}>
+                          Leave elsewhere as owner
+                        </Button>
+                        <Button variant="secondary" onClick={rejoinElsewhere}>
+                          Rejoin elsewhere as owner
                         </Button>
                       </Row>
                     </Shell.Header>

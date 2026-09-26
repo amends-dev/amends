@@ -221,8 +221,8 @@ failures keep the input, `created` receives the new group's ID, and `reset` clea
 may (`renamable`): `reset` starts from the current name, `ready` holds for a different valid name,
 and saving refreshes the groups.
 
-`useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster and the reader's
-own admission, says whether they may manage it (`manageable`) and leave it (`leavable`), and adds
+`useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster, with
+`rosterFailure` when it can no longer be read, and the reader's own admission, says whether they may manage it (`manageable`) and leave it (`leavable`), and adds
 several members, removes one, or leaves, one change at a time, with `changing` naming the change in
 flight. Each change refreshes the roster, stream, groups, and inbox; adding someone already added
 counts as added.
