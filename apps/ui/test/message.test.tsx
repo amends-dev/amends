@@ -54,13 +54,26 @@ it("orders a transcript as a list of day seams and entries under its name", () =
       <Transcript.Items>
         <Transcript.Day>Monday</Transcript.Day>
         <Transcript.Entry>First</Transcript.Entry>
+        <Transcript.Note>
+          Ada followed this thread
+          <Transcript.NoteTime datetime="2026-09-22T09:20:00.000Z">09:20</Transcript.NoteTime>
+        </Transcript.Note>
         <Transcript.Entry>Second</Transcript.Entry>
       </Transcript.Items>
     </Transcript.Root>
   ));
   const region = screen.getByRole("region", { name: "Messages" });
   const items = within(within(region).getByRole("list")).getAllByRole("listitem");
-  expect(items.map((item) => item.textContent)).toEqual(["Monday", "First", "Second"]);
+  expect(items.map((item) => item.textContent)).toEqual([
+    "Monday",
+    "First",
+    "Ada followed this thread09:20",
+    "Second",
+  ]);
+  expect(within(items[2]!).getByText("09:20")).toHaveAttribute(
+    "datetime",
+    "2026-09-22T09:20:00.000Z",
+  );
   expect(within(region).getByRole("button", { name: "Show earlier" })).toBeInTheDocument();
 });
 

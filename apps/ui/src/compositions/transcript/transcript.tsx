@@ -38,7 +38,7 @@ const near = 24;
 /** Brings an entry into view: the one Items was asked to show. */
 const Reveal = createContext<(entry: HTMLElement) => void>();
 /**
- * The entries, as an ordered list of Day and Entry items. The view opens at the newest end and
+ * The entries, as an ordered list of Day, Entry, and Note items. The view opens at the newest end and
  * stays there as entries arrive while the reader is there; otherwise entries added or resized
  * anywhere keep the entry the reader is looking at in place, in every browser. A focused Entry
  * opens the view at it instead, and brings it into view whenever it becomes focused.
@@ -158,6 +158,19 @@ export function Entry(props: JSX.LiHTMLAttributes<HTMLLIElement> & { focused?: b
       class={classes(s.entry, local.class, local.classList)}
     />
   );
+}
+/**
+ * A quiet line between entries about the conversation rather than in it, such as someone
+ * following a thread or leaving. It keeps the reader's place as entries do. Put its NoteTime last.
+ */
+export function Note(props: JSX.LiHTMLAttributes<HTMLLIElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <li {...native} class={classes(s.note, local.class, local.classList)} />;
+}
+/** When a Note's change happened, after its text. */
+export function NoteTime(props: JSX.TimeHTMLAttributes<HTMLTimeElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <time {...native} class={classes(s.noteTime, local.class, local.classList)} />;
 }
 /** A seam naming the day the entries after it belong to. */
 export function Day(

@@ -36,6 +36,24 @@ export const entry = style({
   },
 });
 export const day = style({ minWidth: 0, paddingBlock: "1rem 0.625rem" });
+/** A line about the conversation, set like Status so it reads as the room, not a message. */
+export const note = style({
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "baseline",
+  columnGap: "0.5rem",
+  minWidth: 0,
+  paddingBlock: "0.375rem",
+  fontFamily: fontFamilies.mono,
+  fontSize: "0.6875rem",
+  lineHeight: 1.4,
+  color: colorVars.text.secondary,
+  overflowWrap: "anywhere",
+});
+export const noteTime = style({
+  // A separator to see, not to hear.
+  selectors: { "&::before": { content: '"·" / ""', marginInlineEnd: "0.5rem" } },
+});
 /** One line after the entries; it keeps its height when empty, so they never jump. */
 export const status = style({
   minHeight: "1.4em",

@@ -34,6 +34,7 @@ interface Setup {
   readonly member: Session;
   readonly workspaceId: string;
   readonly ownerMemberId: string;
+  readonly memberId: string;
   readonly groupId: string;
   readonly threads: ReadonlyArray<string>;
 }
@@ -147,6 +148,7 @@ export function ConversationsFixture(props: {
         member,
         workspaceId: workspace.id,
         ownerMemberId: workspace.ownerMemberId,
+        memberId: joined.id,
         groupId: group.id,
         threads,
       });
@@ -168,18 +170,20 @@ export function ConversationsFixture(props: {
       body,
     ).catch((cause) => setError(String(cause)));
   };
-  /** The owner leaves the group from another session, so this one hears of it live. */
-  const leaveElsewhere = () => {
+  /** Someone leaves the group from their own session, so this one hears of it live. */
+  const leave = (who: "owner" | "member") => {
     const value = setup();
     if (!value) return;
     const path = `/workspaces/${value.workspaceId}/groups/${value.groupId}/members`;
+    const session = value[who],
+      memberId = who === "owner" ? value.ownerMemberId : value.memberId;
     void (async () => {
-      const roster = (await api(value.scenario, `${path}?limit=100`, value.owner.token)) as Array<{
+      const roster = (await api(value.scenario, `${path}?limit=100`, session.token)) as Array<{
         readonly id: string;
         readonly memberId: string;
       }>;
-      const own = roster.find((admission) => admission.memberId === value.ownerMemberId);
-      if (own) await api(value.scenario, `${path}/${own.id}/leave`, value.owner.token, {});
+      const own = roster.find((admission) => admission.memberId === memberId);
+      if (own) await api(value.scenario, `${path}/${own.id}/leave`, session.token, {});
     })().catch((cause) => setError(String(cause)));
   };
   /** The owner, who manages the workspace's groups, adds themselves back from another session. */
@@ -290,8 +294,11 @@ export function ConversationsFixture(props: {
                         >
                           Mention owner as member
                         </Button>
-                        <Button variant="secondary" onClick={leaveElsewhere}>
+                        <Button variant="secondary" onClick={() => leave("owner")}>
                           Leave elsewhere as owner
+                        </Button>
+                        <Button variant="secondary" onClick={() => leave("member")}>
+                          Leave as member
                         </Button>
                         <Button variant="secondary" onClick={rejoinElsewhere}>
                           Rejoin elsewhere as owner

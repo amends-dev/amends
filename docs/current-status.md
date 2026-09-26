@@ -50,8 +50,10 @@ scrolled. Someone writing a reply shows as typing in the thread panel and on the
 the stream until their signal runs out or their message arrives; starting a thread sends no
 typing, since there is no thread yet. The thread panel follows and unfollows its thread, and a
 team group's page header follows the group so that threads started there afterwards include the
-reader; following agents on someone's behalf has no control. Timelines show messages but not
-people joining or leaving.
+reader; following agents on someone's behalf has no control. The thread panel notes someone
+following the thread, stopping, leaving the group, or being removed, between its messages; joining
+by writing or being mentioned shows only in the message. A group's stream shows its threads, not
+people joining or leaving the group.
 
 People are shown by the name they chose in the workspace, or by the identity they sign in as
 until they choose one. The apps ask for a name when creating a workspace or accepting an

@@ -167,7 +167,9 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   states.
 - `ThreadPanel` is the content of the shell's inspector for one thread: its header with a message
   count and close action, and the thread's messages in compact density, with "Show earlier
-  messages". Given a `focus` position, such as the message that notified the reader, it reads back
+  messages". Between them, quiet notes say when someone followed the thread, stopped following,
+  left the group, or was removed from the group or workspace, naming the reader "You"; joining by
+  writing or being mentioned shows in the message itself. Notes add nothing to the count. Given a `focus` position, such as the message that notified the reader, it reads back
   until that message is loaded, sets it apart, and opens at it. While visible, it reads the thread through the newest activity it shows, and it shows who else
   is typing under the messages. The app places it in `Shell.Inspector` and owns where closing leads.
   Once a refresh says the reader can no longer read the thread, it shows that instead of the
@@ -202,7 +204,9 @@ starts a thread from the page, mentions the other member, replies in a thread, a
 find a draft kept. **Reading** shows the member's threads unread, clears the group's dot by
 viewing it, and clears a reply's dot and count by opening its thread. **Typing** shows the member
 typing in the open thread and its row until their reply arrives. **Following** follows the group
-and sees the member's next thread reach the owner, then follows and unfollows a thread.
+and sees the member's next thread reach the owner, then follows and unfollows a thread, noted in
+its timeline. **Departures** sees the member leave the group from their own session and the open
+thread note it live.
 **CreateGroup** creates a group with the other member from the sidebar and opens it empty.
 **Members** adds a third person to the group, removes the member, and leaves.
 **Rename** renames the group and sees the new name wherever it is named.

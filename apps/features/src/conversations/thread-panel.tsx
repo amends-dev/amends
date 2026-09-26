@@ -4,6 +4,7 @@ import {
   useThreadFollow,
   useThreadTimeline,
   useTyping,
+  useWorkspace,
   type ThreadTimeline,
 } from "@amends/client";
 import { Composer } from "@amends/ui/compositions/composer";
@@ -17,8 +18,14 @@ import { Text } from "@amends/ui/primitives/text";
 import { createEffect, Match, Show, Switch } from "solid-js";
 import { lostAccess } from "../internal/lost.ts";
 import { ReplyComposer } from "./composers.tsx";
-import { Entries, type Post } from "./entries.tsx";
-import { memberName, typingText } from "./presentation.ts";
+import { Entries, type Note, type Post } from "./entries.tsx";
+import {
+  memberName,
+  participantName,
+  participationNote,
+  typingText,
+  type Participation,
+} from "./presentation.ts";
 
 export interface ThreadPanelProps {
   readonly workspaceId: string;
@@ -37,7 +44,8 @@ type Published = Extract<ThreadTimeline.Item, { readonly message: unknown }>;
 const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in item;
 /**
  * One thread's messages for the shell's inspector, from the newest and live while mounted, with
- * its header, close action, and a composer for replying. Earlier messages load on request.
+ * notes where people followed it or stopped taking part, its header, close action, and a composer
+ * for replying. Earlier messages load on request.
  */
 export function ThreadPanel(props: ThreadPanelProps) {
   const timeline = useThreadTimeline(props.workspaceId, props.threadId);
@@ -45,6 +53,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
   const lost = lostAccess(timeline);
   const problem = () => lost() ?? (timeline.value() === undefined ? timeline.failure() : undefined);
   const members = useMembers(props.workspaceId);
+  const self = useWorkspace(() => props.workspaceId);
   const typing = useTyping(props.workspaceId);
   const typists = () =>
     typingText(typing(props.threadId).map((memberId) => memberName(members.member(memberId))));
@@ -54,14 +63,30 @@ export function ThreadPanel(props: ThreadPanelProps) {
     props.threadId,
     () => timeline.value()?.at(-1)?.activity.sequence,
   );
-  const posts = () =>
-    (timeline.value() ?? []).filter(isMessage).map((item): Post => ({
-      key: item.message.id,
-      author: item.message.author,
-      publishedAt: item.message.publishedAt,
-      text: item.message.text,
-      mentions: item.message.mentions,
-    }));
+  const noteOf = (item: Participation): Note => {
+    const participant = item.participant.participant;
+    return {
+      key: item.activity.id,
+      note: participationNote(
+        item,
+        participantName(participant, members.member),
+        participant._tag === "Member" && participant.memberId === self()?.member.id,
+      ),
+      occurredAt: item.activity.occurredAt,
+    };
+  };
+  const entries = () =>
+    (timeline.value() ?? []).map((item): Post | Note =>
+      isMessage(item)
+        ? {
+            key: item.message.id,
+            author: item.message.author,
+            publishedAt: item.message.publishedAt,
+            text: item.message.text,
+            mentions: item.message.mentions,
+          }
+        : noteOf(item),
+    );
   // Read back until the position to show is loaded, one page at a time.
   createEffect(() => {
     const target = props.focus,
@@ -76,7 +101,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
   };
   const follow = useThreadFollow(props.workspaceId, props.threadId);
   const meta = () => {
-    const count = posts().length;
+    const count = (timeline.value() ?? []).filter(isMessage).length;
     if (timeline.value() === undefined || lost()) return "";
     const messages = timeline.complete()
       ? `${count} ${count === 1 ? "message" : "messages"}`
@@ -151,7 +176,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
                 </Transcript.Earlier>
               </Show>
               <Transcript.Items>
-                <Entries posts={posts()} members={members} density="compact" focus={focused()} />
+                <Entries posts={entries()} members={members} density="compact" focus={focused()} />
               </Transcript.Items>
               <Transcript.Status>{typists()}</Transcript.Status>
             </Transcript.Root>

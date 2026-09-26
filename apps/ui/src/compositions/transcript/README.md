@@ -21,9 +21,11 @@ import { Transcript } from "@amends/ui/compositions/transcript";
 
 Root is a `section` region; name it with `aria-label`. Status, after Items, is a quiet mono line
 for what is happening now, such as who is typing; it keeps one line's height when empty so the
-entries do not jump, and it is not a live region. Items is an ordered list of Day and Entry
-items. Day is a centered seam with a mono label; Entry usually holds a Message. Earlier sits
-above the list for a control or a note.
+entries do not jump, and it is not a live region. Items is an ordered list of Day, Entry, and
+Note items. Day is a centered seam with a mono label; Entry usually holds a Message. Note is a quiet
+mono line about the conversation rather than in it, such as someone following a thread or
+leaving its group, with its NoteTime last; it anchors the reader's place as entries do. Earlier
+sits above the list for a control or a note.
 
 Items keeps the reader's place in its nearest scrolling ancestor, or the document. The view
 opens at the newest end and stays there as entries arrive while the reader is there, measured
@@ -43,4 +45,4 @@ kept as before. The FocusedEntry stories cover both.
 
 The Default story's play test runs in a real browser: it opens at the newest entry, keeps the
 first visible entry in place while earlier entries arrive, and follows new entries at the end.
-**Thread panel** shows compact messages in the shell's inspector.
+**Thread panel** shows compact messages in the shell's inspector, with notes between them.

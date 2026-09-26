@@ -161,7 +161,16 @@ function Panel(props: { theme?: "cotton" | "soot" }) {
           <Shell.InspectorBody>
             <Transcript.Root aria-label="Thread messages">
               <Transcript.Items>
-                <Entries posts={[post(12), post(13), post(14)]} density="compact" />
+                <Entries posts={[post(12), post(13)]} density="compact" />
+                <Transcript.Note>
+                  Ada Lovelace followed this thread
+                  <Transcript.NoteTime datetime="2026-09-23T10:02:00Z">10:02</Transcript.NoteTime>
+                </Transcript.Note>
+                <Entries posts={[post(14)]} density="compact" />
+                <Transcript.Note>
+                  Rae Ashworth left the group
+                  <Transcript.NoteTime datetime="2026-09-23T11:40:00Z">11:40</Transcript.NoteTime>
+                </Transcript.Note>
               </Transcript.Items>
               <Transcript.Status>Jo Mercer is typing…</Transcript.Status>
             </Transcript.Root>

@@ -4,6 +4,7 @@ import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, {
   CreateGroup,
+  Departures,
   DirectMessage,
   Following,
   Group,
@@ -37,6 +38,9 @@ it("shows another member typing until their message arrives", async () => {
 });
 it("follows a group and a thread, and a followed group's new threads reach the reader", async () => {
   await stories.story(Following).run();
+});
+it("notes following, unfollowing, and someone leaving the group in the thread, live", async () => {
+  await stories.story(Departures).run();
 });
 it("lists the inbox newest first, settles what is seen or read, and takes new mentions live", async () => {
   await stories.story(InboxView).run();

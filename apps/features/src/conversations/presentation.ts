@@ -1,4 +1,4 @@
-import { toDate, type Member, type Thread } from "@amends/client";
+import { toDate, type Member, type Thread, type ThreadTimeline } from "@amends/client";
 import { nameOf } from "../internal/names.ts";
 
 export { initials } from "../internal/names.ts";
@@ -18,6 +18,35 @@ export const authorOf = (
     name: memberName(record),
     kind: record?.identity._tag === "Agent" ? ("agent" as const) : ("human" as const),
   };
+};
+
+/** Someone following a thread or ending their part in it, as its timeline records it. */
+export type Participation = Extract<ThreadTimeline.Item, { readonly participant: unknown }>;
+/** Who a participation belongs to, as a thread's notes name them. */
+export const participantName = (
+  participant: Participation["participant"]["participant"],
+  member: (memberId: string) => Member.Record | undefined,
+) => {
+  if (participant._tag === "Member") return memberName(member(participant.memberId));
+  return participant._tag === "Contact" ? "A contact" : "Triage";
+};
+/**
+ * What a thread says when someone follows it or stops taking part, naming the reader "You".
+ * Joining by writing or being mentioned shows in the message itself, so it has no note.
+ */
+export const participationNote = (item: Participation, name: string, self: boolean) => {
+  const who = self ? "You" : name;
+  if (item.activity.kind === "participation.followed") return `${who} followed this thread`;
+  switch (item.activity.details.reason) {
+    case "unfollowed":
+      return `${who} stopped following`;
+    case "group-left":
+      return `${who} left the group`;
+    case "group-removed":
+      return `${who} ${self ? "were" : "was"} removed from the group`;
+    case "workspace-removed":
+      return `${who} ${self ? "were" : "was"} removed from the workspace`;
+  }
 };
 
 const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });

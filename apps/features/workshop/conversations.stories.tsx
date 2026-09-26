@@ -187,9 +187,33 @@ export const Following = {
     await userEvent.click(await button("Follow"));
     await button("Unfollow");
     await waitFor(() => expect(panel().getByText(/· following$/)).toBeVisible());
+    // The timeline notes it, as others reading the thread see it under the owner's name.
+    await waitFor(() => expect(panel().getByText("You followed this thread")).toBeVisible());
     await userEvent.click(await button("Unfollow"));
     await button("Follow");
     await expect(panel().queryByText(/· following$/)).toBeNull();
+    await waitFor(() => expect(panel().getByText("You stopped following")).toBeVisible());
+  },
+} satisfies Story;
+/** Someone leaving the group ends their part in its threads, which say so live. */
+export const Departures = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const stream = await canvas.findByRole("region", { name: "Design" }, { timeout: 20000 });
+    await waitFor(() => expect(within(stream).getAllByRole("article")).toHaveLength(3));
+    // The member started this thread and the owner replied, so both take part in it.
+    await userEvent.click(within(stream).getByRole("link", { name: /2 replies/ }));
+    const thread = await canvas.findByRole("region", { name: "Thread messages" });
+    await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(3));
+    await userEvent.click(canvas.getByRole("button", { name: "Leave as member" }));
+    const note = await within(canvas.getByRole("region", { name: "Thread messages" })).findByText(
+      "member@example.test left the group",
+      {},
+      { timeout: 10000 },
+    );
+    // The note sits after the messages, with its time, and adds no message to the count.
+    await expect(note.closest("li")?.querySelector("time")).toHaveAttribute("datetime");
+    await expect(canvas.getByText(/^3 messages/)).toBeVisible();
   },
 } satisfies Story;
 export const InboxView = {
