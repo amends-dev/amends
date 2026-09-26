@@ -4,6 +4,7 @@ import {
   useGroupStream,
   useMarkGroupRead,
   useMembers,
+  useTyping,
   type Thread,
 } from "@amends/client";
 import { Composer } from "@amends/ui/compositions/composer";
@@ -16,7 +17,7 @@ import { Text } from "@amends/ui/primitives/text";
 import { Match, Show, Switch } from "solid-js";
 import { NewThreadComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
-import { timeOf } from "./presentation.ts";
+import { memberName, timeOf, typingText } from "./presentation.ts";
 
 export interface GroupStreamProps {
   readonly workspaceId: string;
@@ -41,6 +42,7 @@ export function GroupStream(props: GroupStreamProps) {
   const stream = useGroupStream(props.workspaceId, props.groupId);
   const members = useMembers(props.workspaceId);
   const groups = useGroups(props.workspaceId);
+  const typing = useTyping(props.workspaceId);
   // Seeing the stream catches the reader up with the group, whenever it has something new.
   useMarkGroupRead(props.workspaceId, props.groupId, () => {
     const item = groups.value()?.find((entry) => entry.group.id === props.groupId);
@@ -125,6 +127,12 @@ export function GroupStream(props: GroupStreamProps) {
               members={members}
               footer={(post) => {
                 const opening = () => post().opening;
+                const typists = () =>
+                  typingText(
+                    typing(opening().thread.id).map((memberId) =>
+                      memberName(members.member(memberId)),
+                    ),
+                  );
                 return (
                   <Message.Replies
                     href={props.threadHref(opening().thread.id)}
@@ -133,15 +141,15 @@ export function GroupStream(props: GroupStreamProps) {
                     <Show when={opening().unread}>
                       <Message.Unread label="unread" />
                     </Show>
-                    <Show
-                      when={opening().replies > 0}
-                      fallback={<Message.ReplyNote>reply in thread</Message.ReplyNote>}
-                    >
+                    <Show when={opening().replies > 0}>
                       <Message.ReplyCount>{replies(opening().replies)}</Message.ReplyCount>
-                      <Message.ReplyNote>
-                        last at {timeOf(opening().latest.occurredAt).text}
-                      </Message.ReplyNote>
                     </Show>
+                    <Message.ReplyNote>
+                      {typists() ||
+                        (opening().replies > 0
+                          ? `last at ${timeOf(opening().latest.occurredAt).text}`
+                          : "reply in thread")}
+                    </Message.ReplyNote>
                   </Message.Replies>
                 );
               }}

@@ -55,7 +55,9 @@ refresh discards drafts. Background refreshes never mark settings pending or loc
   feed. The directory refreshes when the page wakes instead; an identity-level feed would be
   a backend addition.
 - Read-state signals refresh the groups and streams, since they change unread state and pending
-  counts. Typing signals are received but not yet shown, and the notifications a commit carries
+  counts. Typing signals keep a per-workspace list of who is typing in each thread until the
+  moment each names, or until that member's message is published, and never show the reader. They
+  are not replayed, so a reconnect starts with nobody typing. The notifications a commit carries
   refresh counts without updating an inbox, which the client does not read yet.
 - Each open workspace view holds one HTTP connection. Browsers allow about six per origin over
   HTTP/1.1, shared across tabs; production should serve the API over HTTP/2.

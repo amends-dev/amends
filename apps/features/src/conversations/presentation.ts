@@ -54,3 +54,12 @@ export const dayLabel = (day: number, now = new Date()) => {
   if (days > 1 && days < 7) return weekday.format(date);
   return (date.getFullYear() === now.getFullYear() ? thisYear : otherYear).format(date);
 };
+/** Who is typing, as a line: one or two names, or several people. */
+export const typingText = (names: ReadonlyArray<string>) =>
+  names.length === 0
+    ? ""
+    : names.length === 1
+      ? `${names[0]} is typing…`
+      : names.length === 2
+        ? `${names[0]} and ${names[1]} are typing…`
+        : "Several people are typing…";

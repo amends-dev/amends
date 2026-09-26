@@ -192,3 +192,9 @@ timeline position shown, or when a group's latest unread activity happened, unde
 is none. Each value is sent once, one at a time; a failed mark is retried only once something
 newer is due. Marks invalidate the groups and streams, as the reader's own read signal does when
 it arrives, and the server moves positions forward only and acknowledges the notifications read.
+
+`useTyping(workspaceId)` returns who is typing in a thread now, from the change feed's typing
+signals, without the reader: each until the moment its signal names, or until that member's
+message is published, looking again when the soonest runs out. A reply's composer tells the
+thread's readers that the reader is typing when its draft grows, at most every 2.5 seconds; the
+server's signal lasts six.

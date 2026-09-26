@@ -8,6 +8,7 @@ import {
   DirectoryProvider,
   Session,
   useSettings,
+  useTyping,
   useWorkspaceFeed,
   WorkspaceFeedProvider,
   type SessionStore,
@@ -154,10 +155,13 @@ function fixture(options: { changes?: (request: Request) => Response | undefined
     },
   };
   const [shown, setShown] = createSignal(true);
-  let feed!: WorkspaceFeedScope, settings!: SettingsController;
+  let feed!: WorkspaceFeedScope,
+    settings!: SettingsController,
+    typing!: ReturnType<typeof useTyping>;
   function Consumer() {
     feed = useWorkspaceFeed();
     settings = useSettings("one", "workspace");
+    typing = useTyping("one");
     return null;
   }
   render(() => (
@@ -196,6 +200,9 @@ function fixture(options: { changes?: (request: Request) => Response | undefined
     },
     get settings() {
       return settings;
+    },
+    get typing() {
+      return typing;
     },
     connected: async (index: number) => {
       await waitFor(() => expect(streams.length).toBeGreaterThan(index));
@@ -336,4 +343,42 @@ it("keeps backing off when a connection fails as soon as it opens", async () => 
     await waitFor(() => expect(f.feed.state()).toMatchObject({ _tag: "Reconnecting", attempt }));
     window.dispatchEvent(new Event("online"));
   }
+});
+
+it("shows who is typing until their signal runs out or their message arrives, never the reader", async () => {
+  const f = fixture();
+  const stream = await f.connected(0);
+  stream.send(ready("1", false));
+  const typing = (memberId: string, ms: number) => ({
+    _tag: "Signal",
+    workspaceId: "one",
+    signal: {
+      _tag: "Typing",
+      workspaceId: "one",
+      groupId: "group",
+      threadId: "thread",
+      memberId,
+      until: new Date(Date.now() + ms).toISOString(),
+    },
+  });
+  stream.send(typing("ada", 60_000));
+  // The reader's own typing, from another of their sessions, is not shown to them.
+  stream.send(typing("owner", 60_000));
+  await waitFor(() => expect(f.typing("thread")).toEqual(["ada"]));
+  expect(f.typing("other")).toEqual([]);
+  // Ada's message arriving ends her typing it.
+  stream.send(
+    committed(
+      "2",
+      event("thread.message.published", {
+        threadId: "thread",
+        author: { _tag: "Member", memberId: "ada" },
+      }),
+    ),
+  );
+  await waitFor(() => expect(f.typing("thread")).toEqual([]));
+  // A signal lasts only until the moment it names.
+  stream.send(typing("rae", 300));
+  await waitFor(() => expect(f.typing("thread")).toEqual(["rae"]));
+  await waitFor(() => expect(f.typing("thread")).toEqual([]), { timeout: 2000 });
 });

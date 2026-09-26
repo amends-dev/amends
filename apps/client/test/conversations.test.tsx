@@ -243,6 +243,8 @@ it("a reply keeps its draft across remounts, retries with its key, and clears on
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     if (request.method !== "POST") return json([]);
+    // Writing a reply tells the thread's readers; those signals are not posts.
+    if (request.url.endsWith("/typing")) return new Response(null, { status: 204 });
     posts.push({ key: request.headers.get("idempotency-key"), body: await request.json() });
     if (failNext) {
       failNext = false;
@@ -302,12 +304,11 @@ it("a reply keeps its draft across remounts, retries with its key, and clears on
   expect(posts[0]!.key).toBe(posts[1]!.key);
   expect(posts[2]!.key).not.toBe(posts[0]!.key);
   expect(
-    new URL(
-      fetch.mock.calls.find(
-        ([input, init]) => new Request(input, init).method === "POST",
-      )![0] as string,
-    ).pathname,
-  ).toBe("/workspaces/one/threads/thread/messages");
+    fetch.mock.calls
+      .map(([input, init]) => new Request(input, init))
+      .filter((request) => request.method === "POST" && !request.url.endsWith("/typing"))
+      .map((request) => new URL(request.url).pathname),
+  ).toEqual(Array.from({ length: 3 }, () => "/workspaces/one/threads/thread/messages"));
 });
 
 it("a draft mentions the members whose @name its text still holds", () => {
@@ -325,9 +326,14 @@ it("a draft mentions the members whose @name its text still holds", () => {
 
 it("a reply sends the mentions its text still holds", async () => {
   const bodies: Array<unknown> = [];
+  let typed = 0;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     if (request.method !== "POST") return json([]);
+    if (request.url.endsWith("/typing")) {
+      typed++;
+      return new Response(null, { status: 204 });
+    }
     bodies.push(await request.json());
     return new Response(
       JSON.stringify({
@@ -365,6 +371,8 @@ it("a reply sends the mentions its text still holds", async () => {
   await waitFor(() => expect(composer.draft()).toBe(""));
   composer.setDraft("@Ada again");
   expect(composer.mentions()).toEqual([]);
+  // Writing told the thread's readers once; the edits since were too soon to repeat it.
+  expect(typed).toBe(1);
 });
 
 it("marks an open thread read once per newer position, only while the page shows", async () => {

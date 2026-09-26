@@ -2,6 +2,7 @@ import {
   useMarkThreadRead,
   useMembers,
   useThreadTimeline,
+  useTyping,
   type ThreadTimeline,
 } from "@amends/client";
 import { Composer } from "@amends/ui/compositions/composer";
@@ -15,6 +16,7 @@ import { Text } from "@amends/ui/primitives/text";
 import { Match, Show, Switch } from "solid-js";
 import { ReplyComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
+import { memberName, typingText } from "./presentation.ts";
 
 export interface ThreadPanelProps {
   readonly workspaceId: string;
@@ -33,6 +35,9 @@ const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in
 export function ThreadPanel(props: ThreadPanelProps) {
   const timeline = useThreadTimeline(props.workspaceId, props.threadId);
   const members = useMembers(props.workspaceId);
+  const typing = useTyping(props.workspaceId);
+  const typists = () =>
+    typingText(typing(props.threadId).map((memberId) => memberName(members.member(memberId))));
   // An open thread is read through the newest activity it shows, as that activity arrives.
   useMarkThreadRead(
     props.workspaceId,
@@ -117,6 +122,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
               <Transcript.Items>
                 <Entries posts={posts()} members={members} density="compact" />
               </Transcript.Items>
+              <Transcript.Status>{typists()}</Transcript.Status>
             </Transcript.Root>
             <Composer.Dock surface="panel">
               <ReplyComposer

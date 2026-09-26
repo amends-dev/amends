@@ -159,6 +159,7 @@ function Panel(props: { theme?: "cotton" | "soot" }) {
               <Transcript.Items>
                 <Entries posts={[post(12), post(13), post(14)]} density="compact" />
               </Transcript.Items>
+              <Transcript.Status>Jo Mercer is typing…</Transcript.Status>
             </Transcript.Root>
           </Shell.InspectorBody>
         </Shell.Inspector>

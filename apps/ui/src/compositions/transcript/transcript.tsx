@@ -120,3 +120,12 @@ export function Day(
     </li>
   );
 }
+/**
+ * What is happening in the conversation now, such as who is typing, after the entries. It keeps
+ * one line's height when empty. It is not announced; make it a live region only where every
+ * change is worth hearing.
+ */
+export function Status(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.status, local.class, local.classList)} />;
+}

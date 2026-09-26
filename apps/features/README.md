@@ -135,12 +135,14 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   seams, oldest first, opening at the newest. Each links to its thread with its reply count and
   when the last reply came, or "reply in thread"; the open thread's link is marked current, and a
   thread with activity the reader has not seen carries an unread dot. While the stream is visible,
-  it catches the reader up with the group whenever the group has something new.
+  it catches the reader up with the group whenever the group has something new. A thread's row shows
+  who is typing in it in place of when its last reply came.
   "Show earlier threads" reads further back. It has loading, empty, unavailable, and retry
   states.
 - `ThreadPanel` is the content of the shell's inspector for one thread: its header with a message
   count and close action, and the thread's messages in compact density, with "Show earlier
-  messages". While visible, it reads the thread through the newest activity it shows. The app places it in `Shell.Inspector` and owns where closing leads.
+  messages". While visible, it reads the thread through the newest activity it shows, and it shows who else
+  is typing under the messages. The app places it in `Shell.Inspector` and owns where closing leads.
 - `GroupName` renders a group's name as text, the same way the navigation names it.
 - `NewThreadComposer` and `ReplyComposer` write a new thread in a group and a reply in a thread.
   They show what sending does, or why it failed, and keep the draft for another try. Typing `@`
@@ -156,4 +158,5 @@ group through the real host: the owner reads a stream a member started, opens a 
 controls post as the member, so replies and new threads arrive over the live feed. **Writing**
 starts a thread from the page, mentions the other member, replies in a thread, and returns to
 find a draft kept. **Reading** shows the member's threads unread, clears the group's dot by
-viewing it, and clears a reply's dot and count by opening its thread.
+viewing it, and clears a reply's dot and count by opening its thread. **Typing** shows the member
+typing in the open thread and its row until their reply arrives.

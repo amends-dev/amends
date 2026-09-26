@@ -1,9 +1,10 @@
 import { ApiErrors, Workspace } from "@amends/api-http";
 import { Cause, Clock, Data, Duration, Effect, Exit, Queue, Random, Schema, Stream } from "effect";
 import { Sse } from "effect/unstable/encoding";
-import { Atom, Reactivity } from "effect/unstable/reactivity";
+import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
 import { watchWake } from "../live/wake.ts";
 import { isUnauthorized, type ApiClient } from "./client.ts";
+import { posted, typing, typistsAtom } from "./typing.ts";
 import {
   collectionKey,
   directoryKey,
@@ -177,6 +178,8 @@ const run = Effect.fnUntraced(function* (
 ) {
   const api = yield* client;
   const reactivity = yield* Reactivity.Reactivity;
+  const registry = yield* AtomRegistry.AtomRegistry;
+  const typists = typistsAtom(workspaceId);
   const everything = [
     directoryKey,
     ...workspaceResources.map(key(workspaceId)),
@@ -209,12 +212,25 @@ const run = Effect.fnUntraced(function* (
         });
       case "Committed": {
         cursor = message.cursor;
+        // A member whose message arrived is no longer typing it.
+        for (const event of message.events)
+          if (event.name === "thread.message.published") {
+            const threadId = text(event.payload, "threadId"),
+              memberId = text(event.payload, "author", "memberId");
+            if (threadId && memberId)
+              registry.update(typists, (current) =>
+                posted(current, threadId, memberId, Date.now()),
+              );
+          }
         // A notification for the reader changes their pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
       }
       case "Signal": {
-        const keys = signalKeys(workspaceId, message.signal);
+        const signal = message.signal;
+        if (signal._tag === "Typing")
+          registry.update(typists, (current) => typing(current, signal, Date.now()));
+        const keys = signalKeys(workspaceId, signal);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
       }
     }

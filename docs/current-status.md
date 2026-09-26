@@ -46,8 +46,10 @@ without picking it addresses no one. An open thread is read through the newest a
 shows, and a visible group's stream catches the reader up with the group, clearing the stream's
 unread dots, the sidebar's new-activity dot, and the pending counts of what was read, but only
 while the page is visible. A thread counts as read when it opens, however far back the reader has
-scrolled. There is no typing indicator and no following, timelines show messages but not people
-joining or leaving, and authors are named by their identity, with no profile name or photo. There is no page for creating groups or managing their
+scrolled. Someone writing a reply shows as typing in the thread panel and on the thread's row in
+the stream until their signal runs out or their message arrives; starting a thread sends no
+typing, since there is no thread yet. There is no following, timelines show messages but not
+people joining or leaving, and authors are named by their identity, with no profile name or photo. There is no page for creating groups or managing their
 members, and no notification inbox or Triage.
 
 ## Storage cost

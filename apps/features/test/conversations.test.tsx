@@ -2,7 +2,7 @@ import { afterEach, inject, it } from "@effect/vitest";
 import { cleanup } from "@solidjs/testing-library";
 import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
-import meta, { Group, Reading, Writing } from "../workshop/conversations.stories.tsx";
+import meta, { Group, Reading, Typing, Writing } from "../workshop/conversations.stories.tsx";
 import { closeScenarios } from "../workshop/scenario.ts";
 
 afterEach(async () => {
@@ -19,4 +19,7 @@ it("starts threads and replies from the composers, keeping drafts per thread", a
 });
 it("reads a thread when it opens and catches up with the group while it shows", async () => {
   await stories.story(Reading).run();
+});
+it("shows another member typing until their message arrives", async () => {
+  await stories.story(Typing).run();
 });

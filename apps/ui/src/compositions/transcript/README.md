@@ -19,7 +19,9 @@ import { Transcript } from "@amends/ui/compositions/transcript";
 </Transcript.Root>;
 ```
 
-Root is a `section` region; name it with `aria-label`. Items is an ordered list of Day and Entry
+Root is a `section` region; name it with `aria-label`. Status, after Items, is a quiet mono line
+for what is happening now, such as who is typing; it keeps one line's height when empty so the
+entries do not jump, and it is not a live region. Items is an ordered list of Day and Entry
 items. Day is a centered seam with a mono label; Entry usually holds a Message. Earlier sits
 above the list for a control or a note.
 

@@ -18,7 +18,7 @@ export async function api(scenario: Scenario, path: string, token?: string, body
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`Fixture request failed: ${path} (${response.status})`);
-  return response.status === 202 ? undefined : response.json();
+  return response.status === 202 || response.status === 204 ? undefined : response.json();
 }
 export function WorkspacesFixture(props: {
   baseUrl?: string;

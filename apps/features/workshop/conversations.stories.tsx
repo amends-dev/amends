@@ -114,5 +114,30 @@ export const Reading = {
     await expect(entries.getAllByRole("img", { name: "unread" })).toHaveLength(2);
   },
 } satisfies Story;
+export const Typing = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const stream = await canvas.findByRole("region", { name: "Design" }, { timeout: 20000 });
+    const entries = within(stream);
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(3));
+    await userEvent.click(entries.getByRole("link", { name: /2 replies/ }));
+    const thread = await canvas.findByRole("region", { name: "Thread messages" });
+    // The member typing shows in the thread and on its row in the stream.
+    await userEvent.click(canvas.getByRole("button", { name: "Type as member" }));
+    await waitFor(() =>
+      expect(within(thread).getByText("member@example.test is typing…")).toBeVisible(),
+    );
+    await expect(
+      entries.getByRole("link", { name: /member@example.test is typing…/ }),
+    ).toBeVisible();
+    // Their message arriving ends it.
+    await userEvent.click(canvas.getByRole("button", { name: "Reply as member" }));
+    await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(4), {
+      timeout: 10000,
+    });
+    await waitFor(() => expect(within(thread).queryByText(/is typing/)).toBeNull());
+    await expect(entries.queryByText(/is typing/)).toBeNull();
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

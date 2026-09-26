@@ -5,6 +5,7 @@ import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
 import { isMessageText, newPostKey, postRequest, type Post } from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
+import { typingRequest } from "../api/typing.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
 
@@ -18,6 +19,8 @@ interface Draft {
   readonly mentioned: ReadonlyArray<Mentioned>;
 }
 const empty: Draft = { text: "", mentioned: [] };
+/** How often a reply being written tells the thread's readers again; its signal lasts longer. */
+const typingInterval = 2500;
 /** One draft per composer target, kept in the credential scope's registry while it lasts. */
 const draftOf = Atom.family((_key: string) => Atom.make(empty).pipe(Atom.keepAlive));
 /** The members whose `@name` a text still contains, each once, in the order first mentioned. */
@@ -76,11 +79,28 @@ function compose(workspaceId: string, target: Target): ComposerController {
     { when: () => session.session !== undefined },
   );
   const ready = () => isMessageText(draft().text) && !request.pending();
+  // Replying tells the thread's readers the reader is typing, at most every so often.
+  const typing =
+    target.kind === "reply"
+      ? useRequest(typingRequest(useApiClient(), workspaceId), () => {}, {
+          when: () => session.session !== undefined,
+        })
+      : undefined;
+  let typedAt = 0;
+  const typed = (previous: string, text: string) => {
+    if (!typing || target.kind !== "reply" || text.length <= previous.length) return;
+    const now = Date.now();
+    if (now - typedAt < typingInterval || !isMessageText(text)) return;
+    typedAt = now;
+    typing.run(target.threadId);
+  };
   return {
     draft: () => draft().text,
     setDraft: (text) => {
+      const previous = draft().text;
       write({ ...draft(), text });
       setError(undefined);
+      typed(previous, text);
     },
     mention: (memberId, name) =>
       write({

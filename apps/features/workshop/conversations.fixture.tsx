@@ -151,6 +151,12 @@ export function ConversationsFixture(props: {
                         </Button>
                         <Button
                           variant="secondary"
+                          onClick={() => asMember(`/threads/${value().threads[1]}/typing`, {})}
+                        >
+                          Type as member
+                        </Button>
+                        <Button
+                          variant="secondary"
                           onClick={() =>
                             asMember(`/groups/${value().groupId}/threads`, {
                               text: "One more question about the receipts.",

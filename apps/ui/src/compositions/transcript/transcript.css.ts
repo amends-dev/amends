@@ -1,4 +1,6 @@
 import { style } from "@vanilla-extract/css";
+import { colorVars } from "../../foundations/color/theme.css.ts";
+import { fontFamilies } from "../../foundations/typography/tokens.ts";
 
 export const root = style({ display: "flex", flexDirection: "column", minWidth: 0 });
 export const earlier = style({
@@ -19,3 +21,13 @@ export const items = style({
 });
 export const entry = style({ minWidth: 0 });
 export const day = style({ minWidth: 0, paddingBlock: "1rem 0.625rem" });
+/** One line after the entries; it keeps its height when empty, so they never jump. */
+export const status = style({
+  minHeight: "1.4em",
+  paddingBlock: "0.25rem",
+  fontFamily: fontFamilies.mono,
+  fontSize: "0.6875rem",
+  lineHeight: 1.4,
+  color: colorVars.text.secondary,
+  overflowWrap: "anywhere",
+});
