@@ -7,6 +7,7 @@ import {
   groupsRead,
   inboxRead,
   membersRead,
+  permissionsRead,
   rosterRead,
   streamRead,
   timelineRead,
@@ -72,16 +73,32 @@ export function useGroupRoster(
 export interface Members {
   /** A workspace member by ID, current or removed, once the members have loaded. */
   readonly member: (memberId: string) => Member.Record | undefined;
+  /** Every member, current or removed, once loaded. */
+  readonly all: Accessor<ReadonlyArray<Member.Record> | undefined>;
 }
-/** The workspace's members, to name who wrote what. */
+/** The workspace's members, to name who wrote what and choose whom to include. */
 export function useMembers(workspaceId: string): Members {
   const read = membersRead(useApiClient(), workspaceId);
-  if (!read) return { member: () => undefined };
+  if (!read) return { member: () => undefined, all: () => undefined };
   const members = connect(read);
   const byId = createMemo(
     () => new Map((members.value() ?? []).map((member) => [member.id as string, member])),
   );
-  return { member: (memberId) => byId().get(memberId) };
+  return { member: (memberId) => byId().get(memberId), all: members.value };
+}
+
+/**
+ * Whether the reader may do something across the workspace, by permission name, once known and
+ * live while mounted, so a page offers only what they may do.
+ */
+export function useWorkspacePermission(
+  workspaceId: string,
+  permission: string,
+): Accessor<boolean | undefined> {
+  const read = permissionsRead(useApiClient(), workspaceId);
+  if (!read) return () => undefined;
+  const permissions = connect(read);
+  return () => permissions.value()?.some((name) => name === permission);
 }
 
 /** How many notifications from the reader's groups are still pending for them, live while mounted. */

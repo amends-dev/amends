@@ -229,5 +229,40 @@ export const InboxView = {
     await expect(within(unread).getByRole("listitem")).toHaveTextContent("the receipts are in.");
   },
 } satisfies Story;
+export const CreateGroup = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      body = within(document.body);
+    const sidebar = await canvas.findByRole(
+      "navigation",
+      { name: "Workspace" },
+      { timeout: 20000 },
+    );
+    await within(sidebar).findByRole("link", { name: /Design/ });
+    // The owner may create groups, so the Groups heading offers it.
+    await userEvent.click(await within(sidebar).findByRole("button", { name: "New group" }));
+    const dialog = await body.findByRole("dialog", { name: "New group" });
+    const create = within(dialog).getByRole("button", { name: "Create group" });
+    await expect(create).toBeDisabled();
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Name" }), "Receipts");
+    await expect(create).toBeEnabled();
+    // The owner is always a member; the other member is added from the picker.
+    const chips = within(dialog).getByRole("list", { name: "Members" });
+    await expect(within(chips).getAllByRole("listitem")).toHaveLength(1);
+    await expect(within(chips).getByRole("listitem")).toHaveTextContent("you");
+    const picker = within(dialog).getByRole("combobox", { name: "Members" });
+    await userEvent.type(picker, "member");
+    await userEvent.click(await body.findByRole("option", { name: /member@example\.test/ }));
+    await waitFor(() => expect(within(chips).getAllByRole("listitem")).toHaveLength(2));
+    await userEvent.click(create);
+    // The new group opens, empty, and joins the sidebar.
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "New group" })).toBeNull(), {
+      timeout: 10000,
+    });
+    const created = await within(sidebar).findByRole("link", { name: /Receipts/ });
+    await waitFor(() => expect(created).toHaveAttribute("aria-current", "page"));
+    await canvas.findByText("Nothing said yet", {}, { timeout: 10000 });
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

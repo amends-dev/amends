@@ -5,7 +5,9 @@ Nested routes provide Inbox, Triage, Tasks, Environments, Connections, and
 [Settings](workspace-settings.md). Settings manages workspace metadata, members, and
 invitations. The sidebar lists the reader's groups between the workspace pages and Configure;
 `/workspaces/:workspaceId/groups/:groupId` shows a group's stream, and
-`…/threads/:threadId` opens a thread beside it. Inbox, after Home, counts what is pending for the
+`…/threads/:threadId` opens a thread beside it. A reader who may create groups gets a "+" on the
+Groups heading that opens a New group dialog and then the group it creates; the section shows
+for them even before they belong to any group. Inbox, after Home, counts what is pending for the
 reader and lists their notifications; `/inbox/groups/:groupId/threads/:threadId` opens a thread
 beside it, and Inbox stays the current destination. The other pages remain scaffolding; task data,
 activity, configuration operations, dynamic Channels/Agents sections, and keyboard-shortcut

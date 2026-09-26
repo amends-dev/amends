@@ -130,7 +130,12 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
 - `GroupsNavigation` renders the reader's groups as a navigation section, teams by name with a
   `#` glyph and direct groups by the other people in them with `@`. A group shows a count of what
   is addressed to the reader and a dot when it has new activity. The app supplies `href` and the
-  current group; the section is hidden while the reader has no groups.
+  current group; the section is hidden while the reader has no groups, unless they may create
+  one. Readers with `group.create` get a "New group" action in its heading that opens
+  `NewGroupDialog`; the app's `onCreated` decides where the new group leads.
+- `NewGroupDialog` names a private team group and chooses its active people and agents with the
+  UI ChipPicker, the reader fixed as "you". Create stays disabled until the name has text, failures
+  explain themselves and keep the input, and closing clears it.
 - `GroupStream` renders a group's stream as a Transcript: each thread's opening message with day
   seams, oldest first, opening at the newest. Each links to its thread with its reply count and
   when the last reply came, or "reply in thread"; the open thread's link is marked current, and a
@@ -170,6 +175,7 @@ find a draft kept. **Reading** shows the member's threads unread, clears the gro
 viewing it, and clears a reply's dot and count by opening its thread. **Typing** shows the member
 typing in the open thread and its row until their reply arrives. **Following** follows the group
 and sees the member's next thread reach the owner, then follows and unfollows a thread.
+**CreateGroup** creates a group with the other member from the sidebar and opens it empty.
 **Inbox** shows the owner's inbox with the member's mention and reply newest first, marks one
 seen, opens the other's thread beside the inbox to settle it, takes a new mention over the live
 feed, and narrows to what is unread.

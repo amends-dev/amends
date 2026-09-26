@@ -55,7 +55,8 @@ so a client can import the complete contract without loading server code.
   ineligible recipient returns 409; missing recipients return 404.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
-- `assignments`: `GET …/roles` lists built-in role choices;
+- `assignments`: `GET …/permissions` lists the caller's own workspace-wide permission names, such
+  as `group.create`, for any active member; `GET …/roles` lists built-in role choices;
   `GET …/members/:memberId/assignments` reads access; `POST …/assignments` adds a role;
   `PUT …/assignments` atomically replaces workspace roles with an expected assignment-ID
   set; `DELETE …/members/:memberId/assignments/:assignmentId` revokes access.

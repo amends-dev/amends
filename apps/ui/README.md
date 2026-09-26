@@ -310,7 +310,9 @@ page and thread composer, sending with Enter or its button and docking at the bo
 region. See [Composer](src/compositions/composer/README.md). **Compositions / Inbox** lists what
 has come to the reader as the Home reference's "Needs you" cards: a pending dot, why it came, what
 was said as a serif quote, and a link to open it beside a button to mark it seen. See
-[Inbox](src/compositions/inbox/README.md).
+[Inbox](src/compositions/inbox/README.md). **Compositions / ChipPicker** chooses several people or
+other options as removable dashed chips above the picker reference's Combobox. See
+[ChipPicker](src/compositions/chip-picker/README.md).
 
 **Compositions / KeyValue** follows the Primitives v2 Key and value reference:
 compact mono keys/values at opposite edges, content-driven wrapping, and seams

@@ -3,6 +3,7 @@ import { cleanup } from "@solidjs/testing-library";
 import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, {
+  CreateGroup,
   Following,
   Group,
   InboxView,
@@ -35,4 +36,7 @@ it("follows a group and a thread, and a followed group's new threads reach the r
 });
 it("lists the inbox newest first, settles what is seen or read, and takes new mentions live", async () => {
   await stories.story(InboxView).run();
+});
+it("creates a group with a picked member and opens it", async () => {
+  await stories.story(CreateGroup).run();
 });

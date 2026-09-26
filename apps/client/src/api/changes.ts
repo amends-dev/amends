@@ -36,7 +36,13 @@ type Affected = WorkspaceResource | typeof directoryKey;
 const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "workspace.initialized": ["settings", "ownership", directoryKey],
   "workspace.renamed": ["settings", "ownership", directoryKey],
-  "workspace.ownership-transferred": ["settings", "ownership", "members", directoryKey],
+  "workspace.ownership-transferred": [
+    "settings",
+    "ownership",
+    "members",
+    "permissions",
+    directoryKey,
+  ],
   "workspace.member.added": ["members", "ownership", directoryKey],
   "workspace.member.removed": ["members", "ownership", directoryKey],
   "workspace.invitation.issued": ["invitations"],
@@ -46,9 +52,30 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "workspace.role.renamed": ["settings", "members"],
   // Grants decide what the reader may do and see, including another member's access, and which
   // notification sources they can still read.
-  "workspace.role.permissions-changed": ["settings", "ownership", "members", "groups", "inbox"],
-  "workspace.assignment.created": ["settings", "ownership", "members", "groups", "inbox"],
-  "workspace.assignment.revoked": ["settings", "ownership", "members", "groups", "inbox"],
+  "workspace.role.permissions-changed": [
+    "settings",
+    "ownership",
+    "members",
+    "groups",
+    "inbox",
+    "permissions",
+  ],
+  "workspace.assignment.created": [
+    "settings",
+    "ownership",
+    "members",
+    "groups",
+    "inbox",
+    "permissions",
+  ],
+  "workspace.assignment.revoked": [
+    "settings",
+    "ownership",
+    "members",
+    "groups",
+    "inbox",
+    "permissions",
+  ],
   "group.created": ["groups"],
   // Group access decides the same for the group's threads.
   "group.membership.added": ["groups", "inbox"],

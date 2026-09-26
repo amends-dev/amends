@@ -13,12 +13,15 @@ import {
   useGroupStream,
   useInbox,
   useInboxPending,
+  useCreateGroup,
+  useWorkspacePermission,
   useMarkGroupRead,
   useMarkSeen,
   useMarkThreadRead,
   useReply,
   useThreadTimeline,
   type ComposerController,
+  type CreateGroupController,
   type NotificationInbox,
   type PagedView,
   type SeenController,
@@ -174,6 +177,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/inbox",
     "workspace/one/members",
     "workspace/one/ownership",
+    "workspace/one/permissions",
     "workspace/one/rosters",
     "workspace/one/settings",
     "workspace/one/streams",
@@ -397,6 +401,94 @@ it("the inbox's pending count adds up what each group holds for the reader", asy
   ));
   expect(pending()).toBeUndefined();
   await waitFor(() => expect(pending()).toBe(5));
+});
+
+it("creates a group with the reader in it, retrying with the same key, and reads permissions", async () => {
+  const posts: Array<{ key: string | null; body: unknown }> = [];
+  let failNext = true;
+  const created = {
+    id: "g2",
+    workspaceId: "one",
+    kind: "Team",
+    visibility: "Private",
+    name: "Receipts",
+    createdBy: "alice-one",
+    createdAt: minute(0),
+  };
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/me/workspaces")
+      return json({
+        memberships: [
+          {
+            workspace: {
+              id: "one",
+              name: "Studio",
+              createdBy: "alice",
+              ownerMemberId: "alice-one",
+            },
+            member: {
+              id: "alice-one",
+              workspaceId: "one",
+              identity: { _tag: "Human", id: "alice" },
+              status: "active",
+            },
+            people: 2,
+          },
+        ],
+        invitations: [],
+      });
+    if (path.endsWith("/permissions")) return json(["group.create", "invitation.manage"]);
+    if (request.method !== "POST") return json([]);
+    posts.push({ key: request.headers.get("idempotency-key"), body: await request.json() });
+    if (failNext) {
+      failNext = false;
+      return new Response("Host unavailable", { status: 503 });
+    }
+    return new Response(JSON.stringify(created), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const opened: Array<string> = [];
+  let group!: CreateGroupController;
+  let creator!: () => boolean | undefined;
+  function Consumer() {
+    group = useCreateGroup("one", (groupId) => opened.push(groupId));
+    creator = useWorkspacePermission("one", "group.create");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(creator()).toBe(true));
+  expect(group.ready()).toBe(false);
+  group.setName("  ");
+  expect(group.ready()).toBe(false);
+  group.setName("  Receipts ");
+  group.setMembers(["bob-one"]);
+  await waitFor(() => expect(group.ready()).toBe(true));
+  group.create();
+  await waitFor(() => expect(group.error()).toBe("failed"));
+  // The same group again keeps its key, so one created unseen is not created twice.
+  group.create();
+  await waitFor(() => expect(opened).toEqual(["g2"]));
+  expect(posts).toHaveLength(2);
+  expect(posts[0]?.key).toBe(posts[1]?.key);
+  expect(posts[1]?.body).toEqual({ name: "Receipts", memberIds: ["alice-one", "bob-one"] });
+  group.reset();
+  expect([group.name(), group.members(), group.error()]).toEqual(["", [], undefined]);
 });
 
 it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {

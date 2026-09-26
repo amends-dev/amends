@@ -51,8 +51,14 @@ the stream until their signal runs out or their message arrives; starting a thre
 typing, since there is no thread yet. The thread panel follows and unfollows its thread, and a
 team group's page header follows the group so that threads started there afterwards include the
 reader; following agents on someone's behalf has no control. Timelines show messages but not
-people joining or leaving, and authors are named by their identity, with no profile name or photo. There is no page for creating groups or managing their
-members.
+people joining or leaving, and authors are named by their identity, with no profile name or photo.
+
+A reader who may create groups (owners and administrators, by `group.create`) gets a "New group"
+action on the sidebar's Groups heading: a dialog names a private team group and picks its people
+and agents as chips, with the reader always included, then opens the new group. Viewers are not
+offered it; the apps read what the reader may do from `GET /workspaces/:id/permissions`, which
+lists workspace-wide permissions only. There is no page for managing a group's members, renaming
+it, leaving it, or starting a direct message.
 
 The Inbox destination lists the reader's notifications newest first, live, with the sidebar
 counting what is pending: why each came (a mention, a reply in a followed thread, or a new thread

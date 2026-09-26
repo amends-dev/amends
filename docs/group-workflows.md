@@ -18,7 +18,9 @@ both eligible. Adding an agent does not invoke it or grant permission to use it.
 
 The creator is admitted only when their membership ID is listed, and the list may be empty;
 creator attribution establishes no membership or group ownership. The creation permission covers
-the initial audience; later additions need their own permission.
+the initial audience; later additions need their own permission. The apps always list the
+creator, and offer creation only to members whose workspace permissions, read through
+`AssignmentApplication.permissions`, include `group.create`.
 
 ## Reading groups
 

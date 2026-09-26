@@ -133,6 +133,15 @@ export const participantsRead = (client: ApiClient, workspaceId: string, threadI
     ? participantsOf(client, joined(workspaceId, threadId))
     : undefined;
 
+/** What the reader may do across the workspace, as permission names. */
+export const permissionsRead = (client: ApiClient, workspaceId: string) =>
+  valid(workspaceId)
+    ? client.query("assignments", "permissions", {
+        params: { workspaceId: Workspace.Id.make(workspaceId) },
+        reactivityKeys: [workspaceKey(workspaceId, "permissions")],
+      })
+    : undefined;
+
 /** The workspace's members, to name authors. */
 export const membersRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId)
@@ -343,6 +352,35 @@ export const seenRequest = (client: ApiClient, workspace: string) =>
         workspaceKey(workspace, "inbox"),
         workspaceKey(workspace, "groups"),
       ]);
+    }),
+  );
+
+/** A private team group to create: its name and everyone admitted to it, the creator included. */
+export interface NewGroup {
+  readonly name: string;
+  readonly memberIds: ReadonlyArray<string>;
+  readonly key: ReturnType<typeof newWorkspaceRequestKey>;
+}
+/** Whether a name can name a group: it has something besides surrounding whitespace. */
+export const isGroupName = (name: string) => Schema.is(Group.Name)(name.trim());
+/**
+ * Create a private team group, then invalidate the reader's groups, as the change feed would when
+ * the commit arrives. A retry with the same key returns the first attempt's group.
+ */
+export const createGroupRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (group: NewGroup) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const created = yield* api.groups.create({
+        params: { workspaceId: yield* command(Workspace.Id)(workspace) },
+        headers: { "idempotency-key": group.key },
+        payload: yield* command(Group.CreatePrivateTeamInput)({
+          name: group.name.trim(),
+          memberIds: group.memberIds,
+        }),
+      });
+      yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
+      return created.id;
     }),
   );
 

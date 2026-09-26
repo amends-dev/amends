@@ -10,7 +10,8 @@ and cache invalidation; apps mount it once per workspace view; features show its
    The provider opens one stream per workspace per credential scope, shared by every consumer,
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
-   each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`, and `inbox`, and one key
+   each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`, `inbox`, and
+   `permissions`, and one key
    per group stream, group roster, thread timeline, and thread participants within their
    collections.
 3. Each `Committed` message maps its events to the keys they affect
@@ -20,7 +21,8 @@ and cache invalidation; apps mount it once per workspace view; features show its
    refreshes the groups and that group's stream and roster, joining or leaving a thread its
    participants, workspace membership every roster,
    and grant changes every stream and roster. Group membership and grant changes also refresh the
-   inbox, since they decide which notification sources the reader can still read. A commit that
+   inbox, since they decide which notification sources the reader can still read, and grant and
+   ownership changes refresh what the reader may do. A commit that
    carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. Facts with no mapping refresh nothing. Add
    a mapping when a read starts depending on a fact.

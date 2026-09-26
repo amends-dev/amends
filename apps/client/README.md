@@ -151,7 +151,9 @@ Requests are credential-scoped and cancelled on disposal. See
 
 Conversation reads live while mounted and share one read per workspace, group, or thread in a
 credential scope. `useGroups(workspaceId)` reads every page of the reader's groups;
-`useMembers(workspaceId)` finds members by ID to name authors. Each returns a `Read` whose
+`useMembers(workspaceId)` finds members by ID to name authors and lists them `all` to choose from.
+`useWorkspacePermission(workspaceId, name)` says whether the reader may do something across the
+workspace, from the permissions read, which grant and ownership changes on the feed refresh. Each returns a `Read` whose
 `value` keeps the last success while it refreshes or a refresh fails, with `loading` for the
 first read and `failure` as a `WorkspaceFailure` code.
 
@@ -206,6 +208,10 @@ participation events refresh; unfollowing ends the reader's own participation by
 follows for the reader's own member, from the groups list, and `followable` holds only for team
 groups. A change shows at once and stays pending until the read agrees, since undoing a thread
 follow needs the participation the read returns.
+
+`useCreateGroup(workspaceId, created)` creates a private team group from a `name` and the other
+`members` chosen, always adding the reader. A retry of the same group keeps its idempotency key,
+failures keep the input, `created` receives the new group's ID, and `reset` clears it.
 
 `useInbox(workspaceId, filter)` is the reader's inbox newest first, `"all"` of it or only what is
 `"pending"`, as a `PagedView` of notifications with their sources: it opens at the newest 25,

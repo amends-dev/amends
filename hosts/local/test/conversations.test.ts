@@ -76,6 +76,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
           })
           .pipe(Effect.flip);
         expect(refused).toMatchObject({ _tag: "Authorization.Denied" });
+        // Each can ask what they may do, so apps offer group creation only to Alice.
+        expect(yield* asAlice.assignments.permissions({ params: { workspaceId } })).toContain(
+          "group.create",
+        );
+        expect(yield* asBob.assignments.permissions({ params: { workspaceId } })).not.toContain(
+          "group.create",
+        );
         const groupId = group.id;
         expect(yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } })).toEqual(
           [

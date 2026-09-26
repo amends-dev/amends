@@ -53,6 +53,8 @@ interface State {
   readonly scope: ReturnType<typeof createOverlayScope>;
   readonly input: Accessor<HTMLInputElement | undefined>;
   readonly setInput: (input: HTMLInputElement) => void;
+  /** Kobalte's own input text, which Lifecycle connects once the primitive exists. */
+  readonly connectInputText: (clear: () => void) => void;
 }
 const Context = createContext<State>();
 function context() {
@@ -63,6 +65,7 @@ function context() {
 function Lifecycle() {
   const state = context(),
     primitive = Primitive.useComboboxContext();
+  state.connectInputText(() => primitive.setInputValue(""));
   createEffect(on(state.scope.mount, () => primitive.close(), { defer: true }));
   createEffect(() => {
     if (primitive.isDisabled() || state.readOnly()) primitive.close();
@@ -106,10 +109,14 @@ export function Root<T extends Option>(props: RootProps<T>) {
   });
   const key = () => (local.value === undefined ? internal() : local.value);
   const selected = createMemo(() => options().find((option) => option.value === key()) ?? null);
+  let clearInputText = () => {};
   const change = (option: T | null) => {
     const value = option?.value ?? null;
     if (local.value === undefined) setInternal(value);
     local.onChange?.(value);
+    // A caller that keeps nothing selected, such as one adding each choice to a list, still gets
+    // an empty input back once Kobalte has finished selecting.
+    if (option !== null && local.clearOnSelect) queueMicrotask(() => clearInputText());
   };
   createEffect(() => {
     scope.mount();
@@ -148,6 +155,9 @@ export function Root<T extends Option>(props: RootProps<T>) {
         scope,
         input,
         setInput,
+        connectInputText: (clear) => {
+          clearInputText = clear;
+        },
         form: () => local.form,
         clear: () => change(null),
         clearOnSelect: () => local.clearOnSelect ?? false,

@@ -34,6 +34,7 @@ interface Setup {
   readonly threads: ReadonlyArray<string>;
 }
 const hashThread = () => new URLSearchParams(window.location.hash.slice(1)).get("thread") ?? "";
+const hashGroup = () => new URLSearchParams(window.location.hash.slice(1)).get("group") ?? "";
 /**
  * The owner of a workspace reads a group where a member started threads and the owner replied,
  * through the real host, or their inbox, where the member has since replied to them and mentioned
@@ -49,11 +50,15 @@ export function ConversationsFixture(props: {
   const [credential, setCredential] = createSignal<Session>();
   const [error, setError] = createSignal<string>();
   const [thread, setThread] = createSignal(hashThread());
+  const [shownGroup, setShownGroup] = createSignal(hashGroup());
   const store: SessionStore = { read: credential, write: setCredential, subscribe: () => () => {} };
   let current: Scenario | undefined,
     alive = true;
   onMount(() => {
-    const follow = () => setThread(hashThread());
+    const follow = () => {
+      setThread(hashThread());
+      setShownGroup(hashGroup());
+    };
     window.addEventListener("hashchange", follow);
     onCleanup(() => window.removeEventListener("hashchange", follow));
     void (async () => {
@@ -159,7 +164,10 @@ export function ConversationsFixture(props: {
                         <GroupsNavigation
                           workspaceId={value().workspaceId}
                           href={(groupId) => `#group=${groupId}`}
-                          current={value().groupId}
+                          current={shownGroup() || value().groupId}
+                          onCreated={(groupId) => {
+                            window.location.hash = `group=${groupId}`;
+                          }}
                         />
                       </Navigation.Root>
                     </Shell.SidebarContent>
@@ -223,13 +231,17 @@ export function ConversationsFixture(props: {
                       fallback={
                         <Shell.Main workspace aria-label="Design">
                           <Shell.Content fill>
-                            <GroupStream
-                              workspaceId={value().workspaceId}
-                              groupId={value().groupId}
-                              label="Design"
-                              threadHref={(threadId) => `#thread=${threadId}`}
-                              currentThread={thread() || undefined}
-                            />
+                            <Show when={shownGroup() || value().groupId} keyed>
+                              {(groupId) => (
+                                <GroupStream
+                                  workspaceId={value().workspaceId}
+                                  groupId={groupId}
+                                  label={groupId === value().groupId ? "Design" : "Group"}
+                                  threadHref={(threadId) => `#thread=${threadId}`}
+                                  currentThread={thread() || undefined}
+                                />
+                              )}
+                            </Show>
                           </Shell.Content>
                         </Shell.Main>
                       }

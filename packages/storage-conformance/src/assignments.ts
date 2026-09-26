@@ -76,6 +76,45 @@ export const assignments = (harness: Harness) => {
       ),
     );
 
+    it.effect("each member reads what their own grants let them do across the workspace", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const { workspace, viewer } = yield* setup;
+            // Owners and administrators create groups and manage invitations; viewers do neither.
+            const owner = yield* Operations.permissions(workspace.id, alice);
+            const administrator = yield* Operations.permissions(workspace.id, charlie);
+            const reader = yield* Operations.permissions(workspace.id, bob);
+            for (const granted of [owner, administrator])
+              expect(granted).toEqual(
+                expect.arrayContaining(["group.create", "invitation.manage"]),
+              );
+            expect(reader).not.toContain("group.create");
+            expect(reader).not.toContain("invitation.manage");
+            expect(owner).toContain("workspace.transfer-ownership");
+            expect(administrator).not.toContain("workspace.transfer-ownership");
+            // Only workspace-wide permissions are listed, never those of a group or thread.
+            expect(owner).not.toContain("thread.read");
+            // A new role changes the answer at once.
+            yield* Operations.assign(workspace.id, alice, {
+              memberId: viewer.id,
+              roleId: BuiltinRoles.AdministratorId,
+            });
+            expect(yield* Operations.permissions(workspace.id, bob)).toContain("group.create");
+            expect(
+              yield* Effect.flip(
+                Operations.permissions(workspace.id, {
+                  _tag: "Human",
+                  id: Identity.HumanId.make("stranger"),
+                }),
+              ),
+            ).toMatchObject({ _tag: "Gateway.NotMember" });
+          }),
+        ),
+      ),
+    );
+
     it.effect(
       "assignments are additive, duplicate assignment is idempotent, and role replacement is atomic",
       () =>

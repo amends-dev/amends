@@ -13,7 +13,12 @@ const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 let feed: ReturnType<typeof withChangeFeed>;
 /** Change-feed requests reach controllable streams; `fetch` sees every other request. */
-function mount(path: string, token: string | undefined, fetch: typeof globalThis.fetch) {
+function mount(
+  path: string,
+  token: string | undefined,
+  fetch: typeof globalThis.fetch,
+  permissions?: ReadonlyArray<string>,
+) {
   window.history.replaceState(null, "", `/#${path}`);
   let stored = token ? Schema.decodeSync(Session)({ token, identity: token }) : undefined;
   const store: SessionStore = {
@@ -23,7 +28,7 @@ function mount(path: string, token: string | undefined, fetch: typeof globalThis
     },
     subscribe: () => () => {},
   };
-  feed = withChangeFeed(fetch);
+  feed = withChangeFeed(fetch, undefined, permissions);
   const transport = FetchHttpClient.layer.pipe(
     Layer.provide(Layer.succeed(FetchHttpClient.Fetch, feed.fetch)),
   );
@@ -507,4 +512,50 @@ it("lists the inbox at its hash route, opens a thread beside it, and marks one s
   fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/inbox"));
   expect(screen.getByRole("list", { name: "Notifications" })).toBe(list);
+});
+
+it("creates a group from the sidebar and opens it at its hash route", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path === "/workspaces/one/groups")
+      return response(
+        {
+          id: "g2",
+          workspaceId: "one",
+          kind: "Team",
+          visibility: "Private",
+          name: "Receipts",
+          createdBy: "owner-one",
+          createdAt: at,
+        },
+        201,
+      );
+    if (path.endsWith("/groups/g2/openings")) return response([]);
+    return response({
+      memberships: [
+        {
+          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 1,
+        },
+      ],
+      invitations: [],
+    });
+  });
+  mount("/workspaces/one", "alice", fetch, ["group.create"]);
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  fireEvent.click(await within(sidebar).findByRole("button", { name: "New group" }));
+  const dialog = await screen.findByRole("dialog", { name: "New group" });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Name" }), {
+    target: { value: "Receipts" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create group" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g2"));
+  await screen.findByText("Nothing said yet");
 });

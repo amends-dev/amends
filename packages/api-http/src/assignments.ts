@@ -1,4 +1,4 @@
-import { Assignment } from "@amends/core/authorization";
+import { Assignment, Permission } from "@amends/core/authorization";
 import { Member, Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
@@ -11,6 +11,11 @@ const error = [...ApiErrors.member, ...ApiErrors.assignment];
 
 export class AssignmentsGroup extends HttpApiGroup.make("assignments")
   .add(
+    HttpApiEndpoint.get("permissions", "/permissions", {
+      params,
+      success: Schema.Array(Permission.Name),
+      error: ApiErrors.member,
+    }),
     HttpApiEndpoint.get("roles", "/roles", {
       params,
       success: Schema.Array(Assignment.RoleChoice),

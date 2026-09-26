@@ -213,6 +213,7 @@ export function WorkspaceLayout(props: ParentProps) {
               workspaceId={params.workspaceId}
               href={(id) => href(paths.group(params.workspaceId, id))}
               current={groupId()}
+              onCreated={(id) => navigate(paths.group(params.workspaceId, id))}
             />
             <Navigation.Section>
               <Navigation.SectionHeader>

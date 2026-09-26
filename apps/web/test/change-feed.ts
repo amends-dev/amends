@@ -36,16 +36,20 @@ export const committed = (
   notifications: [],
 });
 
-/** The workspace sidebar's reads of the reader's groups and the members naming them. */
-const sidebar = /^\/workspaces\/[^/]+\/(groups|members)$/;
+/**
+ * The workspace sidebar's reads: the reader's groups, the members naming them, and what the
+ * reader may do there.
+ */
+const sidebar = /^\/workspaces\/[^/]+\/(groups|members|permissions)$/;
 /**
  * Route change-feed requests to streams the test controls, answer the workspace sidebar's reads
- * with empty lists, and send everything else to `fetch`. Each stream opens with Ready, without a
- * reset, unless `open` answers the request itself.
+ * with empty lists, or with `permissions` granted, and send everything else to `fetch`. Each
+ * stream opens with Ready, without a reset, unless `open` answers the request itself.
  */
 export function withChangeFeed(
   fetch: typeof globalThis.fetch,
   open: (request: Request) => Response | undefined = () => undefined,
+  permissions: ReadonlyArray<string> = [],
 ) {
   const streams: Array<FeedStream> = [];
   const encoder = new TextEncoder();
@@ -54,7 +58,9 @@ export function withChangeFeed(
     const path = new URL(request.url).pathname;
     if (request.method === "GET" && sidebar.test(path))
       return Promise.resolve(
-        new Response("[]", { headers: { "content-type": "application/json" } }),
+        new Response(JSON.stringify(path.endsWith("/permissions") ? permissions : []), {
+          headers: { "content-type": "application/json" },
+        }),
       );
     if (!path.endsWith("/changes")) return fetch(input, init);
     const answered = open(request);

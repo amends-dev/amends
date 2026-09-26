@@ -11,6 +11,14 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     return handlers.handleAll({
+      permissions: ({ params }) =>
+        Effect.flatMap(Principal, (identity) =>
+          gateway.asMember(
+            params.workspaceId,
+            identity,
+            Effect.flatMap(AssignmentApplication.Service, (service) => service.permissions),
+          ),
+        ),
       roles: ({ params }) =>
         Effect.flatMap(Principal, (identity) =>
           gateway.asMember(

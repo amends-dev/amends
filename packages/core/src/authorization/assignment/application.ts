@@ -9,6 +9,8 @@ import { Member } from "../../workspace/member/member.ts";
 import { MemberStore } from "../../workspace/member/store.ts";
 import { Authorization } from "../authorization.ts";
 import { Delegation } from "../delegation.ts";
+import type { Permission } from "../permission.ts";
+import { PermissionCatalog } from "../permission-catalog.ts";
 import { Requirement } from "../requirement.ts";
 import { BuiltinRoles } from "../role/builtin.ts";
 import { Assignment } from "./assignment.ts";
@@ -28,7 +30,19 @@ export type Error =
   | InactiveMember
   | NotFound
   | Changed;
+/** Reading one's own permissions needs only active membership. */
+export type PermissionsError = Exclude<Authorization.Error, Authorization.Denied>;
 export interface Interface {
+  /**
+   * What the acting member may do across the whole workspace: each declared workspace permission
+   * a current grant covers, in declaration order. Clients offer only the actions it names; the
+   * operations still check their own requirements.
+   */
+  readonly permissions: Effect.Effect<
+    ReadonlyArray<Permission.Name>,
+    PermissionsError,
+    Actor.Service
+  >;
   readonly roles: Effect.Effect<ReadonlyArray<Assignment.RoleChoice>, Error, Actor.Service>;
   readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, Error, Actor.Service>;
   readonly assign: (
@@ -56,6 +70,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   | Delegation.Service
   | Journal.Service
   | Crypto.Crypto
+  | PermissionCatalog.Service
 > {
   const assignments = yield* AssignmentStore.Service;
   const members = yield* MemberStore.Service;
@@ -63,6 +78,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
+  const catalog = yield* PermissionCatalog.Service;
   const workspaceId = authorization.workspaceId;
   if (
     [assignments.workspaceId, members.workspaceId, delegation.workspaceId].some(
@@ -73,6 +89,22 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       message: "Assignment services belong to different workspaces",
     });
   const manage = Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId });
+  const workspaceWide = catalog.definitions.filter(
+    (permission) => permission.targetKind === "Workspace",
+  );
+  const permissions = Effect.gen(function* () {
+    const covered = yield* authorization.permitted(
+      workspaceWide.map((permission) =>
+        Requirement.Value.make({
+          permission: { name: permission.name, targetKind: permission.targetKind },
+          target: { _tag: "Workspace", workspaceId },
+        }),
+      ),
+    );
+    return workspaceWide
+      .filter((_, index) => covered[index] === true)
+      .map((permission) => permission.name);
+  }).pipe(Effect.withSpan("AssignmentApplication.permissions"));
   const member = Effect.fn("AssignmentApplication.member")(function* (memberId: Member.Id) {
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
     const found = yield* members.get(id);
@@ -216,7 +248,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ roles: choices, list, assign, revoke, change });
+  return Service.of({ permissions, roles: choices, list, assign, revoke, change });
 });
 
 /** @category layers */

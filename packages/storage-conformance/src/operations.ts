@@ -111,6 +111,14 @@ export const transferOwnership = (
     ),
   );
 
+export const permissions = (workspaceId: Workspace.Id, identity: Identity.MemberReference) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(AssignmentApplication.Service, (service) => service.permissions),
+    ),
+  );
 export const access = (
   workspaceId: Workspace.Id,
   identity: Identity.MemberReference,

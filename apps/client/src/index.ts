@@ -51,6 +51,7 @@ export {
   useThreadTimeline,
   useInbox,
   useInboxPending,
+  useWorkspacePermission,
   type Read,
   type Members,
   type PagedView,
@@ -82,3 +83,4 @@ export {
   type GroupFollowController,
 } from "./conversations/follow.ts";
 export { useMarkSeen, type SeenController } from "./conversations/seen.ts";
+export { useCreateGroup, type CreateGroupController } from "./conversations/groups.ts";
