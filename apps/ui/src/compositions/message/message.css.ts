@@ -87,3 +87,12 @@ export const mention = style({
   WebkitBoxDecorationBreak: "clone",
   "@media": { "(forced-colors: active)": { backgroundColor: "transparent" } },
 });
+/** Marks a thread with activity the reader has not seen, before its reply count. */
+export const unread = style({
+  flex: "none",
+  width: "0.375rem",
+  height: "0.375rem",
+  borderRadius: "50%",
+  backgroundColor: colorVars.text.link,
+  "@media": { "(forced-colors: active)": { backgroundColor: "LinkText" } },
+});

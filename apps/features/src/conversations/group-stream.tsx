@@ -1,4 +1,11 @@
-import { useGroupStream, useMembers, type Thread } from "@amends/client";
+import {
+  toDate,
+  useGroups,
+  useGroupStream,
+  useMarkGroupRead,
+  useMembers,
+  type Thread,
+} from "@amends/client";
 import { Composer } from "@amends/ui/compositions/composer";
 import { EmptyState } from "@amends/ui/compositions/empty-state";
 import { Message } from "@amends/ui/compositions/message";
@@ -33,6 +40,14 @@ const replies = (count: number) => `${count} ${count === 1 ? "reply" : "replies"
 export function GroupStream(props: GroupStreamProps) {
   const stream = useGroupStream(props.workspaceId, props.groupId);
   const members = useMembers(props.workspaceId);
+  const groups = useGroups(props.workspaceId);
+  // Seeing the stream catches the reader up with the group, whenever it has something new.
+  useMarkGroupRead(props.workspaceId, props.groupId, () => {
+    const item = groups.value()?.find((entry) => entry.group.id === props.groupId);
+    return item?.newActivity && item.latestActivityAt
+      ? toDate(item.latestActivityAt).getTime()
+      : undefined;
+  });
   const posts = () =>
     (stream.value() ?? []).map((opening): Opening => ({
       key: opening.thread.id,
@@ -108,22 +123,28 @@ export function GroupStream(props: GroupStreamProps) {
             <Entries
               posts={posts()}
               members={members}
-              footer={(post) => (
-                <Message.Replies
-                  href={props.threadHref(post.opening.thread.id)}
-                  aria-current={props.currentThread === post.opening.thread.id ? "page" : undefined}
-                >
-                  <Show
-                    when={post.opening.replies > 0}
-                    fallback={<Message.ReplyNote>reply in thread</Message.ReplyNote>}
+              footer={(post) => {
+                const opening = () => post().opening;
+                return (
+                  <Message.Replies
+                    href={props.threadHref(opening().thread.id)}
+                    aria-current={props.currentThread === opening().thread.id ? "page" : undefined}
                   >
-                    <Message.ReplyCount>{replies(post.opening.replies)}</Message.ReplyCount>
-                    <Message.ReplyNote>
-                      last at {timeOf(post.opening.latest.occurredAt).text}
-                    </Message.ReplyNote>
-                  </Show>
-                </Message.Replies>
-              )}
+                    <Show when={opening().unread}>
+                      <Message.Unread label="unread" />
+                    </Show>
+                    <Show
+                      when={opening().replies > 0}
+                      fallback={<Message.ReplyNote>reply in thread</Message.ReplyNote>}
+                    >
+                      <Message.ReplyCount>{replies(opening().replies)}</Message.ReplyCount>
+                      <Message.ReplyNote>
+                        last at {timeOf(opening().latest.occurredAt).text}
+                      </Message.ReplyNote>
+                    </Show>
+                  </Message.Replies>
+                );
+              }}
             />
           </Transcript.Items>
         </Transcript.Root>

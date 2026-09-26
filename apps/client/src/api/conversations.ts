@@ -277,3 +277,32 @@ export const postRequest = (client: ApiClient, workspace: string) =>
       }
     }),
   );
+
+/** What the reader has read: a thread through a timeline position, or a group caught up now. */
+export type ReadMark =
+  | { readonly kind: "thread"; readonly threadId: string; readonly through: number }
+  | { readonly kind: "group"; readonly groupId: string };
+/**
+ * Record a read mark, then invalidate the unread state and pending counts it changes, as the
+ * reader's own read signal would when it arrives. Positions only move forward on the server.
+ */
+export const readRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (mark: ReadMark) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const workspaceId = yield* command(Workspace.Id)(workspace);
+      if (mark.kind === "thread")
+        yield* api.threads.markRead({
+          params: { workspaceId, threadId: yield* command(Thread.Id)(mark.threadId) },
+          payload: { throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through) },
+        });
+      else
+        yield* api.groups.markRead({
+          params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
+        });
+      yield* Reactivity.invalidate([
+        workspaceKey(workspace, "groups"),
+        collectionKey(workspace, "streams"),
+      ]);
+    }),
+  );

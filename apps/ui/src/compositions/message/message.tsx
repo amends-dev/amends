@@ -68,6 +68,23 @@ export function Replies(props: RepliesProps) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <a {...native} class={classes(s.replies, local.class, local.classList)} />;
 }
+/**
+ * Inside Replies, marks a thread with activity the reader has not seen. It names itself with
+ * `label`, which joins the link's accessible name.
+ */
+export function Unread(
+  props: Omit<JSX.HTMLAttributes<HTMLSpanElement>, "children" | "aria-label"> & { label: string },
+) {
+  const [local, native] = splitProps(props, ["label", "class", "classList"]);
+  return (
+    <span
+      {...native}
+      role="img"
+      aria-label={local.label}
+      class={classes(s.unread, local.class, local.classList)}
+    />
+  );
+}
 export function ReplyCount(props: JSX.HTMLAttributes<HTMLSpanElement>) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <span {...native} class={classes(s.replyCount, local.class, local.classList)} />;

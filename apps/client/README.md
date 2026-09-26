@@ -184,3 +184,11 @@ message shows even while the change feed is away.
 a name drops its mention, and a retry reuses its key only when both text and mentions match.
 `useGroupRoster(workspaceId, groupId)` reads a group's current members, whom its messages can
 mention, live over membership and grant changes.
+
+`useMarkThreadRead(workspaceId, threadId, through)` and `useMarkGroupRead(workspaceId, groupId,
+unreadSince)` record what the reader has seen while mounted and the page is visible
+(`usePageVisible`). Each takes an accessor that grows with newer activity: a thread's newest
+timeline position shown, or when a group's latest unread activity happened, undefined when there
+is none. Each value is sent once, one at a time; a failed mark is retried only once something
+newer is due. Marks invalidate the groups and streams, as the reader's own read signal does when
+it arrives, and the server moves positions forward only and acknowledges the notifications read.

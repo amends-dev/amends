@@ -86,5 +86,33 @@ export const Writing = {
     );
   },
 } satisfies Story;
+export const Reading = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const stream = await canvas.findByRole("region", { name: "Design" }, { timeout: 20000 });
+    const entries = within(stream);
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(3));
+    // The member's threads are new to the owner; the one the owner replied to is read.
+    await waitFor(() => expect(entries.getAllByRole("img", { name: "unread" })).toHaveLength(2));
+    // Seeing the stream catches the owner up with the group, so its sidebar dot clears.
+    await waitFor(() => expect(canvas.queryByRole("img", { name: "new activity" })).toBeNull());
+    // A reply addressed to the owner shows as a count and marks its thread unread.
+    await userEvent.click(canvas.getByRole("button", { name: "Reply as member" }));
+    const replied = await entries.findByRole(
+      "link",
+      { name: /^unread 3 replies/ },
+      { timeout: 10000 },
+    );
+    await waitFor(() => expect(canvas.getByLabelText("1 for you")).toBeVisible());
+    // Opening the thread reads it: its dot and the count clear.
+    await userEvent.click(replied);
+    await canvas.findByRole("region", { name: "Thread messages" });
+    await waitFor(() => expect(entries.getByRole("link", { name: /^3 replies/ })).toBeVisible(), {
+      timeout: 10000,
+    });
+    await waitFor(() => expect(canvas.queryByLabelText("1 for you")).toBeNull());
+    await expect(entries.getAllByRole("img", { name: "unread" })).toHaveLength(2);
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

@@ -7,6 +7,8 @@ import {
   ClientProvider,
   Session,
   useGroupStream,
+  useMarkGroupRead,
+  useMarkThreadRead,
   useReply,
   useThreadTimeline,
   type ComposerController,
@@ -363,4 +365,64 @@ it("a reply sends the mentions its text still holds", async () => {
   await waitFor(() => expect(composer.draft()).toBe(""));
   composer.setDraft("@Ada again");
   expect(composer.mentions()).toEqual([]);
+});
+
+it("marks an open thread read once per newer position, only while the page shows", async () => {
+  const marks: Array<{ path: string; body: unknown }> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    marks.push({ path, body: request.method === "POST" ? await request.text() : null });
+    return new Response(null, { status: 204 });
+  });
+  const hide = (hidden: boolean) => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => (hidden ? "hidden" : "visible"),
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+  hide(true);
+  const [through, setThrough] = createSignal<number | undefined>(undefined);
+  const [unreadSince, setUnreadSince] = createSignal<number | undefined>(undefined);
+  function Consumer() {
+    useMarkThreadRead("one", "thread", through);
+    useMarkGroupRead("one", "group", unreadSince);
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  setThrough(3);
+  setUnreadSince(1000);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  // Nothing counts as read while the page is hidden.
+  expect(marks).toEqual([]);
+  hide(false);
+  await waitFor(() => expect(marks).toHaveLength(2));
+  expect(marks).toContainEqual({
+    path: "/workspaces/one/threads/thread/read",
+    body: JSON.stringify({ throughSequence: 3 }),
+  });
+  expect(marks).toContainEqual({ path: "/workspaces/one/groups/group/read", body: "" });
+  // The same position is not sent again; a newer one is.
+  setThrough(3);
+  setUnreadSince(undefined);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(marks).toHaveLength(2);
+  setThrough(5);
+  await waitFor(() => expect(marks).toHaveLength(3));
+  expect(marks[2]).toEqual({
+    path: "/workspaces/one/threads/thread/read",
+    body: JSON.stringify({ throughSequence: 5 }),
+  });
+  hide(false);
 });

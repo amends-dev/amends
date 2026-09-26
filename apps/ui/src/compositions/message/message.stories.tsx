@@ -33,7 +33,7 @@ function Entry(props: {
   kind?: "human" | "agent";
   time: string;
   text: string;
-  replies?: { count: string; note: string; current?: boolean } | "none";
+  replies?: { count: string; note: string; current?: boolean; unread?: boolean } | "none";
   density?: "comfortable" | "compact";
 }) {
   return (
@@ -57,6 +57,7 @@ function Entry(props: {
           </Message.Replies>
         ) : props.replies ? (
           <Message.Replies href="#thread" aria-current={props.replies.current ? "page" : undefined}>
+            {props.replies.unread ? <Message.Unread label="unread" /> : null}
             <Message.ReplyCount>{props.replies.count}</Message.ReplyCount>
             <Message.ReplyNote>{props.replies.note}</Message.ReplyNote>
           </Message.Replies>
@@ -83,7 +84,7 @@ function Reference(props: { theme?: "cotton" | "soot"; width?: string; rtl?: boo
         initials="JM"
         time="13:58"
         text="Explain the reconcile script to me — what is it actually comparing?"
-        replies={{ count: "3 replies", note: "last at 14:05" }}
+        replies={{ count: "3 replies", note: "last at 14:05", unread: true }}
       />
       <Message.Root aria-labelledby="mention-author">
         <Message.Avatar>
@@ -146,6 +147,9 @@ export const Default = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByRole("article", { name: "Jo Mercer" })).toHaveLength(3);
+    await expect(
+      canvas.getByRole("link", { name: "unread 3 replies last at 14:05" }),
+    ).toBeVisible();
     const open = canvas.getByRole("link", { name: "1 reply last at 16:22" });
     await expect(open).toHaveAttribute("aria-current", "page");
     await expect(canvas.getByRole("link", { name: "reply in thread" })).toHaveAttribute(

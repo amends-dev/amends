@@ -42,11 +42,12 @@ Web and desktop list the reader's groups in the sidebar, show a group's stream o
 their opening messages, and open a thread's messages in the inspector, all live over the change
 feed. The page composer starts a thread and the thread composer replies, keeping drafts per group
 and thread within the session, and both mention group members picked after `@`. A name typed
-without picking it addresses no one. There is no typing indicator, no following, and
-opening a thread does not record it as read, so unread state and pending counts only clear
-through the API. Streams show no per-thread unread marker,
-timelines show messages but not people joining or leaving, and authors are named by their
-identity, with no profile name or photo. There is no page for creating groups or managing their
+without picking it addresses no one. An open thread is read through the newest activity it
+shows, and a visible group's stream catches the reader up with the group, clearing the stream's
+unread dots, the sidebar's new-activity dot, and the pending counts of what was read, but only
+while the page is visible. A thread counts as read when it opens, however far back the reader has
+scrolled. There is no typing indicator and no following, timelines show messages but not people
+joining or leaving, and authors are named by their identity, with no profile name or photo. There is no page for creating groups or managing their
 members, and no notification inbox or Triage.
 
 ## Storage cost

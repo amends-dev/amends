@@ -2,7 +2,7 @@ import type { Members } from "@amends/client";
 import { Avatar } from "@amends/ui/primitives/avatar";
 import { Message } from "@amends/ui/compositions/message";
 import { Transcript } from "@amends/ui/compositions/transcript";
-import { For, Show, type JSX } from "solid-js";
+import { For, Show, untrack, type Accessor, type JSX } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
 import { authorOf, dayLabel, dayOf, initials, memberName, timeOf } from "./presentation.ts";
 
@@ -50,7 +50,8 @@ export function Entries<P extends Post>(props: {
   readonly posts: ReadonlyArray<P>;
   readonly members: Members;
   readonly density?: "comfortable" | "compact";
-  readonly footer?: (post: P) => JSX.Element;
+  /** Rendered once per entry; it reads the current post, so refreshes update it in place. */
+  readonly footer?: (post: Accessor<P>) => JSX.Element;
 }) {
   const rows = keyed(
     () => rowsOf(props.posts),
@@ -100,7 +101,7 @@ export function Entries<P extends Post>(props: {
                           }
                         </For>
                       </Message.Body>
-                      {props.footer?.(post())}
+                      {untrack(() => props.footer?.(post))}
                     </Message.Content>
                   </Message.Root>
                 </Transcript.Entry>

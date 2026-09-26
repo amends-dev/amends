@@ -1,4 +1,9 @@
-import { useMembers, useThreadTimeline, type ThreadTimeline } from "@amends/client";
+import {
+  useMarkThreadRead,
+  useMembers,
+  useThreadTimeline,
+  type ThreadTimeline,
+} from "@amends/client";
 import { Composer } from "@amends/ui/compositions/composer";
 import { EmptyState } from "@amends/ui/compositions/empty-state";
 import { Shell } from "@amends/ui/compositions/shell";
@@ -28,6 +33,12 @@ const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in
 export function ThreadPanel(props: ThreadPanelProps) {
   const timeline = useThreadTimeline(props.workspaceId, props.threadId);
   const members = useMembers(props.workspaceId);
+  // An open thread is read through the newest activity it shows, as that activity arrives.
+  useMarkThreadRead(
+    props.workspaceId,
+    props.threadId,
+    () => timeline.value()?.at(-1)?.activity.sequence,
+  );
   const posts = () =>
     (timeline.value() ?? []).filter(isMessage).map((item): Post => ({
       key: item.message.id,

@@ -42,6 +42,7 @@ carry the full instant. Body keeps the author's line breaks and indentation and 
 Replies is the link from an opening message to its thread, a pill whose text lines up with the
 message. ReplyCount uses the link color (`text.link`); ReplyNote is secondary context, such as
 when the last reply came or "reply in thread". Set `aria-current` while its thread is open, which
-keeps the pill filled; hover and press use the shared action colors. Coarse pointers get a 44px
+keeps the pill filled; put an `Unread` dot first, named by its `label`, when the thread has activity
+the reader has not seen; hover and press use the shared action colors. Coarse pointers get a 44px
 target. The stories cover the reference, all states on canvas and panel, Soot, narrow, RTL, and
 enlarged text.
