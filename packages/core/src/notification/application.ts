@@ -5,6 +5,7 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationSource } from "./source.ts";
+import { NotificationInbox } from "./inbox.ts";
 import type { Thread } from "../thread/thread.ts";
 import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
@@ -35,6 +36,12 @@ export type ResolveError =
       NotificationSource.Unavailable | NotificationSource.InvalidReference
     >
   | SourceUnavailable;
+export type InboxError =
+  | Exclude<Error, NotFound>
+  | Exclude<
+      NotificationSource.Error,
+      NotificationSource.Unavailable | NotificationSource.InvalidReference
+    >;
 export type AcknowledgeError =
   | Error
   | NotificationStore.Conflict
@@ -63,6 +70,13 @@ export interface Interface {
   readonly resolveSource: (
     notificationId: Notification.Id,
   ) => Effect.Effect<Thread.TimelineItem, ResolveError, Actor.Service>;
+  /**
+   * The acting identity's notifications newest first, each with its source as `resolveSource`
+   * reads it, or without one where that source is unavailable.
+   */
+  readonly inbox: (
+    options: NotificationInbox.Options,
+  ) => Effect.Effect<ReadonlyArray<NotificationInbox.Item>, InboxError, Actor.Service>;
   /** Record that the acting human saw their notification; source access is independent. */
   readonly acknowledge: (
     notificationId: Notification.Id,
@@ -76,6 +90,7 @@ export class Service extends Context.Service<Service, Interface>()(
 const decodeRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
 const decodeRecords = Schema.decodeEffect(Schema.Array(Schema.toType(Notification.Record)));
 const decodeOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
+const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));
 const sameRecipient = Schema.toEquivalence(Notification.Recipient);
 const invalidRecord = (cause: Schema.SchemaError) =>
   new InvalidResponse({ message: `Notification store returned invalid data: ${cause.message}` });
@@ -126,17 +141,15 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     return record;
   });
 
-  const read = Effect.fnUntraced(function* (
-    options: NotificationStore.ReadOptions,
+  /** A page the store returned for this recipient, checked against what was asked. */
+  const checked = Effect.fnUntraced(function* (
+    target: Notification.Recipient,
+    readPage: Effect.Effect<ReadonlyArray<Notification.Record>, NotificationStore.Failure>,
+    limit: number,
     pendingOnly: boolean,
   ) {
-    const target = yield* recipient();
-    const request = yield* decodeOptions(options);
-    const readPage = pendingOnly
-      ? notifications.listPendingByRecipient(target, request)
-      : notifications.listByRecipient(target, request);
     const records = yield* decodeRecords(yield* readPage).pipe(Effect.mapError(invalidRecord));
-    if (records.length > request.limit)
+    if (records.length > limit)
       return yield* new InvalidResponse({
         message: "Notification page exceeds the requested limit",
       });
@@ -157,6 +170,17 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     }
     return records;
   });
+  const read = Effect.fnUntraced(function* (
+    options: NotificationStore.ReadOptions,
+    pendingOnly: boolean,
+  ) {
+    const target = yield* recipient();
+    const request = yield* decodeOptions(options);
+    const readPage = pendingOnly
+      ? notifications.listPendingByRecipient(target, request)
+      : notifications.listByRecipient(target, request);
+    return yield* checked(target, readPage, request.limit, pendingOnly);
+  });
 
   const list = Effect.fn("NotificationApplication.list")((options: NotificationStore.ReadOptions) =>
     read(options, false),
@@ -165,17 +189,49 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     (options: NotificationStore.ReadOptions) => read(options, true),
   );
 
+  /** The source of a notification the actor owns, or None where it is unavailable. */
+  const sourceOf = (notification: Notification.Record) =>
+    source.resolve(notification).pipe(
+      Effect.asSome,
+      Effect.catchTags({
+        "NotificationSource.Unavailable": () => Effect.succeed(Option.none<Thread.TimelineItem>()),
+        "NotificationSource.InvalidReference": (error) =>
+          Effect.fail(new InvalidResponse({ message: error.message })),
+      }),
+    );
   const resolveSource = Effect.fn("NotificationApplication.resolveSource")(function* (
     notificationId: Notification.Id,
   ) {
     const notification = yield* get(notificationId);
-    return yield* source.resolve(notification).pipe(
-      Effect.catchTags({
-        "NotificationSource.Unavailable": () =>
-          Effect.fail(new SourceUnavailable({ notificationId: notification.id })),
-        "NotificationSource.InvalidReference": (error) =>
-          Effect.fail(new InvalidResponse({ message: error.message })),
-      }),
+    const found = yield* sourceOf(notification);
+    if (Option.isNone(found))
+      return yield* new SourceUnavailable({ notificationId: notification.id });
+    return found.value;
+  });
+  const inbox = Effect.fn("NotificationApplication.inbox")(function* (
+    options: NotificationInbox.Options,
+  ) {
+    const target = yield* recipient();
+    const { pendingOnly = false, ...request } = yield* decodeInboxOptions(options);
+    const records = yield* checked(
+      target,
+      pendingOnly
+        ? notifications.listLatestPendingByRecipient(target, request)
+        : notifications.listLatestByRecipient(target, request),
+      request.limit,
+      pendingOnly,
+    );
+    return yield* Effect.forEach(
+      records,
+      (notification) =>
+        Effect.map(
+          sourceOf(notification),
+          Option.match({
+            onNone: (): NotificationInbox.Item => ({ notification }),
+            onSome: (item): NotificationInbox.Item => ({ notification, source: item }),
+          }),
+        ),
+      { concurrency: 4 },
     );
   });
   const acknowledge = Effect.fn("NotificationApplication.acknowledge")(function* (
@@ -201,7 +257,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       return yield* new InvalidResponse({ message: "Seen notification still reads as unseen" });
     return seen;
   });
-  return Service.of({ workspaceId, get, list, listPending, resolveSource, acknowledge });
+  return Service.of({ workspaceId, get, list, listPending, resolveSource, inbox, acknowledge });
 });
 
 /**

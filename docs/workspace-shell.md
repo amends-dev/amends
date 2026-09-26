@@ -1,11 +1,13 @@
 # Workspace shell
 
 Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout.
-Nested routes provide Triage, Tasks, Environments, Connections, and
+Nested routes provide Inbox, Triage, Tasks, Environments, Connections, and
 [Settings](workspace-settings.md). Settings manages workspace metadata, members, and
 invitations. The sidebar lists the reader's groups between the workspace pages and Configure;
 `/workspaces/:workspaceId/groups/:groupId` shows a group's stream, and
-`…/threads/:threadId` opens a thread beside it. The other pages remain scaffolding; task data,
+`…/threads/:threadId` opens a thread beside it. Inbox, after Home, counts what is pending for the
+reader and lists their notifications; `/inbox/groups/:groupId/threads/:threadId` opens a thread
+beside it, and Inbox stays the current destination. The other pages remain scaffolding; task data,
 activity, configuration operations, dynamic Channels/Agents sections, and keyboard-shortcut
 help remain separate features.
 
@@ -48,7 +50,8 @@ The current apps implement the shared page frame, header, reading-edge gutters,
 responsive navigation, Settings member detail, and group streams with a thread in the 400px
 Shell inspector, following the Agent messages mock: beside the stream at 1280px and wider, a
 sheet at the inline end below it, and a full-width sheet on phones. The workspace layout owns the
-inspector and opens it while a thread route matches; closing it returns to the group. The same
+inspector and opens it while a thread route matches; closing it returns to the group, or to the
+inbox for a thread opened from there. The same
 inspector will hold session logs. ListDetail uses the Settings
 mock's 310px aside and switches to one pane on tablet/phone. Most other domain
 screens remain scaffolding, so their own detail and card grids will be composed

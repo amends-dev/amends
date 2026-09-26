@@ -20,6 +20,13 @@ export const ReadOptions = Schema.Struct({
 });
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
+/** Reading newest first: the page before an exclusive boundary, or the newest page without one. */
+export const LatestOptions = Schema.Struct({
+  before: Schema.optionalKey(Cursor),
+  limit: ReadOptions.fields.limit,
+});
+export interface LatestOptions extends Schema.Schema.Type<typeof LatestOptions> {}
+
 /** A recipient's pending notifications from one group's thread activity. */
 export const PendingCount = Schema.Struct({
   groupId: Notification.ThreadReference.fields.groupId,
@@ -68,6 +75,22 @@ export interface Interface {
   readonly listPendingByRecipient: (
     recipient: Notification.Recipient,
     options: ReadOptions,
+  ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+
+  /**
+   * The recipient's newest notifications first: at most limit records before the exclusive
+   * cursor, ordered by recordedAt descending, then ID in descending binary lexical order. Each
+   * call reads its current view.
+   */
+  readonly listLatestByRecipient: (
+    recipient: Notification.Recipient,
+    options: LatestOptions,
+  ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+
+  /** Same ordering and pagination, restricted to Pending records. */
+  readonly listLatestPendingByRecipient: (
+    recipient: Notification.Recipient,
+    options: LatestOptions,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
 
   /**

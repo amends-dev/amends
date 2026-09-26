@@ -11,7 +11,7 @@ points; credential verification belongs to the authentication middleware, and
 domain rules belong to core.
 
 Notification handlers enter through `Gateway.asMember` and call
-`NotificationApplication.get`, `list`, `listPending`, `resolveSource`, or `acknowledge`. The
+`NotificationApplication.get`, `list`, `listPending`, `inbox`, `resolveSource`, or `acknowledge`. The
 contract decodes the page size, cursor, and optional pending-only filter; core derives the
 recipient from the actor and checks active membership and recipient ownership. The HTTP layer adds
 no notification generation or delivery.

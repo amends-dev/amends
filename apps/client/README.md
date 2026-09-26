@@ -37,14 +37,14 @@ portable backend packages under `packages/*` remain Effect-only.
   Commits invalidate the reads they affect; see [live updates](../../docs/live-updates.md).
 - `useSettings(workspaceId, section)` composes keyed settings reads with commands that refresh
   them before reporting. `revision` counts explicit refreshes so editors can discard drafts.
-- `useGroups`, `useMembers`, `useGroupStream`, and `useThreadTimeline` are live conversation
-  reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
+- `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
+  conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format.
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
-  `paths.group` and `paths.thread` name a group's page and a thread open beside it; both resume
-  after sign-in.
+  `paths.group` and `paths.thread` name a group's page and a thread open beside it, and
+  `paths.inboxThread` a thread open beside the inbox; all resume after sign-in.
 
 Only `src/api` imports the HTTP contract and gateway session/directory schemas.
 Client cannot import UI, icons, styling, Storybook, router libraries, platform entry
@@ -206,3 +206,12 @@ participation events refresh; unfollowing ends the reader's own participation by
 follows for the reader's own member, from the groups list, and `followable` holds only for team
 groups. A change shows at once and stays pending until the read agrees, since undoing a thread
 follow needs the participation the read returns.
+
+`useInbox(workspaceId, filter)` is the reader's inbox newest first, `"all"` of it or only what is
+`"pending"`, as a `PagedView` of notifications with their sources: it opens at the newest 25,
+"earlier" reads 25 older ones, and a refresh reads down to the oldest shown, so new notifications
+arrive at the top. Notifications the change feed delivers to the reader, their read and seen
+signals, and group access changes refresh it. `useMarkSeen(workspaceId, notificationId)` marks one
+seen without opening it, showing `seen` once the host has recorded it, and `useInboxPending`
+totals the groups' pending counts for the Inbox destination. Marking a thread read refreshes the
+inbox, since it settles the reader's notifications from that thread.

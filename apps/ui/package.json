@@ -14,6 +14,7 @@
     "./features/workspaces": "./src/features/workspaces/index.ts",
     "./compositions/item-list": "./src/compositions/item-list/index.ts",
     "./compositions/message": "./src/compositions/message/index.ts",
+    "./compositions/inbox": "./src/compositions/inbox/index.ts",
     "./compositions/composer": "./src/compositions/composer/index.ts",
     "./compositions/transcript": "./src/compositions/transcript/index.ts",
     "./primitives/workspace-mark": "./src/primitives/workspace-mark/index.ts",

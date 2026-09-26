@@ -2,7 +2,7 @@ import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { and, asc, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -14,6 +14,7 @@ import { notificationSeen, notifications } from "./schema.ts";
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
 const validateRecipient = Schema.decodeEffect(Notification.Recipient);
 const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
+const validateLatest = Schema.decodeEffect(Schema.toType(NotificationStore.LatestOptions));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
@@ -121,6 +122,33 @@ export const make = Effect.fn("Notifications.make")(function* () {
           ),
         )
         .orderBy(asc(notifications.recordedAt), asc(orderedId))
+        .limit(request.limit),
+    ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
+  });
+
+  /** Newest first: the recipient indexes read backwards. */
+  const latest = Effect.fnUntraced(function* (
+    recipient: Notification.Recipient,
+    options: NotificationStore.LatestOptions,
+    pending: boolean,
+  ) {
+    const target = yield* validateRecipient(recipient);
+    const request = yield* validateLatest(options);
+    const before = request.before;
+    return yield* guard(
+      recorded()
+        .where(
+          and(
+            inWorkspace,
+            eq(notifications.recipientKind, target._tag),
+            eq(inbox, inboxOf(target)),
+            pending ? pendingOnly : undefined,
+            before === undefined
+              ? undefined
+              : sql`(${notifications.recordedAt}, ${orderedId}) < (${sql.param(DateTime.toDate(before.recordedAt), notifications.recordedAt)}, ${before.id})`,
+          ),
+        )
+        .orderBy(desc(notifications.recordedAt), desc(orderedId))
         .limit(request.limit),
     ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
   });
@@ -249,6 +277,14 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       (recipient, options) => list(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
+    ),
+    listLatestByRecipient: Effect.fn("Notifications.listLatestByRecipient")(
+      (recipient, options) => latest(recipient, options, false),
+      Effect.mapError(storeFailure(NotificationStore, "listLatestByRecipient")),
+    ),
+    listLatestPendingByRecipient: Effect.fn("Notifications.listLatestPendingByRecipient")(
+      (recipient, options) => latest(recipient, options, true),
+      Effect.mapError(storeFailure(NotificationStore, "listLatestPendingByRecipient")),
     ),
     markSeen: Effect.fn("Notifications.markSeen")(function* (input, at) {
       const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(input).pipe(

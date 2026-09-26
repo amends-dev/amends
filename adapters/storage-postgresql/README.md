@@ -67,7 +67,7 @@ history, participant checks, and a member's group admissions; they and `threads_
 `participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID
 order without a sort. Notification and fact pages compare `(recorded_at, id)` and
 `(position, entry_index)` cursors as rows, which bounds the index scan instead of filtering
-earlier rows. The directory reads across workspaces through `members_by_identity` and
+earlier rows; newest-first inbox pages scan the same recipient indexes backwards. The directory reads across workspaces through `members_by_identity` and
 `pending_invitations_by_recipient`, and counts active members only for the identity's own
 workspaces; a workspace whose members were all removed still lists with a count of zero.
 A plan test checks these access paths, and the pending notification indexes, with sequential

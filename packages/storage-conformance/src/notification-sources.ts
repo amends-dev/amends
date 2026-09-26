@@ -14,6 +14,7 @@ import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 import {
   Notification,
   NotificationApplication,
+  NotificationInbox,
   NotificationSource,
   NotificationStore,
 } from "@amends/core/notification";
@@ -36,6 +37,7 @@ import {
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Context, DateTime, Effect, Option } from "effect";
+import { TestClock } from "effect/testing";
 import {
   type Bound,
   boundTo,
@@ -376,6 +378,89 @@ export const notificationSources = (harness: Harness) => {
                 value: { status: "ended" },
               });
               expect(yield* notifications(bound, humanId)).toEqual([note]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "the inbox lists the reader's notifications newest first with the sources they can read",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, group, first, human } = yield* prepare();
+              yield* grant(bound, humanId, ThreadPermissions.Read);
+              yield* TestClock.adjust("1 second");
+              const second = yield* run(bound, owner, reply(first.thread.id, [humanId], "Second"));
+              const inbox = (options: NotificationInbox.Options) =>
+                run(
+                  bound,
+                  human,
+                  Effect.flatMap(NotificationApplication.Service, (s) => s.inbox(options)),
+                );
+              const [older, newer] = yield* notifications(bound, humanId);
+              if (!older || !newer) return yield* Effect.die("Missing notifications");
+              expect(yield* inbox({ limit: 10 })).toEqual([
+                { notification: newer, source: second },
+                {
+                  notification: older,
+                  source: { activity: first.activity, message: first.message },
+                },
+              ]);
+              expect(
+                yield* inbox({
+                  limit: 1,
+                  before: { recordedAt: newer.recordedAt, id: newer.id },
+                }),
+              ).toEqual([
+                {
+                  notification: older,
+                  source: { activity: first.activity, message: first.message },
+                },
+              ]);
+              // What the reader saw stays in the inbox and leaves what is pending.
+              const seen = yield* run(
+                bound,
+                human,
+                Effect.flatMap(NotificationApplication.Service, (s) => s.acknowledge(older.id)),
+              );
+              expect((yield* inbox({ limit: 10 })).map((item) => item.notification)).toEqual([
+                newer,
+                seen,
+              ]);
+              expect(
+                (yield* inbox({ limit: 10, pendingOnly: true })).map((item) => item.notification),
+              ).toEqual([newer]);
+              // Leaving the group keeps the notifications without what they point to.
+              const part = Option.getOrThrow(
+                yield* bound.participations.get(
+                  newer.participationId ?? ThreadParticipation.Id.make("missing"),
+                ),
+              );
+              yield* run(
+                bound,
+                human,
+                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+                  s.leave({
+                    groupId: group.id,
+                    membershipId: memberParticipant(part).groupMembershipId,
+                  }),
+                ),
+              );
+              expect(yield* inbox({ limit: 10 })).toEqual([
+                { notification: newer },
+                { notification: seen },
+              ]);
+              // Nobody else reads this inbox.
+              expect(
+                yield* run(
+                  bound,
+                  owner,
+                  Effect.flatMap(NotificationApplication.Service, (s) => s.inbox({ limit: 10 })),
+                ),
+              ).toEqual([]);
             }),
           ),
         ),

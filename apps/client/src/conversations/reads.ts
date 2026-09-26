@@ -5,13 +5,16 @@ import { createMemo, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
 import {
   groupsRead,
+  inboxRead,
   membersRead,
   rosterRead,
   streamRead,
   timelineRead,
   type Group,
   type GroupMembership,
+  type InboxFilter,
   type Member,
+  type NotificationInbox,
   type PagedRead,
   type Thread,
   type ThreadTimeline,
@@ -81,6 +84,12 @@ export function useMembers(workspaceId: string): Members {
   return { member: (memberId) => byId().get(memberId) };
 }
 
+/** How many notifications from the reader's groups are still pending for them, live while mounted. */
+export function useInboxPending(workspaceId: string): Accessor<number | undefined> {
+  const groups = useGroups(workspaceId);
+  return () => groups.value()?.reduce((total, item) => total + item.pending, 0);
+}
+
 /** A view that opens at its newest items and pages back on request. */
 export interface PagedView<A> extends Read<ReadonlyArray<A>> {
   /** Nothing older remains to read. */
@@ -131,5 +140,17 @@ export function useThreadTimeline(
   threadId: string,
 ): PagedView<ThreadTimeline.Item> {
   const read = timelineRead(useApiClient(), workspaceId, threadId);
+  return read ? page(read) : unpaged;
+}
+
+/**
+ * The reader's inbox, newest first and live while mounted: every notification, or those still
+ * pending for them. Older notifications load on request.
+ */
+export function useInbox(
+  workspaceId: string,
+  filter: InboxFilter,
+): PagedView<NotificationInbox.Item> {
+  const read = inboxRead(useApiClient(), workspaceId, filter);
   return read ? page(read) : unpaged;
 }

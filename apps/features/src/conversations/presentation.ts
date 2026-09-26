@@ -54,6 +54,12 @@ export const dayLabel = (day: number, now = new Date()) => {
   if (days > 1 && days < 7) return weekday.format(date);
   return (date.getFullYear() === now.getFullYear() ? thisYear : otherYear).format(date);
 };
+/** When something came, as a list shows it: the time today, otherwise the day. */
+export const whenOf = (instant: Parameters<typeof toDate>[0], now = new Date()) => {
+  const time = timeOf(instant);
+  const day = dayOf(instant);
+  return { ...time, text: day === startOfDay(now).getTime() ? time.text : dayLabel(day, now) };
+};
 /** Who is typing, as a line: one or two names, or several people. */
 export const typingText = (names: ReadonlyArray<string>) =>
   names.length === 0

@@ -52,7 +52,17 @@ typing, since there is no thread yet. The thread panel follows and unfollows its
 team group's page header follows the group so that threads started there afterwards include the
 reader; following agents on someone's behalf has no control. Timelines show messages but not
 people joining or leaving, and authors are named by their identity, with no profile name or photo. There is no page for creating groups or managing their
-members, and no notification inbox or Triage.
+members.
+
+The Inbox destination lists the reader's notifications newest first, live, with the sidebar
+counting what is pending: why each came (a mention, a reply in a followed thread, or a new thread
+in a followed group), what was said, and a link that opens the thread beside the inbox, where
+reading it settles its notifications. A notification can be marked seen without opening it, and
+the list narrows to what is unread. Only one notification is marked at a time; there is no "mark
+all seen", and opening a thread from the inbox shows it from its newest messages rather than at the
+message that notified the reader. The inbox reads each listed notification's source as resolving
+one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
+placeholder until tasks exist.
 
 ## Storage cost
 
@@ -190,7 +200,7 @@ navigation, and work/activity pages remain unimplemented. The app-owned
 page boundaries, and an account popup with appearance and sign-out controls.
 [Live updates](live-updates.md) keep workspace views current over the change feed. Invitations
 from other workspaces appear only when the page wakes or reloads, since no identity-level feed
-exists; typing, read-state signals, and delivered notifications are not consumed yet.
+exists.
 Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work. The removed legacy web screens remain available in Git history.

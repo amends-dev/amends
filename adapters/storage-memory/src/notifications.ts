@@ -11,6 +11,7 @@ import { compareBinary, keyOf, Rows } from "./rows.ts";
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
 const validateRecipient = Schema.decodeEffect(Notification.Recipient);
 const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
+const validateLatest = Schema.decodeEffect(Schema.toType(NotificationStore.LatestOptions));
 const rows = Rows.make(Schema.fromJsonString(Notification.Record));
 
 /** Whose inbox a notification is in: a membership, a contact, or triage. */
@@ -37,6 +38,8 @@ const byRecorded = (left: Notification.Record, right: Notification.Record) =>
   compareBinary(left.id, right.id);
 const isAfter = (record: Notification.Record, cursor: NotificationStore.Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) > 0;
+const isBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) =>
+  byRecorded(record, Object.assign({}, record, cursor)) < 0;
 
 /** A record as reads show it: a pending notification its human recipient saw reads as Seen. */
 const withSeen = (space: MemoryDatabase.Space) => (record: Notification.Record) => {
@@ -81,6 +84,26 @@ export const make = Effect.fn("Notifications.make")(function* () {
           (after === undefined || isAfter(record, after)),
       )
       .toSorted(byRecorded)
+      .slice(0, request.limit);
+  });
+
+  const latest = Effect.fnUntraced(function* (
+    recipient: Notification.Recipient,
+    options: NotificationStore.LatestOptions,
+    pendingOnly: boolean,
+  ) {
+    const target = inboxKey(yield* validateRecipient(recipient));
+    const request = yield* validateLatest(options);
+    const before = request.before;
+    const records = yield* all;
+    return records
+      .filter(
+        (record) =>
+          inboxKey(record.recipient) === target &&
+          (!pendingOnly || record.state._tag === "Pending") &&
+          (before === undefined || isBefore(record, before)),
+      )
+      .toSorted((left, right) => byRecorded(right, left))
       .slice(0, request.limit);
   });
 
@@ -150,6 +173,14 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       (recipient, options) => list(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
+    ),
+    listLatestByRecipient: Effect.fn("Notifications.listLatestByRecipient")(
+      (recipient, options) => latest(recipient, options, false),
+      Effect.mapError(storeFailure(NotificationStore, "listLatestByRecipient")),
+    ),
+    listLatestPendingByRecipient: Effect.fn("Notifications.listLatestPendingByRecipient")(
+      (recipient, options) => latest(recipient, options, true),
+      Effect.mapError(storeFailure(NotificationStore, "listLatestPendingByRecipient")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (recipient, threadInput, throughSequence) {

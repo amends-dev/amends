@@ -10,7 +10,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
    The provider opens one stream per workspace per credential scope, shared by every consumer,
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
-   each workspace's `settings`, `ownership`, `members`, `invitations`, and `groups`, and one key
+   each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`, and `inbox`, and one key
    per group stream, group roster, thread timeline, and thread participants within their
    collections.
 3. Each `Committed` message maps its events to the keys they affect
@@ -19,8 +19,9 @@ and cache invalidation; apps mount it once per workspace view; features show its
    that thread's timeline and that group's stream, and the groups list; group membership
    refreshes the groups and that group's stream and roster, joining or leaving a thread its
    participants, workspace membership every roster,
-   and grant changes every stream and roster. A commit that
-   carries a notification for the reader refreshes the groups' pending counts. Mounted reads
+   and grant changes every stream and roster. Group membership and grant changes also refresh the
+   inbox, since they decide which notification sources the reader can still read. A commit that
+   carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. Facts with no mapping refresh nothing. Add
    a mapping when a read starts depending on a fact.
 4. `Ready` with `reset` invalidates every key for the workspace and the directory. A first
@@ -57,10 +58,11 @@ refresh discards drafts. Background refreshes never mark settings pending or loc
   feed. The directory refreshes when the page wakes instead; an identity-level feed would be
   a backend addition.
 - Read-state signals refresh the groups and streams, since they change unread state and pending
-  counts. Typing signals keep a per-workspace list of who is typing in each thread until the
+  counts; reading a thread and seeing notifications also refresh the inbox, since both settle
+  notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
   moment each names, or until that member's message is published, and never show the reader. They
   are not replayed, so a reconnect starts with nobody typing. The notifications a commit carries
-  refresh counts without updating an inbox, which the client does not read yet.
+  refresh the inbox by refetching it rather than being added to it from the message.
 - Each open workspace view holds one HTTP connection. Browsers allow about six per origin over
   HTTP/1.1, shared across tabs; production should serve the API over HTTP/2.
 - The desktop content security policy already permits the configured API origin for streams.

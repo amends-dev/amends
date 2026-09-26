@@ -28,6 +28,7 @@ import { CreateWorkspacePage } from "./pages/create-workspace.tsx";
 import { WorkspaceUnavailablePage } from "./pages/workspace-unavailable.tsx";
 import { WorkspaceLayout } from "./workspace-layout.tsx";
 import { GroupPage } from "./pages/group.tsx";
+import { InboxPage } from "./pages/inbox.tsx";
 import {
   HomePage,
   TriagePage,
@@ -130,6 +131,10 @@ export function ApplicationRoutes() {
           <Route
             path={["/groups/:groupId", "/groups/:groupId/threads/:threadId"]}
             component={GroupPage}
+          />
+          <Route
+            path={["/inbox", "/inbox/groups/:groupId/threads/:threadId"]}
+            component={InboxPage}
           />
           <Route path="/triage" component={TriagePage} />
           <Route path="/tasks" component={TasksPage} />

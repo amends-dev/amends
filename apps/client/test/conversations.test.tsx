@@ -11,12 +11,17 @@ import {
   useThreadFollow,
   type FollowController,
   useGroupStream,
+  useInbox,
+  useInboxPending,
   useMarkGroupRead,
+  useMarkSeen,
   useMarkThreadRead,
   useReply,
   useThreadTimeline,
   type ComposerController,
+  type NotificationInbox,
   type PagedView,
+  type SeenController,
   type SessionStore,
   type Thread,
   type ThreadTimeline,
@@ -137,8 +142,10 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/streams:group",
     "workspace/one/timelines:thread",
   ]);
+  // Leaving a group also changes which notification sources the reader can still read.
   expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
     "workspace/one/groups",
+    "workspace/one/inbox",
     "workspace/one/rosters:group",
     "workspace/one/streams:group",
   ]);
@@ -164,6 +171,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     ).toSorted(),
   ).toEqual([
     "workspace/one/groups",
+    "workspace/one/inbox",
     "workspace/one/members",
     "workspace/one/ownership",
     "workspace/one/rosters",
@@ -171,9 +179,15 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/streams",
     "workspace/one/timelines:thread",
   ]);
+  // Reading a thread settles notifications from it.
   expect(signalKeys("one", { _tag: "ThreadRead" })).toEqual([
     "workspace/one/groups",
     "workspace/one/streams",
+    "workspace/one/inbox",
+  ]);
+  expect(signalKeys("one", { _tag: "NotificationsSeen" })).toEqual([
+    "workspace/one/groups",
+    "workspace/one/inbox",
   ]);
   expect(signalKeys("one", { _tag: "GroupCaughtUp" })).toEqual(["workspace/one/groups"]);
   expect(signalKeys("one", { _tag: "Typing" })).toEqual([]);
@@ -239,6 +253,150 @@ it("a timeline opens at its newest activity, pages back once, and a change reads
     ["21", null],
     [null, "72"],
   ]);
+});
+
+/** A notification for Alice recorded at the given minute, from the given thread position. */
+const notification = (index: number, state: { _tag: string } = { _tag: "Pending" }) => {
+  const id = `notification-${String(index).padStart(3, "0")}`;
+  return {
+    notification: {
+      id,
+      workspaceId: "one",
+      source: { logId: "journal", entryId: `entry-${index}` },
+      participationId: "participation",
+      thread: { threadId: "thread", groupId: "group", sequence: index + 1 },
+      recipient: { _tag: "Human", id: "alice", memberId: "alice-member" },
+      recordedAt: minute(index),
+      state,
+    },
+    source: item(index + 1),
+  };
+};
+/** Serves the inbox newest first, pending only when asked, and records acknowledgments. */
+function inboxHost(inbox: Array<ReturnType<typeof notification>>) {
+  const requests: Array<URL> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    requests.push(url);
+    const acknowledged = /\/notifications\/([^/]+)\/acknowledge$/.exec(url.pathname);
+    if (request.method === "POST" && acknowledged) {
+      const entry = inbox.find(
+        (value) => value.notification.id === decodeURIComponent(acknowledged[1] ?? ""),
+      );
+      if (!entry) return Promise.resolve(new Response(null, { status: 404 }));
+      entry.notification.state = {
+        _tag: "Acknowledged",
+        outcome: { _tag: "Seen" },
+        acknowledgedAt: minute(59),
+      } as { _tag: string };
+      return Promise.resolve(json(entry.notification));
+    }
+    const limit = Number(url.searchParams.get("limit"));
+    const before = url.searchParams.get("before");
+    const cursor = before === null ? undefined : (JSON.parse(before) as { id: string });
+    const shown = inbox
+      .filter(
+        (value) =>
+          url.searchParams.get("pendingOnly") !== "true" ||
+          value.notification.state._tag === "Pending",
+      )
+      .filter((value) => cursor === undefined || value.notification.id < cursor.id)
+      .toSorted((a, b) => (a.notification.id < b.notification.id ? 1 : -1));
+    return Promise.resolve(json(shown.slice(0, limit)));
+  });
+  return { fetch, requests };
+}
+
+it("an inbox opens at its newest notifications, pages back, and a refresh keeps what is shown", async () => {
+  const inbox = Array.from({ length: 60 }, (_, index) => notification(index));
+  const { fetch, requests } = inboxHost(inbox);
+  const view = mount(fetch, () => useInbox("one", "all"));
+  const ids = () =>
+    view()
+      .value()
+      ?.map((entry: NotificationInbox.Item) => entry.notification.id) ?? [];
+  await waitFor(() => expect(ids()).toHaveLength(25));
+  // Newest first, with each notification's source.
+  expect([ids()[0], ids().at(-1)]).toEqual(["notification-059", "notification-035"]);
+  expect(view().value()?.[0]?.source).toMatchObject({ message: { id: "message-60" } });
+  view().loadEarlier();
+  await waitFor(() => expect(ids()).toHaveLength(50));
+  expect(ids().at(-1)).toBe("notification-010");
+  // A new notification arrives at the top; nothing shown drops off the bottom.
+  inbox.push(notification(60));
+  requests.length = 0;
+  view().retry();
+  await waitFor(() => expect(ids()[0]).toBe("notification-060"));
+  expect((ids().at(-1) ?? "") <= "notification-010").toBe(true);
+  expect(requests.every((url) => url.pathname === "/workspaces/one/notifications/inbox")).toBe(
+    true,
+  );
+  expect(requests.every((url) => !url.searchParams.has("pendingOnly"))).toBe(true);
+  view().loadEarlier();
+  await waitFor(() => expect(view().complete()).toBe(true));
+  expect(ids()).toHaveLength(61);
+});
+
+it("a pending inbox asks for pending notifications and drops one once the reader has seen it", async () => {
+  const inbox = [notification(0), notification(1, { _tag: "Acknowledged" }), notification(2)];
+  const { fetch, requests } = inboxHost(inbox);
+  let seen!: SeenController;
+  const view = mount(fetch, () => {
+    seen = useMarkSeen("one", "notification-002");
+    return useInbox("one", "pending");
+  });
+  const ids = () =>
+    view()
+      .value()
+      ?.map((entry: NotificationInbox.Item) => entry.notification.id) ?? [];
+  await waitFor(() => expect(ids()).toEqual(["notification-002", "notification-000"]));
+  expect(requests[0]?.searchParams.get("pendingOnly")).toBe("true");
+  seen.markSeen();
+  await waitFor(() => expect(seen.seen()).toBe(true));
+  // Seeing it refreshes the inbox, which no longer lists it.
+  await waitFor(() => expect(ids()).toEqual(["notification-000"]));
+  expect(seen.error()).toBeUndefined();
+});
+
+it("the inbox's pending count adds up what each group holds for the reader", async () => {
+  const group = (id: string, pending: number) => ({
+    group: {
+      id,
+      workspaceId: "one",
+      kind: "Team",
+      visibility: "Private",
+      name: id,
+      createdBy: "owner",
+      createdAt: minute(0),
+    },
+    latestActivityAt: null,
+    caughtUpAt: null,
+    newActivity: false,
+    following: false,
+    pending,
+  });
+  const fetch = vi.fn<typeof globalThis.fetch>(() =>
+    Promise.resolve(json([group("a", 2), group("b", 0), group("c", 3)])),
+  );
+  let pending!: () => number | undefined;
+  function Consumer() {
+    pending = useInboxPending("one");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  expect(pending()).toBeUndefined();
+  await waitFor(() => expect(pending()).toBe(5));
 });
 
 it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {

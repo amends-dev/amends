@@ -154,6 +154,11 @@ it("keeps only known nested workspace destinations in sign-in return paths", () 
   expect(returnPath("/workspaces/one/tasks?filter=mine#work")).toBe(
     "/workspaces/one/tasks?filter=mine#work",
   );
+  expect(returnPath("/workspaces/one/inbox")).toBe("/workspaces/one/inbox");
+  expect(returnPath("/workspaces/one/inbox/groups/g/threads/t")).toBe(
+    paths.inboxThread("one", "g", "t"),
+  );
+  expect(returnPath("/workspaces/one/inbox/groups/g")).toBe(paths.workspaces);
   expect(returnPath("/workspaces/one/unknown")).toBe(paths.workspaces);
   expect(returnPath("/workspaces/one/tasks/../../../sign-in")).toBe(paths.workspaces);
   expect(paths.workspacePage("a/b", "triage")).toBe("/workspaces/a%2Fb/triage");

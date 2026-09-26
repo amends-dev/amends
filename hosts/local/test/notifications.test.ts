@@ -154,6 +154,19 @@ describe.skipIf(!available)("PostgreSQL", () => {
             params: { ...params, notificationId: second.id },
           }),
         ).toEqual(second);
+        // Newest first, and without sources the reader cannot reach, as with these fixtures.
+        expect(yield* humanClient.notifications.inbox({ params, query: { limit: 1 } })).toEqual([
+          { notification: second },
+        ]);
+        expect(
+          yield* humanClient.notifications.inbox({
+            params,
+            query: { limit: 10, before: { recordedAt: second.recordedAt, id: second.id } },
+          }),
+        ).toEqual([{ notification: first }]);
+        expect(yield* bobClient.notifications.inbox({ params, query: { limit: 10 } })).toEqual([
+          { notification: forBob },
+        ]);
         expect(yield* bobClient.notifications.list({ params, query: { limit: 10 } })).toEqual([
           forBob,
         ]);
@@ -196,6 +209,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
         ).toBe(404);
         expect(
           (yield* outsiderClient.notifications.list({
+            params,
+            query: { limit: 10 },
+            responseMode: "response-only",
+          })).status,
+        ).toBe(403);
+        expect(
+          (yield* outsiderClient.notifications.inbox({
             params,
             query: { limit: 10 },
             responseMode: "response-only",
@@ -259,7 +279,20 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           expect(response.status).toBe(400);
         }
-        for (const path of [base + "?limit=10", base + "/missing"]) {
+        for (const query of [
+          "",
+          "limit=0",
+          "limit=51",
+          "limit=1&pendingOnly=maybe",
+          "limit=1&before=not-json",
+          `limit=1&before=${encodeURIComponent(JSON.stringify({ recordedAt: "not-a-date", id: "a" }))}`,
+        ]) {
+          const response = yield* http.get(`${base}/inbox?${query}`, {
+            headers: { authorization: "Bearer human" },
+          });
+          expect(response.status).toBe(400);
+        }
+        for (const path of [base + "?limit=10", base + "/inbox?limit=10", base + "/missing"]) {
           expect((yield* http.get(path)).status).toBe(401);
           expect(
             (yield* http.get(path, { headers: { authorization: "Bearer invalid" } })).status,

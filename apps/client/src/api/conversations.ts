@@ -2,6 +2,8 @@ import {
   Group,
   GroupMembership,
   Member,
+  Notification,
+  NotificationInbox,
   Thread,
   ThreadMessage,
   ThreadParticipation,
@@ -16,7 +18,16 @@ import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
 import { requestAtom } from "./request.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
-export { Group, GroupMembership, Member, Thread, ThreadParticipation, ThreadTimeline };
+export {
+  Group,
+  GroupMembership,
+  Member,
+  Notification,
+  NotificationInbox,
+  Thread,
+  ThreadParticipation,
+  ThreadTimeline,
+};
 
 /** How many threads or timeline items one page reads. */
 export const pageSize = 50;
@@ -132,9 +143,9 @@ export const membersRead = (client: ApiClient, workspaceId: string) =>
     : undefined;
 
 /**
- * A view that pages back from the newest end. `items` are in the order the view shows them,
- * oldest first; `complete` means nothing older remains. `earlier` counts the reader's requests for
- * older items, so a read can tell a request for more from a refresh.
+ * A view that pages back from the newest end. `items` are in the order the view shows them;
+ * `complete` means nothing older remains. `earlier` counts the reader's requests for older items,
+ * so a read can tell a request for more from a refresh.
  */
 export interface Paged<A> {
   readonly items: ReadonlyArray<A>;
@@ -252,6 +263,89 @@ export const timelineRead = (client: ApiClient, workspaceId: string, threadId: s
     ? timelineOf(client, joined(workspaceId, threadId))
     : undefined;
 
+/** How many notifications one inbox page reads. */
+export const inboxPageSize = 25;
+/** Newest first, then ID in descending binary order: the inbox's page order. */
+const recordedAfter = (left: Notification.Record, right: Notification.Record) =>
+  DateTime.toEpochMillis(left.recordedAt) - DateTime.toEpochMillis(right.recordedAt) ||
+  (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+/** Everything in the reader's inbox, or only what is still pending for them. */
+export type InboxFilter = "all" | "pending";
+const inboxOf = perClient(
+  (client: ApiClient, key: string): PagedRead<NotificationInbox.Item, unknown> => {
+    const { workspaceId, id: filter } = split(key);
+    const earlier = Atom.make(0);
+    const atom = client.runtime
+      .atom(
+        Effect.fnUntraced(function* (get) {
+          const api = yield* client;
+          const requested = get(earlier);
+          const previous = previousOf<NotificationInbox.Item>(get);
+          // The oldest notification shown stays shown: a refresh reads down to it, and a request
+          // for more reads one page past it. New notifications arrive at the top.
+          const reach = Option.flatMap(previous, (view) =>
+            Option.fromUndefinedOr(view.items.at(-1)),
+          );
+          const more = Option.isNone(previous) || requested > previous.value.earlier;
+          const newestFirst: Array<NotificationInbox.Item> = [];
+          let before: Pick<Notification.Record, "recordedAt" | "id"> | undefined;
+          let complete = false;
+          while (true) {
+            const page = yield* api.notifications.inbox({
+              params: { workspaceId },
+              query: {
+                limit: inboxPageSize,
+                ...(filter === "pending" ? { pendingOnly: true } : {}),
+                ...(before === undefined ? {} : { before }),
+              },
+            });
+            newestFirst.push(...page);
+            const last = page.at(-1);
+            if (page.length < inboxPageSize || last === undefined) {
+              complete = true;
+              break;
+            }
+            before = { recordedAt: last.notification.recordedAt, id: last.notification.id };
+            if (Option.isNone(reach)) break;
+            const oldest = reach.value.notification;
+            const done = more
+              ? newestFirst.filter((item) => recordedAfter(item.notification, oldest) < 0).length >=
+                inboxPageSize
+              : recordedAfter(last.notification, oldest) <= 0;
+            if (done) break;
+          }
+          return { items: newestFirst, complete, earlier: requested };
+        }),
+      )
+      .pipe(Atom.withReactivity([workspaceKey(workspaceId, "inbox")]));
+    return { atom, earlier };
+  },
+);
+/** The reader's inbox, newest first, with each notification's source where they can read it. */
+export const inboxRead = (client: ApiClient, workspaceId: string, filter: InboxFilter) =>
+  valid(workspaceId) ? inboxOf(client, joined(workspaceId, filter)) : undefined;
+
+/**
+ * Record that the reader saw a notification, then invalidate their inbox and pending counts, as
+ * their own signal would when it arrives. Seeing it again keeps the first time.
+ */
+export const seenRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (notificationId: string) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      yield* api.notifications.acknowledge({
+        params: {
+          workspaceId: yield* command(Workspace.Id)(workspace),
+          notificationId: yield* command(Notification.Id)(notificationId),
+        },
+      });
+      yield* Reactivity.invalidate([
+        workspaceKey(workspace, "inbox"),
+        workspaceKey(workspace, "groups"),
+      ]);
+    }),
+  );
+
 /** Whether text can be sent as a message: it has something besides whitespace. */
 export const isMessageText = Schema.is(ThreadMessage.Text);
 export const newPostKey = newWorkspaceRequestKey;
@@ -330,9 +424,11 @@ export const readRequest = (client: ApiClient, workspace: string) =>
         yield* api.groups.markRead({
           params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
         });
+      // Reading a thread settles the reader's notifications from it.
       yield* Reactivity.invalidate([
         workspaceKey(workspace, "groups"),
         collectionKey(workspace, "streams"),
+        ...(mark.kind === "thread" ? [workspaceKey(workspace, "inbox")] : []),
       ]);
     }),
   );

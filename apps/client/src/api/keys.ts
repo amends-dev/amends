@@ -2,13 +2,20 @@
  * Invalidation keys for credential-scoped reads. Each read registers one key; writes and the
  * workspace change feed invalidate them, and the registry refreshes whichever reads are mounted.
  */
-export type WorkspaceResource = "settings" | "ownership" | "members" | "invitations" | "groups";
+export type WorkspaceResource =
+  | "settings"
+  | "ownership"
+  | "members"
+  | "invitations"
+  | "groups"
+  | "inbox";
 export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "settings",
   "ownership",
   "members",
   "invitations",
   "groups",
+  "inbox",
 ];
 /** Everything the signed-in identity can reach, across workspaces. */
 export const directoryKey = "directory";

@@ -5,6 +5,7 @@ import preview from "../.storybook/preview.ts";
 import meta, {
   Following,
   Group,
+  InboxView,
   Reading,
   Typing,
   Writing,
@@ -31,4 +32,7 @@ it("shows another member typing until their message arrives", async () => {
 });
 it("follows a group and a thread, and a followed group's new threads reach the reader", async () => {
   await stories.story(Following).run();
+});
+it("lists the inbox newest first, settles what is seen or read, and takes new mentions live", async () => {
+  await stories.story(InboxView).run();
 });

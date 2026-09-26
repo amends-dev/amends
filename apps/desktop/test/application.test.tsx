@@ -433,3 +433,78 @@ it("shows a group's stream at its route and an open thread beside it", async () 
   await waitFor(() => expect(screen.queryByRole("region", { name: "Thread messages" })).toBeNull());
   expect(screen.getByRole("region", { name: "Conversation" })).toBe(stream);
 });
+
+/** One pending mention of the reader in thread t1, as their inbox lists it. */
+const mentioned = () => ({
+  notification: {
+    id: "n1",
+    workspaceId: "one",
+    source: { logId: "journal", entryId: "e2" },
+    participationId: "p1",
+    thread: { threadId: "t1", groupId: "g1", sequence: 2 },
+    recipient: { _tag: "Human", id: "alice", memberId: "owner-one" },
+    recordedAt: at,
+    state: { _tag: "Pending" } as { _tag: string },
+  },
+  source: {
+    ...item(2, "m2", "On it."),
+    message: { ...message("m2", "On it."), mentions: ["owner-one"] },
+  },
+});
+it("lists the inbox at its hash route, opens a thread beside it, and marks one seen", async () => {
+  const inbox = [mentioned()];
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path.endsWith("/notifications/inbox")) return Promise.resolve(response(inbox));
+    if (request.method === "POST" && path.endsWith("/notifications/n1/acknowledge")) {
+      inbox[0]!.notification.state = {
+        _tag: "Acknowledged",
+        outcome: { _tag: "Seen" },
+        acknowledgedAt: at,
+      } as { _tag: string };
+      return Promise.resolve(response(inbox[0]!.notification));
+    }
+    const answer = conversation(path);
+    return Promise.resolve(
+      response(
+        answer ?? {
+          memberships: [
+            {
+              workspace: {
+                id: "one",
+                name: "Studio",
+                createdBy: "alice",
+                ownerMemberId: "owner-one",
+              },
+              member: {
+                id: "owner-one",
+                workspaceId: "one",
+                identity: { _tag: "Human", id: "alice" },
+                status: "active",
+              },
+              people: 1,
+            },
+          ],
+          invitations: [],
+        },
+      ),
+    );
+  });
+  mount("/workspaces/one/inbox", "alice", fetch);
+  const list = await screen.findByRole("list", { name: "Notifications" });
+  await within(list).findByText("On it.");
+  const open = within(list).getByRole("link", { name: "Open thread" });
+  expect(open).toHaveAttribute("href", "#/workspaces/one/inbox/groups/g1/threads/t1");
+  fireEvent.click(open);
+  await waitFor(() =>
+    expect(window.location.hash).toBe("#/workspaces/one/inbox/groups/g1/threads/t1"),
+  );
+  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  await within(thread).findByText("Can you look at the terms?");
+  fireEvent.click(within(list).getByRole("button", { name: "Mark seen" }));
+  await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/inbox"));
+  expect(screen.getByRole("list", { name: "Notifications" })).toBe(list);
+});

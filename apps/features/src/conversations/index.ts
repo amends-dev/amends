@@ -9,3 +9,4 @@ export {
   type ReplyComposerProps,
 } from "./composers.tsx";
 export { GroupFollowAction, GroupFollowNote, type GroupFollowProps } from "./follow.tsx";
+export { Inbox, type InboxProps } from "./inbox.tsx";

@@ -192,5 +192,42 @@ export const Following = {
     await expect(panel().queryByText(/· following$/)).toBeNull();
   },
 } satisfies Story;
+export const InboxView = {
+  name: "Inbox",
+  args: { view: "inbox" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inbox = await canvas.findByRole("list", { name: "Notifications" }, { timeout: 20000 });
+    const cards = within(inbox);
+    // The mention and the reply in a thread the owner follows came to them, newest first.
+    await waitFor(() => expect(cards.getAllByRole("listitem")).toHaveLength(2));
+    const [mention, reply] = cards.getAllByRole("listitem");
+    await expect(mention).toHaveTextContent("mentioned you · #Design");
+    await expect(mention).toHaveTextContent("can you approve the September close?");
+    await expect(reply).toHaveTextContent("replied · #Design");
+    await expect(cards.getAllByRole("img", { name: "unread" })).toHaveLength(2);
+    // Marking one seen keeps it in the inbox without its dot.
+    await userEvent.click(within(mention!).getByRole("button", { name: "Mark seen" }));
+    await waitFor(() => expect(cards.getAllByRole("img", { name: "unread" })).toHaveLength(1));
+    // Opening the other reads its thread beside the inbox, which settles it too.
+    await userEvent.click(within(reply!).getByRole("link", { name: "Open thread" }));
+    const thread = await canvas.findByRole("region", { name: "Thread messages" });
+    await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(4));
+    await waitFor(() => expect(cards.queryAllByRole("img", { name: "unread" })).toHaveLength(0), {
+      timeout: 10000,
+    });
+    // A new mention arrives at the top over the live feed.
+    await userEvent.click(canvas.getByRole("button", { name: "Mention owner as member" }));
+    await waitFor(() => expect(cards.getAllByRole("listitem")).toHaveLength(3), {
+      timeout: 10000,
+    });
+    await expect(cards.getAllByRole("listitem")[0]).toHaveTextContent("the receipts are in.");
+    // Unread narrows the inbox to what is still pending.
+    await userEvent.click(canvas.getByRole("radio", { name: "Unread" }));
+    const unread = await canvas.findByRole("list", { name: "Unread notifications" });
+    await waitFor(() => expect(within(unread).getAllByRole("listitem")).toHaveLength(1));
+    await expect(within(unread).getByRole("listitem")).toHaveTextContent("the receipts are in.");
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

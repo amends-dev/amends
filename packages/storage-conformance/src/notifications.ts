@@ -198,6 +198,68 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect(
+      "both latest notification lists page newest first, exclusively, in the same order",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const bound = yield* boundTo(workspaceId);
+              yield* initialized(bound);
+              const newestFirst = [
+                record("after", { recordedAt: DateTime.add(recordedAt, { milliseconds: 1 }) }),
+                ...["\u{10000}", "\uE000", "é", "a", "A"].map((id) => record(id)),
+                record("before", { recordedAt: DateTime.add(recordedAt, { milliseconds: -1 }) }),
+              ];
+              yield* bound.store.transaction(
+                Effect.forEach(
+                  [
+                    ...newestFirst,
+                    record("theirs", { recipient: { ...another } }),
+                    record("agent's", { recipient: { ...agent } }),
+                  ],
+                  bound.notifications.insert,
+                ),
+              );
+              for (const read of [
+                bound.notifications.listLatestByRecipient,
+                bound.notifications.listLatestPendingByRecipient,
+              ]) {
+                expect(yield* read(human, page)).toEqual(newestFirst);
+                let before: NotificationStore.Cursor | undefined;
+                for (const next of newestFirst) {
+                  expect(
+                    yield* read(human, { limit: 1, ...(before === undefined ? {} : { before }) }),
+                  ).toEqual([next]);
+                  before = { recordedAt: next.recordedAt, id: next.id };
+                }
+                expect(yield* read(human, { limit: 1, before })).toEqual([]);
+                // The boundary need not be a stored notification.
+                expect(
+                  yield* read(human, {
+                    limit: 2,
+                    before: { recordedAt, id: Notification.Id.make("b") },
+                  }),
+                ).toEqual([record("a"), record("A")]);
+              }
+              // What the recipient saw stays in their inbox, and leaves what is pending.
+              const seenAt = DateTime.add(recordedAt, { minutes: 1 });
+              yield* bound.notifications.markSeen([Notification.Id.make("é")], seenAt);
+              const seen = record("é", {
+                state: { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: seenAt },
+              });
+              expect(yield* bound.notifications.listLatestByRecipient(human, page)).toEqual(
+                newestFirst.map((value) => (value.id === seen.id ? seen : value)),
+              );
+              expect(yield* bound.notifications.listLatestPendingByRecipient(human, page)).toEqual(
+                newestFirst.filter((value) => value.id !== seen.id),
+              );
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
       "notification uniqueness rejects reused IDs and duplicate source-recipient associations",
       () =>
         harness.withStorage((storage) =>
@@ -451,6 +513,25 @@ export const notifications = (harness: Harness) => {
                   { limit: -1 },
                   { limit: 1.5 },
                   { limit: 1, after: badCursor },
+                ]) {
+                  expect(yield* Effect.flip(read(human, options))).toMatchObject({
+                    _tag: "NotificationStore.Failure",
+                  });
+                }
+                expect(yield* Effect.flip(read(badRecipient, page))).toMatchObject({
+                  _tag: "NotificationStore.Failure",
+                });
+                expect(yield* read(human, page)).toEqual([]);
+              }
+              for (const read of [
+                bound.notifications.listLatestByRecipient,
+                bound.notifications.listLatestPendingByRecipient,
+              ]) {
+                for (const options of [
+                  { limit: 0 },
+                  { limit: -1 },
+                  { limit: 1.5 },
+                  { limit: 1, before: badCursor },
                 ]) {
                   expect(yield* Effect.flip(read(human, options))).toMatchObject({
                     _tag: "NotificationStore.Failure",

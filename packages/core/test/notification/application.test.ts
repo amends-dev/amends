@@ -76,7 +76,10 @@ const seed = (fixture: Fixture) =>
   );
 const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Interface> = {}) => {
   const records = [mine, theirs, agents];
-  const list = (recipient: Notification.Recipient, options: NotificationStore.ReadOptions) =>
+  const list = (
+    recipient: Notification.Recipient,
+    options: NotificationStore.ReadOptions | NotificationStore.LatestOptions,
+  ) =>
     Effect.succeed(
       records.filter((value) => sameRecipient(value.recipient, recipient)).slice(0, options.limit),
     );
@@ -85,6 +88,8 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     get: (id) => Effect.succeed(Option.fromUndefinedOr(records.find((value) => value.id === id))),
     listByRecipient: list,
     listPendingByRecipient: list,
+    listLatestByRecipient: list,
+    listLatestPendingByRecipient: list,
     listPendingByThread: unexpected,
     countPendingByGroup: unexpected,
     insert: unexpected,

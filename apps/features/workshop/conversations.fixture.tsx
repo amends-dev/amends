@@ -10,6 +10,7 @@ import {
   GroupFollowNote,
   GroupStream,
   GroupsNavigation,
+  Inbox,
   ThreadPanel,
 } from "@amends/features/conversations";
 import { Navigation } from "@amends/ui/compositions/navigation";
@@ -28,18 +29,21 @@ interface Setup {
   readonly owner: Session;
   readonly member: Session;
   readonly workspaceId: string;
+  readonly ownerMemberId: string;
   readonly groupId: string;
   readonly threads: ReadonlyArray<string>;
 }
 const hashThread = () => new URLSearchParams(window.location.hash.slice(1)).get("thread") ?? "";
 /**
  * The owner of a workspace reads a group where a member started threads and the owner replied,
- * through the real host. Controls act as the member, so their messages arrive over the live feed.
+ * through the real host, or their inbox, where the member has since replied to them and mentioned
+ * them. Controls act as the member, so their messages arrive over the live feed.
  */
 export function ConversationsFixture(props: {
   baseUrl?: string;
   threads?: number;
   theme?: "cotton" | "soot";
+  view?: "group" | "inbox";
 }) {
   const [setup, setSetup] = createSignal<Setup>();
   const [credential, setCredential] = createSignal<Session>();
@@ -97,10 +101,29 @@ export function ConversationsFixture(props: {
             text,
             mentions: [],
           });
+      if (props.view === "inbox" && threads[1]) {
+        // The owner takes part in the thread they replied to, so the member's reply reaches them.
+        await api(scenario, `${path}/threads/${threads[1]}/messages`, member.token, {
+          text: "Does that include the refunds?",
+          mentions: [],
+        });
+        await api(scenario, `${path}/groups/${group.id}/threads`, member.token, {
+          text: "@owner@example.test can you approve the September close?",
+          mentions: [workspace.ownerMemberId],
+        });
+      }
       if (!alive) return;
       // The client reads its credential when it mounts, so set it before rendering.
       setCredential(owner);
-      setSetup({ scenario, owner, member, workspaceId: workspace.id, groupId: group.id, threads });
+      setSetup({
+        scenario,
+        owner,
+        member,
+        workspaceId: workspace.id,
+        ownerMemberId: workspace.ownerMemberId,
+        groupId: group.id,
+        threads,
+      });
     })().catch((cause) => {
       if (alive) setError(String(cause));
     });
@@ -182,19 +205,45 @@ export function ConversationsFixture(props: {
                         >
                           Start thread as member
                         </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            asMember(`/groups/${value().groupId}/threads`, {
+                              text: "@owner@example.test the receipts are in.",
+                              mentions: [value().ownerMemberId],
+                            })
+                          }
+                        >
+                          Mention owner as member
+                        </Button>
                       </Row>
                     </Shell.Header>
-                    <Shell.Main workspace aria-label="Design">
-                      <Shell.Content fill>
-                        <GroupStream
-                          workspaceId={value().workspaceId}
-                          groupId={value().groupId}
-                          label="Design"
-                          threadHref={(threadId) => `#thread=${threadId}`}
-                          currentThread={thread() || undefined}
-                        />
-                      </Shell.Content>
-                    </Shell.Main>
+                    <Show
+                      when={props.view === "inbox"}
+                      fallback={
+                        <Shell.Main workspace aria-label="Design">
+                          <Shell.Content fill>
+                            <GroupStream
+                              workspaceId={value().workspaceId}
+                              groupId={value().groupId}
+                              label="Design"
+                              threadHref={(threadId) => `#thread=${threadId}`}
+                              currentThread={thread() || undefined}
+                            />
+                          </Shell.Content>
+                        </Shell.Main>
+                      }
+                    >
+                      <Shell.Main workspace aria-label="Inbox">
+                        <Shell.Content>
+                          <Inbox
+                            workspaceId={value().workspaceId}
+                            threadHref={(_, threadId) => `#thread=${threadId}`}
+                            currentThread={thread() || undefined}
+                          />
+                        </Shell.Content>
+                      </Shell.Main>
+                    </Show>
                   </Shell.Body>
                   <Shell.Inspector
                     title="Thread"

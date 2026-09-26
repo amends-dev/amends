@@ -307,7 +307,10 @@ entries arrive at either end. Reply counts use the Foundations' link color, `tex
 place persimmon appears in content. See [Message](src/compositions/message/README.md) and
 [Transcript](src/compositions/transcript/README.md). **Compositions / Composer** is the reference's
 page and thread composer, sending with Enter or its button and docking at the bottom of its
-region. See [Composer](src/compositions/composer/README.md).
+region. See [Composer](src/compositions/composer/README.md). **Compositions / Inbox** lists what
+has come to the reader as the Home reference's "Needs you" cards: a pending dot, why it came, what
+was said as a serif quote, and a link to open it beside a button to mark it seen. See
+[Inbox](src/compositions/inbox/README.md).
 
 **Compositions / KeyValue** follows the Primitives v2 Key and value reference:
 compact mono keys/values at opposite edges, content-driven wrapping, and seams

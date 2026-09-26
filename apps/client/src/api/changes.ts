@@ -44,13 +44,15 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],
   "workspace.role.created": ["settings", "members"],
   "workspace.role.renamed": ["settings", "members"],
-  // Grants decide what the reader may do and see, including another member's access.
-  "workspace.role.permissions-changed": ["settings", "ownership", "members", "groups"],
-  "workspace.assignment.created": ["settings", "ownership", "members", "groups"],
-  "workspace.assignment.revoked": ["settings", "ownership", "members", "groups"],
+  // Grants decide what the reader may do and see, including another member's access, and which
+  // notification sources they can still read.
+  "workspace.role.permissions-changed": ["settings", "ownership", "members", "groups", "inbox"],
+  "workspace.assignment.created": ["settings", "ownership", "members", "groups", "inbox"],
+  "workspace.assignment.revoked": ["settings", "ownership", "members", "groups", "inbox"],
   "group.created": ["groups"],
-  "group.membership.added": ["groups"],
-  "group.membership.removed": ["groups"],
+  // Group access decides the same for the group's threads.
+  "group.membership.added": ["groups", "inbox"],
+  "group.membership.removed": ["groups", "inbox"],
   "group.follow.started": ["groups"],
   "group.follow.ended": ["groups"],
   // A group's latest activity, and whether it is new to the reader.
@@ -115,7 +117,7 @@ export const affectedKeys = (
   events: Iterable<{ readonly name: string; readonly payload?: unknown }>,
   notified = false,
 ): Array<string> => {
-  const affected = new Set<Affected>(notified ? ["groups"] : []);
+  const affected = new Set<Affected>(notified ? ["groups", "inbox"] : []);
   const collections = new Set<WorkspaceCollection>(),
     items = new Set<string>();
   for (const event of events) {
@@ -137,14 +139,20 @@ export const affectedKeys = (
 };
 /**
  * The reads a signal to the reader's own sessions changes. Reading a thread changes its stream's
- * unread state and the reader's pending counts; catching up or seeing notifications, the groups.
+ * unread state, and settles notifications from it, changing the inbox and pending counts; seeing
+ * notifications changes the inbox and counts; catching up, the groups.
  */
 export const signalKeys = (workspaceId: string, signal: { readonly _tag: string }) => {
   switch (signal._tag) {
     case "ThreadRead":
-      return [workspaceKey(workspaceId, "groups"), collectionKey(workspaceId, "streams")];
-    case "GroupCaughtUp":
+      return [
+        workspaceKey(workspaceId, "groups"),
+        collectionKey(workspaceId, "streams"),
+        workspaceKey(workspaceId, "inbox"),
+      ];
     case "NotificationsSeen":
+      return [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")];
+    case "GroupCaughtUp":
       return [workspaceKey(workspaceId, "groups")];
     default:
       return [];
@@ -229,7 +237,7 @@ const run = Effect.fnUntraced(function* (
                 posted(current, threadId, memberId, Date.now()),
               );
           }
-        // A notification for the reader changes their pending counts.
+        // A notification for the reader changes their inbox and pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
       }

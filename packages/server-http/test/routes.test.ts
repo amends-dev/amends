@@ -193,6 +193,7 @@ const operations = Layer.mergeAll(
       ),
       list: record("notification.list", () => Effect.succeed([notification])),
       listPending: record("notification.listPending", () => Effect.succeed([notification])),
+      inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
     }),
   ),
   Layer.succeed(
@@ -353,6 +354,34 @@ it.effect("notification queries decode cursors and select the requested applicat
       { operation: "notification.listPending", arguments: [{ limit: 2, after }] },
       { operation: "asMember", arguments: [workspaceId, alice] },
       { operation: "notification.list", arguments: [{ limit: 3 }] },
+    ]);
+  }),
+);
+
+it.effect("the inbox route decodes its cursor and passes the page to the application", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const before = { recordedAt: notification.recordedAt, id: Notification.Id.make("a + & é") };
+    const pages = yield* run("alice", (client) =>
+      Effect.gen(function* () {
+        const first = yield* client.notifications.inbox({
+          params: { workspaceId },
+          query: { limit: 1 },
+        });
+        const next = yield* client.notifications.inbox({
+          params: { workspaceId },
+          query: { limit: 2, before, pendingOnly: true },
+        });
+        return [first, next];
+      }),
+    );
+    // The inbox is its own route, never a notification named "inbox".
+    expect(pages).toEqual([[{ notification }], [{ notification }]]);
+    expect(calls).toEqual([
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "notification.inbox", arguments: [{ limit: 1 }] },
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "notification.inbox", arguments: [{ limit: 2, before, pendingOnly: true }] },
     ]);
   }),
 );

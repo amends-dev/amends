@@ -225,6 +225,16 @@ triage need only an active participation. Rejoining a group under a new admissio
 old participation current again. A page skips participants who are no longer current and keeps
 reading until it holds `limit` of them or the thread has no more; an empty page ends the list.
 
+## Reading the inbox
+
+`NotificationApplication.inbox({ limit, before?, pendingOnly? })` lists the acting human or agent's
+notifications newest first, by recorded time then ID in descending binary order, all of them or
+only those still pending. `before` is the last listed `{ recordedAt, id }`, an exclusive boundary.
+Each item carries its notification and, as `source`, the timeline item that resolving it returns;
+where resolving would return `SourceUnavailable`, the item has no `source`. It requires active
+membership only, lists nobody else's notifications, and changes nothing. `list` and `listPending`
+keep the oldest-first order, for work queues.
+
 ## Resolving a notification source
 
 `NotificationApplication.resolveSource(notificationId)` returns the source's `Thread.TimelineItem`

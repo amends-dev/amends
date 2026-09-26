@@ -43,14 +43,16 @@ its activity asks an agent for no work, as another agent's message does. Each ac
 records `requestsWork`. A human or agent recipient names the
 membership notified as well as the identity (`Notification.ofMember`), so an inbox belongs to one
 membership: someone who rejoins under a new member ID starts with an empty one.
-`NotificationApplication` serves the acting member's own inbox (`get`, `list`, `listPending`),
-`resolveSource`, and human `acknowledge`; contact and triage inboxes are read only through the
+`NotificationApplication` serves the acting member's own inbox (`get`, `list`, `listPending`, and
+`inbox`, newest first with each source they can still read), `resolveSource`, and human
+`acknowledge`; contact and triage inboxes are read only through the
 store. `NotificationProjection`
 generates notifications from each recorded thread activity's recipients, and settles pending agent
 input when a participation ends, from the activity and its own notifications alone. A human's `Seen` is private state the store keeps outside the
 journal. Internal `NotificationSource` resolves a notification's recorded activity for
 `resolveSource`. Notifications never create turns, accept their input, or execute work. See
-[resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source)
+[reading the inbox](../../docs/thread-workflows.md#reading-the-inbox),
+[resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source),
 and [acknowledging a notification](../../docs/thread-workflows.md#acknowledging-a-notification).
 
 Membership demonstrates the feature layout:

@@ -22,4 +22,4 @@ export {
 export { Assignment } from "@amends/core/authorization";
 export { Group, GroupMembership } from "@amends/core/group";
 export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends/core/thread";
-export { Notification } from "@amends/core/notification";
+export { Notification, NotificationInbox } from "@amends/core/notification";

@@ -1,4 +1,4 @@
-import { paths, useWorkspace, type WorkspacePage } from "@amends/client";
+import { paths, useInboxPending, useWorkspace, type WorkspacePage } from "@amends/client";
 import { Account } from "@amends/features/account";
 import {
   GroupFollowAction,
@@ -16,6 +16,7 @@ import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
 import { Column, Row } from "@amends/ui/primitives/layout";
 import {
   IconMarkHome,
+  IconMarkMail,
   IconMarkTriage,
   IconMarkTasks,
   IconMarkEnvironments,
@@ -23,18 +24,23 @@ import {
   IconMarkSettings,
 } from "@amends/icons";
 import { useLocation, useMatch, useNavigate, useParams } from "@solidjs/router";
-import { createEffect, on, Show, type JSX, type ParentProps } from "solid-js";
+import { createEffect, createMemo, on, Show, type JSX, type ParentProps } from "solid-js";
 
 const labels: Record<WorkspacePage, string> = {
   home: "Home",
+  inbox: "Inbox",
   triage: "Triage",
   tasks: "Tasks",
   environments: "Environments",
   connections: "Connections",
   settings: "Settings",
 };
+/** Pages whose own subpaths, such as a thread opened from the inbox, are still that page. */
+const nested = new Set<WorkspacePage>(["inbox", "settings"]);
 const href = (path: string) => `#${path}`;
-function WorkspaceLink(props: ParentProps<{ page: WorkspacePage; label: string }>) {
+function WorkspaceLink(
+  props: ParentProps<{ page: WorkspacePage; label: string; count?: number | undefined }>,
+) {
   const params = useParams<{ workspaceId: string }>(),
     location = useLocation(),
     shell = Shell.useShell();
@@ -44,7 +50,7 @@ function WorkspaceLink(props: ParentProps<{ page: WorkspacePage; label: string }
       href={href(path())}
       aria-current={
         location.pathname.replace(/\/$/, "") === path() ||
-        (props.page === "settings" && location.pathname.startsWith(`${path()}/`))
+        (nested.has(props.page) && location.pathname.startsWith(`${path()}/`))
           ? "page"
           : undefined
       }
@@ -54,6 +60,11 @@ function WorkspaceLink(props: ParentProps<{ page: WorkspacePage; label: string }
     >
       <Navigation.Icon>{props.children}</Navigation.Icon>
       <Navigation.Label>{props.label}</Navigation.Label>
+      <Show when={props.count}>
+        {(count) => (
+          <Navigation.Count aria-label={`${count()} unread`}>{String(count())}</Navigation.Count>
+        )}
+      </Show>
     </Navigation.Link>
   );
 }
@@ -106,8 +117,28 @@ export function WorkspaceLayout(props: ParentProps) {
   const navigate = useNavigate();
   const conversation = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/*rest");
   const opened = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/threads/:threadId");
+  const fromInbox = useMatch(
+    () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
+  );
+  const pending = useInboxPending(params.workspaceId);
   const groupId = () => conversation()?.params.groupId;
-  const threadId = () => opened()?.params.threadId;
+  // A thread opens beside its group's stream, or beside the inbox it was opened from.
+  const panel = createMemo(
+    () => {
+      const { groupId, threadId } = (opened() ?? fromInbox())?.params ?? {};
+      return groupId && threadId ? { groupId, threadId } : undefined;
+    },
+    undefined,
+    { equals: (left, right) => left?.threadId === right?.threadId },
+  );
+  const closePanel = () => {
+    const group = groupId();
+    navigate(
+      group
+        ? paths.group(params.workspaceId, group)
+        : paths.workspacePage(params.workspaceId, "inbox"),
+    );
+  };
   const settings = () =>
     location.pathname.startsWith(paths.workspacePage(params.workspaceId, "settings"));
   const settingsSection = () => {
@@ -118,7 +149,7 @@ export function WorkspaceLayout(props: ParentProps) {
     (Object.keys(labels) as WorkspacePage[]).find(
       (name) =>
         paths.workspacePage(params.workspaceId, name) === location.pathname.replace(/\/$/, "") ||
-        (name === "settings" &&
+        (nested.has(name) &&
           location.pathname.startsWith(`${paths.workspacePage(params.workspaceId, name)}/`)),
     );
   const title = () => {
@@ -168,6 +199,9 @@ export function WorkspaceLayout(props: ParentProps) {
               <WorkspaceLink page="home" label="Home">
                 <IconMarkHome />
               </WorkspaceLink>
+              <WorkspaceLink page="inbox" label="Inbox" count={pending()}>
+                <IconMarkMail />
+              </WorkspaceLink>
               <WorkspaceLink page="triage" label="Triage">
                 <IconMarkTriage />
               </WorkspaceLink>
@@ -207,6 +241,9 @@ export function WorkspaceLayout(props: ParentProps) {
           <Navigation.Root compact aria-label="Workspace shortcuts">
             <WorkspaceLink page="home" label="Home">
               <IconMarkHome />
+            </WorkspaceLink>
+            <WorkspaceLink page="inbox" label="Inbox" count={pending()}>
+              <IconMarkMail />
             </WorkspaceLink>
             <WorkspaceLink page="triage" label="Triage">
               <IconMarkTriage />
@@ -266,22 +303,18 @@ export function WorkspaceLayout(props: ParentProps) {
       </Shell.Body>
       <Shell.Inspector
         title="Thread"
-        open={threadId() !== undefined}
+        open={panel() !== undefined}
         onOpenChange={(open) => {
-          const group = groupId();
-          if (!open && group) navigate(paths.group(params.workspaceId, group));
+          if (!open && panel()) closePanel();
         }}
       >
-        <Show when={groupId() && threadId()} keyed>
-          {(id) => (
+        <Show when={panel()} keyed>
+          {(thread) => (
             <ThreadPanel
               workspaceId={params.workspaceId}
-              groupId={groupId()!}
-              threadId={id}
-              onClose={() => {
-                const group = groupId();
-                if (group) navigate(paths.group(params.workspaceId, group));
-              }}
+              groupId={thread.groupId}
+              threadId={thread.threadId}
+              onClose={closePanel}
             />
           )}
         </Show>

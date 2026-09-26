@@ -49,6 +49,8 @@ export {
   useMembers,
   useGroupStream,
   useThreadTimeline,
+  useInbox,
+  useInboxPending,
   type Read,
   type Members,
   type PagedView,
@@ -56,7 +58,10 @@ export {
 export type {
   Group,
   GroupMembership,
+  InboxFilter,
   Member,
+  Notification,
+  NotificationInbox,
   Thread,
   ThreadTimeline,
 } from "./api/conversations.ts";
@@ -76,3 +81,4 @@ export {
   type FollowController,
   type GroupFollowController,
 } from "./conversations/follow.ts";
+export { useMarkSeen, type SeenController } from "./conversations/seen.ts";
