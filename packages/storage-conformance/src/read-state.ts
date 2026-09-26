@@ -18,7 +18,7 @@ import {
   ThreadPermissions,
 } from "@amends/core/thread";
 import { Member, MemberFacts } from "@amends/core/workspace";
-import { DateTime, Deferred, Effect, Fiber } from "effect";
+import { DateTime, Deferred, Effect, Fiber, Tracer } from "effect";
 import { TestClock } from "effect/testing";
 import {
   type Bound,
@@ -478,6 +478,146 @@ export const readState = (harness: Harness) => {
                 ),
               ),
             ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+          }),
+        ),
+      ),
+    );
+
+    it.effect(
+      "group streams page threads by start with their opening, replies, and unread state",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, team } = yield* prepare();
+              const human = actorFor(humanId);
+              const stream = (actor: Actor.Value, options: Thread.OpeningOptions) =>
+                run(
+                  bound,
+                  actor,
+                  Effect.flatMap(ThreadApplication.Service, (s) =>
+                    s.listOpenings(team.id, options),
+                  ),
+                );
+              yield* TestClock.adjust("1 minute");
+              const first = yield* run(bound, owner, start(team.id, []));
+              yield* TestClock.adjust("1 minute");
+              const second = yield* run(bound, owner, start(team.id, []));
+              yield* TestClock.adjust("1 minute");
+              // Posting reads the thread through the author's own message.
+              const own = yield* run(bound, human, start(team.id, []));
+              // A reply counts and moves the latest message; its thread keeps its place in the stream.
+              yield* TestClock.adjust("1 minute");
+              const answer = yield* run(bound, owner, reply(first.thread.id, []));
+              const page = yield* stream(human, { limit: 2 });
+              expect(
+                page.map((item) => [item.thread.id, item.message, item.replies, item.unread]),
+              ).toEqual([
+                [own.thread.id, own.message, 0, false],
+                [second.thread.id, second.message, 0, true],
+              ]);
+              const last = page[1];
+              if (last === undefined) return yield* Effect.die("Missing page item");
+              const next = yield* stream(human, {
+                before: { createdAt: last.thread.createdAt, threadId: last.thread.id },
+                limit: 2,
+              });
+              expect(next).toEqual([
+                {
+                  thread: first.thread,
+                  message: first.message,
+                  replies: 1,
+                  latest: {
+                    threadId: first.thread.id,
+                    sequence: answer.activity.sequence,
+                    occurredAt: answer.activity.occurredAt,
+                  },
+                  readThrough: null,
+                  unread: true,
+                },
+              ]);
+              // Latest-activity order puts the replied thread first; the stream does not.
+              const recent = yield* run(
+                bound,
+                human,
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.listInGroup(team.id, { limit: 1 }),
+                ),
+              );
+              expect(recent.map((item) => item.thread.id)).toEqual([first.thread.id]);
+              yield* run(bound, human, markRead(first.thread.id, answer.activity.sequence));
+              expect(
+                (yield* stream(human, { limit: 10 })).map((item) => [item.thread.id, item.unread]),
+              ).toEqual([
+                [own.thread.id, false],
+                [second.thread.id, true],
+                [first.thread.id, false],
+              ]);
+              // Without a read grant nothing shows, and a group outside the reader's is missing.
+              expect(yield* stream(actorFor(plainId), { limit: 10 })).toEqual([]);
+              expect(
+                yield* Effect.flip(
+                  run(
+                    bound,
+                    actorFor(outsiderId),
+                    Effect.flatMap(ThreadApplication.Service, (s) =>
+                      s.listOpenings(team.id, { limit: 1 }),
+                    ),
+                  ),
+                ),
+              ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+            }),
+          ),
+        ),
+    );
+
+    it.effect("a stream page reads storage a fixed number of times, however many threads", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, team } = yield* prepare();
+            // Count store reads by span name, which both adapters share.
+            const reads = Effect.fnUntraced(function* () {
+              const counts = new Map<string, number>();
+              const items = yield* run(
+                bound,
+                owner,
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.listOpenings(team.id, { limit: 50 }),
+                ),
+              ).pipe(
+                Effect.withTracer(
+                  Tracer.make({
+                    span(options) {
+                      if (
+                        /^(Threads|ThreadActivities|ThreadMessages|ReadStates)\./.test(options.name)
+                      )
+                        counts.set(options.name, (counts.get(options.name) ?? 0) + 1);
+                      return Tracer.nativeTracer.span(options);
+                    },
+                  }),
+                ),
+              );
+              return { items: items.length, counts: Object.fromEntries(counts) };
+            });
+            const thread = yield* run(bound, owner, start(team.id, []));
+            yield* run(bound, owner, reply(thread.thread.id, []));
+            const small = yield* reads();
+            for (let index = 0; index < 6; index++) {
+              const started = yield* run(bound, owner, start(team.id, []));
+              yield* run(bound, owner, reply(started.thread.id, []));
+            }
+            const large = yield* reads();
+            expect([small.items, large.items]).toEqual([1, 7]);
+            expect(large.counts).toEqual(small.counts);
+            expect(small.counts).toMatchObject({
+              "Threads.listByStart": 1,
+              "ThreadActivities.getFirst": 1,
+              "ThreadActivities.countByKind": 1,
+              "ThreadMessages.getMany": 1,
+            });
           }),
         ),
       ),

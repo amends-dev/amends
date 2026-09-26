@@ -45,6 +45,18 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       success: Schema.Array(Thread.ListItem.annotate({ identifier: "ThreadListItem" })),
       error: [...ApiErrors.member, ...ApiErrors.thread],
     }),
+    HttpApiEndpoint.get("openings", "/groups/:groupId/openings", {
+      params: inGroup,
+      query: {
+        limit,
+        before: Schema.optionalKey(Schema.fromJsonString(Thread.OpeningCursor)).annotate({
+          description:
+            "Exclusive boundary as JSON containing the last item's thread createdAt (UTC ISO string) and threadId.",
+        }),
+      },
+      success: Schema.Array(Thread.Opening.annotate({ identifier: "ThreadOpening" })),
+      error: [...ApiErrors.member, ...ApiErrors.thread],
+    }),
     HttpApiEndpoint.post("start", "/groups/:groupId/threads", {
       params: inGroup,
       headers: ApiErrors.requestKey,

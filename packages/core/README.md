@@ -154,7 +154,7 @@ every thread belongs to one group.
 
 `@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
 four store contracts. Its operations are `ThreadApplication` (`startInGroup`, `startDirect`, `get`,
-`listInGroup`, `readTimeline`, `listParticipants`), `ThreadMessageApplication.publish`, and
+`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageApplication.publish`, and
 `ThreadParticipationApplication` (`follow`, `unfollow`). A participant is a member, a contact, or
 triage: member participation references the exact group admission, while contacts and triage take
 part without group access. A message author is a member or a contact.

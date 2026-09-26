@@ -321,6 +321,7 @@ CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_i
 CREATE INDEX "active_participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspace_id","group_membership_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
+CREATE INDEX "threads_by_start" ON "threads" ("workspace_id","group_id","created_at","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_latest" ON "threads" ("workspace_id","group_id","latest_activity_at","id" COLLATE "C");--> statement-breakpoint
 ALTER TABLE "log_append_keys" ADD CONSTRAINT "log_append_keys_batch" FOREIGN KEY ("workspace_id","log_id","commit_id") REFERENCES "log_batches"("workspace_id","log_id","commit_id");--> statement-breakpoint
 ALTER TABLE "log_batches" ADD CONSTRAINT "log_batches_commit" FOREIGN KEY ("workspace_id","commit_id") REFERENCES "commits"("workspace_id","id");--> statement-breakpoint

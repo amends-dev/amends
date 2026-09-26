@@ -56,6 +56,7 @@ it.effect(
         get: () => Effect.die("Unexpected thread read"),
         listByGroup: () => Effect.die("Unexpected thread read"),
         listByLatest: () => Effect.die("Unexpected thread read"),
+        listByStart: () => Effect.die("Unexpected thread read"),
         getLatest: () => Effect.die("Unexpected thread read"),
         insert: (record) => Effect.sync(() => void inserted.push(record)),
         recordLatest: (latest) => Effect.sync(() => void threadLatest.push(latest)),

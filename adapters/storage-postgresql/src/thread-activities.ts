@@ -5,6 +5,7 @@ import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { threadActivities } from "./schema.ts";
 import { Binding } from "./binding.ts";
+import { inIds } from "./id-list.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
 const decode = Schema.decodeUnknownEffect(
@@ -16,6 +17,7 @@ const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =
   decode(rows).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
   );
+const decodeCounts = Schema.decodeUnknownEffect(Schema.Array(ThreadActivityStore.Count));
 /** Workspace-bound thread-activities projection storage. @category constructors */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
@@ -61,6 +63,47 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "latest")),
+    ),
+    getFirst: Effect.fn("ThreadActivities.getFirst")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+        if (ids.length === 0) return [];
+        // Recording keeps each timeline contiguous from 1, so its first activity is at 1.
+        return yield* guard(
+          db
+            .select()
+            .from(threadActivities)
+            .where(
+              and(
+                inWorkspace,
+                inIds(threadActivities.threadId, ids),
+                eq(threadActivities.sequence, 1),
+              ),
+            ),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "getFirst")),
+    ),
+    countByKind: Effect.fn("ThreadActivities.countByKind")(
+      function* (input, kindInput) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+        const kind = yield* Schema.decodeEffect(ThreadActivity.Kind)(kindInput);
+        if (ids.length === 0) return [];
+        return yield* guard(
+          db
+            .select({ threadId: threadActivities.threadId, count: sql<number>`count(*)::int` })
+            .from(threadActivities)
+            .where(
+              and(
+                inWorkspace,
+                inIds(threadActivities.threadId, ids),
+                eq(threadActivities.kind, kind),
+              ),
+            )
+            .groupBy(threadActivities.threadId),
+        ).pipe(Effect.flatMap(decodeCounts));
+      },
+      Effect.mapError(storeFailure(ThreadActivityStore, "countByKind")),
     ),
     readPage: Effect.fn("ThreadActivities.readPage")(
       function* (input, options) {

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "a7eeac29-16fc-4510-b9ba-f03b89b1bc78",
+  "id": "9f4639f6-4caa-47ef-8736-6efbc23fc4a6",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -3590,6 +3590,48 @@
       "method": "btree",
       "concurrently": false,
       "name": "threads_by_group",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "threads_by_start",
       "entityType": "indexes",
       "schema": "public",
       "table": "threads"

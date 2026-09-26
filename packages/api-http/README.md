@@ -183,6 +183,7 @@ describe the rules behind each operation.
 | `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.            |
 | `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                      |
 | `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.    |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count. |
 | `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread, message, and activity.          |
 | `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.   |
 | `GET …/threads/:threadId`                            | One thread.                                                                                    |
@@ -196,7 +197,8 @@ describe the rules behind each operation.
 Every page takes an integer `limit` from 1 to 100 and an exclusive boundary from the last item of
 the previous page; an empty page ends the traversal. Groups, rosters, and participants pass that
 item's ID as `after`. Thread lists pass `before`, URL-encoded JSON of the last item's
-`{ latestActivityAt, threadId }`, as the typed client does from the decoded cursor. A timeline page
+`{ latestActivityAt, threadId }`, and streams the last item's thread `{ createdAt, threadId }`, as
+the typed client does from the decoded cursor. A timeline page
 is in ascending sequence order: `afterSequence` and `beforeSequence` bound it exclusively, and
 `from=newest` takes the page from the newest end of that range, so a view opens at the latest page
 and pages back with `beforeSequence` set to its first item's sequence. Timeline items are

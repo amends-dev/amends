@@ -10,7 +10,7 @@ const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
 const rows = Rows.make(Schema.fromJsonString(Thread.Record));
 const latestRows = Rows.make(Schema.fromJsonString(Thread.Latest));
 
-/** Newest latest activity first, then ID in descending binary order. */
+/** Newest time first, then ID in descending binary order. */
 const newestFirst = (
   left: { readonly at: number; readonly id: string },
   right: { readonly at: number; readonly id: string },
@@ -69,6 +69,29 @@ export const make = Effect.fn("Threads.make")(function* () {
           .map(({ thread }) => thread);
       },
       Effect.mapError(storeFailure(ThreadStore, "listByLatest")),
+    ),
+    listByStart: Effect.fn("Threads.listByStart")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
+        const before = Option.fromUndefinedOr(options.before).pipe(
+          Option.map((cursor) => ({
+            at: DateTime.toEpochMillis(cursor.createdAt),
+            id: cursor.threadId,
+          })),
+        );
+        return (yield* inGroup(groupId))
+          .map((thread) => ({
+            thread,
+            at: DateTime.toEpochMillis(thread.createdAt),
+            id: thread.id,
+          }))
+          .filter((entry) => Option.isNone(before) || newestFirst(entry, before.value) > 0)
+          .toSorted(newestFirst)
+          .slice(0, options.limit)
+          .map(({ thread }) => thread);
+      },
+      Effect.mapError(storeFailure(ThreadStore, "listByStart")),
     ),
     getLatest: Effect.fn("Threads.getLatest")(
       function* (input) {

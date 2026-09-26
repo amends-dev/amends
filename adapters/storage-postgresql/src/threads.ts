@@ -101,6 +101,30 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "listByLatest")),
     ),
+    listByStart: Effect.fn("Threads.listByStart")(
+      function* (groupInput, input) {
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
+        const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
+        const orderedId = sql`${threads.id} COLLATE "C"`;
+        return yield* guard(
+          db
+            .select()
+            .from(threads)
+            .where(
+              and(
+                inWorkspace,
+                eq(threads.groupId, groupId),
+                options.before === undefined
+                  ? undefined
+                  : sql`(${threads.createdAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.createdAt), threads.createdAt)}, ${options.before.threadId})`,
+              ),
+            )
+            .orderBy(desc(threads.createdAt), desc(orderedId))
+            .limit(options.limit),
+        ).pipe(Effect.flatMap(decodeRows));
+      },
+      Effect.mapError(storeFailure(ThreadStore, "listByStart")),
+    ),
     getLatest: Effect.fn("Threads.getLatest")(
       function* (input) {
         const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);

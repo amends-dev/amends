@@ -157,6 +157,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         expect(texts(timeline)).toEqual(["Can you review the draft?", "On it."]);
         const latest = timeline.at(-1)!.activity.sequence;
+        // The group's stream shows the thread by its opening message, with the reply counted.
+        expect(
+          yield* asBob.threads.openings({ params: { workspaceId, groupId }, query: { limit: 10 } }),
+        ).toMatchObject([
+          {
+            thread: started.thread,
+            message: { id: started.message.id, text: "Can you review the draft?" },
+            replies: 1,
+            latest: { sequence: latest },
+          },
+        ]);
         const newest = yield* asBob.threads.timeline({
           params: { workspaceId, threadId },
           query: { limit: 1, from: "newest" },
@@ -305,6 +316,22 @@ describe.skipIf(!available)("PostgreSQL", () => {
           },
         });
         expect(rest.map((item) => item.thread.id)).toEqual([direct.thread.id]);
+        const [newest] = yield* asBob.threads.openings({
+          params: { workspaceId, groupId },
+          query: { limit: 1 },
+        });
+        expect(newest).toMatchObject({ thread: second.thread, message: { text: "Another one" } });
+        expect(
+          yield* asBob.threads.openings({
+            params: { workspaceId, groupId },
+            query: {
+              limit: 10,
+              before: { createdAt: newest!.thread.createdAt, threadId: newest!.thread.id },
+            },
+          }),
+        ).toMatchObject([
+          { thread: direct.thread, message: { text: "Quick question" }, replies: 0 },
+        ]);
         // Direct groups have fixed members and nothing to follow.
         const roster = yield* asAlice.groups.members({
           params: { workspaceId, groupId },
@@ -371,6 +398,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
               get: { operationId: "threads.list" },
               post: { operationId: "threads.start" },
             },
+            "/workspaces/{workspaceId}/groups/{groupId}/openings": {
+              get: { operationId: "threads.openings" },
+            },
             "/workspaces/{workspaceId}/threads/{threadId}/timeline": {
               get: { operationId: "threads.timeline" },
             },
@@ -378,7 +408,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
               get: { operationId: "notifications.source" },
             },
           },
-          components: { schemas: { TimelineItem: {}, GroupListItem: {}, ThreadListItem: {} } },
+          components: {
+            schemas: { TimelineItem: {}, GroupListItem: {}, ThreadListItem: {}, ThreadOpening: {} },
+          },
         });
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),

@@ -50,6 +50,30 @@ export const ListItem = Schema.Struct({
   unread: Schema.Boolean,
 });
 export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
+/** Exclusive boundary for paging a group's threads by when they started, newest first. */
+export const OpeningCursor = Schema.Struct({
+  createdAt: Record.fields.createdAt,
+  threadId: ThreadId.Id,
+});
+export interface OpeningCursor extends Schema.Schema.Type<typeof OpeningCursor> {}
+export const OpeningOptions = Schema.Struct({
+  before: Schema.optionalKey(OpeningCursor),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface OpeningOptions extends Schema.Schema.Type<typeof OpeningOptions> {}
+/**
+ * A readable thread as its group's stream shows it: the message that opened it, how many replies
+ * followed, its latest message, and the reader's position, with `unread` as in `ListItem`.
+ */
+export const Opening = Schema.Struct({
+  thread: Record,
+  message: ThreadMessage.Record,
+  replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  latest: Latest,
+  readThrough: ListItem.fields.readThrough,
+  unread: Schema.Boolean,
+});
+export interface Opening extends Schema.Schema.Type<typeof Opening> {}
 export const StartInGroupInput = Schema.Struct({
   groupId: GroupId.Id,
   text: ThreadMessage.Text,

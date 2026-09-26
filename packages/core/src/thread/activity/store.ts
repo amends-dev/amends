@@ -3,8 +3,7 @@ import type { Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
 import type { WorkspaceId } from "../../workspace/id.ts";
 import type { ThreadActivity } from "./activity.ts";
-
-import type { ThreadId } from "../id.ts";
+import { ThreadId } from "../id.ts";
 
 /**
  * One page of a thread's timeline, always in ascending sequence order. The range lies strictly
@@ -29,6 +28,13 @@ export const ReadOptions = Schema.Struct({
 );
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
+/** How many activities of one kind a thread holds. */
+export const Count = Schema.Struct({
+  threadId: ThreadId.Id,
+  count: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface Count extends Schema.Schema.Type<typeof Count> {}
+
 export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
@@ -50,6 +56,21 @@ export interface Interface {
   readonly latest: (
     id: ThreadId.Id,
   ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
+  /**
+   * The first activity of several threads in one read. Absent IDs are omitted and each thread
+   * appears once; order is unspecified.
+   */
+  readonly getFirst: (
+    ids: ReadonlyArray<ThreadId.Id>,
+  ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+  /**
+   * How many activities of one kind each of several threads holds, in one read. Threads with none,
+   * and absent IDs, are omitted; order is unspecified.
+   */
+  readonly countByKind: (
+    ids: ReadonlyArray<ThreadId.Id>,
+    kind: ThreadActivity.Kind,
+  ) => Effect.Effect<ReadonlyArray<Count>, Failure>;
   /**
    * At most limit activities of the requested range, from its requested end, in ascending
    * sequence order. No shared snapshot across pages.

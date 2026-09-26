@@ -135,6 +135,7 @@ const conversations = Layer.mergeAll(
         Effect.fail(new ThreadApplication.NotFound({ threadId: id })),
       ),
       listInGroup: record("thread.list", () => Effect.succeed([])),
+      listOpenings: record("thread.openings", () => Effect.succeed([])),
       readTimeline: record("thread.timeline", () => Effect.succeed([])),
       listParticipants: record("thread.participants", () => Effect.succeed([])),
     }),
@@ -569,6 +570,7 @@ it.effect(
         latestActivityAt: DateTime.makeUnsafe("2026-01-02T03:04:05.678Z"),
         threadId: Thread.Id.make("a + & é"),
       };
+      const opened = { createdAt: before.latestActivityAt, threadId: before.threadId };
       const membershipId = GroupMembership.Id.make("admission-one");
       const participationId = ThreadParticipation.Id.make("participation-one");
       const key = Request.Key.make("start-1");
@@ -621,6 +623,11 @@ it.effect(
           client.threads.list({
             params: { workspaceId, groupId },
             query: { limit: 10, before },
+            responseMode: "response-only",
+          }),
+          client.threads.openings({
+            params: { workspaceId, groupId },
+            query: { limit: 10, before: opened },
             responseMode: "response-only",
           }),
           client.threads.start({
@@ -677,8 +684,8 @@ it.effect(
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
       );
       expect(statuses).toEqual([
-        201, 200, 404, 200, 409, 409, 409, 204, 409, 204, 200, 409, 400, 404, 200, 200, 403, 404,
-        409, 409, 404, 409,
+        201, 200, 404, 200, 409, 409, 409, 204, 409, 204, 200, 200, 409, 400, 404, 200, 200, 403,
+        404, 409, 409, 404, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
@@ -695,6 +702,7 @@ it.effect(
         { operation: "group.unfollow", arguments: [{ groupId, memberId }] },
         { operation: "group.markRead", arguments: [{ groupId }] },
         { operation: "thread.list", arguments: [groupId, { limit: 10, before }] },
+        { operation: "thread.openings", arguments: [groupId, { limit: 10, before: opened }] },
         {
           operation: "thread.start",
           arguments: [{ groupId, text: "  Hello\n", mentions: [memberId] }, { requestKey: key }],

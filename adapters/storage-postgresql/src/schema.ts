@@ -525,6 +525,8 @@ export const threads = pgTable(
       sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
     ),
     index("threads_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
+    // A group's threads by when they started, newest first.
+    index("threads_by_start").on(t.workspaceId, t.groupId, t.createdAt, sql`${t.id} COLLATE "C"`),
     // A group's threads by latest activity, newest first.
     index("threads_by_latest").on(
       t.workspaceId,

@@ -27,6 +27,14 @@ export interface Interface {
     options: Thread.ListOptions,
   ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
   /**
+   * A group's threads, newest start first, then ID in descending binary order, after the exclusive
+   * `before` cursor and up to `limit`.
+   */
+  readonly listByStart: (
+    id: GroupId.Id,
+    options: Thread.OpeningOptions,
+  ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+  /**
    * Reject malformed or foreign records and reused IDs. The group and creator are recorded as given,
    * checked when the thread starts. Preserve historical values on replay.
    */

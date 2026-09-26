@@ -1109,15 +1109,63 @@ export const threadReads = (harness: Harness) => {
               ),
             ).toEqual(byId(messages));
             expect(messages).toHaveLength(2);
+            // A thread's first activity is its opening message; counts are per kind.
+            yield* append(bound, first.thread, 2);
+            const threadIds = [
+              first.thread.id,
+              second.thread.id,
+              first.thread.id,
+              Thread.Id.make("missing"),
+            ];
+            const openings = [
+              ...Option.toArray(yield* bound.activities.get(first.activity.id)),
+              ...Option.toArray(yield* bound.activities.get(second.activity.id)),
+            ];
+            expect(byId(yield* bound.activities.getFirst(threadIds))).toEqual(byId(openings));
+            const published = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
+            const byThread = (counts: ReadonlyArray<ThreadActivityStore.Count>) =>
+              [...counts].sort((a, b) => (a.threadId < b.threadId ? -1 : 1));
+            expect(byThread(yield* bound.activities.countByKind(threadIds, published))).toEqual(
+              byThread([
+                { threadId: first.thread.id, count: 2 },
+                { threadId: second.thread.id, count: 1 },
+              ]),
+            );
+            const unused = ThreadActivity.Kind.make("participation.ended");
+            // A group's threads by start: newest first, equal times in descending ID order.
+            const started = (yield* bound.threads.listByGroup(group.id)).toSorted(
+              (a, b) =>
+                DateTime.toEpochMillis(b.createdAt) - DateTime.toEpochMillis(a.createdAt) ||
+                (a.id < b.id ? 1 : a.id > b.id ? -1 : 0),
+            );
+            expect(started).toHaveLength(2);
+            expect(yield* bound.threads.listByStart(group.id, { limit: 10 })).toEqual(started);
+            const [newest, oldest] = started;
+            if (newest === undefined || oldest === undefined)
+              return yield* Effect.die("Missing threads");
+            expect(yield* bound.threads.listByStart(group.id, { limit: 1 })).toEqual([newest]);
+            expect(
+              yield* bound.threads.listByStart(group.id, {
+                before: { createdAt: newest.createdAt, threadId: newest.id },
+                limit: 10,
+              }),
+            ).toEqual([oldest]);
             for (const empty of [
               bound.members.getMany([]),
               bound.groupMemberships.getMany([]),
               bound.participations.getMany([]),
               bound.messages.getMany([]),
+              bound.activities.getFirst([]),
+              bound.activities.countByKind([], published),
+              bound.activities.countByKind(threadIds, unused),
+              bound.threads.listByStart(Group.Id.make("missing"), { limit: 10 }),
               foreign.members.getMany(memberIds),
               foreign.groupMemberships.getMany(admissionIds),
               foreign.participations.getMany(participationIds),
               foreign.messages.getMany(messageIds),
+              foreign.activities.getFirst(threadIds),
+              foreign.activities.countByKind(threadIds, published),
+              foreign.threads.listByStart(group.id, { limit: 10 }),
             ])
               expect(yield* empty).toEqual([]);
           }),
@@ -1270,6 +1318,55 @@ export const threadReads = (harness: Harness) => {
                 expect(yield* Effect.flip(run(broken, owner, list(group.id)))).toMatchObject({
                   _tag: "ThreadApplication.InvalidResponse",
                 });
+              }
+              // A stream page rejects listings, openings, messages, and counts that do not agree.
+              const openings = Effect.flatMap(ThreadApplication.Service, (service) =>
+                service.listOpenings(group.id, { limit: 100 }),
+              );
+              expect(yield* run(bound, owner, openings)).toHaveLength(2);
+              const opening = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
+              const other = Option.getOrThrow(yield* bound.activities.get(second.activity.id));
+              const count = { threadId: first.thread.id, count: 1 };
+              for (const replace of [
+                { listByStart: () => Effect.succeed([first.thread, first.thread]) },
+                { listByStart: () => Effect.succeed([secret.thread]) },
+              ]
+                .map((stores) =>
+                  Context.add(bound.context, ThreadStore.Service, { ...bound.threads, ...stores }),
+                )
+                .concat(
+                  [
+                    { getFirst: () => Effect.succeed([opening]) },
+                    { getFirst: () => Effect.succeed([opening, opening, other]) },
+                    {
+                      getFirst: () =>
+                        Effect.succeed([opening, Object.assign({}, other, { sequence: 2 })]),
+                    },
+                    { countByKind: () => Effect.succeed([count]) },
+                    {
+                      countByKind: () =>
+                        Effect.succeed([count, count, { ...count, threadId: second.thread.id }]),
+                    },
+                  ].map((stores) =>
+                    Context.add(bound.context, ThreadActivityStore.Service, {
+                      ...bound.activities,
+                      ...stores,
+                    }),
+                  ),
+                )
+                .concat([
+                  Context.add(bound.context, ThreadMessageStore.Service, {
+                    ...bound.messages,
+                    getMany: () =>
+                      Effect.succeed([
+                        Object.assign({}, first.message, { threadId: second.thread.id }),
+                        second.message,
+                      ]),
+                  }),
+                ])) {
+                expect(
+                  yield* Effect.flip(run({ ...bound, context: replace }, owner, openings)),
+                ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
               }
               for (const rows of [
                 [participant, participant],

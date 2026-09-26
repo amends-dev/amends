@@ -30,6 +30,16 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
+      openings: ({ params, query }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadApplication.Service, (threads) =>
+              threads.listOpenings(params.groupId, query),
+            ),
+          ),
+        ),
       start: ({ params, headers, payload }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

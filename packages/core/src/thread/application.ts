@@ -31,6 +31,10 @@ import { ThreadParticipationStore } from "./participation/store.ts";
 import { ThreadActivityReading } from "./activity/reading.ts";
 import { ThreadActivityResolvers } from "./activity/resolvers.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
+import { ThreadActivity } from "./activity/activity.ts";
+import { ThreadActivityKind } from "./activity/kind.ts";
+import { ThreadMessageActivity } from "./message/activity.ts";
+import { ThreadMessage } from "./message/message.ts";
 import { ThreadReading } from "../attention/reading.ts";
 import { ReadStateStore } from "../attention/store.ts";
 import type { Request } from "../request/request.ts";
@@ -125,6 +129,16 @@ export interface Interface {
     groupId: Group.Id,
     options: Thread.ListOptions,
   ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Service>;
+  /**
+   * One page of a group's threads the actor can read, newest start first, as its stream shows them:
+   * each with its opening message, reply count, latest message, and the actor's position and unread
+   * state, under the same rules as `listInGroup`. A page reads a fixed number of times, however
+   * many threads it holds.
+   */
+  readonly listOpenings: (
+    groupId: Group.Id,
+    options: Thread.OpeningOptions,
+  ) => Effect.Effect<ReadonlyArray<Thread.Opening>, ReadError, Actor.Service>;
   /** Bounded activity page with resolved subjects, ordered by sequence. The cursor is exclusive. */
   readonly readTimeline: (
     threadId: Thread.Id,
@@ -429,12 +443,21 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     ]);
     return thread;
   });
-  const listInGroup = Effect.fn("ThreadApplication.listInGroup")(function* (
+  /**
+   * Fill a page with a group's threads the actor can read, from one store listing, reading further
+   * when grants skip some. Each comes with its latest activity and the actor's position.
+   */
+  const readablePage = Effect.fnUntraced(function* <Cursor>(
     groupId: Group.Id,
-    input: Thread.ListOptions,
+    limit: number,
+    first: Cursor | undefined,
+    list: (
+      id: Group.Id,
+      before: Cursor | undefined,
+    ) => Effect.Effect<ReadonlyArray<Thread.Record>, ThreadStore.Failure>,
+    cursorOf: (thread: Thread.Record, latest: Thread.Latest) => Cursor,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
     const admission = yield* audience
       .require(id)
       .pipe(
@@ -445,14 +468,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     const actor = yield* Actor.Service;
     const seen = new Set<Thread.Id>();
     const items: Array<Thread.ListItem> = [];
-    let before = options.before;
-    // Fill the page with readable threads, reading further when grants skip some.
-    while (items.length < options.limit) {
+    let before = first;
+    while (items.length < limit) {
       const page: Array<Thread.Record> = [];
-      for (const found of yield* threads.listByLatest(
-        id,
-        before === undefined ? { limit: options.limit } : { before, limit: options.limit },
-      )) {
+      for (const found of yield* list(id, before)) {
         const thread = yield* decodeThread(found).pipe(Effect.mapError(invalidReadRecord));
         if (thread.workspaceId !== workspaceId || thread.groupId !== id || seen.has(thread.id))
           return yield* new InvalidResponse({
@@ -496,8 +515,8 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         const current = latest.get(thread.id);
         if (current === undefined)
           return yield* new InvalidResponse({ message: "Listed thread has no recorded activity" });
-        before = { latestActivityAt: current.occurredAt, threadId: thread.id };
-        if (allowed[index] !== true || items.length === options.limit) continue;
+        before = cursorOf(thread, current);
+        if (allowed[index] !== true || items.length === limit) continue;
         const readThrough = positions.get(thread.id) ?? null;
         items.push({
           thread,
@@ -510,9 +529,111 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
               : current.sequence > readThrough,
         });
       }
-      if (page.length < options.limit) break;
+      if (page.length < limit) break;
     }
     return items;
+  });
+  const listInGroup = Effect.fn("ThreadApplication.listInGroup")(function* (
+    groupId: Group.Id,
+    input: Thread.ListOptions,
+  ) {
+    const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
+    return yield* readablePage(
+      groupId,
+      options.limit,
+      options.before,
+      (id, before) =>
+        threads.listByLatest(
+          id,
+          before === undefined ? { limit: options.limit } : { before, limit: options.limit },
+        ),
+      (thread, latest): Thread.ListCursor => ({
+        latestActivityAt: latest.occurredAt,
+        threadId: thread.id,
+      }),
+    );
+  });
+  const published = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
+  const listOpenings = Effect.fn("ThreadApplication.listOpenings")(function* (
+    groupId: Group.Id,
+    input: Thread.OpeningOptions,
+  ) {
+    const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
+    const items = yield* readablePage(
+      groupId,
+      options.limit,
+      options.before,
+      (id, before) =>
+        threads.listByStart(
+          id,
+          before === undefined ? { limit: options.limit } : { before, limit: options.limit },
+        ),
+      (thread): Thread.OpeningCursor => ({ createdAt: thread.createdAt, threadId: thread.id }),
+    );
+    if (items.length === 0) return [];
+    // A start publishes its opening message as the thread's first activity.
+    const ids = items.map((item) => item.thread.id);
+    const openings = new Map<Thread.Id, ThreadMessage.Id>();
+    for (const row of yield* activities.getFirst(ids)) {
+      const activity = yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(row).pipe(
+        Effect.mapError(invalidReadRecord),
+      );
+      if (
+        activity.workspaceId !== workspaceId ||
+        !ids.includes(activity.threadId) ||
+        openings.has(activity.threadId) ||
+        activity.sequence !== 1
+      )
+        return yield* new InvalidResponse({
+          message: "Activity store returned another thread's or a later activity",
+        });
+      const opening = yield* ThreadActivityKind.decode(
+        ThreadMessageActivity.Published,
+        activity,
+      ).pipe(
+        Effect.mapError(
+          () => new InvalidResponse({ message: "A thread does not open with a message" }),
+        ),
+      );
+      openings.set(activity.threadId, opening.details.messageId);
+    }
+    const found = new Map<ThreadMessage.Id, ThreadMessage.Record>();
+    for (const row of yield* messages.getMany([...openings.values()])) {
+      const message = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Record))(row).pipe(
+        Effect.mapError(invalidReadRecord),
+      );
+      if (message.workspaceId !== workspaceId || openings.get(message.threadId) !== message.id)
+        return yield* new InvalidResponse({
+          message: "Message store returned another thread's or workspace's message",
+        });
+      found.set(message.id, message);
+    }
+    const counts = new Map<Thread.Id, number>();
+    for (const row of yield* activities.countByKind(ids, published)) {
+      const value = yield* Schema.decodeEffect(Schema.toType(ThreadActivityStore.Count))(row).pipe(
+        Effect.mapError(invalidReadRecord),
+      );
+      if (!ids.includes(value.threadId) || counts.has(value.threadId))
+        return yield* new InvalidResponse({
+          message: "Activity store counted another thread",
+        });
+      counts.set(value.threadId, value.count);
+    }
+    return yield* Effect.forEach(items, (item) => {
+      const messageId = openings.get(item.thread.id);
+      const message = messageId === undefined ? undefined : found.get(messageId);
+      const count = counts.get(item.thread.id);
+      return message === undefined || count === undefined
+        ? Effect.fail(new InvalidResponse({ message: "A listed thread's opening is missing" }))
+        : Effect.succeed({
+            thread: item.thread,
+            message,
+            replies: count - 1,
+            latest: item.latest,
+            readThrough: item.readThrough,
+            unread: item.unread,
+          } satisfies Thread.Opening);
+    });
   });
   const readTimeline = Effect.fn("ThreadApplication.readTimeline")(
     (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>
@@ -549,6 +670,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     startDirect,
     get,
     listInGroup,
+    listOpenings,
     readTimeline,
     listParticipants,
   });

@@ -50,7 +50,9 @@ run on their own, without the workspace lock, when the caller has no transaction
 
 Read-state tables reference no projection rows, so rebuilding projections keeps them.
 `threads_by_latest` serves a group's threads newest latest activity first, from an exclusive
-`(latest_activity_at, id)` cursor.
+`(latest_activity_at, id)` cursor, and `threads_by_start` newest start first, from an exclusive
+`(created_at, id)` cursor. A stream page reads its threads' first activities through the
+`(thread_id, sequence)` index and counts their messages with one grouped query.
 
 `active_group_memberships_by_member` pages a member's current groups in group-ID order for
 group lists; rosters page a group's active admissions by admission ID.

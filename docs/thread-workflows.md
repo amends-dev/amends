@@ -171,13 +171,18 @@ follow the same policy.
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `get(threadId)`                                                             | The thread's metadata.                                                                                                                                                                                       |
 | `listInGroup(groupId, { limit, before? })`                                  | A page of `Thread.ListItem` values, newest latest activity first: each readable thread with its latest message, the caller's read position, and `unread`. Threads without a covering read grant are skipped. |
+| `listOpenings(groupId, { limit, before? })`                                 | A page of `Thread.Opening` values, newest start first: each readable thread with its opening message, reply count, latest message, the caller's read position, and `unread`, as its group's stream shows it. |
 | `readTimeline(threadId, { limit, afterSequence?, beforeSequence?, from? })` | An ascending sequence page of `Thread.TimelineItem` values with each activity's resolved subject, from the oldest or the newest end of the range.                                                            |
 | `listParticipants(threadId, { limit, after? })`                             | A page of current `ThreadParticipation.Summary` values in participation-ID order, after the exclusive `after` participation ID.                                                                              |
 
 `listInGroup` keeps reading until the page is full or the group has no older threads. Its
-exclusive `before` cursor is the last item's latest activity time and thread ID. A thread is
-`unread` when its latest message is past the caller's read position or, if never read, came after
-the caller joined the group. Posting reads the thread through the author's own message.
+exclusive `before` cursor is the last item's latest activity time and thread ID. `listOpenings`
+applies the same access and unread rules in start order, so a reply never moves a thread; its
+`before` cursor is the last item's thread `createdAt` and ID. Its reply count is the thread's
+messages after the opening one, and the opening message is read by reference, so a page makes a
+fixed number of reads however many threads it holds. A thread is `unread` when its latest message
+is past the caller's read position or, if never read, came after the caller joined the group.
+Posting reads the thread through the author's own message.
 
 A nonparticipant with group access and the grant can read the whole earlier conversation. Reading
 creates no participation, acknowledges nothing, and requests no agent work. Later group members

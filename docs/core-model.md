@@ -2462,8 +2462,8 @@ not bypass the audience requirement; workspace ownership or an administrator rol
 implicitly make someone a member of every conversation. Any broader inspection policy
 requires an explicit future design.
 
-For implemented group threads, `ThreadApplication.get`, `listInGroup`, `readTimeline`, and
-`listParticipants` enforce current group access and `thread.read` on the Thread target.
+For implemented group threads, `ThreadApplication.get`, `listInGroup`, `listOpenings`,
+`readTimeline`, and `listParticipants` enforce current group access and `thread.read` on the Thread target.
 Discovery filters unreadable threads. Timeline pages follow an exclusive sequence cursor and
 resolve message content or a historical follow summary under the same check. Participant summaries expose member references
 and joining details, while routing identities and ended participation remain internal.
