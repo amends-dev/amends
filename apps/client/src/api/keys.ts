@@ -16,11 +16,15 @@ export const workspaceKey = (workspaceId: string, resource: WorkspaceResource) =
   `workspace/${workspaceId}/${resource}`;
 
 /**
- * Reads of one group or thread: a group's stream, or a thread's timeline. Each registers under its
+ * Reads of one group or thread: a group's stream or roster, or a thread's timeline. Each registers under its
  * collection and its own ID, so one can be invalidated alone and a collection all at once.
  */
-export type WorkspaceCollection = "streams" | "timelines";
-export const workspaceCollections: ReadonlyArray<WorkspaceCollection> = ["streams", "timelines"];
+export type WorkspaceCollection = "streams" | "timelines" | "rosters";
+export const workspaceCollections: ReadonlyArray<WorkspaceCollection> = [
+  "streams",
+  "timelines",
+  "rosters",
+];
 export const collectionKey = (workspaceId: string, collection: WorkspaceCollection) =>
   `workspace/${workspaceId}/${collection}`;
 /** The key a read of one item registers. */

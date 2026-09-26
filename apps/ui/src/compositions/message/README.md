@@ -32,6 +32,10 @@ Root is an `article`; name it with `aria-labelledby` pointing at the Author. `de
 `comfortable` (default) for a stream and `compact` for a narrow thread panel, with the reference's
 smaller text and spacing. Avatar holds one decorative Avatar; the Author carries the name.
 
+Mention sets a mentioned person's `@name` apart inside Body: emphasized on a soft wash, so it
+reads as a reference to someone rather than an assignment. Callers decide which runs are
+mentions.
+
 Time is a `time` element: the visible text is short, `datetime` is required, and `title` can
 carry the full instant. Body keeps the author's line breaks and indentation and wraps long words.
 

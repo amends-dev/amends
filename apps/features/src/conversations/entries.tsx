@@ -4,7 +4,7 @@ import { Message } from "@amends/ui/compositions/message";
 import { Transcript } from "@amends/ui/compositions/transcript";
 import { For, Show, type JSX } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
-import { authorOf, dayLabel, dayOf, initials, timeOf } from "./presentation.ts";
+import { authorOf, dayLabel, dayOf, initials, memberName, timeOf } from "./presentation.ts";
 
 /** What a transcript shows for one message. */
 export interface Post {
@@ -12,10 +12,24 @@ export interface Post {
   readonly author: Parameters<typeof authorOf>[0];
   readonly publishedAt: Parameters<typeof timeOf>[0];
   readonly text: string;
+  /** The members the message addresses, whose `@name` in its text shows as a mention. */
+  readonly mentions: ReadonlyArray<string>;
 }
 type Row<P extends Post> =
   | { readonly key: string; readonly kind: "day"; readonly day: number }
   | { readonly key: string; readonly kind: "post"; readonly post: P };
+const escaped = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+/** A message's text as plain runs and the `@name` of each member it mentions. */
+const segments = (text: string, mentions: ReadonlyArray<string>, members: Members) => {
+  const tokens = mentions
+    .map((id) => `@${memberName(members.member(id))}`)
+    .toSorted((left, right) => right.length - left.length);
+  if (tokens.length === 0) return [{ text, mention: false }];
+  return text
+    .split(new RegExp(`(${tokens.map(escaped).join("|")})`, "u"))
+    .filter(Boolean)
+    .map((part) => ({ text: part, mention: tokens.includes(part) }));
+};
 /** Messages oldest first, with a day seam before each new day. */
 const rowsOf = <P extends Post>(posts: ReadonlyArray<P>) => {
   const rows: Array<Row<P>> = [];
@@ -75,7 +89,17 @@ export function Entries<P extends Post>(props: {
                           {time().text}
                         </Message.Time>
                       </Message.Header>
-                      <Message.Body>{post().text}</Message.Body>
+                      <Message.Body>
+                        <For each={segments(post().text, post().mentions, props.members)}>
+                          {(part) =>
+                            part.mention ? (
+                              <Message.Mention>{part.text}</Message.Mention>
+                            ) : (
+                              part.text
+                            )
+                          }
+                        </For>
+                      </Message.Body>
                       {props.footer?.(post())}
                     </Message.Content>
                   </Message.Root>

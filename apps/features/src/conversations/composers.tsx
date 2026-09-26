@@ -1,14 +1,18 @@
 import {
+  useGroupRoster,
   useGroups,
+  useMembers,
   useNewThread,
   useReply,
+  useWorkspace,
   type ComposerController,
   type WorkspaceFailure,
 } from "@amends/client";
-import { Composer } from "@amends/ui/compositions/composer";
+import { Composer, type MentionCandidate } from "@amends/ui/compositions/composer";
 import { Button } from "@amends/ui/primitives/button";
 import { createUniqueId, Show } from "solid-js";
 import { useGroupLabel } from "./group-name.tsx";
+import { memberName } from "./presentation.ts";
 
 const failures: { readonly [Failure in WorkspaceFailure]: string } = {
   changed: "This conversation changed while you were sending. Try again.",
@@ -17,8 +21,27 @@ const failures: { readonly [Failure in WorkspaceFailure]: string } = {
   invalid: "Write something to send.",
   failed: "We couldn’t send this. Try again when the host is reachable.",
 };
+/** The group's other members, as the composer suggests them after @. */
+function useCandidates(workspaceId: string, groupId: string) {
+  const roster = useGroupRoster(workspaceId, groupId);
+  const members = useMembers(workspaceId);
+  const self = useWorkspace(() => workspaceId);
+  return (): ReadonlyArray<MentionCandidate> =>
+    (roster.value() ?? []).flatMap((admission) => {
+      if (admission.memberId === self()?.member.id) return [];
+      const member = members.member(admission.memberId);
+      return [
+        {
+          id: admission.memberId,
+          label: memberName(member),
+          kind: member?.identity._tag === "Agent" ? "agent" : "human",
+        },
+      ];
+    });
+}
 function Writing(props: {
   readonly controller: ComposerController;
+  readonly candidates: ReadonlyArray<MentionCandidate>;
   readonly label: string;
   readonly placeholder: string;
   readonly note: string;
@@ -38,6 +61,11 @@ function Writing(props: {
           readOnly={control.pending()}
           value={control.draft()}
           onInput={control.setDraft}
+          mentions={{
+            candidates: props.candidates,
+            label: "People to mention",
+            onMention: (candidate) => control.mention(candidate.id, candidate.label),
+          }}
         />
         <Composer.Actions>
           <Button
@@ -69,6 +97,7 @@ export interface NewThreadComposerProps {
  */
 export function NewThreadComposer(props: NewThreadComposerProps) {
   const controller = useNewThread(props.workspaceId, props.groupId);
+  const candidates = useCandidates(props.workspaceId, props.groupId);
   const groups = useGroups(props.workspaceId);
   const label = useGroupLabel(props.workspaceId);
   const group = () => groups.value()?.find((item) => item.group.id === props.groupId)?.group;
@@ -80,8 +109,9 @@ export function NewThreadComposer(props: NewThreadComposerProps) {
   return (
     <Writing
       controller={controller}
+      candidates={candidates()}
       label={`Message ${name()}`}
-      placeholder={`Message ${name()}`}
+      placeholder={`Message ${name()} — @ to mention`}
       note={
         group()?.kind === "Direct"
           ? `Starts a new thread with ${name()}.`
@@ -93,16 +123,20 @@ export function NewThreadComposer(props: NewThreadComposerProps) {
 }
 export interface ReplyComposerProps {
   readonly workspaceId: string;
+  /** The thread's group, whose members its replies can mention. */
+  readonly groupId: string;
   readonly threadId: string;
 }
 /** The thread composer: writing in it replies in the thread. Its draft is kept per thread. */
 export function ReplyComposer(props: ReplyComposerProps) {
   const controller = useReply(props.workspaceId, props.threadId);
+  const candidates = useCandidates(props.workspaceId, props.groupId);
   return (
     <Writing
       controller={controller}
+      candidates={candidates()}
       label="Reply"
-      placeholder="Reply in this thread"
+      placeholder="Reply in this thread — @ to mention"
       note="Replying here stays in this thread."
       send="Reply"
       density="compact"

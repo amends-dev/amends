@@ -75,3 +75,15 @@ export const replies = style([
 ]);
 export const replyCount = style({ ...mono, fontSize: "0.71875rem", color: colorVars.text.link });
 export const replyNote = style({ ...mono, color: colorVars.text.secondary });
+/** A resolved mention in message text: a name set apart, never styled like an assignment. */
+export const mention = style({
+  fontWeight: 600,
+  color: colorVars.text.primary,
+  backgroundColor: colorVars.action.hover,
+  borderRadius: "0.3125rem",
+  paddingInline: "0.1875rem",
+  // A mention that wraps keeps its wash on each line.
+  boxDecorationBreak: "clone",
+  WebkitBoxDecorationBreak: "clone",
+  "@media": { "(forced-colors: active)": { backgroundColor: "transparent" } },
+});

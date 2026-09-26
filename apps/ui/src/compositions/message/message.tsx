@@ -52,6 +52,11 @@ export function Body(props: JSX.HTMLAttributes<HTMLParagraphElement>) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <p {...native} class={classes(s.body, local.class, local.classList)} />;
 }
+/** A mention of someone the message addresses, inside Body. */
+export function Mention(props: JSX.HTMLAttributes<HTMLSpanElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <span {...native} class={classes(s.mention, local.class, local.classList)} />;
+}
 export type RepliesProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "type"> & {
   href: string;
 };

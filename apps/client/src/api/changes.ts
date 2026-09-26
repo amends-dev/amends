@@ -77,13 +77,20 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     { collection: "timelines", id: text(payload, "activity", "threadId") },
     { collection: "streams", id: text(payload, "groupId") },
   ],
-  // Which of a group's threads the reader may see.
-  "group.membership.added": (payload) => [{ collection: "streams", id: text(payload, "groupId") }],
+  // Who belongs to a group, and which of its threads the reader may see.
+  "group.membership.added": (payload) => [
+    { collection: "streams", id: text(payload, "groupId") },
+    { collection: "rosters", id: text(payload, "groupId") },
+  ],
   "group.membership.removed": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
+    { collection: "rosters", id: text(payload, "groupId") },
   ],
+  // Rosters list active workspace members only.
+  "workspace.member.added": () => [{ collection: "rosters", id: undefined }],
+  "workspace.member.removed": () => [{ collection: "rosters", id: undefined }],
 };
-/** Grants decide which threads each stream shows, so they change every stream. */
+/** Grants decide which threads each stream shows and which rosters are readable. */
 const everyStream = new Set([
   "workspace.role.permissions-changed",
   "workspace.assignment.created",
@@ -108,7 +115,10 @@ export const affectedKeys = (
     for (const target of targets[event.name]?.(event.payload) ?? [])
       if (target.id === undefined) collections.add(target.collection);
       else items.add(itemKey(workspaceId, target.collection, target.id));
-    if (everyStream.has(event.name)) collections.add("streams");
+    if (everyStream.has(event.name)) {
+      collections.add("streams");
+      collections.add("rosters");
+    }
   }
   const whole = [...collections].map((collection) => collectionKey(workspaceId, collection));
   return [

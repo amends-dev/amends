@@ -8,20 +8,45 @@ import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
 
+/** Someone a draft mentioned, and the name its text shows them by after `@`. */
+export interface Mentioned {
+  readonly memberId: string;
+  readonly name: string;
+}
+interface Draft {
+  readonly text: string;
+  readonly mentioned: ReadonlyArray<Mentioned>;
+}
+const empty: Draft = { text: "", mentioned: [] };
 /** One draft per composer target, kept in the credential scope's registry while it lasts. */
-const draftOf = Atom.family((_key: string) => Atom.make("").pipe(Atom.keepAlive));
+const draftOf = Atom.family((_key: string) => Atom.make(empty).pipe(Atom.keepAlive));
+/** The members whose `@name` a text still contains, each once, in the order first mentioned. */
+export const mentionsIn = (text: string, mentioned: ReadonlyArray<Mentioned>) => [
+  ...new Set(
+    mentioned
+      .filter((entry) =>
+        new RegExp(`(^|\\s)@${escape(entry.name)}(?=$|[\\s.,;:!?)])`, "u").test(text),
+      )
+      .map((entry) => entry.memberId),
+  ),
+];
+const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 export interface ComposerController {
   /** The text being written, kept when the composer unmounts and remounts. */
   readonly draft: Accessor<string>;
-  /** Replace the draft; a failure shown for the previous one clears. */
+  /** Replace the draft's text; a failure shown for the previous one clears. */
   readonly setDraft: (text: string) => void;
+  /** Record that the text now mentions a member by `@name`. */
+  readonly mention: (memberId: string, name: string) => void;
+  /** The members the draft mentions: those whose `@name` is still in its text. */
+  readonly mentions: Accessor<ReadonlyArray<string>>;
   /** The draft has text and nothing is sending. */
   readonly ready: Accessor<boolean>;
   readonly pending: Accessor<boolean>;
   /** Why the last send failed; the draft is kept for another try. */
   readonly error: Accessor<WorkspaceFailure | undefined>;
-  /** Send the draft; it clears once the message is posted. */
+  /** Send the draft with its mentions; it clears once the message is posted. */
   readonly send: () => void;
 }
 type Target =
@@ -35,8 +60,9 @@ function compose(workspaceId: string, target: Target): ComposerController {
   const draft = useAtomValue(() => draftAtom),
     write = useAtomSet(() => draftAtom);
   const [error, setError] = createSignal<WorkspaceFailure>();
-  // A retry of the same text keeps its key, so a post that succeeded unseen is not repeated.
-  let attempt: { readonly text: string; readonly key: ReturnType<typeof newPostKey> } | undefined;
+  const mentions = () => mentionsIn(draft().text, draft().mentioned);
+  // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.
+  let attempt: { readonly body: string; readonly key: ReturnType<typeof newPostKey> } | undefined;
   const request = useRequest(
     postRequest(useApiClient(), workspaceId),
     (exit, post) => {
@@ -45,26 +71,37 @@ function compose(workspaceId: string, target: Target): ComposerController {
         return;
       }
       attempt = undefined;
-      if (draft() === post.text) write("");
+      if (draft().text === post.text) write(empty);
     },
     { when: () => session.session !== undefined },
   );
-  const ready = () => isMessageText(draft()) && !request.pending();
+  const ready = () => isMessageText(draft().text) && !request.pending();
   return {
-    draft,
+    draft: () => draft().text,
     setDraft: (text) => {
-      write(text);
+      write({ ...draft(), text });
       setError(undefined);
     },
+    mention: (memberId, name) =>
+      write({
+        ...draft(),
+        mentioned: [
+          ...draft().mentioned.filter((entry) => entry.memberId !== memberId),
+          { memberId, name },
+        ],
+      }),
+    mentions,
     ready,
     pending: request.pending,
     error,
     send: () => {
       if (!ready()) return;
-      const text = draft();
-      if (attempt?.text !== text) attempt = { text, key: newPostKey() };
+      const text = draft().text,
+        addressed = mentions();
+      const body = JSON.stringify([text, addressed]);
+      if (attempt?.body !== body) attempt = { body, key: newPostKey() };
       setError(undefined);
-      request.run({ ...target, text, key: attempt.key } as Post);
+      request.run({ ...target, text, mentions: addressed, key: attempt.key } as Post);
     },
   };
 }

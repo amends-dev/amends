@@ -256,10 +256,11 @@ export function WorkspaceLayout(props: ParentProps) {
           if (!open && group) navigate(paths.group(params.workspaceId, group));
         }}
       >
-        <Show when={threadId()} keyed>
+        <Show when={groupId() && threadId()} keyed>
           {(id) => (
             <ThreadPanel
               workspaceId={params.workspaceId}
+              groupId={groupId()!}
               threadId={id}
               onClose={() => {
                 const group = groupId();

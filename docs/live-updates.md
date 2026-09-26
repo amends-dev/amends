@@ -11,12 +11,13 @@ and cache invalidation; apps mount it once per workspace view; features show its
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
    each workspace's `settings`, `ownership`, `members`, `invitations`, and `groups`, and one key
-   per group stream and thread timeline within their collections.
+   per group stream, group roster, and thread timeline within their collections.
 3. Each `Committed` message maps its events to the keys they affect
    (`apps/client/src/api/changes.ts`) and invalidates each once, so every affected read
    refreshes once. Thread activity names its thread and group in its payload, so it refreshes
    that thread's timeline and that group's stream, and the groups list; group membership
-   refreshes the groups and that group's stream, and grant changes every stream. A commit that
+   refreshes the groups and that group's stream and roster, workspace membership every roster,
+   and grant changes every stream and roster. A commit that
    carries a notification for the reader refreshes the groups' pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. Facts with no mapping refresh nothing. Add
    a mapping when a read starts depending on a fact.

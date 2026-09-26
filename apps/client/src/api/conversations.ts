@@ -1,4 +1,12 @@
-import { Group, Member, Thread, ThreadMessage, ThreadTimeline, Workspace } from "@amends/api-http";
+import {
+  Group,
+  GroupMembership,
+  Member,
+  Thread,
+  ThreadMessage,
+  ThreadTimeline,
+  Workspace,
+} from "@amends/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
@@ -7,7 +15,7 @@ import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
 import { requestAtom } from "./request.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
-export { Group, Member, Thread, ThreadTimeline };
+export { Group, GroupMembership, Member, Thread, ThreadTimeline };
 
 /** How many threads or timeline items one page reads. */
 export const pageSize = 50;
@@ -54,6 +62,35 @@ const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
 );
 export const groupsRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId) ? groupsOf(client, workspaceId) : undefined;
+
+/** A group's current admissions, read page by page: whom its messages can mention. */
+const rosterOf = perClient((client: ApiClient, key: string) => {
+  const { workspaceId, id } = split(key);
+  return client.runtime
+    .atom(
+      Effect.gen(function* () {
+        const api = yield* client;
+        const params = { workspaceId, groupId: Group.Id.make(id) };
+        const admissions: Array<GroupMembership.Record> = [];
+        let after: GroupMembership.Id | undefined;
+        while (true) {
+          const page = yield* api.groups.members({
+            params,
+            query: after === undefined ? { limit: 100 } : { limit: 100, after },
+          });
+          admissions.push(...page);
+          const last = page.at(-1);
+          if (page.length < 100 || last === undefined) return admissions;
+          after = last.id;
+        }
+      }),
+    )
+    .pipe(Atom.withReactivity(itemKeys(workspaceId, "rosters", id)));
+});
+export const rosterRead = (client: ApiClient, workspaceId: string, groupId: string) =>
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(Group.Id)(groupId))
+    ? rosterOf(client, joined(workspaceId, groupId))
+    : undefined;
 
 /** The workspace's members, to name authors. */
 export const membersRead = (client: ApiClient, workspaceId: string) =>
@@ -188,20 +225,16 @@ export const timelineRead = (client: ApiClient, workspaceId: string, threadId: s
 /** Whether text can be sent as a message: it has something besides whitespace. */
 export const isMessageText = Schema.is(ThreadMessage.Text);
 export const newPostKey = newWorkspaceRequestKey;
+interface Message {
+  readonly text: string;
+  /** The members the message addresses. */
+  readonly mentions: ReadonlyArray<string>;
+  readonly key: ReturnType<typeof newPostKey>;
+}
 /** A message to post: the first of a new thread in a group, or a reply in a thread. */
 export type Post =
-  | {
-      readonly kind: "start";
-      readonly groupId: string;
-      readonly text: string;
-      readonly key: ReturnType<typeof newPostKey>;
-    }
-  | {
-      readonly kind: "reply";
-      readonly threadId: string;
-      readonly text: string;
-      readonly key: ReturnType<typeof newPostKey>;
-    };
+  | (Message & { readonly kind: "start"; readonly groupId: string })
+  | (Message & { readonly kind: "reply"; readonly threadId: string });
 /**
  * Post one message, then invalidate the reads it changes, as the change feed would when the
  * commit arrives, so it shows even while the feed is away. A retry with the same key returns the
@@ -212,7 +245,10 @@ export const postRequest = (client: ApiClient, workspace: string) =>
     Effect.gen(function* () {
       const api = yield* client;
       const workspaceId = yield* command(Workspace.Id)(workspace);
-      const payload = { text: yield* command(ThreadMessage.Text)(post.text), mentions: [] };
+      const payload = {
+        text: yield* command(ThreadMessage.Text)(post.text),
+        mentions: yield* command(ThreadMessage.PublishInput.fields.mentions)(post.mentions),
+      };
       const headers = { "idempotency-key": post.key };
       switch (post.kind) {
         case "start": {

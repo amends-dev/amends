@@ -39,6 +39,7 @@ export function GroupStream(props: GroupStreamProps) {
       author: opening.message.author,
       publishedAt: opening.message.publishedAt,
       text: opening.message.text,
+      mentions: opening.message.mentions,
       opening,
     }));
   // Writing on the page starts a thread; it docks under the stream while the group is readable.

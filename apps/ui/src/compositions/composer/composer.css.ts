@@ -4,6 +4,8 @@ import { focus } from "../../foundations/focus/tokens.ts";
 import { fontFamilies } from "../../foundations/typography/tokens.ts";
 
 export const root = style({
+  // Suggestions open above the composer.
+  position: "relative",
   display: "flex",
   flexDirection: "column",
   gap: "0.625rem",
@@ -83,4 +85,62 @@ export const docked = style({
   zIndex: 1,
   paddingBlock: "0.75rem 1rem",
   minWidth: 0,
+});
+
+export const suggestions = style({
+  position: "absolute",
+  insetInlineStart: 0,
+  bottom: "calc(100% + 0.375rem)",
+  zIndex: 20,
+  boxSizing: "border-box",
+  width: "min(22rem, 100%)",
+  maxHeight: "min(18rem, 50dvh)",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  margin: 0,
+  padding: "0.375rem",
+  listStyle: "none",
+  borderRadius: "0.625rem",
+  backgroundColor: colorVars.surface.panel,
+  color: colorVars.text.primary,
+  boxShadow: "0 2px 4px oklch(0.24 0.014 84 / 0.06), 0 10px 28px oklch(0.24 0.014 84 / 0.1)",
+  "@media": { "(forced-colors: active)": { border: "1px solid CanvasText", boxShadow: "none" } },
+});
+export const suggestion = style({
+  display: "flex",
+  alignItems: "center",
+  gap: "0.625rem",
+  minHeight: "2.375rem",
+  minWidth: 0,
+  boxSizing: "border-box",
+  padding: "0.375rem 0.625rem",
+  borderRadius: "0.4375rem",
+  cursor: "pointer",
+  fontSize: "0.875rem",
+  selectors: {
+    '&[aria-selected="true"]': { backgroundColor: colorVars.action.hover },
+  },
+  "@media": {
+    "(any-pointer: coarse)": { minHeight: "2.75rem" },
+    "(forced-colors: active)": {
+      selectors: {
+        '&[aria-selected="true"]': {
+          forcedColorAdjust: "none",
+          backgroundColor: "Highlight",
+          color: "HighlightText",
+        },
+      },
+    },
+  },
+});
+export const suggestionLabel = style({ minWidth: 0, overflowWrap: "anywhere" });
+export const suggestionNote = style({
+  marginInlineStart: "auto",
+  minWidth: 0,
+  fontFamily: fontFamilies.mono,
+  fontSize: "0.6875rem",
+  color: colorVars.text.secondary,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 });

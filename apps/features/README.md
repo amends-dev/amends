@@ -141,7 +141,9 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   messages". The app places it in `Shell.Inspector` and owns where closing leads.
 - `GroupName` renders a group's name as text, the same way the navigation names it.
 - `NewThreadComposer` and `ReplyComposer` write a new thread in a group and a reply in a thread.
-  They show what sending does, or why it failed, and keep the draft for another try. The stream
+  They show what sending does, or why it failed, and keep the draft for another try. Typing `@`
+  suggests the group's other members from its roster, and a chosen member is mentioned while
+  their `@name` stays in the text; messages show their mentions set apart. The stream
   docks the first under itself while the group is readable, and the thread panel docks the
   second under the thread.
 
@@ -150,4 +152,5 @@ message shows its time of day with the full date as its title, and day seams rea
 Yesterday, a weekday within the week, or the date. The **Features / Conversations** stories run a
 group through the real host: the owner reads a stream a member started, opens a thread, and its
 controls post as the member, so replies and new threads arrive over the live feed. **Writing**
-starts a thread from the page, replies in a thread, and returns to find a draft kept.
+starts a thread from the page, mentions the other member, replies in a thread, and returns to
+find a draft kept.

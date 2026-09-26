@@ -85,6 +85,23 @@ function Reference(props: { theme?: "cotton" | "soot"; width?: string; rtl?: boo
         text="Explain the reconcile script to me — what is it actually comparing?"
         replies={{ count: "3 replies", note: "last at 14:05" }}
       />
+      <Message.Root aria-labelledby="mention-author">
+        <Message.Avatar>
+          <Avatar.Root kind="human" decorative>
+            <Avatar.Fallback>RA</Avatar.Fallback>
+          </Avatar.Root>
+        </Message.Avatar>
+        <Message.Content>
+          <Message.Header>
+            <Message.Author id="mention-author">Rae Ashworth</Message.Author>
+            <Message.Time datetime="2026-09-22T15:02:00Z">15:02</Message.Time>
+          </Message.Header>
+          <Message.Body>
+            <Message.Mention>@Ada</Message.Mention> can you check the totals with{" "}
+            <Message.Mention>@Jo Mercer</Message.Mention> before the close?
+          </Message.Body>
+        </Message.Content>
+      </Message.Root>
       <Entry
         id="hello"
         who="Jo Mercer"

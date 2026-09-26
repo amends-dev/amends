@@ -185,6 +185,7 @@ export function ConversationsFixture(props: {
                       {(threadId) => (
                         <ThreadPanel
                           workspaceId={value().workspaceId}
+                          groupId={value().groupId}
                           threadId={threadId}
                           onClose={() => {
                             window.location.hash = "";

@@ -16,6 +16,7 @@ import {
   type ThreadTimeline,
 } from "../src/index.ts";
 import { affectedKeys, signalKeys } from "../src/api/changes.ts";
+import { mentionsIn } from "../src/conversations/compose.ts";
 
 afterEach(cleanup);
 const json = (body: unknown) =>
@@ -132,6 +133,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
   ]);
   expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
     "workspace/one/groups",
+    "workspace/one/rosters:group",
     "workspace/one/streams:group",
   ]);
   // A payload without the expected field refreshes the whole collection rather than none.
@@ -158,6 +160,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/groups",
     "workspace/one/members",
     "workspace/one/ownership",
+    "workspace/one/rosters",
     "workspace/one/settings",
     "workspace/one/streams",
     "workspace/one/timelines:thread",
@@ -303,4 +306,61 @@ it("a reply keeps its draft across remounts, retries with its key, and clears on
       )![0] as string,
     ).pathname,
   ).toBe("/workspaces/one/threads/thread/messages");
+});
+
+it("a draft mentions the members whose @name its text still holds", () => {
+  const mentioned = [
+    { memberId: "ada", name: "ada@mercier.co" },
+    { memberId: "jo", name: "Jo Mercer" },
+    { memberId: "rae", name: "Rae" },
+  ];
+  expect(mentionsIn("@ada@mercier.co and @Jo Mercer, please", mentioned)).toEqual(["ada", "jo"]);
+  // Removed from the text, or only part of a longer word, a name mentions no one.
+  expect(mentionsIn("Ask @Raelynn", mentioned)).toEqual([]);
+  expect(mentionsIn("email@Rae", mentioned)).toEqual([]);
+  expect(mentionsIn("@Rae? @Rae.", mentioned)).toEqual(["rae"]);
+});
+
+it("a reply sends the mentions its text still holds", async () => {
+  const bodies: Array<unknown> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    if (request.method !== "POST") return json([]);
+    bodies.push(await request.json());
+    return new Response(
+      JSON.stringify({
+        message: message("reply", "thread", minute(1)),
+        activity: item(2).activity,
+      }),
+      { status: 201, headers: { "content-type": "application/json" } },
+    );
+  });
+  let composer!: ComposerController;
+  function Consumer() {
+    composer = useReply("one", "mentions");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  composer.mention("ada", "Ada");
+  composer.mention("jo", "Jo");
+  composer.setDraft("@Ada and @Jo, look");
+  expect(composer.mentions()).toEqual(["ada", "jo"]);
+  composer.setDraft("@Ada, look");
+  expect(composer.mentions()).toEqual(["ada"]);
+  composer.send();
+  await waitFor(() => expect(bodies).toEqual([{ text: "@Ada, look", mentions: ["ada"] }]));
+  // A posted draft forgets its mentions.
+  await waitFor(() => expect(composer.draft()).toBe(""));
+  composer.setDraft("@Ada again");
+  expect(composer.mentions()).toEqual([]);
 });

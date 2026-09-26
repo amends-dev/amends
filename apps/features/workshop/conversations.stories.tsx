@@ -16,9 +16,9 @@ export const Group = {
     const entries = within(stream);
     await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(3));
     await expect(entries.getByText("Today")).toBeVisible();
-    await expect(canvas.getByRole("link", { name: /Design/ })).toHaveAttribute(
-      "aria-current",
-      "page",
+    // The sidebar's groups load on their own, alongside the stream.
+    await waitFor(() =>
+      expect(canvas.getByRole("link", { name: /Design/ })).toHaveAttribute("aria-current", "page"),
     );
     // The thread the owner replied to shows its replies; opening it lists them.
     const open = entries.getByRole("link", { name: /^2 replies last at/ });
@@ -58,6 +58,16 @@ export const Writing = {
     await expect(entries.getAllByRole("article").at(-1)).toHaveTextContent(
       "A question for everyone",
     );
+    // @ suggests the group's other members; the chosen one is mentioned and shown as such.
+    await userEvent.type(page, "Over to @mem");
+    const people = await canvas.findByRole("listbox", { name: "People to mention" });
+    await expect(within(people).getAllByRole("option")).toHaveLength(1);
+    await userEvent.keyboard("{Enter}");
+    await expect(page).toHaveValue("Over to @member@example.test ");
+    await userEvent.type(page, "for review{Enter}");
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(5));
+    const mentioned = entries.getAllByRole("article").at(-1)!;
+    await expect(within(mentioned).getByText("@member@example.test")).toBeVisible();
     // Writing in a thread replies there, and its count follows.
     await userEvent.click(entries.getByRole("link", { name: /^2 replies/ }));
     const thread = await canvas.findByRole("region", { name: "Thread messages" });

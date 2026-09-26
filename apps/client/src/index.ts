@@ -45,6 +45,7 @@ export {
 export type { WorkspaceFeedState } from "./api/changes.ts";
 export {
   useGroups,
+  useGroupRoster,
   useMembers,
   useGroupStream,
   useThreadTimeline,
@@ -52,6 +53,18 @@ export {
   type Members,
   type PagedView,
 } from "./conversations/reads.ts";
-export type { Group, Member, Thread, ThreadTimeline } from "./api/conversations.ts";
+export type {
+  Group,
+  GroupMembership,
+  Member,
+  Thread,
+  ThreadTimeline,
+} from "./api/conversations.ts";
 export { toDate } from "./conversations/time.ts";
-export { useNewThread, useReply, type ComposerController } from "./conversations/compose.ts";
+export {
+  useNewThread,
+  useReply,
+  mentionsIn,
+  type ComposerController,
+  type Mentioned,
+} from "./conversations/compose.ts";

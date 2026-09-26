@@ -178,3 +178,9 @@ retried, so a post that succeeded unseen is not repeated, and takes a new key fo
 draft clears once the message is posted. Posting invalidates the reads it changes, the group's
 stream and the groups for a new thread, the thread's timeline and the streams for a reply, so the
 message shows even while the change feed is away.
+
+`mention(memberId, name)` records that the text mentions a member by `@name`. `mentions` and
+`send` count only the members whose `@name` the text still holds as a word of its own, so deleting
+a name drops its mention, and a retry reuses its key only when both text and mentions match.
+`useGroupRoster(workspaceId, groupId)` reads a group's current members, whom its messages can
+mention, live over membership and grant changes.

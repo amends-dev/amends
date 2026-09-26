@@ -4,7 +4,7 @@ import { createSignal } from "solid-js";
 import { definePreview } from "storybook-solidjs-vite/next";
 import { Composer } from "@amends/ui/compositions/composer";
 import preview from "../.storybook/preview.ts";
-import meta, { Default } from "../src/compositions/composer/composer.stories.tsx";
+import meta, { Default, Mentions } from "../src/compositions/composer/composer.stories.tsx";
 afterEach(cleanup);
 
 it("sends on Enter and the send button, but not while an input method composes", () => {
@@ -38,4 +38,8 @@ it("sends on Enter and the send button, but not while an input method composes",
 
 it("types, sends, and clears through the story's composer", async () => {
   await definePreview(preview).meta(meta).story(Default).run();
+});
+
+it("suggests people after @ and inserts the chosen one", async () => {
+  await definePreview(preview).meta(meta).story(Mentions).run();
 });

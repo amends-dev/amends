@@ -6,9 +6,11 @@ import { useApiClient } from "../api/context.tsx";
 import {
   groupsRead,
   membersRead,
+  rosterRead,
   streamRead,
   timelineRead,
   type Group,
+  type GroupMembership,
   type Member,
   type PagedRead,
   type Thread,
@@ -56,6 +58,14 @@ export function useGroups(workspaceId: string): Read<ReadonlyArray<Group.ListIte
   return read ? connect(read) : unread;
 }
 
+/** A group's current members, live while mounted: whom its messages can mention. */
+export function useGroupRoster(
+  workspaceId: string,
+  groupId: string,
+): Read<ReadonlyArray<GroupMembership.Record>> {
+  const read = rosterRead(useApiClient(), workspaceId, groupId);
+  return read ? connect(read) : unread;
+}
 export interface Members {
   /** A workspace member by ID, current or removed, once the members have loaded. */
   readonly member: (memberId: string) => Member.Record | undefined;

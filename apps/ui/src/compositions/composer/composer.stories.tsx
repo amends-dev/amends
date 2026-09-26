@@ -6,7 +6,7 @@ import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { colorVars } from "@amends/ui/foundations/color/styles";
 import { Button } from "@amends/ui/primitives/button";
 import { Column } from "@amends/ui/primitives/layout";
-import { Composer } from "@amends/ui/compositions/composer";
+import { Composer, type MentionCandidate } from "@amends/ui/compositions/composer";
 
 function Frame(
   props: ParentProps<{ theme?: "cotton" | "soot"; width?: string; rtl?: boolean; panel?: boolean }>,
@@ -127,6 +127,42 @@ function States(props: { theme?: "cotton" | "soot" }) {
   );
 }
 
+const people: ReadonlyArray<MentionCandidate> = [
+  { id: "ada", label: "Ada", description: "ada@mercier.co", kind: "agent" },
+  { id: "jo", label: "Jo Mercer", description: "jo@mercier.co", kind: "human" },
+  { id: "rae", label: "Rae Ashworth", description: "rae@mercier.co", kind: "human" },
+];
+/** A composer that suggests people after @ and records whom it mentioned. */
+function Mentioning(props: { theme?: "cotton" | "soot" }) {
+  const [draft, setDraft] = createSignal("");
+  const [mentioned, setMentioned] = createSignal<ReadonlyArray<string>>([]);
+  return (
+    <Frame {...props}>
+      <Composer.Root onSend={() => {}}>
+        <Composer.Frame>
+          <Composer.Input
+            aria-label="Message with mentions"
+            placeholder="Message #Design — @ to mention"
+            value={draft()}
+            onInput={setDraft}
+            mentions={{
+              candidates: people,
+              label: "People to mention",
+              onMention: (person) => setMentioned((all) => [...all, person.id]),
+            }}
+          />
+          <Composer.Actions>
+            <Button type="submit" variant="primary" disabled={!draft().trim()}>
+              Send
+            </Button>
+          </Composer.Actions>
+        </Composer.Frame>
+      </Composer.Root>
+      <output data-testid="mentioned">{mentioned().join("|")}</output>
+    </Frame>
+  );
+}
+
 const meta = { title: "Compositions/Composer", render: () => <Reference /> } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -186,5 +222,54 @@ export const Docked = {
         </Composer.Dock>
       </div>
     </ThemeProvider>
+  ),
+} satisfies Story;
+export const Mentions = {
+  render: () => (
+    <div style={{ "padding-top": "14rem" }}>
+      <Mentioning />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole("textbox", { name: "Message with mentions" });
+    await userEvent.type(input, "Ask @");
+    const list = canvas.getByRole("listbox", { name: "People to mention" });
+    await expect(within(list).getAllByRole("option")).toHaveLength(3);
+    await expect(input).toHaveAttribute(
+      "aria-activedescendant",
+      within(list).getAllByRole("option")[0]!.id,
+    );
+    // Typing narrows the list; names starting with it come first, then other matches.
+    await userEvent.type(input, "r");
+    await expect(
+      within(list)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["RARae Ashworthrae@mercier.co", "AAdaada@mercier.co", "JMJo Mercerjo@mercier.co"]);
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(input).toHaveValue("Ask @Ada ");
+    await expect(canvas.getByTestId("mentioned")).toHaveTextContent("ada");
+    await expect(canvas.queryByRole("listbox")).toBeNull();
+    // Escape dismisses the list for that word; a new @ opens it again.
+    await userEvent.type(input, "and @a");
+    await expect(canvas.getByRole("listbox")).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await expect(canvas.queryByRole("listbox")).toBeNull();
+    await userEvent.type(input, " @");
+    await expect(canvas.getByRole("listbox")).toBeVisible();
+    await userEvent.click(
+      within(canvas.getByRole("listbox")).getByRole("option", { name: /Jo Mercer/ }),
+    );
+    await expect(input).toHaveValue("Ask @Ada and @a @Jo Mercer ");
+    await expect(canvas.getByTestId("mentioned")).toHaveTextContent("ada|jo");
+    await expect(input).toHaveFocus();
+  },
+} satisfies Story;
+export const MentionsSoot = {
+  render: () => (
+    <div style={{ "padding-top": "14rem" }}>
+      <Mentioning theme="soot" />
+    </div>
   ),
 } satisfies Story;

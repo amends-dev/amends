@@ -13,6 +13,8 @@ import { Entries, type Post } from "./entries.tsx";
 
 export interface ThreadPanelProps {
   readonly workspaceId: string;
+  /** The thread's group, whose members replies can mention. */
+  readonly groupId: string;
   readonly threadId: string;
   /** Close the panel; the page owns where that leads. */
   readonly onClose: () => void;
@@ -32,6 +34,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
       author: item.message.author,
       publishedAt: item.message.publishedAt,
       text: item.message.text,
+      mentions: item.message.mentions,
     }));
   const meta = () => {
     const count = posts().length;
@@ -105,7 +108,11 @@ export function ThreadPanel(props: ThreadPanelProps) {
               </Transcript.Items>
             </Transcript.Root>
             <Composer.Dock surface="panel">
-              <ReplyComposer workspaceId={props.workspaceId} threadId={props.threadId} />
+              <ReplyComposer
+                workspaceId={props.workspaceId}
+                groupId={props.groupId}
+                threadId={props.threadId}
+              />
             </Composer.Dock>
           </Match>
         </Switch>
