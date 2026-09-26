@@ -1,6 +1,12 @@
 import { paths, useWorkspace, type WorkspacePage } from "@amends/client";
 import { Account } from "@amends/features/account";
-import { GroupName, GroupsNavigation, ThreadPanel } from "@amends/features/conversations";
+import {
+  GroupFollowAction,
+  GroupFollowNote,
+  GroupName,
+  GroupsNavigation,
+  ThreadPanel,
+} from "@amends/features/conversations";
 import { Live } from "@amends/features/live";
 import { Shell } from "@amends/ui/compositions/shell";
 import { PageHeader } from "@amends/ui/compositions/page-header";
@@ -239,9 +245,19 @@ export function WorkspaceLayout(props: ParentProps) {
                 </Show>
               </PageHeader.Title>
               <PageHeader.Actions>
+                <Show when={groupId()} keyed>
+                  {(id) => <GroupFollowAction workspaceId={params.workspaceId} groupId={id} />}
+                </Show>
                 <Live.Status />
               </PageHeader.Actions>
             </PageHeader.Heading>
+            <Show when={groupId()} keyed>
+              {(id) => (
+                <PageHeader.Meta>
+                  <GroupFollowNote workspaceId={params.workspaceId} groupId={id} />
+                </PageHeader.Meta>
+              )}
+            </Show>
           </PageHeader.Root>
         </Shell.Header>
         <Shell.Main workspace aria-label={title()}>

@@ -4,6 +4,7 @@ import {
   Member,
   Thread,
   ThreadMessage,
+  ThreadParticipation,
   ThreadTimeline,
   Workspace,
 } from "@amends/api-http";
@@ -15,7 +16,7 @@ import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
 import { requestAtom } from "./request.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
-export { Group, GroupMembership, Member, Thread, ThreadTimeline };
+export { Group, GroupMembership, Member, Thread, ThreadParticipation, ThreadTimeline };
 
 /** How many threads or timeline items one page reads. */
 export const pageSize = 50;
@@ -90,6 +91,35 @@ const rosterOf = perClient((client: ApiClient, key: string) => {
 export const rosterRead = (client: ApiClient, workspaceId: string, groupId: string) =>
   valid(workspaceId) && Option.isSome(Schema.decodeOption(Group.Id)(groupId))
     ? rosterOf(client, joined(workspaceId, groupId))
+    : undefined;
+
+/** A thread's current participants, read page by page: whether the reader follows it. */
+const participantsOf = perClient((client: ApiClient, key: string) => {
+  const { workspaceId, id } = split(key);
+  return client.runtime
+    .atom(
+      Effect.gen(function* () {
+        const api = yield* client;
+        const params = { workspaceId, threadId: Thread.Id.make(id) };
+        const participants: Array<ThreadParticipation.Summary> = [];
+        let after: ThreadParticipation.Id | undefined;
+        while (true) {
+          const page = yield* api.threads.participants({
+            params,
+            query: after === undefined ? { limit: 100 } : { limit: 100, after },
+          });
+          participants.push(...page);
+          const last = page.at(-1);
+          if (page.length < 100 || last === undefined) return participants;
+          after = last.id;
+        }
+      }),
+    )
+    .pipe(Atom.withReactivity(itemKeys(workspaceId, "participants", id)));
+});
+export const participantsRead = (client: ApiClient, workspaceId: string, threadId: string) =>
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(Thread.Id)(threadId))
+    ? participantsOf(client, joined(workspaceId, threadId))
     : undefined;
 
 /** The workspace's members, to name authors. */
@@ -304,5 +334,50 @@ export const readRequest = (client: ApiClient, workspace: string) =>
         workspaceKey(workspace, "groups"),
         collectionKey(workspace, "streams"),
       ]);
+    }),
+  );
+
+/** Following a thread, which makes the reader take part in it, or a team group, or stopping. */
+export type Follow =
+  | { readonly kind: "follow-thread"; readonly threadId: string }
+  | {
+      readonly kind: "unfollow-thread";
+      readonly threadId: string;
+      readonly participationId: string;
+    }
+  | { readonly kind: "follow-group"; readonly groupId: string; readonly memberId: string }
+  | { readonly kind: "unfollow-group"; readonly groupId: string; readonly memberId: string };
+/** Follow or stop following, then invalidate the read that shows it. */
+export const followRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (follow: Follow) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const workspaceId = yield* command(Workspace.Id)(workspace);
+      switch (follow.kind) {
+        case "follow-thread":
+        case "unfollow-thread": {
+          const threadId = yield* command(Thread.Id)(follow.threadId);
+          if (follow.kind === "follow-thread")
+            yield* api.threads.follow({ params: { workspaceId, threadId } });
+          else
+            yield* api.threads.unfollow({
+              params: { workspaceId, threadId },
+              payload: {
+                participationId: yield* command(ThreadParticipation.Id)(follow.participationId),
+              },
+            });
+          yield* Reactivity.invalidate([itemKey(workspace, "participants", threadId)]);
+          return;
+        }
+        case "follow-group":
+        case "unfollow-group": {
+          const params = { workspaceId, groupId: yield* command(Group.Id)(follow.groupId) };
+          const payload = { memberId: yield* command(Member.Id)(follow.memberId) };
+          if (follow.kind === "follow-group") yield* api.groups.follow({ params, payload });
+          else yield* api.groups.unfollow({ params, payload });
+          yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
+          return;
+        }
+      }
     }),
   );

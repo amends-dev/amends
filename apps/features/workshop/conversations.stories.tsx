@@ -25,7 +25,8 @@ export const Group = {
     await userEvent.click(open);
     const thread = await canvas.findByRole("region", { name: "Thread messages" });
     await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(3));
-    await expect(canvas.getByText("3 messages")).toBeVisible();
+    // The owner replied there, so they take part in it and follow it.
+    await canvas.findByText("3 messages · following", {}, { timeout: 10000 });
     await waitFor(() => expect(open).toHaveAttribute("aria-current", "page"));
     // A reply from the other member arrives in the thread and its count over the live feed.
     await userEvent.click(canvas.getByRole("button", { name: "Reply as member" }));
@@ -137,6 +138,58 @@ export const Typing = {
     });
     await waitFor(() => expect(within(thread).queryByText(/is typing/)).toBeNull());
     await expect(entries.queryByText(/is typing/)).toBeNull();
+  },
+} satisfies Story;
+export const Following = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const stream = await canvas.findByRole("region", { name: "Design" }, { timeout: 20000 });
+    const entries = within(stream);
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(3));
+    // Following the group makes threads started there afterwards include the owner.
+    await canvas.findByText("Follow to take part in new threads here.", {}, { timeout: 10000 });
+    await userEvent.click(canvas.getByRole("button", { name: "Follow" }));
+    await canvas.findByText("Following: new threads here include you.", {}, { timeout: 10000 });
+    await waitFor(() => {
+      if (canvas.getByRole("button", { name: "Unfollow" }).getAttribute("aria-busy") === "true")
+        throw new Error("Unfollow is pending");
+    });
+    await userEvent.click(canvas.getByRole("button", { name: "Start thread as member" }));
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(4), {
+      timeout: 10000,
+    });
+    await waitFor(() => expect(canvas.getByLabelText("1 for you")).toBeVisible(), {
+      timeout: 10000,
+    });
+    await userEvent.click(canvas.getByRole("button", { name: "Unfollow" }));
+    await canvas.findByText("Follow to take part in new threads here.", {}, { timeout: 10000 });
+    // Following a thread makes the owner take part in it; the panel says so.
+    await userEvent.click(entries.getAllByRole("link", { name: /reply in thread/ })[0]!);
+    // The panel is an aside beside the stream when wide, a sheet when narrow; its content moves
+    // between them once it knows, so it is found again for each look.
+    await canvas.findByRole("region", { name: "Thread messages" });
+    const panel = () =>
+      within(
+        canvas
+          .getByRole("region", { name: "Thread messages" })
+          .closest<HTMLElement>("aside, dialog")!,
+      );
+    // A follow change stays pending until the thread's participants show it.
+    const button = (name: string) =>
+      waitFor(
+        () => {
+          const found = panel().getByRole("button", { name });
+          if (found.getAttribute("aria-busy") === "true") throw new Error(`${name} is pending`);
+          return found;
+        },
+        { timeout: 10000 },
+      );
+    await userEvent.click(await button("Follow"));
+    await button("Unfollow");
+    await waitFor(() => expect(panel().getByText(/· following$/)).toBeVisible());
+    await userEvent.click(await button("Unfollow"));
+    await button("Follow");
+    await expect(panel().queryByText(/· following$/)).toBeNull();
   },
 } satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;

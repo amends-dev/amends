@@ -144,6 +144,9 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   messages". While visible, it reads the thread through the newest activity it shows, and it shows who else
   is typing under the messages. The app places it in `Shell.Inspector` and owns where closing leads.
 - `GroupName` renders a group's name as text, the same way the navigation names it.
+- `GroupFollowAction` follows or stops following a team group, and `GroupFollowNote` says what
+  following means for the reader now; direct groups show no action. The thread panel's header
+  follows or unfollows its thread, and its meta line says when the reader follows it.
 - `NewThreadComposer` and `ReplyComposer` write a new thread in a group and a reply in a thread.
   They show what sending does, or why it failed, and keep the draft for another try. Typing `@`
   suggests the group's other members from its roster, and a chosen member is mentioned while
@@ -159,4 +162,5 @@ controls post as the member, so replies and new threads arrive over the live fee
 starts a thread from the page, mentions the other member, replies in a thread, and returns to
 find a draft kept. **Reading** shows the member's threads unread, clears the group's dot by
 viewing it, and clears a reply's dot and count by opening its thread. **Typing** shows the member
-typing in the open thread and its row until their reply arrives.
+typing in the open thread and its row until their reply arrives. **Following** follows the group
+and sees the member's next thread reach the owner, then follows and unfollows a thread.

@@ -198,3 +198,11 @@ signals, without the reader: each until the moment its signal names, or until th
 message is published, looking again when the soonest runs out. A reply's composer tells the
 thread's readers that the reader is typing when its draft grows, at most every 2.5 seconds; the
 server's signal lasts six.
+
+`useThreadFollow(workspaceId, threadId)` and `useGroupFollow(workspaceId, groupId)` return a
+`FollowController`: `following` once known, `pending`, an `error` code, and `toggle`. Following a
+thread makes the reader take part in it, read from its participants, which change feed
+participation events refresh; unfollowing ends the reader's own participation by its ID. A group
+follows for the reader's own member, from the groups list, and `followable` holds only for team
+groups. A change shows at once and stays pending until the read agrees, since undoing a thread
+follow needs the participation the read returns.

@@ -5,7 +5,11 @@ import { FetchHttpClient } from "effect/unstable/http";
 import { createSignal, Show } from "solid-js";
 import {
   ClientProvider,
+  DirectoryProvider,
   Session,
+  useGroupFollow,
+  useThreadFollow,
+  type FollowController,
   useGroupStream,
   useMarkGroupRead,
   useMarkThreadRead,
@@ -433,4 +437,110 @@ it("marks an open thread read once per newer position, only while the page shows
     body: JSON.stringify({ throughSequence: 5 }),
   });
   hide(false);
+});
+
+it("follows and unfollows a thread and a group as the reader, showing each change at once", async () => {
+  let participants: Array<unknown> = [];
+  let following = false;
+  const posts: Array<{ path: string; body: unknown }> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/me/workspaces")
+      return json({
+        memberships: [
+          {
+            workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" },
+            member: {
+              id: "owner",
+              workspaceId: "one",
+              identity: { _tag: "Human", id: "alice" },
+              status: "active",
+            },
+            people: 1,
+          },
+        ],
+        invitations: [],
+      });
+    if (path.endsWith("/participants")) return json(participants);
+    if (path.endsWith("/groups"))
+      return json([
+        {
+          group: {
+            id: "group",
+            workspaceId: "one",
+            kind: "Team",
+            visibility: "Private",
+            name: "Design",
+            createdBy: "owner",
+            createdAt: minute(0),
+          },
+          latestActivityAt: null,
+          caughtUpAt: null,
+          newActivity: false,
+          following,
+          pending: 0,
+        },
+      ]);
+    const body = request.method === "POST" ? await request.text() : "";
+    posts.push({ path, body: body ? JSON.parse(body) : undefined });
+    if (path.endsWith("/threads/thread/follow")) {
+      const summary = {
+        id: "participation",
+        workspaceId: "one",
+        threadId: "thread",
+        participant: { _tag: "Member", memberId: "owner" },
+        joinedAt: minute(1),
+        joinedAtSequence: 2,
+      };
+      participants = [summary];
+      return json(summary);
+    }
+    if (path.endsWith("/threads/thread/unfollow")) participants = [];
+    if (path.endsWith("/groups/group/follow")) following = true;
+    if (path.endsWith("/groups/group/unfollow")) following = false;
+    return new Response(null, { status: 204 });
+  });
+  let thread!: FollowController, group!: ReturnType<typeof useGroupFollow>;
+  function Consumer() {
+    thread = useThreadFollow("one", "thread");
+    group = useGroupFollow("one", "group");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect([thread.following(), group.following()]).toEqual([false, false]));
+  expect(group.followable()).toBe(true);
+  thread.toggle();
+  await waitFor(() => expect(thread.following()).toBe(true));
+  await waitFor(() => expect(thread.pending()).toBe(false));
+  thread.toggle();
+  await waitFor(() => expect(thread.following()).toBe(false));
+  group.toggle();
+  await waitFor(() => expect(group.following()).toBe(true));
+  await waitFor(() => expect(group.pending()).toBe(false));
+  group.toggle();
+  await waitFor(() => expect(group.following()).toBe(false));
+  await waitFor(() => expect(posts).toHaveLength(4));
+  // Unfollowing names the participation the reader holds; groups are followed for the reader.
+  expect(posts).toEqual([
+    { path: "/workspaces/one/threads/thread/follow", body: undefined },
+    {
+      path: "/workspaces/one/threads/thread/unfollow",
+      body: { participationId: "participation" },
+    },
+    { path: "/workspaces/one/groups/group/follow", body: { memberId: "owner" } },
+    { path: "/workspaces/one/groups/group/unfollow", body: { memberId: "owner" } },
+  ]);
 });

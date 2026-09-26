@@ -5,7 +5,13 @@ import {
   type Session,
   type SessionStore,
 } from "@amends/client";
-import { GroupStream, GroupsNavigation, ThreadPanel } from "@amends/features/conversations";
+import {
+  GroupFollowAction,
+  GroupFollowNote,
+  GroupStream,
+  GroupsNavigation,
+  ThreadPanel,
+} from "@amends/features/conversations";
 import { Navigation } from "@amends/ui/compositions/navigation";
 import { Shell } from "@amends/ui/compositions/shell";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
@@ -138,6 +144,16 @@ export function ConversationsFixture(props: {
                   <Shell.Body>
                     <Shell.Header workspace>
                       <Row gap={2}>
+                        <GroupFollowAction
+                          workspaceId={value().workspaceId}
+                          groupId={value().groupId}
+                        />
+                        <Text variant="mono" tone="secondary">
+                          <GroupFollowNote
+                            workspaceId={value().workspaceId}
+                            groupId={value().groupId}
+                          />
+                        </Text>
                         <Button
                           variant="secondary"
                           onClick={() =>

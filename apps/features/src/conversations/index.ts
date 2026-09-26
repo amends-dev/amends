@@ -8,3 +8,4 @@ export {
   type NewThreadComposerProps,
   type ReplyComposerProps,
 } from "./composers.tsx";
+export { GroupFollowAction, GroupFollowNote, type GroupFollowProps } from "./follow.tsx";

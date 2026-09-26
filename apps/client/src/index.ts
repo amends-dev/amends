@@ -70,3 +70,9 @@ export {
 } from "./conversations/compose.ts";
 export { usePageVisible, useMarkThreadRead, useMarkGroupRead } from "./conversations/read.ts";
 export { useTyping } from "./conversations/typing.ts";
+export {
+  useThreadFollow,
+  useGroupFollow,
+  type FollowController,
+  type GroupFollowController,
+} from "./conversations/follow.ts";

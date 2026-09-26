@@ -1,6 +1,7 @@
 import {
   useMarkThreadRead,
   useMembers,
+  useThreadFollow,
   useThreadTimeline,
   useTyping,
   type ThreadTimeline,
@@ -52,11 +53,15 @@ export function ThreadPanel(props: ThreadPanelProps) {
       text: item.message.text,
       mentions: item.message.mentions,
     }));
+  const follow = useThreadFollow(props.workspaceId, props.threadId);
   const meta = () => {
     const count = posts().length;
     if (timeline.value() === undefined) return "";
-    if (!timeline.complete()) return "Latest messages";
-    return `${count} ${count === 1 ? "message" : "messages"}`;
+    const messages = timeline.complete()
+      ? `${count} ${count === 1 ? "message" : "messages"}`
+      : "Latest messages";
+    if (follow.error()) return `${messages} · couldn’t change following`;
+    return follow.following() ? `${messages} · following` : messages;
   };
   return (
     <>
@@ -65,6 +70,11 @@ export function ThreadPanel(props: ThreadPanelProps) {
           <Shell.InspectorTitle>Thread</Shell.InspectorTitle>
           <Shell.InspectorMeta>{meta()}</Shell.InspectorMeta>
         </Shell.InspectorHeading>
+        <Show when={follow.following() !== undefined}>
+          <Button variant="secondary" pending={follow.pending()} onClick={() => follow.toggle()}>
+            {follow.following() ? "Unfollow" : "Follow"}
+          </Button>
+        </Show>
         <IconButton
           aria-label="Close thread"
           shape="circle"

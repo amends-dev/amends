@@ -87,6 +87,13 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
   ],
+  // Who takes part in a thread, and so follows it.
+  "thread.participation.added": (payload) => [
+    { collection: "participants", id: text(payload, "threadId") },
+  ],
+  "thread.participation.ended": (payload) => [
+    { collection: "participants", id: text(payload, "threadId") },
+  ],
   // Rosters list active workspace members only.
   "workspace.member.added": () => [{ collection: "rosters", id: undefined }],
   "workspace.member.removed": () => [{ collection: "rosters", id: undefined }],

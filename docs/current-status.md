@@ -48,7 +48,9 @@ unread dots, the sidebar's new-activity dot, and the pending counts of what was 
 while the page is visible. A thread counts as read when it opens, however far back the reader has
 scrolled. Someone writing a reply shows as typing in the thread panel and on the thread's row in
 the stream until their signal runs out or their message arrives; starting a thread sends no
-typing, since there is no thread yet. There is no following, timelines show messages but not
+typing, since there is no thread yet. The thread panel follows and unfollows its thread, and a
+team group's page header follows the group so that threads started there afterwards include the
+reader; following agents on someone's behalf has no control. Timelines show messages but not
 people joining or leaving, and authors are named by their identity, with no profile name or photo. There is no page for creating groups or managing their
 members, and no notification inbox or Triage.
 
