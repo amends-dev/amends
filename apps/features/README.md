@@ -136,6 +136,11 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
 - `NewGroupDialog` names a private team group and chooses its active people and agents with the
   UI ChipPicker, the reader fixed as "you". Create stays disabled until the name has text, failures
   explain themselves and keep the input, and closing clears it.
+- `GroupMembersAction` is a group header's member count, opening its members: the reader first,
+  then everyone by name, keyed by admission so live refreshes keep rows and focus. Managers add
+  people with the ChipPicker and remove members; anyone leaves a team group. Removing and leaving
+  ask first in the row, moving focus to the answer and back on Cancel. The app's `onLeft` decides
+  where leaving leads.
 - `GroupStream` renders a group's stream as a Transcript: each thread's opening message with day
   seams, oldest first, opening at the newest. Each links to its thread with its reply count and
   when the last reply came, or "reply in thread"; the open thread's link is marked current, and a
@@ -176,6 +181,7 @@ viewing it, and clears a reply's dot and count by opening its thread. **Typing**
 typing in the open thread and its row until their reply arrives. **Following** follows the group
 and sees the member's next thread reach the owner, then follows and unfollows a thread.
 **CreateGroup** creates a group with the other member from the sidebar and opens it empty.
+**Members** adds a third person to the group, removes the member, and leaves.
 **Inbox** shows the owner's inbox with the member's mention and reply newest first, marks one
 seen, opens the other's thread beside the inbox to settle it, takes a new mention over the live
 feed, and narrows to what is unread.

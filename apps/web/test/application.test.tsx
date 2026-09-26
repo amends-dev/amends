@@ -6,7 +6,7 @@ import { FetchHttpClient } from "effect/unstable/http";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
 import { Session, type SessionStore } from "@amends/client";
-import { committed, withChangeFeed } from "./change-feed.ts";
+import { committed, withChangeFeed, type Sidebar } from "./change-feed.ts";
 
 const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });
 function memoryStore(initial?: Session) {
@@ -41,11 +41,11 @@ function mount(
   store: SessionStore,
   fetch: typeof globalThis.fetch,
   open?: (request: Request) => Response | undefined,
-  permissions?: ReadonlyArray<string>,
+  sidebar?: Sidebar,
 ) {
   const history = createMemoryHistory();
   history.set({ value: path, scroll: false, replace: true });
-  feed = withChangeFeed(fetch, open, permissions);
+  feed = withChangeFeed(fetch, open, sidebar);
   const transport = FetchHttpClient.layer.pipe(
     Layer.provide(Layer.succeed(FetchHttpClient.Fetch, feed.fetch)),
   );
@@ -800,9 +800,9 @@ it("offers a new group only to those who may create one, and opens the group it 
     if (path.endsWith("/groups/g2/openings")) return response([]);
     return response({ memberships: [membership("one", "Studio")], invitations: [] });
   });
-  const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch, undefined, [
-    "group.create",
-  ]);
+  const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch, undefined, {
+    permissions: ["group.create"],
+  });
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
   fireEvent.click(await within(sidebar).findByRole("button", { name: "New group" }));
   const dialog = await screen.findByRole("dialog", { name: "New group" });
@@ -823,4 +823,75 @@ it("shows no new group action to a reader who may not create one", async () => {
   await screen.findByRole("navigation", { name: "Workspace" });
   await screen.findByText("Workspace / Home");
   expect(screen.queryByRole("button", { name: "New group" })).toBeNull();
+});
+
+/** Group g1 in the reader's sidebar, as someone who manages its members. */
+const managed = {
+  group: {
+    id: "g1",
+    workspaceId: "one",
+    kind: "Team",
+    visibility: "Private",
+    name: "Design",
+    createdBy: "owner-one",
+    createdAt: at,
+  },
+  latestActivityAt: null,
+  caughtUpAt: null,
+  newActivity: false,
+  following: false,
+  pending: 0,
+  manageable: true,
+};
+it("manages a group's members from its header, and leaving returns to the workspace", async () => {
+  const admission = (id: string, memberId: string) => ({
+    id,
+    workspaceId: "one",
+    groupId: "g1",
+    memberId,
+    admittedAt: at,
+    status: "active",
+  });
+  let roster = [admission("a1", "owner-one"), admission("a2", "ada-one")];
+  const changes: Array<string> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/groups/g1/members" && request.method === "GET")
+      return Promise.resolve(response(roster));
+    const departure = /\/groups\/g1\/members\/([^/]+)(\/leave)?$/.exec(path);
+    if (departure) {
+      changes.push(`${departure[2] ? "leave" : "remove"} ${departure[1]}`);
+      const ended = roster.find((entry) => entry.id === departure[1])!;
+      roster = roster.filter((entry) => entry.id !== departure[1]);
+      return Promise.resolve(response({ ...ended, status: "removed" }));
+    }
+    const answer = conversation(path);
+    return Promise.resolve(
+      response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] }),
+    );
+  });
+  const history = mount(
+    "/workspaces/one/groups/g1",
+    memoryStore(session("alice")).store,
+    fetch,
+    undefined,
+    { groups: [managed] },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "2 members" }));
+  const dialog = await screen.findByRole("dialog", { name: "Members" });
+  const list = within(dialog).getByRole("list", { name: "Members" });
+  await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2));
+  expect(within(dialog).getByRole("combobox", { name: "Add people" })).toBeInTheDocument();
+  const [own, other] = within(list).getAllByRole("listitem");
+  // Removing asks first, then removes.
+  fireEvent.click(within(other!).getByRole("button", { name: "Remove" }));
+  fireEvent.click(within(other!).getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(1));
+  fireEvent.click(within(own!).getByRole("button", { name: "Leave" }));
+  fireEvent.click(within(own!).getByRole("button", { name: "Leave" }));
+  await waitFor(() => expect(changes).toEqual(["remove a2", "leave a1"]));
+  console.log("DEBUG", own!.textContent, screen.queryByRole("alert")?.textContent);
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one"));
+  expect(changes).toEqual(["remove a2", "leave a1"]);
 });

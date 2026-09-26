@@ -213,6 +213,12 @@ follow needs the participation the read returns.
 `members` chosen, always adding the reader. A retry of the same group keeps its idempotency key,
 failures keep the input, `created` receives the new group's ID, and `reset` clears it.
 
+`useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster and the reader's
+own admission, says whether they may manage it (`manageable`) and leave it (`leavable`), and adds
+several members, removes one, or leaves, one change at a time, with `changing` naming the change in
+flight. Each change refreshes the roster, stream, groups, and inbox; adding someone already added
+counts as added.
+
 `useInbox(workspaceId, filter)` is the reader's inbox newest first, `"all"` of it or only what is
 `"pending"`, as a `PagedView` of notifications with their sources: it opens at the newest 25,
 "earlier" reads 25 older ones, and a refresh reads down to the oldest shown, so new notifications

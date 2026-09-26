@@ -8,6 +8,7 @@ import {
 import {
   GroupFollowAction,
   GroupFollowNote,
+  GroupMembersAction,
   GroupStream,
   GroupsNavigation,
   Inbox,
@@ -44,7 +45,7 @@ export function ConversationsFixture(props: {
   baseUrl?: string;
   threads?: number;
   theme?: "cotton" | "soot";
-  view?: "group" | "inbox";
+  view?: "group" | "inbox" | "members";
 }) {
   const [setup, setSetup] = createSignal<Setup>();
   const [credential, setCredential] = createSignal<Session>();
@@ -83,6 +84,16 @@ export function ConversationsFixture(props: {
         member.token,
         {},
       );
+      if (props.view === "members") {
+        // Someone in the workspace but not yet in the group, to add.
+        const third = await signIn(scenario, "third@example.test");
+        const invited = await api(scenario, `${path}/invitations`, owner.token, {
+          recipientId: third.humanId,
+          roleId: "builtin:viewer",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        });
+        await api(scenario, `${path}/invitations/${invited.details.id}/accept`, third.token, {});
+      }
       const group = await api(scenario, `${path}/groups`, owner.token, {
         name: "Design",
         memberIds: [workspace.ownerMemberId, joined.id],
@@ -175,6 +186,13 @@ export function ConversationsFixture(props: {
                   <Shell.Body>
                     <Shell.Header workspace>
                       <Row gap={2}>
+                        <GroupMembersAction
+                          workspaceId={value().workspaceId}
+                          groupId={value().groupId}
+                          onLeft={() => {
+                            window.location.hash = "left";
+                          }}
+                        />
                         <GroupFollowAction
                           workspaceId={value().workspaceId}
                           groupId={value().groupId}

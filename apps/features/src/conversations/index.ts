@@ -11,3 +11,4 @@ export {
 export { GroupFollowAction, GroupFollowNote, type GroupFollowProps } from "./follow.tsx";
 export { Inbox, type InboxProps } from "./inbox.tsx";
 export { NewGroupDialog, type NewGroupDialogProps } from "./new-group.tsx";
+export { GroupMembersAction, type GroupMembersProps } from "./members.tsx";

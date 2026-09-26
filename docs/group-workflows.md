@@ -42,7 +42,10 @@ member left, are skipped. A group has `newActivity` when its latest message came
 last caught up with it through `ReadStateApplication.markGroupRead`, or after they joined when they
 never have. `pending` counts the caller's pending notifications from the group's threads: the
 activity addressed to them, as a sidebar badge shows it. Reading a thread settles its notifications
-and so lowers the count. The change feed delivers new notifications to their recipient, and
+and so lowers the count. `manageable` holds for a team group where the caller has
+`group.membership.manage`, from the same grant resolution, so clients offer adding and removing
+members only there; direct groups are never manageable. The change feed delivers new
+notifications to their recipient, and
 [signals](../packages/core/README.md#signals) carry the reader's read-state changes to their other
 sessions, so a client can keep both current.
 

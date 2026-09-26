@@ -90,6 +90,8 @@ export const ListItem = Schema.Struct({
   newActivity: Schema.Boolean,
   following: Schema.Boolean,
   pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  /** The reader may add and remove the group's members: a team group they manage. */
+  manageable: Schema.Boolean,
 });
 export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
 

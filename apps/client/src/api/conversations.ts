@@ -384,6 +384,57 @@ export const createGroupRequest = (client: ApiClient, workspace: string) =>
     }),
   );
 
+/** A change to who belongs to a team group: adding members, removing one, or leaving. */
+export type MembershipChange =
+  | { readonly kind: "add"; readonly groupId: string; readonly memberIds: ReadonlyArray<string> }
+  | { readonly kind: "remove"; readonly groupId: string; readonly membershipId: string }
+  | { readonly kind: "leave"; readonly groupId: string; readonly membershipId: string };
+/**
+ * Change a group's members, then invalidate what that changes: its roster and stream, the groups,
+ * and the inbox, whose sources follow group access. Members are added one at a time; one already
+ * added, as by someone else meanwhile, counts as added.
+ */
+export const membershipRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (change: MembershipChange) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const params = {
+        workspaceId: yield* command(Workspace.Id)(workspace),
+        groupId: yield* command(Group.Id)(change.groupId),
+      };
+      const invalidate = Reactivity.invalidate([
+        itemKey(workspace, "rosters", change.groupId),
+        itemKey(workspace, "streams", change.groupId),
+        workspaceKey(workspace, "groups"),
+        workspaceKey(workspace, "inbox"),
+      ]);
+      switch (change.kind) {
+        case "add":
+          // What was added before a failure stays added, so the reads refresh either way.
+          yield* Effect.forEach(change.memberIds, (memberId) =>
+            Effect.flatMap(command(Member.Id)(memberId), (id) =>
+              api.groups.addMember({ params, payload: { memberId: id } }),
+            ).pipe(
+              Effect.asVoid,
+              Effect.catchTag("GroupMembershipApplication.AlreadyMember", () => Effect.void),
+            ),
+          ).pipe(Effect.ensuring(invalidate));
+          return;
+        case "remove":
+        case "leave": {
+          const admission = {
+            ...params,
+            membershipId: yield* command(GroupMembership.Id)(change.membershipId),
+          };
+          if (change.kind === "remove") yield* api.groups.removeMember({ params: admission });
+          else yield* api.groups.leave({ params: admission });
+          yield* invalidate;
+          return;
+        }
+      }
+    }),
+  );
+
 /** Whether text can be sent as a message: it has something besides whitespace. */
 export const isMessageText = Schema.is(ThreadMessage.Text);
 export const newPostKey = newWorkspaceRequestKey;

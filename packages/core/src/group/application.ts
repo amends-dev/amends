@@ -253,11 +253,17 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     // One grant resolution and one read per kind of record for the page.
     const candidates = [...admissions.keys()];
     const allowed = yield* authorization.permitted(
-      candidates.map((groupId) =>
+      candidates.flatMap((groupId) => [
         Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId }),
-      ),
+        Requirement.make(GroupMembershipPermissions.Manage, {
+          _tag: "Group",
+          workspaceId,
+          groupId,
+        }),
+      ]),
     );
-    const ids = candidates.filter((_, index) => allowed[index] === true);
+    const ids = candidates.filter((_, index) => allowed[index * 2] === true);
+    const managed = new Set(candidates.filter((_, index) => allowed[index * 2 + 1] === true));
     const records = new Map<Group.Id, Group.Record>();
     for (const found of yield* groups.getMany(ids)) {
       const group = yield* Schema.decodeEffect(Schema.toType(Group.Record))(found).pipe(
@@ -333,6 +339,8 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
           DateTime.isGreaterThan(latestActivityAt, caughtUpAt ?? admission.admittedAt),
         following: following.has(admission.id),
         pending: pending.get(groupId) ?? 0,
+        // Direct groups keep the members they started with.
+        manageable: group.kind === "Team" && managed.has(groupId),
       });
     }
     return items;

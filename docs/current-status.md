@@ -57,8 +57,16 @@ A reader who may create groups (owners and administrators, by `group.create`) ge
 action on the sidebar's Groups heading: a dialog names a private team group and picks its people
 and agents as chips, with the reader always included, then opens the new group. Viewers are not
 offered it; the apps read what the reader may do from `GET /workspaces/:id/permissions`, which
-lists workspace-wide permissions only. There is no page for managing a group's members, renaming
-it, leaving it, or starting a direct message.
+lists workspace-wide permissions only.
+
+A group's header shows its member count, which opens its members: the reader first, then everyone
+by name. Where the reader manages the group, flagged `manageable` on each item of their groups list,
+they add people and agents with the chip picker and remove members after a confirming second
+click; anyone may leave a team group the same way, which returns them to the workspace home.
+Direct groups list their members without changes. Members of groups the reader does not belong to
+cannot be managed from the apps, since the management reads have no HTTP route. After leaving, the
+reader's pending notifications from the group stay in the inbox but no longer count in the
+sidebar, which counts per group. Renaming a group and starting a direct message have no UI.
 
 The Inbox destination lists the reader's notifications newest first, live, with the sidebar
 counting what is pending: why each came (a mention, a reply in a followed thread, or a new thread

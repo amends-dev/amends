@@ -264,5 +264,57 @@ export const CreateGroup = {
     await canvas.findByText("Nothing said yet", {}, { timeout: 10000 });
   },
 } satisfies Story;
+export const Members = {
+  args: { view: "members" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      body = within(document.body);
+    // The owner manages the group, so its members can be added and removed.
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "2 members" }, { timeout: 20000 }),
+    );
+    const dialog = await body.findByRole("dialog", { name: "Members" });
+    const list = within(dialog).getByRole("list", { name: "Members" });
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2));
+    const picker = within(dialog).getByRole("combobox", { name: "Add people" });
+    await userEvent.type(picker, "third");
+    await userEvent.click(await body.findByRole("option", { name: /third@example\.test/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(3), {
+      timeout: 10000,
+    });
+    await expect(canvas.getByRole("button", { name: "3 members" })).toBeInTheDocument();
+    // Removing someone asks first.
+    const member = within(list)
+      .getAllByRole("listitem")
+      .find((row) => row.textContent?.includes("member@example.test"))!;
+    await userEvent.click(within(member).getByRole("button", { name: "Remove" }));
+    await expect(member).toHaveTextContent("They’ll stop seeing its threads.");
+    // The question takes focus, so the keyboard answers it.
+    await waitFor(() =>
+      expect(within(member).getByRole("button", { name: "Remove" })).toHaveFocus(),
+    );
+    await userEvent.click(within(member).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2), {
+      timeout: 10000,
+    });
+    // Leaving closes the members and hands the reader back to the app.
+    const own = within(list)
+      .getAllByRole("listitem")
+      .find((row) => row.textContent?.includes("you"))!;
+    // The reader is listed first.
+    await expect(within(list).getAllByRole("listitem")[0]).toBe(own);
+    await userEvent.click(within(own).getByRole("button", { name: "Leave" }));
+    await userEvent.click(within(own).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(within(own).getByRole("button", { name: "Leave" })).toHaveFocus());
+    await userEvent.click(within(own).getByRole("button", { name: "Leave" }));
+    await userEvent.click(within(own).getByRole("button", { name: "Leave" }));
+    await waitFor(() => expect(window.location.hash).toBe("#left"), { timeout: 10000 });
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "Members" })).toBeNull());
+    await waitFor(() => expect(canvas.queryByRole("link", { name: /Design/ })).toBeNull(), {
+      timeout: 10000,
+    });
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

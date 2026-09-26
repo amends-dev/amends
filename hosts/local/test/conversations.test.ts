@@ -93,9 +93,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
               newActivity: false,
               following: false,
               pending: 0,
+              manageable: false,
             },
           ],
         );
+        // Alice owns the workspace, so she manages the group's members; Bob only reads it.
+        expect(
+          yield* asAlice.groups.list({ params: { workspaceId }, query: { limit: 10 } }),
+        ).toMatchObject([{ group: { id: group.id }, manageable: true }]);
         const roster = yield* asBob.groups.members({
           params: { workspaceId, groupId },
           query: { limit: 10 },
@@ -324,6 +329,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(row).toMatchObject({
           group: { id: groupId, kind: "Direct", memberIds: [aliceId, bobId].sort() },
           newActivity: true,
+          // A direct group keeps the members it started with.
+          manageable: false,
         });
         const first = yield* asBob.threads.list({
           params: { workspaceId, groupId },

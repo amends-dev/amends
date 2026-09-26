@@ -7,7 +7,7 @@ import { FetchHttpClient } from "effect/unstable/http";
 import { colorThemes } from "@amends/ui/foundations/color/styles";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
-import { committed, withChangeFeed } from "./change-feed.ts";
+import { committed, withChangeFeed, type Sidebar } from "./change-feed.ts";
 
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -17,7 +17,7 @@ function mount(
   path: string,
   token: string | undefined,
   fetch: typeof globalThis.fetch,
-  permissions?: ReadonlyArray<string>,
+  sidebar?: Sidebar,
 ) {
   window.history.replaceState(null, "", `/#${path}`);
   let stored = token ? Schema.decodeSync(Session)({ token, identity: token }) : undefined;
@@ -28,7 +28,7 @@ function mount(
     },
     subscribe: () => () => {},
   };
-  feed = withChangeFeed(fetch, undefined, permissions);
+  feed = withChangeFeed(fetch, undefined, sidebar);
   const transport = FetchHttpClient.layer.pipe(
     Layer.provide(Layer.succeed(FetchHttpClient.Fetch, feed.fetch)),
   );
@@ -548,7 +548,7 @@ it("creates a group from the sidebar and opens it at its hash route", async () =
       invitations: [],
     });
   });
-  mount("/workspaces/one", "alice", fetch, ["group.create"]);
+  mount("/workspaces/one", "alice", fetch, { permissions: ["group.create"] });
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
   fireEvent.click(await within(sidebar).findByRole("button", { name: "New group" }));
   const dialog = await screen.findByRole("dialog", { name: "New group" });

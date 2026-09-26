@@ -23,6 +23,7 @@ import {
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { Member, MemberApplication, MemberFacts, MemberStore } from "@amends/core/workspace";
+import { ThreadApplication } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Context, Effect, Option } from "effect";
 import {
@@ -641,6 +642,59 @@ export const groupReads = (harness: Harness) => {
             }),
           ),
         ),
+    );
+
+    it.effect("each listed group says whether the reader may manage its members", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, reader, first, second } = yield* prepare();
+            for (const groupId of [first.id, second.id])
+              yield* grant(bound, readerId, GroupPermissions.Read, groupId);
+            const manageable = (actor: Actor.Value) =>
+              run(
+                bound,
+                actor,
+                Effect.flatMap(GroupApplication.Service, (service) =>
+                  Effect.map(service.listMine({ limit: 100 }), (items) =>
+                    Object.fromEntries(
+                      items.map((item) => [
+                        item.group.kind === "Team" ? item.group.name : item.group.id,
+                        item.manageable,
+                      ]),
+                    ),
+                  ),
+                ),
+              );
+            // Reading a group is not managing it.
+            expect(yield* manageable(reader)).toEqual({ Engineering: false, Design: false });
+            // A grant for one group covers that group only.
+            yield* grant(bound, readerId, GroupMembershipPermissions.Manage, first.id);
+            expect(yield* manageable(reader)).toEqual({ Engineering: true, Design: false });
+            yield* grant(bound, readerId, GroupMembershipPermissions.Manage);
+            expect(yield* manageable(reader)).toEqual({ Engineering: true, Design: true });
+            // Nobody manages a direct group's members, owners included.
+            yield* run(
+              bound,
+              owner,
+              Effect.flatMap(ThreadApplication.Service, (threads) =>
+                threads.startDirect({ memberIds: [readerId], text: "Hello", mentions: [] }),
+              ),
+            );
+            const listed = yield* run(
+              bound,
+              owner,
+              Effect.flatMap(GroupApplication.Service, (service) =>
+                service.listMine({ limit: 100 }),
+              ),
+            );
+            expect(listed.map((item) => [item.group.kind, item.manageable])).toEqual([
+              ["Direct", false],
+            ]);
+          }),
+        ),
+      ),
     );
 
     it.effect("management revocation and invalid actors are checked again on every read", () =>

@@ -7,6 +7,7 @@ import meta, {
   Following,
   Group,
   InboxView,
+  Members,
   Reading,
   Typing,
   Writing,
@@ -39,4 +40,7 @@ it("lists the inbox newest first, settles what is seen or read, and takes new me
 });
 it("creates a group with a picked member and opens it", async () => {
   await stories.story(CreateGroup).run();
+});
+it("adds and removes a group's members and leaves it", async () => {
+  await stories.story(Members).run();
 });

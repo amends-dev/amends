@@ -7,7 +7,8 @@ invitations. The sidebar lists the reader's groups between the workspace pages a
 `/workspaces/:workspaceId/groups/:groupId` shows a group's stream, and
 `…/threads/:threadId` opens a thread beside it. A reader who may create groups gets a "+" on the
 Groups heading that opens a New group dialog and then the group it creates; the section shows
-for them even before they belong to any group. Inbox, after Home, counts what is pending for the
+for them even before they belong to any group. A group's header shows its member count, which
+opens its members to add, remove, or leave; leaving returns to Home. Inbox, after Home, counts what is pending for the
 reader and lists their notifications; `/inbox/groups/:groupId/threads/:threadId` opens a thread
 beside it, and Inbox stays the current destination. The other pages remain scaffolding; task data,
 activity, configuration operations, dynamic Channels/Agents sections, and keyboard-shortcut

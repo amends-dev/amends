@@ -3,6 +3,7 @@ import { Account } from "@amends/features/account";
 import {
   GroupFollowAction,
   GroupFollowNote,
+  GroupMembersAction,
   GroupName,
   GroupsNavigation,
   ThreadPanel,
@@ -284,7 +285,16 @@ export function WorkspaceLayout(props: ParentProps) {
               </PageHeader.Title>
               <PageHeader.Actions>
                 <Show when={groupId()} keyed>
-                  {(id) => <GroupFollowAction workspaceId={params.workspaceId} groupId={id} />}
+                  {(id) => (
+                    <>
+                      <GroupMembersAction
+                        workspaceId={params.workspaceId}
+                        groupId={id}
+                        onLeft={() => navigate(paths.workspace(params.workspaceId))}
+                      />
+                      <GroupFollowAction workspaceId={params.workspaceId} groupId={id} />
+                    </>
+                  )}
                 </Show>
                 <Live.Status />
               </PageHeader.Actions>

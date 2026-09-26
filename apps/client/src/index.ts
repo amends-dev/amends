@@ -84,3 +84,4 @@ export {
 } from "./conversations/follow.ts";
 export { useMarkSeen, type SeenController } from "./conversations/seen.ts";
 export { useCreateGroup, type CreateGroupController } from "./conversations/groups.ts";
+export { useGroupMembers, type GroupMembersController } from "./conversations/members.ts";

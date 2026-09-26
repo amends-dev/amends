@@ -14,6 +14,7 @@ import {
   useInbox,
   useInboxPending,
   useCreateGroup,
+  useGroupMembers,
   useWorkspacePermission,
   useMarkGroupRead,
   useMarkSeen,
@@ -22,6 +23,7 @@ import {
   useThreadTimeline,
   type ComposerController,
   type CreateGroupController,
+  type GroupMembersController,
   type NotificationInbox,
   type PagedView,
   type SeenController,
@@ -379,6 +381,7 @@ it("the inbox's pending count adds up what each group holds for the reader", asy
     newActivity: false,
     following: false,
     pending,
+    manageable: false,
   });
   const fetch = vi.fn<typeof globalThis.fetch>(() =>
     Promise.resolve(json([group("a", 2), group("b", 0), group("c", 3)])),
@@ -489,6 +492,132 @@ it("creates a group with the reader in it, retrying with the same key, and reads
   expect(posts[1]?.body).toEqual({ name: "Receipts", memberIds: ["alice-one", "bob-one"] });
   group.reset();
   expect([group.name(), group.members(), group.error()]).toEqual(["", [], undefined]);
+});
+
+it("adds, removes, and leaves a group's members, refreshing its roster each time", async () => {
+  const admission = (id: string, memberId: string, status = "active") => ({
+    id,
+    workspaceId: "one",
+    groupId: "g1",
+    memberId,
+    admittedAt: minute(0),
+    status,
+  });
+  let roster = [admission("a1", "alice-one"), admission("a2", "bob-one")];
+  const changes: Array<string> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/me/workspaces")
+      return json({
+        memberships: [
+          {
+            workspace: {
+              id: "one",
+              name: "Studio",
+              createdBy: "alice",
+              ownerMemberId: "alice-one",
+            },
+            member: {
+              id: "alice-one",
+              workspaceId: "one",
+              identity: { _tag: "Human", id: "alice" },
+              status: "active",
+            },
+            people: 3,
+          },
+        ],
+        invitations: [],
+      });
+    if (path === "/workspaces/one/groups")
+      return json([
+        {
+          group: {
+            id: "g1",
+            workspaceId: "one",
+            kind: "Team",
+            visibility: "Private",
+            name: "Design",
+            createdBy: "alice-one",
+            createdAt: minute(0),
+          },
+          latestActivityAt: null,
+          caughtUpAt: null,
+          newActivity: false,
+          following: false,
+          pending: 0,
+          manageable: true,
+        },
+      ]);
+    if (path === "/workspaces/one/groups/g1/members" && request.method === "GET")
+      return json(roster);
+    if (path === "/workspaces/one/groups/g1/members" && request.method === "POST") {
+      const { memberId } = (await request.json()) as { memberId: string };
+      changes.push(`add ${memberId}`);
+      // Someone else added Kit meanwhile: that still counts as added.
+      if (memberId === "kit-one")
+        return new Response(
+          JSON.stringify({
+            _tag: "GroupMembershipApplication.AlreadyMember",
+            groupId: "g1",
+            memberId,
+          }),
+          { status: 409, headers: { "content-type": "application/json" } },
+        );
+      const added = admission(`a-${memberId}`, memberId);
+      roster = [...roster, added];
+      return new Response(JSON.stringify(added), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    const departure = /^\/workspaces\/one\/groups\/g1\/members\/([^/]+)(\/leave)?$/.exec(path);
+    if (departure) {
+      const [, id = "", leave] = departure;
+      changes.push(`${leave ? "leave" : "remove"} ${id}`);
+      const ended = roster.find((entry) => entry.id === id)!;
+      roster = roster.filter((entry) => entry.id !== id);
+      return json({ ...ended, status: "removed" });
+    }
+    return json([]);
+  });
+  const events: Array<string> = [];
+  let members!: GroupMembersController;
+  function Consumer() {
+    members = useGroupMembers("one", "g1", {
+      added: () => events.push("added"),
+      left: () => events.push("left"),
+    });
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(members.own()?.id).toBe("a1"));
+  expect([members.manageable(), members.leavable()]).toEqual([true, true]);
+  members.add(["cho-one", "kit-one"]);
+  expect(members.changing()).toBe("add");
+  await waitFor(() => expect(events).toEqual(["added"]));
+  await waitFor(() => expect(members.roster()).toHaveLength(3));
+  expect(members.error()).toBeUndefined();
+  members.remove("a2");
+  await waitFor(() =>
+    expect(members.roster()?.map((entry) => entry.id)).toEqual(["a1", "a-cho-one"]),
+  );
+  members.leave();
+  await waitFor(() => expect(events).toEqual(["added", "left"]));
+  expect(changes).toEqual(["add cho-one", "add kit-one", "remove a2", "leave a1"]);
+  expect(members.changing()).toBeUndefined();
 });
 
 it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {
@@ -730,6 +859,7 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
           newActivity: false,
           following,
           pending: 0,
+          manageable: true,
         },
       ]);
     const body = request.method === "POST" ? await request.text() : "";
