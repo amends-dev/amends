@@ -127,12 +127,21 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
 
 `@amends/features/conversations` connects the conversation reads to UI:
 
-- `GroupsNavigation` renders the reader's groups as a navigation section, teams by name with a
-  `#` glyph and direct groups by the other people in them with `@`. A group shows a count of what
-  is addressed to the reader and a dot when it has new activity. The app supplies `href` and the
-  current group; the section is hidden while the reader has no groups, unless they may create
-  one. Readers with `group.create` get a "New group" action in its heading that opens
-  `NewGroupDialog`; the app's `onCreated` decides where the new group leads.
+- `GroupsNavigation` renders the reader's groups as two navigation sections: Groups, teams by name
+  with a `#` glyph, and Direct, direct groups by the other people in them with `@`. A group shows a
+  count of what is addressed to the reader and a dot when it has new activity. The app supplies
+  `href` and the current group. Groups is hidden while the reader has no team groups, unless they
+  may create one: readers with `group.create` get a "New group" action in its heading that opens
+  `NewGroupDialog`, and the app's `onCreated` decides where the new group leads. Direct always
+  shows once the groups load, with a "New message" action that opens `NewMessageDialog`; the app's
+  `onMessage` receives the conversation or the people chosen.
+- `NewMessageDialog` chooses people and agents to message with the ChipPicker. When the reader
+  already has a direct group with exactly them, it says so and offers to open it; otherwise it
+  offers to start one, handing the people to the app.
+- `DirectDraft` is the page for a conversation that does not exist yet: an empty state and a docked
+  composer whose first message creates the direct group, with the chosen people as mention
+  suggestions. When the reader has, or gains, a conversation with exactly them, `onGroup` hands it
+  over. `DirectDraftName` names the people, as the page title.
 - `NewGroupDialog` names a private team group and chooses its active people and agents with the
   UI ChipPicker, the reader fixed as "you". Create stays disabled until the name has text, failures
   explain themselves and keep the input, and closing clears it.
@@ -182,6 +191,8 @@ typing in the open thread and its row until their reply arrives. **Following** f
 and sees the member's next thread reach the owner, then follows and unfollows a thread.
 **CreateGroup** creates a group with the other member from the sidebar and opens it empty.
 **Members** adds a third person to the group, removes the member, and leaves.
+**DirectMessage** messages the member for the first time from Direct, lands in the new
+conversation, and finds it again from New message.
 **Inbox** shows the owner's inbox with the member's mention and reply newest first, marks one
 seen, opens the other's thread beside the inbox to settle it, takes a new mention over the live
 feed, and narrows to what is unread.

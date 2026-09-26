@@ -895,3 +895,38 @@ it("manages a group's members from its header, and leaving returns to the worksp
   await waitFor(() => expect(history.get()).toBe("/workspaces/one"));
   expect(changes).toEqual(["remove a2", "leave a1"]);
 });
+
+it("drafts a first message to someone new and opens the conversation it starts", async () => {
+  const started: Array<unknown> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path === "/workspaces/one/threads") {
+      started.push(await request.json());
+      return response(
+        {
+          thread: { id: "t9", workspaceId: "one", groupId: "g9", createdBy: author, createdAt: at },
+          message: message("m9", "Are you free?"),
+          activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" },
+        },
+        201,
+      );
+    }
+    if (path.endsWith("/groups/g9/openings")) return response([]);
+    return response({ memberships: [membership("one", "Studio")], invitations: [] });
+  });
+  const history = mount(
+    "/workspaces/one/direct?to=ada-one",
+    memoryStore(session("alice")).store,
+    fetch,
+  );
+  await screen.findByText("Workspace / Direct");
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  // Everyone may start a direct message.
+  expect(within(sidebar).getByRole("button", { name: "New message" })).toBeInTheDocument();
+  const composer = await screen.findByRole("textbox", { name: /^Message / });
+  fireEvent.input(composer, { target: { value: "Are you free?" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g9"));
+  expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }]);
+});

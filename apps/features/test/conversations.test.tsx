@@ -4,6 +4,7 @@ import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, {
   CreateGroup,
+  DirectMessage,
   Following,
   Group,
   InboxView,
@@ -43,4 +44,7 @@ it("creates a group with a picked member and opens it", async () => {
 });
 it("adds and removes a group's members and leaves it", async () => {
   await stories.story(Members).run();
+});
+it("messages someone new, creating the conversation with the first message, and finds it again", async () => {
+  await stories.story(DirectMessage).run();
 });

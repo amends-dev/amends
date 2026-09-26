@@ -39,7 +39,8 @@ function useCandidates(workspaceId: string, groupId: string) {
       ];
     });
 }
-function Writing(props: {
+/** A composer for a controller: its input with mention suggestions, send action, and note. */
+export function Writing(props: {
   readonly controller: ComposerController;
   readonly candidates: ReadonlyArray<MentionCandidate>;
   readonly label: string;

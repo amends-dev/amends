@@ -66,7 +66,14 @@ click; anyone may leave a team group the same way, which returns them to the wor
 Direct groups list their members without changes. Members of groups the reader does not belong to
 cannot be managed from the apps, since the management reads have no HTTP route. After leaving, the
 reader's pending notifications from the group stay in the inbox but no longer count in the
-sidebar, which counts per group. Renaming a group and starting a direct message have no UI.
+sidebar, which counts per group. Renaming a group has no backend operation or UI.
+
+Direct groups have their own Direct section in the sidebar, whose "+" offers everyone a New message
+dialog. Choosing people opens the conversation the reader already has with exactly them, or a
+draft page at `/direct?to=…` whose first message starts it, creating their direct group; the group
+then replaces the draft in history. A draft keeps its text per set of people within the session.
+A direct group's page lists its members without changes, since its membership is fixed; including
+someone else means a new conversation.
 
 The Inbox destination lists the reader's notifications newest first, live, with the sidebar
 counting what is pending: why each came (a mention, a reply in a followed thread, or a new thread

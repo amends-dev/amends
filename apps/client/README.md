@@ -43,8 +43,9 @@ portable backend packages under `packages/*` remain Effect-only.
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
-  `paths.group` and `paths.thread` name a group's page and a thread open beside it, and
-  `paths.inboxThread` a thread open beside the inbox; all resume after sign-in.
+  `paths.group` and `paths.thread` name a group's page and a thread open beside it,
+  `paths.inboxThread` a thread open beside the inbox, and `paths.directDraft` a first message to
+  people with no conversation yet; all resume after sign-in.
 
 Only `src/api` imports the HTTP contract and gateway session/directory schemas.
 Client cannot import UI, icons, styling, Storybook, router libraries, platform entry
@@ -180,6 +181,9 @@ retried, so a post that succeeded unseen is not repeated, and takes a new key fo
 draft clears once the message is posted. Posting invalidates the reads it changes, the group's
 stream and the groups for a new thread, the thread's timeline and the streams for a reply, so the
 message shows even while the change feed is away.
+`useDirectMessage(workspaceId, memberIds, started)` writes the first message to some people the
+same way, with a draft kept per set of people; posting it starts a thread in their direct group,
+creating the group when they have none, and `started` receives the group.
 
 `mention(memberId, name)` records that the text mentions a member by `@name`. `mentions` and
 `send` count only the members whose `@name` the text still holds as a word of its own, so deleting

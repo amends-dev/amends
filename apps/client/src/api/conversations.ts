@@ -444,10 +444,19 @@ interface Message {
   readonly mentions: ReadonlyArray<string>;
   readonly key: ReturnType<typeof newPostKey>;
 }
-/** A message to post: the first of a new thread in a group, or a reply in a thread. */
+/**
+ * A message to post: the first of a new thread in a group, the first to some people in their
+ * direct group, which it creates when they have none, or a reply in a thread.
+ */
 export type Post =
   | (Message & { readonly kind: "start"; readonly groupId: string })
+  | (Message & { readonly kind: "direct"; readonly memberIds: ReadonlyArray<string> })
   | (Message & { readonly kind: "reply"; readonly threadId: string });
+/** Where a posted message went. */
+export interface Posted {
+  readonly groupId?: string;
+  readonly threadId: string;
+}
 /**
  * Post one message, then invalidate the reads it changes, as the change feed would when the
  * commit arrives, so it shows even while the feed is away. A retry with the same key returns the
@@ -475,7 +484,23 @@ export const postRequest = (client: ApiClient, workspace: string) =>
             itemKey(workspace, "streams", groupId),
             workspaceKey(workspace, "groups"),
           ]);
-          return started.thread.id;
+          return { groupId, threadId: started.thread.id };
+        }
+        case "direct": {
+          const started = yield* api.threads.startDirect({
+            params: { workspaceId },
+            headers,
+            payload: {
+              ...payload,
+              memberIds: yield* command(Thread.StartDirectInput.fields.memberIds)(post.memberIds),
+            },
+          });
+          const groupId = started.thread.groupId;
+          yield* Reactivity.invalidate([
+            itemKey(workspace, "streams", groupId),
+            workspaceKey(workspace, "groups"),
+          ]);
+          return { groupId, threadId: started.thread.id };
         }
         case "reply": {
           const threadId = yield* command(Thread.Id)(post.threadId);
@@ -485,10 +510,10 @@ export const postRequest = (client: ApiClient, workspace: string) =>
             itemKey(workspace, "timelines", threadId),
             collectionKey(workspace, "streams"),
           ]);
-          return threadId;
+          return { threadId };
         }
       }
-    }),
+    }).pipe(Effect.map((posted): Posted => posted)),
   );
 
 /** What the reader has read: a thread through a timeline position, or a group caught up now. */

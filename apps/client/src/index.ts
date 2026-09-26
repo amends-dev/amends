@@ -69,6 +69,7 @@ export type {
 export { toDate } from "./conversations/time.ts";
 export {
   useNewThread,
+  useDirectMessage,
   useReply,
   mentionsIn,
   type ComposerController,

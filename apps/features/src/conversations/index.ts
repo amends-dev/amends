@@ -12,3 +12,11 @@ export { GroupFollowAction, GroupFollowNote, type GroupFollowProps } from "./fol
 export { Inbox, type InboxProps } from "./inbox.tsx";
 export { NewGroupDialog, type NewGroupDialogProps } from "./new-group.tsx";
 export { GroupMembersAction, type GroupMembersProps } from "./members.tsx";
+export {
+  DirectDraft,
+  DirectDraftName,
+  NewMessageDialog,
+  type DirectDraftProps,
+  type MessageTarget,
+  type NewMessageDialogProps,
+} from "./direct.tsx";

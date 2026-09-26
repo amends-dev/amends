@@ -14,6 +14,7 @@ import {
   useInbox,
   useInboxPending,
   useCreateGroup,
+  useDirectMessage,
   useGroupMembers,
   useWorkspacePermission,
   useMarkGroupRead,
@@ -618,6 +619,57 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
   await waitFor(() => expect(events).toEqual(["added", "left"]));
   expect(changes).toEqual(["add cho-one", "add kit-one", "remove a2", "leave a1"]);
   expect(members.changing()).toBeUndefined();
+});
+
+it("a first direct message starts the conversation and hands over its group", async () => {
+  const posts: Array<{ path: string; body: unknown }> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    if (request.method !== "POST") return json([]);
+    const path = new URL(request.url).pathname;
+    posts.push({ path, body: await request.json() });
+    return new Response(
+      JSON.stringify({
+        thread: {
+          id: "t9",
+          workspaceId: "one",
+          groupId: "g9",
+          createdBy: author,
+          createdAt: minute(1),
+        },
+        message: message("m9", "t9", minute(1)),
+        activity: { ...item(1).activity, threadId: "t9" },
+      }),
+      { status: 201, headers: { "content-type": "application/json" } },
+    );
+  });
+  const started: Array<string> = [];
+  let composer!: ComposerController;
+  function Consumer() {
+    composer = useDirectMessage("one", ["bob-one"], (groupId) => started.push(groupId));
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  composer.setDraft("Are you free?");
+  composer.send();
+  await waitFor(() => expect(started).toEqual(["g9"]));
+  expect(posts).toEqual([
+    {
+      path: "/workspaces/one/threads",
+      body: { memberIds: ["bob-one"], text: "Are you free?", mentions: [] },
+    },
+  ]);
+  expect(composer.draft()).toBe("");
 });
 
 it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {

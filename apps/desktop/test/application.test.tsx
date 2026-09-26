@@ -559,3 +559,40 @@ it("creates a group from the sidebar and opens it at its hash route", async () =
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g2"));
   await screen.findByText("Nothing said yet");
 });
+
+it("drafts a first direct message at its hash route and opens the conversation", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path === "/workspaces/one/threads")
+      return response(
+        {
+          thread: { id: "t9", workspaceId: "one", groupId: "g9", createdBy: author, createdAt: at },
+          message: message("m9", "Are you free?"),
+          activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" },
+        },
+        201,
+      );
+    if (path.endsWith("/groups/g9/openings")) return response([]);
+    return response({
+      memberships: [
+        {
+          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 2,
+        },
+      ],
+      invitations: [],
+    });
+  });
+  mount("/workspaces/one/direct?to=ada-one", "alice", fetch);
+  const composer = await screen.findByRole("textbox", { name: /^Message / });
+  fireEvent.input(composer, { target: { value: "Are you free?" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g9"));
+});

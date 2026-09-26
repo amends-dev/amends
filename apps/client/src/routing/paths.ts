@@ -20,6 +20,9 @@ export const paths = {
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}`,
   thread: (id: string, groupId: string, threadId: string) =>
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
+  /** A first message to some people who have no direct group together yet. */
+  directDraft: (id: string, memberIds: ReadonlyArray<string>) =>
+    `/workspaces/${encodeURIComponent(id)}/direct?to=${memberIds.map(encodeURIComponent).join(",")}`,
   /** A thread opened from the inbox, beside it. */
   inboxThread: (id: string, groupId: string, threadId: string) =>
     `/workspaces/${encodeURIComponent(id)}/inbox/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
@@ -34,7 +37,7 @@ export function returnPath(value: string | undefined): string {
     url.origin !== "https://amends.invalid" ||
     !(
       url.pathname === paths.workspaces ||
-      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?|groups\/[^/]+(?:\/threads\/[^/]+)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?))?$/.test(
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?|groups\/[^/]+(?:\/threads\/[^/]+)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
         url.pathname,
       )
     )

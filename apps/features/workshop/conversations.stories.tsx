@@ -316,5 +316,46 @@ export const Members = {
     });
   },
 } satisfies Story;
+export const DirectMessage = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      body = within(document.body);
+    const sidebar = await canvas.findByRole(
+      "navigation",
+      { name: "Workspace" },
+      { timeout: 20000 },
+    );
+    const direct = await within(sidebar).findByRole("group", { name: "Direct" });
+    // Anyone may message people; nobody has yet.
+    await expect(within(direct).queryAllByRole("link")).toHaveLength(0);
+    const choose = async () => {
+      await userEvent.click(within(direct).getByRole("button", { name: "New message" }));
+      const dialog = await body.findByRole("dialog", { name: "New message" });
+      await userEvent.type(within(dialog).getByRole("combobox", { name: "To" }), "member");
+      await userEvent.click(await body.findByRole("option", { name: /member@example\.test/ }));
+      return dialog;
+    };
+    const dialog = await choose();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Start conversation" }));
+    // The conversation does not exist until its first message.
+    await canvas.findByText(
+      "Your first message starts your conversation with member@example.test.",
+    );
+    await userEvent.type(
+      canvas.getByRole("textbox", { name: "Message member@example.test" }),
+      "Are you free for a call?{Enter}",
+    );
+    const stream = await canvas.findByRole("region", { name: "Group" }, { timeout: 10000 });
+    await within(stream).findByText("Are you free for a call?");
+    const link = await within(direct).findByRole("link", { name: /member@example\.test/ });
+    await waitFor(() => expect(link).toHaveAttribute("aria-current", "page"));
+    // Choosing the same person again leads back to that conversation.
+    const again = await choose();
+    await within(again).findByText("You already have a conversation with them.");
+    await userEvent.click(within(again).getByRole("button", { name: "Open conversation" }));
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "New message" })).toBeNull());
+    await expect(link).toHaveAttribute("aria-current", "page");
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

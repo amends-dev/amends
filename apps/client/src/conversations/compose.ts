@@ -54,12 +54,21 @@ export interface ComposerController {
 }
 type Target =
   | { readonly kind: "start"; readonly groupId: string }
+  | { readonly kind: "direct"; readonly memberIds: ReadonlyArray<string> }
   | { readonly kind: "reply"; readonly threadId: string };
-function compose(workspaceId: string, target: Target): ComposerController {
+const targetKey = (target: Target) =>
+  target.kind === "start"
+    ? target.groupId
+    : target.kind === "direct"
+      ? target.memberIds.toSorted().join(",")
+      : target.threadId;
+function compose(
+  workspaceId: string,
+  target: Target,
+  posted?: (groupId: string) => void,
+): ComposerController {
   const session = useSession();
-  const draftAtom = draftOf(
-    `${workspaceId}\u0000${target.kind === "start" ? target.groupId : target.threadId}\u0000${target.kind}`,
-  );
+  const draftAtom = draftOf(`${workspaceId}\u0000${targetKey(target)}\u0000${target.kind}`);
   const draft = useAtomValue(() => draftAtom),
     write = useAtomSet(() => draftAtom);
   const [error, setError] = createSignal<WorkspaceFailure>();
@@ -75,6 +84,7 @@ function compose(workspaceId: string, target: Target): ComposerController {
       }
       attempt = undefined;
       if (draft().text === post.text) write(empty);
+      if (exit.value.groupId !== undefined) posted?.(exit.value.groupId);
     },
     { when: () => session.session !== undefined },
   );
@@ -128,6 +138,15 @@ function compose(workspaceId: string, target: Target): ComposerController {
 /** Start a thread in a group from a kept draft. */
 export const useNewThread = (workspaceId: string, groupId: string) =>
   compose(workspaceId, { kind: "start", groupId });
+/**
+ * Write the first message to some people, which starts a thread in their direct group, creating
+ * the group when they have none. `started` receives the group once the message is posted.
+ */
+export const useDirectMessage = (
+  workspaceId: string,
+  memberIds: ReadonlyArray<string>,
+  started: (groupId: string) => void,
+) => compose(workspaceId, { kind: "direct", memberIds }, started);
 /** Reply in a thread from a kept draft. */
 export const useReply = (workspaceId: string, threadId: string) =>
   compose(workspaceId, { kind: "reply", threadId });

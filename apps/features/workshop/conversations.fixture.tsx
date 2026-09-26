@@ -6,6 +6,7 @@ import {
   type SessionStore,
 } from "@amends/client";
 import {
+  DirectDraft,
   GroupFollowAction,
   GroupFollowNote,
   GroupMembersAction,
@@ -36,6 +37,7 @@ interface Setup {
 }
 const hashThread = () => new URLSearchParams(window.location.hash.slice(1)).get("thread") ?? "";
 const hashGroup = () => new URLSearchParams(window.location.hash.slice(1)).get("group") ?? "";
+const hashDirect = () => new URLSearchParams(window.location.hash.slice(1)).get("direct") ?? "";
 /**
  * The owner of a workspace reads a group where a member started threads and the owner replied,
  * through the real host, or their inbox, where the member has since replied to them and mentioned
@@ -52,6 +54,7 @@ export function ConversationsFixture(props: {
   const [error, setError] = createSignal<string>();
   const [thread, setThread] = createSignal(hashThread());
   const [shownGroup, setShownGroup] = createSignal(hashGroup());
+  const [drafting, setDrafting] = createSignal(hashDirect());
   const store: SessionStore = { read: credential, write: setCredential, subscribe: () => () => {} };
   let current: Scenario | undefined,
     alive = true;
@@ -59,6 +62,7 @@ export function ConversationsFixture(props: {
     const follow = () => {
       setThread(hashThread());
       setShownGroup(hashGroup());
+      setDrafting(hashDirect());
     };
     window.addEventListener("hashchange", follow);
     onCleanup(() => window.removeEventListener("hashchange", follow));
@@ -179,6 +183,12 @@ export function ConversationsFixture(props: {
                           onCreated={(groupId) => {
                             window.location.hash = `group=${groupId}`;
                           }}
+                          onMessage={(target) => {
+                            window.location.hash =
+                              "groupId" in target
+                                ? `group=${target.groupId}`
+                                : `direct=${target.memberIds.join(",")}`;
+                          }}
                         />
                       </Navigation.Root>
                     </Shell.SidebarContent>
@@ -249,14 +259,30 @@ export function ConversationsFixture(props: {
                       fallback={
                         <Shell.Main workspace aria-label="Design">
                           <Shell.Content fill>
-                            <Show when={shownGroup() || value().groupId} keyed>
-                              {(groupId) => (
-                                <GroupStream
+                            <Show
+                              when={drafting()}
+                              keyed
+                              fallback={
+                                <Show when={shownGroup() || value().groupId} keyed>
+                                  {(groupId) => (
+                                    <GroupStream
+                                      workspaceId={value().workspaceId}
+                                      groupId={groupId}
+                                      label={groupId === value().groupId ? "Design" : "Group"}
+                                      threadHref={(threadId) => `#thread=${threadId}`}
+                                      currentThread={thread() || undefined}
+                                    />
+                                  )}
+                                </Show>
+                              }
+                            >
+                              {(to) => (
+                                <DirectDraft
                                   workspaceId={value().workspaceId}
-                                  groupId={groupId}
-                                  label={groupId === value().groupId ? "Design" : "Group"}
-                                  threadHref={(threadId) => `#thread=${threadId}`}
-                                  currentThread={thread() || undefined}
+                                  memberIds={to.split(",")}
+                                  onGroup={(groupId) => {
+                                    window.location.hash = `group=${groupId}`;
+                                  }}
                                 />
                               )}
                             </Show>

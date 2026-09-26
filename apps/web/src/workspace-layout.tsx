@@ -1,6 +1,13 @@
-import { paths, useInboxPending, useWorkspace, type WorkspacePage } from "@amends/client";
+import {
+  paths,
+  useGroups,
+  useInboxPending,
+  useWorkspace,
+  type WorkspacePage,
+} from "@amends/client";
 import { Account } from "@amends/features/account";
 import {
+  DirectDraftName,
   GroupFollowAction,
   GroupFollowNote,
   GroupMembersAction,
@@ -24,7 +31,7 @@ import {
   IconMarkConnections,
   IconMarkSettings,
 } from "@amends/icons";
-import { useLocation, useMatch, useNavigate, useParams } from "@solidjs/router";
+import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createEffect, createMemo, on, Show, type JSX, type ParentProps } from "solid-js";
 
 const labels: Record<WorkspacePage, string> = {
@@ -121,8 +128,13 @@ export function WorkspaceLayout(props: ParentProps) {
   const fromInbox = useMatch(
     () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
   );
+  const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
+  const [search] = useSearchParams<{ to?: string }>();
   const pending = useInboxPending(params.workspaceId);
+  const groups = useGroups(params.workspaceId);
   const groupId = () => conversation()?.params.groupId;
+  const direct = () =>
+    groups.value()?.find((item) => item.group.id === groupId())?.group.kind === "Direct";
   // A thread opens beside its group's stream, or beside the inbox it was opened from.
   const panel = createMemo(
     () => {
@@ -155,6 +167,7 @@ export function WorkspaceLayout(props: ParentProps) {
     );
   const title = () => {
     if (groupId()) return "Conversation";
+    if (drafting()) return "New message";
     if (settings())
       return settingsSection() === "members"
         ? "People"
@@ -165,7 +178,8 @@ export function WorkspaceLayout(props: ParentProps) {
     return current ? labels[current] : "Page not found";
   };
   const crumbs = () => {
-    if (groupId()) return "Workspace / Groups";
+    if (groupId()) return direct() ? "Workspace / Direct" : "Workspace / Groups";
+    if (drafting()) return "Workspace / Direct";
     if (settings()) return "Configure / Settings";
     const configure = page() === "environments" || page() === "connections";
     return `${configure ? "Configure" : "Workspace"} / ${title()}`;
@@ -215,6 +229,13 @@ export function WorkspaceLayout(props: ParentProps) {
               href={(id) => href(paths.group(params.workspaceId, id))}
               current={groupId()}
               onCreated={(id) => navigate(paths.group(params.workspaceId, id))}
+              onMessage={(target) =>
+                navigate(
+                  "groupId" in target
+                    ? paths.group(params.workspaceId, target.groupId)
+                    : paths.directDraft(params.workspaceId, target.memberIds),
+                )
+              }
             />
             <Navigation.Section>
               <Navigation.SectionHeader>
@@ -279,7 +300,17 @@ export function WorkspaceLayout(props: ParentProps) {
             </PageHeader.Crumbs>
             <PageHeader.Heading>
               <PageHeader.Title>
-                <Show when={groupId()} fallback={title()}>
+                <Show
+                  when={groupId()}
+                  fallback={
+                    <Show when={drafting()} fallback={title()}>
+                      <DirectDraftName
+                        workspaceId={params.workspaceId}
+                        memberIds={(search.to ?? "").split(",").filter(Boolean)}
+                      />
+                    </Show>
+                  }
+                >
                   {(id) => <GroupName workspaceId={params.workspaceId} groupId={id()} />}
                 </Show>
               </PageHeader.Title>
@@ -309,7 +340,9 @@ export function WorkspaceLayout(props: ParentProps) {
           </PageHeader.Root>
         </Shell.Header>
         <Shell.Main workspace aria-label={title()}>
-          <Shell.Content fill={groupId() !== undefined}>{props.children}</Shell.Content>
+          <Shell.Content fill={groupId() !== undefined || drafting() !== undefined}>
+            {props.children}
+          </Shell.Content>
         </Shell.Main>
       </Shell.Body>
       <Shell.Inspector
