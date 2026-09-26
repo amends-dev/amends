@@ -758,11 +758,24 @@ it("lists the inbox at its route, opens a thread beside it, and marks one seen",
   const destination = within(sidebar).getByRole("link", { name: "Inbox" });
   expect(destination).toHaveAttribute("aria-current", "page");
   const open = within(list).getByRole("link", { name: "Open thread" });
-  expect(open).toHaveAttribute("href", "/workspaces/one/inbox/groups/g1/threads/t1");
+  // It opens the thread at the message that notified the reader.
+  expect(open).toHaveAttribute("href", "/workspaces/one/inbox/groups/g1/threads/t1?at=2");
   fireEvent.click(open);
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one/inbox/groups/g1/threads/t1"));
+  await waitFor(() =>
+    expect(history.get()).toBe("/workspaces/one/inbox/groups/g1/threads/t1?at=2"),
+  );
   const thread = await screen.findByRole("region", { name: "Thread messages" });
   await within(thread).findByText("Can you look at the terms?");
+  // The message that notified the reader is set apart.
+  await waitFor(() =>
+    expect(within(thread).getByText("On it.").closest("li")).toHaveAttribute(
+      "data-focused",
+      "true",
+    ),
+  );
+  expect(within(thread).getByText("Can you look at the terms?").closest("li")).not.toHaveAttribute(
+    "data-focused",
+  );
   expect(open).toHaveAttribute("aria-current", "page");
   // The inbox stays the current destination while a thread is open beside it.
   expect(destination).toHaveAttribute("aria-current", "page");

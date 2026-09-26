@@ -13,6 +13,7 @@ import {
   useGroupStream,
   useInbox,
   useInboxPending,
+  useMarkAllSeen,
   useCreateGroup,
   useDirectMessage,
   useRenameGroup,
@@ -29,6 +30,7 @@ import {
   type GroupMembersController,
   type NotificationInbox,
   type PagedView,
+  type SeenAllController,
   type SeenController,
   type SessionStore,
   type Thread,
@@ -351,6 +353,35 @@ it("an inbox opens at its newest notifications, pages back, and a refresh keeps 
   expect(ids()).toHaveLength(61);
 });
 
+it("marks everything seen through the newest shown, then refreshes the inbox", async () => {
+  const inbox = [notification(0), notification(1), notification(2)];
+  const posts: Array<unknown> = [];
+  const { fetch: serve } = inboxHost(inbox);
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    if (request.method === "POST" && new URL(request.url).pathname.endsWith("/acknowledge")) {
+      const body = (await request.json()) as { through: { id: string } };
+      posts.push(body);
+      for (const entry of inbox)
+        if (entry.notification.id <= body.through.id)
+          entry.notification.state = { _tag: "Acknowledged" } as { _tag: string };
+      return json({ acknowledged: 3 });
+    }
+    return serve(input, init);
+  });
+  let seen!: SeenAllController;
+  const view = mount(fetch, () => {
+    seen = useMarkAllSeen("one");
+    return useInbox("one", "pending");
+  });
+  await waitFor(() => expect(view().value()).toHaveLength(3));
+  const newest = view().value()![0]!.notification;
+  seen.markAllSeen(newest);
+  await waitFor(() => expect(view().value()).toEqual([]));
+  expect(posts).toEqual([{ through: { recordedAt: minute(2), id: "notification-002" } }]);
+  expect(seen.error()).toBeUndefined();
+});
+
 it("a pending inbox asks for pending notifications and drops one once the reader has seen it", async () => {
   const inbox = [notification(0), notification(1, { _tag: "Acknowledged" }), notification(2)];
   const { fetch, requests } = inboxHost(inbox);
@@ -372,28 +403,11 @@ it("a pending inbox asks for pending notifications and drops one once the reader
   expect(seen.error()).toBeUndefined();
 });
 
-it("the inbox's pending count adds up what each group holds for the reader", async () => {
-  const group = (id: string, pending: number) => ({
-    group: {
-      id,
-      workspaceId: "one",
-      kind: "Team",
-      visibility: "Private",
-      name: id,
-      createdBy: "owner",
-      createdAt: minute(0),
-    },
-    latestActivityAt: null,
-    caughtUpAt: null,
-    newActivity: false,
-    following: false,
-    pending,
-    manageable: false,
-    renamable: false,
+it("the inbox's pending count is the inbox's own, from groups left too", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    return Promise.resolve(json(path.endsWith("/notifications/count") ? { pending: 5 } : []));
   });
-  const fetch = vi.fn<typeof globalThis.fetch>(() =>
-    Promise.resolve(json([group("a", 2), group("b", 0), group("c", 3)])),
-  );
   let pending!: () => number | undefined;
   function Consumer() {
     pending = useInboxPending("one");

@@ -14,7 +14,7 @@ import { Button } from "@amends/ui/primitives/button";
 import { Drawing } from "@amends/ui/primitives/drawing";
 import { IconButton } from "@amends/ui/primitives/icon-button";
 import { Text } from "@amends/ui/primitives/text";
-import { Match, Show, Switch } from "solid-js";
+import { createEffect, Match, Show, Switch } from "solid-js";
 import { ReplyComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
 import { memberName, typingText } from "./presentation.ts";
@@ -24,6 +24,11 @@ export interface ThreadPanelProps {
   /** The thread's group, whose members replies can mention. */
   readonly groupId: string;
   readonly threadId: string;
+  /**
+   * The timeline position the reader came to see, such as the message that notified them. The
+   * panel reads back far enough to show it, sets it apart, and opens at it.
+   */
+  readonly focus?: number;
   /** Close the panel; the page owns where that leads. */
   readonly onClose: () => void;
 }
@@ -53,6 +58,18 @@ export function ThreadPanel(props: ThreadPanelProps) {
       text: item.message.text,
       mentions: item.message.mentions,
     }));
+  // Read back until the position to show is loaded, one page at a time.
+  createEffect(() => {
+    const target = props.focus,
+      first = timeline.value()?.[0];
+    if (target === undefined || first === undefined || timeline.complete()) return;
+    if (first.activity.sequence > target && !timeline.loadingEarlier()) timeline.loadEarlier();
+  });
+  const focused = () => {
+    const target = props.focus;
+    const item = timeline.value()?.find((entry) => entry.activity.sequence === target);
+    return item && isMessage(item) ? item.message.id : undefined;
+  };
   const follow = useThreadFollow(props.workspaceId, props.threadId);
   const meta = () => {
     const count = posts().length;
@@ -130,7 +147,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
                 </Transcript.Earlier>
               </Show>
               <Transcript.Items>
-                <Entries posts={posts()} members={members} density="compact" />
+                <Entries posts={posts()} members={members} density="compact" focus={focused()} />
               </Transcript.Items>
               <Transcript.Status>{typists()}</Transcript.Status>
             </Transcript.Root>

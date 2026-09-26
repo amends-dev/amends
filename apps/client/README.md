@@ -232,6 +232,8 @@ counts as added.
 "earlier" reads 25 older ones, and a refresh reads down to the oldest shown, so new notifications
 arrive at the top. Notifications the change feed delivers to the reader, their read and seen
 signals, and group access changes refresh it. `useMarkSeen(workspaceId, notificationId)` marks one
-seen without opening it, showing `seen` once the host has recorded it, and `useInboxPending`
-totals the groups' pending counts for the Inbox destination. Marking a thread read refreshes the
+seen without opening it, showing `seen` once the host has recorded it; `useMarkAllSeen` marks
+everything still pending through the newest notification shown; and `useInboxPending` reads how many
+are pending for the Inbox destination, including those from groups the reader left.
+`paths.inboxThread` takes the position that notified the reader as `?at=`. Marking a thread read refreshes the
 inbox, since it settles the reader's notifications from that thread.

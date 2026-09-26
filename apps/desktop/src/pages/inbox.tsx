@@ -9,8 +9,8 @@ export function InboxPage() {
   return (
     <Inbox
       workspaceId={params.workspaceId}
-      threadHref={(groupId, threadId) =>
-        href(paths.inboxThread(params.workspaceId, groupId, threadId))
+      threadHref={(groupId, threadId, sequence) =>
+        href(paths.inboxThread(params.workspaceId, groupId, threadId, sequence))
       }
       currentThread={params.threadId}
     />

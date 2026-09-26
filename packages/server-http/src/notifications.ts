@@ -36,6 +36,28 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
+      count: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(NotificationApplication.Service, (notifications) =>
+              Effect.map(notifications.countPending, (pending) => ({ pending })),
+            ),
+          ),
+        ),
+      acknowledgeThrough: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(NotificationApplication.Service, (notifications) =>
+              Effect.map(notifications.acknowledgeThrough(payload.through), (acknowledged) => ({
+                acknowledged,
+              })),
+            ),
+          ),
+        ),
       get: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

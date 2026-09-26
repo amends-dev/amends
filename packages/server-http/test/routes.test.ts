@@ -195,6 +195,8 @@ const operations = Layer.mergeAll(
       list: record("notification.list", () => Effect.succeed([notification])),
       listPending: record("notification.listPending", () => Effect.succeed([notification])),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
+      acknowledgeThrough: record("notification.acknowledgeThrough", () => Effect.succeed(2)),
+      countPending: Effect.succeed(3),
     }),
   ),
   Layer.succeed(

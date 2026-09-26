@@ -37,14 +37,18 @@ export const committed = (
 });
 
 /**
- * The workspace sidebar's reads: the reader's groups, the members naming them, and what the
- * reader may do there.
+ * The workspace sidebar's reads: the reader's groups, the members naming them, what the reader
+ * may do there, and how many notifications are pending for them.
  */
-const sidebarRead = /^\/workspaces\/[^/]+\/(groups|members|permissions)$/;
-/** What the sidebar's reads answer: nothing, unless a test grants permissions or lists groups. */
+const sidebarRead = /^\/workspaces\/[^/]+\/(groups|members|permissions|notifications\/count)$/;
+/**
+ * What the sidebar's reads answer: nothing, unless a test grants permissions, lists groups, or
+ * has notifications pending.
+ */
 export interface Sidebar {
   readonly permissions?: ReadonlyArray<string>;
   readonly groups?: ReadonlyArray<unknown>;
+  readonly pending?: number;
 }
 /**
  * Route change-feed requests to streams the test controls, answer the workspace sidebar's reads
@@ -69,7 +73,9 @@ export function withChangeFeed(
               ? (sidebar.permissions ?? [])
               : path.endsWith("/groups")
                 ? (sidebar.groups ?? [])
-                : [],
+                : path.endsWith("/notifications/count")
+                  ? { pending: sidebar.pending ?? 0 }
+                  : [],
           ),
           {
             headers: { "content-type": "application/json" },

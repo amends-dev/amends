@@ -81,6 +81,16 @@ export interface Interface {
   readonly acknowledge: (
     notificationId: Notification.Id,
   ) => Effect.Effect<Notification.Record, AcknowledgeError, Actor.Service>;
+  /**
+   * Record that the acting human saw every notification still pending for them up to and
+   * including `through`, in inbox order, so what arrives after the newest they saw stays pending.
+   * Returns how many it marked. Their other sessions hear of each batch as a signal.
+   */
+  readonly acknowledgeThrough: (
+    through: NotificationStore.Cursor,
+  ) => Effect.Effect<number, Exclude<AcknowledgeError, NotFound | AlreadyHandled>, Actor.Service>;
+  /** How many notifications are still pending for the acting identity, from anywhere. */
+  readonly countPending: Effect.Effect<number, Exclude<Error, NotFound>, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -92,6 +102,23 @@ const decodeRecords = Schema.decodeEffect(Schema.Array(Schema.toType(Notificatio
 const decodeOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));
 const sameRecipient = Schema.toEquivalence(Notification.Recipient);
+const decodeCursor = Schema.decodeEffect(Schema.toType(NotificationStore.Cursor));
+/** IDs in binary lexical order, as stores order them: by code point. */
+const compareIds = (left: string, right: string) => {
+  const a = Array.from(left, (char) => char.codePointAt(0) ?? 0),
+    b = Array.from(right, (char) => char.codePointAt(0) ?? 0);
+  for (let index = 0; index < Math.min(a.length, b.length); index++)
+    if (a[index] !== b[index]) return a[index]! - b[index]!;
+  return a.length - b.length;
+};
+/** Whether a notification comes at or before a cursor in inbox order. */
+const atOrBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) => {
+  const byTime =
+    DateTime.toEpochMillis(record.recordedAt) - DateTime.toEpochMillis(cursor.recordedAt);
+  return byTime < 0 || (byTime === 0 && compareIds(record.id, cursor.id) <= 0);
+};
+/** How many seen notifications one write records, and one signal names. */
+const seenBatch = 100;
 const invalidRecord = (cause: Schema.SchemaError) =>
   new InvalidResponse({ message: `Notification store returned invalid data: ${cause.message}` });
 const requireWorkspace = Effect.fnUntraced(function* (
@@ -257,7 +284,55 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       return yield* new InvalidResponse({ message: "Seen notification still reads as unseen" });
     return seen;
   });
-  return Service.of({ workspaceId, get, list, listPending, resolveSource, inbox, acknowledge });
+  const acknowledgeThrough = Effect.fn("NotificationApplication.acknowledgeThrough")(function* (
+    input: NotificationStore.Cursor,
+  ) {
+    const target = yield* recipient();
+    if (target._tag !== "Human") return yield* new HumanRecipientRequired({});
+    const through = yield* decodeCursor(input);
+    const memberId = (yield* Actor.Service).memberId;
+    let after: NotificationStore.Cursor | undefined;
+    let marked = 0;
+    while (true) {
+      const page = yield* checked(
+        target,
+        notifications.listPendingByRecipient(
+          target,
+          after === undefined ? { limit: seenBatch } : { limit: seenBatch, after },
+        ),
+        seenBatch,
+        true,
+      );
+      const due = page.filter((record) => atOrBefore(record, through));
+      const [first, ...rest] = due.map((record) => record.id);
+      if (first !== undefined) {
+        const notificationIds = [first, ...rest] as const;
+        yield* notifications.markSeen(notificationIds, yield* DateTime.now);
+        yield* signals.publish(
+          Signal.Value.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds }),
+        );
+        marked += due.length;
+      }
+      const last = page.at(-1);
+      if (last === undefined || page.length < seenBatch || due.length < page.length) return marked;
+      after = { recordedAt: last.recordedAt, id: last.id };
+    }
+  });
+  const countPending = Effect.gen(function* () {
+    const target = yield* recipient();
+    return yield* notifications.countPendingByRecipient(target);
+  }).pipe(Effect.withSpan("NotificationApplication.countPending"));
+  return Service.of({
+    workspaceId,
+    get,
+    list,
+    listPending,
+    resolveSource,
+    inbox,
+    acknowledge,
+    acknowledgeThrough,
+    countPending,
+  });
 });
 
 /**

@@ -42,6 +42,17 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       success: Schema.Array(NotificationInbox.Item.annotate({ identifier: "InboxItem" })),
       error: ApiErrors.member,
     }),
+    HttpApiEndpoint.get("count", "/count", {
+      params: { workspaceId: Workspace.Id },
+      success: Schema.Struct({ pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+      error: ApiErrors.member,
+    }),
+    HttpApiEndpoint.post("acknowledgeThrough", "/acknowledge", {
+      params: { workspaceId: Workspace.Id },
+      payload: Schema.Struct({ through: NotificationStore.Cursor }),
+      success: Schema.Struct({ acknowledged: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+      error: [...ApiErrors.member, ApiErrors.NotificationHumanRecipientRequired],
+    }),
     HttpApiEndpoint.get("get", "/:notificationId", {
       params,
       success: record,

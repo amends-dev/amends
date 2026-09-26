@@ -150,6 +150,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listLatestByRecipient: unexpected,
         listLatestPendingByRecipient: unexpected,
         listPendingByThread: unexpected,
+        countPendingByRecipient: unexpected,
         countPendingByGroup: unexpected,
         insert: unexpected,
         insertMany: unexpected,

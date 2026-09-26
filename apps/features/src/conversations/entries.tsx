@@ -52,6 +52,8 @@ export function Entries<P extends Post>(props: {
   readonly density?: "comfortable" | "compact";
   /** Rendered once per entry; it reads the current post, so refreshes update it in place. */
   readonly footer?: (post: Accessor<P>) => JSX.Element;
+  /** The key of the post the reader came to see: set apart and brought into view. */
+  readonly focus?: string;
 }) {
   const rows = keyed(
     () => rowsOf(props.posts),
@@ -76,7 +78,7 @@ export function Entries<P extends Post>(props: {
               const time = () => timeOf(post().publishedAt);
               const id = `message-${key}`;
               return (
-                <Transcript.Entry>
+                <Transcript.Entry focused={props.focus === key}>
                   <Message.Root aria-labelledby={id} density={props.density}>
                     <Message.Avatar>
                       <Avatar.Root kind={author().kind} decorative>

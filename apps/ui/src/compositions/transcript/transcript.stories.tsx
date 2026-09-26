@@ -32,9 +32,9 @@ const post = (id: number): Post => ({
   text: texts[Math.abs(id) % texts.length]!,
   replies: id % 3 === 0 ? `${(Math.abs(id) % 4) + 1} replies` : undefined,
 });
-function Entry(props: { post: Post; density?: "comfortable" | "compact" }) {
+function Entry(props: { post: Post; density?: "comfortable" | "compact"; focused?: boolean }) {
   return (
-    <Transcript.Entry>
+    <Transcript.Entry focused={props.focused}>
       <Message.Root aria-labelledby={`post-${props.post.id}`} density={props.density}>
         <Message.Avatar>
           <Avatar.Root kind="human" decorative>
@@ -59,7 +59,11 @@ function Entry(props: { post: Post; density?: "comfortable" | "compact" }) {
   );
 }
 /** Entries with a day seam before each new day. */
-function Entries(props: { posts: ReadonlyArray<Post>; density?: "comfortable" | "compact" }) {
+function Entries(props: {
+  posts: ReadonlyArray<Post>;
+  density?: "comfortable" | "compact";
+  focus?: number;
+}) {
   return (
     <For each={props.posts}>
       {(item, index) => (
@@ -67,7 +71,7 @@ function Entries(props: { posts: ReadonlyArray<Post>; density?: "comfortable" | 
           {index() === 0 || props.posts[index() - 1]!.day !== item.day ? (
             <Transcript.Day>{item.day}</Transcript.Day>
           ) : null}
-          <Entry post={item} density={props.density} />
+          <Entry post={item} density={props.density} focused={props.focus === item.id} />
         </>
       )}
     </For>
@@ -168,6 +172,36 @@ function Panel(props: { theme?: "cotton" | "soot" }) {
   );
 }
 
+/**
+ * Opened at an entry the reader came to see, as from a notification: its earlier page loads
+ * first, then the view opens at it, set apart, and another entry can take the focus.
+ */
+function Focused(props: { theme?: "cotton" | "soot" }) {
+  const [posts, setPosts] = createSignal(
+    Array.from({ length: 10 }, (_, index) => post(index + 10)),
+  );
+  const [focus, setFocus] = createSignal(4);
+  // The focused entry is older than the first page; it arrives with the earlier one.
+  queueMicrotask(() =>
+    setPosts((all) => [...Array.from({ length: 10 }, (_, index) => post(index)), ...all]),
+  );
+  return (
+    <>
+      <Row gap={2} style={{ padding: "1rem 1.875rem" }}>
+        <Button variant="secondary" onClick={() => setFocus(15)}>
+          Focus another
+        </Button>
+      </Row>
+      <Scroller theme={props.theme}>
+        <Transcript.Root aria-label="Messages">
+          <Transcript.Items>
+            <Entries posts={posts()} focus={focus()} />
+          </Transcript.Items>
+        </Transcript.Root>
+      </Scroller>
+    </>
+  );
+}
 const meta = { title: "Compositions/Transcript", render: () => <Live /> } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -199,5 +233,35 @@ export const Default = {
   },
 } satisfies Story;
 export const Soot = { render: () => <Live theme="soot" /> } satisfies Story;
+/** Whether an element sits within the scroller's visible area. */
+const visible = (scroller: HTMLElement, element: Element) => {
+  const view = scroller.getBoundingClientRect(),
+    box = element.getBoundingClientRect();
+  return box.top >= view.top - 1 && box.bottom <= view.bottom + 1;
+};
+export const FocusedEntry = {
+  render: () => <Focused />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroller = canvas.getByTestId("scroller");
+    const list = within(canvas.getByRole("region", { name: "Messages" }));
+    const entry = (id: number) =>
+      list
+        .getAllByRole("article")
+        .find((article) => article.getAttribute("aria-labelledby") === `post-${id}`)!;
+    // It opens at the focused entry, not at the newest end, and sets it apart.
+    await waitFor(() => expect(list.getAllByRole("article")).toHaveLength(20));
+    await waitFor(() => expect(visible(scroller, entry(4))).toBe(true));
+    await expect(entry(4).closest("li")).toHaveAttribute("data-focused", "true");
+    await expect(
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight,
+    ).toBeGreaterThan(24);
+    // Focusing another entry brings it into view.
+    await userEvent.click(canvas.getByRole("button", { name: "Focus another" }));
+    await waitFor(() => expect(visible(scroller, entry(15))).toBe(true));
+    await expect(entry(4).closest("li")).not.toHaveAttribute("data-focused");
+  },
+} satisfies Story;
+export const FocusedEntrySoot = { render: () => <Focused theme="soot" /> } satisfies Story;
 export const ThreadPanel = { render: () => <Panel /> } satisfies Story;
 export const ThreadPanelSoot = { render: () => <Panel theme="soot" /> } satisfies Story;

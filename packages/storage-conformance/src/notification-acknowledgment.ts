@@ -15,6 +15,7 @@ import {
 
 import {
   ThreadApplication,
+  ThreadMessageApplication,
   ThreadParticipation,
   ThreadParticipationApplication,
 } from "@amends/core/thread";
@@ -194,6 +195,67 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 message: p.first.message,
                 activity: p.first.activity,
               });
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "seeing everything through the newest shown leaves later arrivals pending, and the count follows",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const p = yield* prepare();
+              const service =
+                (actor: Actor.Value) =>
+                <A, E>(
+                  use: (s: NotificationApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+                ) =>
+                  run(p.bound, actor, Effect.flatMap(NotificationApplication.Service, use));
+              const asHuman = service(human);
+              const pending = () =>
+                p.bound.notifications.listPendingByRecipient(
+                  Notification.ofMember(human.memberId, human.identity),
+                  { limit: 100 },
+                );
+              yield* TestClock.adjust("1 second");
+              // The writer's reply reaches the thread's participants, the human among them.
+              yield* run(
+                p.bound,
+                writer,
+                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
+                  s.publish({ threadId: p.first.thread.id, text: "Any thoughts?", mentions: [] }),
+                ),
+              );
+              const [older, newer] = yield* pending();
+              if (!older || !newer) return yield* Effect.die("Expected two pending notifications");
+              expect(older.id).toBe(p.humanNote.id);
+              expect(yield* asHuman((s) => s.countPending)).toBe(2);
+              // Through the older one: the newer, which the reader had not seen, stays pending.
+              expect(
+                yield* asHuman((s) =>
+                  s.acknowledgeThrough({ recordedAt: older.recordedAt, id: older.id }),
+                ),
+              ).toBe(1);
+              expect(yield* pending()).toEqual([newer]);
+              expect(yield* asHuman((s) => s.countPending)).toBe(1);
+              const through = { recordedAt: newer.recordedAt, id: newer.id };
+              expect(yield* asHuman((s) => s.acknowledgeThrough(through))).toBe(1);
+              expect(yield* asHuman((s) => s.countPending)).toBe(0);
+              // Nothing left to see marks nothing.
+              expect(yield* asHuman((s) => s.acknowledgeThrough(through))).toBe(0);
+              // Agents accept work rather than seeing it, and everyone counts only their own.
+              expect(
+                yield* Effect.flip(service(agent)((s) => s.acknowledgeThrough(through))),
+              ).toMatchObject({ _tag: "NotificationApplication.HumanRecipientRequired" });
+              expect(yield* service(p.owner)((s) => s.countPending)).toBe(2);
+              expect(
+                yield* p.bound.notifications.countPendingByRecipient(
+                  Notification.ofMember(p.owner.memberId, p.owner.identity),
+                ),
+              ).toBe(2);
             }),
           ),
         ),

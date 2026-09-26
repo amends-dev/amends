@@ -19,7 +19,22 @@ export const items = style({
   listStyle: "none",
   minWidth: 0,
 });
-export const entry = style({ minWidth: 0 });
+export const entry = style({
+  minWidth: 0,
+  borderRadius: "0.625rem",
+  selectors: {
+    // The entry the reader came to see: a wash that reaches past its edges without moving it.
+    '&[data-focused="true"]': {
+      backgroundColor: colorVars.action.selected,
+      boxShadow: `0 0 0 0.5rem ${colorVars.action.selected}`,
+    },
+  },
+  "@media": {
+    "(forced-colors: active)": {
+      selectors: { '&[data-focused="true"]': { outline: "2px solid Highlight" } },
+    },
+  },
+});
 export const day = style({ minWidth: 0, paddingBlock: "1rem 0.625rem" });
 /** One line after the entries; it keeps its height when empty, so they never jump. */
 export const status = style({

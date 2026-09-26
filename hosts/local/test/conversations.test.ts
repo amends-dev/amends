@@ -158,6 +158,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(
           yield* asAlice.notifications.source({ params: { workspaceId, notificationId } }),
         ).toMatchObject({ message: { id: started.message.id } });
+        expect(yield* asAlice.notifications.count({ params: { workspaceId } })).toEqual({
+          pending: 1,
+        });
         // Her inbox shows it with the message, newest first.
         expect(
           yield* asAlice.notifications.inbox({ params: { workspaceId }, query: { limit: 10 } }),
@@ -178,6 +181,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
             query: { limit: 10, pendingOnly: true },
           }),
         ).toEqual([]);
+        expect(yield* asAlice.notifications.count({ params: { workspaceId } })).toEqual({
+          pending: 0,
+        });
+        // Seeing everything through it again has nothing left to mark.
+        expect(
+          yield* asAlice.notifications.acknowledgeThrough({
+            params: { workspaceId },
+            payload: { through: { recordedAt: seen.recordedAt, id: seen.id } },
+          }),
+        ).toEqual({ acknowledged: 0 });
         expect(
           yield* asAlice.notifications.inbox({ params: { workspaceId }, query: { limit: 10 } }),
         ).toMatchObject([{ notification: seen }]);

@@ -163,15 +163,17 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   states.
 - `ThreadPanel` is the content of the shell's inspector for one thread: its header with a message
   count and close action, and the thread's messages in compact density, with "Show earlier
-  messages". While visible, it reads the thread through the newest activity it shows, and it shows who else
+  messages". Given a `focus` position, such as the message that notified the reader, it reads back
+  until that message is loaded, sets it apart, and opens at it. While visible, it reads the thread through the newest activity it shows, and it shows who else
   is typing under the messages. The app places it in `Shell.Inspector` and owns where closing leads.
 - `GroupName` renders a group's name as text, the same way the navigation names it.
 - `Inbox` renders the reader's inbox newest first with the UI Inbox cards: why each notification
   came (who mentioned them, replied in a thread they follow, or started a thread in a group they
   follow, and where), when, what was said, a link that opens its thread, and "Mark seen" while it
-  is pending. "All" or "Unread" choose what it lists, and "Show older" reads further back. A
-  notification whose thread the reader can no longer see says so, without a link. The app supplies
-  each thread's `href` and the thread open beside it.
+  is pending. "All" or "Unread" choose what it lists, "Mark all seen" marks everything through the
+  newest one listed while any are pending, and "Show older" reads further back. A notification
+  whose thread the reader can no longer see says so, without a link. The app supplies each thread's
+  `href`, given the position that notified the reader, and the thread open beside it.
 - `GroupFollowAction` follows or stops following a team group, and `GroupFollowNote` says what
   following means for the reader now; direct groups show no action. The thread panel's header
   follows or unfollows its thread, and its meta line says when the reader follows it.

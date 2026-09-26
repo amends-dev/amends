@@ -500,10 +500,10 @@ it("lists the inbox at its hash route, opens a thread beside it, and marks one s
   const list = await screen.findByRole("list", { name: "Notifications" });
   await within(list).findByText("On it.");
   const open = within(list).getByRole("link", { name: "Open thread" });
-  expect(open).toHaveAttribute("href", "#/workspaces/one/inbox/groups/g1/threads/t1");
+  expect(open).toHaveAttribute("href", "#/workspaces/one/inbox/groups/g1/threads/t1?at=2");
   fireEvent.click(open);
   await waitFor(() =>
-    expect(window.location.hash).toBe("#/workspaces/one/inbox/groups/g1/threads/t1"),
+    expect(window.location.hash).toBe("#/workspaces/one/inbox/groups/g1/threads/t1?at=2"),
   );
   const thread = await screen.findByRole("region", { name: "Thread messages" });
   await within(thread).findByText("Can you look at the terms?");

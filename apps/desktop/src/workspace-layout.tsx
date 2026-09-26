@@ -130,7 +130,7 @@ export function WorkspaceLayout(props: ParentProps) {
     () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
   );
   const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
-  const [search] = useSearchParams<{ to?: string }>();
+  const [search] = useSearchParams<{ to?: string; at?: string }>();
   const pending = useInboxPending(params.workspaceId);
   const groups = useGroups(params.workspaceId);
   const groupId = () => conversation()?.params.groupId;
@@ -364,6 +364,8 @@ export function WorkspaceLayout(props: ParentProps) {
               workspaceId={params.workspaceId}
               groupId={thread.groupId}
               threadId={thread.threadId}
+              // Opened from the inbox, the thread opens at the message that notified the reader.
+              focus={fromInbox() && search.at ? Number(search.at) || undefined : undefined}
               onClose={closePanel}
             />
           )}

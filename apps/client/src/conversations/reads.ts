@@ -7,6 +7,7 @@ import {
   groupsRead,
   inboxRead,
   membersRead,
+  pendingCountRead,
   permissionsRead,
   rosterRead,
   streamRead,
@@ -101,10 +102,15 @@ export function useWorkspacePermission(
   return () => permissions.value()?.some((name) => name === permission);
 }
 
-/** How many notifications from the reader's groups are still pending for them, live while mounted. */
+/**
+ * How many notifications are still pending for the reader, live while mounted: the inbox's own
+ * count, including those from groups they have left.
+ */
 export function useInboxPending(workspaceId: string): Accessor<number | undefined> {
-  const groups = useGroups(workspaceId);
-  return () => groups.value()?.reduce((total, item) => total + item.pending, 0);
+  const read = pendingCountRead(useApiClient(), workspaceId);
+  if (!read) return () => undefined;
+  const count = connect(read);
+  return () => count.value()?.pending;
 }
 
 /** A view that opens at its newest items and pages back on request. */

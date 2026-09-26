@@ -40,6 +40,8 @@ interface Setup {
 const hashThread = () => new URLSearchParams(window.location.hash.slice(1)).get("thread") ?? "";
 const hashGroup = () => new URLSearchParams(window.location.hash.slice(1)).get("group") ?? "";
 const hashDirect = () => new URLSearchParams(window.location.hash.slice(1)).get("direct") ?? "";
+const hashAt = () =>
+  Number(new URLSearchParams(window.location.hash.slice(1)).get("at")) || undefined;
 /**
  * The owner of a workspace reads a group where a member started threads and the owner replied,
  * through the real host, or their inbox, where the member has since replied to them and mentioned
@@ -57,6 +59,7 @@ export function ConversationsFixture(props: {
   const [thread, setThread] = createSignal(hashThread());
   const [shownGroup, setShownGroup] = createSignal(hashGroup());
   const [drafting, setDrafting] = createSignal(hashDirect());
+  const [at, setAt] = createSignal(hashAt());
   const store: SessionStore = { read: credential, write: setCredential, subscribe: () => () => {} };
   let current: Scenario | undefined,
     alive = true;
@@ -65,6 +68,7 @@ export function ConversationsFixture(props: {
       setThread(hashThread());
       setShownGroup(hashGroup());
       setDrafting(hashDirect());
+      setAt(hashAt());
     };
     window.addEventListener("hashchange", follow);
     onCleanup(() => window.removeEventListener("hashchange", follow));
@@ -303,7 +307,9 @@ export function ConversationsFixture(props: {
                         <Shell.Content>
                           <Inbox
                             workspaceId={value().workspaceId}
-                            threadHref={(_, threadId) => `#thread=${threadId}`}
+                            threadHref={(_, threadId, sequence) =>
+                              `#thread=${threadId}&at=${sequence}`
+                            }
                             currentThread={thread() || undefined}
                           />
                         </Shell.Content>
@@ -323,6 +329,7 @@ export function ConversationsFixture(props: {
                           workspaceId={value().workspaceId}
                           groupId={value().groupId}
                           threadId={threadId}
+                          focus={at()}
                           onClose={() => {
                             window.location.hash = "";
                           }}

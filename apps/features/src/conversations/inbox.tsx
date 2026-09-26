@@ -1,6 +1,8 @@
 import {
   useGroups,
   useInbox,
+  useInboxPending,
+  useMarkAllSeen,
   useMarkSeen,
   useMembers,
   type InboxFilter,
@@ -20,8 +22,8 @@ import { authorOf, whenOf } from "./presentation.ts";
 
 export interface InboxProps {
   readonly workspaceId: string;
-  /** Where each notification's thread opens. */
-  readonly threadHref: (groupId: string, threadId: string) => string;
+  /** Where each notification's thread opens, at the timeline position that notified the reader. */
+  readonly threadHref: (groupId: string, threadId: string, sequence: number) => string;
   /** The thread open beside the inbox. */
   readonly currentThread?: string;
 }
@@ -56,7 +58,7 @@ function Entry(props: {
   readonly workspaceId: string;
   readonly item: () => Item;
   readonly reason: (item: Item) => string;
-  readonly href: (groupId: string, threadId: string) => string;
+  readonly href: (groupId: string, threadId: string, sequence: number) => string;
   readonly current?: string;
 }) {
   const notification = () => props.item().notification;
@@ -91,7 +93,7 @@ function Entry(props: {
             <View.Quote>{text()}</View.Quote>
             <View.Actions>
               <View.Open
-                href={props.href(reference().groupId, reference().threadId)}
+                href={props.href(reference().groupId, reference().threadId, reference().sequence)}
                 aria-current={open() ? "page" : undefined}
               >
                 Open thread
@@ -182,6 +184,36 @@ function Notifications(props: InboxProps & { readonly filter: InboxFilter }) {
   );
 }
 /**
+ * Mark everything still pending seen, through the newest notification the list shows, so one that
+ * arrives meanwhile stays unread.
+ */
+function MarkAllSeen(props: { readonly workspaceId: string; readonly filter: InboxFilter }) {
+  const inbox = useInbox(props.workspaceId, props.filter);
+  const pending = useInboxPending(props.workspaceId);
+  const seen = useMarkAllSeen(props.workspaceId);
+  const newest = () => inbox.value()?.[0]?.notification;
+  return (
+    <Show when={(pending() ?? 0) > 0 ? newest() : undefined}>
+      {(through) => (
+        <Row gap={2} align="center">
+          <Show when={seen.error()}>
+            <Text role="alert" tone="danger">
+              Couldn’t mark these seen.
+            </Text>
+          </Show>
+          <Button
+            variant="secondary"
+            pending={seen.pending()}
+            onClick={() => seen.markAllSeen(through())}
+          >
+            Mark all seen
+          </Button>
+        </Row>
+      )}
+    </Show>
+  );
+}
+/**
  * The reader's inbox, newest first and live while mounted: what came to them, each with why and
  * what was said, a link to its thread, and a way to mark it seen. Everything shows by default;
  * the reader can narrow it to what is still unread. Older notifications load on request.
@@ -190,14 +222,19 @@ export function Inbox(props: InboxProps) {
   const [filter, setFilter] = createSignal<InboxFilter>("all");
   return (
     <Column gap={4}>
-      <SegmentedControl.Root
-        aria-label="Show"
-        value={filter()}
-        onValueChange={(value) => setFilter(value === "pending" ? "pending" : "all")}
-      >
-        <SegmentedControl.Item value="all">All</SegmentedControl.Item>
-        <SegmentedControl.Item value="pending">Unread</SegmentedControl.Item>
-      </SegmentedControl.Root>
+      <Row justify="between" align="center" gap={3}>
+        <SegmentedControl.Root
+          aria-label="Show"
+          value={filter()}
+          onValueChange={(value) => setFilter(value === "pending" ? "pending" : "all")}
+        >
+          <SegmentedControl.Item value="all">All</SegmentedControl.Item>
+          <SegmentedControl.Item value="pending">Unread</SegmentedControl.Item>
+        </SegmentedControl.Root>
+        <Show when={filter()} keyed>
+          {(shown) => <MarkAllSeen workspaceId={props.workspaceId} filter={shown} />}
+        </Show>
+      </Row>
       <Show when={filter()} keyed>
         {(shown) => <Notifications {...props} filter={shown} />}
       </Show>

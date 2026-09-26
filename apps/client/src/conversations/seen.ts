@@ -1,7 +1,7 @@
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { seenRequest } from "../api/conversations.ts";
+import { seenRequest, seenThroughRequest, type Notification } from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
@@ -35,6 +35,34 @@ export function useMarkSeen(workspaceId: string, notificationId: string): SeenCo
       if (seen()) return;
       setError(undefined);
       request.run(notificationId);
+    },
+  };
+}
+
+export interface SeenAllController {
+  readonly pending: Accessor<boolean>;
+  /** Why the last attempt failed. */
+  readonly error: Accessor<WorkspaceFailure | undefined>;
+  /** Mark everything still pending seen, up to and including the newest notification shown. */
+  readonly markAllSeen: (through: Pick<Notification.Record, "recordedAt" | "id">) => void;
+}
+/** Mark all of the reader's notifications seen, up to the newest they are shown. */
+export function useMarkAllSeen(workspaceId: string): SeenAllController {
+  const session = useSession();
+  const [error, setError] = createSignal<WorkspaceFailure>();
+  const request = useRequest(
+    seenThroughRequest(useApiClient(), workspaceId),
+    (exit) => {
+      if (Exit.isFailure(exit)) setError(workspaceFailure(exit.cause));
+    },
+    { when: () => session.session !== undefined },
+  );
+  return {
+    pending: request.pending,
+    error,
+    markAllSeen: (through) => {
+      setError(undefined);
+      request.run(through);
     },
   };
 }

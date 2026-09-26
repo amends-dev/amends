@@ -34,6 +34,13 @@ and does this itself, so it works the same in WebKit, which has none. The scroll
 the list is laid out, and again if it moves, as Inspector content does between its dock and
 sheet. Callers key entries by domain ID, so refreshes keep each entry's element.
 
+Mark the entry the reader came to see `focused`, such as the message that notified them. It is
+set apart with a wash of the selected-action color that reaches past its edges without moving it
+(an outline in forced colors), and the view opens centered on it instead of at the newest end. An
+entry that becomes focused later, as when the page reads back until that message arrives or the
+reader follows another notification, is brought into view then; after that the reader's place is
+kept as before. The FocusedEntry stories cover both.
+
 The Default story's play test runs in a real browser: it opens at the newest entry, keeps the
 first visible entry in place while earlier entries arrive, and follows new entries at the end.
 **Thread panel** shows compact messages in the shell's inspector.

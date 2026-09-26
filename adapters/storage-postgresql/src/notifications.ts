@@ -226,6 +226,27 @@ export const make = Effect.fn("Notifications.make")(function* () {
       (recipient, options) => list(recipient, options, false),
       Effect.mapError(storeFailure(NotificationStore, "listByRecipient")),
     ),
+    countPendingByRecipient: Effect.fn("Notifications.countPendingByRecipient")(
+      function* (recipient) {
+        const target = yield* validateRecipient(recipient);
+        // The pending recipient index answers this without reading what the recipient has seen.
+        const [row] = yield* guard(
+          db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(notifications)
+            .where(
+              and(
+                inWorkspace,
+                eq(notifications.recipientKind, target._tag),
+                eq(inbox, inboxOf(target)),
+                pendingOnly,
+              ),
+            ),
+        );
+        return yield* Schema.decodeUnknownEffect(Schema.Int)(row?.count ?? 0);
+      },
+      Effect.mapError(storeFailure(NotificationStore, "countPendingByRecipient")),
+    ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
       function* (recipient, groupInput) {
         const target = yield* validateRecipient(recipient);

@@ -233,7 +233,18 @@ only those still pending. `before` is the last listed `{ recordedAt, id }`, an e
 Each item carries its notification and, as `source`, the timeline item that resolving it returns;
 where resolving would return `SourceUnavailable`, the item has no `source`. It requires active
 membership only, lists nobody else's notifications, and changes nothing. `list` and `listPending`
-keep the oldest-first order, for work queues.
+keep the oldest-first order, for work queues. `countPending` counts what is still pending for the
+acting identity, from any source, including threads they can no longer read.
+
+## Seeing everything at once
+
+`NotificationApplication.acknowledgeThrough({ recordedAt, id })` records `Seen` for every
+notification still pending for the acting human up to and including that position in inbox
+order, typically the newest one they are shown, so a notification that arrives meanwhile stays
+pending. It marks them in batches of 100, each written as `acknowledge` writes one and heard by
+the person's other sessions as one `NotificationsSeen` signal, and returns how many it marked;
+nothing left to mark returns zero. Batches are not one transaction: a failure keeps what earlier
+batches marked, and a retry continues. Agents receive `HumanRecipientRequired`.
 
 ## Resolving a notification source
 

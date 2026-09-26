@@ -23,9 +23,9 @@ export const paths = {
   /** A first message to some people who have no direct group together yet. */
   directDraft: (id: string, memberIds: ReadonlyArray<string>) =>
     `/workspaces/${encodeURIComponent(id)}/direct?to=${memberIds.map(encodeURIComponent).join(",")}`,
-  /** A thread opened from the inbox, beside it. */
-  inboxThread: (id: string, groupId: string, threadId: string) =>
-    `/workspaces/${encodeURIComponent(id)}/inbox/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
+  /** A thread opened from the inbox, beside it, at the timeline position that notified the reader. */
+  inboxThread: (id: string, groupId: string, threadId: string, at?: number) =>
+    `/workspaces/${encodeURIComponent(id)}/inbox/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}${at === undefined ? "" : `?at=${at}`}`,
 } as const;
 
 /** Only internal protected destinations can be resumed after authentication. */

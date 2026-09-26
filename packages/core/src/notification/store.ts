@@ -103,6 +103,11 @@ export interface Interface {
     throughSequence: number,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
 
+  /** How many pending notifications the recipient has, from anywhere. */
+  readonly countPendingByRecipient: (
+    recipient: Notification.Recipient,
+  ) => Effect.Effect<number, Failure>;
+
   /**
    * How many pending notifications the recipient has from thread activity in each of these
    * groups, for groups with any. Read one page of groups at a time.

@@ -78,7 +78,10 @@ same key returns the first attempt's result, and the same key with a different b
   returns the same 404. The caller cannot select a different recipient.
   `GET …/inbox` lists the same inbox newest first, each notification with its `source` timeline
   item where the caller can still read it; it takes `limit` from 1 to 50, `pendingOnly`, and
-  `before`, the last item's `{ recordedAt, id }` as URL-encoded JSON.
+  `before`, the last item's `{ recordedAt, id }` as URL-encoded JSON. `GET …/count` returns
+  `{ pending }`, how many notifications are still pending for the caller, and
+  `POST …/acknowledge` with `{ through: { recordedAt, id } }` marks a person's pending
+  notifications seen up to that one, returning `{ acknowledged }`.
   `GET …/:notificationId/source` returns the timeline item the notification points to, under the
   caller's current access to it (404 `NotificationApplication.SourceUnavailable` without it).
   `POST …/:notificationId/acknowledge` records that the person saw it and returns the

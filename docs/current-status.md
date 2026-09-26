@@ -65,8 +65,9 @@ they add people and agents with the chip picker and remove members after a confi
 click; anyone may leave a team group the same way, which returns them to the workspace home.
 Direct groups list their members without changes. Members of groups the reader does not belong to
 cannot be managed from the apps, since the management reads have no HTTP route. After leaving, the
-reader's pending notifications from the group stay in the inbox but no longer count in the
-sidebar, which counts per group.
+reader's pending notifications from the group stay in the inbox, and in its count, as
+notifications whose thread they can no longer see. A thread already open beside the inbox or
+stream keeps showing what it last read after the reader loses access to it.
 
 A team group's name has a quiet "Rename" beside it on its page for readers with `group.rename`
 (administrators and owners by default), opening a dialog focused on the current name. The new name
@@ -81,13 +82,13 @@ A direct group's page lists its members without changes, since its membership is
 someone else means a new conversation.
 
 The Inbox destination lists the reader's notifications newest first, live, with the sidebar
-counting what is pending: why each came (a mention, a reply in a followed thread, or a new thread
-in a followed group), what was said, and a link that opens the thread beside the inbox, where
-reading it settles its notifications. A notification can be marked seen without opening it, and
-the list narrows to what is unread. Only one notification is marked at a time; there is no "mark
-all seen", and opening a thread from the inbox shows it from its newest messages rather than at the
-message that notified the reader. The inbox reads each listed notification's source as resolving
-one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
+counting everything still pending for them: why each came (a mention, a reply in a followed
+thread, or a new thread in a followed group), what was said, and a link that opens the thread
+beside the inbox at the message that notified them, reading back as far as it takes and setting
+that message apart. Reading the thread settles its notifications. A notification can be marked
+seen without opening it, "Mark all seen" marks everything through the newest one listed so that
+later arrivals stay unread, and the list narrows to what is unread. The inbox reads each listed
+notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
 
 ## Storage cost

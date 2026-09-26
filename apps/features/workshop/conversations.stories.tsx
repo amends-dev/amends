@@ -213,6 +213,12 @@ export const InboxView = {
     await userEvent.click(within(reply!).getByRole("link", { name: "Open thread" }));
     const thread = await canvas.findByRole("region", { name: "Thread messages" });
     await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(4));
+    // It opens at the reply that notified the owner, set apart from the rest.
+    await waitFor(() =>
+      expect(
+        within(thread).getByText("Does that include the refunds?").closest("li"),
+      ).toHaveAttribute("data-focused", "true"),
+    );
     await waitFor(() => expect(cards.queryAllByRole("img", { name: "unread" })).toHaveLength(0), {
       timeout: 10000,
     });
@@ -227,6 +233,10 @@ export const InboxView = {
     const unread = await canvas.findByRole("list", { name: "Unread notifications" });
     await waitFor(() => expect(within(unread).getAllByRole("listitem")).toHaveLength(1));
     await expect(within(unread).getByRole("listitem")).toHaveTextContent("the receipts are in.");
+    // Marking all seen clears what is unread, through the newest shown.
+    await userEvent.click(canvas.getByRole("button", { name: "Mark all seen" }));
+    await canvas.findByText("Nothing needs you", {}, { timeout: 10000 });
+    await waitFor(() => expect(canvas.queryByRole("button", { name: "Mark all seen" })).toBeNull());
   },
 } satisfies Story;
 export const CreateGroup = {

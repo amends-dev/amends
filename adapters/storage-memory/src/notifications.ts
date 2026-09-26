@@ -205,6 +205,15 @@ export const make = Effect.fn("Notifications.make")(function* () {
       },
       Effect.mapError(storeFailure(NotificationStore, "listPendingByThread")),
     ),
+    countPendingByRecipient: Effect.fn("Notifications.countPendingByRecipient")(
+      function* (recipient) {
+        const target = inboxKey(yield* validateRecipient(recipient));
+        return (yield* all).filter(
+          (record) => inboxKey(record.recipient) === target && record.state._tag === "Pending",
+        ).length;
+      },
+      Effect.mapError(storeFailure(NotificationStore, "countPendingByRecipient")),
+    ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
       function* (recipient, groupInput) {
         const target = inboxKey(yield* validateRecipient(recipient));

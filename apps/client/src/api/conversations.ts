@@ -334,6 +334,35 @@ const inboxOf = perClient(
 export const inboxRead = (client: ApiClient, workspaceId: string, filter: InboxFilter) =>
   valid(workspaceId) ? inboxOf(client, joined(workspaceId, filter)) : undefined;
 
+/** How many notifications are still pending for the reader, as the inbox reads them. */
+export const pendingCountRead = (client: ApiClient, workspaceId: string) =>
+  valid(workspaceId)
+    ? client.query("notifications", "count", {
+        params: { workspaceId: Workspace.Id.make(workspaceId) },
+        reactivityKeys: [workspaceKey(workspaceId, "inbox")],
+      })
+    : undefined;
+
+/**
+ * Record that the reader saw everything still pending for them up to the newest notification
+ * they are shown, then invalidate their inbox and pending counts. What arrived after it stays.
+ */
+export const seenThroughRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (through: Pick<Notification.Record, "recordedAt" | "id">) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const { acknowledged } = yield* api.notifications.acknowledgeThrough({
+        params: { workspaceId: yield* command(Workspace.Id)(workspace) },
+        payload: { through: { recordedAt: through.recordedAt, id: through.id } },
+      });
+      yield* Reactivity.invalidate([
+        workspaceKey(workspace, "inbox"),
+        workspaceKey(workspace, "groups"),
+      ]);
+      return acknowledged;
+    }),
+  );
+
 /**
  * Record that the reader saw a notification, then invalidate their inbox and pending counts, as
  * their own signal would when it arrives. Seeing it again keeps the first time.
