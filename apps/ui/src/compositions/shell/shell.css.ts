@@ -191,7 +191,14 @@ export const content = style({
 export const contentInner = style({
   flexShrink: 0,
   // Auto margins become zero when content is taller than Main, preserving its start edge.
-  selectors: { [`${content}[data-centered="true"] > &`]: { marginBlock: "auto" } },
+  selectors: {
+    [`${content}[data-centered="true"] > &`]: { marginBlock: "auto" },
+    [`${content}[data-fill="true"] > &`]: {
+      flexGrow: 1,
+      display: "flex",
+      flexDirection: "column",
+    },
+  },
 });
 export const skip = style([
   typographyStyles.body,
@@ -243,7 +250,15 @@ export const inspector = style({
   selectors: { "&[hidden]": { display: "none" } },
 });
 export const inspectorDock = style({ display: "flex", flex: 1, minWidth: 0, minHeight: 0 });
-export const inspectorFrame = style({ flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" });
+// A column, so InspectorBody can fill the height left under the header.
+export const inspectorFrame = style({
+  display: "flex",
+  flexDirection: "column",
+  flex: 1,
+  minWidth: 0,
+  minHeight: 0,
+  overflowY: "auto",
+});
 /** Inspector content: a header that stays in place over a scrolling body. */
 export const inspectorHeader = style({
   position: "sticky",
@@ -282,7 +297,11 @@ export const inspectorMeta = style({
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 });
+// Fills the rest of the inspector as a column, so a docked composer sits at its end.
 export const inspectorBody = style({
+  display: "flex",
+  flexDirection: "column",
+  flex: "1 0 auto",
   minWidth: 0,
   paddingInline: "1.25rem",
   paddingBlockEnd: "1.25rem",

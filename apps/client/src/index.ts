@@ -54,3 +54,4 @@ export {
 } from "./conversations/reads.ts";
 export type { Group, Member, Thread, ThreadTimeline } from "./api/conversations.ts";
 export { toDate } from "./conversations/time.ts";
+export { useNewThread, useReply, type ComposerController } from "./conversations/compose.ts";

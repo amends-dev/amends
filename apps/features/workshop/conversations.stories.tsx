@@ -43,5 +43,38 @@ export const Group = {
     );
   },
 } satisfies Story;
+export const Writing = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const stream = await canvas.findByRole("region", { name: "Design" }, { timeout: 20000 });
+    const entries = within(stream);
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(3));
+    // Writing on the page starts a thread.
+    const page = await canvas.findByRole("textbox", { name: "Message #Design" });
+    await expect(page).toHaveAccessibleDescription("Starts a new thread in #Design.");
+    await userEvent.type(page, "A question for everyone{Enter}");
+    await waitFor(() => expect(entries.getAllByRole("article")).toHaveLength(4));
+    await expect(page).toHaveValue("");
+    await expect(entries.getAllByRole("article").at(-1)).toHaveTextContent(
+      "A question for everyone",
+    );
+    // Writing in a thread replies there, and its count follows.
+    await userEvent.click(entries.getByRole("link", { name: /^2 replies/ }));
+    const thread = await canvas.findByRole("region", { name: "Thread messages" });
+    await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(3));
+    const reply = canvas.getByRole("textbox", { name: "Reply" });
+    await userEvent.type(reply, "Following up.{Enter}");
+    await waitFor(() => expect(within(thread).getAllByRole("article")).toHaveLength(4));
+    await waitFor(() => expect(entries.getByRole("link", { name: /^3 replies/ })).toBeVisible());
+    // A draft left in one thread is still there after visiting another.
+    await userEvent.type(reply, "Unsent draft");
+    await userEvent.click(entries.getAllByRole("link", { name: "reply in thread" })[0]!);
+    await waitFor(() => expect(canvas.getByRole("textbox", { name: "Reply" })).toHaveValue(""));
+    await userEvent.click(entries.getByRole("link", { name: /^3 replies/ }));
+    await waitFor(() =>
+      expect(canvas.getByRole("textbox", { name: "Reply" })).toHaveValue("Unsent draft"),
+    );
+  },
+} satisfies Story;
 export const ManyThreads = { args: { threads: 60 } } satisfies Story;
 export const Soot = { args: { theme: "soot" } } satisfies Story;

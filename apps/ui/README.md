@@ -305,7 +305,9 @@ Thread, following the Agent messages reference: an entry with its author, time, 
 to its thread's replies, and the ordered column with day seams that keeps the reader's place as
 entries arrive at either end. Reply counts use the Foundations' link color, `text.link`, the one
 place persimmon appears in content. See [Message](src/compositions/message/README.md) and
-[Transcript](src/compositions/transcript/README.md).
+[Transcript](src/compositions/transcript/README.md). **Compositions / Composer** is the reference's
+page and thread composer, sending with Enter or its button and docking at the bottom of its
+region. See [Composer](src/compositions/composer/README.md).
 
 **Compositions / KeyValue** follows the Primitives v2 Key and value reference:
 compact mono keys/values at opposite edges, content-driven wrapping, and seams

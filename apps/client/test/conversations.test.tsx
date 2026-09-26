@@ -2,11 +2,14 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
+import { createSignal, Show } from "solid-js";
 import {
   ClientProvider,
   Session,
   useGroupStream,
+  useReply,
   useThreadTimeline,
+  type ComposerController,
   type PagedView,
   type SessionStore,
   type Thread,
@@ -227,4 +230,77 @@ it("a timeline opens at its newest activity, pages back once, and a change reads
     ["21", null],
     [null, "72"],
   ]);
+});
+
+it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {
+  const posts: Array<{ key: string | null; body: unknown }> = [];
+  let failNext = true;
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    if (request.method !== "POST") return json([]);
+    posts.push({ key: request.headers.get("idempotency-key"), body: await request.json() });
+    if (failNext) {
+      failNext = false;
+      return new Response("Host unavailable", { status: 503 });
+    }
+    // The contract answers a publication with 201.
+    return new Response(
+      JSON.stringify({
+        message: message("reply", "thread", minute(1)),
+        activity: item(2).activity,
+      }),
+      { status: 201, headers: { "content-type": "application/json" } },
+    );
+  });
+  const [shown, setShown] = createSignal(true);
+  let composer!: ComposerController;
+  function Consumer() {
+    composer = useReply("one", "thread");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Show when={shown()}>
+        <Consumer />
+      </Show>
+    </ClientProvider>
+  ));
+  expect(composer.ready()).toBe(false);
+  composer.setDraft("   ");
+  expect(composer.ready()).toBe(false);
+  composer.setDraft("On it.");
+  // The draft outlives the composer that wrote it.
+  setShown(false);
+  setShown(true);
+  expect(composer.draft()).toBe("On it.");
+  composer.send();
+  await waitFor(() => expect(composer.error()).toBe("failed"));
+  expect(composer.draft()).toBe("On it.");
+  composer.send();
+  await waitFor(() => expect(composer.draft()).toBe(""));
+  expect(composer.error()).toBeUndefined();
+  composer.setDraft("Second");
+  composer.send();
+  await waitFor(() => expect(posts).toHaveLength(3));
+  expect(posts.map((post) => post.body)).toEqual([
+    { text: "On it.", mentions: [] },
+    { text: "On it.", mentions: [] },
+    { text: "Second", mentions: [] },
+  ]);
+  // A retry of the same text reuses its key; a new message gets its own.
+  expect(posts[0]!.key).toBe(posts[1]!.key);
+  expect(posts[2]!.key).not.toBe(posts[0]!.key);
+  expect(
+    new URL(
+      fetch.mock.calls.find(
+        ([input, init]) => new Request(input, init).method === "POST",
+      )![0] as string,
+    ).pathname,
+  ).toBe("/workspaces/one/threads/thread/messages");
 });

@@ -2,7 +2,7 @@ import { afterEach, inject, it } from "@effect/vitest";
 import { cleanup } from "@solidjs/testing-library";
 import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
-import meta, { Group } from "../workshop/conversations.stories.tsx";
+import meta, { Group, Writing } from "../workshop/conversations.stories.tsx";
 import { closeScenarios } from "../workshop/scenario.ts";
 
 afterEach(async () => {
@@ -13,4 +13,7 @@ afterEach(async () => {
 const stories = definePreview(preview).meta({ ...meta, args: { baseUrl: inject("workshopUrl") } });
 it("reads a group's stream and a thread, live, through HTTP and PostgreSQL", async () => {
   await stories.story(Group).run();
+});
+it("starts threads and replies from the composers, keeping drafts per thread", async () => {
+  await stories.story(Writing).run();
 });

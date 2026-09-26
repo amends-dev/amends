@@ -245,7 +245,7 @@ export function WorkspaceLayout(props: ParentProps) {
           </PageHeader.Root>
         </Shell.Header>
         <Shell.Main workspace aria-label={title()}>
-          <Shell.Content>{props.children}</Shell.Content>
+          <Shell.Content fill={groupId() !== undefined}>{props.children}</Shell.Content>
         </Shell.Main>
       </Shell.Body>
       <Shell.Inspector

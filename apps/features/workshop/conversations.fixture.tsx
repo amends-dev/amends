@@ -163,7 +163,7 @@ export function ConversationsFixture(props: {
                       </Row>
                     </Shell.Header>
                     <Shell.Main workspace aria-label="Design">
-                      <Shell.Content>
+                      <Shell.Content fill>
                         <GroupStream
                           workspaceId={value().workspaceId}
                           groupId={value().groupId}

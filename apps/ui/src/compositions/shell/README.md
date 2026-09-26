@@ -123,7 +123,9 @@ Content composes Container: `standard` (default) uses its 67.5rem outer limit;
 The default `fluid` width fills workspace content with 30px gutters, or 18px on
 phones, aligned with `Header workspace`. Use `Main workspace` to keep the body
 directly below that header. Other named widths remain centered for standalone
-pages. Without `centered`, content starts at the top. Centering uses free space only:
+pages. Without `centered`, content starts at the top. `fill` makes content a column that fills Main,
+so a part with an automatic top margin, such as `Composer.Dock`, sits at its end under short
+content. Centering uses free space only:
 long content starts at the top. `Body scroll="page"` keeps header, main, and footer
 in one scrollable flow, so tall chrome cannot crowd out the content at enlarged
 text sizes. The default `scroll="regions"` retains the existing independent Main

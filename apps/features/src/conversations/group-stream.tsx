@@ -1,4 +1,5 @@
 import { useGroupStream, useMembers, type Thread } from "@amends/client";
+import { Composer } from "@amends/ui/compositions/composer";
 import { EmptyState } from "@amends/ui/compositions/empty-state";
 import { Message } from "@amends/ui/compositions/message";
 import { Transcript } from "@amends/ui/compositions/transcript";
@@ -6,6 +7,7 @@ import { Button } from "@amends/ui/primitives/button";
 import { Drawing } from "@amends/ui/primitives/drawing";
 import { Text } from "@amends/ui/primitives/text";
 import { Match, Show, Switch } from "solid-js";
+import { NewThreadComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
 import { timeOf } from "./presentation.ts";
 
@@ -25,7 +27,8 @@ interface Opening extends Post {
 const replies = (count: number) => `${count} ${count === 1 ? "reply" : "replies"}`;
 /**
  * A group's conversation as its threads' opening messages, oldest shown first and live while
- * mounted, each linking to its thread with its reply count. Earlier threads load on request.
+ * mounted, each linking to its thread with its reply count, and a composer under it that starts
+ * a thread. Earlier threads load on request.
  */
 export function GroupStream(props: GroupStreamProps) {
   const stream = useGroupStream(props.workspaceId, props.groupId);
@@ -38,6 +41,12 @@ export function GroupStream(props: GroupStreamProps) {
       text: opening.message.text,
       opening,
     }));
+  // Writing on the page starts a thread; it docks under the stream while the group is readable.
+  const compose = () => (
+    <Composer.Dock>
+      <NewThreadComposer workspaceId={props.workspaceId} groupId={props.groupId} />
+    </Composer.Dock>
+  );
   return (
     <Switch>
       <Match when={stream.value() === undefined && stream.failure()}>
@@ -75,10 +84,11 @@ export function GroupStream(props: GroupStreamProps) {
           <EmptyState.Text>
             <EmptyState.Title>Nothing said yet</EmptyState.Title>
             <EmptyState.Description>
-              Threads started in this group appear here.
+              Write the first message below to start a thread.
             </EmptyState.Description>
           </EmptyState.Text>
         </EmptyState.Root>
+        {compose()}
       </Match>
       <Match when={true}>
         <Transcript.Root aria-label={props.label}>
@@ -116,6 +126,7 @@ export function GroupStream(props: GroupStreamProps) {
             />
           </Transcript.Items>
         </Transcript.Root>
+        {compose()}
       </Match>
     </Switch>
   );

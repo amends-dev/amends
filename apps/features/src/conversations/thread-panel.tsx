@@ -1,4 +1,5 @@
 import { useMembers, useThreadTimeline, type ThreadTimeline } from "@amends/client";
+import { Composer } from "@amends/ui/compositions/composer";
 import { EmptyState } from "@amends/ui/compositions/empty-state";
 import { Shell } from "@amends/ui/compositions/shell";
 import { Transcript } from "@amends/ui/compositions/transcript";
@@ -7,6 +8,7 @@ import { Drawing } from "@amends/ui/primitives/drawing";
 import { IconButton } from "@amends/ui/primitives/icon-button";
 import { Text } from "@amends/ui/primitives/text";
 import { Match, Show, Switch } from "solid-js";
+import { ReplyComposer } from "./composers.tsx";
 import { Entries, type Post } from "./entries.tsx";
 
 export interface ThreadPanelProps {
@@ -19,7 +21,7 @@ type Published = Extract<ThreadTimeline.Item, { readonly message: unknown }>;
 const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in item;
 /**
  * One thread's messages for the shell's inspector, from the newest and live while mounted, with
- * its header and close action. Earlier messages load on request.
+ * its header, close action, and a composer for replying. Earlier messages load on request.
  */
 export function ThreadPanel(props: ThreadPanelProps) {
   const timeline = useThreadTimeline(props.workspaceId, props.threadId);
@@ -102,6 +104,9 @@ export function ThreadPanel(props: ThreadPanelProps) {
                 <Entries posts={posts()} members={members} density="compact" />
               </Transcript.Items>
             </Transcript.Root>
+            <Composer.Dock surface="panel">
+              <ReplyComposer workspaceId={props.workspaceId} threadId={props.threadId} />
+            </Composer.Dock>
           </Match>
         </Switch>
       </Shell.InspectorBody>

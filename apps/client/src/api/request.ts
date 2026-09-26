@@ -1,5 +1,5 @@
 import { Effect, type Exit } from "effect";
-import { Atom, type AtomRegistry } from "effect/unstable/reactivity";
+import { Atom, type AtomRegistry, type Reactivity } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
 
 /** One ask of a request atom; the attempt tags its answer. */
@@ -23,7 +23,11 @@ export const requestAtom = <I, A, E>(
   operation: (
     input: I,
     get: Atom.FnContext,
-  ) => Effect.Effect<A, E, ApiClient["Identifier"] | AtomRegistry.AtomRegistry>,
+  ) => Effect.Effect<
+    A,
+    E,
+    ApiClient["Identifier"] | AtomRegistry.AtomRegistry | Reactivity.Reactivity
+  >,
 ) =>
   client.runtime
     .fn<Ask<I>>()(

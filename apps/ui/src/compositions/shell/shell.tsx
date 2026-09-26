@@ -426,6 +426,11 @@ export type ContentProps = JSX.HTMLAttributes<HTMLDivElement> & {
   width?: "fluid" | "standard" | "medium" | "narrow";
   /** Center short content vertically; overflow starts at the top and scrolls in Main. */
   centered?: boolean;
+  /**
+   * Fill Main's height as a column, so a part can sit at its end even under short content, as a
+   * composer docks under a conversation.
+   */
+  fill?: boolean;
 };
 /** Optional content boundary inside Main, composed from the shared Container primitive. */
 export function Content(props: ContentProps) {
@@ -433,6 +438,7 @@ export function Content(props: ContentProps) {
   const [local, native] = splitProps(props, [
     "width",
     "centered",
+    "fill",
     "children",
     "class",
     "classList",
@@ -442,6 +448,7 @@ export function Content(props: ContentProps) {
       {...native}
       class={classes(s.content, local.class, local.classList)}
       data-centered={local.centered ?? false}
+      data-fill={local.fill ?? false}
       data-width={local.width ?? "fluid"}
     >
       <Container

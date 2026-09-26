@@ -1,8 +1,11 @@
-import { Group, Member, Thread, ThreadTimeline, Workspace } from "@amends/api-http";
+import { Group, Member, Thread, ThreadMessage, ThreadTimeline, Workspace } from "@amends/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
-import { itemKeys, workspaceKey } from "./keys.ts";
+import { command } from "./failures.ts";
+import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
+import { requestAtom } from "./request.ts";
+import { newWorkspaceRequestKey } from "./workspaces.ts";
 
 export { Group, Member, Thread, ThreadTimeline };
 
@@ -181,3 +184,60 @@ export const timelineRead = (client: ApiClient, workspaceId: string, threadId: s
   valid(workspaceId) && Option.isSome(Schema.decodeOption(Thread.Id)(threadId))
     ? timelineOf(client, joined(workspaceId, threadId))
     : undefined;
+
+/** Whether text can be sent as a message: it has something besides whitespace. */
+export const isMessageText = Schema.is(ThreadMessage.Text);
+export const newPostKey = newWorkspaceRequestKey;
+/** A message to post: the first of a new thread in a group, or a reply in a thread. */
+export type Post =
+  | {
+      readonly kind: "start";
+      readonly groupId: string;
+      readonly text: string;
+      readonly key: ReturnType<typeof newPostKey>;
+    }
+  | {
+      readonly kind: "reply";
+      readonly threadId: string;
+      readonly text: string;
+      readonly key: ReturnType<typeof newPostKey>;
+    };
+/**
+ * Post one message, then invalidate the reads it changes, as the change feed would when the
+ * commit arrives, so it shows even while the feed is away. A retry with the same key returns the
+ * first attempt's result.
+ */
+export const postRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (post: Post) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const workspaceId = yield* command(Workspace.Id)(workspace);
+      const payload = { text: yield* command(ThreadMessage.Text)(post.text), mentions: [] };
+      const headers = { "idempotency-key": post.key };
+      switch (post.kind) {
+        case "start": {
+          const groupId = yield* command(Group.Id)(post.groupId);
+          const started = yield* api.threads.start({
+            params: { workspaceId, groupId },
+            headers,
+            payload,
+          });
+          yield* Reactivity.invalidate([
+            itemKey(workspace, "streams", groupId),
+            workspaceKey(workspace, "groups"),
+          ]);
+          return started.thread.id;
+        }
+        case "reply": {
+          const threadId = yield* command(Thread.Id)(post.threadId);
+          yield* api.threads.publish({ params: { workspaceId, threadId }, headers, payload });
+          // A reply changes its group's stream, whichever group that is.
+          yield* Reactivity.invalidate([
+            itemKey(workspace, "timelines", threadId),
+            collectionKey(workspace, "streams"),
+          ]);
+          return threadId;
+        }
+      }
+    }),
+  );

@@ -169,3 +169,12 @@ since a paging atom that restarts would drop older pages whenever a change arriv
 Their keys are per item within a collection (`workspace/<id>/streams:<group>`,
 `workspace/<id>/timelines:<thread>`), so a commit refreshes only the stream and timeline it
 touches, and a reset refreshes them all through the collection key.
+
+`useNewThread(workspaceId, groupId)` and `useReply(workspaceId, threadId)` return a
+`ComposerController` for writing: a `draft` kept per group or thread in the credential scope, so
+it survives remounts and moving between threads, `ready` once it has text and nothing is sending,
+`pending`, an `error` code, and `send`. A send reuses its request key when the same text is
+retried, so a post that succeeded unseen is not repeated, and takes a new key for new text. The
+draft clears once the message is posted. Posting invalidates the reads it changes, the group's
+stream and the groups for a new thread, the thread's timeline and the streams for a reply, so the
+message shows even while the change feed is away.
