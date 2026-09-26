@@ -10,7 +10,7 @@ import { useGroups } from "./reads.ts";
 export interface RenameGroupController {
   /** The reader may rename the group: a team group whose name they may change. */
   readonly renamable: Accessor<boolean>;
-  /** The group's name now, once loaded. */
+  /** The group's name now, once loaded; after a rename made meanwhile, the name it was given. */
   readonly current: Accessor<string | undefined>;
   readonly name: Accessor<string>;
   /** Replace the new name; a failure shown for the previous attempt clears. */
@@ -20,7 +20,11 @@ export interface RenameGroupController {
   readonly pending: Accessor<boolean>;
   /** Why the last attempt failed; the new name is kept for another try. */
   readonly error: Accessor<WorkspaceFailure | undefined>;
-  /** Save the new name; `renamed` runs once it is saved. */
+  /**
+   * Save the new name over the one the form started from; `renamed` runs once it is saved. If
+   * someone renamed the group meanwhile, it fails as `changed`, and saving again replaces their
+   * name, as the reader has now seen it.
+   */
   readonly save: () => void;
   /** Start again from the current name, as when the form opens. */
   readonly reset: () => void;
@@ -39,12 +43,16 @@ export function useRenameGroup(
     return group?.kind === "Team" ? group.name : undefined;
   };
   const [name, setName] = createSignal(""),
-    [error, setError] = createSignal<WorkspaceFailure>();
+    [error, setError] = createSignal<WorkspaceFailure>(),
+    // The name the reader is renaming from; after a conflict, whatever the group is called then.
+    [expected, setExpected] = createSignal<string>();
   const request = useRequest(
     renameGroupRequest(useApiClient(), workspaceId),
     (exit) => {
       if (Exit.isFailure(exit)) {
-        setError(workspaceFailure(exit.cause));
+        const failure = workspaceFailure(exit.cause);
+        if (failure === "changed") setExpected(undefined);
+        setError(failure);
         return;
       }
       renamed();
@@ -64,12 +72,14 @@ export function useRenameGroup(
     pending: request.pending,
     error,
     save: () => {
-      if (!ready()) return;
+      const from = expected() ?? current();
+      if (!ready() || from === undefined) return;
       setError(undefined);
-      request.run({ groupId, name: name() });
+      request.run({ groupId, name: name(), expectedName: from });
     },
     reset: () => {
       setName(current() ?? "");
+      setExpected(current());
       setError(undefined);
     },
   };

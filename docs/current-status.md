@@ -80,8 +80,9 @@ and comes back if access returns.
 
 A team group's name has a quiet "Rename" beside it on its page for readers with `group.rename`
 (administrators and owners by default), opening a dialog focused on the current name. The new name
-shows in the header, sidebar, and composer, and reaches other members over the change feed.
-Renames are last-write-wins, with no check against a name changed meanwhile.
+shows in the header, sidebar, and composer, and reaches other members over the change feed. A
+rename made elsewhere while the dialog is open refuses the save and names the new name; saving
+again replaces it knowingly.
 
 Direct groups have their own Direct section in the sidebar, whose "+" offers everyone a New message
 dialog. Choosing people opens the conversation the reader already has with exactly them, or a

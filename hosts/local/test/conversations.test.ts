@@ -106,17 +106,29 @@ describe.skipIf(!available)("PostgreSQL", () => {
         // Alice renames it; Bob, a viewer, may not.
         const renamed = yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
-          payload: { name: "Product design" },
+          payload: { name: "Product design", expectedName: "Design" },
         });
         expect(renamed).toEqual({ ...group, name: "Product design" });
         expect(
           yield* asBob.groups
-            .rename({ params: { workspaceId, groupId: group.id }, payload: { name: "Mine" } })
+            .rename({
+              params: { workspaceId, groupId: group.id },
+              payload: { name: "Mine", expectedName: "Product design" },
+            })
             .pipe(Effect.flip),
         ).toMatchObject({ _tag: "Authorization.Denied" });
+        // Renaming from a name that has since changed would replace that rename unseen.
+        expect(
+          yield* asAlice.groups
+            .rename({
+              params: { workspaceId, groupId: group.id },
+              payload: { name: "Plans", expectedName: "Design" },
+            })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "GroupApplication.Changed", groupId: group.id });
         yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
-          payload: { name: "Design" },
+          payload: { name: "Design", expectedName: "Product design" },
         });
         const roster = yield* asBob.groups.members({
           params: { workspaceId, groupId },

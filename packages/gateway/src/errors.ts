@@ -109,6 +109,7 @@ export const PublicError = Schema.Union([
   GroupApplication.NotFound,
   GroupApplication.InactiveMember,
   GroupApplication.NotRenamable,
+  GroupApplication.Changed,
   GroupMembershipApplication.GroupNotFound,
   GroupMembershipApplication.MemberNotFound,
   GroupMembershipApplication.InactiveMember,

@@ -24,13 +24,15 @@ creator, and offer creation only to members whose workspace permissions, read th
 
 ## Renaming a group
 
-`GroupApplication.rename({ groupId, name })` requires `group.rename` on the group, in the
+`GroupApplication.rename({ groupId, name, expectedName })` requires `group.rename` on the group, in the
 Administrator and Owner bundles since bundle revision 3; an exact Group scope covers that group
 only. It needs no membership of the group. After that check, a missing or foreign group is
 `GroupApplication.NotFound`, and a direct group, named by its members, is
 `GroupApplication.NotRenamable`. The name follows creation's rule: nonempty and trimmed. Renaming
 records `group.renamed` with the new name and returns the group; the same name again records
-nothing. Renames are not compared against an expected name, so the latest one holds. Members read
+nothing. Otherwise `expectedName`, the name the renamer last saw, must still be the group's name:
+one renamed meanwhile is `GroupApplication.Changed`, so a rename is never silently replaced, and
+nothing is recorded. Members read
 the new name through their groups list, and the change feed delivers the fact to the group's
 readers. Each listed group says whether the reader may rename it (`renamable`), from the same grant
 resolution as reading it.

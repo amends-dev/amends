@@ -946,12 +946,13 @@ it("drafts a first message to someone new and opens the conversation it starts",
 });
 
 it("renames a group from beside its name", async () => {
-  let name = "Design";
+  let name = "Design",
+    expectedName: string | undefined;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/workspaces/one/groups/g1/rename") {
-      name = ((await request.json()) as { name: string }).name;
+      ({ name, expectedName } = (await request.json()) as { name: string; expectedName: string });
       return response({ ...managed.group, name });
     }
     if (path === "/workspaces/one/groups/g1/members") return response([]);
@@ -969,4 +970,6 @@ it("renames a group from beside its name", async () => {
   fireEvent.input(field, { target: { value: "Product design" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Save name" }));
   await waitFor(() => expect(name).toBe("Product design"));
+  // It renames from the name the dialog started from, so a rename made meanwhile is not lost.
+  expect(expectedName).toBe("Design");
 });

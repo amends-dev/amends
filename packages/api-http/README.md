@@ -183,29 +183,29 @@ group or thread the caller cannot read answers 404 exactly as a missing one does
 [group](../../docs/group-workflows.md) and [thread](../../docs/thread-workflows.md) workflows
 describe the rules behind each operation.
 
-| Endpoint                                             | Operation                                                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following. |
-| `POST …/groups`                                      | Create a private team from `{ name, memberIds }`; 201 with the group.                          |
-| `GET …/groups/:groupId`                              | One group.                                                                                     |
-| `POST …/groups/:groupId/rename`                      | Give a team group `{ name }` under `group.rename`; returns it. A direct group is 409.          |
-| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                      |
-| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                  |
-| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                    |
-| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                    |
-| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.            |
-| `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                      |
-| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.    |
-| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count. |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread, message, and activity.          |
-| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.   |
-| `GET …/threads/:threadId`                            | One thread.                                                                                    |
-| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                           |
-| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                |
-| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message and its activity.                        |
-| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.   |
-| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                   |
-| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                              |
+| Endpoint                                             | Operation                                                                                                                                                             |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                        |
+| `POST …/groups`                                      | Create a private team from `{ name, memberIds }`; 201 with the group.                                                                                                 |
+| `GET …/groups/:groupId`                              | One group.                                                                                                                                                            |
+| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group, or a name no longer `expectedName` (`GroupApplication.Changed`), is 409. |
+| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                             |
+| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                         |
+| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                           |
+| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                           |
+| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                                   |
+| `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                                                                                             |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                           |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                        |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread, message, and activity.                                                                                 |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.                                                                          |
+| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                           |
+| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                                  |
+| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                       |
+| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message and its activity.                                                                                               |
+| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                          |
+| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                          |
+| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                     |
 
 Every page takes an integer `limit` from 1 to 100 and an exclusive boundary from the last item of
 the previous page; an empty page ends the traversal. Groups, rosters, and participants pass that

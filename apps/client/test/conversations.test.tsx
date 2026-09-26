@@ -698,7 +698,7 @@ it("a first direct message starts the conversation and hands over its group", as
   expect(composer.draft()).toBe("");
 });
 
-it("renames a group it may rename, starting from its name and saving only a change", async () => {
+it("renames a group it may rename, from the name it started from, saving only a change", async () => {
   let name = "Design";
   const renames: Array<unknown> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -714,8 +714,14 @@ it("renames a group it may rename, starting from its name and saving only a chan
       createdAt: minute(0),
     };
     if (path === "/workspaces/one/groups/g1/rename") {
-      const body = (await request.json()) as { name: string };
+      const body = (await request.json()) as { name: string; expectedName: string };
       renames.push(body);
+      // As the host does, a rename from a name the group no longer has is refused.
+      if (body.name !== name && body.expectedName !== name)
+        return new Response(JSON.stringify({ _tag: "GroupApplication.Changed", groupId: "g1" }), {
+          status: 409,
+          headers: { "content-type": "application/json" },
+        });
       name = body.name;
       return json({ ...group, name });
     }
@@ -762,9 +768,23 @@ it("renames a group it may rename, starting from its name and saving only a chan
   expect(rename.ready()).toBe(true);
   rename.save();
   await waitFor(() => expect(saved).toEqual(["saved"]));
-  expect(renames).toEqual([{ name: "Product design" }]);
+  expect(renames).toEqual([{ name: "Product design", expectedName: "Design" }]);
   // Saving refreshes the groups, so the new name is the current one.
   await waitFor(() => expect(rename.current()).toBe("Product design"));
+  // Someone renames it elsewhere while the reader drafts another name from the one they saw.
+  rename.reset();
+  name = "Plans";
+  rename.setName("Roadmap");
+  rename.save();
+  await waitFor(() => expect(rename.error()).toBe("changed"));
+  expect(renames.at(-1)).toEqual({ name: "Roadmap", expectedName: "Product design" });
+  expect(saved).toEqual(["saved"]);
+  // The refusal refreshes the groups, so the reader sees that name; saving again replaces it.
+  await waitFor(() => expect(rename.current()).toBe("Plans"));
+  expect(rename.name()).toBe("Roadmap");
+  rename.save();
+  await waitFor(() => expect(saved).toEqual(["saved", "saved"]));
+  expect(renames.at(-1)).toEqual({ name: "Roadmap", expectedName: "Plans" });
 });
 
 it("a reply keeps its draft across remounts, retries with its key, and clears once posted", async () => {

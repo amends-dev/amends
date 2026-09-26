@@ -225,7 +225,8 @@ failures keep the input, `created` receives the new group's ID, and `reset` clea
 
 `useRenameGroup(workspaceId, groupId, renamed)` renames a team group where the list says the reader
 may (`renamable`): `reset` starts from the current name, `ready` holds for a different valid name,
-and saving refreshes the groups.
+and saving refreshes the groups. It renames from the name `reset` started from, so a rename made
+meanwhile fails as `changed` and refreshes the groups; saving again renames from that name.
 
 `useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster, with
 `rosterFailure` when it can no longer be read, and the reader's own admission, says whether they may manage it (`manageable`) and leave it (`leavable`), and adds

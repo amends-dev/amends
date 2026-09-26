@@ -25,9 +25,9 @@ import { GroupFollow } from "./follow/follow.ts";
 import { GroupFollowStore } from "./follow/store.ts";
 import { ReadStateStore } from "../attention/store.ts";
 import { NotificationStore } from "../notification/store.ts";
-import { InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
+import { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
 import { Notification } from "../notification/notification.ts";
-export { InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
+export { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "GroupApplication.InvalidResponse",
@@ -48,7 +48,7 @@ export type Error =
   | InvalidResponse;
 /** Creating can also meet a request key used before for a different group. */
 export type CreateError = Error | RequestReceipts.Error | GroupStore.Failure | NotFound;
-export type RenameError = Error | GroupStore.Failure | NotFound | NotRenamable;
+export type RenameError = Error | GroupStore.Failure | NotFound | NotRenamable | Changed;
 
 export type ReadError =
   | Authorization.Error
@@ -76,7 +76,8 @@ export interface Interface {
   /**
    * Require group.rename on the group, then give a team group a new name. Renaming needs no
    * membership of the group; a missing or foreign group is NotFound after that check, and a direct
-   * group, named by its members, is NotRenamable. The same name again records nothing.
+   * group, named by its members, is NotRenamable. The same name again records nothing; otherwise
+   * a name other than `expectedName` is Changed, and nothing is recorded.
    */
   readonly rename: (
     input: Group.RenameInput,
@@ -250,6 +251,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       const group = yield* load(request.groupId);
       if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
       if (group.name === request.name) return group;
+      if (group.name !== request.expectedName) return yield* new Changed({ groupId: group.id });
       yield* journal.publish(GroupFacts.Renamed, {
         workspaceId,
         groupId: group.id,

@@ -97,8 +97,11 @@ export const ListItem = Schema.Struct({
 });
 export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
 
-/** A team group's new name. */
-export const RenameInput = Schema.Struct({ groupId: Id, name: Name });
+/**
+ * A team group's new name, and the name the renamer last saw, so a rename made meanwhile is not
+ * silently replaced.
+ */
+export const RenameInput = Schema.Struct({ groupId: Id, name: Name, expectedName: Name });
 export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 /** What renaming a team group records. */
 export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name });

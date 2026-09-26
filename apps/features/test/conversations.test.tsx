@@ -13,6 +13,7 @@ import meta, {
   Members,
   Reading,
   Rename,
+  RenameConflict,
   Typing,
   Writing,
 } from "../workshop/conversations.stories.tsx";
@@ -56,6 +57,9 @@ it("messages someone new, creating the conversation with the first message, and 
 });
 it("renames a group, which shows everywhere it is named", async () => {
   await stories.story(Rename).run();
+});
+it("names a rename made elsewhere meanwhile, and replaces it only when saved again", async () => {
+  await stories.story(RenameConflict).run();
 });
 it("stops showing a thread and its group once the reader loses access elsewhere", async () => {
   await stories.story(LosingAccess).run();

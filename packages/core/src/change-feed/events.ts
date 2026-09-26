@@ -177,6 +177,8 @@ const registry: ReadonlyArray<Registered> = [
   register(InvitationFacts.Revoked, { requirement: manageInvitations }),
   register(RoleFacts.Created),
   register(RoleFacts.Renamed),
+  // Marks a built-in role revision; the renames and permission changes it made come with it.
+  register(RoleFacts.BuiltinsRevised),
   register(RoleFacts.PermissionsChanged, {
     access: () => ({ _tag: "Grants", memberId: undefined }),
   }),
@@ -192,6 +194,9 @@ const registry: ReadonlyArray<Registered> = [
   }),
   register(GroupFacts.Created, {
     requirement: ({ id }, workspaceId) => readGroup(id, workspaceId),
+  }),
+  register(GroupFacts.Renamed, {
+    requirement: ({ groupId }, workspaceId) => readGroup(groupId, workspaceId),
   }),
   register(GroupMembershipFacts.Added, {
     requirement: ({ groupId }, workspaceId) => readGroup(groupId, workspaceId),
@@ -259,6 +264,10 @@ for (const registered of registry) {
   versions.set(registered.version, registered);
   byName.set(registered.name, versions);
 }
+
+/** Whether the feed delivers a fact at this version; facts it does not register are internal. */
+export const delivers = (fact: { readonly name: string; readonly version: number }) =>
+  byName.get(fact.name)?.has(fact.version) ?? false;
 
 /**
  * Decode one journal entry for delivery. Facts the feed does not register are internal and

@@ -124,7 +124,8 @@ Owning domains name their kinds once, through `Group.audienceOf`, `Member.audien
 `Identity.audienceOf`, so facts and the consumers that grant scopes use the same keys.
 `Fact.makeAudience(fact, payload)` validates the payload and returns the scopes, which must be
 distinct. A fact that declares no audience is internal: nothing outside its projections
-learns of it.
+learns of it. One that declares an audience must be registered with the
+[change feed](../packages/core/README.md#change-feed), which a core test checks.
 
 Audiences are derived when a consumer decodes an event, not stored with the entry, so
 correcting a rule also corrects delivery of earlier history. The declaration must therefore

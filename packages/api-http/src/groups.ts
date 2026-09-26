@@ -40,9 +40,17 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
     }),
     HttpApiEndpoint.post("rename", "/:groupId/rename", {
       params: group,
-      payload: Schema.Struct({ name: Group.RenameInput.fields.name }),
+      payload: Schema.Struct({
+        name: Group.RenameInput.fields.name,
+        expectedName: Group.RenameInput.fields.expectedName,
+      }),
       success: Group.Record,
-      error: [...ApiErrors.member, ...ApiErrors.group, ApiErrors.NotRenamable],
+      error: [
+        ...ApiErrors.member,
+        ...ApiErrors.group,
+        ApiErrors.NotRenamable,
+        ApiErrors.GroupChanged,
+      ],
     }),
     HttpApiEndpoint.get("get", "/:groupId", {
       params: group,

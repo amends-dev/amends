@@ -418,6 +418,38 @@ export const Rename = {
     await canvas.findByRole("link", { name: /Product design/ });
   },
 } satisfies Story;
+/** A rename made elsewhere while the dialog is open is named, not silently replaced. */
+export const RenameConflict = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement),
+      body = within(document.body);
+    const rename = await canvas.findByRole("button", { name: "Rename" }, { timeout: 20000 });
+    await userEvent.click(canvas.getByRole("button", { name: "Rename elsewhere soon as owner" }));
+    await userEvent.click(rename);
+    const dialog = await body.findByRole("dialog", { name: "Rename group" });
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    await waitFor(() => expect(name).toHaveValue("Design"));
+    await userEvent.clear(name);
+    await userEvent.type(name, "Product design");
+    // The other rename arrives while this one is being typed.
+    await waitFor(() => expect(canvas.getByTestId("group-name")).toHaveTextContent("Plans"), {
+      timeout: 10000,
+    });
+    const save = within(dialog).getByRole("button", { name: "Save name" });
+    await userEvent.click(save);
+    await expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Someone renamed it to “Plans” meanwhile. Save again to use your name instead.",
+    );
+    await expect(name).toHaveValue("Product design");
+    await expect(canvas.getByTestId("group-name")).toHaveTextContent("Plans");
+    // Saving again, having seen it, replaces it.
+    await userEvent.click(save);
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "Rename group" })).toBeNull());
+    await waitFor(() =>
+      expect(canvas.getByTestId("group-name")).toHaveTextContent("Product design"),
+    );
+  },
+} satisfies Story;
 export const LosingAccess = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

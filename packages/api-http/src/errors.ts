@@ -129,6 +129,8 @@ export const group = [
 ] as const;
 /** A direct group is named by its members and refuses a name with 409. */
 export const NotRenamable = GroupApplication.NotRenamable.pipe(HttpApiSchema.status(409));
+/** A group renamed since the caller last saw its name refuses another name with 409. */
+export const GroupChanged = GroupApplication.Changed.pipe(HttpApiSchema.status(409));
 export const groupMembership = [
   GroupMembershipApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
   GroupMembershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),

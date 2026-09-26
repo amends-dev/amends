@@ -186,6 +186,22 @@ export function ConversationsFixture(props: {
       if (own) await api(value.scenario, `${path}/${own.id}/leave`, session.token, {});
     })().catch((cause) => setError(String(cause)));
   };
+  /**
+   * The owner renames the group from another session a moment later, as someone else might
+   * while a rename is open here.
+   */
+  const renameSoon = () => {
+    const value = setup();
+    if (!value) return;
+    setTimeout(() => {
+      void api(
+        value.scenario,
+        `/workspaces/${value.workspaceId}/groups/${value.groupId}/rename`,
+        value.owner.token,
+        { name: "Plans", expectedName: "Design" },
+      ).catch((cause) => setError(String(cause)));
+    }, 1000);
+  };
   /** The owner, who manages the workspace's groups, adds themselves back from another session. */
   const rejoinElsewhere = () => {
     const value = setup();
@@ -299,6 +315,9 @@ export function ConversationsFixture(props: {
                         </Button>
                         <Button variant="secondary" onClick={() => leave("member")}>
                           Leave as member
+                        </Button>
+                        <Button variant="secondary" onClick={renameSoon}>
+                          Rename elsewhere soon as owner
                         </Button>
                         <Button variant="secondary" onClick={rejoinElsewhere}>
                           Rejoin elsewhere as owner

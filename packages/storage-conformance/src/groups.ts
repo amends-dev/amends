@@ -649,10 +649,15 @@ export const groups = (harness: Harness) => {
             const group = yield* asActor(create([memberId]), owner).pipe(
               Effect.provide(core(bound)),
             );
-            const rename = (by: Actor.Value, groupId: Group.Id, name: string) =>
+            const rename = (
+              by: Actor.Value,
+              groupId: Group.Id,
+              name: string,
+              expectedName: string = "Engineering",
+            ) =>
               asActor(
                 Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.rename({ groupId, name }),
+                  service.rename({ groupId, name, expectedName }),
                 ),
                 by,
               ).pipe(Effect.provide(core(bound)));
@@ -674,9 +679,19 @@ export const groups = (harness: Harness) => {
               _tag: "Member",
               memberId: owner.memberId,
             });
-            // The same name again records nothing.
+            // The same name again records nothing, whatever name the renamer last saw.
             expect(yield* rename(owner, group.id, "Platform")).toEqual(renamed);
             expect(yield* history(bound)).toHaveLength(before.length + 1);
+            // Another name from a renamer who last saw the old one would replace a rename made
+            // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
+            expect(yield* Effect.flip(rename(owner, group.id, "Design"))).toMatchObject({
+              _tag: "GroupApplication.Changed",
+              groupId: group.id,
+            });
+            expect(yield* history(bound)).toHaveLength(before.length + 1);
+            expect(yield* rename(owner, group.id, "Engineering", "Platform")).toEqual(group);
+            expect(yield* history(bound)).toHaveLength(before.length + 2);
+            yield* rename(owner, group.id, "Platform");
             // A name must have text without surrounding space, and the group must exist.
             for (const name of ["", " Platform"])
               expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("SchemaError");

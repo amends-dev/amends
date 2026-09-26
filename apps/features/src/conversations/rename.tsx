@@ -7,8 +7,7 @@ import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createSignal, createUniqueId, Show } from "solid-js";
 
-const messages: { readonly [Failure in WorkspaceFailure]: string } = {
-  changed: "The group changed while you were renaming it. Try again.",
+const messages: { readonly [Failure in Exclude<WorkspaceFailure, "changed">]: string } = {
   denied: "You can no longer rename this group.",
   gone: "This group is no longer available to you.",
   invalid: "Give the group a name.",
@@ -27,6 +26,11 @@ export function GroupRenameAction(props: GroupRenameProps) {
   const [open, setOpen] = createSignal(false);
   let field: HTMLInputElement | undefined;
   const rename = useRenameGroup(props.workspaceId, props.groupId, () => setOpen(false));
+  // A rename made meanwhile is named, so saving again knowingly replaces it.
+  const say = (failure: WorkspaceFailure) =>
+    failure === "changed"
+      ? `Someone renamed it to “${rename.current() ?? ""}” meanwhile. Save again to use your name instead.`
+      : messages[failure];
   return (
     <Show when={rename.renamable()}>
       <Dialog.Root
@@ -75,7 +79,7 @@ export function GroupRenameAction(props: GroupRenameProps) {
                 <Show when={rename.error()}>
                   {(failure) => (
                     <Text role="alert" tone="danger">
-                      {messages[failure()]}
+                      {say(failure())}
                     </Text>
                   )}
                 </Show>

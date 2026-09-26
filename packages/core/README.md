@@ -362,7 +362,9 @@ commit that admits the reader delivers what it admits. The commit that removes t
 reader from the workspace is delivered, then the stream ends. Registry views give
 some facts their public shape: activity omits its notification recipients, and
 participation omits routing identities and admissions. Facts outside the registry,
-such as test facts, are internal. A registered name recorded in a version this host does not
+such as test facts, are internal. A core test checks that the registry holds every fact that
+declares an audience, at each version, and no other, so a new fact meant for readers cannot be
+left out. A registered name recorded in a version this host does not
 know, written by a newer host or no longer registered, can be neither shown nor filtered: the
 commit holding it reaches no reader, and ends every subscription with `ChangeFeed.Unavailable`,
 so reconnecting from the last cursor resets. The follower logs it and continues.

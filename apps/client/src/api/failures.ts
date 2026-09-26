@@ -64,6 +64,7 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "OwnershipApplication.MemberNotFound": "gone",
   // Conversations: someone else changed what the reader acted on, or it left their reach.
   "GroupMembershipApplication.AlreadyMember": "changed",
+  "GroupApplication.Changed": "changed",
   "ReadStateApplication.BeyondTimeline": "changed",
   "ThreadParticipationApplication.AlreadyEnded": "changed",
   "NotificationApplication.AlreadyHandled": "changed",

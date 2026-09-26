@@ -44,7 +44,11 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.rename({ groupId: params.groupId, name: payload.name }),
+              groups.rename({
+                groupId: params.groupId,
+                name: payload.name,
+                expectedName: payload.expectedName,
+              }),
             ),
           ),
         ),

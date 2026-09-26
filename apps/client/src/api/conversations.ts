@@ -414,20 +414,37 @@ export const createGroupRequest = (client: ApiClient, workspace: string) =>
   );
 
 /** Give a team group a new name, then invalidate the groups that show it. */
+/**
+ * Rename a team group from the name the reader last saw. A rename made meanwhile refuses it as
+ * changed, and the groups refresh to show that name.
+ */
 export const renameGroupRequest = (client: ApiClient, workspace: string) =>
-  requestAtom(client, (rename: { readonly groupId: string; readonly name: string }) =>
-    Effect.gen(function* () {
-      const api = yield* client;
-      const renamed = yield* api.groups.rename({
-        params: {
-          workspaceId: yield* command(Workspace.Id)(workspace),
-          groupId: yield* command(Group.Id)(rename.groupId),
-        },
-        payload: { name: yield* command(Group.Name)(rename.name.trim()) },
-      });
-      yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
-      return renamed;
-    }),
+  requestAtom(
+    client,
+    (rename: { readonly groupId: string; readonly name: string; readonly expectedName: string }) =>
+      Effect.gen(function* () {
+        const api = yield* client;
+        const renamed = yield* api.groups
+          .rename({
+            params: {
+              workspaceId: yield* command(Workspace.Id)(workspace),
+              groupId: yield* command(Group.Id)(rename.groupId),
+            },
+            payload: {
+              name: yield* command(Group.Name)(rename.name.trim()),
+              expectedName: yield* command(Group.Name)(rename.expectedName),
+            },
+          })
+          .pipe(
+            Effect.tapError((error) =>
+              error._tag === "GroupApplication.Changed"
+                ? Reactivity.invalidate([workspaceKey(workspace, "groups")])
+                : Effect.void,
+            ),
+          );
+        yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
+        return renamed;
+      }),
   );
 
 /** A change to who belongs to a team group: adding members, removing one, or leaving. */
