@@ -43,3 +43,14 @@ export {
   type WorkspaceFeedScope,
 } from "./live/workspace-feed.tsx";
 export type { WorkspaceFeedState } from "./api/changes.ts";
+export {
+  useGroups,
+  useMembers,
+  useGroupStream,
+  useThreadTimeline,
+  type Read,
+  type Members,
+  type PagedView,
+} from "./conversations/reads.ts";
+export type { Group, Member, Thread, ThreadTimeline } from "./api/conversations.ts";
+export { toDate } from "./conversations/time.ts";

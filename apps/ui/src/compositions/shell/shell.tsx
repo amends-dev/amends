@@ -554,6 +554,30 @@ export function Inspector(props: InspectorProps) {
     </Drawer.Root>
   );
 }
+/** The top of Inspector content: a Heading, then the page's close action. It stays in view. */
+export function InspectorHeader(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.inspectorHeader, local.class, local.classList)} />;
+}
+/** Groups the Title and an optional Meta line. */
+export function InspectorHeading(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.inspectorHeading, local.class, local.classList)} />;
+}
+export function InspectorTitle(props: JSX.HTMLAttributes<HTMLHeadingElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <h2 {...native} class={classes(s.inspectorTitle, local.class, local.classList)} />;
+}
+/** Compact context under the title, cut off on one line. */
+export function InspectorMeta(props: JSX.HTMLAttributes<HTMLSpanElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <span {...native} class={classes(s.inspectorMeta, local.class, local.classList)} />;
+}
+/** The scrolling content below the header, at the inspector's gutters. */
+export function InspectorBody(props: JSX.HTMLAttributes<HTMLDivElement>) {
+  const [local, native] = splitProps(props, ["class", "classList"]);
+  return <div {...native} class={classes(s.inspectorBody, local.class, local.classList)} />;
+}
 export function Footer(props: JSX.HTMLAttributes<HTMLElement>) {
   context();
   const [local, native] = splitProps(props, ["class", "classList"]);

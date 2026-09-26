@@ -244,6 +244,49 @@ export const inspector = style({
 });
 export const inspectorDock = style({ display: "flex", flex: 1, minWidth: 0, minHeight: 0 });
 export const inspectorFrame = style({ flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto" });
+/** Inspector content: a header that stays in place over a scrolling body. */
+export const inspectorHeader = style({
+  position: "sticky",
+  top: 0,
+  zIndex: 1,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.625rem",
+  minWidth: 0,
+  paddingBlock: "1.125rem 0.75rem",
+  paddingInline: "1.25rem",
+  backgroundColor: colorVars.surface.panel,
+});
+export const inspectorHeading = style({
+  display: "flex",
+  flex: 1,
+  flexDirection: "column",
+  gap: "0.125rem",
+  minWidth: 0,
+});
+export const inspectorTitle = style({
+  margin: 0,
+  fontFamily: fontFamilies.serif,
+  fontSize: "1.25rem",
+  fontWeight: 400,
+  lineHeight: 1.15,
+  color: colorVars.text.primary,
+  overflowWrap: "anywhere",
+});
+export const inspectorMeta = style({
+  fontFamily: fontFamilies.mono,
+  fontSize: "0.6875rem",
+  lineHeight: 1.4,
+  color: colorVars.text.secondary,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+});
+export const inspectorBody = style({
+  minWidth: 0,
+  paddingInline: "1.25rem",
+  paddingBlockEnd: "1.25rem",
+});
 export const inspectorDrawer = style({
   insetInlineStart: "auto",
   insetInlineEnd: 0,

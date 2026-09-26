@@ -1,5 +1,6 @@
 import { paths, useWorkspace, type WorkspacePage } from "@amends/client";
 import { Account } from "@amends/features/account";
+import { GroupName, GroupsNavigation, ThreadPanel } from "@amends/features/conversations";
 import { Live } from "@amends/features/live";
 import { Shell } from "@amends/ui/compositions/shell";
 import { PageHeader } from "@amends/ui/compositions/page-header";
@@ -15,8 +16,8 @@ import {
   IconMarkConnections,
   IconMarkSettings,
 } from "@amends/icons";
-import { useLocation, useParams } from "@solidjs/router";
-import { createEffect, on, type JSX, type ParentProps } from "solid-js";
+import { useLocation, useMatch, useNavigate, useParams } from "@solidjs/router";
+import { createEffect, on, Show, type JSX, type ParentProps } from "solid-js";
 
 const labels: Record<WorkspacePage, string> = {
   home: "Home",
@@ -96,6 +97,11 @@ export function WorkspaceLayout(props: ParentProps) {
     location = useLocation(),
     shell = Shell.useShell();
   const membership = useWorkspace(() => params.workspaceId);
+  const navigate = useNavigate();
+  const conversation = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/*rest");
+  const opened = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/threads/:threadId");
+  const groupId = () => conversation()?.params.groupId;
+  const threadId = () => opened()?.params.threadId;
   const settings = () =>
     location.pathname.startsWith(paths.workspacePage(params.workspaceId, "settings"));
   const settingsSection = () => {
@@ -110,6 +116,7 @@ export function WorkspaceLayout(props: ParentProps) {
           location.pathname.startsWith(`${paths.workspacePage(params.workspaceId, name)}/`)),
     );
   const title = () => {
+    if (groupId()) return "Conversation";
     if (settings())
       return settingsSection() === "members"
         ? "People"
@@ -120,6 +127,7 @@ export function WorkspaceLayout(props: ParentProps) {
     return current ? labels[current] : "Page not found";
   };
   const crumbs = () => {
+    if (groupId()) return "Workspace / Groups";
     if (settings()) return "Configure / Settings";
     const configure = page() === "environments" || page() === "connections";
     return `${configure ? "Configure" : "Workspace"} / ${title()}`;
@@ -161,6 +169,11 @@ export function WorkspaceLayout(props: ParentProps) {
                 <IconMarkTasks />
               </WorkspaceLink>
             </Navigation.Section>
+            <GroupsNavigation
+              workspaceId={params.workspaceId}
+              href={(id) => href(paths.group(params.workspaceId, id))}
+              current={groupId()}
+            />
             <Navigation.Section>
               <Navigation.SectionHeader>
                 <Navigation.SectionLabel>Configure</Navigation.SectionLabel>
@@ -220,7 +233,11 @@ export function WorkspaceLayout(props: ParentProps) {
               {crumbs()}
             </PageHeader.Crumbs>
             <PageHeader.Heading>
-              <PageHeader.Title>{title()}</PageHeader.Title>
+              <PageHeader.Title>
+                <Show when={groupId()} fallback={title()}>
+                  {(id) => <GroupName workspaceId={params.workspaceId} groupId={id()} />}
+                </Show>
+              </PageHeader.Title>
               <PageHeader.Actions>
                 <Live.Status />
               </PageHeader.Actions>
@@ -231,6 +248,27 @@ export function WorkspaceLayout(props: ParentProps) {
           <Shell.Content>{props.children}</Shell.Content>
         </Shell.Main>
       </Shell.Body>
+      <Shell.Inspector
+        title="Thread"
+        open={threadId() !== undefined}
+        onOpenChange={(open) => {
+          const group = groupId();
+          if (!open && group) navigate(paths.group(params.workspaceId, group));
+        }}
+      >
+        <Show when={threadId()} keyed>
+          {(id) => (
+            <ThreadPanel
+              workspaceId={params.workspaceId}
+              threadId={id}
+              onClose={() => {
+                const group = groupId();
+                if (group) navigate(paths.group(params.workspaceId, group));
+              }}
+            />
+          )}
+        </Show>
+      </Shell.Inspector>
     </>
   );
 }

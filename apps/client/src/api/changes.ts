@@ -4,7 +4,16 @@ import { Sse } from "effect/unstable/encoding";
 import { Atom, Reactivity } from "effect/unstable/reactivity";
 import { watchWake } from "../live/wake.ts";
 import { isUnauthorized, type ApiClient } from "./client.ts";
-import { directoryKey, workspaceKey, workspaceResources, type WorkspaceResource } from "./keys.ts";
+import {
+  collectionKey,
+  directoryKey,
+  itemKey,
+  workspaceCollections,
+  workspaceKey,
+  workspaceResources,
+  type WorkspaceCollection,
+  type WorkspaceResource,
+} from "./keys.ts";
 
 export type WorkspaceFeedState = Data.TaggedEnum<{
   /** Opening the first connection. */
@@ -35,16 +44,93 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "workspace.role.created": ["settings", "members"],
   "workspace.role.renamed": ["settings", "members"],
   // Grants decide what the reader may do and see, including another member's access.
-  "workspace.role.permissions-changed": ["settings", "ownership", "members"],
-  "workspace.assignment.created": ["settings", "ownership", "members"],
-  "workspace.assignment.revoked": ["settings", "ownership", "members"],
+  "workspace.role.permissions-changed": ["settings", "ownership", "members", "groups"],
+  "workspace.assignment.created": ["settings", "ownership", "members", "groups"],
+  "workspace.assignment.revoked": ["settings", "ownership", "members", "groups"],
+  "group.created": ["groups"],
+  "group.membership.added": ["groups"],
+  "group.membership.removed": ["groups"],
+  "group.follow.started": ["groups"],
+  "group.follow.ended": ["groups"],
+  // A group's latest activity, and whether it is new to the reader.
+  "thread.activity.recorded": ["groups"],
 };
+/** A field of an event's JSON payload, when it is a string. */
+const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {
+  let current = value;
+  for (const name of path) {
+    if (typeof current !== "object" || current === null || !Object.hasOwn(current, name))
+      return undefined;
+    current = (current as Readonly<Record<string, unknown>>)[name];
+  }
+  return typeof current === "string" ? current : undefined;
+};
+interface Target {
+  readonly collection: WorkspaceCollection;
+  readonly id: string | undefined;
+}
+/** The reads of one group or thread each fact can change, found from its payload. */
+const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Target>>> = {
+  // Starting a thread, replying, and joining or leaving it: the thread's timeline and its group's
+  // stream, whose reply counts and unread state follow.
+  "thread.activity.recorded": (payload) => [
+    { collection: "timelines", id: text(payload, "activity", "threadId") },
+    { collection: "streams", id: text(payload, "groupId") },
+  ],
+  // Which of a group's threads the reader may see.
+  "group.membership.added": (payload) => [{ collection: "streams", id: text(payload, "groupId") }],
+  "group.membership.removed": (payload) => [
+    { collection: "streams", id: text(payload, "groupId") },
+  ],
+};
+/** Grants decide which threads each stream shows, so they change every stream. */
+const everyStream = new Set([
+  "workspace.role.permissions-changed",
+  "workspace.assignment.created",
+  "workspace.assignment.revoked",
+]);
 const key = (workspaceId: string) => (affected: Affected) =>
   affected === directoryKey ? directoryKey : workspaceKey(workspaceId, affected);
-export const affectedKeys = (workspaceId: string, names: Iterable<string>): Array<string> => {
-  const keys = new Set<Affected>();
-  for (const name of names) for (const affected of affects[name] ?? []) keys.add(affected);
-  return [...keys].map(key(workspaceId));
+/**
+ * The keys a commit invalidates, each once, so every affected read refreshes once. An item's key
+ * is dropped when its whole collection is invalidated.
+ */
+export const affectedKeys = (
+  workspaceId: string,
+  events: Iterable<{ readonly name: string; readonly payload?: unknown }>,
+  notified = false,
+): Array<string> => {
+  const affected = new Set<Affected>(notified ? ["groups"] : []);
+  const collections = new Set<WorkspaceCollection>(),
+    items = new Set<string>();
+  for (const event of events) {
+    for (const resource of affects[event.name] ?? []) affected.add(resource);
+    for (const target of targets[event.name]?.(event.payload) ?? [])
+      if (target.id === undefined) collections.add(target.collection);
+      else items.add(itemKey(workspaceId, target.collection, target.id));
+    if (everyStream.has(event.name)) collections.add("streams");
+  }
+  const whole = [...collections].map((collection) => collectionKey(workspaceId, collection));
+  return [
+    ...[...affected].map(key(workspaceId)),
+    ...whole,
+    ...[...items].filter((item) => !whole.some((prefix) => item.startsWith(`${prefix}:`))),
+  ];
+};
+/**
+ * The reads a signal to the reader's own sessions changes. Reading a thread changes its stream's
+ * unread state and the reader's pending counts; catching up or seeing notifications, the groups.
+ */
+export const signalKeys = (workspaceId: string, signal: { readonly _tag: string }) => {
+  switch (signal._tag) {
+    case "ThreadRead":
+      return [workspaceKey(workspaceId, "groups"), collectionKey(workspaceId, "streams")];
+    case "GroupCaughtUp":
+    case "NotificationsSeen":
+      return [workspaceKey(workspaceId, "groups")];
+    default:
+      return [];
+  }
 };
 
 const failures = (cause: Cause.Cause<unknown>) =>
@@ -81,7 +167,11 @@ const run = Effect.fnUntraced(function* (
 ) {
   const api = yield* client;
   const reactivity = yield* Reactivity.Reactivity;
-  const everything = [directoryKey, ...workspaceResources.map(key(workspaceId))];
+  const everything = [
+    directoryKey,
+    ...workspaceResources.map(key(workspaceId)),
+    ...workspaceCollections.map((collection) => collectionKey(workspaceId, collection)),
+  ];
   const id = Schema.decodeOption(Workspace.Id)(workspaceId);
   if (id._tag === "None") {
     Queue.offerUnsafe(states, WorkspaceFeedState.Ended({ reason: "unavailable" }));
@@ -109,14 +199,14 @@ const run = Effect.fnUntraced(function* (
         });
       case "Committed": {
         cursor = message.cursor;
-        const keys = affectedKeys(
-          workspaceId,
-          message.events.map((event) => event.name),
-        );
+        // A notification for the reader changes their pending counts.
+        const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
       }
-      case "Signal":
-        return Effect.void;
+      case "Signal": {
+        const keys = signalKeys(workspaceId, message.signal);
+        return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
+      }
     }
   };
   while (true) {

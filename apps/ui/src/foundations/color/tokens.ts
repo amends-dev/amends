@@ -52,6 +52,8 @@ export interface ColorTokens {
     readonly primary: string;
     readonly secondary: string;
     readonly onTooltip: string;
+    /** Links in content: persimmon text, the one place it appears inside the shell's content. */
+    readonly link: string;
     /** Error messages on canvas and panel. */
     readonly invalid: string;
     readonly disabled: string;
@@ -151,6 +153,7 @@ export const cotton = {
     primary: "oklch(0.24 0.014 84)",
     secondary: "oklch(0.41 0.014 84)",
     onTooltip: "oklch(0.95 0.006 90)",
+    link: "oklch(0.47 0.12 40)",
     invalid: cottonStatus.danger.text,
     disabled: "oklch(0.62 0.014 84)",
   },
@@ -203,6 +206,7 @@ export const soot = {
     primary: "oklch(0.95 0.006 90)",
     secondary: "oklch(0.74 0.008 86)",
     onTooltip: "oklch(0.95 0.006 90)",
+    link: "oklch(0.72 0.12 44)",
     invalid: sootStatus.danger.text,
     disabled: "oklch(0.5 0.012 84)",
   },

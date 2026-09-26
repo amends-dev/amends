@@ -25,12 +25,15 @@ type Client = ApiClient["Service"];
 type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, unknown>
   ? E
   : never;
-/** Every failure the workspace, member, access, and invitation endpoints report, from the contract. */
+/** Every failure the workspace, member, access, invitation, and conversation endpoints report. */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
   | Failure<Client["members"][keyof Client["members"]]>
   | Failure<Client["assignments"][keyof Client["assignments"]]>
   | Failure<Client["invitations"][keyof Client["invitations"]]>
+  | Failure<Client["groups"][keyof Client["groups"]]>
+  | Failure<Client["threads"][keyof Client["threads"]]>
+  | Failure<Client["notifications"][keyof Client["notifications"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
@@ -59,7 +62,41 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "MemberApplication.NotFound": "gone",
   "OwnershipApplication.InvalidRecipient": "gone",
   "OwnershipApplication.MemberNotFound": "gone",
+  // Conversations: someone else changed what the reader acted on, or it left their reach.
+  "GroupMembershipApplication.AlreadyMember": "changed",
+  "ReadStateApplication.BeyondTimeline": "changed",
+  "ThreadParticipationApplication.AlreadyEnded": "changed",
+  "NotificationApplication.AlreadyHandled": "changed",
+  "GroupFollowApplication.AgentRequired": "denied",
+  "ReadStateApplication.HumanRequired": "denied",
+  "ThreadApplication.HumanAuthorRequired": "denied",
+  "ThreadMessageApplication.HumanAuthorRequired": "denied",
+  "NotificationApplication.HumanRecipientRequired": "denied",
+  "GroupApplication.NotFound": "gone",
+  "GroupApplication.MemberNotFound": "gone",
+  "GroupApplication.InactiveMember": "gone",
+  "GroupMembershipApplication.GroupNotFound": "gone",
+  "GroupMembershipApplication.MemberNotFound": "gone",
+  "GroupMembershipApplication.NotFound": "gone",
+  "GroupMembershipApplication.InactiveMember": "gone",
+  "GroupMembershipApplication.AlreadyRemoved": "gone",
+  "GroupFollowApplication.GroupNotFound": "gone",
+  "GroupFollowApplication.MemberUnavailable": "gone",
+  "ReadStateApplication.ThreadNotFound": "gone",
+  "ReadStateApplication.GroupNotFound": "gone",
+  "ThreadApplication.NotFound": "gone",
+  "ThreadApplication.GroupNotFound": "gone",
+  "ThreadApplication.ParticipantUnavailable": "gone",
+  "ThreadMessageApplication.NotFound": "gone",
+  "ThreadMessageApplication.ParticipantUnavailable": "gone",
+  "ThreadParticipationApplication.ThreadNotFound": "gone",
+  "ThreadParticipationApplication.NotFound": "gone",
+  "NotificationApplication.NotFound": "gone",
+  "NotificationApplication.SourceUnavailable": "gone",
   "Client.InvalidCommand": "invalid",
+  "GroupMembershipApplication.FixedMembership": "invalid",
+  "GroupFollowApplication.NotFollowable": "invalid",
+  "ThreadApplication.DirectMembersRequired": "invalid",
   "Gateway.InvalidInput": "invalid",
   "InvitationApplication.InvalidExpiry": "invalid",
   "Delegation.UnsupportedRole": "invalid",

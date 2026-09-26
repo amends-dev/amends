@@ -122,3 +122,27 @@ uses the workshop's `drop-changes` control, and `RefreshRecovery` uses `break-di
 persistent live region. It is empty while live and for two seconds after a drop, then shows
 "Connecting…" or "Reconnecting…". Mount it inside `WorkspaceFeedProvider`; the apps place it in
 the page header's actions. See [live updates](../../docs/live-updates.md).
+
+## Conversations
+
+`@amends/features/conversations` connects the conversation reads to UI:
+
+- `GroupsNavigation` renders the reader's groups as a navigation section, teams by name with a
+  `#` glyph and direct groups by the other people in them with `@`. A group shows a count of what
+  is addressed to the reader and a dot when it has new activity. The app supplies `href` and the
+  current group; the section is hidden while the reader has no groups.
+- `GroupStream` renders a group's stream as a Transcript: each thread's opening message with day
+  seams, oldest first, opening at the newest. Each links to its thread with its reply count and
+  when the last reply came, or "reply in thread"; the open thread's link is marked current.
+  "Show earlier threads" reads further back. It has loading, empty, unavailable, and retry
+  states.
+- `ThreadPanel` is the content of the shell's inspector for one thread: its header with a message
+  count and close action, and the thread's messages in compact density, with "Show earlier
+  messages". The app places it in `Shell.Inspector` and owns where closing leads.
+- `GroupName` renders a group's name as text, the same way the navigation names it.
+
+Authors are named by their identity until profiles exist. Times use the reader's locale: a
+message shows its time of day with the full date as its title, and day seams read Today,
+Yesterday, a weekday within the week, or the date. The **Features / Conversations** stories run a
+group through the real host: the owner reads a stream a member started, opens a thread, and its
+controls post as the member, so replies and new threads arrive over the live feed.

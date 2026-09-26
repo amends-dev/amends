@@ -37,7 +37,9 @@ Use links for destinations; actions should use Button or IconButton separately.
 
 Label accepts a text string, including a reactive expression. Icon is decorative and accepts
 the caller's glyph as children. Count is optional; use a meaningful accessible label when its
-number needs context. Do not nest interactive content inside a Link.
+number needs context. Dot marks a destination with something new: a small persimmon mark (the
+Shell reference's attention dot) whose `label` joins the link's accessible name. Like Count, it
+is visually hidden in the rail. Do not nest interactive content inside a Link.
 
 Root inherits compact presentation and mobile dismissal from Shell. Its optional `compact`
 prop supports standalone usage and review. Compact links keep their accessible names and

@@ -37,9 +37,14 @@ portable backend packages under `packages/*` remain Effect-only.
   Commits invalidate the reads they affect; see [live updates](../../docs/live-updates.md).
 - `useSettings(workspaceId, section)` composes keyed settings reads with commands that refresh
   them before reporting. `revision` counts explicit refreshes so editors can discard drafts.
+- `useGroups`, `useMembers`, `useGroupStream`, and `useThreadTimeline` are live conversation
+  reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
+  presentation to format.
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
+  `paths.group` and `paths.thread` name a group's page and a thread open beside it; both resume
+  after sign-in.
 
 Only `src/api` imports the HTTP contract and gateway session/directory schemas.
 Client cannot import UI, icons, styling, Storybook, router libraries, platform entry
@@ -121,7 +126,8 @@ current. Controllers keep their own state and never track attempts themselves.
 
 `workspaceFailure(cause)` classifies a workspace operation's failure as `changed`, `denied`,
 `gone`, `invalid`, or `failed`. The map is keyed by every failure tag the contract reports for
-workspace, member, access, and invitation endpoints, so a new or renamed failure fails to compile
+workspace, member, access, invitation, group, thread, and notification endpoints, so a new or
+renamed failure fails to compile
 until it is placed. Readers' inputs decode through `command(schema)`, which reports a mismatch as
 `Client.InvalidCommand` (`invalid`); a malformed response is `failed`. `isStale` is true for
 `changed`, `denied`, and `gone`: what the reader sees is out of date. Controllers expose these
@@ -140,3 +146,26 @@ refresh produces, because keyed reads can still show their previous settled valu
 refresh starts. `useAcceptInvitation` joins and refreshes the directory.
 Requests are credential-scoped and cancelled on disposal. See
 [workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.
+
+## Conversations
+
+Conversation reads live while mounted and share one read per workspace, group, or thread in a
+credential scope. `useGroups(workspaceId)` reads every page of the reader's groups;
+`useMembers(workspaceId)` finds members by ID to name authors. Each returns a `Read` whose
+`value` keeps the last success while it refreshes or a refresh fails, with `loading` for the
+first read and `failure` as a `WorkspaceFailure` code.
+
+`useGroupStream(workspaceId, groupId)` and `useThreadTimeline(workspaceId, threadId)` return a
+`PagedView`: items oldest first, opening at the newest page of 50, with `loadEarlier`,
+`loadingEarlier`, and `complete`. Both keep their pages in one atom and read its previous value,
+since a paging atom that restarts would drop older pages whenever a change arrives:
+
+- A timeline only grows, so a change reads what followed its newest item (`afterSequence`) and
+  appends it; `loadEarlier` reads the page before its oldest (`beforeSequence`, from the newest).
+- A stream's threads are ordered by start, but replies change their counts and unread state. A
+  change reads again from the newest down to the oldest thread shown, so nothing on screen drops
+  off; `loadEarlier` reads on to one page past it.
+
+Their keys are per item within a collection (`workspace/<id>/streams:<group>`,
+`workspace/<id>/timelines:<thread>`), so a commit refreshes only the stream and timeline it
+touches, and a reset refreshes them all through the collection key.

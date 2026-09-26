@@ -27,6 +27,7 @@ import { WorkspacePickerPage } from "./pages/workspace-picker.tsx";
 import { CreateWorkspacePage } from "./pages/create-workspace.tsx";
 import { WorkspaceUnavailablePage } from "./pages/workspace-unavailable.tsx";
 import { WorkspaceLayout } from "./workspace-layout.tsx";
+import { GroupPage } from "./pages/group.tsx";
 import {
   HomePage,
   TriagePage,
@@ -126,6 +127,10 @@ export function ApplicationRoutes() {
         <Route path={paths.createWorkspace} component={CreateWorkspacePage} />
         <Route path="/workspaces/:workspaceId" component={WorkspaceRoute}>
           <Route path="/" component={HomePage} />
+          <Route
+            path={["/groups/:groupId", "/groups/:groupId/threads/:threadId"]}
+            component={GroupPage}
+          />
           <Route path="/triage" component={TriagePage} />
           <Route path="/tasks" component={TasksPage} />
           <Route path="/environments" component={EnvironmentsPage} />

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { HashRouter } from "@solidjs/router";
 import { Session, type SessionStore } from "@amends/client";
 import { Layer, Schema } from "effect";
@@ -347,4 +347,89 @@ it("explains an unavailable workspace under the account header and returns to th
   await screen.findByRole("heading", { name: "Where are you working?" });
   expect(window.location.hash).toBe("#/workspaces");
   expect(store.read()?.token).toBe("jo");
+});
+/** A group with one thread and its reply, as the host answers them. */
+const at = "2026-09-25T12:00:00.000Z";
+const author = { _tag: "Member", memberId: "owner-one" };
+const message = (id: string, text: string) => ({
+  id,
+  workspaceId: "one",
+  threadId: "t1",
+  author,
+  text,
+  mentions: [],
+  publishedAt: at,
+});
+const item = (sequence: number, id: string, text: string) => ({
+  activity: {
+    id: `activity-${sequence}`,
+    workspaceId: "one",
+    threadId: "t1",
+    sequence,
+    occurredAt: at,
+    kind: "message.published",
+    subject: `message:${id}`,
+    occurrence: `message:${id}`,
+    newActivity: true,
+    details: { messageId: id },
+  },
+  message: message(id, text),
+});
+const conversation = (path: string) =>
+  path.endsWith("/groups/g1/openings")
+    ? [
+        {
+          thread: { id: "t1", workspaceId: "one", groupId: "g1", createdBy: author, createdAt: at },
+          message: message("m1", "Can you look at the terms?"),
+          replies: 1,
+          latest: { threadId: "t1", sequence: 2, occurredAt: at },
+          readThrough: 2,
+          unread: false,
+        },
+      ]
+    : path.endsWith("/threads/t1/timeline")
+      ? [item(1, "m1", "Can you look at the terms?"), item(2, "m2", "On it.")]
+      : undefined;
+
+it("shows a group's stream at its route and an open thread beside it", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    const answer = conversation(path);
+    return Promise.resolve(
+      response(
+        answer ?? {
+          memberships: [
+            {
+              workspace: {
+                id: "one",
+                name: "Studio",
+                createdBy: "alice",
+                ownerMemberId: "owner-one",
+              },
+              member: {
+                id: "owner-one",
+                workspaceId: "one",
+                identity: { _tag: "Human", id: "alice" },
+                status: "active",
+              },
+              people: 1,
+            },
+          ],
+          invitations: [],
+        },
+      ),
+    );
+  });
+  mount("/workspaces/one/groups/g1/threads/t1", "alice", fetch);
+  const stream = await screen.findByRole("region", { name: "Conversation" });
+  await within(stream).findByText("Can you look at the terms?");
+  const link = within(stream).getByRole("link", { name: /^1 reply/ });
+  expect(link).toHaveAttribute("href", "#/workspaces/one/groups/g1/threads/t1");
+  expect(link).toHaveAttribute("aria-current", "page");
+  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  await within(thread).findByText("On it.");
+  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g1"));
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Thread messages" })).toBeNull());
+  expect(screen.getByRole("region", { name: "Conversation" })).toBe(stream);
 });

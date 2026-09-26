@@ -12,6 +12,7 @@ and Soot (dark):
 | `text.secondary`   | Supporting information    | Canvas and panel       |
 | `surface.tooltip`  | Compact dark tooltip      | `text.onTooltip`       |
 | `text.onTooltip`   | Light tooltip label       | `surface.tooltip`      |
+| `text.link`        | Links within content      | Canvas and panel       |
 
 The tooltip pair follows the Primitives v2 reference and remains dark with light text in
 both themes. It has its own 4.5:1 text contrast check. Ordinary reading, status, action,

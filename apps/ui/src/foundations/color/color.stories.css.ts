@@ -32,5 +32,6 @@ export const panelSample = style({ backgroundColor: colorVars.surface.panel, pad
 export const sampleTitle = style({ margin: "0 0 16px", fontSize: 14, fontWeight: 500 });
 export const primary = style({ color: colorVars.text.primary });
 export const secondary = style({ color: colorVars.text.secondary });
+export const link = style({ color: colorVars.text.link });
 export const sampleText = style({ margin: "12px 0 4px" });
 export const ratio = style({ margin: 0, fontSize: 12, color: colorVars.text.secondary });

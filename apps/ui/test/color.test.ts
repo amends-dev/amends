@@ -79,6 +79,15 @@ for (const [theme, palette] of Object.entries(colors)) {
         expect(new Color(action.onFill).contrastWCAG21(action[state])).toBeGreaterThanOrEqual(4.5);
       });
     }
+    it("keeps link text readable on content surfaces, at rest and hovered", () => {
+      for (const surface of ["canvas", "panel"] as const)
+        for (const state of ["transparent", palette.action.hover, palette.action.pressed])
+          expect(
+            new Color(palette.text.link).contrastWCAG21(
+              compositeOnSurface(state, palette.surface[surface]),
+            ),
+          ).toBeGreaterThanOrEqual(4.5);
+    });
     it("keeps compact tooltip text readable on its dedicated surface", () => {
       expect(
         new Color(palette.text.onTooltip).contrastWCAG21(palette.surface.tooltip),

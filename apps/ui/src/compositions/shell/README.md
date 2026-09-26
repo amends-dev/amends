@@ -59,7 +59,10 @@ collapsed footer. The shared grid owns placement; app code supplies ordinary chi
 The same utility moves with the sidebar into its mobile drawer.
 
 `Inspector` is an optional sibling after Body. Compose its content as children and
-control `open`/`onOpenChange` from the owning page. At 1280px and wider it reserves
+control `open`/`onOpenChange` from the owning page. `InspectorHeader` stays at the top of the
+scrolling inspector, holding an `InspectorHeading` (an `InspectorTitle` in the serif and an
+optional one-line mono `InspectorMeta`) and the page's close action; `InspectorBody` holds the
+content at the inspector's gutters. At 1280px and wider it reserves
 400px beside the content. Below 1280px the same mounted content moves into a modal
 sheet at the inline end; on phones the sheet fills the width. The page supplies a
 visible close action. Its `title` names the aside and modal, and `returnFocus` can

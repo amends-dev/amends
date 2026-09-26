@@ -300,6 +300,13 @@ for empty regions and failures: a drawing, a serif line, a sentence, and one act
 read through the drawing, never red. See [EmptyState](src/compositions/empty-state/README.md)
 and [Drawing](src/primitives/drawing/README.md).
 
+**Compositions / Message** and **Compositions / Transcript** are the Inventory's Message and
+Thread, following the Agent messages reference: an entry with its author, time, text, and a link
+to its thread's replies, and the ordered column with day seams that keeps the reader's place as
+entries arrive at either end. Reply counts use the Foundations' link color, `text.link`, the one
+place persimmon appears in content. See [Message](src/compositions/message/README.md) and
+[Transcript](src/compositions/transcript/README.md).
+
 **Compositions / KeyValue** follows the Primitives v2 Key and value reference:
 compact mono keys/values at opposite edges, content-driven wrapping, and seams
 between rows. Reference, Comparison, Narrow, Long Content, RTL, Enlarged Text, and

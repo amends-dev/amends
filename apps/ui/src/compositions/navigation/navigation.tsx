@@ -174,3 +174,20 @@ export function Count(props: JSX.HTMLAttributes<HTMLSpanElement>) {
   const [local, native] = splitProps(props, ["class", "classList"]);
   return <span {...native} class={classes(s.count, local.class, local.classList)} />;
 }
+/**
+ * A persimmon dot for a destination that has something new. It names itself with `label`, which
+ * joins the link's accessible name.
+ */
+export function Dot(
+  props: Omit<JSX.HTMLAttributes<HTMLSpanElement>, "children" | "aria-label"> & { label: string },
+) {
+  const [local, native] = splitProps(props, ["label", "class", "classList"]);
+  return (
+    <span
+      {...native}
+      role="img"
+      aria-label={local.label}
+      class={classes(s.dot, local.class, local.classList)}
+    />
+  );
+}

@@ -34,8 +34,18 @@ HTTP exposes sign-in, workspace creation and the directory, members, invitations
 the notification inbox, its sources and acknowledgment, groups, threads, replies, following, read
 state, the change feed, and typing. The management reads of groups the caller does not belong to,
 `GroupApplication.getForManagement` and `GroupMembershipApplication.listCurrentForManagement`, are
-available through core and the gateway only. The client has no conversation reads or commands yet,
-and the web and desktop apps have no pages for conversations.
+available through core and the gateway only.
+
+## Conversations in the apps
+
+Web and desktop list the reader's groups in the sidebar, show a group's stream of threads by
+their opening messages, and open a thread's messages in the inspector, all live over the change
+feed. Nothing can be written from the apps yet: there is no composer for starting threads or
+replying, no mentions, no following, and opening a thread does not record it as read, so unread
+state and pending counts only clear through the API. Streams show no per-thread unread marker,
+timelines show messages but not people joining or leaving, and authors are named by their
+identity, with no profile name or photo. There is no page for creating groups or managing their
+members, and no notification inbox or Triage.
 
 ## Storage cost
 

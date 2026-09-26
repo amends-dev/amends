@@ -18,13 +18,14 @@ const roles = [
     usage: "Dark tooltip surface in either theme; use text.onTooltip.",
   },
   { group: "text", name: "onTooltip", usage: "Light text paired only with surface.tooltip." },
+  { group: "text", name: "link", usage: "Links within content, on canvas or panel." },
 ] as const;
 
 function Pairings(props: { theme: ColorTheme; surface: "canvas" | "panel" }) {
   return (
     <div class={props.surface === "canvas" ? s.canvasSample : s.panelSample}>
       <h3 class={s.sampleTitle}>Text on surface.{props.surface}</h3>
-      <For each={["primary", "secondary"] as const}>
+      <For each={["primary", "secondary", "link"] as const}>
         {(tone) => (
           <>
             <p class={`${s.sampleText} ${s[tone]}`} data-color-pair={`${tone}/${props.surface}`}>

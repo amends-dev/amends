@@ -52,6 +52,7 @@ function DemoLinks(props: { onCreate?: () => void }) {
             <DemoIcon name="members" />
           </Navigation.Icon>
           <Navigation.Label>Members</Navigation.Label>
+          <Navigation.Dot label="new activity" />
         </Navigation.Link>
       </Navigation.Section>
     </>

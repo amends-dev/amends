@@ -104,3 +104,17 @@ export const count = style([
     selectors: { [`${root}[data-compact="true"] &`]: hiddenText },
   },
 ]);
+
+export const dot = style({
+  flex: "none",
+  width: "0.375rem",
+  height: "0.375rem",
+  marginInlineStart: "auto",
+  borderRadius: "50%",
+  backgroundColor: colorVars.text.link,
+  selectors: {
+    [`${count} + &`]: { marginInlineStart: 0 },
+    [`${root}[data-compact="true"] &`]: hiddenText,
+  },
+  "@media": { "(forced-colors: active)": { backgroundColor: "LinkText" } },
+});

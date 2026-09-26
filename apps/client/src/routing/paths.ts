@@ -15,6 +15,10 @@ export const paths = {
   workspace: (id: string) => `/workspaces/${encodeURIComponent(id)}`,
   workspacePage: (id: string, page: WorkspacePage) =>
     `/workspaces/${encodeURIComponent(id)}${page === "home" ? "" : `/${page}`}`,
+  group: (id: string, groupId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}`,
+  thread: (id: string, groupId: string, threadId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
 } as const;
 
 /** Only internal protected destinations can be resumed after authentication. */
@@ -26,7 +30,7 @@ export function returnPath(value: string | undefined): string {
     url.origin !== "https://amends.invalid" ||
     !(
       url.pathname === paths.workspaces ||
-      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?))?$/.test(
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?|groups\/[^/]+(?:\/threads\/[^/]+)?))?$/.test(
         url.pathname,
       )
     )

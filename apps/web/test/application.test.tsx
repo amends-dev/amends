@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createMemoryHistory, MemoryRouter } from "@solidjs/router";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
@@ -636,4 +636,75 @@ it("points an invited identity to its invitation instead of reporting no access"
   expect(screen.getByText(/You’ve been invited to Fold Studio/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
   await screen.findByRole("button", { name: "Accept invitation" });
+});
+/** A group with one thread and its reply, as the host answers them. */
+const at = "2026-09-25T12:00:00.000Z";
+const author = { _tag: "Member", memberId: "owner-one" };
+const message = (id: string, text: string) => ({
+  id,
+  workspaceId: "one",
+  threadId: "t1",
+  author,
+  text,
+  mentions: [],
+  publishedAt: at,
+});
+const item = (sequence: number, id: string, text: string) => ({
+  activity: {
+    id: `activity-${sequence}`,
+    workspaceId: "one",
+    threadId: "t1",
+    sequence,
+    occurredAt: at,
+    kind: "message.published",
+    subject: `message:${id}`,
+    occurrence: `message:${id}`,
+    newActivity: true,
+    details: { messageId: id },
+  },
+  message: message(id, text),
+});
+const conversation = (path: string) =>
+  path.endsWith("/groups/g1/openings")
+    ? [
+        {
+          thread: { id: "t1", workspaceId: "one", groupId: "g1", createdBy: author, createdAt: at },
+          message: message("m1", "Can you look at the terms?"),
+          replies: 1,
+          latest: { threadId: "t1", sequence: 2, occurredAt: at },
+          readThrough: 2,
+          unread: false,
+        },
+      ]
+    : path.endsWith("/threads/t1/timeline")
+      ? [item(1, "m1", "Can you look at the terms?"), item(2, "m2", "On it.")]
+      : undefined;
+
+it("shows a group's stream at its route and an open thread beside it", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    const answer = conversation(path);
+    return Promise.resolve(
+      response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] }),
+    );
+  });
+  const history = mount(
+    "/workspaces/one/groups/g1/threads/t1",
+    memoryStore(session("alice")).store,
+    fetch,
+  );
+  const stream = await screen.findByRole("region", { name: "Conversation" });
+  await within(stream).findByText("Can you look at the terms?");
+  expect(screen.getByText("Workspace / Groups")).toBeInTheDocument();
+  const link = within(stream).getByRole("link", { name: /^1 reply/ });
+  expect(link).toHaveAttribute("href", "/workspaces/one/groups/g1/threads/t1");
+  expect(link).toHaveAttribute("aria-current", "page");
+  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  await within(thread).findByText("On it.");
+  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g1"));
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Thread messages" })).toBeNull());
+  expect(link).not.toHaveAttribute("aria-current");
+  // The stream stays mounted while threads open and close beside it.
+  expect(screen.getByRole("region", { name: "Conversation" })).toBe(stream);
 });
