@@ -53,5 +53,6 @@ replacing drafts. Rows are keyed by ID, so refreshes keep focus and open dialogs
 UI stories cover shared presentation. Connected stories run against isolated HTTP
 and PostgreSQL data; conformance tests cover rename permissions, stale writes,
 rollback, directory updates, and replay on both adapters. App tests cover section
-routes and persistent shell selection. Profile names/photos, mark customization,
+routes and persistent shell selection. Members are listed by the name they chose, with the
+identity they sign in as in their details. Profile photos, mark customization,
 recipient decline, and direct/scoped grant editing remain outside this slice.

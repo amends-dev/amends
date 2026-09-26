@@ -51,10 +51,14 @@ export interface Interface {
     request: Invitation.IssueInput,
     options?: Request.Options,
   ) => Effect.Effect<Invitation.Record, IssueError, Actor.Service>;
-  /** Trusted ingress supplies the authenticated recipient; no membership is required yet. */
+  /**
+   * Trusted ingress supplies the authenticated recipient; no membership is required yet. The
+   * recipient may say what people in the workspace call them.
+   */
   readonly accept: (
     id: Invitation.Id,
     recipient: Identity.HumanId,
+    options?: { readonly name?: Member.Name },
   ) => Effect.Effect<Member.Record, Error>;
   readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
   /** Every invitation in the workspace in issue order; requires invitation.manage. */
@@ -179,8 +183,13 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   const accept = Effect.fn("InvitationApplication.accept")(function* (
     id: Invitation.Id,
     authenticated: Identity.HumanId,
+    options: { readonly name?: Member.Name } = {},
   ) {
     const recipient = yield* Schema.decodeEffect(Identity.HumanId)(authenticated);
+    const name =
+      options.name === undefined
+        ? undefined
+        : yield* Schema.decodeEffect(Member.Name)(options.name);
     const invitation = yield* load(id);
     const { details, state } = invitation;
     if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });
@@ -224,6 +233,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       id: Member.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       identity: Identity.Reference.cases.Human.make({ id: recipient }),
+      ...(name === undefined ? {} : { name }),
       status: "active",
     };
     const provenance = yield* Publication.make(
@@ -239,6 +249,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
         memberId: member.id,
         workspaceId,
         identity: member.identity,
+        ...(name === undefined ? {} : { name }),
       });
       yield* journal.publish(AssignmentFacts.Created, {
         assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),

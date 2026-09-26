@@ -1,16 +1,29 @@
 import {
   useDirectory,
   useAcceptInvitation,
+  useSession,
   formatInstant,
+  suggestedName,
   type AcceptInvitationError,
   type DirectoryScope,
 } from "@amends/client";
+import { Dialog } from "@amends/ui/compositions/dialog";
+import { Field } from "@amends/ui/compositions/field";
 import { ItemList } from "@amends/ui/compositions/item-list";
+import { Input } from "@amends/ui/primitives/input";
 import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
 import { Button } from "@amends/ui/primitives/button";
 import { Column } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
-import { createContext, For, Show, useContext, type ParentProps } from "solid-js";
+import {
+  createContext,
+  createSignal,
+  createUniqueId,
+  For,
+  Show,
+  useContext,
+  type ParentProps,
+} from "solid-js";
 import { keyed } from "../internal/keyed.ts";
 
 const acceptMessages: { readonly [Error in AcceptInvitationError]: string } = {
@@ -153,6 +166,12 @@ function InvitationEntry(props: {
     props.invitation.details.workspaceId,
     props.invitation.details.id,
   );
+  const session = useSession();
+  const form = createUniqueId();
+  const [joining, setJoining] = createSignal(false);
+  const [name, setName] = createSignal("");
+  let field: HTMLInputElement | undefined;
+  const workspaceName = () => props.invitation.workspaceName ?? "this workspace";
   return (
     <ItemList.Item>
       <ItemList.Row>
@@ -173,9 +192,80 @@ function InvitationEntry(props: {
           </Show>
         </ItemList.Content>
         <ItemList.Actions>
-          <Button pending={value.pending()} onClick={value.accept}>
-            {value.completed() ? "Try again" : "Accept invitation"}
-          </Button>
+          <Show
+            when={value.completed()}
+            fallback={
+              <Dialog.Root
+                open={joining()}
+                initialFocus={() => {
+                  queueMicrotask(() => field?.select());
+                  return field;
+                }}
+                onOpenChange={(open) => {
+                  if (value.pending()) return;
+                  // Each opening suggests a name from the identity the reader signs in as.
+                  if (open) setName(suggestedName(session.session?.humanId));
+                  setJoining(open);
+                }}
+              >
+                <Dialog.Trigger>Accept invitation</Dialog.Trigger>
+                <Dialog.Content>
+                  <Dialog.Header>
+                    <Dialog.Title>Join {workspaceName()}</Dialog.Title>
+                    <Dialog.Description>
+                      What should people there call you? You can change it later.
+                    </Dialog.Description>
+                  </Dialog.Header>
+                  <Dialog.Body>
+                    <form
+                      id={form}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        value.accept(name());
+                      }}
+                    >
+                      <Column gap={3}>
+                        <Field label="Your name">
+                          {(control) => (
+                            <Input
+                              {...control}
+                              ref={(element) => {
+                                field = element;
+                              }}
+                              autocomplete="name"
+                              maxLength={80}
+                              value={name()}
+                              onInput={(event) => setName(event.currentTarget.value)}
+                              disabled={value.pending()}
+                            />
+                          )}
+                        </Field>
+                        <Show when={value.error()}>
+                          {(error) => (
+                            <Text role="alert" tone="danger">
+                              {acceptMessages[error()]}
+                            </Text>
+                          )}
+                        </Show>
+                      </Column>
+                    </form>
+                  </Dialog.Body>
+                  <Dialog.Footer>
+                    <Dialog.Close variant="secondary" disabled={value.pending()}>
+                      Cancel
+                    </Dialog.Close>
+                    <Button type="submit" form={form} pending={value.pending()}>
+                      Join
+                    </Button>
+                  </Dialog.Footer>
+                </Dialog.Content>
+              </Dialog.Root>
+            }
+          >
+            <Button pending={value.pending()} onClick={() => value.accept()}>
+              Try again
+            </Button>
+          </Show>
         </ItemList.Actions>
       </ItemList.Row>
     </ItemList.Item>

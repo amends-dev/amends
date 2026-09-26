@@ -69,8 +69,10 @@ as those features are built.
 UI supplies AccountMenu parts over Popover, Avatar, IconButton, and shared controls.
 Its wide panel contains identity, ThemeChoice, and app-supplied action links.
 Features connects identity/sign-out to the session and theme selection to the
-headless AppearanceProvider. The session currently supplies only a human identifier;
-there is no profile name, photo, or Google-account integration.
+headless AppearanceProvider. Inside a workspace, the trigger and identity show the name the
+reader chose there above the identifier they sign in as, and the app adds "Change your name",
+which opens a dialog over the page as the menu closes. Outside one, only the identifier shows.
+There is no profile photo or Google-account integration.
 
 The application owns an appearance source for storage and system appearance.
 Client stores light/dark/system state without UI dependencies. The outer

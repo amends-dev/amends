@@ -34,7 +34,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   input: Workspace.CreateInput,
 ) {
   const createdBy = yield* Schema.decodeEffect(Identity.HumanId)(creator);
-  const { name } = yield* Schema.decodeEffect(Workspace.CreateInput)(input);
+  const { name, memberName } = yield* Schema.decodeEffect(Workspace.CreateInput)(input);
   const workspace = yield* WorkspaceStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -59,6 +59,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         workspaceId: record.id,
         memberId: ownerMemberId,
         identity: Identity.Reference.cases.Human.make({ id: createdBy }),
+        ...(memberName === undefined ? {} : { name: memberName }),
       });
       for (const role of BuiltinRoles.make(record.id, catalog.definitions)) {
         yield* journal.publish(RoleFacts.Created, {

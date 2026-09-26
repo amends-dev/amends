@@ -74,6 +74,11 @@ A plan test checks these access paths, and the pending notification indexes, wit
 scans and sorts disabled, and that a pending read filters out none of the reader's seen rows. These indexes
 replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
 
+Members keep the name they chose in a nullable `name` column, which the directory also returns;
+a null reads as a member without a name. Renaming updates only an active member's row. Adding
+the column replaced the development baseline; recreate disposable PostgreSQL databases when
+adopting it.
+
 Batch reads (`getMany` on members, group admissions, thread participations, and messages) match
 `id = any($1)` with the IDs bound as one array against each table's workspace/ID key, so every
 batch size shares one prepared statement. Notification pending counts and `markSeen` match their

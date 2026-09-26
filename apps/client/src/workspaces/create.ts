@@ -3,7 +3,9 @@ import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
 import {
   createWorkspaceRequest,
+  isMemberName,
   isWorkspaceName,
+  suggestedName,
   newWorkspaceRequestKey,
   workspaceRejection,
   type CreatedWorkspace,
@@ -13,8 +15,16 @@ import { useSession } from "../session/provider.tsx";
 export type CreateWorkspaceState = Data.TaggedEnum<{
   Form: {
     readonly name: string;
+    /** What people there will call the creator, suggested from their identity. */
+    readonly memberName: string;
     readonly pending: boolean;
-    readonly error: "invalid-name" | "denied" | "request-reused" | "request-failed" | undefined;
+    readonly error:
+      | "invalid-name"
+      | "invalid-member-name"
+      | "denied"
+      | "request-reused"
+      | "request-failed"
+      | undefined;
   };
   Created: {
     readonly workspace: CreatedWorkspace;
@@ -27,6 +37,7 @@ const State = Data.taggedEnum<CreateWorkspaceState>();
 export interface CreateWorkspaceController {
   readonly state: Accessor<CreateWorkspaceState>;
   readonly setName: (name: string) => void;
+  readonly setMemberName: (name: string) => void;
   readonly submit: (name?: string) => void;
   readonly retryRefresh: () => void;
 }
@@ -35,9 +46,16 @@ export interface CreateWorkspaceController {
 export function useCreateWorkspace(): CreateWorkspaceController {
   const session = useSession();
   const [state, setState] = createSignal<CreateWorkspaceState>(
-    State.Form({ name: "", pending: false, error: undefined }),
+    State.Form({
+      name: "",
+      memberName: suggestedName(session.session?.humanId),
+      pending: false,
+      error: undefined,
+    }),
   );
-  let intent: { name: string; key: ReturnType<typeof newWorkspaceRequestKey> } | undefined;
+  let intent:
+    | { name: string; memberName: string; key: ReturnType<typeof newWorkspaceRequestKey> }
+    | undefined;
   const request = useRequest(
     createWorkspaceRequest(useApiClient()),
     (exit, input) => {
@@ -70,7 +88,12 @@ export function useCreateWorkspace(): CreateWorkspaceController {
     setName: (name) => {
       const value = state();
       if (value._tag === "Form" && !value.pending && session.isCurrent())
-        setState(State.Form({ name, pending: false, error: undefined }));
+        setState(State.Form({ ...value, name, pending: false, error: undefined }));
+    },
+    setMemberName: (memberName) => {
+      const value = state();
+      if (value._tag === "Form" && !value.pending && session.isCurrent())
+        setState(State.Form({ ...value, memberName, pending: false, error: undefined }));
     },
     submit: (name) => {
       const value = state();
@@ -78,11 +101,20 @@ export function useCreateWorkspace(): CreateWorkspaceController {
         return;
       const submitted = (name ?? value.name).trim();
       if (!isWorkspaceName(submitted)) {
-        setState(State.Form({ name: name ?? value.name, pending: false, error: "invalid-name" }));
+        setState(State.Form({ ...value, name: name ?? value.name, error: "invalid-name" }));
         return;
       }
-      if (intent?.name !== submitted) intent = { name: submitted, key: newWorkspaceRequestKey() };
-      setState(State.Form({ name: submitted, pending: true, error: undefined }));
+      // A name is optional; without one, people see the creator's identity.
+      const memberName = value.memberName.trim();
+      if (memberName !== "" && !isMemberName(memberName)) {
+        setState(State.Form({ ...value, name: submitted, error: "invalid-member-name" }));
+        return;
+      }
+      if (intent?.name !== submitted || intent.memberName !== memberName)
+        intent = { name: submitted, memberName, key: newWorkspaceRequestKey() };
+      setState(
+        State.Form({ ...value, name: submitted, memberName, pending: true, error: undefined }),
+      );
       if (!request.run({ kind: "create", ...intent })) setState(value);
     },
     retryRefresh: refresh,

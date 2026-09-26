@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { WorkspaceId } from "./id.ts";
 import { MemberId } from "./member/id.ts";
+import { Member } from "./member/member.ts";
 
 export const Id = WorkspaceId.Id;
 export type Id = WorkspaceId.Id;
@@ -9,7 +10,11 @@ export type Id = WorkspaceId.Id;
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
 export type Name = typeof Name.Type;
 
-export const CreateInput = Schema.Struct({ name: Name }).annotate({
+/** A new workspace's name, and what its creator is called there. */
+export const CreateInput = Schema.Struct({
+  name: Name,
+  memberName: Schema.optionalKey(Member.Name),
+}).annotate({
   identifier: "WorkspaceCreateInput",
 });
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}

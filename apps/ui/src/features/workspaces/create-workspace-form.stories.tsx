@@ -5,8 +5,14 @@ import { CreateWorkspaceForm } from "@amends/ui/features/workspaces";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { Button } from "@amends/ui/primitives/button";
 import "@amends/ui/foundations/typography/fonts";
-function Specimen(props: { theme?: "cotton" | "soot"; narrow?: boolean }) {
+function Specimen(props: {
+  theme?: "cotton" | "soot";
+  narrow?: boolean;
+  naming?: boolean;
+  nameError?: string;
+}) {
   const [name, setName] = createSignal("");
+  const [memberName, setMemberName] = createSignal("Jo Mercer");
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal<string>();
   const [submissions, setSubmissions] = createSignal(0);
@@ -19,6 +25,16 @@ function Specimen(props: { theme?: "cotton" | "soot"; narrow?: boolean }) {
             setName(value);
             setError(undefined);
           }}
+          {...(props.naming
+            ? {
+                memberName: memberName(),
+                onMemberNameChange: (value: string) => {
+                  setMemberName(value);
+                  setError(undefined);
+                },
+                memberNameError: props.nameError,
+              }
+            : {})}
           pending={pending()}
           requestError={error()}
           onSubmit={() => {
@@ -56,6 +72,24 @@ export const Comparison = {
   ),
 } satisfies Story;
 export const Narrow = { render: () => <Specimen narrow /> } satisfies Story;
+/** Creating a workspace also asks what people there will call the creator. */
+export const WithYourName = {
+  render: () => (
+    <>
+      <Specimen naming />
+      <Specimen naming theme="soot" narrow nameError="Use 1 to 80 characters." />
+    </>
+  ),
+  play: async ({ canvasElement }) => {
+    const [field, invalid] = within(canvasElement).getAllByRole("textbox", { name: /Your name/ });
+    await expect(field).toHaveValue("Jo Mercer");
+    await expect(field).toHaveAccessibleDescription(/You can change it later/);
+    await userEvent.clear(field!);
+    await userEvent.type(field!, "Jo");
+    await expect(field).toHaveValue("Jo");
+    await expect(invalid).toHaveAccessibleDescription(/Use 1 to 80 characters/);
+  },
+} satisfies Story;
 export const Recovery = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

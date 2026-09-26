@@ -72,6 +72,25 @@ export const make = Effect.fn("Members.make")(function* () {
         .pipe(Effect.mapError(storeFailure(MemberStore, "insert")));
       space.records.members.set(record.id, row);
     }),
+    rename: Effect.fn("Members.rename")(function* (id, input) {
+      yield* Store.Transaction;
+      const name = yield* Schema.decodeEffect(Member.Name)(input).pipe(
+        Effect.mapError(storeConflict(MemberStore, "rename")),
+      );
+      const space = yield* write.pipe(Effect.mapError(storeFailure(MemberStore, "rename")));
+      const current = yield* rows
+        .get(space.records.members, id)
+        .pipe(Effect.mapError(storeFailure(MemberStore, "rename")));
+      if (current._tag === "None" || current.value.status !== "active")
+        return yield* new MemberStore.Conflict({
+          operation: "rename",
+          message: "Expected an active membership",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, name })
+        .pipe(Effect.mapError(storeFailure(MemberStore, "rename")));
+      space.records.members.set(id, row);
+    }),
     markRemoved: Effect.fn("Members.markRemoved")(function* (id) {
       yield* Store.Transaction;
       const space = yield* write.pipe(Effect.mapError(storeFailure(MemberStore, "markRemoved")));

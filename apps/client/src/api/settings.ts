@@ -162,11 +162,17 @@ export const settingsRequest = (client: ApiClient, workspace: string, section: S
     }),
   );
 
-/** Accept an invitation, then refresh the directory; `refreshOnly` retries just the refresh. */
+/**
+ * Accept an invitation, with what the member will be called there, then refresh the directory;
+ * `refreshOnly` retries just the refresh.
+ */
 export const acceptInvitationRequest = (client: ApiClient) =>
   requestAtom(
     client,
-    (input: { workspaceId: string; invitationId: string; refreshOnly: boolean }, get) =>
+    (
+      input: { workspaceId: string; invitationId: string; name?: string; refreshOnly: boolean },
+      get,
+    ) =>
       Effect.gen(function* () {
         if (!input.refreshOnly) {
           const api = yield* client;
@@ -175,6 +181,7 @@ export const acceptInvitationRequest = (client: ApiClient) =>
               workspaceId: yield* command(Workspace.Id)(input.workspaceId),
               invitationId: yield* command(Invitation.Id)(input.invitationId),
             },
+            payload: input.name ? { name: yield* command(Member.Name)(input.name.trim()) } : {},
           });
         }
         const refreshed = yield* Effect.exit(

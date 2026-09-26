@@ -6,9 +6,18 @@ import { ApiErrors } from "./errors.ts";
 
 const params = { workspaceId: Workspace.Id, memberId: Member.Id };
 
-/** Membership reads and removal, authorized by core for the principal's membership. */
+/**
+ * Membership reads and removal, authorized by core for the principal's membership, and the
+ * caller choosing what people in the workspace call them.
+ */
 export class MembersGroup extends HttpApiGroup.make("members")
   .add(
+    HttpApiEndpoint.put("rename", "/me/name", {
+      params: { workspaceId: Workspace.Id },
+      payload: Schema.Struct({ name: Member.Name }),
+      success: Member.Record,
+      error: [...ApiErrors.member, ApiErrors.MemberNotFound],
+    }),
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(Member.Record),

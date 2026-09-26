@@ -32,6 +32,11 @@ export function Form(props: { headingAs?: "h1" | "h2" | "h3" }) {
           headingAs={props.headingAs}
           name={state().name}
           onNameChange={value.setName}
+          memberName={state().memberName}
+          onMemberNameChange={value.setMemberName}
+          memberNameError={
+            state().error === "invalid-member-name" ? "Use 1 to 80 characters." : undefined
+          }
           onSubmit={value.submit}
           pending={state().pending}
           nameError={state().error === "invalid-name" ? "Enter a workspace name." : undefined}

@@ -46,6 +46,7 @@ const workspaceWithBob = Effect.gen(function* () {
   });
   const joined = yield* asBob.invitations.accept({
     params: { workspaceId: workspace.id, invitationId: invitation.details.id },
+    payload: {},
   });
   return { asAlice, asBob, workspace, aliceId: workspace.ownerMemberId, bobId: joined.id };
 });

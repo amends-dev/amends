@@ -57,6 +57,15 @@ export interface Interface {
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
   /**
+   * Projection write that sets an active membership's name. Fail with Conflict if absent or
+   * removed; the same name again changes nothing.
+   */
+  readonly rename: (
+    memberId: Member.Id,
+    name: Member.Name,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+
+  /**
    * Change an active membership to removed, retaining its ID, workspace, and
    * identity. Fail with Conflict if absent or already removed. A later admission
    * for this identity must use a fresh member ID.

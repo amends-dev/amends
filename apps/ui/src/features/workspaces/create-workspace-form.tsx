@@ -1,4 +1,4 @@
-import { createEffect, createSignal, createUniqueId, splitProps, type JSX } from "solid-js";
+import { createEffect, createSignal, createUniqueId, Show, splitProps, type JSX } from "solid-js";
 import { Field } from "../../compositions/field/index.ts";
 import { Button } from "../../primitives/button/index.ts";
 import { Input } from "../../primitives/input/index.ts";
@@ -13,6 +13,10 @@ export type CreateWorkspaceFormProps = Omit<
 > & {
   name: string;
   onNameChange: (name: string) => void;
+  /** What people in the new workspace will call its creator; optional. */
+  memberName?: string;
+  onMemberNameChange?: (name: string) => void;
+  memberNameError?: string;
   onSubmit: (name: string) => void;
   pending?: boolean;
   nameError?: string;
@@ -23,6 +27,9 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps) {
   const [local, native] = splitProps(props, [
     "name",
     "onNameChange",
+    "memberName",
+    "onMemberNameChange",
+    "memberNameError",
     "onSubmit",
     "pending",
     "nameError",
@@ -92,6 +99,26 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps) {
           />
         )}
       </Field>
+      <Show when={local.onMemberNameChange}>
+        {(change) => (
+          <Field
+            label="Your name"
+            description="What people in this workspace will call you. You can change it later."
+            error={local.memberNameError}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="memberName"
+                autocomplete="name"
+                value={local.memberName ?? ""}
+                readOnly={local.pending}
+                onInput={(e) => change()(e.currentTarget.value)}
+              />
+            )}
+          </Field>
+        )}
+      </Show>
       <div>
         <Button type="submit" pending={local.pending} class={s.submit}>
           Create workspace

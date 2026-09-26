@@ -43,7 +43,8 @@ so a client can import the complete contract without loading server code.
   invitations.
 - `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput` (`{ "name": "Design studio" }`)
   and creates a workspace owned by the authenticated human. The name is required,
-  non-empty, and trimmed; the returned `Workspace.Record` includes it.
+  non-empty, and trimmed; the returned `Workspace.Record` includes it. An optional
+  `memberName` names the creator's membership.
   `GET /workspaces/:workspaceId/settings` returns metadata and action/role flags;
   `GET …/member-management` adds access and removal flags to readable members.
   `PUT …/name` accepts `{ name, expectedName }` and returns the renamed workspace
@@ -55,6 +56,8 @@ so a client can import the complete contract without loading server code.
   ineligible recipient returns 409; missing recipients return 404.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
+  `PUT …/members/me/name` accepts `{ name }` and returns the caller's own renamed member.
+  Member records carry an optional `name` (`Member.Name`, 1 to 80 trimmed characters).
 - `assignments`: `GET …/permissions` lists the caller's own workspace-wide permission names, such
   as `group.create`, for any active member; `GET …/roles` lists built-in role choices;
   `GET …/members/:memberId/assignments` reads access; `POST …/assignments` adds a role;
@@ -63,7 +66,9 @@ so a client can import the complete contract without loading server code.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations;
   `POST` to the same path issues one with required `recipientId`, `roleId`, and `expiresAt`. `POST …/:invitationId/accept` and
   `POST …/:invitationId/revoke` change state; accepting in a workspace that was never created
-  returns 404 with `Gateway.WorkspaceNotFound`.
+  returns 404 with `Gateway.WorkspaceNotFound`. Acceptance takes no body or `{ name? }`, the new
+  member's name; the payload lists `Schema.Null` first so a bodiless request still decodes, and
+  generated clients pass `payload: {}`.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
 

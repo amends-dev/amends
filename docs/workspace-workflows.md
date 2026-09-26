@@ -10,11 +10,13 @@ The examples assume the local host on port 8787 with its development bearer iden
 `POST /workspaces` requires a JSON body with a non-empty, trimmed `name`. It creates
 a workspace owned by the caller and returns `id`, `name`, `createdBy`, and
 `ownerMemberId`. Missing, blank, or untrimmed names return HTTP 400 without creating
-a workspace. Names are display labels; IDs remain the stable routing identity.
+a workspace. Names are display labels; IDs remain the stable routing identity. An optional
+`memberName` says what people in the workspace call the creator; see
+[member names](#member-names).
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
+  -d '{"name":"Design studio","memberName":"Alice Liddell"}' http://127.0.0.1:8787/workspaces
 ```
 
 Creation and invitation issuance accept an `Idempotency-Key` header. Send a new key, such as a
@@ -54,6 +56,26 @@ inspect. Active-membership checks deny its later operations, including calls wit
 before removal. An old accepted invitation cannot restore access: rejoining creates a fresh member
 ID with the new invitation's role, and inherits no group admissions.
 
+### Member names
+
+Each workspace member may have a `name`: what people in that workspace call them. It belongs to
+the membership, not the identity, so the same person can go by different names in different
+workspaces, and a rejoined membership starts without one. Names are 1 to 80 characters with no
+surrounding whitespace; invalid names return HTTP 400. A member without a name has no `name`
+field, and the apps show their identity instead.
+
+A member names themselves when creating the workspace (`memberName`), when accepting an
+invitation (`name`), or later with `PUT /workspaces/:id/members/me/name`:
+
+```bash
+curl -X PUT -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
+  -d '{"name":"Alice"}' http://127.0.0.1:8787/workspaces/<workspace-id>/members/me/name
+```
+
+Renaming needs no permission beyond an active membership and changes only the caller's own name;
+it returns their member record. The same name again records nothing. Each name is recorded as a
+`workspace.member.added` or `workspace.member.renamed` fact, so replay restores it.
+
 ## Invitations
 
 `POST /workspaces/:id/invitations` issues an invitation to an address with an
@@ -64,7 +86,12 @@ curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json
   -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","roleId":"builtin:viewer"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations
 curl -X POST -H 'Authorization: Bearer bob' http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
+curl -X POST -H 'Authorization: Bearer bob' -H 'content-type: application/json' \
+  -d '{"name":"Bob Chen"}' \
+  http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
 ```
+
+Acceptance takes no body, or an optional `name` for the new member.
 
 The response carries the invitation ID under `details.id` and the selected role
 under `details.roleId`. Expiry must follow issuance; acceptance at the exact
@@ -84,7 +111,8 @@ Invitations use stable human IDs; email delivery is outside this workflow.
 Already-active members cannot be invited or accept a second invitation. Multiple
 pending invitations may exist, but only one can establish an active membership.
 Repeating acceptance of the same accepted invitation returns its recorded member
-without granting again, even after expiry or loss of inviter authority. If that
+without granting again, even after expiry or loss of inviter authority, and ignores a name it
+brings. If that
 membership was later removed, the receipt returns the removed record; it never
 reactivates it.
 

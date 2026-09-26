@@ -14,6 +14,7 @@ import { Text } from "@amends/ui/primitives/text";
 import { createEffect, createSignal, For, on, Show, onMount } from "solid-js";
 import { keyed } from "../internal/keyed.ts";
 import { settingsMessage, useSettingsScope } from "./settings.tsx";
+import { initials, nameOf } from "../internal/names.ts";
 type Entry = SettingsData["members"][number];
 const workspaceRoles = (entry: Entry) =>
   entry.access?.assignments.filter(
@@ -40,14 +41,12 @@ function MemberRow(props: { entry: Entry; href: string; selected: boolean; you: 
             kind={props.entry.member.identity._tag === "Human" ? "human" : "agent"}
             decorative
           >
-            <Avatar.Fallback>
-              {props.entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
-            </Avatar.Fallback>
+            <Avatar.Fallback>{initials(nameOf(props.entry.member))}</Avatar.Fallback>
           </Avatar.Root>
         </ItemList.Leading>
         <ItemList.Content>
           <ItemList.Title>
-            {props.entry.member.identity.id}
+            {nameOf(props.entry.member)}
             {props.you ? " · You" : ""}
           </ItemList.Title>
           <ItemList.Description>
@@ -219,8 +218,8 @@ function MemberEditor(props: { entry: Entry }) {
             <Dialog.Header>
               <Dialog.Title>Remove member</Dialog.Title>
               <Dialog.Description>
-                Remove {props.entry.member.identity.id} from this workspace? Rejoining requires a
-                fresh invitation and creates a new membership.
+                Remove {nameOf(props.entry.member)} from this workspace? Rejoining requires a fresh
+                invitation and creates a new membership.
               </Dialog.Description>
             </Dialog.Header>
             <Dialog.Body>
@@ -277,14 +276,16 @@ function MemberContent(props: { entry: Entry }) {
             kind={props.entry.member.identity._tag === "Human" ? "human" : "agent"}
             decorative
           >
-            <Avatar.Fallback>
-              {props.entry.member.identity.id.slice(0, 1).toLocaleUpperCase()}
-            </Avatar.Fallback>
+            <Avatar.Fallback>{initials(nameOf(props.entry.member))}</Avatar.Fallback>
           </Avatar.Root>
-          <Text as="span">{props.entry.member.identity.id}</Text>
+          <Text as="span">{nameOf(props.entry.member)}</Text>
         </Row>
       </Column>
       <KeyValue.Root>
+        <KeyValue.Row>
+          <KeyValue.Label>Signs in as</KeyValue.Label>
+          <KeyValue.Value>{props.entry.member.identity.id}</KeyValue.Value>
+        </KeyValue.Row>
         <KeyValue.Row>
           <KeyValue.Label>Kind</KeyValue.Label>
           <KeyValue.Value>{props.entry.member.identity._tag}</KeyValue.Value>

@@ -9,6 +9,7 @@ import { Column, Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createEffect, createSignal, on, Show } from "solid-js";
 import { settingsMessage, useSettingsScope } from "./settings.tsx";
+import { nameOf } from "../internal/names.ts";
 /**
  * The name field follows the stored name until edited. A draft keeps the name it was made
  * against, so a rename saved elsewhere meanwhile conflicts instead of being overwritten.
@@ -69,7 +70,7 @@ export function WorkspaceDetails() {
             </KeyValue.Row>
             <KeyValue.Row>
               <KeyValue.Label>Owner</KeyValue.Label>
-              <KeyValue.Value>{data().ownership.owner.identity.id}</KeyValue.Value>
+              <KeyValue.Value>{nameOf(data().ownership.owner)}</KeyValue.Value>
             </KeyValue.Row>
             <KeyValue.Row>
               <KeyValue.Label>Workspace ID</KeyValue.Label>
@@ -140,7 +141,7 @@ export function OwnershipTransfer() {
                     options={
                       value.data()?.ownership.candidates.map((member) => ({
                         value: member.id,
-                        label: member.identity.id,
+                        label: nameOf(member),
                       })) ?? []
                     }
                     value={selected()}

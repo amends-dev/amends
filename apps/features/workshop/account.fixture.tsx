@@ -31,32 +31,50 @@ function Theme(props: ParentProps) {
     </ThemeProvider>
   );
 }
-function AccountPreview() {
+/** The account menu, inside a workspace when one is given, where the reader has a name. */
+function AccountPreview(props: { readonly workspaceId?: string }) {
   const session = useSession(),
     directory = useDirectory();
+  const [naming, setNaming] = createSignal(false);
   return (
     <Show when={session.session} fallback={<Text role="status">Signed out</Text>}>
       <Text role="status">
         {directory.state()._tag === "Ready" ? "Session validated" : "Checking session…"}
       </Text>
       <Account.Root>
-        <Account.Trigger />
+        <Account.Trigger workspaceId={props.workspaceId} />
         <Account.Content>
-          <Account.Identity />
+          <Account.Identity workspaceId={props.workspaceId} />
           <Divider.Line />
           <Account.Appearance />
           <Divider.Line />
           <Account.Actions>
             <Account.Link href="#workspaces">Switch workspace</Account.Link>
+            <Show when={props.workspaceId}>
+              <Account.ChangeName onClick={() => setNaming(true)} />
+            </Show>
             <Account.SignOut />
           </Account.Actions>
         </Account.Content>
       </Account.Root>
+      <Show when={props.workspaceId}>
+        {(workspaceId) => (
+          <Account.NameDialog
+            workspaceId={workspaceId()}
+            open={naming()}
+            onOpenChange={setNaming}
+          />
+        )}
+      </Show>
     </Show>
   );
 }
-export function AccountFixture(props: { baseUrl?: string }) {
-  const [ready, setReady] = createSignal<{ scenario: Scenario; session: Session }>();
+export function AccountFixture(props: { baseUrl?: string; workspace?: boolean }) {
+  const [ready, setReady] = createSignal<{
+    scenario: Scenario;
+    session: Session;
+    workspaceId?: string;
+  }>();
   const [error, setError] = createSignal<string>();
   let alive = true;
   let scenario: Scenario | undefined;
@@ -72,7 +90,15 @@ export function AccountFixture(props: { baseUrl?: string }) {
       const session = Schema.decodeUnknownSync(Session)(
         await api(scenario, "/session/code", undefined, { email: "account@example.com", code }),
       );
-      if (alive) setReady({ scenario, session });
+      // Inside a workspace, the account holder named themselves when creating it.
+      const workspace = props.workspace
+        ? ((await api(scenario, "/workspaces", session.token, {
+            name: "Mercier & Co",
+            memberName: "Account Holder",
+          })) as { readonly id: string })
+        : undefined;
+      if (alive)
+        setReady({ scenario, session, ...(workspace ? { workspaceId: workspace.id } : {}) });
     })().catch((cause) => {
       if (alive) setError(String(cause));
     });
@@ -100,7 +126,7 @@ export function AccountFixture(props: { baseUrl?: string }) {
             return (
               <ClientProvider apiBaseUrl={value().scenario.apiBaseUrl} sessionStore={store}>
                 <DirectoryProvider>
-                  <AccountPreview />
+                  <AccountPreview workspaceId={value().workspaceId} />
                 </DirectoryProvider>
               </ClientProvider>
             );

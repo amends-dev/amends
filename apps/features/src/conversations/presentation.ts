@@ -1,18 +1,11 @@
 import { toDate, type Member, type Thread } from "@amends/client";
+import { nameOf } from "../internal/names.ts";
 
-/** How a member appears: their identity until profiles exist. */
+export { initials } from "../internal/names.ts";
+
+/** How a member appears: the name they chose here, else their identity. */
 export const memberName = (member: Member.Record | undefined) =>
-  member?.identity.id ?? "Former member";
-const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-const first = (text: string, count: number) =>
-  Array.from(graphemes.segment(text), (part) => part.segment).slice(0, count);
-/** One or two initials from a name, for an avatar. */
-export const initials = (name: string) => {
-  const words = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-  const letters =
-    words.length > 1 ? [...first(words[0]!, 1), ...first(words[1]!, 1)] : first(words[0] ?? "?", 2);
-  return letters.join("").toLocaleUpperCase();
-};
+  member === undefined ? "Former member" : nameOf(member);
 export type Author = ReturnType<typeof authorOf>;
 /** The name and avatar kind of whoever wrote a message. */
 export const authorOf = (

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "9f4639f6-4caa-47ef-8736-6efbc23fc4a6",
+  "id": "09ca4a4d-5e34-46b1-a8b9-afc40bc304d9",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1505,6 +1505,19 @@
       "generated": null,
       "identity": null,
       "name": "identity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "members"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
       "entityType": "columns",
       "schema": "public",
       "table": "members"

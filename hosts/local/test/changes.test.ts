@@ -3,7 +3,7 @@ import { BuiltinRoles } from "@amends/core/authorization";
 import { ChangeFeed } from "@amends/core/change-feed";
 import { Identity } from "@amends/core/identity";
 import { Thread, ThreadApplication } from "@amends/core/thread";
-import { InvitationFacts, MemberFacts, Workspace } from "@amends/core/workspace";
+import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
@@ -120,6 +120,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* foreign.next).toMatchObject({ _tag: "Committed", workspaceId: other.id });
           const member = yield* bob.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
+            payload: {},
           });
           const accepted = yield* first.next;
           expect(yield* second.next).toEqual(accepted);
@@ -168,6 +169,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const eve = yield* client("eve");
           yield* eve.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: after.details.id },
+            payload: {},
           });
           const joined = yield* second.next;
           if (joined._tag !== "Committed") return yield* Effect.die("Expected commit");
@@ -181,6 +183,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
               .filter((name) => !name.startsWith("workspace.invitation."))
               .toSorted(),
           );
+          // A member naming themselves reaches everyone who may read the members.
+          yield* eve.members.rename({
+            params: { workspaceId: workspace.id },
+            payload: { name: Member.Name.make("Eve Moss") },
+          });
+          const renamed = yield* second.next;
+          expect(renamed).toMatchObject({
+            _tag: "Committed",
+            events: [{ name: MemberFacts.Renamed.name, payload: { name: "Eve Moss" } }],
+          });
+          expect(yield* asBob.next).toEqual(renamed);
           yield* asBob.close;
           yield* alice.members.remove({
             params: { workspaceId: workspace.id, memberId: member.id },
@@ -215,6 +228,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const member = yield* bob.invitations.accept({
           params: { workspaceId: workspace.id, invitationId: invitation.details.id },
+          payload: {},
         });
         // No HTTP endpoint starts threads yet; the host's gateway does it as alice.
         const gateway = yield* Gateway.Service;
@@ -322,6 +336,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           yield* api.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
+            payload: {},
           });
         }
         const refused = (api: typeof alice) =>

@@ -42,6 +42,7 @@ export type Error =
   | WorkspaceMismatch
   | InvalidResponse;
 
+export type RenameError = Error | Projection.Error | Log.WriteError | PlatformError.PlatformError;
 export type RemoveError =
   | GroupMembershipDeparture.Error
   | Error
@@ -79,6 +80,11 @@ export interface Interface {
   readonly remove: (
     memberId: Member.Id,
   ) => Effect.Effect<Member.Record, RemoveError, Actor.Service>;
+  /**
+   * Choose what people in the workspace call the acting member. Anyone active may name
+   * themselves, and only themselves; the same name again records nothing.
+   */
+  readonly rename: (name: Member.Name) => Effect.Effect<Member.Record, RenameError, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -246,19 +252,28 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
           }
         }).pipe(Publication.withCause(removed, revokedAt));
       }
-      return {
-        id,
-        workspaceId,
-        identity: member.identity,
-        status: "removed",
-      } satisfies Member.Record;
+      return { ...member, status: "removed" } satisfies Member.Record;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
 
-  return Service.of({ workspaceId, get, list, remove });
+  const rename = Effect.fn("MemberApplication.rename")(
+    function* (input: Member.Name) {
+      const name = yield* Schema.decodeEffect(Member.Name)(input);
+      yield* authorization.require([]);
+      const member = yield* load((yield* Actor.Service).memberId);
+      if (member.name === name) return member;
+      yield* journal.publish(MemberFacts.Renamed, { workspaceId, memberId: member.id, name });
+      return { ...member, name } satisfies Member.Record;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  return Service.of({ workspaceId, get, list, remove, rename });
 });
 
 /**

@@ -67,6 +67,13 @@ export const InviteAndJoin = {
     await canvas.findByText("Saved.");
     await userEvent.click(canvas.getByRole("button", { name: "Act as Recipient" }));
     await userEvent.click(await canvas.findByRole("button", { name: "Accept invitation" }));
+    // Joining asks what people there should call the recipient, suggested from their email.
+    const join = await within(document.body).findByRole("dialog", { name: /^Join / });
+    const name = within(join).getByRole("textbox", { name: "Your name" });
+    await expect(name).not.toHaveValue("");
+    await userEvent.clear(name);
+    await userEvent.type(name, "Rae Ashworth");
+    await userEvent.click(within(join).getByRole("button", { name: "Join" }));
     await canvas.findByRole("link", { name: /Mercier & Co 4 members/ }, { timeout: 10000 });
     await expect(
       canvas.queryByRole("button", { name: "Accept invitation" }),

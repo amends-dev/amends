@@ -33,14 +33,14 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
-      accept: ({ params }) =>
+      accept: ({ params, payload }) =>
         Effect.gen(function* () {
           const principal = yield* Principal;
           if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
           return yield* gateway.inWorkspace(
             params.workspaceId,
             Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.accept(params.invitationId, principal.id),
+              invitations.accept(params.invitationId, principal.id, payload ?? {}),
             ),
           );
         }),

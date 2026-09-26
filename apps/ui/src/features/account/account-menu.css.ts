@@ -32,3 +32,18 @@ export const link = style([
     },
   },
 ]);
+/** A menu button set like the links beside it. */
+export const item = style([
+  link,
+  {
+    border: "none",
+    backgroundColor: "transparent",
+    cursor: "pointer",
+    selectors: { "&:disabled": { cursor: "default", color: colorVars.text.secondary } },
+  },
+]);
+/** The identity someone signs in as, under their name. */
+export const identifier = style([
+  typographyStyles.mono,
+  { color: colorVars.text.secondary, overflowWrap: "anywhere" },
+]);

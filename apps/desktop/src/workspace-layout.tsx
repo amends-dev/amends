@@ -33,7 +33,15 @@ import {
   IconMarkSettings,
 } from "@amends/icons";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { createEffect, createMemo, on, Show, type JSX, type ParentProps } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  on,
+  Show,
+  type JSX,
+  type ParentProps,
+} from "solid-js";
 
 const labels: Record<WorkspacePage, string> = {
   home: "Home",
@@ -90,31 +98,41 @@ function ordinary(event: MouseEvent) {
 function AccountControl() {
   const params = useParams<{ workspaceId: string }>();
   const shell = Shell.useShell();
+  const [naming, setNaming] = createSignal(false);
   const close: JSX.EventHandler<HTMLAnchorElement, MouseEvent> = (event) => {
     if (ordinary(event)) shell.closeNavigation();
   };
   return (
-    <Account.Root>
-      <Account.Trigger />
-      <Account.Content>
-        <Account.Identity />
-        <Divider.Line />
-        <Account.Appearance />
-        <Divider.Line />
-        <Account.Actions>
-          <Account.Link href={href(paths.workspaces)} onClick={close}>
-            Switch workspace
-          </Account.Link>
-          <Account.Link
-            href={href(paths.workspacePage(params.workspaceId, "settings"))}
-            onClick={close}
-          >
-            Settings
-          </Account.Link>
-          <Account.SignOut />
-        </Account.Actions>
-      </Account.Content>
-    </Account.Root>
+    <>
+      <Account.Root>
+        <Account.Trigger workspaceId={params.workspaceId} />
+        <Account.Content>
+          <Account.Identity workspaceId={params.workspaceId} />
+          <Divider.Line />
+          <Account.Appearance />
+          <Divider.Line />
+          <Account.Actions>
+            <Account.Link href={href(paths.workspaces)} onClick={close}>
+              Switch workspace
+            </Account.Link>
+            <Account.Link
+              href={href(paths.workspacePage(params.workspaceId, "settings"))}
+              onClick={close}
+            >
+              Settings
+            </Account.Link>
+            <Account.ChangeName onClick={() => setNaming(true)} />
+            <Account.SignOut />
+          </Account.Actions>
+        </Account.Content>
+      </Account.Root>
+      {/* The dialog lives outside the menu, which closes as it opens. */}
+      <Account.NameDialog
+        workspaceId={params.workspaceId}
+        open={naming()}
+        onOpenChange={setNaming}
+      />
+    </>
   );
 }
 /** App-owned composition. The route guard keeps this instance alive while membership remains active. */

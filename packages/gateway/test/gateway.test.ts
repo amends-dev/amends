@@ -125,6 +125,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         list: unexpected(),
         insert: unexpected,
         markRemoved: unexpected,
+        rename: unexpected,
       }),
     ),
     Context.add(

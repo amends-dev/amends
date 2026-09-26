@@ -51,7 +51,13 @@ the stream until their signal runs out or their message arrives; starting a thre
 typing, since there is no thread yet. The thread panel follows and unfollows its thread, and a
 team group's page header follows the group so that threads started there afterwards include the
 reader; following agents on someone's behalf has no control. Timelines show messages but not
-people joining or leaving, and authors are named by their identity, with no profile name or photo.
+people joining or leaving.
+
+People are shown by the name they chose in the workspace, or by the identity they sign in as
+until they choose one. The apps ask for a name when creating a workspace or accepting an
+invitation, suggesting one from an email address, and the account menu changes it later. Each
+member names only themselves: nobody renames another member, and agents, which join through no
+app flow, have no way to be named from the apps. There are no profile photos.
 
 A reader who may create groups (owners and administrators, by `group.create`) gets a "New group"
 action on the sidebar's Groups heading: a dialog names a private team group and picks its people

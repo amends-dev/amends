@@ -164,6 +164,10 @@ const registry: ReadonlyArray<Registered> = [
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => ({ _tag: "Removed", memberId }),
   }),
+  register(MemberFacts.Renamed, {
+    requirement: ({ memberId }, workspaceId) => readMember(memberId, workspaceId),
+    concerns: ({ memberId }) => memberId,
+  }),
   // Invitations name their recipient and role, which only invitation managers may list.
   register(InvitationFacts.Issued, { requirement: manageInvitations }),
   register(InvitationFacts.Accepted, {

@@ -102,9 +102,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
               invitationId: invitation.details.id,
             };
             const wrongRecipient = yield* Effect.flip(
-              asAlice.invitations.accept({ params: invitationParams }),
+              asAlice.invitations.accept({ params: invitationParams, payload: {} }),
             );
-            const joined = yield* asBob.invitations.accept({ params: invitationParams });
+            const joined = yield* asBob.invitations.accept({
+              params: invitationParams,
+              payload: { name: Member.Name.make("Bob") },
+            });
+            // Bob chose his name on joining, and can change it; nobody else can.
+            const renamed = yield* asBob.members.rename({
+              params: { workspaceId: workspace.id },
+              payload: { name: Member.Name.make("Bob Chen") },
+            });
             const readByBob = yield* asBob.members.get({ params });
             const cannotInvite = yield* Effect.flip(
               asBob.invitations.issue({
@@ -136,6 +144,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               responseMode: "response-only",
             });
             return {
+              renamed,
               owner,
               outsider,
               invitation,
@@ -153,6 +162,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             };
           }).pipe(Effect.scoped, Effect.provide(fixture.layer));
           expect(outcome.owner.identity).toEqual({ _tag: "Human", id: alice });
+          expect(outcome.joined.name).toBe("Bob");
+          expect(outcome.renamed).toEqual({ ...outcome.joined, name: "Bob Chen" });
+          // Everyone reads the name Bob chose.
+          expect(outcome.members.find((member) => member.id === outcome.joined.id)?.name).toBe(
+            "Bob Chen",
+          );
           expect(outcome.outsider).toMatchObject({ _tag: "Gateway.NotMember" });
           expect(outcome.invitation.state).toEqual({ _tag: "Pending" });
           expect(outcome.wrongRecipient).toMatchObject({
@@ -229,6 +244,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const after = yield* client.me.workspaces();
             yield* client.invitations.accept({
               params: { workspaceId: other.id, invitationId: invitation.details.id },
+              payload: {},
             });
             const joined = yield* client.me.workspaces();
             return { wrong, session, reused, before, workspace, other, after, joined };

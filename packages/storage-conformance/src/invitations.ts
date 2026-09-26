@@ -1,6 +1,6 @@
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Actor } from "@amends/core/identity";
-import { Log } from "@amends/core/journal";
+import { Journal, Log } from "@amends/core/journal";
 import { Invitation, InvitationApplication, Member } from "@amends/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
@@ -21,8 +21,86 @@ import {
 /** Invitation lifecycle: acceptance, revocation, competition, and stored settlement. */
 
 export const invitations = (harness: Harness) => {
-  const { initialized, runGateway } = Support.make(harness);
+  const { core, initialized, runGateway } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: invitations`, () => {
+    it.effect(
+      "members choose their names on creating, on joining, and later; replay keeps them",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const saved = yield* Effect.scoped(
+              runGateway(
+                storage,
+                Effect.gen(function* () {
+                  const workspace = yield* Operations.createWorkspace(
+                    alice.id,
+                    Member.Name.make("Alice Moreau"),
+                  );
+                  const bound = yield* boundTo(workspace.id);
+                  expect(yield* bound.members.get(workspace.ownerMemberId)).toMatchObject({
+                    _tag: "Some",
+                    value: { name: "Alice Moreau" },
+                  });
+                  const invitation = yield* Operations.invite(
+                    workspace.id,
+                    alice,
+                    request(yield* future),
+                  );
+                  const joined = yield* Operations.acceptInvitation(
+                    workspace.id,
+                    bob.id,
+                    invitation.details.id,
+                    Member.Name.make("Bob"),
+                  );
+                  expect(joined.name).toBe("Bob");
+                  const renamed = yield* Operations.renameMember(
+                    workspace.id,
+                    bob,
+                    Member.Name.make("Bob Chen"),
+                  );
+                  expect(renamed).toMatchObject({
+                    id: joined.id,
+                    identity: joined.identity,
+                    name: "Bob Chen",
+                    status: "active",
+                  });
+                  expect(yield* bound.members.get(joined.id)).toEqual(Option.some(renamed));
+                  // The same name again records nothing; a name needs text without surrounding space.
+                  const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 50 });
+                  expect(
+                    yield* Operations.renameMember(workspace.id, bob, Member.Name.make("Bob Chen")),
+                  ).toEqual(renamed);
+                  expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 50 })).toEqual(
+                    before,
+                  );
+                  for (const name of ["", " Bob", "x".repeat(81)])
+                    expect(
+                      (yield* Effect.flip(
+                        Operations.renameMember(workspace.id, bob, name as Member.Name),
+                      ))._tag,
+                    ).toMatch(/SchemaError|InvalidInput/);
+                  return { workspaceId: workspace.id, members: yield* bound.members.list };
+                }),
+              ),
+            );
+            // Rebuilding from the journal keeps every name.
+            yield* Effect.scoped(
+              runHost(
+                storage,
+                Effect.gen(function* () {
+                  const bound = yield* boundTo(saved.workspaceId);
+                  yield* storage.discardProjections;
+                  yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                    Effect.provide(core(bound)),
+                  );
+                  expect(yield* bound.members.list).toEqual(saved.members);
+                }),
+              ),
+            );
+          }),
+        ),
+    );
+
     it.effect(
       "owner invites a reader; concurrent repeat acceptance grants once and never reactivates removed membership",
       () =>

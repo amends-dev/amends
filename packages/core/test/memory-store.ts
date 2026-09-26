@@ -79,12 +79,19 @@ const cloneReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
     entryCount: receipt.entryCount,
     entries: receipt.entries.map((entry) => ({ ...entry, payload: entry.payload.slice() })),
   });
-const cloneMember = (member: Member.Record): Member.Record => ({
-  id: member.id,
-  workspaceId: member.workspaceId,
-  identity: { ...member.identity },
-  status: member.status,
-});
+const cloneMember = (
+  member: Member.Record,
+  changes: { readonly name?: Member.Name; readonly status?: Member.Status } = {},
+): Member.Record => {
+  const name = changes.name ?? member.name;
+  return {
+    id: member.id,
+    workspaceId: member.workspaceId,
+    identity: { ...member.identity },
+    ...(name === undefined ? {} : { name }),
+    status: changes.status ?? member.status,
+  };
+};
 const cloneRole = (role: Role.Record): Role.Record => ({
   id: role.id,
   workspaceId: role.workspaceId,
@@ -511,7 +518,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       list: Effect.gen(function* () {
         return [...(yield* view).members.values()]
           .filter((member) => member.workspaceId === workspaceId)
-          .map(cloneMember);
+          .map((member) => cloneMember(member));
       }),
       insert: Effect.fn("JournalTest.members.insert")(function* (record) {
         const target = yield* memberState("insert");
@@ -552,12 +559,17 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
             message: "Expected an active membership",
           });
         }
-        target.members.set(keyOf(id), {
-          id: existing.id,
-          workspaceId,
-          identity: { ...existing.identity },
-          status: "removed",
-        });
+        target.members.set(keyOf(id), cloneMember(existing, { status: "removed" }));
+      }),
+      rename: Effect.fn("JournalTest.members.rename")(function* (id, name) {
+        const target = yield* memberState("rename");
+        const existing = target.members.get(keyOf(id));
+        if (existing === undefined || existing.status !== "active")
+          return yield* new MemberStore.Conflict({
+            operation: "rename",
+            message: "Expected an active membership",
+          });
+        target.members.set(keyOf(id), cloneMember(existing, { name }));
       }),
     });
   };

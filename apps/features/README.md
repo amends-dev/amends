@@ -76,8 +76,9 @@ Mount them inside the existing ClientProvider and DirectoryProvider.
 ```
 
 The app supplies URLs and navigation callbacks, headings, creation entry, account
-actions, and Shell layout. The picker shows active memberships and addressed invitations
-with acceptance.
+actions, and Shell layout. The picker shows active memberships and addressed invitations;
+accepting one opens a dialog asking what people there should call the reader, suggested from
+their email address. CreateWorkspace's form asks the same of the creator.
 
 `WorkspaceUnavailable` explains why a workspace route cannot open, from the directory. Compose
 `Heading`, `Reason`, and `Hint` under `Root workspaceId={id}`; Reason is a Notice for a pending
@@ -95,10 +96,13 @@ HTTP and sign in through the normal development flow. See
 
 `@amends/features/account` connects the UI AccountMenu parts to session and
 appearance state. Compose Account.Root with Trigger and Content; place Identity,
-Appearance, Actions, Link, and SignOut inside. Mount under ClientProvider and
-AppearanceProvider. The apps supply destination hrefs and Shell placement. The
-account workshop signs in through the real backend and verifies that sign-out
-retains appearance. See [workspace shell](../../docs/workspace-shell.md).
+Appearance, Actions, Link, ChangeName, and SignOut inside. Mount under ClientProvider and
+AppearanceProvider. The apps supply destination hrefs and Shell placement. Given a
+`workspaceId`, Trigger and Identity show the name the reader chose there. ChangeName closes
+the menu and calls back, so the app opens `NameDialog`, which it places outside Root, since
+the menu's panel closes as the dialog opens. The account workshop signs in through the real
+backend and verifies that sign-out retains appearance; **ChangeName** renames the account
+holder in a workspace from the menu. See [workspace shell](../../docs/workspace-shell.md).
 
 ## Settings
 
@@ -188,7 +192,8 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   docks the first under itself while the group is readable, and the thread panel docks the
   second under the thread.
 
-Authors are named by their identity until profiles exist. Times use the reader's locale: a
+Authors are named by the name they chose in the workspace, or by their identity until they
+choose one. Times use the reader's locale: a
 message shows its time of day with the full date as its title, and day seams read Today,
 Yesterday, a weekday within the week, or the date. The **Features / Conversations** stories run a
 group through the real host: the owner reads a stream a member started, opens a thread, and its

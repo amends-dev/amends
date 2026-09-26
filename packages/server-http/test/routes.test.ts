@@ -209,6 +209,15 @@ const operations = Layer.mergeAll(
           : Effect.fail(new MemberApplication.NotFound({ workspaceId, memberId: target })),
       ),
       remove: record("remove", () => Effect.fail(denied)),
+      rename: record("rename", (name) =>
+        Effect.succeed({
+          id: member.id,
+          workspaceId: member.workspaceId,
+          identity: member.identity,
+          name,
+          status: member.status,
+        }),
+      ),
       list: Effect.succeed([member]),
     }),
   ),
@@ -497,6 +506,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     const accepted = yield* run("alice", (client) =>
       client.invitations.accept({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
+        payload: {},
       }),
     );
     expect(accepted).toEqual(member);
@@ -506,7 +516,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
         arguments: [alice.id, { name: "Test workspace" }, { requestKey: "create-1" }],
       },
       { operation: "inWorkspace", arguments: [workspaceId] },
-      { operation: "accept", arguments: ["invitation-one", alice.id] },
+      { operation: "accept", arguments: ["invitation-one", alice.id, {}] },
     ]);
   }),
 );

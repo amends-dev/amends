@@ -45,6 +45,8 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   ],
   "workspace.member.added": ["members", "ownership", directoryKey],
   "workspace.member.removed": ["members", "ownership", directoryKey],
+  // A member's name shows wherever members are named, and in the directory's memberships.
+  "workspace.member.renamed": ["members", directoryKey],
   "workspace.invitation.issued": ["invitations"],
   "workspace.invitation.revoked": ["invitations"],
   "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],

@@ -29,7 +29,9 @@ portable backend packages under `packages/*` remain Effect-only.
   cancellation, and successful session installation. It has no presentation or
   navigation behavior; see the [controller contract](src/sign-in/README.md).
 - `useCreateWorkspace()` owns the name draft, schema validation, idempotent creation,
-  and shared directory refresh. Its `Ready` state follows a successful refresh;
+  and shared directory refresh. Its `memberName` draft, what people there will call the
+  creator, starts from `suggestedName(identity)`, which words an email address's local part;
+  a blank one sends none, and changing it starts a new creation key. Its `Ready` state follows a successful refresh;
   `Created` preserves the result when only the refresh needs retry. Keys last for
   the mounted intent, not across reloads. See [workspace entry](../../docs/workspace-entry.md).
 - `WorkspaceFeedProvider` keeps one workspace's reads current over its change feed while
@@ -144,7 +146,11 @@ section identity changes. Its reads are keyed atoms, so the workspace change fee
 them in the background without marking the scope pending; commands refresh them, and the
 directory, before reporting `saved`. Inside operations, `refreshResult` waits for the result a
 refresh produces, because keyed reads can still show their previous settled value when the
-refresh starts. `useAcceptInvitation` joins and refreshes the directory.
+refresh starts. `useAcceptInvitation` joins, optionally with the new member's name, and refreshes
+the directory. `useMemberName(workspaceId, saved)` changes what people in a workspace call the
+reader: `reset` starts from their name there or a suggestion, and `ready` holds while the draft is
+a valid, different name. The rename refreshes the members and the directory, and a
+`workspace.member.renamed` commit on the feed refreshes them for everyone else.
 Requests are credential-scoped and cancelled on disposal. See
 [workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.
 

@@ -17,9 +17,24 @@ import { Effect } from "effect";
  * core application operation for an asserted identity, the way a protocol
  * handler does, without going through HTTP.
  */
-export const createWorkspace = (creator: Identity.HumanId) =>
+export const createWorkspace = (creator: Identity.HumanId, memberName?: Member.Name) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.createWorkspace(creator, { name: "Test workspace" }),
+    gateway.createWorkspace(creator, {
+      name: "Test workspace",
+      ...(memberName === undefined ? {} : { memberName }),
+    }),
+  );
+export const renameMember = (
+  workspaceId: Workspace.Id,
+  identity: Identity.MemberReference,
+  name: Member.Name,
+) =>
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(MemberApplication.Service, (members) => members.rename(name)),
+    ),
   );
 
 export const getMember = (
@@ -65,12 +80,13 @@ export const acceptInvitation = (
   workspaceId: Workspace.Id,
   recipient: Identity.HumanId,
   invitationId: Invitation.Id,
+  name?: Member.Name,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
     gateway.inWorkspace(
       workspaceId,
       Effect.flatMap(InvitationApplication.Service, (invitations) =>
-        invitations.accept(invitationId, recipient),
+        invitations.accept(invitationId, recipient, name === undefined ? {} : { name }),
       ),
     ),
   );

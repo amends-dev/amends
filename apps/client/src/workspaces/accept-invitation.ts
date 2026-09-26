@@ -30,10 +30,16 @@ export function useAcceptInvitation(workspaceId: string, invitationId: string) {
     pending: request.pending,
     error,
     completed,
-    accept: () => {
+    /** Join, as `name` when given; once joined, a retry only refreshes. */
+    accept: (name?: string) => {
       if (request.pending()) return;
       setError(undefined);
-      request.run({ workspaceId, invitationId, refreshOnly: completed() });
+      request.run({
+        workspaceId,
+        invitationId,
+        ...(name?.trim() ? { name: name.trim() } : {}),
+        refreshOnly: completed(),
+      });
     },
   };
 }

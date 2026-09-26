@@ -167,6 +167,7 @@ CREATE TABLE "members" (
 	"id" text,
 	"identity_kind" text NOT NULL,
 	"identity_id" text NOT NULL,
+	"name" text,
 	"status" text NOT NULL,
 	CONSTRAINT "members_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "members_identity_kind" CHECK ("identity_kind" IN ('Human', 'Agent'))

@@ -32,6 +32,9 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
     }),
     HttpApiEndpoint.post("accept", "/:invitationId/accept", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
+      // What the recipient wants people in the workspace to call them. A request without a body
+      // reads as null, accepting without a name.
+      payload: [Schema.Null, Schema.Struct({ name: Schema.optionalKey(Member.Name) })],
       success: Member.Record,
       error: [
         ApiErrors.HumanRequired,

@@ -14,9 +14,15 @@ const recordColumns = {
   id: members.id,
   workspaceId: members.workspaceId,
   identity: { _tag: members.identityKind, id: members.identityId },
+  name: members.name,
   status: members.status,
 };
-const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
+/** A row as the record reads it: a member who never chose a name has none. */
+export const toMember = <R extends { readonly name: string | null }>({ name, ...row }: R) =>
+  name === null ? row : { ...row, name };
+const decodeRecords = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
+const decode = (rows: ReadonlyArray<{ readonly name: string | null }>) =>
+  decodeRecords(rows.map(toMember));
 
 /**
  * Memberships, active and removed; one active membership per identity.
@@ -72,10 +78,30 @@ export const make = Effect.fn("Members.make")(function* () {
           id: record.id,
           identityKind: record.identity._tag,
           identityId: record.identity.id,
+          name: record.name ?? null,
           status: record.status,
         }),
         true,
       ).pipe(Effect.mapError(storeError(MemberStore, "insert")));
+    }),
+    rename: Effect.fn("Members.rename")(function* (id, input) {
+      yield* Store.Transaction;
+      const name = yield* Schema.decodeEffect(Member.Name)(input).pipe(
+        Effect.mapError(storeConflict(MemberStore, "rename")),
+      );
+      const rows = yield* guard(
+        db
+          .update(members)
+          .set({ name })
+          .where(and(inWorkspace, eq(members.id, id), eq(members.status, "active")))
+          .returning({ id: members.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(MemberStore, "rename")));
+      if (rows.length === 0)
+        return yield* new MemberStore.Conflict({
+          operation: "rename",
+          message: "Expected an active membership",
+        });
     }),
     markRemoved: Effect.fn("Members.markRemoved")(function* (id) {
       yield* Store.Transaction;

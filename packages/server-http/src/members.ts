@@ -31,6 +31,14 @@ export const layer = HttpApiBuilder.group(
             Effect.flatMap(MemberApplication.Service, (members) => members.get(params.memberId)),
           ),
         ),
+      rename: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(MemberApplication.Service, (members) => members.rename(payload.name)),
+          ),
+        ),
       remove: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

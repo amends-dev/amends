@@ -8,6 +8,7 @@ import {
   DirectoryProvider,
   Session,
   useCreateWorkspace,
+  suggestedName,
   useDirectory,
   type CreateWorkspaceController,
   type DirectoryScope,
@@ -133,6 +134,28 @@ it("validates and trims the name, blocks duplicate submissions, and refreshes be
   expect(f.directory.state()).toMatchObject({ listing: { memberships: [{ workspace }] } });
   expect(f.calls).toHaveLength(3);
 });
+it("sends the creator's chosen name, trimmed, and a new key when it changes", async () => {
+  const f = fixture();
+  await f.ready();
+  expect(f.controller.state()).toMatchObject({ memberName: "" });
+  f.controller.setMemberName("x".repeat(81));
+  f.controller.submit("Studio");
+  expect(f.controller.state()).toMatchObject({ error: "invalid-member-name" });
+  expect(f.calls).toHaveLength(1);
+  f.controller.setMemberName("  Alice Liddell  ");
+  f.controller.submit("Studio");
+  const first = await f.at(1);
+  expect(await first.request.json()).toEqual({ name: "Studio", memberName: "Alice Liddell" });
+  first.resolve(json({}, 503));
+  await waitFor(() => expect(f.controller.state()).toMatchObject({ error: "request-failed" }));
+  f.controller.setMemberName("Alice");
+  f.controller.submit();
+  const second = await f.at(2);
+  expect(await second.request.json()).toEqual({ name: "Studio", memberName: "Alice" });
+  expect(second.request.headers.get("idempotency-key")).not.toBe(
+    first.request.headers.get("idempotency-key"),
+  );
+});
 it("reuses the creation key after an uncertain response and changes it for a new submitted name", async () => {
   const f = fixture();
   await f.ready();
@@ -195,4 +218,11 @@ it.each(["hide", "replace"] as const)("ignores late creation after %s", async (a
   old.retryRefresh();
   expect(old.state()._tag).toBe("Form");
   if (action === "replace") expect(f.store.read()?.token).toBe("bob");
+});
+it("suggests a name from an email identity, and none from anything else", () => {
+  expect(suggestedName("ada.lovelace@example.com")).toBe("Ada Lovelace");
+  expect(suggestedName("jo_mercer+work@example.com")).toBe("Jo Mercer Work");
+  expect(suggestedName("alice")).toBe("");
+  expect(suggestedName(undefined)).toBe("");
+  expect(suggestedName(`${"a".repeat(81)}@example.com`)).toBe("");
 });
