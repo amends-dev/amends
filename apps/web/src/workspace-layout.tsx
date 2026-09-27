@@ -140,7 +140,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                 name.reset();
                 setDialog("name");
               },
-              onSignOut: () => session.replace(undefined),
+              onSignOut: session.signOut,
             },
           }}
           homeHref={href(path("home"))}

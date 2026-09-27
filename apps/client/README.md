@@ -17,7 +17,10 @@ portable backend packages under `packages/*` remain Effect-only.
 - `ClientProvider` accepts an absolute `apiBaseUrl`, a `sessionStore`, and an optional
   Effect HTTP transport. It supplies the typed client and a credential-scoped registry
   to caller-owned children. It renders no DOM elements and selects no router/theme.
-- `useSession()` exposes the current credential, `replace`, and `isCurrent`.
+- `useSession()` exposes the current credential, `replace`, `signOut`, `signedOut`, and
+  `isCurrent`. `signedOut` holds once the credential was cleared by signing out, here or in another
+  window, rather than rejected by the host, so the apps send the next person to sign-in without
+  returning to the page the previous one left.
 - `DirectoryProvider` validates a credential through `GET /me/workspaces` and exposes
   `SignedOut`, `Loading`, `Ready { listing }`, or `Failed` through `useDirectory()`.
   `retry` lets the consuming app decide when to repeat a failed read. Guests make no request.

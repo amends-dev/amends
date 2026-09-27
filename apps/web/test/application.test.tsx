@@ -92,7 +92,20 @@ it("validates a restored credential before mounting protected content and suppor
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(fixture.store.read()).toBeUndefined();
-  expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces");
+  // Whoever signs in next starts afresh.
+  expect(history.get()).toBe("/sign-in");
+});
+it("signing out in another window leaves no way back to this page for the next person", async () => {
+  const fixture = memoryStore(session("alice"));
+  const history = mount("/workspaces/one/triage", fixture.store, () =>
+    Promise.resolve(
+      response({ memberships: [membership("one", "Alice workspace")], invitations: [] }),
+    ),
+  );
+  await screen.findByRole("heading", { name: "Triage" });
+  fixture.change(undefined);
+  await screen.findByRole("heading", { name: "Sign in to amends" });
+  expect(history.get()).toBe("/sign-in");
 });
 it("clears rejected credentials while preserving the intended route", async () => {
   const fixture = memoryStore(session("expired"));

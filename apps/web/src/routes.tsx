@@ -37,7 +37,16 @@ function RequireSession(props: ParentProps) {
   return (
     <Show
       when={session.session}
-      fallback={<Navigate href={signInPath(location.pathname + location.search + location.hash)} />}
+      fallback={
+        // Signing out starts the next person afresh; otherwise sign-in returns to this page.
+        <Navigate
+          href={
+            session.signedOut
+              ? paths.signIn
+              : signInPath(location.pathname + location.search + location.hash)
+          }
+        />
+      }
     >
       <DirectoryProvider>
         <ValidatedSession>{props.children}</ValidatedSession>

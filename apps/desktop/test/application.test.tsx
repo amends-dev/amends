@@ -62,7 +62,8 @@ it("composes validated client state with UI and signs out through the desktop ro
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(store.read()).toBeUndefined();
-  expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces");
+  // Whoever signs in next starts afresh.
+  expect(window.location.hash).toBe("#/sign-in");
 });
 it("clears a rejected session and renders the desktop sign-in form", async () => {
   const store = mount("/workspaces/one", "expired", () =>
@@ -220,7 +221,8 @@ it("navigates workspace sections with persistent chrome and retains appearance a
   fireEvent.keyDown(account, { key: "Enter" });
   fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Sign out" }), { key: "Enter" });
   await screen.findByRole("heading", { name: "Sign in to amends" });
-  expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftriage");
+  // Signing out leaves no way back to the page for whoever signs in next.
+  expect(window.location.hash).toBe("#/sign-in");
   // Sign-in keeps the dark appearance chosen inside the workspace.
   expect(document.querySelector('[data-mode="dark"]')).not.toBeNull();
 });

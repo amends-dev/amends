@@ -6,8 +6,6 @@ export function useStandaloneAccount(): () => StandaloneAccount | undefined {
   const session = useSession();
   return () => {
     const identity = session.session?.humanId;
-    return identity === undefined
-      ? undefined
-      : { identity, onSignOut: () => session.replace(undefined) };
+    return identity === undefined ? undefined : { identity, onSignOut: session.signOut };
   };
 }
