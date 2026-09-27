@@ -159,6 +159,7 @@
       "dependencies": {
         "@amends/icons": "workspace:*",
         "@fontsource/inter": "^5.2.8",
+        "@kobalte/core": "^0.13.14",
         "@vanilla-extract/css": "^1.21.2",
       },
       "devDependencies": {

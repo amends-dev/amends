@@ -15,6 +15,7 @@ import {
 import { IconMarkClose, IconMenu } from "@amends/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { media } from "../../foundations/layout/tokens.ts";
+import { createMediaQuery } from "../../internal/media.ts";
 import { classes } from "../../internal/props.ts";
 import * as s from "./shell.css.ts";
 
@@ -40,18 +41,6 @@ function useState(part: string): State {
   return state;
 }
 
-function matches(query: string): Accessor<boolean> {
-  const [value, setValue] = createSignal(false);
-  onMount(() => {
-    const list = window.matchMedia(query);
-    const update = () => setValue(list.matches);
-    update();
-    list.addEventListener("change", update);
-    onCleanup(() => list.removeEventListener("change", update));
-  });
-  return value;
-}
-
 export type RootProps = JSX.HTMLAttributes<HTMLDivElement>;
 
 /**
@@ -62,8 +51,8 @@ export type RootProps = JSX.HTMLAttributes<HTMLDivElement>;
 export function Root(props: RootProps) {
   const [local, native] = splitProps(props, ["class", "children"]);
   const id = createUniqueId();
-  const touch = matches(media.touch);
-  const overlay = matches(media.overlay);
+  const touch = createMediaQuery(media.touch);
+  const overlay = createMediaQuery(media.overlay);
   const [navigationOpen, setNavigationOpen] = createSignal(false);
   const [asideOpen, setAsideOpen] = createSignal(false);
   const [toggle, setToggle] = createSignal<HTMLButtonElement>();

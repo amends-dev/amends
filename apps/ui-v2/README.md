@@ -112,17 +112,43 @@ sends, Shift+Enter starts a new line, and Send waits for non-blank text. The cal
 draft so it survives navigation. Phones use 16px message and field text so the page does not
 zoom, and give reactions and the reply summary 44px targets.
 
+## Form components and the modal
+
+`Button` is primary, secondary, or quiet, with an optional icon or menu chevron. `Field` gives
+one control a label, help, and error text, and `Input` and the member picker pick those
+associations up. `SearchField` is the quiet filled search. `Choice` is one choice among boxed
+options, such as Public and Private, over native radio inputs. `Menu` wraps Kobalte's dropdown
+menu for filters, sorting, and pickers; it attaches inside the nearest dialog or Theme so it
+keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
+`MemberPicker` chooses several people by name: chosen people become removable chips and leave
+the list, arrows and Enter pick, and Backspace removes the last chip. It is a dropdown on wider
+layouts and an always-shown list on phones.
+
+`Modal` is the fifth pattern: a Pane with `variant="modal"` in a native dialog, so the page
+behind is inert, Escape and a click outside close it, and focus returns. It is 640 × 600 capped
+to the viewport, and fills the screen on phones. `Modal.Actions` holds its buttons at the end
+of a 64px band, sharing the width on phones.
+
 ## Screens
 
 Screens take plain data and callbacks; web and desktop fill them from client hooks and own
 routing. `WorkspaceNavigation` is the rail and the Home sidebar. `GroupPane` is a group's header
 and tabs around the current tab, `GroupThreads` is its Threads tab (timeline and composer), and
-`ThreadPane` is an open thread in the side panel. `Timeline` renders messages and dividers from
+`ThreadPane` is an open thread in the side panel. `GroupTasks` is the Tasks tab: search, status
+and assignee filters, and sorting that stay above the task list, with the status and key
+columns giving way on narrower layouts. `TaskPane` opens a task in the side panel with its
+state and assignee pickers, description, a link to where it started, and its activity.
+`GroupSettings` is the settings modal: General (name, visibility, and your membership) and
+Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages and dividers from
 `TimelineEntry` data, and conversations read from the bottom: they open at the newest message
 and follow new ones while the reader is at the end. **Screens / Group threads** composes them
-with the Lunacy sample data; its Reply and Send stories run as tests.
+with the Lunacy sample data, and **Screens / Group tasks** and **Screens / Group settings** add
+the Tasks tab, a task, and the settings modal to the same working harness. Their interaction
+stories run as tests.
 
-The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
+The settings copy says "group" where the mocks said "channel", and the visibility help follows
+the chosen option. Task panel messages use the standard message size rather than the mock's
+smaller text. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
 the icon set covers, at every size.
 
 ## Run and verify

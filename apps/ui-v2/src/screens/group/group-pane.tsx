@@ -24,6 +24,8 @@ export interface GroupPaneProps {
   readonly memberCount: number;
   readonly tab: GroupTab;
   readonly tabHref: (tab: GroupTab) => string;
+  /** Switches tabs in place of following their links. */
+  readonly onTabChange?: (tab: GroupTab) => void;
   readonly taskCount?: number;
   readonly onOpenMembers: () => void;
   readonly onOpenNotifications: () => void;
@@ -77,6 +79,11 @@ export function GroupPane(props: GroupPaneProps) {
                   href={props.tabHref(tab.id)}
                   current={props.tab === tab.id}
                   count={tab.id === "tasks" ? props.taskCount : undefined}
+                  onClick={(event: MouseEvent) => {
+                    if (!props.onTabChange) return;
+                    event.preventDefault();
+                    props.onTabChange(tab.id);
+                  }}
                 >
                   {tab.label}
                 </Tabs.Tab>

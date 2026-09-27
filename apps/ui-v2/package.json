@@ -10,11 +10,17 @@
   ],
   "exports": {
     "./components/avatar": "./src/components/avatar/index.ts",
+    "./components/button": "./src/components/button/index.ts",
+    "./components/choice": "./src/components/choice/index.ts",
     "./components/composer": "./src/components/composer/index.ts",
     "./components/count": "./src/components/count/index.ts",
     "./components/divider": "./src/components/divider/index.ts",
+    "./components/field": "./src/components/field/index.ts",
     "./components/icon-button": "./src/components/icon-button/index.ts",
+    "./components/input": "./src/components/input/index.ts",
     "./components/logo": "./src/components/logo/index.ts",
+    "./components/member-picker": "./src/components/member-picker/index.ts",
+    "./components/menu": "./src/components/menu/index.ts",
     "./components/message": "./src/components/message/index.ts",
     "./components/tabs": "./src/components/tabs/index.ts",
     "./components/task-status": "./src/components/task-status/index.ts",
@@ -25,6 +31,7 @@
     "./foundations/theme": "./src/foundations/theme/index.ts",
     "./foundations/typography": "./src/foundations/typography/tokens.ts",
     "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts",
+    "./patterns/modal": "./src/patterns/modal/index.ts",
     "./patterns/pane": "./src/patterns/pane/index.ts",
     "./patterns/rail": "./src/patterns/rail/index.ts",
     "./patterns/shell": "./src/patterns/shell/index.ts",
@@ -42,6 +49,7 @@
   "dependencies": {
     "@amends/icons": "workspace:*",
     "@fontsource/inter": "^5.2.8",
+    "@kobalte/core": "^0.13.14",
     "@vanilla-extract/css": "^1.21.2"
   },
   "devDependencies": {

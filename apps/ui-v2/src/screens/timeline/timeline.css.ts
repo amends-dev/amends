@@ -1,5 +1,7 @@
 import { style } from "@vanilla-extract/css";
+import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
+import { typeScale } from "../../foundations/typography/tokens.ts";
 
 // Conversations read from the bottom: short timelines rest against the composer.
 export const timeline = style({
@@ -8,5 +10,17 @@ export const timeline = style({
   justifyContent: "flex-end",
   gap: "1.5rem",
   minHeight: "100%",
+  selectors: { "&[data-anchor=top]": { justifyContent: "flex-start", minHeight: 0 } },
   "@media": { [media.mobile]: { gap: "1.375rem" } },
 });
+
+export const event = style({
+  ...typeScale.control,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.625rem",
+  margin: 0,
+  color: vars.color.text.secondary,
+});
+
+export const eventIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });

@@ -19,6 +19,7 @@ export const pane = style({
 });
 
 const side = `${pane}[data-variant="side"]`;
+const modal = `${pane}[data-variant="modal"]`;
 
 /**
  * Parts place themselves in named areas, so one header rearranges per layout: a 60px bar with
@@ -38,8 +39,15 @@ export const header = style({
   paddingInline: "1.5rem",
   // Drawn inside the header, so the current tab's underline sits over it as in the mocks.
   boxShadow: `inset 0 -1px 0 ${vars.color.border.divider}`,
+  selectors: {
+    // Modals: a 64px title bar, then tabs or a subtitle; no fixed band to line up with.
+    [`${modal} &`]: { gridTemplateRows: "4rem auto auto", minHeight: 0 },
+  },
   "@media": {
-    [media.touch]: { minHeight: "6.5rem" },
+    [media.touch]: {
+      minHeight: "6.5rem",
+      selectors: { [`${modal} &`]: { minHeight: 0 } },
+    },
     [media.mobile]: {
       paddingInline: "1rem",
       selectors: {
@@ -84,6 +92,8 @@ export const back = style([
   },
 ]);
 
+export const backAlways = style({ display: "flex" });
+
 export const backIcon = style({
   display: "grid",
   placeItems: "center",
@@ -119,14 +129,22 @@ export const titleIcon = style({
   },
 });
 
-export const titleText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
+export const titleText = style({
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+  selectors: { [`${modal} &`]: { flexDirection: "row", alignItems: "baseline", gap: "0.75rem" } },
+  "@media": {
+    [media.mobile]: { selectors: { [`${modal} &`]: { flexDirection: "column", gap: 0 } } },
+  },
+});
 
 export const heading = style({
   ...typeScale.title,
   ...ellipsis,
   margin: 0,
   fontWeight: fontWeight.medium,
-  selectors: { [`${side} &`]: typeScale.body },
+  selectors: { [`${side} &`]: typeScale.body, [`${modal} &`]: typeScale.heading },
   "@media": {
     [media.touch]: {
       selectors: { [`${pane}:not([data-variant="side"]) &`]: typeScale.titleTouch },
@@ -142,6 +160,7 @@ export const context = style({
   display: "none",
   lineHeight: "1.125rem",
   color: vars.color.text.secondary,
+  selectors: { [`${modal} &`]: { ...typeScale.hint, display: "block" } },
   "@media": { [media.mobile]: { display: "block" } },
 });
 
@@ -152,15 +171,48 @@ export const actions = style({
   gap: "0.5rem",
   selectors: { [`${side} &`]: { marginInlineEnd: "-0.5rem" } },
   "@media": {
-    [media.touch]: { gap: "0.25rem", marginInlineEnd: "-1rem" },
+    [media.touch]: {
+      gap: "0.25rem",
+      marginInlineEnd: "-1rem",
+      selectors: { [`${modal} &`]: { marginInlineEnd: "-0.5rem" } },
+    },
     [media.mobile]: { marginInlineEnd: "-0.75rem" },
   },
 });
 
-// Phones close a side pane with Back instead.
-export const close = style({ "@media": { [media.mobile]: { display: "none" } } });
+// Phones close a side pane with Back instead; modals keep their close button.
+export const close = style({
+  "@media": { [media.mobile]: { selectors: { [`${side} &`]: { display: "none" } } } },
+});
 
-export const tabs = style({ gridArea: "tabs", minWidth: 0, alignSelf: "end" });
+export const tabs = style({
+  gridArea: "tabs",
+  minWidth: 0,
+  alignSelf: "end",
+  selectors: { [`${modal} &`]: { paddingBlockStart: "0.25rem" } },
+});
+
+// Controls above a list that stay while it scrolls, such as search and filters.
+// One row where the search gives way first; phones wrap it onto its own line.
+export const toolbar = style({
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+  flex: "none",
+  padding: "1.25rem 1.5rem 0",
+  "@media": {
+    [media.touch]: { paddingBlockStart: "1rem" },
+    [media.mobile]: { flexWrap: "wrap", padding: "0.75rem 1rem 0" },
+  },
+});
+
+export const toolbarEnd = style({
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+  marginInlineStart: "auto",
+  "@media": { [media.mobile]: { marginInlineStart: 0 } },
+});
 
 export const subtitle = style({
   ...typeScale.control,
@@ -181,9 +233,14 @@ export const body = style({
   overflowY: "auto",
   overscrollBehavior: "contain",
   padding: "1.25rem 1.5rem",
+  selectors: {
+    [`${modal} &`]: { padding: "1.5rem" },
+    // A list directly under a toolbar and its headings starts at the top edge.
+    "&[data-inset=list]": { paddingBlockStart: 0 },
+  },
   "@media": {
     [media.touch]: { padding: "1rem 1.5rem" },
-    [media.mobile]: { padding: "1rem" },
+    [media.mobile]: { padding: "1rem", selectors: { [`${modal} &`]: { padding: "1rem" } } },
   },
 });
 

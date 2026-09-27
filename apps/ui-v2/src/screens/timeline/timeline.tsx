@@ -1,5 +1,5 @@
 import { For, Match, Show, Switch } from "solid-js";
-import { IconMarkResources } from "@amends/icons";
+import { IconMarkNew, IconMarkResources } from "@amends/icons";
 import type { AvatarStackPerson } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { Message, type MessageAuthor } from "../../components/message/index.ts";
@@ -36,7 +36,14 @@ export interface TimelineDivider {
   readonly align?: "center" | "start";
 }
 
-export type TimelineEntry = TimelineMessage | TimelineDivider;
+/** Something that happened, such as "AJ created this task · 10:06 AM". */
+export interface TimelineEvent {
+  readonly kind: "event";
+  readonly id: string;
+  readonly text: string;
+}
+
+export type TimelineEntry = TimelineMessage | TimelineDivider | TimelineEvent;
 
 export interface TimelineProps {
   readonly entries: readonly TimelineEntry[];
@@ -45,17 +52,27 @@ export interface TimelineProps {
   readonly onOpenThread?: (messageId: string) => void;
   readonly onReact?: (messageId: string, emoji: string) => void;
   readonly taskHref: (key: string) => string;
+  /** Conversations rest against the bottom; a task's activity reads from the top. */
+  readonly anchor?: "bottom" | "top";
 }
 
-/** Messages and dividers, oldest first. */
+/** Messages, dividers, and events, oldest first. */
 export function Timeline(props: TimelineProps) {
   return (
-    <div class={s.timeline}>
+    <div class={s.timeline} data-anchor={props.anchor ?? "bottom"}>
       <For each={props.entries}>
         {(entry) => (
           <Switch>
             <Match when={entry.kind === "divider" && entry}>
               {(divider) => <Divider label={divider().label} align={divider().align} />}
+            </Match>
+            <Match when={entry.kind === "event" && entry}>
+              {(event) => (
+                <p class={s.event}>
+                  <IconMarkNew class={s.eventIcon} />
+                  {event().text}
+                </p>
+              )}
             </Match>
             <Match when={entry.kind === "message" && entry}>
               {(message) => (

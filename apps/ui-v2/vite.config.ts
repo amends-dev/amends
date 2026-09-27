@@ -9,7 +9,10 @@ export default defineConfig({
   test: {
     name: "@amends/ui-v2",
     environment: "happy-dom",
-    setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
+    setupFiles: [
+      fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url)),
+      fileURLToPath(new URL("./test/browser-defaults.ts", import.meta.url)),
+    ],
     include: ["test/**/*.test.{ts,tsx}"],
   },
 });

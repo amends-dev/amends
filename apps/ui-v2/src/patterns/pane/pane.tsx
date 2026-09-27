@@ -5,11 +5,14 @@ import { IconButton, type IconButtonProps } from "../../components/icon-button/i
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./pane.css.ts";
 
-const Variant = createContext<"main" | "side">("main");
+const Variant = createContext<"main" | "side" | "modal">("main");
 
 export type RootProps = JSX.HTMLAttributes<HTMLDivElement> & {
-  /** Main content, or a side panel with a smaller title and a Back bar on phones. Default main. */
-  variant?: "main" | "side";
+  /**
+   * Main content; a side panel, with a smaller title and a Back bar on phones; or a modal, with a
+   * larger title and its context beside it. Default main.
+   */
+  variant?: "main" | "side" | "modal";
 };
 
 /**
@@ -93,19 +96,21 @@ export function Close(props: CloseProps) {
 }
 
 export type BackProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
-  /** Where Back leads, such as the group's name. */
-  children: string;
+  /** Where Back leads, such as the group's name; shown beside the arrow. */
+  children?: string;
+  /** Show on every layout, as in a modal's subview. Default phones only. */
+  always?: boolean;
 };
 
-/** Returns from a full-screen side pane on phones; hidden on wider layouts. */
+/** Returns from a full-screen side pane on phones, or from a subview when `always` is set. */
 export function Back(props: BackProps) {
-  const [local, native] = splitProps(props, ["children", "class"]);
+  const [local, native] = splitProps(props, ["children", "always", "class"]);
   return (
     <button
+      aria-label={local.children ? `Back to ${local.children}` : "Back"}
       {...native}
       type="button"
-      aria-label={`Back to ${local.children}`}
-      class={classes(s.back, local.class)}
+      class={classes(s.back, local.always && s.backAlways, local.class)}
     >
       <span class={s.backIcon} aria-hidden="true">
         <IconMarkBack size={20} />
@@ -131,12 +136,35 @@ export function Subtitle(props: SubtitleProps) {
   return <p {...native} class={classes(s.subtitle, local.class)} />;
 }
 
-export type BodyProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type ToolbarProps = JSX.HTMLAttributes<HTMLDivElement>;
+
+/** Search, filters, and actions above a list; they stay while the list scrolls. */
+export function Toolbar(props: ToolbarProps) {
+  const [local, native] = splitProps(props, ["class"]);
+  return <div {...native} class={classes(s.toolbar, local.class)} />;
+}
+
+/** The trailing group in a Toolbar, such as sorting and New task. */
+export function ToolbarEnd(props: ToolbarProps) {
+  const [local, native] = splitProps(props, ["class"]);
+  return <div {...native} class={classes(s.toolbarEnd, local.class)} />;
+}
+
+export type BodyProps = JSX.HTMLAttributes<HTMLDivElement> & {
+  /** "list" starts flush under a toolbar's column headings. Default "default". */
+  inset?: "default" | "list";
+};
 
 /** The scrolling content. */
 export function Body(props: BodyProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.body, local.class)} />;
+  const [local, native] = splitProps(props, ["class", "inset"]);
+  return (
+    <div
+      {...native}
+      data-inset={local.inset === "list" ? "list" : undefined}
+      class={classes(s.body, local.class)}
+    />
+  );
 }
 
 export type FooterProps = JSX.HTMLAttributes<HTMLDivElement>;

@@ -10,4 +10,5 @@ export type {
   SubtitleProps as PaneSubtitleProps,
   TabsProps as PaneTabsProps,
   TitleProps as PaneTitleProps,
+  ToolbarProps as PaneToolbarProps,
 } from "./pane.tsx";
