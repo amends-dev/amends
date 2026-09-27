@@ -30,7 +30,7 @@ const server = (url: string) =>
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
   );
-/** Alice owns a workspace that Bob joined as a viewer. */
+/** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const asAlice = yield* client(alice);
   const asBob = yield* client(bob);
@@ -41,7 +41,7 @@ const workspaceWithBob = Effect.gen(function* () {
     payload: {
       recipientId: bob,
       expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-      roleId: BuiltinRoles.ViewerId,
+      roleId: BuiltinRoles.MemberId,
     },
   });
   const joined = yield* asBob.invitations.accept({
@@ -68,55 +68,70 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const group = yield* create("group-1");
         expect(group).toMatchObject({ kind: "Team", name: "Design", createdBy: aliceId });
         expect(yield* create("group-1")).toEqual(group);
-        // Viewers take part in conversations but do not create groups.
-        const refused = yield* asBob.groups
-          .create({
-            params: { workspaceId },
-            headers: {},
-            payload: { name: "Mine", memberIds: [bobId] },
-          })
-          .pipe(Effect.flip);
-        expect(refused).toMatchObject({ _tag: "Authorization.Denied" });
-        // Each can ask what they may do, so apps offer group creation only to Alice.
-        expect(yield* asAlice.assignments.permissions({ params: { workspaceId } })).toContain(
-          "group.create",
-        );
-        expect(yield* asBob.assignments.permissions({ params: { workspaceId } })).not.toContain(
-          "group.create",
-        );
+        // Members create groups too, and a private one of theirs is theirs alone: the owner, who
+        // is not in it, can neither see it nor get into it.
+        const mine = yield* asBob.groups.create({
+          params: { workspaceId },
+          headers: {},
+          payload: { name: "Mine", memberIds: [bobId] },
+        });
+        const outside = { workspaceId, groupId: mine.id };
+        expect(yield* asAlice.groups.get({ params: outside }).pipe(Effect.flip)).toMatchObject({
+          _tag: "GroupApplication.NotFound",
+        });
+        expect(
+          yield* asAlice.groups
+            .addMember({ params: outside, payload: { memberId: aliceId } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+        expect(
+          yield* asAlice.groups
+            .rename({ params: outside, payload: { name: "Ours", expectedName: "Mine" } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "GroupApplication.NotFound" });
+        expect(
+          yield* asAlice.groups
+            .members({ params: outside, query: { limit: 10 } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+        // Bob leaves his group again; the rest of the conversation happens in Design.
+        const [kept] = yield* asBob.groups.members({ params: outside, query: { limit: 10 } });
+        yield* asBob.groups.leave({ params: { ...outside, membershipId: kept!.id } });
+        // Each can ask what they may do: both may create groups.
+        for (const client of [asAlice, asBob])
+          expect(yield* client.assignments.permissions({ params: { workspaceId } })).toContain(
+            "group.create",
+          );
         const groupId = group.id;
-        expect(yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } })).toEqual(
-          [
-            {
-              group,
-              latestActivityAt: null,
-              caughtUpAt: null,
-              newActivity: false,
-              following: false,
-              pending: 0,
-              manageable: false,
-              renamable: false,
-            },
-          ],
-        );
-        // Alice owns the workspace, so she manages the group's members; Bob only reads it.
+        // Any member of a private group adds and removes its people and renames it.
+        expect(
+          yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } }),
+        ).toContainEqual({
+          group,
+          latestActivityAt: null,
+          caughtUpAt: null,
+          newActivity: false,
+          following: false,
+          pending: 0,
+          manageable: true,
+          membersRemovable: true,
+          renamable: true,
+        });
         expect(
           yield* asAlice.groups.list({ params: { workspaceId }, query: { limit: 10 } }),
         ).toMatchObject([{ group: { id: group.id }, manageable: true, renamable: true }]);
-        // Alice renames it; Bob, a viewer, may not.
+        // Alice renames it; Bob may too, and the same name again changes nothing.
         const renamed = yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
           payload: { name: "Product design", expectedName: "Design" },
         });
         expect(renamed).toEqual({ ...group, name: "Product design" });
         expect(
-          yield* asBob.groups
-            .rename({
-              params: { workspaceId, groupId: group.id },
-              payload: { name: "Mine", expectedName: "Product design" },
-            })
-            .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "Authorization.Denied" });
+          yield* asBob.groups.rename({
+            params: { workspaceId, groupId: group.id },
+            payload: { name: "Product design", expectedName: "Product design" },
+          }),
+        ).toEqual(renamed);
         // Renaming from a name that has since changed would replace that rename unseen.
         expect(
           yield* asAlice.groups
@@ -372,7 +387,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           headers: {},
           payload: { text: "Welcome, everyone.", mentions: [] },
         });
-        // Bob, a viewer, finds the public group but not the private one, and cannot read in yet.
+        // Bob, a member, finds the public group but not the private one, and cannot read in yet.
         const browse = () =>
           asBob.groups.listPublic({ params: { workspaceId }, query: { limit: 10 } });
         expect(yield* browse()).toEqual([{ group: lobby, members: 1, joined: false }]);

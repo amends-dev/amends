@@ -115,7 +115,7 @@ uses that transaction and sees its staged changes without opening another one.
 
 `@amends/core/group` holds team and direct groups, their admissions, and follows.
 `GroupApplication` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
-`get`, `getForManagement`);
+`get`);
 `GroupMembershipApplication` adds, removes, and lets members join public groups and leave team
 groups, and reads rosters;
 `GroupFollowApplication` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
@@ -233,7 +233,7 @@ back instead of running again. See [retrying safely](../../docs/thread-workflows
 ## Permission declarations and built-in roles
 
 Declare a permission beside its owning feature and register it in `core.ts`.
-Every declaration must explicitly choose `builtinTier`: `viewer`, `administrator`,
+Every declaration must explicitly choose `builtinTier`: `member`, `administrator`,
 or `owner`. Permission groups supply a name prefix and default target kind, but
 never a default tier:
 
@@ -241,13 +241,13 @@ never a default tier:
 import { Permission } from "@amends/core/authorization";
 
 const member = Permission.makeGroup("member", { targetKind: "Member" });
-const Read = member.make("read", { builtinTier: "viewer" });
+const Read = member.make("read", { builtinTier: "member" });
 const Remove = member.make("remove", { builtinTier: "administrator" });
 ```
 
 `PermissionCatalog` validates and freezes the registered definitions. Its
 `definitions` array supplies `BuiltinRoles.make`, which constructs cumulative
-Viewer, Administrator, and Owner records for one workspace. Workspace initialization
+Member, Administrator, and Owner records for one workspace. Workspace initialization
 records all three roles and one workspace-scoped Owner assignment for its creator.
 The reserved role IDs are stable within each workspace; display names are labels.
 
@@ -265,8 +265,11 @@ records the names and permissions that differ, then the revision. It leaves a wo
 same or a later revision alone, so an older host never reverts it. The gateway runs it when it
 boots a workspace. A recorded permission the catalog does not declare, retired or added by a newer
 host, grants nothing, since no requirement can name it, and its holder's other grants stand;
-`Delegation` still loads the roles that record it. Bundle revision 3 adds `group.rename` for
-administrators and owners, and revision 4 adds `group.join` for every role. `AssignmentApplication` provides listing, assignment,
+`Delegation` still loads the roles that record it. Bundle revision 1 is the current bundles:
+Member takes part in conversations and creates, renames, joins, and manages the groups it belongs
+to; Administrator adds people management, invitations, role changes, and `group.moderate` for
+public groups; Owner adds workspace rename and ownership transfer. No role reaches a group from
+outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentApplication` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
 clients can offer just the actions the member may take. `Delegation` supplies the shared

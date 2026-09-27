@@ -99,16 +99,19 @@ export const gateway = (harness: Harness) => {
                   scope: { _tag: "Workspace", workspaceId: workspace.id },
                 },
               ]);
-              expect(yield* bound.roles.get(BuiltinRoles.ViewerId)).toEqual(
+              expect(yield* bound.roles.get(BuiltinRoles.MemberId)).toEqual(
                 Option.some({
-                  id: BuiltinRoles.ViewerId,
+                  id: BuiltinRoles.MemberId,
                   workspaceId: workspace.id,
-                  name: "Viewer",
+                  name: "Member",
                   permissions: [
                     MemberPermissions.Read.name,
                     AssignmentPermissions.Read.name,
+                    GroupPermissions.Create.name,
                     GroupPermissions.Read.name,
                     GroupPermissions.Follow.name,
+                    GroupPermissions.Rename.name,
+                    GroupMembershipPermissions.Manage.name,
                     GroupMembershipPermissions.Join.name,
                     ThreadPermissions.Start.name,
                     ThreadPermissions.Read.name,
@@ -139,6 +142,7 @@ export const gateway = (harness: Harness) => {
                       GroupPermissions.Read.name,
                       GroupPermissions.Follow.name,
                       GroupPermissions.Rename.name,
+                      GroupPermissions.Moderate.name,
                       GroupMembershipPermissions.Manage.name,
                       GroupMembershipPermissions.Join.name,
                       ThreadPermissions.Start.name,
@@ -198,7 +202,7 @@ export const gateway = (harness: Harness) => {
                     invitations.issue({
                       recipientId: bob.id,
                       expiresAt,
-                      roleId: BuiltinRoles.ViewerId,
+                      roleId: BuiltinRoles.MemberId,
                     }),
                   ),
                 );
@@ -285,7 +289,7 @@ export const gateway = (harness: Harness) => {
           expect(accepted.map((assignment) => assignment.source)).toEqual([
             {
               _tag: "Role",
-              roleId: BuiltinRoles.ViewerId,
+              roleId: BuiltinRoles.MemberId,
               scope: { _tag: "Workspace", workspaceId: outcome.a.id },
             },
           ]);

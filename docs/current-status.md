@@ -33,9 +33,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 
 HTTP exposes sign-in, workspace creation and the directory, members, invitations, assignments, ownership,
 the notification inbox, its sources and acknowledgment, groups, threads, replies, following, read
-state, the change feed, and typing. The management reads of groups the caller does not belong to,
-`GroupApplication.getForManagement` and `GroupMembershipApplication.listCurrentForManagement`, are
-available through core and the gateway only.
+state, the change feed, and typing. No operation reaches a group from outside it, so there is no
+workspace-wide oversight of private groups or direct groups by design.
 
 ## Conversations in the apps
 
@@ -62,28 +61,29 @@ invitation, suggesting one from an email address, and the account menu changes i
 member names only themselves: nobody renames another member, and agents, which join through no
 app flow, have no way to be named from the apps. There are no profile photos.
 
-A reader who may create groups (owners and administrators, by `group.create`) gets a "New group"
-action on the sidebar's Groups heading: a dialog names a team group, picks its people and agents
+Everyone gets a "New group" action on the sidebar's Groups heading (every role holds
+`group.create`): a dialog names a team group, picks its people and agents
 as chips, with the reader always included, and makes it private or public, then opens the new
 group. Everyone gets "Browse groups" in the same section, a page listing the public groups they may
 join by name with their member counts; joining one opens it, and one they belong to links there.
 New public groups appear on it live, while renames and member counts of groups the reader is not
-in update when it next loads. Viewers are not offered New group; the apps read what the reader may
-do from `GET /workspaces/:id/permissions`, which lists workspace-wide permissions only.
+in update when it next loads. The apps read what the reader may do from
+`GET /workspaces/:id/permissions`, which lists workspace-wide permissions only.
 
 A group's header shows its member count, which opens its members: the reader first, then everyone
-by name. Where the reader manages the group, flagged `manageable` on each item of their groups list,
-they add people and agents with the chip picker and remove members after a confirming second
-click; anyone may leave a team group the same way, which returns them to the workspace home.
-Direct groups list their members without changes. Members of groups the reader does not belong to
-cannot be managed from the apps, since the management reads have no HTTP route. After leaving, the
+by name. Any member of a team group adds people and agents with the chip picker (`manageable` on
+each item of their groups list); in a private group any member also removes others after a
+confirming second click, while in a public one only administrators and the owner do
+(`membersRemovable`). Anyone may leave a team group the same way, which returns them to the
+workspace home. Direct groups list their members without changes. Nobody manages a group they are
+not in: administrators moderate a public group by joining it. After leaving, the
 reader's pending notifications from the group stay in the inbox, and in its count, as
 notifications whose thread they can no longer see. A stream or thread open when the reader loses
 access, from any session, turns into an unavailable state rather than showing what it last read,
 and comes back if access returns.
 
-A team group's name has a quiet "Rename" beside it on its page for readers with `group.rename`
-(administrators and owners by default), opening a dialog focused on the current name. The new name
+A team group's name has a quiet "Rename" beside it on its page for its members (every role holds
+`group.rename`), opening a dialog focused on the current name. The new name
 shows in the header, sidebar, and composer, and reaches other members over the change feed. A
 rename made elsewhere while the dialog is open refuses the save and names the new name; saving
 again replaces it knowingly.

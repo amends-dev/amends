@@ -828,7 +828,7 @@ export const notifications = (harness: Harness) => {
             const join = Effect.gen(function* () {
               const invitation = yield* invite(workspace.id, alice, {
                 recipientId: bob.id,
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
                 expiresAt: yield* future,
               });
               return yield* acceptInvitation(workspace.id, bob.id, invitation.details.id);

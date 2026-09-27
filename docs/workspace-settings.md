@@ -5,7 +5,7 @@ entry redirects to Workspace; `?member=:memberId` selects a member. Links preser
 browser/hash history. Apps compose shared pieces without styles.
 
 - **Workspace:** rename, creation attribution, current owner, and confirmed ownership
-  transfer. The three roles are Viewer, Administrator, and Owner. Transfer makes the
+  transfer. The three roles are Member, Administrator, and Owner. Transfer makes the
   former owner an Administrator; ordinary role editing never assigns Owner.
 - **Members:** active/removed lists and responsive details. Backend flags control
   role editing and removal. The access summary includes separate assignments;

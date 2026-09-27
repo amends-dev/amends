@@ -509,8 +509,8 @@ export const LosingAccess = {
     await expect(canvas.queryByRole("region", { name: "Thread messages" })).toBeNull();
     await expect(canvas.queryByRole("button", { name: /^(Follow|Unfollow)$/ })).toBeNull();
     await waitFor(() => expect(canvas.queryByRole("button", { name: /members$/ })).toBeNull());
-    // Access back, both show again.
-    await userEvent.click(canvas.getByRole("button", { name: "Rejoin elsewhere as owner" }));
+    // The member, still in the group, adds the owner back, and both show again.
+    await userEvent.click(canvas.getByRole("button", { name: "Add owner back as member" }));
     await canvas.findByRole("region", { name: "Design" }, { timeout: 10000 });
     await canvas.findByRole("region", { name: "Thread messages" }, { timeout: 10000 });
     await canvas.findByRole("button", { name: "2 members" }, { timeout: 10000 });

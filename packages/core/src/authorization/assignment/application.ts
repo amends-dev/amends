@@ -133,7 +133,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   const choices = Effect.gen(function* () {
     yield* authorization.require([]);
     return yield* Effect.forEach(
-      [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId],
+      [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId],
       (id) =>
         Effect.gen(function* () {
           const role = yield* delegation.loadRole(id);

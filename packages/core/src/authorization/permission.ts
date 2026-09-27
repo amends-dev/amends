@@ -10,7 +10,7 @@ export const Reference = Schema.Struct({ name: Name, targetKind: Target.Kind });
 export interface Reference extends Schema.Schema.Type<typeof Reference> {}
 
 /** The lowest built-in role that includes a permission. Never an authorization rank. */
-export const BuiltinTier = Schema.Literals(["viewer", "administrator", "owner"]);
+export const BuiltinTier = Schema.Literals(["member", "administrator", "owner"]);
 export type BuiltinTier = typeof BuiltinTier.Type;
 
 /** A domain-owned action with an explicit placement in the built-in role bundles. */

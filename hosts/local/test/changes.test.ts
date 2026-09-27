@@ -97,7 +97,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               params: { workspaceId },
               payload: {
                 recipientId: Identity.HumanId.make(recipientId),
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
                 expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), {
                   days: 1,
                 }),
@@ -234,7 +234,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           params: { workspaceId: workspace.id },
           payload: {
             recipientId: Identity.HumanId.make("bob"),
-            roleId: BuiltinRoles.ViewerId,
+            roleId: BuiltinRoles.MemberId,
             expiresAt: DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"),
           },
         });
@@ -342,7 +342,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             params: { workspaceId: workspace.id },
             payload: {
               recipientId: Identity.HumanId.make(id),
-              roleId: BuiltinRoles.ViewerId,
+              roleId: BuiltinRoles.MemberId,
               expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), { days: 1 }),
             },
           });

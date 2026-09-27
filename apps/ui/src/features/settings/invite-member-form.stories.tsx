@@ -14,7 +14,7 @@ function Specimen(props: { theme?: "cotton" | "soot"; pending?: boolean }) {
           recipient={recipient()}
           role={role()}
           roles={[
-            { value: "viewer", label: "Viewer" },
+            { value: "member", label: "Member" },
             { value: "administrator", label: "Administrator" },
           ]}
           onRecipientChange={setRecipient}

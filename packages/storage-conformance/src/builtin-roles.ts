@@ -32,7 +32,7 @@ import {
   workspaceId,
 } from "./support.ts";
 
-const roleIds = [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
+const roleIds = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
 const current = BuiltinRoles.make(workspaceId, Core.permissions);
 /** The next revision's declarations: member removal becomes a viewer's, agent use nobody's. */
 const next: BuiltinRoleUpgrade.Target = {
@@ -41,7 +41,7 @@ const next: BuiltinRoleUpgrade.Target = {
     if (permission.name === AgentPermissions.Use.name) return [];
     return [
       permission.name === MemberPermissions.Remove.name
-        ? Object.assign({}, permission, { builtinTier: "viewer" as const })
+        ? Object.assign({}, permission, { builtinTier: "member" as const })
         : permission,
     ];
   }),
@@ -52,7 +52,7 @@ const later: BuiltinRoleUpgrade.Target = {
   definitions: [
     ...Core.permissions,
     Permission.makeGroup("later", { targetKind: "Workspace" }).make("feature", {
-      builtinTier: "viewer",
+      builtinTier: "member",
     }),
   ],
 };
@@ -253,7 +253,7 @@ export const builtinRoles = (harness: Harness) => {
                 const choices = yield* (yield* AssignmentApplication.Service).roles;
                 const invitation = yield* (yield* InvitationApplication.Service).issue({
                   recipientId: Identity.HumanId.make("recipient"),
-                  roleId: BuiltinRoles.ViewerId,
+                  roleId: BuiltinRoles.MemberId,
                   expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
                 });
                 return [choices, invitation] as const;
@@ -264,7 +264,7 @@ export const builtinRoles = (harness: Harness) => {
             BuiltinRoles.make(workspaceId, later.definitions),
           );
           expect(invitation).toMatchObject({
-            details: { roleId: BuiltinRoles.ViewerId },
+            details: { roleId: BuiltinRoles.MemberId },
             state: { _tag: "Pending" },
           });
         }),

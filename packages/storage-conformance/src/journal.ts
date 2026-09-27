@@ -158,7 +158,7 @@ export const journal = (harness: Harness) => {
                 .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
             ).pipe(Effect.provide(core(bound)));
             const roleIds = [
-              BuiltinRoles.ViewerId,
+              BuiltinRoles.MemberId,
               BuiltinRoles.AdministratorId,
               BuiltinRoles.OwnerId,
             ];
@@ -278,7 +278,7 @@ export const journal = (harness: Harness) => {
                 workspace: yield* bound.workspace.get,
                 members: byId(yield* bound.members.list),
                 roles: yield* Effect.forEach(
-                  [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId],
+                  [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId],
                   (id) => bound.roles.get(id),
                 ),
                 assignments: yield* Effect.forEach(actors, (actor) =>

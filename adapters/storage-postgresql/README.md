@@ -170,8 +170,8 @@ specific admission through a conditional status update; readmission uses a fresh
 removal lists and settles active group admissions within the same transaction. Departure tests
 cover attribution, stale requests, partial-cleanup rollback, replay, and concurrent departure
 and admission/removal races. Departure reuses the existing schema baseline.
-Authorized group reads also reuse these stores: ordinary reads require audience membership
-and `group.read`; explicit management reads inspect a known group under its management grant.
+Authorized group reads also reuse these stores: reads require audience membership and
+`group.read`, and no read reaches a group from outside it.
 The read suite verifies permission and audience separation, current rosters, staged changes,
 revocation, and reads without opening transactions. `builtin_role_revisions` holds the built-in
 bundle revision of each workspace's roles, which an upsert only moves forward.

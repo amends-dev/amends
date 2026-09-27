@@ -97,8 +97,13 @@ export const ListItem = Schema.Struct({
   newActivity: Schema.Boolean,
   following: Schema.Boolean,
   pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  /** The reader may add and remove the group's members: a team group they manage. */
+  /** The reader may add people to the group: a team group they may manage. */
   manageable: Schema.Boolean,
+  /**
+   * The reader may remove others from the group: any member of a private group they may manage,
+   * and moderators of a public one.
+   */
+  membersRemovable: Schema.Boolean,
   /** The reader may rename the group: a team group whose name they may change. */
   renamable: Schema.Boolean,
 });

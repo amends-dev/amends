@@ -165,7 +165,7 @@ export const invitations = (harness: Harness) => {
                   const freshInvite = yield* Operations.invite(workspace.id, alice, {
                     recipientId: bob.id,
                     expiresAt: yield* future,
-                    roleId: BuiltinRoles.ViewerId,
+                    roleId: BuiltinRoles.MemberId,
                   });
                   const rejoined = yield* Operations.acceptInvitation(
                     workspace.id,
@@ -295,7 +295,7 @@ export const invitations = (harness: Harness) => {
             const bound = yield* boundTo(workspaceId);
             const workspace = yield* initialized(bound);
             const issuedAt = yield* DateTime.now;
-            const details = (id: string, roleId = BuiltinRoles.ViewerId): Invitation.Issuance => ({
+            const details = (id: string, roleId = BuiltinRoles.MemberId): Invitation.Issuance => ({
               id: Invitation.Id.make(id),
               workspaceId,
               recipientId: bob.id,
@@ -306,7 +306,7 @@ export const invitations = (harness: Harness) => {
             });
             const memberId = Member.Id.make("joined");
             const settledAt = DateTime.add(issuedAt, { minutes: 5 });
-            const pending = (id: string, roleId = BuiltinRoles.ViewerId): Invitation.Record => ({
+            const pending = (id: string, roleId = BuiltinRoles.MemberId): Invitation.Record => ({
               details: details(id, roleId),
               state: { _tag: "Pending" },
             });

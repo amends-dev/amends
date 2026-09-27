@@ -4,12 +4,12 @@ import { Permission } from "../permission.ts";
 import { Role } from "./role.ts";
 
 /** Reserved identities, scoped by the role's workspace. Display names are not identities. */
-export const ViewerId = Role.Id.make("builtin:viewer");
+export const MemberId = Role.Id.make("builtin:member");
 export const AdministratorId = Role.Id.make("builtin:administrator");
 export const OwnerId = Role.Id.make("builtin:owner");
 
 const roles = [
-  { id: ViewerId, name: "Viewer", tier: "viewer" },
+  { id: MemberId, name: "Member", tier: "member" },
   { id: AdministratorId, name: "Administrator", tier: "administrator" },
   { id: OwnerId, name: "Owner", tier: "owner" },
 ] as const;
@@ -23,7 +23,7 @@ export const Revision = Schema.Int.check(Schema.isGreaterThan(0));
  * workspace recorded at an older revision is upgraded when a host loads it, and one at a newer
  * revision is left alone, so an older host never reverts it. A test pins each revision's bundles.
  */
-export const revision = 4;
+export const revision = 1;
 
 /** Display label for a built-in identity, including invitations before membership exists. */
 export const nameOf = (roleId: Role.Id): string =>
@@ -31,7 +31,7 @@ export const nameOf = (roleId: Role.Id): string =>
 
 // Ordering is local to bundle construction. Access checks use stored permissions and scopes.
 const order: Readonly<Record<Permission.BuiltinTier, number>> = {
-  viewer: 0,
+  member: 0,
   administrator: 1,
   owner: 2,
 };

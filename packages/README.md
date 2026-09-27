@@ -109,12 +109,12 @@ activity; unfollow ends one participation while retaining group access. Its auth
 reads provide group discovery, metadata, timeline pages, and current participant summaries,
 with group audience and `thread.read` checked independently of participation. Agent-use permission
 is declared in the agent domain; execution remains future work.
-The group surface supplies private team creation, authorized reads, an internal audience check,
-and membership admission/departure, with
-separate creation and Group-scoped membership-management permissions. Self-leave needs no
-management grant; workspace removal also settles group admissions. Ordinary group reads require
-membership and `group.read`; separate management reads expose known-group metadata and current
-admissions under `group.membership.manage`. The notification surface includes its record, store contract,
+The group surface supplies team creation, private or public, authorized reads, public discovery
+and joining, an internal audience check, and membership admission/departure, with separate
+creation and Group-scoped membership-management permissions. Every group operation but joining a
+public group requires membership of the group as well as its grant, so no role reaches a group from
+outside it. Self-leave needs no management grant; workspace removal also settles group
+admissions. The notification surface includes its record, store contract,
 authorized inbox and source reads, human acknowledgment, activity-driven generation, and pending-agent-input settlement.
 Notification reads derive the recipient from the current actor and require active membership.
 `NotificationApplication.resolveSource` returns a typed timeline item after ownership, historical

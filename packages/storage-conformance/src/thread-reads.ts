@@ -272,7 +272,7 @@ export const threadReads = (harness: Harness) => {
                     memberId: readerId,
                     source: {
                       _tag: "Role",
-                      roleId: BuiltinRoles.ViewerId,
+                      roleId: BuiltinRoles.MemberId,
                       scope: { _tag: "Workspace", workspaceId },
                     },
                   }),

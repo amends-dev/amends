@@ -683,6 +683,7 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
           following: false,
           pending: 0,
           manageable: true,
+          membersRemovable: true,
           renamable: true,
         },
       ]);
@@ -741,7 +742,11 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
     </ClientProvider>
   ));
   await waitFor(() => expect(members.own()?.id).toBe("a1"));
-  expect([members.manageable(), members.leavable()]).toEqual([true, true]);
+  expect([members.manageable(), members.membersRemovable(), members.leavable()]).toEqual([
+    true,
+    true,
+    true,
+  ]);
   members.add(["cho-one", "kit-one"]);
   expect(members.changing()).toBe("add");
   await waitFor(() => expect(events).toEqual(["added"]));
@@ -845,6 +850,7 @@ it("renames a group it may rename, from the name it started from, saving only a 
           following: false,
           pending: 0,
           manageable: true,
+          membersRemovable: true,
           renamable: true,
         },
       ]);
@@ -1137,6 +1143,7 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
           following,
           pending: 0,
           manageable: true,
+          membersRemovable: true,
           renamable: true,
         },
       ]);

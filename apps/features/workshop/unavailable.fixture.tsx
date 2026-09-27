@@ -43,7 +43,7 @@ export function UnavailableFixture(props: {
           owner.token,
           {
             recipientId: member.humanId,
-            roleId: "builtin:viewer",
+            roleId: "builtin:member",
             expiresAt: new Date(Date.now() + 86400000).toISOString(),
           },
         );

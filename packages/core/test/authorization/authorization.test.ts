@@ -438,7 +438,7 @@ it.effect("requirements are validated against canonical permission definitions",
     yield* seed(fixture, [alice], [direct("remove", alice.memberId, MemberPermissions.Remove)]);
     const unregistered = Permission.make("member.unregistered", {
       targetKind: "Member",
-      builtinTier: "viewer",
+      builtinTier: "member",
     });
     expect(
       yield* run(fixture, Effect.flip(check([Requirement.make(unregistered, bobTarget)]))),

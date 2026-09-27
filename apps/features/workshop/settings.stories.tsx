@@ -20,7 +20,7 @@ const control = async (canvasElement: HTMLElement, command: string) => {
 export const Workspace = {} satisfies Story;
 export const Members = { args: { section: "members" } } satisfies Story;
 export const Invites = { args: { section: "invites" } } satisfies Story;
-export const Viewer = { args: { as: "Viewer" } } satisfies Story;
+export const Member = { args: { as: "Member" } } satisfies Story;
 export const Soot = { args: { theme: "soot", section: "members" } } satisfies Story;
 export const Rename = {
   play: async ({ canvasElement }) => {
@@ -38,7 +38,7 @@ export const Rename = {
   },
 } satisfies Story;
 export const ReadOnly = {
-  args: { as: "Viewer" },
+  args: { as: "Member" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText(
@@ -62,7 +62,7 @@ export const InviteAndJoin = {
       "new@example.test",
     );
     await userEvent.click(canvas.getByRole("button", { name: /^Role / }));
-    await userEvent.click(within(document.body).getByRole("option", { name: "Viewer" }));
+    await userEvent.click(within(document.body).getByRole("option", { name: "Member" }));
     await userEvent.click(canvas.getByRole("button", { name: "Create invitation" }));
     await canvas.findByText("Saved.");
     await userEvent.click(canvas.getByRole("button", { name: "Act as Recipient" }));
@@ -85,7 +85,7 @@ export const ChangeRole = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole("link", { name: /viewer@example.test/ }, { timeout: 15000 }),
+      await canvas.findByRole("link", { name: /member@example.test/ }, { timeout: 15000 }),
     );
     await userEvent.click(canvas.getByRole("button", { name: /^Workspace role / }));
     await userEvent.click(within(document.body).getByRole("option", { name: "Administrator" }));
@@ -101,7 +101,7 @@ export const RemoveMember = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole("link", { name: /viewer@example.test/ }, { timeout: 15000 }),
+      await canvas.findByRole("link", { name: /member@example.test/ }, { timeout: 15000 }),
     );
     await userEvent.click(canvas.getByRole("button", { name: "Remove member" }));
     await userEvent.click(within(document.body).getByRole("button", { name: "Confirm removal" }));
@@ -119,7 +119,7 @@ export const TransferOwner = {
     );
     const body = within(document.body);
     await userEvent.click(body.getByRole("button", { name: /^New owner / }));
-    await userEvent.click(body.getByRole("option", { name: "viewer@example.test" }));
+    await userEvent.click(body.getByRole("option", { name: "member@example.test" }));
     await userEvent.click(body.getByRole("button", { name: "Confirm transfer" }));
     await canvas.findByText("Only an authorized owner can rename this workspace.");
     await expect(
@@ -185,7 +185,7 @@ export const LostInvitationResponse = {
       "new@example.test",
     );
     await userEvent.click(canvas.getByRole("button", { name: /^Role / }));
-    await userEvent.click(within(document.body).getByRole("option", { name: "Viewer" }));
+    await userEvent.click(within(document.body).getByRole("option", { name: "Member" }));
     const url =
       canvasElement.querySelector<HTMLElement>("[data-scenario-url]")?.dataset.scenarioUrl;
     const response = await fetch(`${url}/control`, {

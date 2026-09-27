@@ -539,7 +539,7 @@ export const threadParticipation = (harness: Harness) => {
                     memberId: humanId,
                     source: {
                       _tag: "Role",
-                      roleId: BuiltinRoles.ViewerId,
+                      roleId: BuiltinRoles.MemberId,
                       scope: { _tag: "Workspace", workspaceId },
                     },
                   }),
@@ -551,7 +551,7 @@ export const threadParticipation = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (j) =>
                   j.publish(RoleFacts.PermissionsChanged, {
                     workspaceId,
-                    roleId: BuiltinRoles.ViewerId,
+                    roleId: BuiltinRoles.MemberId,
                     permissions: [],
                   }),
                 ),

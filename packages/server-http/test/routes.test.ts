@@ -93,7 +93,6 @@ const conversations = Layer.mergeAll(
       get: record("group.get", (id) => Effect.fail(new GroupApplication.NotFound({ groupId: id }))),
       listMine: record("group.listMine", () => Effect.succeed([])),
       listPublic: record("group.listPublic", () => Effect.succeed([])),
-      getForManagement: () => Effect.die("unused"),
     }),
   ),
   Layer.succeed(
@@ -113,7 +112,6 @@ const conversations = Layer.mergeAll(
         Effect.fail(new GroupMembershipApplication.AlreadyRemoved(input)),
       ),
       listCurrent: record("group.members", () => Effect.succeed([])),
-      listCurrentForManagement: () => Effect.die("unused"),
     }),
   ),
   Layer.succeed(
@@ -536,7 +534,7 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
         payload: {
           recipientId: Identity.HumanId.make("bob"),
           expiresAt,
-          roleId: BuiltinRoles.ViewerId,
+          roleId: BuiltinRoles.MemberId,
         },
       }),
     );
@@ -550,7 +548,7 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
       arguments: [
         {
           recipientId: "bob",
-          roleId: BuiltinRoles.ViewerId,
+          roleId: BuiltinRoles.MemberId,
         },
         { requestKey: "issue-1" },
       ],

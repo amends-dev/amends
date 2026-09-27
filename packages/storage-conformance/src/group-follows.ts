@@ -103,7 +103,7 @@ export const groupFollows = (harness: Harness) => {
                       memberId,
                       source: {
                         _tag: "Role",
-                        roleId: BuiltinRoles.ViewerId,
+                        roleId: BuiltinRoles.MemberId,
                         scope: { _tag: "Workspace", workspaceId },
                       },
                     })

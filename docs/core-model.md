@@ -657,7 +657,7 @@ and detailed membership lifecycle states are refined below for the first human a
 An invitation identifies a human, its issuing member, a required built-in role,
 and an expiry time. Issuance and revocation require invitation management and
 assignment management permissions. Shared delegation policy allows the current owner
-to delegate Viewer or Administrator, while other administrators can delegate Viewer.
+to delegate Member or Administrator, while other administrators can delegate Member.
 Owner is reserved for initialization and the ownership-transfer workflow.
 
 Acceptance receives a trusted authenticated human identity, checks recipient and
@@ -672,7 +672,7 @@ member ID. Role permissions remain live through the referenced role.
 Assignment and revocation require explicit management authority. Assigning roles is
 additive. Replacing a workspace role is a dedicated atomic operation that checks
 the previous assignment IDs to reject stale changes. The owner can manage
-administrators; other administrators can manage Viewer-only or unassigned members.
+administrators; other administrators can manage Member-only or unassigned members.
 Member removal enforces the same recipient restrictions. Authorized non-owners may
 still leave, and the current owner cannot be removed or have their access changed
 through ordinary assignment operations.
@@ -734,8 +734,8 @@ are assigned or changed; it does not infer unlimited grant authority from agent 
 
 ### Built-in roles are constructed from explicit permission tiers
 
-Each permission declares its minimum built-in role through `builtinTier`: `viewer`,
-`administrator`, or `owner`. Viewer includes viewer-tier permissions, Administrator
+Each permission declares its minimum built-in role through `builtinTier`: `member`,
+`administrator`, or `owner`. Member includes member-tier permissions, Administrator
 also includes administrator-tier permissions, and Owner includes all three tiers.
 Classification is required for each action, including actions declared through a
 permission group. It is never inferred from the action's name.
@@ -2357,25 +2357,31 @@ groups for one channel remain possible later.
 
 ### Group permissions govern creation and membership management
 
-| Requested action                                   | Who can perform it                                                        |
-| -------------------------------------------------- | ------------------------------------------------------------------------- |
-| Create a team group and select its initial members | Members with group-creation permission in the workspace.                  |
-| Start a direct group with other active members     | Any active workspace member, with agent-use authority when applicable.    |
-| Add a member to an existing group                  | Members with the required membership-management permission for the group. |
-| Remove another member from a group                 | Members with the required membership-management permission for the group. |
-| Leave one's own team-group membership              | Any current team-group member with active workspace membership.           |
-| Follow a team group, joining its new threads       | Any current group member with `group.follow`, for themselves.             |
-| Make an agent follow a team group                  | A current group member with agent-use authority for that agent.           |
+Agreed: a group belongs to its members, and no workspace role reaches it from outside. Neither
+administrators nor the owner can see, read, rename, join, or manage a private group or a direct
+group they are not in, so a private conversation stays between the people in it. Administrators
+moderate public groups, removing people, from inside them. Every group operation except joining a
+public group requires membership of the group as well as its permission.
+
+| Requested action                                   | Who can perform it                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Create a team group and select its initial members | Members with group-creation permission in the workspace: every built-in role.   |
+| Start a direct group with other active members     | Any active workspace member, with agent-use authority when applicable.          |
+| Join a public team group                           | Members with `group.join` on it.                                                |
+| Add a member to an existing team group             | Members of the group with the membership-management permission.                 |
+| Remove another member from a private team group    | Members of the group with the membership-management permission.                 |
+| Remove another member from a public team group     | Members of the group who also hold `group.moderate`: administrators and owners. |
+| Leave one's own team-group membership              | Any current team-group member with active workspace membership.                 |
+| Follow a team group, joining its new threads       | Any current group member with `group.follow`, for themselves.                   |
+| Make an agent follow a team group                  | A current group member with agent-use authority for that agent.                 |
 
 Application operations check the required permission and its workspace or group target;
-they do not compare role names. Team-group creation uses `group.create` on the workspace.
-Its initial `administrator` built-in tier places it in the Administrator and Owner bundles;
-that placement is a default bundle choice, not a restriction on who may hold the permission.
-Another role, including a future role between Viewer and Administrator, or a direct grant
-can authorize the same operation. Holding an Administrator role without the permission does
-not authorize it. Adding a member to an existing group requires `group.membership.manage`
-on that Group target. Its default tier is also `administrator`, and any role or direct
-grant can provide it. That permission is independent of `group.create` and group membership.
+they do not compare role names. Team-group creation uses `group.create` on the workspace, in
+every built-in role. Bundle placement is a default choice, not a restriction on who may hold a
+permission: another role or a direct grant can authorize the same operation, and holding a role
+without the permission does not. Adding a member to an existing group requires
+`group.membership.manage` on that Group target, also in every built-in role, and membership of
+the group; no grant substitutes for that membership.
 
 Group creation records a private team group and an explicit list of initial memberships
 atomically. Its creation permission covers that requested audience without a second
@@ -2391,7 +2397,7 @@ or reusing the group for that exact member set; it does not require the permissi
 team groups or manage arbitrary group memberships. The group domain still owns creation
 and validates its invariants when called from that workflow. Nothing authorizes changing an
 existing direct group's members. Establishing the group needs no permission; opening its thread
-requires `thread.start` on it, as every thread start does, and the default Viewer bundle grants
+requires `thread.start` on it, as every thread start does, and the default Member bundle grants
 that across the workspace.
 
 Leaving is a self-service operation bounded to the acting member's own current team-group
@@ -2409,26 +2415,21 @@ returns `AlreadyRemoved`; a later authorized addition creates a new admission ID
 departure request cannot affect. These operations and workspace-removal cleanup are implemented
 in core and the storage adapters; their group HTTP/UI surface remains future work.
 
-Membership management concerns the group's membership, rather than access to its thread
-content. A member's management permission authorizes the metadata needed for that
-operation even when that member does not participate in the group. Reading its
-conversations still requires inclusion in the audience and the applicable action permission.
-A member with the required management permission can explicitly add themselves when the group's admission rules permit it;
-that recorded membership change supplies access. A direct group's fixed membership is outside
-membership management; management authority does not add or remove its members.
+Membership management happens from inside the group: management authority never lets someone
+outside a group add themselves, since joining would expose the group's whole history. The one way
+in from outside is joining a public group, which anyone may find. A direct group's fixed
+membership is outside membership management; management authority does not add or remove its
+members.
 
 For implemented private team groups, ordinary metadata and current-roster reads require
 `group.read` on the group as well as current workspace and group membership. The permission
-is included in new Viewer and higher-tier bundles; role names themselves confer no authority.
+is included in every built-in bundle; role names themselves confer no authority.
 `GroupApplication.listMine` includes only current readable memberships. `get` and
 `GroupMembershipApplication.listCurrent` return metadata and active admission records,
 without exposing historical admissions or member profiles. Missing and outside-audience
 groups share the same not-found outcome.
 
-Separate `getForManagement` and `listCurrentForManagement` methods inspect a known group's
-metadata and current roster under `group.membership.manage`, even without audience membership
-or `group.read`. These methods do not supply group discovery or conversation access.
-The shared `GroupAudience.require` policy verifies active workspace and group membership
+There is no management read of a group from outside it. The shared `GroupAudience.require` policy verifies active workspace and group membership
 without a management bypass; callers check their action permission separately. It opens no
 transaction, honors a caller's staged changes, and must run inside the commit for future
 thread writes. Current read operations do not promise a shared snapshot.

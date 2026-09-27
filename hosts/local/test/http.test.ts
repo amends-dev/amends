@@ -58,7 +58,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(yield* reused.json).toMatchObject({ _tag: "Request.Reused" });
         const invitation = {
           recipientId: "bob",
-          roleId: BuiltinRoles.ViewerId,
+          roleId: BuiltinRoles.MemberId,
           expiresAt: "2036-09-20T12:00:00.000Z",
         };
         const path = `/workspaces/${workspace.id}/invitations`;
@@ -94,7 +94,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: {
                 recipientId: bob,
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
               },
             });
             const invitationParams = {
@@ -121,7 +121,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 payload: {
                   recipientId: Identity.HumanId.make("charlie"),
                   expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-                  roleId: BuiltinRoles.ViewerId,
+                  roleId: BuiltinRoles.MemberId,
                 },
               }),
             );
@@ -238,7 +238,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: {
                 recipientId: session.humanId,
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
               },
             });
             const after = yield* client.me.workspaces();

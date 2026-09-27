@@ -87,7 +87,7 @@ export function ConversationsFixture(props: {
       const path = `/workspaces/${workspace.id}`;
       const invitation = await api(scenario, `${path}/invitations`, owner.token, {
         recipientId: member.humanId,
-        roleId: "builtin:viewer",
+        roleId: "builtin:member",
         expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
       });
       const joined = await api(
@@ -101,7 +101,7 @@ export function ConversationsFixture(props: {
         const third = await signIn(scenario, "third@example.test");
         const invited = await api(scenario, `${path}/invitations`, owner.token, {
           recipientId: third.humanId,
-          roleId: "builtin:viewer",
+          roleId: "builtin:member",
           expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
         });
         await api(scenario, `${path}/invitations/${invited.details.id}/accept`, third.token, {});
@@ -214,14 +214,17 @@ export function ConversationsFixture(props: {
       ).catch((cause) => setError(String(cause)));
     }, 1000);
   };
-  /** The owner, who manages the workspace's groups, adds themselves back from another session. */
-  const rejoinElsewhere = () => {
+  /**
+   * The member, still in the group, adds the owner back from their own session: no one outside a
+   * private group, the owner included, can get into it themselves.
+   */
+  const addOwnerBack = () => {
     const value = setup();
     if (!value) return;
     void api(
       value.scenario,
       `/workspaces/${value.workspaceId}/groups/${value.groupId}/members`,
-      value.owner.token,
+      value.member.token,
       { memberId: value.ownerMemberId },
     ).catch((cause) => setError(String(cause)));
   };
@@ -333,8 +336,8 @@ export function ConversationsFixture(props: {
                         <Button variant="secondary" onClick={renameSoon}>
                           Rename elsewhere soon as owner
                         </Button>
-                        <Button variant="secondary" onClick={rejoinElsewhere}>
-                          Rejoin elsewhere as owner
+                        <Button variant="secondary" onClick={addOwnerBack}>
+                          Add owner back as member
                         </Button>
                       </Row>
                     </Shell.Header>

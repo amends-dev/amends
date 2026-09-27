@@ -13,8 +13,13 @@ export interface GroupMembersController {
   readonly roster: Accessor<ReadonlyArray<GroupMembership.Record> | undefined>;
   /** Why the latest roster read failed, such as the reader no longer belonging to the group. */
   readonly rosterFailure: Accessor<WorkspaceFailure | undefined>;
-  /** The reader may add and remove members: a team group they manage. */
+  /** The reader may add people: a team group they belong to and may manage. */
   readonly manageable: Accessor<boolean>;
+  /**
+   * The reader may remove others: any member of a private group they may manage, and moderators
+   * of a public one.
+   */
+  readonly membersRemovable: Accessor<boolean>;
   /** The reader's own admission, which leaving ends; direct groups cannot be left. */
   readonly own: Accessor<GroupMembership.Record | undefined>;
   /** The reader may leave: a team group they belong to. */
@@ -70,6 +75,7 @@ export function useGroupMembers(
     roster: roster.value,
     rosterFailure: roster.failure,
     manageable: () => item()?.manageable ?? false,
+    membersRemovable: () => item()?.membersRemovable ?? false,
     own,
     leavable: () => item()?.group.kind === "Team" && own() !== undefined,
     changing,

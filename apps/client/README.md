@@ -236,7 +236,8 @@ and saving refreshes the groups. It renames from the name `reset` started from, 
 meanwhile fails as `changed` and refreshes the groups; saving again renames from that name.
 
 `useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster, with
-`rosterFailure` when it can no longer be read, and the reader's own admission, says whether they may manage it (`manageable`) and leave it (`leavable`), and adds
+`rosterFailure` when it can no longer be read, and the reader's own admission, says whether they may add people (`manageable`), remove others (`membersRemovable`), and leave
+it (`leavable`), and adds
 several members, removes one, or leaves, one change at a time, with `changing` naming the change in
 flight. Each change refreshes the roster, stream, groups, and inbox; adding someone already added
 counts as added.

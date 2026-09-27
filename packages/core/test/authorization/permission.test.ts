@@ -11,7 +11,7 @@ import { Workspace } from "../../src/workspace/workspace.ts";
 
 it("permission groups preserve existing member definitions and their specific target kind", () => {
   expect(MemberPermissions.Read).toEqual(
-    Permission.make("member.read", { targetKind: "Member", builtinTier: "viewer" }),
+    Permission.make("member.read", { targetKind: "Member", builtinTier: "member" }),
   );
   expect(MemberPermissions.Remove).toEqual(
     Permission.make("member.remove", { targetKind: "Member", builtinTier: "administrator" }),
@@ -26,7 +26,7 @@ it("an action can target its workspace while other actions in the group keep the
     targetKind: "Workspace",
     builtinTier: "administrator",
   });
-  const read = member.make("read", { builtinTier: "viewer" });
+  const read = member.make("read", { builtinTier: "member" });
   expectTypeOf(created.targetKind).toEqualTypeOf<"Workspace">();
   expectTypeOf(read.targetKind).toEqualTypeOf<"Member">();
   expect(created).toEqual(
@@ -36,7 +36,7 @@ it("an action can target its workspace while other actions in the group keep the
     }),
   );
   expect(read).toEqual(
-    Permission.make("it.member.read", { targetKind: "Member", builtinTier: "viewer" }),
+    Permission.make("it.member.read", { targetKind: "Member", builtinTier: "member" }),
   );
 
   const workspaceId = Workspace.Id.make("workspace-1");
@@ -70,10 +70,10 @@ it("groups validate name components and both default and overridden target kinds
     Permission.makeGroup("it.member", { targetKind: "Unknown" });
   }).toThrow("Schema validation failed");
   const member = Permission.makeGroup("it.member", { targetKind: "Member" });
-  expect(() => member.make("", { builtinTier: "viewer" })).toThrow("Schema validation failed");
+  expect(() => member.make("", { builtinTier: "member" })).toThrow("Schema validation failed");
   expect(() => {
     // @ts-expect-error Unsupported target kinds are rejected for action overrides too.
-    member.make("read", { targetKind: "Unknown", builtinTier: "viewer" });
+    member.make("read", { targetKind: "Unknown", builtinTier: "member" });
   }).toThrow("Schema validation failed");
   expect(() => {
     // @ts-expect-error Every action must declare a tier.
@@ -85,7 +85,7 @@ it("group defaults are captured independently of the options object", () => {
   const options: { targetKind: Target.Kind } = { targetKind: "Member" };
   const member = Permission.makeGroup("it.member", options);
   options.targetKind = "Workspace";
-  expect(member.make("read", { builtinTier: "viewer" }).targetKind).toBe("Member");
+  expect(member.make("read", { builtinTier: "member" }).targetKind).toBe("Member");
 });
 
 it("permission tiers are mandatory and validated for direct and grouped declarations", () => {

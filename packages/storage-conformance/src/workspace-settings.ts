@@ -172,9 +172,9 @@ export const workspaceSettings = (harness: Harness) => {
               );
             });
             yield* join(bob.id, BuiltinRoles.AdministratorId);
-            yield* join(charlie.id, BuiltinRoles.ViewerId);
+            yield* join(charlie.id, BuiltinRoles.MemberId);
             yield* join(dave.id, BuiltinRoles.AdministratorId);
-            const removed = yield* join(erin.id, BuiltinRoles.ViewerId);
+            const removed = yield* join(erin.id, BuiltinRoles.MemberId);
             yield* Operations.removeMember(workspace.id, alice, removed.id);
             const summary = Effect.fnUntraced(function* (actor: Identity.MemberReference) {
               const entries = yield* listing(workspace.id, actor);
@@ -195,8 +195,8 @@ export const workspaceSettings = (harness: Harness) => {
                 ]),
               );
             });
-            const viewer = BuiltinRoles.ViewerId,
-              both = `${BuiltinRoles.ViewerId}+${BuiltinRoles.AdministratorId}`;
+            const viewer = BuiltinRoles.MemberId,
+              both = `${BuiltinRoles.MemberId}+${BuiltinRoles.AdministratorId}`;
             expect({
               owner: yield* summary(alice),
               administrator: yield* summary(bob),

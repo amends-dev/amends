@@ -69,8 +69,13 @@ export const groupReads = (harness: Harness) => {
       );
     const get = (id: Group.Id) =>
       Effect.flatMap(GroupApplication.Service, (service) => service.get(id));
-    const getForManagement = (id: Group.Id) =>
-      Effect.flatMap(GroupApplication.Service, (service) => service.getForManagement(id));
+    const rename = (id: Group.Id, name: string, expectedName: string) =>
+      Effect.flatMap(GroupApplication.Service, (service) =>
+        service.rename({ groupId: id, name, expectedName }),
+      );
+    const publicGroups = Effect.flatMap(GroupApplication.Service, (service) =>
+      service.listPublic({ limit: 100 }),
+    );
     /** The actor's readable groups as records; activity and following have their own tests. */
     const mine = Effect.flatMap(GroupApplication.Service, (service) =>
       Effect.map(service.listMine({ limit: 100 }), (items) => items.map((item) => item.group)),
@@ -79,9 +84,11 @@ export const groupReads = (harness: Harness) => {
       Effect.flatMap(GroupMembershipApplication.Service, (service) =>
         service.listCurrent(id, { limit: 100 }),
       );
-    const rosterForManagement = (id: Group.Id) =>
+    const join = (id: Group.Id) =>
+      Effect.flatMap(GroupMembershipApplication.Service, (service) => service.join(id));
+    const removeMember = (groupId: Group.Id, membershipId: GroupMembership.Id) =>
       Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.listCurrentForManagement(id, { limit: 100 }),
+        service.remove({ groupId, membershipId }),
       );
     const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(GroupApplication.Service, (service) =>
@@ -182,7 +189,7 @@ export const groupReads = (harness: Harness) => {
                     memberId: readerId,
                     source: {
                       _tag: "Role",
-                      roleId: BuiltinRoles.ViewerId,
+                      roleId: BuiltinRoles.MemberId,
                       scope: { _tag: "Workspace", workspaceId },
                     },
                   }),
@@ -246,39 +253,61 @@ export const groupReads = (harness: Harness) => {
     );
 
     it.effect(
-      "management reads inspect only known authorized targets and never establish ordinary read or audience access",
+      "no grant reaches a private or direct group from outside it: not the owner's, not a direct one",
       () =>
         harness.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
-              const { bound, reader, owner, first, second, hidden } = yield* prepare();
-              yield* grant(bound, readerId, GroupMembershipPermissions.Manage, hidden.id);
-              expect(yield* run(bound, reader, getForManagement(hidden.id))).toEqual(hidden);
-              expect(
-                (yield* run(bound, reader, rosterForManagement(hidden.id))).map(
-                  (value) => value.memberId,
-                ),
-              ).toEqual([otherId]);
-              expect(yield* run(bound, reader, mine)).toEqual([]);
-              expect(yield* Effect.flip(run(bound, reader, get(hidden.id)))).toMatchObject({
-                _tag: "GroupApplication.NotFound",
-              });
-              expect(yield* Effect.flip(run(bound, reader, roster(hidden.id)))).toMatchObject({
-                _tag: "GroupMembershipApplication.GroupNotFound",
-              });
-              for (const id of [first.id, second.id]) {
-                expect(yield* Effect.flip(run(bound, reader, getForManagement(id)))).toMatchObject({
-                  _tag: "Authorization.Denied",
-                });
-                expect(
-                  yield* Effect.flip(run(bound, reader, rosterForManagement(id))),
-                ).toMatchObject({
-                  _tag: "Authorization.Denied",
-                });
-              }
+              const { bound, reader, owner, hidden } = yield* prepare();
+              // The reader holds every group permission across the workspace, directly.
+              for (const permission of [
+                GroupPermissions.Read,
+                GroupPermissions.Rename,
+                GroupPermissions.Moderate,
+                GroupMembershipPermissions.Manage,
+                GroupMembershipPermissions.Join,
+              ])
+                yield* grant(bound, readerId, permission);
+              const direct = {
+                id: Group.Id.make("direct-others"),
+                workspaceId,
+                kind: "Direct",
+                memberIds: Group.directMembers([otherId, agentId]),
+                createdBy: otherId,
+                createdAt: hidden.createdAt,
+              } satisfies Group.Record;
+              yield* bound.store.transaction(bound.groups.insert(direct));
+              const [admission] = yield* bound.groupMemberships.listActiveByMember(otherId);
               const before = yield* history(bound);
-              expect(yield* run(bound, owner, getForManagement(hidden.id))).toEqual(hidden);
+              // Neither the reader nor the owner, who holds every built-in group permission, can
+              // see, rename, join, or change a group they are not in; to them it is missing.
+              for (const outsider of [reader, owner]) {
+                expect(yield* run(bound, outsider, mine)).not.toContainEqual(hidden);
+                for (const id of [hidden.id, direct.id]) {
+                  expect(yield* Effect.flip(run(bound, outsider, get(id)))).toMatchObject({
+                    _tag: "GroupApplication.NotFound",
+                  });
+                  expect(yield* Effect.flip(run(bound, outsider, roster(id)))).toMatchObject({
+                    _tag: "GroupMembershipApplication.GroupNotFound",
+                  });
+                  expect(
+                    yield* Effect.flip(run(bound, outsider, add(id, outsider.memberId))),
+                  ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+                  expect(yield* Effect.flip(run(bound, outsider, join(id)))).toMatchObject({
+                    _tag: "GroupMembershipApplication.GroupNotFound",
+                  });
+                }
+                expect(
+                  yield* Effect.flip(run(bound, outsider, rename(hidden.id, "Mine", "Private"))),
+                ).toMatchObject({ _tag: "GroupApplication.NotFound" });
+                expect(
+                  yield* Effect.flip(run(bound, outsider, removeMember(hidden.id, admission!.id))),
+                ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+                expect(
+                  (yield* run(bound, outsider, publicGroups)).map((item) => item.group.id),
+                ).not.toContain(hidden.id);
+              }
               expect(yield* history(bound)).toEqual(before);
               expect(yield* bound.groupMemberships.findActive(hidden.id, owner.memberId)).toEqual(
                 Option.none(),
@@ -366,18 +395,11 @@ export const groupReads = (harness: Harness) => {
                   yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, roster(id))),
                 ).toEqual(new GroupMembershipApplication.GroupNotFound({ groupId: id }));
               }
-              for (const id of [foreignGroup.id, Group.Id.make("missing")]) {
+              // The owner, outside all three, finds none of them either.
+              for (const id of [hidden.id, foreignGroup.id, Group.Id.make("missing")])
                 expect(
-                  yield* Effect.flip(
-                    gateway.asMember(workspace.id, ownerIdentity, getForManagement(id)),
-                  ),
+                  yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, get(id))),
                 ).toEqual(new GroupApplication.NotFound({ groupId: id }));
-                expect(
-                  yield* Effect.flip(
-                    gateway.asMember(workspace.id, ownerIdentity, rosterForManagement(id)),
-                  ),
-                ).toEqual(new GroupMembershipApplication.GroupNotFound({ groupId: id }));
-              }
             }),
           ),
         ),
@@ -391,6 +413,8 @@ export const groupReads = (harness: Harness) => {
             storage,
             Effect.gen(function* () {
               const { bound, reader, owner, first, second } = yield* prepare();
+              // The agent, a member of the group, readmits the reader; only members manage it.
+              yield* grant(bound, agentId, GroupMembershipPermissions.Manage, first.id);
               const roleId = Role.Id.make("group-reader");
               yield* publish(
                 bound,
@@ -436,7 +460,7 @@ export const groupReads = (harness: Harness) => {
                   });
                   const fresh = yield* asActor(
                     memberships.add({ groupId: first.id, memberId: readerId }),
-                    owner,
+                    actorFor(agentId),
                   );
                   expect(fresh.id).not.toBe(original.id);
                   expect(yield* audience.require(first.id)).toEqual(fresh);
@@ -478,8 +502,6 @@ export const groupReads = (harness: Harness) => {
                     groups.listMine({ limit: 100 }),
                     groups.get(first.id),
                     memberships.listCurrent(first.id, { limit: 100 }),
-                    groups.getForManagement(first.id),
-                    memberships.listCurrentForManagement(first.id, { limit: 100 }),
                     audience.require(first.id),
                   ];
                   for (const effect of checks) {
@@ -501,7 +523,7 @@ export const groupReads = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
-              const { bound, owner, reader, first } = yield* prepare();
+              const { bound, reader, first } = yield* prepare();
               yield* grant(bound, readerId, GroupPermissions.Read);
               const before = yield* history(bound);
               const readsOnly = {
@@ -534,8 +556,6 @@ export const groupReads = (harness: Harness) => {
                   yield* mine;
                   yield* roster(first.id);
                   yield* (yield* GroupAudience.make()).require(first.id);
-                  yield* asActor(getForManagement(first.id), owner);
-                  yield* asActor(rosterForManagement(first.id), owner);
                 }),
               );
               expect(yield* history(bound)).toEqual(before);
@@ -553,6 +573,7 @@ export const groupReads = (harness: Harness) => {
             Effect.gen(function* () {
               const { bound, owner, reader, first, second } = yield* prepare();
               yield* grant(bound, readerId, GroupPermissions.Read);
+              yield* grant(bound, agentId, GroupMembershipPermissions.Manage, first.id);
               const old = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(first.id, readerId),
               );
@@ -570,7 +591,7 @@ export const groupReads = (harness: Harness) => {
                           expect(yield* Effect.flip(get(first.id))).toMatchObject({
                             _tag: "GroupApplication.NotFound",
                           });
-                          const fresh = yield* asActor(add(first.id, readerId), owner);
+                          const fresh = yield* asActor(add(first.id, readerId), actorFor(agentId));
                           expect(yield* get(first.id)).toEqual(first);
                           expect(
                             (yield* roster(first.id)).some((value) => value.id === fresh.id),
@@ -615,11 +636,14 @@ export const groupReads = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
-              const { bound, owner, reader, first } = yield* prepare();
+              const { bound, reader, first } = yield* prepare();
               yield* grant(bound, readerId, GroupPermissions.Read);
-              const old = yield* run(bound, owner, add(first.id, otherId));
+              // The agent, a member of the group, manages it; only members do.
+              yield* grant(bound, agentId, GroupMembershipPermissions.Manage, first.id);
+              const manager = actorFor(agentId);
+              const old = yield* run(bound, manager, add(first.id, otherId));
               yield* run(bound, actorFor(otherId), leave(old));
-              const fresh = yield* run(bound, owner, add(first.id, otherId));
+              const fresh = yield* run(bound, manager, add(first.id, otherId));
               // Replay/storage may contain an admission whose member was independently removed.
               yield* publish(
                 bound,
@@ -633,7 +657,6 @@ export const groupReads = (harness: Harness) => {
               );
               expect(current.some((value) => value.id === old.id)).toBe(false);
               expect(current.some((value) => value.id === fresh.id)).toBe(true);
-              expect(yield* run(bound, owner, rosterForManagement(first.id))).toEqual(current);
               expect(
                 yield* Effect.flip(run(bound, actorFor(agentId), get(first.id))),
               ).toMatchObject({
@@ -710,13 +733,12 @@ export const groupReads = (harness: Harness) => {
       ),
     );
 
-    it.effect("management revocation and invalid actors are checked again on every read", () =>
+    it.effect("read revocation and invalid actors are checked again on every read", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
-            const { bound, reader, first, hidden } = yield* prepare();
-            yield* grant(bound, readerId, GroupMembershipPermissions.Manage, hidden.id);
+            const { bound, reader, first } = yield* prepare();
             yield* grant(bound, readerId, GroupPermissions.Read, first.id);
             yield* run(
               bound,
@@ -724,26 +746,24 @@ export const groupReads = (harness: Harness) => {
               Effect.gen(function* () {
                 const groups = yield* GroupApplication.Service;
                 const memberships = yield* GroupMembershipApplication.Service;
-                expect(yield* groups.getForManagement(hidden.id)).toEqual(hidden);
+                expect(yield* groups.get(first.id)).toEqual(first);
                 yield* publish(
                   bound,
                   Effect.flatMap(Journal.Service, (journal) =>
                     journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: Assignment.Id.make(
-                        `${readerId}-${GroupMembershipPermissions.Manage.name}-${hidden.id}`,
+                        `${readerId}-${GroupPermissions.Read.name}-${first.id}`,
                       ),
                       memberId: readerId,
                     }),
                   ),
                 );
-                expect(yield* Effect.flip(groups.getForManagement(hidden.id))).toMatchObject({
+                expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
                   _tag: "Authorization.Denied",
                 });
                 expect(
-                  yield* Effect.flip(
-                    memberships.listCurrentForManagement(hidden.id, { limit: 100 }),
-                  ),
+                  yield* Effect.flip(memberships.listCurrent(first.id, { limit: 100 })),
                 ).toMatchObject({ _tag: "Authorization.Denied" });
                 const impostor = Actor.Value.make({
                   workspaceId,
@@ -762,8 +782,6 @@ export const groupReads = (harness: Harness) => {
                   groups.listMine({ limit: 100 }),
                   groups.get(first.id),
                   memberships.listCurrent(first.id, { limit: 100 }),
-                  groups.getForManagement(hidden.id),
-                  memberships.listCurrentForManagement(hidden.id, { limit: 100 }),
                 ];
                 for (const effect of checks) {
                   expect(yield* Effect.flip(asActor(effect, impostor))).toMatchObject({
@@ -790,7 +808,7 @@ export const groupReads = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
-              const { bound, reader, owner, first, second } = yield* prepare();
+              const { bound, reader, first, second } = yield* prepare();
               yield* grant(bound, readerId, GroupPermissions.Read);
               const admission = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(first.id, readerId),
@@ -844,9 +862,6 @@ export const groupReads = (harness: Harness) => {
               expect(yield* Effect.flip(run(wrongGroup, reader, get(first.id)))).toMatchObject({
                 _tag: "GroupApplication.InvalidResponse",
               });
-              expect(
-                yield* Effect.flip(run(wrongGroup, owner, getForManagement(first.id))),
-              ).toMatchObject({ _tag: "GroupApplication.InvalidResponse" });
               for (const records of [
                 [Object.assign({}, admission, { groupId: second.id })],
                 [Object.assign({}, admission, { workspaceId: otherWorkspaceId })],
@@ -867,9 +882,6 @@ export const groupReads = (harness: Harness) => {
                 expect(yield* Effect.flip(run(broken, reader, roster(first.id)))).toMatchObject({
                   _tag: "GroupMembershipApplication.InvalidResponse",
                 });
-                expect(
-                  yield* Effect.flip(run(broken, owner, rosterForManagement(first.id))),
-                ).toMatchObject({ _tag: "GroupMembershipApplication.InvalidResponse" });
               }
               const wrongMember = {
                 ...bound,

@@ -35,7 +35,7 @@ exact grant sees that member. `GET …/members/:memberId` reads one.
 `DELETE …/members/:memberId` removes a member and returns the record with status `removed`.
 It requires `member.remove` on that member, at workspace or member scope; `member.read` is not
 required. Humans and agents follow the same rules. An authorized non-owner may remove their own
-membership. Administrators can remove ordinary Viewer-only or unassigned members, but only the
+membership. Administrators can remove ordinary Member-only or unassigned members, but only the
 owner can remove another administrator or a member with additional access. Ownership alone does
 not authorize removal, and the current owner cannot be removed even by an otherwise authorized
 member: transfer ownership first.
@@ -83,7 +83,7 @@ ISO expiry in the future and a required built-in role:
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","roleId":"builtin:viewer"}' \
+  -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","roleId":"builtin:member"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations
 curl -X POST -H 'Authorization: Bearer bob' http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
 curl -X POST -H 'Authorization: Bearer bob' -H 'content-type: application/json' \
@@ -98,8 +98,8 @@ under `details.roleId`. Expiry must follow issuance; acceptance at the exact
 deadline fails. Invitations require a role and always assign it at workspace scope.
 
 Issuance and revocation require `invitation.manage` and `assignment.manage` on the
-workspace. The shared delegation policy allows the owner to select Viewer or
-Administrator, and other authorized administrators to select Viewer. Owner cannot
+workspace. The shared delegation policy allows the owner to select Member or
+Administrator, and other authorized administrators to select Member. Owner cannot
 be granted through an invitation. `GET …/invitations` requires `invitation.manage`.
 
 Only the named authenticated human can accept. Acceptance rechecks the original
@@ -140,8 +140,8 @@ All assignment mutations require `assignment.manage` on the workspace:
   HTTP 409. Revoking previous roles and assigning the replacement share one commit.
   Direct grants and exact-target assignments are preserved and displayed separately.
 
-The owner can manage Viewer and Administrator access. Other holders of the management
-permission can manage only Viewer-only or unassigned recipients. Direct grants and
+The owner can manage Member and Administrator access. Other holders of the management
+permission can manage only Member-only or unassigned recipients. Direct grants and
 unfamiliar roles require the owner. The Owner assignment and owner membership are
 protected from these mutations, including attempts by the owner; ownership transfer
 has its own operation. Clients should reread access after a stale-change error.
@@ -176,8 +176,10 @@ Creation attribution is kept separately from current ownership.
 
 Authorization resolves stored grants: roles confer permissions only through the bundles they
 store, and ownership supplies no implicit bypass. Each permission declares the lowest built-in
-role whose bundle includes it; Administrator includes the Viewer permissions, and Owner all of
-them. Role IDs are `builtin:viewer`, `builtin:administrator`, and `builtin:owner`.
+role whose bundle includes it; Administrator includes the Member permissions, and Owner all of
+them. Role IDs are `builtin:member`, `builtin:administrator`, and `builtin:owner`. No role
+reaches a private or direct group from outside it: administrators and the owner see and manage
+only the groups they belong to; see [who may do what](group-workflows.md#who-may-do-what).
 
 Bundles are recorded with the workspace at the current bundle revision, and authorization and
 replay use what is recorded. A change to the declarations raises the revision; when a host loads a
@@ -191,24 +193,25 @@ listed, assigned, and offered in invitations.
 
 | Permission                     | Lowest role   | Target    | Authorizes                                                                        |
 | ------------------------------ | ------------- | --------- | --------------------------------------------------------------------------------- |
-| `member.read`                  | Viewer        | Member    | Reading memberships                                                               |
+| `member.read`                  | Member        | Member    | Reading memberships                                                               |
 | `member.remove`                | Administrator | Member    | Removing a member                                                                 |
 | `invitation.manage`            | Administrator | Workspace | Listing invitations; with `assignment.manage`, issuing and revoking them          |
-| `assignment.read`              | Viewer        | Member    | Reading a member's access                                                         |
+| `assignment.read`              | Member        | Member    | Reading a member's access                                                         |
 | `assignment.manage`            | Administrator | Workspace | Adding, replacing, and revoking roles, within delegation limits                   |
 | `workspace.rename`             | Owner         | Workspace | Renaming workspace metadata                                                       |
 | `workspace.transfer-ownership` | Owner         | Workspace | Transferring ownership                                                            |
-| `group.create`                 | Administrator | Workspace | [Creating a team group](group-workflows.md#creating-a-group), private or public   |
-| `group.read`                   | Viewer        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                |
-| `group.follow`                 | Viewer        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself             |
-| `group.rename`                 | Administrator | Group     | [Renaming a team group](group-workflows.md#renaming-a-group); bundles revision 3  |
-| `group.membership.manage`      | Administrator | Group     | Adding and removing members, and management reads                                 |
-| `group.join`                   | Viewer        | Group     | [Finding and joining public groups](group-workflows.md#public-groups); revision 4 |
-| `thread.start`                 | Viewer        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                  |
-| `thread.read`                  | Viewer        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read |
-| `thread.publish`               | Viewer        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation) and typing             |
-| `thread.follow`                | Viewer        | Thread    | Following a thread for oneself                                                    |
-| `agent.use`                    | Viewer        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group |
+| `group.create`                 | Member        | Workspace | [Creating a team group](group-workflows.md#creating-a-group), private or public   |
+| `group.read`                   | Member        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                |
+| `group.follow`                 | Member        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself             |
+| `group.rename`                 | Member        | Group     | [Renaming a team group](group-workflows.md#renaming-a-group) you belong to        |
+| `group.moderate`               | Administrator | Group     | Removing people from a public group you belong to                                 |
+| `group.membership.manage`      | Member        | Group     | Adding people to a group you belong to; removing them from a private one          |
+| `group.join`                   | Member        | Group     | [Finding and joining public groups](group-workflows.md#public-groups)             |
+| `thread.start`                 | Member        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                  |
+| `thread.read`                  | Member        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read |
+| `thread.publish`               | Member        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation) and typing             |
+| `thread.follow`                | Member        | Thread    | Following a thread for oneself                                                    |
+| `agent.use`                    | Member        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group |
 
 Group and thread permissions also need current membership in the group; see each guide.
 

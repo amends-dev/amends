@@ -78,7 +78,7 @@ export const recipientDenial = (
     return new OwnerProtected({ workspaceId: recipient.workspaceId });
   if (!recipientNeedsAssignments(recipient)) return undefined;
   return assignments.some(
-    ({ source }) => source._tag !== "Role" || source.roleId !== BuiltinRoles.ViewerId,
+    ({ source }) => source._tag !== "Role" || source.roleId !== BuiltinRoles.MemberId,
   )
     ? new Denied({ reason: "protected-member" })
     : undefined;
@@ -119,7 +119,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   });
   const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.Id) {
     const id = yield* Schema.decodeEffect(Role.Id)(roleId);
-    if (![BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
+    if (![BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
       return yield* new UnsupportedRole({ roleId: id });
     const found = yield* roles.get(id);
     if (Option.isNone(found)) return yield* new RoleNotFound({ roleId: id });

@@ -147,7 +147,7 @@ export function GroupMembersAction(props: GroupMembersProps) {
                         name={memberName(members.member(memberId()))}
                         agent={members.member(memberId())?.identity._tag === "Agent"}
                         self={memberId() === self()?.member.id}
-                        removable={group.manageable() && memberId() !== self()?.member.id}
+                        removable={group.membersRemovable() && memberId() !== self()?.member.id}
                         leavable={group.leavable() && id === group.own()?.id}
                         confirming={confirming() === id}
                         pending={group.changing() === id}

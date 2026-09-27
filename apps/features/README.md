@@ -135,7 +135,8 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   with a `#` glyph, and Direct, direct groups by the other people in them with `@`. A group shows a
   count of what is addressed to the reader and a dot when it has new activity. The app supplies
   `href` and the current group. Groups shows once the groups load, with a "Browse groups" link to
-  the app's `browseHref`, marked current while `browsing`. Readers with `group.create` also get a
+  the app's `browseHref`, marked current while `browsing`. Readers with `group.create`, which every
+  role holds, also get a
   "New group" action in its heading that opens `NewGroupDialog`, and the app's `onCreated`
   decides where the new group leads. Direct always
   shows once the groups load, with a "New message" action that opens `NewMessageDialog`; the app's
@@ -159,8 +160,9 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   different valid name. If someone renamed the group meanwhile, it names their name and keeps the
   draft, and saving again replaces it.
 - `GroupMembersAction` is a group header's member count, opening its members: the reader first,
-  then everyone by name, keyed by admission so live refreshes keep rows and focus. Managers add
-  people with the ChipPicker and remove members; anyone leaves a team group. Removing and leaving
+  then everyone by name, keyed by admission so live refreshes keep rows and focus. Members add
+  people with the ChipPicker, and remove others where they may (any member of a private group,
+  administrators in a public one); anyone leaves a team group. Removing and leaving
   ask first in the row, moving focus to the answer and back on Cancel. The app's `onLeft` decides
   where leaving leads.
 - `GroupStream` renders a group's stream as a Transcript: each thread's opening message with day
@@ -181,7 +183,7 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   Once a refresh says the reader can no longer read the thread, it shows that instead of the
   messages it last read, and the stream does the same for its group, as does the header's member
   count, until access returns.
-  **LosingAccess** covers both, leaving and rejoining from another session.
+  **LosingAccess** covers both: the owner leaves from another session, and the member adds them back.
 - `GroupName` renders a group's name as text, the same way the navigation names it.
 - `Inbox` renders the reader's inbox newest first with the UI Inbox cards: why each notification
   came (who mentioned them, replied in a thread they follow, or started a thread in a group they

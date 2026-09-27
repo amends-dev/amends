@@ -49,11 +49,11 @@ it.effect("duplicate names reject construction even when their definitions agree
       MemberPermissions.Read,
       Permission.make(MemberPermissions.Read.name, {
         targetKind: "Member",
-        builtinTier: "viewer",
+        builtinTier: "member",
       }),
       Permission.make(MemberPermissions.Read.name, {
         targetKind: "Workspace",
-        builtinTier: "viewer",
+        builtinTier: "member",
       }),
       Permission.make(MemberPermissions.Read.name, { targetKind: "Member", builtinTier: "owner" }),
     ]) {
@@ -100,7 +100,7 @@ it.effect(
     Effect.gen(function* () {
       const declaration = Permission.make("test.read", {
         targetKind: "Member",
-        builtinTier: "viewer",
+        builtinTier: "member",
       });
       const originalName = declaration.name;
       const definitions = [declaration];
@@ -113,7 +113,7 @@ it.effect(
       expect(resolved).toEqual({
         name: originalName,
         targetKind: "Member",
-        builtinTier: "viewer",
+        builtinTier: "member",
       });
       expect(Reflect.set(resolved, "name", MemberPermissions.Remove.name)).toBe(false);
       expect(Reflect.set(resolved, "targetKind", "Workspace")).toBe(false);
@@ -123,7 +123,7 @@ it.effect(
       expect(yield* catalog.get(originalName)).toEqual({
         name: originalName,
         targetKind: "Member",
-        builtinTier: "viewer",
+        builtinTier: "member",
       });
       expect(yield* Effect.flip(catalog.get(MemberPermissions.Remove.name))).toMatchObject({
         _tag: "PermissionCatalog.Unknown",
@@ -142,7 +142,7 @@ it.effect("invalid declarations fail construction through the schema error chann
     ] as const) {
       const declaration = Permission.make("test.invalid", {
         targetKind: "Member",
-        builtinTier: "viewer",
+        builtinTier: "member",
       });
       Reflect.set(declaration, field, value);
       const error = yield* PermissionCatalog.make([declaration]).pipe(Effect.flip);

@@ -30,7 +30,7 @@ export async function signIn(scenario: Scenario, email: string) {
 export function SettingsFixture(props: {
   baseUrl?: string;
   section?: SettingsSection;
-  as?: "Owner" | "Administrator" | "Viewer";
+  as?: "Owner" | "Administrator" | "Member";
   theme?: "cotton" | "soot";
 }) {
   const [scenario, setScenario] = createSignal<Scenario>(),
@@ -73,7 +73,7 @@ export function SettingsFixture(props: {
     }>;
     await api(scenario, `/workspaces/${workspaceId()}/invitations`, owner.token, {
       recipientId: "elsewhere@example.test",
-      roleId: roles.find((choice) => choice.role.name === "Viewer")?.role.id,
+      roleId: roles.find((choice) => choice.role.name === "Member")?.role.id,
       expiresAt: new Date(Date.now() + 86400000).toISOString(),
     });
     setExternal("External invitation complete");
@@ -101,7 +101,7 @@ export function SettingsFixture(props: {
       for (const [role, email] of [
         ["Owner", "owner@example.test"],
         ["Administrator", "admin@example.test"],
-        ["Viewer", "viewer@example.test"],
+        ["Member", "member@example.test"],
         ["Recipient", "new@example.test"],
       ] as const)
         credentials.set(role, await signIn(current, email));
@@ -112,7 +112,7 @@ export function SettingsFixture(props: {
         `/workspaces/${workspace.id}/roles`,
         owner.token,
       )) as Array<{ role: { id: string; name: string } }>;
-      for (const role of ["Administrator", "Viewer"]) {
+      for (const role of ["Administrator", "Member"]) {
         const signed = credentials.get(role)!;
         const invitation = await api(
           current,
@@ -158,7 +158,7 @@ export function SettingsFixture(props: {
               {(s) => (
                 <>
                   <Row as="aside" aria-label="Workshop controls">
-                    <For each={["Owner", "Administrator", "Viewer", "Recipient"]}>
+                    <For each={["Owner", "Administrator", "Member", "Recipient"]}>
                       {(role) => (
                         <Button
                           variant="secondary"

@@ -429,7 +429,7 @@ export const threadReplies = (harness: Harness) => {
                     memberId: humanId,
                     source: {
                       _tag: "Role",
-                      roleId: BuiltinRoles.ViewerId,
+                      roleId: BuiltinRoles.MemberId,
                       scope: { _tag: "Workspace", workspaceId },
                     },
                   }),
@@ -441,7 +441,7 @@ export const threadReplies = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (j) =>
                   j.publish(RoleFacts.PermissionsChanged, {
                     workspaceId,
-                    roleId: BuiltinRoles.ViewerId,
+                    roleId: BuiltinRoles.MemberId,
                     permissions: [ThreadPermissions.Read.name],
                   }),
                 ),

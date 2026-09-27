@@ -8,7 +8,29 @@ and maps malformed input to `Gateway.InvalidInput`. Direct groups (DMs and group
 their first thread; see [starting a direct group](thread-workflows.md#starting-a-direct-group).
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
 broader design, and the [HTTP contract](../packages/api-http/README.md#conversations) exposes these
-operations, except the management reads `getForManagement` and `listCurrentForManagement`.
+operations.
+
+## Who may do what
+
+A group belongs to its members. Workspace roles grant no authority over a group from outside it:
+no grant, and neither administrators nor the owner, can see a private group or a direct group they
+are not in, read it, rename it, add themselves or anyone else to it, or inspect its roster. To
+anyone outside, such a group answers as missing. The built-in roles hold these group permissions:
+
+| Action             | Private team group          | Public team group                           | Direct group |
+| ------------------ | --------------------------- | ------------------------------------------- | ------------ |
+| Create             | any member (`group.create`) | any member (`group.create`)                 | any member   |
+| See that it exists | its members                 | everyone who may join (`group.join`)        | its members  |
+| Read its threads   | its members                 | its members; join to read                   | its members  |
+| Join               | no one; members add people  | anyone who may join                         | no one       |
+| Add people         | its members                 | its members                                 | no one       |
+| Rename             | its members                 | its members                                 | not named    |
+| Remove others      | its members                 | its members who moderate (`group.moderate`) | no one       |
+| Leave              | anyone in it                | anyone in it                                | cannot       |
+
+Every built-in role holds `group.create`, `group.read`, `group.follow`, `group.rename`,
+`group.membership.manage`, and `group.join`; Administrator and Owner also hold `group.moderate`.
+An administrator moderates a public group from inside it, joining it first.
 
 ## Creating a group
 
@@ -20,17 +42,16 @@ both eligible. Adding an agent does not invoke it or grant permission to use it.
 
 The creator is admitted only when their membership ID is listed, and the list may be empty;
 creator attribution establishes no membership or group ownership. The creation permission covers
-the initial audience; later additions need their own permission. The apps always list the
-creator, and offer creation only to members whose workspace permissions, read through
-`AssignmentApplication.permissions`, include `group.create`.
+the initial audience; later additions are the group's members' to make. The apps always list the
+creator, and offer creation to members whose workspace permissions, read through
+`AssignmentApplication.permissions`, include `group.create`, which every built-in role does.
 
 ## Renaming a group
 
-`GroupApplication.rename({ groupId, name, expectedName })` requires `group.rename` on the group, in the
-Administrator and Owner bundles since bundle revision 3; an exact Group scope covers that group
-only. It needs no membership of the group. After that check, a missing or foreign group is
-`GroupApplication.NotFound`, and a direct group, named by its members, is
-`GroupApplication.NotRenamable`. The name follows creation's rule: nonempty and trimmed. Renaming
+`GroupApplication.rename({ groupId, name, expectedName })` requires `group.rename` on the group,
+which every built-in role holds, and membership of the group. To anyone outside it, the group is
+`GroupApplication.NotFound`, as a missing or foreign one is, and a direct group, named by its
+members, is `GroupApplication.NotRenamable`. The name follows creation's rule: nonempty and trimmed. Renaming
 records `group.renamed` with the new name and returns the group; the same name again records
 nothing. Otherwise `expectedName`, the name the renamer last saw, must still be the group's name:
 one renamed meanwhile is `GroupApplication.Changed`, so a rename is never silently replaced, and
@@ -42,7 +63,7 @@ resolution as reading it.
 ## Public groups
 
 A public team group can be found and joined by anyone in the workspace who holds `group.join` on
-it, in every built-in role since bundle revision 4. Its threads still belong to its members alone:
+it, which every built-in role holds. Its threads still belong to its members alone:
 joining is what grants access, under the same read rules as any group, and a non-member reads
 nothing of its conversations.
 
@@ -68,13 +89,11 @@ Ordinary reads require active workspace membership, an active admission to the g
 `group.read` on it. Neither a grant alone nor membership alone suffices: creator attribution,
 workspace ownership, and management grants do not make the caller part of the audience.
 
-| Operation                                                                         | Result and authority                                                                                                                                                                                                          |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GroupApplication.listMine({ limit, after? })`                                    | A page of `Group.ListItem` values for the caller's current readable groups, ordered by group ID, with latest activity, caught-up time, `newActivity`, `following`, and `pending`. Unreadable and unjoined groups are omitted. |
-| `GroupApplication.get(groupId)`                                                   | Group metadata, requiring audience membership and `group.read`.                                                                                                                                                               |
-| `GroupMembershipApplication.listCurrent(groupId, { limit, after? })`              | A page of current admissions under the same read policy, ordered by admission ID.                                                                                                                                             |
-| `GroupApplication.getForManagement(groupId)`                                      | Metadata for a known group, requiring `group.membership.manage` on it.                                                                                                                                                        |
-| `GroupMembershipApplication.listCurrentForManagement(groupId, { limit, after? })` | A page of the current roster for a known group under that management permission.                                                                                                                                              |
+| Operation                                                            | Result and authority                                                                                                                                                                                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GroupApplication.listMine({ limit, after? })`                       | A page of `Group.ListItem` values for the caller's current readable groups, ordered by group ID, with latest activity, caught-up time, `newActivity`, `following`, and `pending`. Unreadable and unjoined groups are omitted. |
+| `GroupApplication.get(groupId)`                                      | Group metadata, requiring audience membership and `group.read`.                                                                                                                                                               |
+| `GroupMembershipApplication.listCurrent(groupId, { limit, after? })` | A page of current admissions under the same read policy, ordered by admission ID.                                                                                                                                             |
 
 Group lists and rosters take an exclusive `after` ID cursor and a `limit`, and keep reading until
 the page is full: groups outside the caller's `group.read` grants, and admissions whose workspace
@@ -83,15 +102,12 @@ last caught up with it through `ReadStateApplication.markGroupRead`, or after th
 never have. `pending` counts the caller's pending notifications from the group's threads: the
 activity addressed to them, as a sidebar badge shows it. Reading a thread settles its notifications
 and so lowers the count. `manageable` holds for a team group where the caller has
-`group.membership.manage`, from the same grant resolution, so clients offer adding and removing
-members only there; direct groups are never manageable. The change feed delivers new
+`group.membership.manage`, from the same grant resolution, so clients offer adding people there;
+`membersRemovable` holds where they may also remove others: a private group they may manage, or a
+public one they moderate. Direct groups are never manageable. The change feed delivers new
 notifications to their recipient, and
 [signals](../packages/core/README.md#signals) carry the reader's read-state changes to their other
 sessions, so a client can keep both current.
-
-Management reads require neither group membership nor `group.read`. They expose only the group
-record and current admissions needed to manage it; they do not join the caller, grant conversation
-access, or list private groups workspace-wide. Creation permission grants no management inspection.
 
 A roster returns `GroupMembership.Record` values: admission IDs, workspace-member references,
 and admission times, for active admissions whose workspace member is still active. It needs no
@@ -99,16 +115,17 @@ and admission times, for active admissions whose workspace member is still activ
 
 Missing, foreign, and outside-audience groups share `GroupApplication.NotFound` for `get`;
 ordinary roster reads use `GroupMembershipApplication.GroupNotFound`. A current member without the
-action grant receives `Authorization.Denied`. Management reads check their grant before reporting
-whether a known group exists. Storage and consistency failures are not hidden as empty lists or
+action grant receives `Authorization.Denied`. No read reaches a group from outside it. Storage and
+consistency failures are not hidden as empty lists or
 missing groups. Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
 
 ## Adding a member
 
 `GroupMembershipApplication.add({ groupId, memberId })` requires `group.membership.manage` on the
-group. An exact Group scope authorizes that group only; a workspace scope covers every group in it.
-The caller needs neither group membership nor a member-read grant, and group creation authority,
-creator attribution, or belonging to the group grants no management authority.
+group, which every built-in role holds, and membership of the group: to anyone outside it, the
+group is `GroupNotFound`. An exact Group scope authorizes that group only; a workspace scope covers
+every group the caller belongs to. No member-read grant is needed, and group creation authority or
+creator attribution grants no management authority.
 
 The group must exist in the workspace, and `memberId` must name an active human or agent
 membership there; missing and foreign references share the not-found outcomes. An existing active
@@ -123,8 +140,10 @@ without an automatic retry.
 ## Removing a member or leaving
 
 `GroupMembershipApplication.remove({ groupId, membershipId })` requires `group.membership.manage`
-on the group. The caller need not belong to it; `group.create`, creator attribution, and role
-names do not authorize removal.
+on the group and membership of it; to anyone outside it, the group is `GroupNotFound`. Any member
+may remove others from a private group. Removing someone else from a public group also requires
+`group.moderate`, which administrators and the owner hold; removing oneself needs no more than
+leaving does. `group.create`, creator attribution, and role names do not authorize removal.
 
 `GroupMembershipApplication.leave({ groupId, membershipId })` requires active workspace membership
 and an admission belonging to the acting member, with no management or read grant. Humans, agents,
@@ -134,7 +153,8 @@ ownership, or grants, and the group may become empty.
 Both address a specific admission and return it with `status: "removed"`, keeping its group,
 member, and admission time. Missing, foreign, and wrong-group admission IDs return
 `GroupMembershipApplication.NotFound`; leaving also returns `NotFound` for another member's
-admission. Managed removal returns `GroupNotFound` for a missing group, after authorization.
+admission. Managed removal returns `GroupNotFound` for a missing group, or one the caller is not
+in, after authorization.
 Repeating a departure returns `AlreadyRemoved`. Adding the member again creates a fresh admission,
 which no earlier removal or leave request can end. Leaving grants no authority to add oneself back.
 

@@ -646,7 +646,8 @@ export const groups = (harness: Harness) => {
           storage,
           Effect.gen(function* () {
             const { bound, owner, actor } = yield* prepare();
-            const group = yield* asActor(create([memberId]), owner).pipe(
+            // Only its members rename a group, so the owner creates it with themselves in it.
+            const group = yield* asActor(create([memberId, owner.memberId]), owner).pipe(
               Effect.provide(core(bound)),
             );
             const rename = (
@@ -707,7 +708,19 @@ export const groups = (harness: Harness) => {
               createdBy: owner.memberId,
               createdAt: group.createdAt,
             } satisfies Group.Record;
-            yield* bound.store.transaction(bound.groups.insert(direct));
+            yield* bound.store.transaction(
+              Effect.all([
+                bound.groups.insert(direct),
+                bound.groupMemberships.insert({
+                  id: GroupMembership.Id.make("direct-owner"),
+                  workspaceId,
+                  groupId: direct.id,
+                  memberId: owner.memberId,
+                  admittedAt: group.createdAt,
+                  status: "active",
+                }),
+              ]),
+            );
             expect(yield* Effect.flip(rename(owner, direct.id, "Pair"))).toMatchObject({
               _tag: "GroupApplication.NotRenamable",
             });

@@ -27,7 +27,7 @@ const issue = (recipient: Identity.HumanId) =>
     Effect.flatMap(DateTime.now, (now) =>
       invitations.issue({
         recipientId: recipient,
-        roleId: BuiltinRoles.ViewerId,
+        roleId: BuiltinRoles.MemberId,
         expiresAt: DateTime.add(now, { hours: 1 }),
       }),
     ),

@@ -26,7 +26,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               inviterMemberId: workspace.ownerMemberId,
               issuedAt,
               expiresAt: DateTime.add(issuedAt, { hours: 1 }),
-              roleId: BuiltinRoles.ViewerId,
+              roleId: BuiltinRoles.MemberId,
             },
             state: { _tag: "Pending" },
           });

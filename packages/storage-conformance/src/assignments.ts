@@ -55,7 +55,7 @@ export const assignments = (harness: Harness) => {
               yield* Effect.flip(
                 Operations.assign(other.id, alice, {
                   memberId: viewer.id,
-                  roleId: BuiltinRoles.ViewerId,
+                  roleId: BuiltinRoles.MemberId,
                 }),
               ),
             ).toMatchObject({ _tag: "AssignmentApplication.MemberNotFound" });
@@ -82,7 +82,7 @@ export const assignments = (harness: Harness) => {
           storage,
           Effect.gen(function* () {
             const { workspace, viewer } = yield* setup;
-            // Owners and administrators create groups and manage invitations; viewers do neither.
+            // Everyone creates groups; owners and administrators also manage invitations.
             const owner = yield* Operations.permissions(workspace.id, alice);
             const administrator = yield* Operations.permissions(workspace.id, charlie);
             const reader = yield* Operations.permissions(workspace.id, bob);
@@ -90,7 +90,7 @@ export const assignments = (harness: Harness) => {
               expect(granted).toEqual(
                 expect.arrayContaining(["group.create", "invitation.manage"]),
               );
-            expect(reader).not.toContain("group.create");
+            expect(reader).toContain("group.create");
             expect(reader).not.toContain("invitation.manage");
             expect(owner).toContain("workspace.transfer-ownership");
             expect(administrator).not.toContain("workspace.transfer-ownership");
@@ -101,7 +101,7 @@ export const assignments = (harness: Harness) => {
               memberId: viewer.id,
               roleId: BuiltinRoles.AdministratorId,
             });
-            expect(yield* Operations.permissions(workspace.id, bob)).toContain("group.create");
+            expect(yield* Operations.permissions(workspace.id, bob)).toContain("invitation.manage");
             expect(
               yield* Effect.flip(
                 Operations.permissions(workspace.id, {
@@ -126,7 +126,7 @@ export const assignments = (harness: Harness) => {
               const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
               const duplicate = yield* Operations.assign(workspace.id, alice, {
                 memberId: viewer.id,
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
               });
               expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
                 before,
@@ -142,10 +142,10 @@ export const assignments = (harness: Harness) => {
               const access = yield* Operations.access(workspace.id, bob, workspace.ownerMemberId);
               expect(
                 access.roles.filter(({ assignable }) => assignable).map(({ role }) => role.id),
-              ).toEqual([BuiltinRoles.ViewerId]);
+              ).toEqual([BuiltinRoles.MemberId]);
               const changed = yield* Operations.change(workspace.id, alice, {
                 memberId: viewer.id,
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
                 expectedAssignmentIds: [admin.id],
               });
               expect(changed.id).not.toBe(admin.id);
@@ -215,7 +215,7 @@ export const assignments = (harness: Harness) => {
                 }),
                 Operations.assign(workspace.id, charlie, {
                   memberId: peer.id,
-                  roleId: BuiltinRoles.ViewerId,
+                  roleId: BuiltinRoles.MemberId,
                 }),
                 Operations.revokeAssignment(workspace.id, charlie, peer.id, adminAssignment.id),
                 Operations.revokeAssignment(
@@ -226,7 +226,7 @@ export const assignments = (harness: Harness) => {
                 ),
                 Operations.change(workspace.id, alice, {
                   memberId: workspace.ownerMemberId,
-                  roleId: BuiltinRoles.ViewerId,
+                  roleId: BuiltinRoles.MemberId,
                   expectedAssignmentIds: [ownerAssignment.id],
                 }),
                 Operations.removeMember(workspace.id, charlie, peer.id),
@@ -248,7 +248,7 @@ export const assignments = (harness: Harness) => {
                 yield* Effect.flip(
                   Operations.assign(workspace.id, alice, {
                     memberId: viewer.id,
-                    roleId: BuiltinRoles.ViewerId,
+                    roleId: BuiltinRoles.MemberId,
                   }),
                 ),
               ).toMatchObject({ _tag: "AssignmentApplication.InactiveMember" });
@@ -363,7 +363,7 @@ export const assignments = (harness: Harness) => {
             const assignments = yield* bound.assignments.listActiveByMember(admin.id);
             yield* Operations.change(workspace.id, alice, {
               memberId: admin.id,
-              roleId: BuiltinRoles.ViewerId,
+              roleId: BuiltinRoles.MemberId,
               expectedAssignmentIds: assignments.map(({ id }) => id),
             });
             expect(

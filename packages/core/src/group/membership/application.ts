@@ -61,6 +61,7 @@ export type Error =
   | NotFound
   | AlreadyRemoved
   | FixedMembership
+  | GroupAudience.InvalidResponse
   | InvalidResponse;
 
 export type ReadError =
@@ -76,15 +77,20 @@ export type ReadError =
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   /**
-   * Require group.membership.manage on this group, validate its active workspace member,
-   * and publish a fresh admission in one commit. An active admission is rejected without
-   * another fact. Management authority does not require the caller to belong to the group.
-   * Adding, removing, and leaving apply to team groups; direct groups reject them as fixed.
+   * Require group.membership.manage on this group and membership of it, validate its active
+   * workspace member, and publish a fresh admission in one commit. An active admission is
+   * rejected without another fact. No workspace role reaches a group from outside it: to a
+   * non-member, a group is GroupNotFound, as a missing one is. Adding, removing, and leaving apply
+   * to team groups; direct groups reject them as fixed.
    */
   readonly add: (
     input: GroupMembership.AddInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /** End this team-group admission after requiring group.membership.manage on its group. */
+  /**
+   * End this team-group admission, requiring group.membership.manage on its group and membership
+   * of it. Any member may remove others from a private group; removing someone else from a public
+   * one also requires group.moderate.
+   */
   readonly remove: (
     input: GroupMembership.RemoveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
@@ -103,11 +109,6 @@ export interface Interface {
    * group.read and audience membership.
    */
   readonly listCurrent: (
-    groupId: Group.Id,
-    options: GroupMembership.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
-  /** Page a known group's current roster under group.membership.manage, without joining it. */
-  readonly listCurrentForManagement: (
     groupId: Group.Id,
     options: GroupMembership.ListOptions,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
@@ -160,13 +161,22 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       message: "Group membership services belong to different workspaces",
     });
 
-  const requireManagement = (groupId: Group.Id) =>
-    authorization.require([
+  /** Management needs the grant and membership of the group; to anyone outside it, it is missing. */
+  const requireManagement = Effect.fnUntraced(function* (groupId: Group.Id) {
+    yield* authorization.require([
       Requirement.make(
         GroupMembershipPermissions.Manage,
         Target.Reference.cases.Group.make({ workspaceId, groupId }),
       ),
     ]);
+    yield* audience
+      .require(groupId)
+      .pipe(
+        Effect.catchTag("GroupAudience.NotMember", () =>
+          Effect.fail(new GroupNotFound({ groupId })),
+        ),
+      );
+  });
   const loadGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const foundGroup = yield* groups.get(groupId);
     if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
@@ -303,8 +313,18 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     function* (input: GroupMembership.RemoveInput) {
       const checked = yield* decodeRemovalInput(input);
       yield* requireManagement(checked.groupId);
-      yield* loadManagedGroup(checked.groupId);
-      return yield* depart(yield* loadMembership(checked), "removed");
+      const group = yield* loadManagedGroup(checked.groupId);
+      const membership = yield* loadMembership(checked);
+      // Removing someone from a public group is moderation; a private one is its members' to tidy.
+      const actor = yield* Actor.Service;
+      if (group.visibility === "Public" && membership.memberId !== actor.memberId)
+        yield* authorization.require([
+          Requirement.make(
+            GroupPermissions.Moderate,
+            Target.Reference.cases.Group.make({ workspaceId, groupId: checked.groupId }),
+          ),
+        ]);
+      return yield* depart(membership, "removed");
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -404,14 +424,6 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     ]);
     return yield* current(id, options);
   });
-  const listCurrentForManagement = Effect.fn("GroupMembershipApplication.listCurrentForManagement")(
-    function* (groupId: Group.Id, options: GroupMembership.ListOptions) {
-      const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-      yield* requireManagement(id);
-      return yield* current(id, options);
-    },
-  );
-
   return Service.of({
     workspaceId,
     add,
@@ -419,7 +431,6 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     remove,
     leave,
     listCurrent,
-    listCurrentForManagement,
   });
 });
 

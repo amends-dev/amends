@@ -70,9 +70,9 @@ export const groupMemberships = (harness: Harness) => {
       Effect.flatMap(GroupMembershipApplication.Service, (service) =>
         service.add({ groupId, memberId }),
       );
-    const create = (name: string) =>
+    const create = (name: string, memberIds: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds: [] }),
+        service.createTeam({ name, memberIds }),
       );
     const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
@@ -82,6 +82,12 @@ export const groupMemberships = (harness: Harness) => {
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(journalId, { limit: 100 });
+    /**
+     * The admissions of the human and the agent the tests admit, leaving out the owner and the
+     * manager, who belong to every prepared group because only its members manage a group.
+     */
+    const admitted = (records: ReadonlyArray<GroupMembership.Record>) =>
+      records.filter((record) => record.memberId === humanId || record.memberId === agentId);
     const seedMembers = (bound: Bound) =>
       publish(
         bound,
@@ -111,8 +117,10 @@ export const groupMemberships = (harness: Harness) => {
         identity: { _tag: "Human", id: workspace.createdBy },
       });
       yield* seedMembers(bound);
-      const group = yield* run(bound, owner, create("Engineering"));
-      const otherGroup = yield* run(bound, owner, create("Design"));
+      // Only a group's members manage it, so the owner and the manager belong to both groups.
+      const managers = [workspace.ownerMemberId, managerId];
+      const group = yield* run(bound, owner, create("Engineering", managers));
+      const otherGroup = yield* run(bound, owner, create("Design", managers));
       return {
         bound,
         owner,
@@ -175,9 +183,6 @@ export const groupMemberships = (harness: Harness) => {
             Effect.gen(function* () {
               const { bound, group, otherGroup, manager } = yield* prepare();
               yield* grant(bound, group.id);
-              expect(yield* bound.groupMemberships.findActive(group.id, managerId)).toEqual(
-                Option.none(),
-              );
               yield* TestClock.adjust("5 seconds");
               const before = yield* history(bound);
               const membership = yield* run(bound, manager, add(group.id, humanId));
@@ -192,9 +197,6 @@ export const groupMemberships = (harness: Harness) => {
                 Option.some(membership),
               );
               expect(yield* bound.groups.get(group.id)).toEqual(Option.some(group));
-              expect(yield* bound.groupMemberships.findActive(group.id, managerId)).toEqual(
-                Option.none(),
-              );
               const events = yield* publish(
                 bound,
                 Effect.flatMap(Journal.Service, (journal) => journal.log.read({ limit: 100 })),
@@ -218,7 +220,11 @@ export const groupMemberships = (harness: Harness) => {
                 requirement: { target: { _tag: "Group", groupId: otherGroup.id } },
               });
               expect(yield* history(bound)).toEqual(after);
-              expect(yield* bound.groupMemberships.listByGroup(otherGroup.id)).toEqual([]);
+              expect(
+                (yield* bound.groupMemberships.listByGroup(otherGroup.id)).map(
+                  (admission) => admission.memberId,
+                ),
+              ).not.toContain(humanId);
             }),
           ),
         ),
@@ -249,8 +255,7 @@ export const groupMemberships = (harness: Harness) => {
                   }),
                 ),
               );
-              const created = yield* run(bound, manager, create("Created by manager"));
-              yield* run(bound, owner, add(created.id, managerId));
+              const created = yield* run(bound, manager, create("Created by manager", [managerId]));
               const before = yield* history(bound);
               expect(
                 yield* Effect.flip(run(bound, manager, add(created.id, humanId))),
@@ -363,7 +368,92 @@ export const groupMemberships = (harness: Harness) => {
                   },
                 );
               expect(yield* history(bound)).toEqual(before);
-              expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([membership]);
+              expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([
+                membership,
+              ]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "any member tidies a private group; removing people from a public one takes a moderator in it",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner } = yield* prepare();
+              // The human holds the built-in Member role; the owner holds Owner.
+              yield* publish(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.publish(AssignmentFacts.Created, {
+                    workspaceId,
+                    assignmentId: Assignment.Id.make("member-new-human"),
+                    memberId: humanId,
+                    source: {
+                      _tag: "Role",
+                      roleId: BuiltinRoles.MemberId,
+                      scope: { _tag: "Workspace", workspaceId },
+                    },
+                  }),
+                ),
+              );
+              const human = memberActor(humanId);
+              const createTeam = (name: string, visibility: Group.Visibility) =>
+                Effect.flatMap(GroupApplication.Service, (service) =>
+                  service.createTeam({ name, memberIds: [humanId], visibility }),
+                );
+              const flags = (actor: Actor.Value, groupId: Group.Id) =>
+                run(
+                  bound,
+                  actor,
+                  Effect.map(
+                    Effect.flatMap(GroupApplication.Service, (service) =>
+                      service.listMine({ limit: 100 }),
+                    ),
+                    (items) => {
+                      const item = items.find((listed) => listed.group.id === groupId);
+                      return item && [item.manageable, item.membersRemovable, item.renamable];
+                    },
+                  ),
+                );
+              // A member creates a private group and tidies it alone: adding and removing.
+              const huddle = yield* run(bound, human, createTeam("Huddle", "Private"));
+              expect(yield* flags(human, huddle.id)).toEqual([true, true, true]);
+              const agentIn = yield* run(bound, human, add(huddle.id, agentId));
+              expect(yield* run(bound, human, remove(agentIn))).toMatchObject({
+                status: "removed",
+              });
+              // In a public group, members add people but only moderators remove them.
+              const lobby = yield* run(bound, human, createTeam("Lobby", "Public"));
+              expect(yield* flags(human, lobby.id)).toEqual([true, false, true]);
+              const agentThere = yield* run(bound, human, add(lobby.id, agentId));
+              expect(yield* Effect.flip(run(bound, human, remove(agentThere)))).toMatchObject({
+                _tag: "Authorization.Denied",
+                requirement: { permission: { name: "group.moderate" } },
+              });
+              // The owner moderates, but only from inside the group, which they join first.
+              expect(yield* Effect.flip(run(bound, owner, remove(agentThere)))).toMatchObject({
+                _tag: "GroupMembershipApplication.GroupNotFound",
+              });
+              yield* run(
+                bound,
+                owner,
+                Effect.flatMap(GroupMembershipApplication.Service, (service) =>
+                  service.join(lobby.id),
+                ),
+              );
+              expect(yield* flags(owner, lobby.id)).toEqual([true, true, true]);
+              expect(yield* run(bound, owner, remove(agentThere))).toMatchObject({
+                status: "removed",
+              });
+              // Removing oneself is always leaving, public or not.
+              const own = Option.getOrThrow(
+                yield* bound.groupMemberships.findActive(lobby.id, humanId),
+              );
+              expect(yield* run(bound, human, remove(own))).toMatchObject({ status: "removed" });
             }),
           ),
         ),
@@ -377,7 +467,7 @@ export const groupMemberships = (harness: Harness) => {
             storage,
             Effect.gen(function* () {
               const { bound, owner, group } = yield* prepare();
-              // The human is a viewer, so they may join; the agent holds no role and may not.
+              // The human is a member, so they may join; the agent holds no role and may not.
               yield* publish(
                 bound,
                 Effect.flatMap(Journal.Service, (journal) =>
@@ -387,7 +477,7 @@ export const groupMemberships = (harness: Harness) => {
                     memberId: humanId,
                     source: {
                       _tag: "Role",
-                      roleId: BuiltinRoles.ViewerId,
+                      roleId: BuiltinRoles.MemberId,
                       scope: { _tag: "Workspace", workspaceId },
                     },
                   }),
@@ -505,7 +595,7 @@ export const groupMemberships = (harness: Harness) => {
             });
             const broken = failingLate(bound, failure);
             expect(yield* Effect.flip(run(broken, owner, add(group.id, humanId)))).toEqual(failure);
-            expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([]);
+            expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
             expect(yield* bound.groups.get(group.id)).toEqual(Option.some(group));
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
@@ -570,7 +660,7 @@ export const groupMemberships = (harness: Harness) => {
               _tag: "GroupMembershipApplication.InactiveMember",
             });
             expect(yield* history(bound)).toEqual(before);
-            expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([]);
+            expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
             yield* run(bound, manager, add(group.id, humanId));
           }),
         ),
@@ -629,9 +719,9 @@ export const groupMemberships = (harness: Harness) => {
                     bound,
                     Effect.flatMap(Journal.Service, (journal) => journal.replay),
                   );
-                  expect(yield* bound.groupMemberships.listByGroup(saved.group.id)).toEqual([
-                    saved.membership,
-                  ]);
+                  expect(
+                    admitted(yield* bound.groupMemberships.listByGroup(saved.group.id)),
+                  ).toEqual([saved.membership]);
                   expect(yield* history(bound)).toEqual(saved.history);
                 }),
               ),
@@ -689,14 +779,21 @@ export const groupMemberships = (harness: Harness) => {
               storage,
               Effect.gen(function* () {
                 const bound = yield* boundTo(workspaceId);
-                expect(yield* bound.groupMemberships.listByGroup(saved.group.id)).toHaveLength(1);
+                expect(
+                  admitted(yield* bound.groupMemberships.listByGroup(saved.group.id)),
+                ).toHaveLength(1);
                 const events = yield* publish(
                   bound,
                   Effect.flatMap(Journal.Service, (journal) =>
                     journal.read({ name: GroupMembershipFacts.Added.name, limit: 100 }),
                   ),
                 );
-                expect(events).toHaveLength(1);
+                // One fact per admission, including the prepared groups' own: none twice.
+                const admissions = [
+                  ...(yield* bound.groupMemberships.listByGroup(saved.group.id)),
+                  ...(yield* bound.groupMemberships.listByGroup(saved.otherGroup.id)),
+                ];
+                expect(events).toHaveLength(admissions.length);
               }),
             ),
           );
@@ -723,7 +820,11 @@ export const groupMemberships = (harness: Harness) => {
               const ownerIdentity = Identity.MemberReference.cases.Human.make({
                 id: workspace.createdBy,
               });
-              const group = yield* gateway.asMember(workspace.id, ownerIdentity, create("Managed"));
+              const group = yield* gateway.asMember(
+                workspace.id,
+                ownerIdentity,
+                create("Managed", [managerId]),
+              );
               const call = (memberId: Member.Id) =>
                 gateway.asMember(workspace.id, managerIdentity, add(group.id, memberId));
               expect(yield* Effect.flip(call(humanId))).toMatchObject({
@@ -811,15 +912,18 @@ export const groupMemberships = (harness: Harness) => {
               ...bound,
               context: Context.add(bound.context, GroupMembershipStore.Service, {
                 ...bound.groupMemberships,
-                findActive: () =>
-                  Effect.succeedSome({
-                    id: GroupMembership.Id.make("wrong-membership"),
-                    workspaceId,
-                    groupId: otherGroup.id,
-                    memberId: humanId,
-                    admittedAt: group.createdAt,
-                    status: "active",
-                  }),
+                // The owner's own admission reads correctly; the human's comes back wrong.
+                findActive: (groupId: Group.Id, memberId: Member.Id) =>
+                  memberId === humanId
+                    ? Effect.succeedSome({
+                        id: GroupMembership.Id.make("wrong-membership"),
+                        workspaceId,
+                        groupId: otherGroup.id,
+                        memberId: humanId,
+                        admittedAt: group.createdAt,
+                        status: "active" as const,
+                      })
+                    : bound.groupMemberships.findActive(groupId, memberId),
               }),
             };
             expect(
@@ -838,7 +942,7 @@ export const groupMemberships = (harness: Harness) => {
               _tag: "GroupAudience.InvalidResponse",
             });
             expect(yield* history(bound)).toEqual(before);
-            expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([]);
+            expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
           }),
         ),
       ),
@@ -875,9 +979,6 @@ export const groupMemberships = (harness: Harness) => {
               }
               expect(yield* bound.groupMemberships.get(elsewhere.id)).toEqual(
                 Option.some(elsewhere),
-              );
-              expect(yield* bound.groupMemberships.findActive(group.id, managerId)).toEqual(
-                Option.none(),
               );
               expect(yield* bound.groups.get(group.id)).toEqual(Option.some(group));
               const events = yield* publish(
@@ -924,12 +1025,15 @@ export const groupMemberships = (harness: Harness) => {
             Effect.gen(function* () {
               const { bound, group, owner } = yield* prepare();
               const admissions = [];
-              for (const actor of [memberActor(humanId), memberActor(agentId), owner]) {
+              for (const actor of [memberActor(humanId), memberActor(agentId)]) {
                 admissions.push({
                   actor,
                   admission: yield* run(bound, owner, add(group.id, actor.memberId)),
                 });
               }
+              // The owner already belongs to the prepared group.
+              const own = yield* bound.groupMemberships.findActive(group.id, owner.memberId);
+              admissions.push({ actor: owner, admission: Option.getOrThrow(own) });
               yield* publish(
                 bound,
                 Effect.flatMap(Journal.Service, (journal) =>
@@ -1089,11 +1193,13 @@ export const groupMemberships = (harness: Harness) => {
                 memberId: foreignWorkspace.ownerMemberId,
                 identity: { _tag: "Human", id: foreignWorkspace.createdBy },
               });
-              const foreignGroup = yield* run(foreign, foreignActor, create("Foreign"));
-              const foreignAdmission = yield* run(
+              const foreignGroup = yield* run(
                 foreign,
                 foreignActor,
-                add(foreignGroup.id, foreignActor.memberId),
+                create("Foreign", [foreignActor.memberId]),
+              );
+              const foreignAdmission = Option.getOrThrow(
+                yield* foreign.groupMemberships.findActive(foreignGroup.id, foreignActor.memberId),
               );
               const before = yield* history(bound);
               expect(yield* Effect.flip(run(bound, owner, remove(old)))).toMatchObject({
@@ -1147,14 +1253,17 @@ export const groupMemberships = (harness: Harness) => {
               for (const memberId of [humanId, agentId])
                 for (const groupId of [group.id, otherGroup.id])
                   active.push(yield* run(bound, owner, add(groupId, memberId)));
-              const untouched = yield* run(bound, owner, add(group.id, managerId));
+              // The manager already belongs to the prepared group, and stays in it.
+              const untouched = Option.getOrThrow(
+                yield* bound.groupMemberships.findActive(group.id, managerId),
+              );
               const issuedAt = yield* DateTime.now;
               const invitation = {
                 id: Invitation.Id.make("pending-before-membership"),
                 workspaceId,
                 inviterMemberId: owner.memberId,
                 recipientId: Identity.HumanId.make("new-human"),
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
                 issuedAt,
                 expiresAt: DateTime.add(issuedAt, { hours: 1 }),
               };
@@ -1435,17 +1544,17 @@ export const groupMemberships = (harness: Harness) => {
                 Effect.gen(function* () {
                   const bound = yield* boundTo(workspaceId);
                   const expected = saved.admissions.toSorted((a, b) => (a.id < b.id ? -1 : 1));
-                  expect(yield* bound.groupMemberships.listByGroup(saved.group.id)).toEqual(
-                    expected,
-                  );
+                  expect(
+                    admitted(yield* bound.groupMemberships.listByGroup(saved.group.id)),
+                  ).toEqual(expected);
                   yield* storage.discardProjections;
                   yield* publish(
                     bound,
                     Effect.flatMap(Journal.Service, (journal) => journal.replay),
                   );
-                  expect(yield* bound.groupMemberships.listByGroup(saved.group.id)).toEqual(
-                    expected,
-                  );
+                  expect(
+                    admitted(yield* bound.groupMemberships.listByGroup(saved.group.id)),
+                  ).toEqual(expected);
                   expect(yield* bound.groupMemberships.listActiveByMember(humanId)).toEqual([]);
                   expect(yield* history(bound)).toEqual(saved.history);
                 }),
@@ -1745,7 +1854,11 @@ export const groupMemberships = (harness: Harness) => {
               const ownerIdentity = Identity.MemberReference.cases.Human.make({
                 id: workspace.createdBy,
               });
-              const group = yield* gateway.asMember(workspace.id, ownerIdentity, create("Managed"));
+              const group = yield* gateway.asMember(
+                workspace.id,
+                ownerIdentity,
+                create("Managed", [workspace.ownerMemberId]),
+              );
               const admission = yield* gateway.asMember(
                 workspace.id,
                 ownerIdentity,

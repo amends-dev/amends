@@ -7,7 +7,7 @@ import { Workspace } from "../../src/workspace/workspace.ts";
 const workspaceId = Workspace.Id.make("workspace-one");
 const read = Permission.make("it.read", {
   targetKind: "Member",
-  builtinTier: "viewer",
+  builtinTier: "member",
 });
 const manage = Permission.make("it.manage", {
   targetKind: "Member",
@@ -20,7 +20,7 @@ const transfer = Permission.make("it.transfer", {
 
 it("built-in role construction includes lower tiers without leaking higher-tier permissions", () => {
   expect(BuiltinRoles.make(workspaceId, [read, manage, transfer])).toEqual([
-    { id: BuiltinRoles.ViewerId, workspaceId, name: "Viewer", permissions: [read.name] },
+    { id: BuiltinRoles.MemberId, workspaceId, name: "Member", permissions: [read.name] },
     {
       id: BuiltinRoles.AdministratorId,
       workspaceId,
@@ -59,7 +59,7 @@ it("invalid or duplicate declarations cannot silently produce built-in roles", (
   for (const tier of [undefined, "unknown"]) {
     const malformed = Permission.make("it.invalid", {
       targetKind: "Member",
-      builtinTier: "viewer",
+      builtinTier: "member",
     });
     Reflect.set(malformed, "builtinTier", tier);
     expect(() => BuiltinRoles.make(workspaceId, [malformed])).toThrow("Schema validation failed");
@@ -71,86 +71,45 @@ it("invalid or duplicate declarations cannot silently produce built-in roles", (
  * them until a host with a later one upgrades it, so an entry never changes once released: to
  * change the declarations, add the next revision here and raise `BuiltinRoles.revision`.
  */
-const revisionOne = {
-  [BuiltinRoles.ViewerId]: [
-    "member.read",
-    "assignment.read",
-    "group.read",
-    "group.follow",
-    "thread.start",
-    "thread.read",
-    "thread.publish",
-    "thread.follow",
-    "agent.use",
-  ],
-  [BuiltinRoles.AdministratorId]: [
-    "member.read",
-    "member.remove",
-    "invitation.manage",
-    "assignment.read",
-    "assignment.manage",
-    "group.create",
-    "group.read",
-    "group.follow",
-    "group.membership.manage",
-    "thread.start",
-    "thread.read",
-    "thread.publish",
-    "thread.follow",
-    "agent.use",
-  ],
-  [BuiltinRoles.OwnerId]: [
-    "member.read",
-    "member.remove",
-    "invitation.manage",
-    "assignment.read",
-    "assignment.manage",
-    "workspace.transfer-ownership",
-    "group.create",
-    "group.read",
-    "group.follow",
-    "group.membership.manage",
-    "thread.start",
-    "thread.read",
-    "thread.publish",
-    "thread.follow",
-    "agent.use",
-  ],
-};
-/** A bundle with `group.rename` in its declaration place, after `group.follow`. */
-const withRename = (permissions: ReadonlyArray<string> = []) =>
-  permissions.flatMap((name) => (name === "group.follow" ? [name, "group.rename"] : [name]));
-/**
- * A bundle with `group.join` in its declaration place: after `group.membership.manage` where the
- * bundle has it, else after the group permissions before it.
- */
-const withJoin = (permissions: ReadonlyArray<string> = []) => {
-  const after = permissions.includes("group.membership.manage")
-    ? "group.membership.manage"
-    : permissions.includes("group.rename")
-      ? "group.rename"
-      : "group.follow";
-  return permissions.flatMap((name) => (name === after ? [name, "group.join"] : [name]));
-};
+const conversation = [
+  "group.create",
+  "group.read",
+  "group.follow",
+  "group.rename",
+  "group.membership.manage",
+  "group.join",
+  "thread.start",
+  "thread.read",
+  "thread.publish",
+  "thread.follow",
+  "agent.use",
+];
 const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<string>>>>> = {
-  1: revisionOne,
-  2: {
-    ...revisionOne,
-    [BuiltinRoles.OwnerId]: ["workspace.rename", ...(revisionOne[BuiltinRoles.OwnerId] ?? [])],
-  },
-  // Revision 3 lets administrators and owners rename team groups.
-  3: {
-    ...revisionOne,
-    [BuiltinRoles.AdministratorId]: withRename(revisionOne[BuiltinRoles.AdministratorId]),
-    [BuiltinRoles.OwnerId]: ["workspace.rename", ...withRename(revisionOne[BuiltinRoles.OwnerId])],
-  },
-  // Revision 4 lets everyone join public groups.
-  4: {
-    [BuiltinRoles.ViewerId]: withJoin(revisionOne[BuiltinRoles.ViewerId]),
-    [BuiltinRoles.AdministratorId]: withJoin(withRename(revisionOne[BuiltinRoles.AdministratorId])),
+  // Members take part in and start conversations, and create groups; administrators manage
+  // people and moderate public groups; the owner also renames and transfers the workspace.
+  1: {
+    [BuiltinRoles.MemberId]: ["member.read", "assignment.read", ...conversation],
+    [BuiltinRoles.AdministratorId]: [
+      "member.read",
+      "member.remove",
+      "invitation.manage",
+      "assignment.read",
+      "assignment.manage",
+      ...conversation.flatMap((name) =>
+        name === "group.rename" ? [name, "group.moderate"] : [name],
+      ),
+    ],
     [BuiltinRoles.OwnerId]: [
       "workspace.rename",
-      ...withJoin(withRename(revisionOne[BuiltinRoles.OwnerId])),
+      "member.read",
+      "member.remove",
+      "invitation.manage",
+      "assignment.read",
+      "assignment.manage",
+      "workspace.transfer-ownership",
+      ...conversation.flatMap((name) =>
+        name === "group.rename" ? [name, "group.moderate"] : [name],
+      ),
     ],
   },
 };

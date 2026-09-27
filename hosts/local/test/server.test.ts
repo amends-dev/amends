@@ -35,7 +35,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               await call(alice.id, "POST", `${base}/invitations`, {
                 recipientId: bob.id,
                 expiresAt,
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
               })
             ).body,
           );
@@ -121,7 +121,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const issued = await call(alice.id, "POST", `${base}/invitations`, {
             recipientId: bob.id,
             expiresAt,
-            roleId: BuiltinRoles.ViewerId,
+            roleId: BuiltinRoles.MemberId,
           });
           const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
           const joined = Schema.decodeUnknownSync(Member.Record)(
@@ -145,7 +145,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             (await call(bob.id, "GET", `${base}/roles`)).body,
           );
           expect(choices.filter(({ assignable }) => assignable).map(({ role }) => role.id)).toEqual(
-            [BuiltinRoles.ViewerId],
+            [BuiltinRoles.MemberId],
           );
           expect(
             (
@@ -161,7 +161,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               await call(bob.id, "POST", `${base}/invitations`, {
                 recipientId: charlie.id,
                 expiresAt,
-                roleId: BuiltinRoles.ViewerId,
+                roleId: BuiltinRoles.MemberId,
               })
             ).status,
           ).toBe(201);
@@ -256,7 +256,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
           recipientId: bob.id,
           expiresAt,
-          roleId: BuiltinRoles.ViewerId,
+          roleId: BuiltinRoles.MemberId,
         });
         expect(issued.status).toBe(201);
         const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
@@ -285,7 +285,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           {
             recipientId: charlie.id,
             expiresAt,
-            roleId: BuiltinRoles.ViewerId,
+            roleId: BuiltinRoles.MemberId,
           },
         );
         expect(issuedAgain.status).toBe(201);

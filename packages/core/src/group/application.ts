@@ -48,7 +48,14 @@ export type Error =
   | InvalidResponse;
 /** Creating can also meet a request key used before for a different group. */
 export type CreateError = Error | RequestReceipts.Error | GroupStore.Failure | NotFound;
-export type RenameError = Error | GroupStore.Failure | NotFound | NotRenamable | Changed;
+export type RenameError =
+  | Error
+  | GroupStore.Failure
+  | GroupMembershipStore.Failure
+  | GroupAudience.InvalidResponse
+  | NotFound
+  | NotRenamable
+  | Changed;
 
 export type ReadError =
   | Authorization.Error
@@ -74,10 +81,11 @@ export interface Interface {
     options?: Request.Options,
   ) => Effect.Effect<Group.Record, CreateError, Actor.Service>;
   /**
-   * Require group.rename on the group, then give a team group a new name. Renaming needs no
-   * membership of the group; a missing or foreign group is NotFound after that check, and a direct
-   * group, named by its members, is NotRenamable. The same name again records nothing; otherwise
-   * a name other than `expectedName` is Changed, and nothing is recorded.
+   * Require group.rename on the group and membership of it, then give a team group a new name.
+   * No workspace role reaches a group from outside it: to a non-member, a group is NotFound, as a
+   * missing or foreign one is. A direct group, named by its members, is NotRenamable. The same name
+   * again records nothing; otherwise a name other than `expectedName` is Changed, and nothing is
+   * recorded.
    */
   readonly rename: (
     input: Group.RenameInput,
@@ -101,10 +109,6 @@ export interface Interface {
   readonly listPublic: (
     options: Group.ListOptions,
   ) => Effect.Effect<ReadonlyArray<Group.PublicItem>, ReadError, Actor.Service>;
-  /** Inspect a known group's metadata with management authority, without granting audience access. */
-  readonly getForManagement: (
-    groupId: Group.Id,
-  ) => Effect.Effect<Group.Record, ReadError, Actor.Service>;
 }
 
 /** What a keyed group creation created, so that a retry returns it. */
@@ -254,6 +258,14 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
           groupId: request.groupId,
         }),
       ]);
+      // Only its members may rename a group; to anyone else it is missing.
+      yield* audience
+        .require(request.groupId)
+        .pipe(
+          Effect.catchTag("GroupAudience.NotMember", () =>
+            Effect.fail(new NotFound({ groupId: request.groupId })),
+          ),
+        );
       const group = yield* load(request.groupId);
       if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
       if (group.name === request.name) return group;
@@ -269,19 +281,6 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const getForManagement = Effect.fn("GroupApplication.getForManagement")(function* (
-    groupId: Group.Id,
-  ) {
-    const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* authorization.require([
-      Requirement.make(GroupMembershipPermissions.Manage, {
-        _tag: "Group",
-        workspaceId,
-        groupId: id,
-      }),
-    ]);
-    return yield* load(id);
-  });
   const invalidList = (message: string) => new InvalidResponse({ message });
   const decodeFailure = (cause: Schema.SchemaError) =>
     invalidList(`Group storage returned invalid data: ${cause.message}`);
@@ -302,11 +301,15 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
           groupId,
         }),
         Requirement.make(GroupPermissions.Rename, { _tag: "Group", workspaceId, groupId }),
+        Requirement.make(GroupPermissions.Moderate, { _tag: "Group", workspaceId, groupId }),
       ]),
     );
-    const ids = candidates.filter((_, index) => allowed[index * 3] === true);
-    const managed = new Set(candidates.filter((_, index) => allowed[index * 3 + 1] === true));
-    const renamers = new Set(candidates.filter((_, index) => allowed[index * 3 + 2] === true));
+    const granted = (offset: number) =>
+      new Set(candidates.filter((_, index) => allowed[index * 4 + offset] === true));
+    const ids = [...granted(0)];
+    const managed = granted(1),
+      renamers = granted(2),
+      moderators = granted(3);
     const records = new Map<Group.Id, Group.Record>();
     for (const found of yield* groups.getMany(ids)) {
       const group = yield* Schema.decodeEffect(Schema.toType(Group.Record))(found).pipe(
@@ -384,6 +387,11 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         pending: pending.get(groupId) ?? 0,
         // Direct groups keep the members they started with, and are named by them.
         manageable: group.kind === "Team" && managed.has(groupId),
+        // Any member tidies a private group; removing people from a public one is moderation.
+        membersRemovable:
+          group.kind === "Team" &&
+          managed.has(groupId) &&
+          (group.visibility === "Private" || moderators.has(groupId)),
         renamable: group.kind === "Team" && renamers.has(groupId),
       });
     }
@@ -497,7 +505,6 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     get,
     listMine,
     listPublic,
-    getForManagement,
   });
 });
 

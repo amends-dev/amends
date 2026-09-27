@@ -139,7 +139,7 @@ export const ownership = (harness: Harness) => {
                 yield* Effect.flip(
                   Operations.assign(workspace.id, alice, {
                     memberId: workspace.ownerMemberId,
-                    roleId: BuiltinRoles.ViewerId,
+                    roleId: BuiltinRoles.MemberId,
                   }),
                 ),
               ).toMatchObject({ _tag: "Delegation.Denied" });

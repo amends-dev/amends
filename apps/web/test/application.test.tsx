@@ -620,7 +620,7 @@ it("points an invited identity to its invitation instead of reporting no access"
               id: "invitation-one",
               workspaceId: "one",
               recipientId: "alice",
-              roleId: "builtin:viewer",
+              roleId: "builtin:member",
               inviterMemberId: "owner-one",
               issuedAt: "2026-09-25T12:00:00.000Z",
               expiresAt: "2099-01-01T00:00:00.000Z",
@@ -903,6 +903,7 @@ const managed = {
   following: false,
   pending: 0,
   manageable: true,
+  membersRemovable: true,
   renamable: true,
 };
 it("manages a group's members from its header, and leaving returns to the workspace", async () => {

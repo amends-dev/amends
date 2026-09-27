@@ -113,7 +113,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   memberId: writer.memberId,
                   source: {
                     _tag: "Role",
-                    roleId: BuiltinRoles.ViewerId,
+                    roleId: BuiltinRoles.MemberId,
                     scope: { _tag: "Workspace", workspaceId },
                   },
                 }),

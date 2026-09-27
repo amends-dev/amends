@@ -162,7 +162,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
       candidates,
     });
   }).pipe(Effect.withSpan("OwnershipApplication.get"));
-  const builtins = [BuiltinRoles.ViewerId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
+  const builtins = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
   const createAssignment = Effect.fn("OwnershipApplication.createAssignment")(function* (
     memberId: Member.Id,
     roleId: Role.Id,

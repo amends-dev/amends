@@ -166,7 +166,7 @@ export const make = (harness: Harness) => {
                 memberId: viewer.memberId,
                 source: {
                   _tag: "Role",
-                  roleId: BuiltinRoles.ViewerId,
+                  roleId: BuiltinRoles.MemberId,
                   scope: { _tag: "Workspace", workspaceId: bound.workspace.workspaceId },
                 },
               });
@@ -218,7 +218,7 @@ export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>)
 export const request = (
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
-  roleId: Role.Id = BuiltinRoles.ViewerId,
+  roleId: Role.Id = BuiltinRoles.MemberId,
 ): Invitation.IssueInput => ({ recipientId, expiresAt, roleId });
 
 /**
