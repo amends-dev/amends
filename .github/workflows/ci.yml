@@ -70,7 +70,8 @@ jobs:
             args: --project postgresql --shard=3/3
           - suite: apps
             args: >-
-              --project @amends/icons --project @amends/ui --project @amends/client
+              --project @amends/icons --project @amends/ui --project @amends/ui-v2
+              --project @amends/client
               --project @amends/features
               --project @amends/web --project @amends/desktop
     env:
@@ -99,6 +100,9 @@ jobs:
         run: bun run --bun vite build
       - name: UI workshop
         working-directory: apps/ui
+        run: bun run --bun storybook build --output-dir dist --disable-telemetry
+      - name: UI v2 workshop
+        working-directory: apps/ui-v2
         run: bun run --bun storybook build --output-dir dist --disable-telemetry
       - name: Feature workshop
         working-directory: apps/features

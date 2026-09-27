@@ -1,0 +1,45 @@
+{
+  "name": "@amends/ui-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "**/*.css.ts",
+    "**/*.css",
+    "./src/foundations/typography/fonts.ts"
+  ],
+  "exports": {
+    "./foundations/color": "./src/foundations/color/tokens.ts",
+    "./foundations/typography": "./src/foundations/typography/tokens.ts",
+    "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts",
+    "./foundations/space": "./src/foundations/space/tokens.ts",
+    "./foundations/elevation": "./src/foundations/elevation/tokens.ts",
+    "./foundations/theme": "./src/foundations/theme/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6010 --no-open --disable-telemetry",
+    "build": "bun run typecheck && bun run --bun storybook build --output-dir dist --disable-telemetry",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun run --bun vitest run --config vite.config.ts"
+  },
+  "dependencies": {
+    "@amends/icons": "workspace:*",
+    "@fontsource/inter": "^5.2.8",
+    "@vanilla-extract/css": "^1.21.2"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.9",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-docs": "10.6.0",
+    "@vanilla-extract/vite-plugin": "^5.2.6",
+    "happy-dom": "^20.10.6",
+    "solid-js": "^1.9.12",
+    "storybook": "10.6.0",
+    "storybook-solidjs-vite": "10.7.2",
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.14"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.12"
+  }
+}

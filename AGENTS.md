@@ -72,6 +72,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   `desktop` consume these libraries and own route
   trees, page composition, API URL, and persistence configuration. `desktop` owns the
   Tauri shell; platform APIs stay in the entry apps.
+  `ui-v2` is the pattern-based design system built from the Lunacy mocks in
+  `design-system/Amends Group Exploration.free`, which are its visual reference. It follows
+  the same UI-only rules and replaces `ui` and `features` screen by screen: its screens are
+  presentational, the connected logic in `features` moves into `client` as hooks, and web and
+  desktop connect the two. Until a screen moves, apps keep using `ui` and `features`.
   The legacy UI implementation and `design-system` package were removed; the current
   `ui` package is the renamed shared workshop. Apps may install UI
   dependencies and consume shared packages. Run desktop's `check:native` after

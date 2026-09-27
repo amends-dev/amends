@@ -4,6 +4,8 @@
   and a separate metadata catalog through `@amends/icons`.
 - [UI](ui/README.md) provides the shared Solid foundations, primitives,
   and compositions, verified in its standalone Storybook workshop.
+- [UI v2](ui-v2/README.md) is the pattern-based design system from the Lunacy mocks. It
+  replaces UI and features screen by screen; so far it has its foundations.
 - [client](client/README.md) owns headless sessions, API/query state, and pure route
   helpers. It has no dependency on UI, styling, router libraries, or Storybook.
 - [features](features/README.md) connects client and UI, with a separate live backend workshop.
@@ -33,11 +35,13 @@ From the repository root after `bun install`:
 bun run --filter @amends/web dev
 bun run --filter @amends/desktop dev
 bun run --filter @amends/ui dev
+bun run --filter @amends/ui-v2 dev
 bun run --filter @amends/features dev
 ```
 
 Run each in its own terminal. The UI workshop serves at
-`http://127.0.0.1:6007/`; features uses port 6008 and requires PostgreSQL. Client has no workshop.
+`http://127.0.0.1:6007/` and UI v2 at `http://127.0.0.1:6010/`; features uses port 6008
+and requires PostgreSQL. Client has no workshop.
 Desktop requires [native tools](desktop/README.md#run-and-verify); web and UI
 Storybook need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
 

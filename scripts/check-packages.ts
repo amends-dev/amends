@@ -54,7 +54,7 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
         errors.push(`${path}: ${section}.${name} is renamed or retired; use @amends/ui.`);
       }
       if (
-        path === "apps/ui/package.json" &&
+        (path === "apps/ui/package.json" || path === "apps/ui-v2/package.json") &&
         ((name.startsWith("@amends/") && name !== "@amends/icons") ||
           name === "effect" ||
           name.startsWith("@effect/atom-") ||
@@ -101,7 +101,7 @@ for await (const path of new Bun.Glob(
 
 // UI owns presentation; client/api owns shared client contract imports.
 for await (const path of new Bun.Glob(
-  "apps/{icons,ui,client,features,web,desktop}/{src,test,workshop,.storybook}/**/*.{ts,tsx}",
+  "apps/{icons,ui,ui-v2,client,features,web,desktop}/{src,test,workshop,.storybook}/**/*.{ts,tsx}",
 ).scan({
   cwd: root,
 })) {
@@ -159,6 +159,7 @@ for await (const path of new Bun.Glob(
     )
       errors.push(`${path}: ${dependency} is renamed or retired; use @amends/ui.`);
     const uiImport = dependency === "@amends/ui" || dependency.startsWith("@amends/ui/");
+    const uiV2Import = dependency === "@amends/ui-v2" || dependency.startsWith("@amends/ui-v2/");
     const clientImport =
       dependency === "@amends/client" || dependency.startsWith("@amends/client/");
     const featureImport =
@@ -215,6 +216,24 @@ for await (const path of new Bun.Glob(
         `${path}: UI must remain presentation-only and must not import client, API, or platform code (${dependency}).`,
       );
     if (
+      path.startsWith("apps/ui-v2/") &&
+      ((dependency.startsWith("@amends/") && !uiV2Import && !iconImport) ||
+        dependency === "effect" ||
+        dependency.startsWith("effect/") ||
+        dependency.startsWith("@effect/atom-") ||
+        dependency === "@solidjs/router" ||
+        dependency.startsWith("@solidjs/router/") ||
+        dependency.startsWith("@tauri-apps/") ||
+        (target.startsWith(resolve(root, "apps") + "/") &&
+          !target.startsWith(resolve(root, "apps/ui-v2") + "/")) ||
+        target.startsWith(resolve(root, "packages") + "/") ||
+        target.startsWith(resolve(root, "adapters") + "/") ||
+        target.startsWith(resolve(root, "hosts") + "/"))
+    )
+      errors.push(
+        `${path}: UI v2 must remain presentation-only and must not import client, API, or platform code (${dependency}).`,
+      );
+    if (
       path.startsWith("apps/client/") &&
       ((dependency.startsWith("@amends/") && !clientImport && !contractImport) ||
         dependency.startsWith("@tauri-apps/") ||
@@ -244,6 +263,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and icons/ui/client/features/web/desktop import boundaries.`,
+    `Checked ${packages.length} shared packages and icons/ui/ui-v2/client/features/web/desktop import boundaries.`,
   );
 }
