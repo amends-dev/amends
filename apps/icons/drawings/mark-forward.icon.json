@@ -1,0 +1,17 @@
+{
+  "name": "mark-forward",
+  "title": "Forward mark",
+  "categories": ["actions", "navigation"],
+  "keywords": ["mark", "forward", "right", "next", "open"],
+  "shapes": [
+    { "line": [4, 12, 20, 12] },
+    {
+      "polyline": [
+        [13, 5],
+        [20, 12],
+        [13, 19]
+      ],
+      "corner": 0
+    }
+  ]
+}

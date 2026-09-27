@@ -12,9 +12,7 @@
   },
   "dependencies": {
     "@amends/client": "workspace:*",
-    "@amends/features": "workspace:*",
     "@amends/icons": "workspace:*",
-    "@amends/ui": "workspace:*",
     "@amends/ui-v2": "workspace:*",
     "@solidjs/router": "catalog:",
     "solid-js": "^1.9.12"

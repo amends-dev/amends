@@ -57,11 +57,10 @@ at once; the feed then delivers the same commit and refreshes those reads again.
 ## Pages under live data
 
 Refreshes replace decoded objects, so lists key their rows by domain ID: UI v2 screens through
-`internal/keyed.tsx`, and the remaining connected features through
-`apps/features/src/internal/keyed.ts`. Rows keep focus, open dialogs, and state. Editors
-follow stored values until edited. A draft keeps the value it was made against, so a change
-saved elsewhere meanwhile makes the save conflict instead of overwriting it; an explicit
-refresh discards drafts. Background refreshes never mark settings pending or lock commands.
+`internal/keyed.tsx`. Rows keep focus, open dialogs, and state. Editors follow stored values
+until edited. A draft keeps the value it was made against, so a change saved elsewhere meanwhile
+makes the save conflict instead of overwriting it; an explicit refresh keeps the draft and makes
+it against the values then shown. Background refreshes never mark settings pending or lock commands.
 
 ## Scope and limits
 

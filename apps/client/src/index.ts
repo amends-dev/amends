@@ -26,15 +26,33 @@ export {
   type CreateWorkspaceController,
   type CreateWorkspaceState,
 } from "./workspaces/create.ts";
-export { useSettings, type SettingsController, type SettingsError } from "./settings/controller.ts";
+export {
+  useSettings,
+  type SettingsChange,
+  type SettingsController,
+  type SettingsError,
+  type SettingsOptions,
+} from "./settings/controller.ts";
+export {
+  useWorkspaceSettings,
+  type MemberFilter,
+  type SettingsAccess,
+  type SettingsAction,
+  type SettingsDone,
+  type SettingsFailure,
+  type SettingsInvitation,
+  type SettingsInvitationStatus,
+  type SettingsMember,
+  type SettingsPerson,
+  type SettingsRole,
+  type WorkspaceSettingsView,
+} from "./settings/views.ts";
 export type { WorkspaceFailure } from "./api/failures.ts";
 export {
   type SettingsData,
   type SettingsSection,
   type SettingsCommand,
   invitationIntent,
-  formatInstant,
-  invitationStatus,
 } from "./api/settings.ts";
 export {
   useWorkspacePicker,

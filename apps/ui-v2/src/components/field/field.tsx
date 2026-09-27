@@ -5,6 +5,7 @@ import * as s from "./field.css.ts";
 
 interface FieldIds {
   readonly control: string;
+  readonly label: string;
   readonly hint: string;
   readonly error: string;
   readonly hasHint: () => boolean;
@@ -18,6 +19,8 @@ export function useField() {
   if (!field) return undefined;
   return {
     id: field.control,
+    /** The Label's id, for a control that names itself by reference, such as a Select. */
+    labelId: field.label,
     describedBy: () =>
       [field.hasHint() && field.hint, field.hasError() && field.error].filter(Boolean).join(" ") ||
       undefined,
@@ -38,6 +41,7 @@ export function Root(props: RootProps) {
   const id = createUniqueId();
   const ids: FieldIds = {
     control: `field-${id}`,
+    label: `field-${id}-label`,
     hint: `field-${id}-hint`,
     error: `field-${id}-error`,
     hasHint: () => Boolean(local.hint),
@@ -68,7 +72,14 @@ export type LabelProps = JSX.LabelHTMLAttributes<HTMLLabelElement>;
 export function Label(props: LabelProps) {
   const field = useContext(Context);
   const [local, native] = splitProps(props, ["class"]);
-  return <label {...native} for={field?.control} class={classes(s.label, local.class)} />;
+  return (
+    <label
+      id={field?.label}
+      {...native}
+      for={field?.control}
+      class={classes(s.label, local.class)}
+    />
+  );
 }
 
 export type AlertProps = Omit<JSX.HTMLAttributes<HTMLParagraphElement>, "role">;

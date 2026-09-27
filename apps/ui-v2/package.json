@@ -26,6 +26,7 @@
     "./components/member-picker": "./src/components/member-picker/index.ts",
     "./components/menu": "./src/components/menu/index.ts",
     "./components/message": "./src/components/message/index.ts",
+    "./components/select": "./src/components/select/index.ts",
     "./components/tabs": "./src/components/tabs/index.ts",
     "./components/task-status": "./src/components/task-status/index.ts",
     "./components/toast": "./src/components/toast/index.ts",
@@ -47,11 +48,13 @@
     "./screens/group": "./src/screens/group/index.ts",
     "./screens/groups": "./src/screens/groups/index.ts",
     "./screens/inbox": "./src/screens/inbox/index.ts",
+    "./screens/settings": "./src/screens/settings/index.ts",
     "./screens/sign-in": "./src/screens/sign-in/index.ts",
     "./screens/standalone": "./src/screens/standalone/index.ts",
     "./screens/timeline": "./src/screens/timeline/index.ts",
     "./screens/workspace-navigation": "./src/screens/workspace-navigation/index.ts",
-    "./screens/workspaces": "./src/screens/workspaces/index.ts"
+    "./screens/workspaces": "./src/screens/workspaces/index.ts",
+    "./styles": "./src/styles.css.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6010 --no-open --disable-telemetry",

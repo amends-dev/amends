@@ -7,8 +7,7 @@ directory validation, workspace lookup, and pure route-path helpers.
 Client and the UI packages ([ui](../ui/README.md) and [ui-v2](../ui-v2/README.md)) are
 independent peers. Neither depends on the other, including in tests and development tooling.
 Client contains no page markup, CSS, router integration, or Storybook. Web and desktop wire
-client hooks to ui-v2 screens and own routes, navigation, and page composition; screens not
-yet moved still go through [features](../features/README.md), which is being retired. Solid
+client hooks to ui-v2 screens and own routes, navigation, and page composition. Solid
 providers/hooks are headless state bindings.
 The package lives under `apps/*` because these bindings use Solid and browser storage;
 portable backend packages under `packages/*` remain Effect-only.
@@ -48,8 +47,10 @@ portable backend packages under `packages/*` remain Effect-only.
 - `WorkspaceFeedProvider` keeps one workspace's reads current over its change feed while
   mounted, and `useWorkspaceFeed()` exposes `Connecting`, `Live`, `Reconnecting`, or `Ended`.
   Commits invalidate the reads they affect; see [live updates](../../docs/live-updates.md).
-- `useSettings(workspaceId, section)` composes keyed settings reads with commands that refresh
-  them before reporting. `revision` counts explicit refreshes so editors can discard drafts.
+- `useWorkspaceSettings(workspaceId, section, { done })` shapes one settings tab for its screens,
+  with drafts, per-change failures, and completion; see [Settings](#settings). It is built on
+  `useSettings(workspaceId, section)`, which composes keyed settings reads with commands that
+  refresh them before reporting.
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
@@ -66,7 +67,7 @@ portable backend packages under `packages/*` remain Effect-only.
 Only `src/api` imports the HTTP contract and gateway session/directory schemas.
 Client cannot import UI, icons, styling, Storybook, router libraries, platform entry
 points, or backend implementations. UI cannot import client or API code. The repository
-boundary check enforces source imports and all dependency sections. Features and the platform apps
+boundary check enforces source imports and all dependency sections. The platform apps
 own the rendering boundary and may consume both public package surfaces.
 
 ## Session lifetime
@@ -153,7 +154,10 @@ codes; the screens that show them own the reader-facing text.
 ## Settings
 
 `useSettings(workspaceId, section)` owns one mounted settings scope, with typed reads,
-mutations, failure codes (`SettingsError`), and explicit refresh. Only stale failures set
+mutations, failure codes (`SettingsError`), and explicit refresh. The Workspace section reads
+settings and ownership; Members adds the roster and, for a reader who may read them, the
+invitations. Its `settled` option hears each change once its result is shown, including one whose
+read-back failed and succeeded on a later refresh. Only stale failures set
 `needsRefresh`, as does a completed command whose result could not be read back
 (`refresh-failed`); after a failed request or invalid input the reader can send again at once. Remount it when workspace or
 section identity changes. Its reads are keyed atoms, so the workspace change feed refreshes
@@ -164,7 +168,18 @@ refresh starts. `useMemberName(workspaceId, saved)` changes what people in a wor
 reader: `reset` starts from their name there or a suggestion, and `ready` holds while the draft is
 a valid, different name. The rename refreshes the members and the directory, and a
 `workspace.member.renamed` commit on the feed refreshes them for everyone else.
-Requests are credential-scoped and cancelled on disposal. See
+Requests are credential-scoped and cancelled on disposal.
+
+`useWorkspaceSettings(workspaceId, section, { done })` is what the settings screens connect to.
+It shapes the workspace, its owner and transfer candidates, the roster (each member's workspace
+role, the roles the reader may give them, their access, and whether they may be removed), and
+invitations newest first with `pending`, `accepted`, `expired`, or `revoked`. It filters the roster
+by search and Active/Removed, and counts active members from the directory. Each change keeps
+what it was made against: `rename`, `transfer`, `role`, `invite`, `remove`, and `revoke`.
+`failure()` names the change that failed, or `refresh` for a read, with its `SettingsError`;
+`stale()` holds changes until `refresh()`, which keeps drafts and makes them against the values
+now shown. An invitation retried with the same recipient and role reuses its request key.
+`done` hears each completed change with whom it concerned and the invitation it created. See
 [workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.
 
 ## Views

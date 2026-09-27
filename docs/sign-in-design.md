@@ -21,9 +21,8 @@ Web/desktop sign-in route
 [CodeInput](../apps/ui/src/primitives/code-input/README.md) and both
 [sign-in forms](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
 workshop. The [client controller](../apps/client/src/sign-in/README.md) implements
-the headless flow. The [connected feature](../apps/features/README.md) and live
-workshop are implemented. Web and desktop now own their sign-in pages, composing
-UI primitives and the shared feature with their existing session guards.
+the headless flow. Web and desktop own their sign-in pages, pairing `useSignIn` with the
+UI v2 sign-in screens behind their existing session guards.
 
 ## UI pieces
 

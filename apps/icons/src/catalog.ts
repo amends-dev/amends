@@ -136,6 +136,13 @@ export const iconCatalog = [
     exportName: "IconMarkEnvironments",
   },
   {
+    name: "mark-forward",
+    title: "Forward mark",
+    keywords: ["mark", "forward", "right", "next", "open"],
+    categories: ["actions", "navigation"],
+    exportName: "IconMarkForward",
+  },
+  {
     name: "mark-home",
     title: "Home mark",
     keywords: ["mark", "home", "overview", "house"],

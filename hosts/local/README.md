@@ -1,10 +1,5 @@
 # Local host
 
-The separate [feature workshop](../../apps/features/README.md) uses this host's real
-routes and runtime over temporary PostgreSQL databases. Its captured delivery,
-request gates, and clock controls live under `workshop/` and are absent from the
-normal server entry point.
-
 This Bun host serves the HTTP API on one machine over a PostgreSQL database. It
 composes the gateway, the PostgreSQL storage adapter, HTTP handlers, and development
 authentication for multiple workspaces.

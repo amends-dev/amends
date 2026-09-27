@@ -110,8 +110,9 @@ unread. There is no way to mark one seen without opening it. The inbox reads eac
 notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
 
-The Settings pages have no UI v2 design yet: they keep the previous UI's content inside a UI v2
-pane, in its theme, until they are designed. The mocks' Agents destination, search, group
+Settings follows the UI v2 mocks: Workspace and Members tabs, with invitations as modals from
+Members. A member's access lists each assignment by its role or permission and whether it covers
+the workspace or one item; which item is not shown. The mocks' Agents destination, search, group
 Tasks and Files tabs, reactions, and task references have no backend and are not shown.
 
 ## Storage cost
@@ -173,10 +174,8 @@ reactive association props; form state and validation timing stay with the consu
 with decorative cells and a compact presentation for narrow containers. SignInEmailForm
 adds controlled email entry, validation feedback, pending guards, and request errors in
 the UI workshop. SignInCodeForm adds code verification/resend presentation, independent
-pending states, recovery feedback, and change-email callbacks. The
-[connected SignIn feature](../apps/features/README.md) runs against real HTTP and
-temporary PostgreSQL data in its own workshop. Web and desktop own the sign-in
-pages, composing shared feature parts and UI primitives. Textarea and other specialized input types remain future
+pending states, recovery feedback, and change-email callbacks. Web and desktop now own
+sign-in over client hooks and UI v2 screens. Textarea and other specialized input types remain future
 pieces. The visible Radio primitive supports native selection and
 form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
 behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),

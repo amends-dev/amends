@@ -21,6 +21,7 @@ export { IconMarkCommand } from "./generated/mark-command.tsx";
 export { IconMarkConnections } from "./generated/mark-connections.tsx";
 export { IconMarkDone } from "./generated/mark-done.tsx";
 export { IconMarkEnvironments } from "./generated/mark-environments.tsx";
+export { IconMarkForward } from "./generated/mark-forward.tsx";
 export { IconMarkHome } from "./generated/mark-home.tsx";
 export { IconMarkMail } from "./generated/mark-mail.tsx";
 export { IconMarkMarketplace } from "./generated/mark-marketplace.tsx";

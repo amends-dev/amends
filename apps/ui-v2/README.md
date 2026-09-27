@@ -4,11 +4,10 @@ The pattern-based design system for web and desktop, built from the Lunacy mocks
 [`design-system/Amends Group Exploration.free`](../../design-system/). The mocks are the
 reference: open the file in Lunacy and compare a screen with its story.
 
-UI v2 replaces [`@amends/ui`](../ui/README.md) and [`@amends/features`](../features/README.md)
-screen by screen. Screens here are presentation only: data arrives as props and actions leave as
-callbacks. The connected logic that lives in features moves into
-[client](../client/README.md) as hooks, and web and desktop join the two. Until a screen is
-replaced, the apps keep using the existing packages.
+UI v2 has replaced [`@amends/ui`](../ui/README.md) and the retired `@amends/features` in web
+and desktop. Screens here are presentation only: data arrives as props and actions leave as
+callbacks. Connected logic lives in [client](../client/README.md) as hooks, and web and desktop
+join the two. `@amends/ui-v2/styles` holds the global styles app entry points load.
 
 ## Structure
 
@@ -131,9 +130,11 @@ and key rows by id through `internal/keyed.tsx`, so callers may pass freshly bui
 `Button` is primary, secondary, or quiet, with an optional icon or menu chevron. `Field` gives
 one control a label, help, and error text, and `Input` and the member picker pick those
 associations up. `SearchField` is the quiet filled search. `Choice` is one choice among boxed
-options, such as Public and Private, over native radio inputs. `Menu` wraps Kobalte's dropdown
-menu for filters, sorting, and pickers; it attaches inside the nearest dialog or Theme so it
-keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
+options, such as Public and Private, over native radio inputs. `Select` is one choice from a
+short list shaped like an Input, such as a role: Kobalte's listbox opens as wide as the field
+with a check by the current option, and inside a Field it takes the label and help. `Menu` wraps
+Kobalte's dropdown menu for filters, sorting, and pickers; it attaches inside the nearest dialog
+or Theme so it keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
 `MemberPicker` chooses several people by name: chosen people become removable chips and leave
 the list, arrows and Enter pick, and Backspace removes the last chip. It is a dropdown on wider
 layouts and an always-shown list on phones.
@@ -208,7 +209,22 @@ under day seams with who mentioned the reader, replied, or started a thread, whe
 said, how long ago, and an unread dot; the open one is set apart. Opening one calls `onOpen`.
 Unread's empty state is "You're all caught up" with View all activity; All's is "No activity yet".
 `ThreadPane` takes a notification `reason` for its subtitle ("Mention · #general") and a
-`backLabel` for phones. **Screens / Inbox** walks the mocks' selection flow. `ChangeName` and
+`backLabel` for phones. **Screens / Inbox** walks the mocks' selection flow.
+`SettingsPane` is Settings from the Lunacy "Workspace settings" frames, with Workspace and
+Members tabs, the member count, Invite people on Members, and loading and failed states.
+`WorkspaceSettings` is the Workspace tab: the name with Save changes, the owner with Transfer
+ownership, and details (the workspace ID with Copy ID, and its creator); touch layouts stack
+the details under the rest. `MemberSettings` is the Members tab: search and an Active/Removed
+filter above the roster's member, role, and status columns, then pending invitations with
+Revoke and View history; on phones the roster lists each role under the name, and the
+invitations become one card that opens the history. `MemberDetails` opens a member in the side
+panel with their role (`Select`, and Save role), access, and Remove member. `InviteMember`,
+`InvitationHistory`, `TransferOwnership`, `ConfirmRemoveMember`, and `ConfirmRevokeInvitation`
+are its modals. They take client's settings codes (`SettingsError`, by `SettingsAction`) and own
+the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
+completed change. A `Shell.Aside` rendered inside `Shell.Main`, as a page renders member details,
+attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
+inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and
 `NewMessage` are compact modals for the account
 menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
 destinations to show, an optional search, and an account menu (identity, appearance, switch

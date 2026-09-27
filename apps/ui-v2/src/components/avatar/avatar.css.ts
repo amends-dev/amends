@@ -3,7 +3,7 @@ import { avatarTones } from "../../foundations/color/tokens.ts";
 import { fontWeight } from "../../foundations/typography/tokens.ts";
 import { vars } from "../../foundations/theme/vars.css.ts";
 
-export const sizes = [22, 24, 28, 30, 32, 40] as const;
+export const sizes = [22, 24, 28, 30, 32, 40, 48] as const;
 export type AvatarSize = (typeof sizes)[number];
 
 const rem = (px: number) => `${px / 16}rem`;

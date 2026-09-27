@@ -16,7 +16,7 @@ bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends/icons
 bun run test --project @amends/ui
-bun run test --project @amends/features
+bun run test --project @amends/ui-v2
 bun run test --project @amends/client
 bun run test --project @amends/web
 bun run test --project @amends/desktop
@@ -333,20 +333,20 @@ tests do not prove that startup works against a database you configure. Follow t
 ## Application foundation
 
 Web and desktop declare their router trees as children of `Application`. Each
-owns a sign-in page built from UI primitives and declarative `SignIn` parts.
+owns a sign-in page over client hooks and UI v2 screens.
 Their tests exercise real form submission through the generated client, directory
 validation before navigation, persistence, safe return destinations, and explicit
 recovery. Web also verifies disposal when navigation interrupts verification.
-Live backend behavior is covered by the shared feature scenarios below; browser
+Live backend behavior is verified against a local host in the browser; browser
 and native review verify the actual app origins and layouts.
 
 Client's session and directory suites verify headless storage, scope lifetime, query
 state, authorization failure, and retry with isolated transports. They require no UI
 package or router. Web's application suite verifies safe redirects, route guards,
 workspace changes, and credential/request cleanup. Desktop's application suite tests
-its independent composition with the real hash router. Each app composes its bootstrap
-screens from UI primitives. UI's workshop at port 6007 covers the shared foundations
-and components; client has no Storybook dependency or workshop.
+its independent composition with the real hash router. Each app composes its screens
+from UI v2, whose workshop at port 6010 covers the patterns, components, and screens;
+client has no Storybook dependency or workshop.
 
 Client's [sign-in suite](../apps/client/test/sign-in.test.tsx) exercises the generated
 HTTP client through isolated fetch transports, including one that resolves after
@@ -356,16 +356,11 @@ response resolvers and observable abort signals verify email changes, form dispo
 credential replacement, and concurrent controllers without sleeps. These headless
 tests complement the app route tests.
 
-The features suite runs its Storybook play scenarios, for the Settings pages,
-against the real local HTTP handlers, gateway, development authentication, and PostgreSQL. Each
-scenario owns a temporary database, captured codes, and an in-memory session. Request gates and
-host controls exercise pending work and recovery without sleeps.
-The subprocess fixture disables environment-file loading and ignores
-`AMENDS_DATABASE_URL`; PostgreSQL discovery uses `AMENDS_POSTGRES_URL` or a local
-installation, and fails clearly if neither exists. Tests close scenarios before
-stopping the host. Run `bun run --filter @amends/features dev` for browser review
-at port 6008 (HMR 6009), and `bun run --filter @amends/features build` to verify its
-bundle. The static bundle needs the development backend/proxy to run live stories.
+Client's settings suite exercises `useWorkspaceSettings` over a scripted transport: how it
+shapes the roster and invitations, a stale role change kept through a refresh, an invitation
+retried with the same request key, and an invitation whose list refresh failed and completes
+once a refresh succeeds. UI v2's settings stories play the flows over a local fixture, and the
+apps' tests cover the settings routes, inviting, and removing.
 
 The local host's HTTP tests exercise desktop CORS preflights, including the generated
 client's `b3` tracing header, and 401 response headers.

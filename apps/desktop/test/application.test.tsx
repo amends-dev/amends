@@ -263,10 +263,14 @@ it("redirects the Settings entry to its workspace section and keeps the rail's s
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
-  expect(screen.getByRole("radio", { name: "Workspace" })).toBeChecked();
-  fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
+  const tabs = () => within(screen.getByRole("navigation", { name: "Settings" }));
+  expect(tabs().getByRole("link", { name: "Workspace" })).toHaveAttribute("aria-current", "page");
+  // Tabs link within the hash router.
+  const members = tabs().getByRole("link", { name: /Members/ });
+  expect(members).toHaveAttribute("href", "#/workspaces/one/settings/members");
+  fireEvent.click(members);
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/settings/members"));
-  expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
+  expect(tabs().getByRole("link", { name: /Members/ })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
 });
 

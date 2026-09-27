@@ -5,18 +5,17 @@ to an application page. [Sign-in](sign-in-design.md) is the first slice.
 
 ## Ownership
 
-| Location                   | Owns                                                                                |
-| -------------------------- | ----------------------------------------------------------------------------------- |
-| Backend and HTTP packages  | Business rules, host capabilities, contracts, and handlers.                         |
-| `apps/client`              | Headless operations, validation, request state, and session lifetime.               |
-| `apps/ui`                  | Reusable visual components and layouts, taking data and callbacks.                  |
-| `apps/features`            | Reusable wiring between client and UI; connected feature stories.                   |
-| `apps/web`, `apps/desktop` | Route trees, page composition, navigation, configuration, and platform integration. |
+| Location                   | Owns                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| Backend and HTTP packages  | Business rules, host capabilities, contracts, and handlers.                           |
+| `apps/client`              | Headless operations, request state, session lifetime, and view hooks for each screen. |
+| `apps/ui-v2`               | Reusable visual components, patterns, and presentational screens.                     |
+| `apps/web`, `apps/desktop` | Route trees, page composition, navigation, configuration, and platform integration.   |
 
-Client and UI remain independent. Features consume both without owning routes or
-platform APIs. Its [workshop](../apps/features/README.md) exercises shared composition. Stories and
-server fixtures stay outside production exports; boundary checks, tests, and CI
-include the features workspace.
+Client and UI remain independent. A client view hook shapes state into what a screen shows,
+as codes rather than wording, and exposes the screen's actions; the screen takes data and
+callbacks and owns its wording. Each app's page passes one to the other and owns only routing
+and which dialog is open.
 
 Compose through nested children and named parts, such as `Pane.Root` containing
 `Pane.Header` and `Pane.Body`. Props carry data and callbacks, rather
@@ -29,17 +28,15 @@ design system. Verify that piece in UI before composing it into an app page.
 ## Build and verify
 
 1. Establish backend behavior and its HTTP contract; reuse what already exists.
-2. Add headless client operations and tests for their state and lifetime.
+2. Add headless client operations and view hooks, with tests for their state and lifetime
+   over a scripted HTTP transport, including conflicts, lost responses, and failed refreshes.
 3. Introduce needed UI pieces one at a time, with isolated Storybook states and
-   browser review of interaction, accessibility, themes, and layout.
-4. Connect client and UI in `features`. Exercise that production component in its
-   own Storybook through the real HTTP server and backend before placing it on a page.
-5. Compose the page in web and desktop, verifying routing and platform behavior.
+   browser review of interaction, accessibility, themes, and layout. A screen's workshop
+   fixture applies its rules over local state, so its flows can be played through.
+4. Compose the page in web and desktop, and verify it against a local host: routing,
+   the connected flows, and platform behavior.
 
-UI stories use presentation fixtures. Connected scenarios use isolated sessions
-and temporary backend data, capture external delivery, and clean up their resources.
-Controlled clocks and request gates make expiry and races reproducible. Host-side
-scenario setup lives in development/test tooling, outside browser code.
+UI stories use presentation fixtures. App tests exercise pages over a scripted transport.
 
 Follow the repository's [verification commands](testing.md). Component scenarios
 establish feature behavior; app and native checks establish platform integration.

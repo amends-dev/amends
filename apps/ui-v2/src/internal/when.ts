@@ -47,3 +47,14 @@ export function agoLabel(at: Date, now = new Date()) {
   if (days < 7) return weekday.format(at);
   return shortDate.format(at);
 }
+const shortDateYear = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+/** Such as "Sep 20", with the year when it is not this one. */
+export const dateLabel = (at: Date, now = new Date()) =>
+  (at.getFullYear() === now.getFullYear() ? shortDate : shortDateYear).format(at);
+/** Whole days until a moment, rounded up, and at least one: a fresh week reads as 7. */
+export const daysUntil = (at: Date, now = new Date()) =>
+  Math.max(1, Math.ceil((at.getTime() - now.getTime()) / 86_400_000));

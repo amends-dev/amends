@@ -16,7 +16,8 @@ import { refreshResult } from "./refresh.ts";
 import { workspaceKey } from "./keys.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
-export type SettingsSection = "workspace" | "members" | "invites";
+/** The Workspace tab reads settings and ownership; Members adds the roster and invitations. */
+export type SettingsSection = "workspace" | "members";
 export interface SettingsData {
   readonly settings: WorkspaceSettings.View;
   readonly ownership: Ownership.View;
@@ -44,12 +45,6 @@ export const invitationIntent = (recipientId: string, roleId: string) => ({
   expiresAt: DateTime.add(DateTime.makeUnsafe(Date.now()), { days: 7 }),
   key: newWorkspaceRequestKey(),
 });
-export const formatInstant = (instant: DateTime.Utc) =>
-  DateTime.toDateUtc(instant).toLocaleString();
-export const invitationStatus = (record: Invitation.Record) =>
-  record.state._tag === "Pending" && DateTime.toEpochMillis(record.details.expiresAt) <= Date.now()
-    ? "Expired"
-    : record.state._tag;
 /** A read left unmounted: it reports nothing and makes no request. */
 const idle = <A>(atom: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>) =>
   Atom.make(AsyncResult.success([])) as unknown as typeof atom;
@@ -129,9 +124,13 @@ const mutate = Effect.fnUntraced(function* (
       });
   }
 });
-/** What a completed command leaves behind: whether reading its result back succeeded. */
+/**
+ * What a completed command leaves behind: whether reading its result back succeeded, and the
+ * invitation it created, if any.
+ */
 export interface Settled {
   readonly refreshed: Exit.Exit<void, unknown>;
+  readonly created?: string;
 }
 /**
  * Run one command, then refresh the section's reads and the directory before answering, so a
@@ -141,7 +140,12 @@ export const settingsRequest = (client: ApiClient, workspace: string, section: S
   requestAtom(client, (input: SettingsCommand, get) =>
     Effect.gen(function* () {
       const workspaceId = yield* command(Workspace.Id)(workspace);
-      if (input.kind !== "refresh") yield* mutate(client, workspaceId, input);
+      const outcome =
+        input.kind === "refresh" ? undefined : yield* mutate(client, workspaceId, input);
+      const created =
+        input.kind === "invite" && outcome !== undefined && "details" in outcome
+          ? outcome.details.id
+          : undefined;
       const current = reads(client, workspaceId);
       const refreshed = yield* Effect.exit(
         Effect.gen(function* () {
@@ -154,11 +158,11 @@ export const settingsRequest = (client: ApiClient, workspace: string, section: S
             ],
             { concurrency: "unbounded" },
           );
-          if (section === "invites" && settings.canReadInvitations)
+          if (section === "members" && settings.canReadInvitations)
             yield* refreshResult(get, current.invitations(true));
         }),
       );
-      return { refreshed } satisfies Settled;
+      return { refreshed, created } satisfies Settled;
     }),
   );
 

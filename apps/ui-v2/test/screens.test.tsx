@@ -67,6 +67,24 @@ import inboxMeta, {
   SelectionFlow,
   UnreadWithThread,
 } from "../src/screens/inbox/inbox.stories.tsx";
+import settingsScreenMeta, {
+  ChangeRole,
+  ConfirmRemove,
+  ConfirmRevoke,
+  ConfirmTransfer,
+  InvitationHistory,
+  InviteFlow,
+  InviteMember,
+  Loading as SettingsLoading,
+  MemberDetailsOpen,
+  Members as SettingsMembers,
+  ReadOnly,
+  RemoveMember,
+  RevokeFromHistory,
+  StaleRename,
+  TransferFlow,
+  Workspace as SettingsWorkspaceStory,
+} from "../src/screens/settings/settings.stories.tsx";
 import standaloneMeta, {
   CheckingSession,
   Crashed,
@@ -287,5 +305,35 @@ describe("inbox", () => {
   });
   it("marks all seen", async () => {
     await stories.story(MarkAllSeen).run();
+  });
+});
+
+describe("workspace settings", () => {
+  const stories = definePreview(preview).meta(settingsScreenMeta);
+  it("renders the workspace, members, details, dialogs, and loading", async () => {
+    await stories.story(SettingsWorkspaceStory).run();
+    await stories.story(SettingsMembers).run();
+    await stories.story(MemberDetailsOpen).run();
+    await stories.story(InviteMember).run();
+    await stories.story(InvitationHistory).run();
+    await stories.story(ConfirmTransfer).run();
+    await stories.story(ConfirmRemove).run();
+    await stories.story(ConfirmRevoke).run();
+    await stories.story(SettingsLoading).run();
+  });
+  it("offers nothing to change to a reader who may only look", async () => {
+    await stories.story(ReadOnly).run();
+  });
+  it("creates an invitation and marks it in Pending", async () => {
+    await stories.story(InviteFlow).run();
+  });
+  it("changes a role, removes a member, revokes, and transfers ownership", async () => {
+    await stories.story(ChangeRole).run();
+    await stories.story(RemoveMember).run();
+    await stories.story(RevokeFromHistory).run();
+    await stories.story(TransferFlow).run();
+  });
+  it("keeps a stale draft through a refresh", async () => {
+    await stories.story(StaleRename).run();
   });
 });

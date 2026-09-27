@@ -490,11 +490,158 @@ it("redirects the Settings entry to its workspace section and keeps the rail's s
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(history.get()).toBe("/workspaces/one/settings/workspace");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
-  expect(screen.getByRole("radio", { name: "Workspace" })).toBeChecked();
-  fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
+  const tabs = () => within(screen.getByRole("navigation", { name: "Settings" }));
+  expect(tabs().getByRole("link", { name: "Workspace" })).toHaveAttribute("aria-current", "page");
+  fireEvent.click(tabs().getByRole("link", { name: /Members/ }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/settings/members"));
-  expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
+  expect(tabs().getByRole("link", { name: /Members/ })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
+});
+
+it("invites someone and removes a member from the Members tab, confirming each with a toast", async () => {
+  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
+  const owner = {
+    id: "owner",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "alice" },
+    name: "Alice",
+    status: "active",
+  };
+  const ada = {
+    ...owner,
+    id: "ada",
+    identity: { _tag: "Human", id: "ada@example.test" },
+    name: "Ada",
+  };
+  const roles = [
+    {
+      role: { id: "builtin:member", workspaceId: "one", name: "Member", permissions: [] },
+      assignable: true,
+    },
+    {
+      role: { id: "builtin:owner", workspaceId: "one", name: "Owner", permissions: [] },
+      assignable: false,
+    },
+  ];
+  const access = (memberId: string, roleId: string) => ({
+    assignments: [
+      {
+        id: `a-${memberId}`,
+        workspaceId: "one",
+        memberId,
+        source: { _tag: "Role", roleId, scope: { _tag: "Workspace", workspaceId: "one" } },
+        status: "active",
+      },
+    ],
+    roles,
+    canManage: true,
+  });
+  let adaStatus = "active";
+  const invitations: unknown[] = [];
+  const requests: string[] = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method !== "GET") requests.push(`${request.method} ${path}`);
+    if (path === "/me/workspaces")
+      return response({ memberships: [{ workspace, member: owner, people: 2 }], invitations: [] });
+    if (path === "/workspaces/one/settings")
+      return response({
+        workspace,
+        canRename: true,
+        canReadInvitations: true,
+        canInvite: true,
+        roles,
+      });
+    if (path === "/workspaces/one/ownership")
+      return response({
+        workspace,
+        owner,
+        ownerAssignmentId: "a-owner",
+        canTransfer: true,
+        candidates: [ada],
+      });
+    if (path === "/workspaces/one/member-management")
+      return response([
+        { member: owner, access: access("owner", "builtin:owner"), canRemove: false },
+        {
+          member: { ...ada, status: adaStatus },
+          access: access("ada", "builtin:member"),
+          canRemove: true,
+        },
+      ]);
+    if (path === "/workspaces/one/members") return response([owner, { ...ada, status: adaStatus }]);
+    if (path === "/workspaces/one/members/ada" && request.method === "DELETE") {
+      adaStatus = "removed";
+      return response({ ...ada, status: "removed" });
+    }
+    if (path === "/workspaces/one/invitations" && request.method === "POST") {
+      const body = (await request.json()) as Record<string, string>;
+      const created = {
+        details: {
+          id: "invitation-one",
+          workspaceId: "one",
+          recipientId: body.recipientId,
+          roleId: body.roleId,
+          inviterMemberId: "owner",
+          issuedAt: new Date().toISOString(),
+          expiresAt: body.expiresAt,
+        },
+        state: { _tag: "Pending" },
+      };
+      invitations.push(created);
+      return response(created, 201);
+    }
+    if (path === "/workspaces/one/invitations") return response(invitations);
+    return response([]);
+  });
+  const history = mount(
+    "/workspaces/one/settings/members",
+    memoryStore(session("alice")).store,
+    fetch,
+  );
+  await screen.findByRole("navigation", { name: "Workspace" });
+  const main = within(screen.getByRole("main"));
+  const roster = await main.findByRole("list", { name: "Members" });
+  expect(
+    within(roster)
+      .getAllByRole("link")
+      .map((link) => link.textContent),
+  ).toEqual([expect.stringContaining("Alice · You"), expect.stringContaining("Ada")]);
+  // Invite: one sign-in email, with the first role the reader may give.
+  fireEvent.click(main.getByRole("button", { name: "Invite people" }));
+  const invite = await screen.findByRole("dialog", { name: "Invite member" });
+  fireEvent.input(within(invite).getByLabelText("Sign-in email"), {
+    target: { value: "new@example.test" },
+  });
+  expect(within(invite).getByRole("button", { name: /Workspace role/ })).toHaveTextContent(
+    "Member",
+  );
+  fireEvent.click(within(invite).getByRole("button", { name: "Create invitation" }));
+  await screen.findByText("Invitation created");
+  const pending = await main.findByRole("list", { name: "Pending invitations" });
+  await waitFor(() => expect(pending).toHaveTextContent("new@example.test"));
+  expect(pending).toHaveTextContent("Member · Expires in 7 days");
+  // Remove: open the member beside the roster, then confirm.
+  fireEvent.click(within(roster).getByRole("link", { name: /Ada/ }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/settings/members?member=ada"));
+  const details = await screen.findByLabelText("Member details", { selector: "aside" });
+  expect(details).toHaveTextContent("ada@example.test");
+  fireEvent.click(within(details).getByRole("button", { name: "Remove member" }));
+  const confirm = await screen.findByRole("dialog", { name: "Remove member" });
+  expect(confirm).toHaveTextContent("Remove Ada?");
+  fireEvent.click(within(confirm).getByRole("button", { name: "Remove member" }));
+  await screen.findByText("Ada was removed");
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/settings/members"));
+  await waitFor(() =>
+    expect(within(main.getByRole("list", { name: "Members" })).getAllByRole("link")).toHaveLength(
+      1,
+    ),
+  );
+  expect(requests).toEqual([
+    "POST /workspaces/one/invitations",
+    "DELETE /workspaces/one/members/ada",
+  ]);
 });
 
 function liveWorkspace(options: { name: () => string; status?: () => string }) {
@@ -545,11 +692,6 @@ it("shows a rename committed elsewhere without a reload, keeping the draft being
     ]),
   );
   await waitFor(() => expect(sidebar).toHaveTextContent("Atelier"));
-  await waitFor(() =>
-    expect(screen.getByRole("complementary", { name: "Workspace details" })).toHaveTextContent(
-      "Atelier",
-    ),
-  );
   expect(screen.getByRole("textbox", { name: "Workspace name" })).toBe(input);
   expect(input).toHaveValue("My draft");
 });

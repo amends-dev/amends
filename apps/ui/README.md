@@ -11,11 +11,10 @@ The [radius foundation](src/foundations/radius/README.md) adds square, medium (1
 The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
 a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
 composes these foundations into primary, secondary, and ghost actions with native button behavior.
-[Web](../web/README.md) and [desktop](../desktop/README.md) import UI and the
-[client package](../client/README.md) independently. UI supplies presentation; client
-supplies headless session/API state. [Features](../features/README.md) connects that
-state to UI props and actions. The apps own route trees and page composition. Neither library depends on the other.
-The apps compose their bootstrap screens from UI's foundations and primitives.
+No app uses this package any more: [web](../web/README.md) and
+[desktop](../desktop/README.md) compose [UI v2](../ui-v2/README.md) with the
+[client package](../client/README.md). It remains as its own workshop until it is removed.
+Neither this package nor client depends on the other.
 `@amends/ui/styles` supplies an opt-in document reset. This package was renamed from `@amends/frontend`;
 it replaces the removed legacy UI implementation. The `design-system` package remains retired.
 
@@ -253,7 +252,7 @@ For each addition:
 
 Application pages belong in web and desktop. Compose reusable UI with nested
 children and named parts, while props carry data, options, and callbacks. Shared
-features bind those parts to client state; UI does not own a page or route tree.
+code binds those parts to client state; UI does not own a page or route tree.
 
 The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
 a design reference. Reading-color specimens retain their system-font scaffolding; typography specimens
@@ -267,7 +266,7 @@ desktop validation are not configured. Tauri integration remains a later step.
 **Workspace entry** adds the neutral [WorkspaceMark](src/primitives/workspace-mark/README.md),
 compound [ItemList](src/compositions/item-list/README.md), and controlled
 [CreateWorkspaceForm](src/features/workspaces/README.md). Each has isolated workshop
-coverage; connected state remains in features and pages remain in the apps.
+coverage; connected state remained outside UI and pages remain in the apps.
 
 **Workspace shell** adds [ThemeChoice](src/features/appearance/README.md) and
 [AccountMenu](src/features/account/README.md), Popover's wide size, and Shell's

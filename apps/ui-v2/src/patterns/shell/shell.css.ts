@@ -131,6 +131,9 @@ export const aside = style({
   },
 });
 
+// The wrapper an Aside rendered inside Main attaches through; it leaves no box of its own.
+export const attached = style({ display: "contents" });
+
 export const asideScrim = style({
   display: "none",
   "@media": {

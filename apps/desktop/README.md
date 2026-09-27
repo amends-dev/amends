@@ -78,11 +78,9 @@ screens: sign-in with `useSignIn`, the workspace picker with `useWorkspacePicker
 workspace-unavailable states with the standalone screens; their links use hash hrefs.
 The route validates new credentials before following a safe hash return path.
 `src/routes.tsx` owns routes, the session guard, and redirects. The workspace layout and its
-group and Inbox pages are built on ui-v2, as in web; Settings keeps its features content inside
-a ui-v2 pane in the previous UI's theme. Both platform
-apps import `@amends/client`, `@amends/ui-v2`, and `@amends/ui` independently: client supplies
-headless state, and the UI packages supply presentation. Each app loads both packages' fonts
-and `@amends/ui/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
+group, Inbox, and Settings pages are built on ui-v2, as in web. Both platform apps import
+`@amends/client` and `@amends/ui-v2` independently: client supplies headless state, and UI v2
+supplies presentation. Each app loads UI v2's fonts and `@amends/ui-v2/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
 stay in this app.
 
 The default API URL is `http://127.0.0.1:8787`. The content security policy permits
@@ -105,7 +103,7 @@ composition, idempotent retry, directory refresh, and invitation acceptance.
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
 routes, the responsive shell, groups and threads, and the account menu. Home, Triage, Tasks,
 Environments, and Connections remain placeholders. The app-owned [Settings pages](../../docs/workspace-settings.md)
-compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
+compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode through the ui-v2 Theme.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages

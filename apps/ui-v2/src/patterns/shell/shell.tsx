@@ -12,6 +12,7 @@ import {
   type Accessor,
   type JSX,
 } from "solid-js";
+import { Portal } from "solid-js/web";
 import { IconMarkClose, IconMenu } from "@amends/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { media } from "../../foundations/layout/tokens.ts";
@@ -20,6 +21,7 @@ import { classes } from "../../internal/props.ts";
 import * as s from "./shell.css.ts";
 
 interface State {
+  readonly root: Accessor<HTMLDivElement | undefined>;
   readonly navigationId: string;
   readonly mainId: string;
   /** Below desktop, where navigation lives in a drawer. */
@@ -35,6 +37,8 @@ interface State {
 }
 
 const Context = createContext<State>();
+// Set inside Main, where an Aside cannot stay: Main turns inert while the Aside floats.
+const InMain = createContext(false);
 function useState(part: string): State {
   const state = useContext(Context);
   if (!state) throw new Error(`Shell.${part} must be inside Shell.Root`);
@@ -56,9 +60,11 @@ export function Root(props: RootProps) {
   const [navigationOpen, setNavigationOpen] = createSignal(false);
   const [asideOpen, setAsideOpen] = createSignal(false);
   const [toggle, setToggle] = createSignal<HTMLButtonElement>();
+  const [root, setRoot] = createSignal<HTMLDivElement>();
   // Crossing into desktop leaves no drawer to close.
   createEffect(on(touch, (isTouch) => !isTouch && setNavigationOpen(false), { defer: true }));
   const state: State = {
+    root,
     navigationId: `shell-${id}-navigation`,
     mainId: `shell-${id}-main`,
     touch,
@@ -72,7 +78,7 @@ export function Root(props: RootProps) {
   };
   return (
     <Context.Provider value={state}>
-      <div {...native} class={classes(s.root, local.class)}>
+      <div {...native} ref={setRoot} class={classes(s.root, local.class)}>
         <a
           href={`#${state.mainId}`}
           class={s.skip}
@@ -198,17 +204,19 @@ export function Main(props: MainProps) {
   const state = useState("Main");
   const [local, native] = splitProps(props, ["class"]);
   return (
-    <main
-      {...native}
-      id={state.mainId}
-      tabIndex={-1}
-      class={classes(s.main, local.class)}
-      inert={
-        (state.touch() && state.navigationOpen()) || (state.asideOpen() && state.overlay())
-          ? true
-          : undefined
-      }
-    />
+    <InMain.Provider value={true}>
+      <main
+        {...native}
+        id={state.mainId}
+        tabIndex={-1}
+        class={classes(s.main, local.class)}
+        inert={
+          (state.touch() && state.navigationOpen()) || (state.asideOpen() && state.overlay())
+            ? true
+            : undefined
+        }
+      />
+    </InMain.Provider>
   );
 }
 
@@ -222,9 +230,26 @@ export type AsideProps = JSX.HTMLAttributes<HTMLElement> & {
 /**
  * The side panel; holds one Pane. Render it while it is open. It sits beside the main content
  * from 80rem, floats over it with a scrim below that, and fills the screen on phones, where the
- * main content keeps its state underneath.
+ * main content keeps its state underneath. A page inside Main may render it too: it attaches
+ * beside Main.
  */
 export function Aside(props: AsideProps) {
+  const state = useState("Aside");
+  if (useContext(InMain))
+    return (
+      <Portal
+        mount={state.root()}
+        ref={(wrapper: HTMLDivElement) => {
+          wrapper.className = s.attached;
+        }}
+      >
+        <Panel {...props} />
+      </Portal>
+    );
+  return <Panel {...props} />;
+}
+
+function Panel(props: AsideProps) {
   const state = useState("Aside");
   const [local, native] = splitProps(props, ["class", "onClose", "aria-label"]);
   const [element, setElement] = createSignal<HTMLElement>();

@@ -8,7 +8,7 @@ Read [README.md](README.md) before changing this package.
 - Build up in order: foundations, components, the six patterns, then screens. Reuse a component
   or pattern before adding one; screens compose patterns rather than restyling them.
 - This package is presentation only. Do not depend on `@amends/client`, `@amends/ui`,
-  `@amends/features`, routing, Effect, or platform APIs. Screens take data as props and report
+  routing, Effect, or platform APIs. Screens take data as props and report
   actions through callbacks; web and desktop connect them to client hooks.
 - Components read colors, shadows, type, and spacing from the foundations, never raw values.
   Corners are square.

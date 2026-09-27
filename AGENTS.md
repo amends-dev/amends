@@ -67,18 +67,14 @@ currently run through TypeScript. Check compatibility before changing this setup
   at a time. It is UI-only and must not depend on client state, routing, or API
   contracts. `client` owns headless session lifetime, typed API access, query state,
   and pure route helpers. Client and UI must not depend on each other in any dependency
-  section or source import. `features` connects client and UI through reusable components
-  and a separate live-backend workshop; it owns no routes or platform APIs. `web` and
-  `desktop` consume these libraries and own route
+  section or source import. `web` and `desktop` consume these libraries and own route
   trees, page composition, API URL, and persistence configuration. `desktop` owns the
   Tauri shell; platform APIs stay in the entry apps.
   `ui-v2` is the pattern-based design system built from the Lunacy mocks in
   `design-system/Amends Group Exploration.free`, which are its visual reference. It follows
-  the same UI-only rules and replaces `ui` and `features` screen by screen: its screens are
-  presentational, the connected logic in `features` moves into `client` as hooks, and web and
-  desktop connect the two. Sign-in, workspace entry, the standalone states, the workspace shell,
-  groups, threads, direct messages, and the Inbox have moved; Settings still uses `ui` and
-  `features` inside a ui-v2 pane until it is designed.
+  the same UI-only rules and has replaced `ui` and the retired `features` package in the apps:
+  its screens are presentational, connected logic lives in `client` as hooks, and web and
+  desktop connect the two. `ui` remains only as its own workshop until it is removed.
   The legacy UI implementation and `design-system` package were removed; the current
   `ui` package is the renamed shared workshop. Apps may install UI
   dependencies and consume shared packages. Run desktop's `check:native` after
@@ -91,11 +87,11 @@ Root `tsconfig.json` checks repository scripts, shared-package tests, and the Vi
 configuration; `bun run typecheck` checks these and every workspace. Use declared
 package names for cross-workspace imports, not relative paths into another workspace.
 
-Compose pages, features, and UI declaratively through nested children and named
-parts. Use props for data, options, and callbacks rather than custom slots carrying
-whole components or JSX trees. Follow framework-required render APIs where needed.
-Pages live in `apps/web` and `apps/desktop`; UI owns reusable visual pieces, and
-features owns connected interactions. Neither shared package owns application pages.
+Compose pages and UI declaratively through nested children and named parts. Use props
+for data, options, and callbacks rather than custom slots carrying whole components or
+JSX trees. Follow framework-required render APIs where needed. Pages live in `apps/web`
+and `apps/desktop`; UI owns reusable visual pieces, and client owns connected state and
+actions as hooks. Neither shared package owns application pages.
 `ui-v2` screens are presentational: they take data and callbacks and render a pane or
 the navigation, while the apps own routes, data, and which screen shows.
 

@@ -51,20 +51,35 @@ const unavailable: SettingsController = {
   refresh: () => {},
 };
 
+/** A change the reader made, as it completes. */
+export type SettingsChange = Exclude<SettingsCommand, { kind: "refresh" }>;
+export interface SettingsOptions {
+  /**
+   * A change completed and its result is shown, with the invitation it created, if any. A change
+   * whose result could not be read back settles once a later refresh succeeds.
+   */
+  readonly settled?: (change: SettingsChange, created: string | undefined) => void;
+}
+
 /**
- * Mounted workspace/section scope; features remount it only when its identity changes. Reads
- * stay live while mounted: the workspace change feed and completed commands refresh them.
+ * Mounted workspace/section scope; remount it only when its identity changes. Reads stay live
+ * while mounted: the workspace change feed and completed commands refresh them.
  */
-export function useSettings(workspaceId: string, section: SettingsSection): SettingsController {
+export function useSettings(
+  workspaceId: string,
+  section: SettingsSection,
+  options: SettingsOptions = {},
+): SettingsController {
   const client = useApiClient();
   const reads = settingsReads(client, workspaceId);
-  return reads ? connect(reads, workspaceId, section) : unavailable;
+  return reads ? connect(reads, workspaceId, section, options) : unavailable;
 }
 
 function connect(
   reads: SettingsReads,
   workspaceId: string,
   section: SettingsSection,
+  options: SettingsOptions,
 ): SettingsController {
   const settings = useAtomValue(() => reads.settings),
     ownership = useAtomValue(() => reads.ownership),
@@ -76,12 +91,14 @@ function connect(
     }),
   );
   const invitations = useAtomValue(() =>
-    reads.invitations(section === "invites" && canReadInvitations()),
+    reads.invitations(section === "members" && canReadInvitations()),
   );
   const [error, setError] = createSignal<SettingsError>();
   const [saved, setSaved] = createSignal(false),
     [needsRefresh, setNeedsRefresh] = createSignal(false),
     [revision, setRevision] = createSignal(0);
+  // A change that completed but could not be read back, settled by the next refresh.
+  let unconfirmed: { readonly change: SettingsChange; readonly created?: string } | undefined;
 
   // Keep the last complete view while reads refresh, so live updates never blank the page.
   const data = createMemo<SettingsData | undefined>((previous) => {
@@ -117,10 +134,11 @@ function connect(
         if (isStale(failure)) setNeedsRefresh(true);
         return;
       }
-      const { refreshed } = exit.value;
+      const { refreshed, created } = exit.value;
       if (Exit.isFailure(refreshed)) {
         // A completed command's result is unknown here, so edits wait for it to load.
         if (command.kind !== "refresh") {
+          unconfirmed = { change: command, created };
           setError("refresh-failed");
           setNeedsRefresh(true);
         } else setError(workspaceFailure(refreshed.cause));
@@ -129,6 +147,9 @@ function connect(
       setNeedsRefresh(false);
       setSaved(command.kind !== "refresh");
       if (command.kind === "refresh") setRevision((value) => value + 1);
+      const change = command.kind === "refresh" ? unconfirmed : { change: command, created };
+      unconfirmed = undefined;
+      if (change) options.settled?.(change.change, change.created);
     },
   );
   const send = (command: SettingsCommand) => {

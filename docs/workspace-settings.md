@@ -1,19 +1,26 @@
 # Workspace settings
 
-Both apps own `/workspaces/:id/settings/{workspace,members,invites}`. The Settings
-entry redirects to Workspace; `?member=:memberId` selects a member. Links preserve
-browser/hash history. Apps compose shared pieces without styles.
+Both apps own `/workspaces/:id/settings/{workspace,members}`. The Settings entry redirects to
+Workspace; `?member=:memberId` opens a member beside Members. Tabs and member rows are links, so
+browser and hash history work. The screens follow the Lunacy "Workspace settings" mocks.
 
-- **Workspace:** rename, creation attribution, current owner, and confirmed ownership
-  transfer. The three roles are Member, Administrator, and Owner. Transfer makes the
-  former owner an Administrator; ordinary role editing never assigns Owner.
-- **Members:** active/removed lists and responsive details. Backend flags control
-  role editing and removal. The access summary includes separate assignments;
-  changing a workspace role preserves those assignments. Removed members rejoin
-  through a new invitation and receive a new membership.
-- **Invites:** recipient identity, assignable role, seven-day expiry, history, and
-  confirmed revocation. The recipient accepts from the workspace picker. Invitations
-  are tied to the exact sign-in identity; there is no transferable code or email delivery.
+- **Workspace:** rename, the current owner, ownership transfer, and details: the workspace ID with
+  Copy ID, and who created it. The three roles are Member, Administrator, and Owner. Transfer
+  makes the former owner an Administrator; ordinary role editing never offers Owner.
+- **Members:** the roster with search and an Active/Removed filter, each member's workspace role
+  and status, then pending invitations. The tab's count is active memberships; pending
+  invitations have their own count and become members only once accepted. A member opens in the
+  side panel with their role, their access, and removal. Changing the workspace role keeps any
+  separate assignments. Removed members rejoin through a new invitation and a new membership.
+- **Invitations** are modals reached from Members: Invite people issues one for a sign-in email
+  and an assignable role, valid for seven days, which appears in that identity's workspace
+  picker. No email or transferable link is sent. View history lists every invitation as
+  Pending, Accepted, Expired, or Revoked; only pending ones can be revoked.
+
+Rename, invite, role editing, removal, and transfer show only where the reader is allowed.
+Transfer, removal, and revoking use confirmation modals, and each completed change confirms
+itself with a toast. On phones, Members lists people with their role and shows invitations as
+one card that opens the history; member details, invite, and history fill the screen.
 
 ## Boundaries and recovery
 
@@ -23,36 +30,32 @@ older workspace upgrades its built-in bundles through the existing mechanism.
 No SQL migration is needed. Both adapters update the directory name; pending
 invitations include `workspaceName` when available.
 
-Client owns typed requests and mounted intent state. Features connects them through
-`Settings.Root` and named parts. UI supplies SegmentedControl, KeyValue, ListDetail, PageColumns,
-ItemList rows/actions, and controlled name/invitation forms, using existing controls.
-The segmented section picker sits below the shared page header. Small labeled
-Divider rows identify lists and forms; the page title appears only in the header.
-Workspace keeps name and ownership controls in the primary column and details in
-the aside. Invites keeps history in the primary column and the new-invite form in
-the aside. Both columns stack in that order on smaller screens. Pages and URL
-construction remain in web/desktop; ThemeProvider owns themes.
+Client's `useWorkspaceSettings` reads one tab: settings and ownership for Workspace, plus the
+roster and invitations for Members. It shapes them for the screens, keeps each draft with what it
+was made against, and reports failures as codes by the change that failed; UI v2's
+[settings screens](../apps/ui-v2/README.md) word them. The pages in web and desktop own routes,
+the open member, and which modal shows.
 
 Name edits carry the name the draft started from. Role changes carry the assignment IDs the
 choice started from; ownership transfer carries the Owner assignment ID read when the dialog
-opened. Stale writes fail and require an explicit refresh/review: a conflict, lost permission, or
-missing target locks the forms until the reader refreshes. A host failure or invalid input
-leaves them current, so the same action can be sent again at once. Refresh replaces form drafts
-with current data.
-A completed mutation followed by a failed refresh retries the read, not the write.
-Invitation retries retain the same key and expiry while mounted. After leaving or
-reloading an interrupted invitation form, check history before creating another.
-Unmounting or credential replacement cancels requests and ignores late responses;
-a server commit may already have completed.
+opened. Stale writes fail and require an explicit refresh: a conflict, lost permission, or
+missing target holds further changes until the reader refreshes. The draft stays through the
+refresh and is then made against the values the reader reviewed, so saving again applies it. A
+host failure or invalid input leaves the values current, so the same change can be sent again at
+once. A completed change whose result could not be read back retries the read, not the write, and
+confirms once the read succeeds; the invite modal offers Refresh rather than another invitation.
+Invitation retries reuse the same key and expiry while mounted. After leaving or reloading an
+interrupted invitation, check the history before creating another. Unmounting or credential
+replacement cancels requests and ignores late responses; a server commit may already have
+completed.
 
-Sections stay current through the workspace change feed, which the app mounts around the
-workspace layout: changes made elsewhere refresh the affected reads without locking forms or
-replacing drafts. Rows are keyed by ID, so refreshes keep focus and open dialogs. See
-[live updates](live-updates.md).
+Tabs stay current through the workspace change feed, which the app mounts around the workspace
+layout: changes made elsewhere refresh the affected reads without replacing drafts. Rows are
+keyed by ID, so refreshes keep focus and open dialogs. See [live updates](live-updates.md).
 
-UI stories cover shared presentation. Connected stories run against isolated HTTP
-and PostgreSQL data; conformance tests cover rename permissions, stale writes,
-rollback, directory updates, and replay on both adapters. App tests cover section
-routes and persistent shell selection. Members are listed by the name they chose, with the
-identity they sign in as in their details. Profile photos, mark customization,
-recipient decline, and direct/scoped grant editing remain outside this slice.
+The UI v2 workshop plays the settings flows over a local fixture. Client tests cover the hook's
+shaping, stale drafts, invitation retries, and refresh recovery over a scripted transport; app
+tests cover the routes, inviting, and removing. Conformance tests cover rename permissions, stale
+writes, rollback, directory updates, and replay on both adapters. Members are listed by the name
+they chose, with the identity they sign in as in their details. Profile photos, mark
+customization, recipient decline, and direct/scoped grant editing remain outside this slice.
