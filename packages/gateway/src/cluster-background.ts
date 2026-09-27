@@ -139,8 +139,16 @@ export const layerWorker = WorkspaceProcess.toLayer(
           if (Exit.isSuccess(exit)) {
             const outcome = exit.value;
             if (outcome._tag === "Continue") yield* schedule(wake, now, yield* unique("more"), 0);
-            if (outcome._tag === "At")
-              yield* schedule(wake, outcome.at, `due:${DateTime.toEpochMillis(outcome.at)}`, 0);
+            if (outcome._tag === "At") {
+              // Runs that ask for the same later time share one wake. A time this wake or the clock
+              // has reached may already have had its wake, which the key would repeat, so it
+              // takes a fresh one: the process may find work still due when its clock lags.
+              const reached = DateTime.max(wake.at, now);
+              const key = DateTime.isGreaterThan(outcome.at, reached)
+                ? `due:${DateTime.toEpochMillis(outcome.at)}`
+                : yield* unique("due");
+              yield* schedule(wake, outcome.at, key, 0);
+            }
             return;
           }
           const failure = Option.map(Cause.findErrorOption(exit.cause), (error) => error._tag);

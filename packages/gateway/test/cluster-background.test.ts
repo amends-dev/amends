@@ -114,6 +114,46 @@ it.effect("a process runs again at once while more is outstanding, and then when
   }),
 );
 
+it.effect("a process that asks again for the time its wake reached runs again", () =>
+  Effect.gen(function* () {
+    let due: DateTime.Utc | undefined;
+    const { runs, layer } = background((run) =>
+      Effect.gen(function* () {
+        if (run === 1) {
+          due = DateTime.add(yield* DateTime.now, { minutes: 1 });
+          return BackgroundProcess.dueAt(due);
+        }
+        // Its clock a little behind the database's, the run at that time still finds it due then.
+        if (run === 2 && due !== undefined) return BackgroundProcess.dueAt(due);
+        return BackgroundProcess.idle;
+      }),
+    );
+    yield* Effect.gen(function* () {
+      yield* wakeIn("commit-1");
+      yield* TestClock.adjust("2 minutes");
+    }).pipe(Effect.provide(layer));
+    expect(seconds(runs)).toEqual([0, 60, 60]);
+  }),
+);
+
+it.effect("runs that each ask for the same later time wake the process once then", () =>
+  Effect.gen(function* () {
+    const start = yield* DateTime.now;
+    const due = DateTime.add(start, { minutes: 10 });
+    const { runs, layer } = background((run) =>
+      Effect.succeed(run <= 3 ? BackgroundProcess.dueAt(due) : BackgroundProcess.idle),
+    );
+    yield* Effect.gen(function* () {
+      for (const commit of ["commit-1", "commit-2", "commit-3"]) {
+        yield* wakeIn(commit);
+        yield* TestClock.adjust("5 seconds");
+      }
+      yield* TestClock.adjust("15 minutes");
+    }).pipe(Effect.provide(layer));
+    expect(seconds(runs)).toEqual([0, 5, 10, 600]);
+  }),
+);
+
 it.effect("a failing process runs again after a backoff that doubles", () =>
   Effect.gen(function* () {
     const { runs, layer } = background((run) =>
