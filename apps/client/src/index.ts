@@ -134,6 +134,7 @@ export {
   useThreadFollow,
   useGroupFollow,
   type FollowController,
+  type FollowEvents,
   type GroupFollowController,
 } from "./conversations/follow.ts";
 export {

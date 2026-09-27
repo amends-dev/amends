@@ -2,6 +2,7 @@ import { paths, useInboxView, useWorkspace } from "@amends/client";
 import { InboxPane, type InboxTab } from "@amends/ui/screens/inbox";
 import { useParams, useSearchParams } from "@solidjs/router";
 import { createEffect, createSignal } from "solid-js";
+import { useWorkspaceActions } from "../workspace-actions.ts";
 
 const href = (path: string) => `#${path}`;
 /** The reader's inbox; the workspace layout shows a thread opened from it beside it. */
@@ -12,10 +13,19 @@ export function InboxPage() {
   const [tab, setTab] = createSignal<InboxTab>("all");
   // The notification whose thread is open beside the inbox, kept in Unread while it is.
   const [selected, setSelected] = createSignal<string>();
+  const actions = useWorkspaceActions();
   const view = useInboxView(
     params.workspaceId,
     () => (tab() === "unread" ? "pending" : "all"),
     selected,
+    {
+      failed: (change) =>
+        actions.toast(
+          change === "seen"
+            ? "Couldn’t mark that notification seen."
+            : "Couldn’t mark everything seen. Try again.",
+        ),
+    },
   );
   // A thread opened by its address, or closed: follow the route.
   createEffect(() => {
@@ -67,7 +77,13 @@ export function InboxPage() {
       }
       onRetry={view.retry}
       earlier={
-        view.earlier() ? { loading: view.loadingEarlier(), onLoad: view.loadEarlier } : undefined
+        view.earlier()
+          ? {
+              loading: view.loadingEarlier(),
+              failed: view.earlierFailed(),
+              onLoad: view.loadEarlier,
+            }
+          : undefined
       }
     />
   );

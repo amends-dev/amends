@@ -256,6 +256,7 @@ export function useGroupConversation(workspaceId: string, groupId: string) {
     /** Older threads remain to load. */
     earlier: () => !stream.complete() && stream.value() !== undefined && !lost(),
     loadingEarlier: stream.loadingEarlier,
+    earlierFailed: stream.earlierFailed,
     loadEarlier: stream.loadEarlier,
     retry: stream.retry,
   };
@@ -381,6 +382,7 @@ export function useThreadConversation(
     typing: () => typing(threadId).map(people.name),
     earlier: () => !timeline.complete() && timeline.value() !== undefined && !lost(),
     loadingEarlier: timeline.loadingEarlier,
+    earlierFailed: timeline.earlierFailed,
     loadEarlier: timeline.loadEarlier,
     retry: timeline.retry,
   };

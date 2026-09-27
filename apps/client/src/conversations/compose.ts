@@ -17,6 +17,13 @@ export interface Mentioned {
 interface Draft {
   readonly text: string;
   readonly mentioned: ReadonlyArray<Mentioned>;
+  /**
+   * The last message sent from this draft and its request key, until it is posted. It lives with
+   * the draft rather than the composer, so sending the same message again after the composer
+   * remounted, such as when a send was cut off by closing the thread, reuses the key and cannot
+   * post it twice.
+   */
+  readonly attempt?: { readonly body: string; readonly key: ReturnType<typeof newPostKey> };
 }
 const empty: Draft = { text: "", mentioned: [] };
 /** How often a reply being written tells the thread's readers again; its signal lasts longer. */
@@ -73,8 +80,6 @@ function compose(
     write = useAtomSet(() => draftAtom);
   const [error, setError] = createSignal<WorkspaceFailure>();
   const mentions = () => mentionsIn(draft().text, draft().mentioned);
-  // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.
-  let attempt: { readonly body: string; readonly key: ReturnType<typeof newPostKey> } | undefined;
   const request = useRequest(
     postRequest(useApiClient(), workspaceId),
     (exit, post) => {
@@ -82,8 +87,8 @@ function compose(
         setError(workspaceFailure(exit.cause));
         return;
       }
-      attempt = undefined;
       if (draft().text === post.text) write(empty);
+      else write({ text: draft().text, mentioned: draft().mentioned });
       if (exit.value.groupId !== undefined) posted?.(exit.value.groupId);
     },
     { when: () => session.session !== undefined },
@@ -129,7 +134,10 @@ function compose(
       const text = draft().text,
         addressed = mentions();
       const body = JSON.stringify([text, addressed]);
-      if (attempt?.body !== body) attempt = { body, key: newPostKey() };
+      // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.
+      const attempt =
+        draft().attempt?.body === body ? draft().attempt! : { body, key: newPostKey() };
+      write({ ...draft(), attempt });
       setError(undefined);
       request.run({ ...target, text, mentions: addressed, key: attempt.key } as Post);
     },

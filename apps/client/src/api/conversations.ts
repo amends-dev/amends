@@ -16,6 +16,7 @@ import type { ApiClient } from "./client.ts";
 import { command } from "./failures.ts";
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
 import { requestAtom } from "./request.ts";
+import { refreshResult } from "./refresh.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
 export {
@@ -678,9 +679,12 @@ export type Follow =
     }
   | { readonly kind: "follow-group"; readonly groupId: string; readonly memberId: string }
   | { readonly kind: "unfollow-group"; readonly groupId: string; readonly memberId: string };
-/** Follow or stop following, then invalidate the read that shows it. */
+/**
+ * Follow or stop following, then refresh the read that shows it and wait for the result, so the
+ * read answers once the request does. A refresh that fails leaves the read as it was.
+ */
 export const followRequest = (client: ApiClient, workspace: string) =>
-  requestAtom(client, (follow: Follow) =>
+  requestAtom(client, (follow: Follow, get) =>
     Effect.gen(function* () {
       const api = yield* client;
       const workspaceId = yield* command(Workspace.Id)(workspace);
@@ -697,7 +701,9 @@ export const followRequest = (client: ApiClient, workspace: string) =>
                 participationId: yield* command(ThreadParticipation.Id)(follow.participationId),
               },
             });
-          yield* Reactivity.invalidate([itemKey(workspace, "participants", threadId)]);
+          yield* Effect.ignore(
+            refreshResult(get, participantsOf(client, joined(workspace, threadId))),
+          );
           return;
         }
         case "follow-group":
@@ -706,7 +712,7 @@ export const followRequest = (client: ApiClient, workspace: string) =>
           const payload = { memberId: yield* command(Member.Id)(follow.memberId) };
           if (follow.kind === "follow-group") yield* api.groups.follow({ params, payload });
           else yield* api.groups.unfollow({ params, payload });
-          yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
+          yield* Effect.ignore(refreshResult(get, groupsOf(client, workspace)));
           return;
         }
       }

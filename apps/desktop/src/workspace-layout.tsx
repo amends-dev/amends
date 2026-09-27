@@ -28,7 +28,7 @@ import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
 import { WorkspaceNavigation, type Destination } from "@amends/ui/screens/workspace-navigation";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createMemo, createSignal, For, Show, type ParentProps } from "solid-js";
-import { WorkspaceActionsContext } from "./workspace-actions.ts";
+import { WorkspaceActionsContext, useWorkspaceActions } from "./workspace-actions.ts";
 
 const href = (path: string) => `#${path}`;
 /** A workspace member or agent, as the member pickers show them. */
@@ -283,7 +283,15 @@ function ThreadPanel(props: {
   const thread = useThreadConversation(props.workspaceId, props.threadId, () => props.focus);
   const reply = useReply(props.workspaceId, props.threadId);
   const candidates = useMentionCandidates(props.workspaceId, props.groupId);
-  const follow = useThreadFollow(props.workspaceId, props.threadId);
+  const actions = useWorkspaceActions();
+  const follow = useThreadFollow(props.workspaceId, props.threadId, {
+    failed: (following) =>
+      actions.toast(
+        following
+          ? "Couldn’t follow the thread. Try again."
+          : "Couldn’t unfollow the thread. Try again.",
+      ),
+  });
   return (
     <ThreadPane
       title="Thread"
@@ -298,7 +306,11 @@ function ThreadPanel(props: {
       onRetry={thread.retry}
       earlier={
         thread.earlier()
-          ? { loading: thread.loadingEarlier(), onLoad: thread.loadEarlier }
+          ? {
+              loading: thread.loadingEarlier(),
+              failed: thread.earlierFailed(),
+              onLoad: thread.loadEarlier,
+            }
           : undefined
       }
       focusId={thread.focusId()}

@@ -55,6 +55,7 @@ import dialogsMeta, {
 } from "../src/screens/account/dialogs.stories.tsx";
 import conversationMeta2, {
   AccountMenu,
+  EarlierFailed,
   Failed,
   Follow,
   Loading,
@@ -279,6 +280,7 @@ describe("live conversation", () => {
     await stories.story(Loading).run();
     await stories.story(Unavailable).run();
     await stories.story(Failed).run();
+    await stories.story(EarlierFailed).run();
   });
   it("replies in a thread with no replies yet", async () => {
     await stories.story(ReplyInThread).run();

@@ -47,13 +47,19 @@ export interface SeenAllController {
   readonly markAllSeen: (through: Pick<Notification.Record, "recordedAt" | "id">) => void;
 }
 /** Mark all of the reader's notifications seen, up to the newest they are shown. */
-export function useMarkAllSeen(workspaceId: string): SeenAllController {
+export function useMarkAllSeen(
+  workspaceId: string,
+  events: { readonly failed?: (failure: WorkspaceFailure) => void } = {},
+): SeenAllController {
   const session = useSession();
   const [error, setError] = createSignal<WorkspaceFailure>();
   const request = useRequest(
     seenThroughRequest(useApiClient(), workspaceId),
     (exit) => {
-      if (Exit.isFailure(exit)) setError(workspaceFailure(exit.cause));
+      if (Exit.isSuccess(exit)) return;
+      const failure = workspaceFailure(exit.cause);
+      setError(failure);
+      events.failed?.(failure);
     },
     { when: () => session.session !== undefined },
   );

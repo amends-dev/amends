@@ -1,6 +1,7 @@
 import { Match, Show, Switch, createEffect, createSignal, on } from "solid-js";
 import { IconAlertTriangle, IconMarkAttach, IconMessage } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
+import { Field } from "../../components/field/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Composer, type MentionCandidate } from "../../components/composer/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
@@ -44,7 +45,12 @@ export interface ConversationProps {
   readonly status?: ConversationStatus;
   readonly onRetry?: () => void;
   /** Older entries remain; the top of the timeline offers to load them. */
-  readonly earlier?: { readonly loading?: boolean; readonly onLoad: () => void };
+  readonly earlier?: {
+    readonly loading?: boolean;
+    /** The last older page failed; loading again tries it once more. */
+    readonly failed?: boolean;
+    readonly onLoad: () => void;
+  };
   /** Put a day seam before each new day. */
   readonly days?: boolean;
   /** The message the reader came to see: set apart and scrolled to. */
@@ -145,13 +151,20 @@ export function ConversationState(props: {
 /** Loads older entries, above the timeline. */
 export function Earlier(props: {
   readonly loading?: boolean;
+  readonly failed?: boolean;
   readonly onLoad: () => void;
+  /** Such as "Show earlier messages". */
   readonly label: string;
+  /** Such as "earlier messages", for the failure. */
+  readonly what: string;
 }) {
   return (
     <div class={s.earlier}>
+      <Show when={props.failed && !props.loading}>
+        <Field.Alert>Couldn’t load {props.what}.</Field.Alert>
+      </Show>
       <Button variant="quiet" disabled={props.loading} onClick={() => props.onLoad()}>
-        {props.loading ? "Loading…" : props.label}
+        {props.loading ? "Loading…" : props.failed ? "Try again" : props.label}
       </Button>
     </div>
   );
@@ -191,8 +204,10 @@ export function GroupThreads(props: GroupThreadsProps) {
                 {(earlier) => (
                   <Earlier
                     loading={earlier().loading}
+                    failed={earlier().failed}
                     onLoad={earlier().onLoad}
                     label="Show earlier threads"
+                    what="earlier threads"
                   />
                 )}
               </Show>

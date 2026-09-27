@@ -24,6 +24,7 @@ import {
   useMarkGroupRead,
   useMarkSeen,
   useMarkThreadRead,
+  useNewThread,
   useReply,
   useThreadTimeline,
   type ComposerController,
@@ -251,6 +252,33 @@ it("a stream opens at its newest threads, pages back, and a refresh keeps what i
   expect(ids()).toHaveLength(121);
   expect(ids()[0]).toBe("thread-000");
   expect(view().failure()).toBeUndefined();
+});
+
+it("an older page that fails says so, and loading again tries it once more", async () => {
+  const openings = Array.from({ length: 120 }, (_, index) => opening(index));
+  const { fetch: answer, requests } = host(openings, []);
+  let failOlder = true;
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const url = new URL(new Request(input, init).url);
+    if (failOlder && url.searchParams.has("before")) {
+      requests.push(url);
+      return Promise.resolve(new Response("Host unavailable", { status: 503 }));
+    }
+    return answer(input, init);
+  });
+  const view = mount(fetch, () => useGroupStream("one", "group"));
+  await waitFor(() => expect(view().value()).toHaveLength(50));
+  view().loadEarlier();
+  await waitFor(() => expect(view().earlierFailed()).toBe(true));
+  // What was shown stays shown.
+  expect(view().value()).toHaveLength(50);
+  expect(view().loadingEarlier()).toBe(false);
+  const asked = requests.length;
+  failOlder = false;
+  view().loadEarlier();
+  await waitFor(() => expect(view().value()).toHaveLength(100));
+  expect(requests.length).toBeGreaterThan(asked);
+  expect(view().earlierFailed()).toBe(false);
 });
 
 it("a timeline opens at its newest activity, pages back once, and a change reads only what followed", async () => {
@@ -762,6 +790,59 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
   expect(members.changing()).toBeUndefined();
 });
 
+it("a new thread in a group posts its first message there with a key, then clears", async () => {
+  const posts: Array<{ path: string; key: string | null; body: unknown }> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    if (request.method !== "POST") return json([]);
+    posts.push({
+      path: new URL(request.url).pathname,
+      key: request.headers.get("idempotency-key"),
+      body: await request.json(),
+    });
+    return new Response(
+      JSON.stringify({
+        thread: {
+          id: "t9",
+          workspaceId: "one",
+          groupId: "g1",
+          createdBy: author,
+          createdAt: minute(1),
+        },
+        message: message("m9", "t9", minute(1)),
+        activity: { ...item(1).activity, threadId: "t9" },
+      }),
+      { status: 201, headers: { "content-type": "application/json" } },
+    );
+  });
+  let composer!: ComposerController;
+  function Consumer() {
+    composer = useNewThread("one", "g1");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  composer.setDraft("Kickoff notes");
+  composer.send();
+  await waitFor(() => expect(composer.draft()).toBe(""));
+  expect(posts).toEqual([
+    {
+      path: "/workspaces/one/groups/g1/threads",
+      key: expect.any(String),
+      body: { text: "Kickoff notes", mentions: [] },
+    },
+  ]);
+});
+
 it("a first direct message starts the conversation and hands over its group", async () => {
   const posts: Array<{ path: string; body: unknown }> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -977,6 +1058,57 @@ it("a reply keeps its draft across remounts, retries with its key, and clears on
   ).toEqual(Array.from({ length: 3 }, () => "/workspaces/one/threads/thread/messages"));
 });
 
+it("a send cut off by closing the thread is sent again with its key after reopening", async () => {
+  const posts: Array<{ key: string | null; signal: AbortSignal }> = [];
+  const held = Promise.withResolvers<Response>();
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    if (request.method !== "POST") return json([]);
+    if (request.url.endsWith("/typing")) return new Response(null, { status: 204 });
+    posts.push({ key: request.headers.get("idempotency-key"), signal: request.signal });
+    // The first may have reached the host before the reader closed the thread.
+    if (posts.length === 1) return held.promise;
+    return new Response(
+      JSON.stringify({
+        message: message("reply", "thread", minute(1)),
+        activity: item(2).activity,
+      }),
+      { status: 201, headers: { "content-type": "application/json" } },
+    );
+  });
+  const [shown, setShown] = createSignal(true);
+  let composer!: ComposerController;
+  function Consumer() {
+    composer = useReply("one", "thread");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Show when={shown()}>
+        <Consumer />
+      </Show>
+    </ClientProvider>
+  ));
+  composer.setDraft("On it.");
+  composer.send();
+  await waitFor(() => expect(posts).toHaveLength(1));
+  // Closing the thread cuts the request off; its outcome is unknown.
+  setShown(false);
+  await waitFor(() => expect(posts[0]!.signal.aborted).toBe(true));
+  setShown(true);
+  expect(composer.draft()).toBe("On it.");
+  composer.send();
+  await waitFor(() => expect(composer.draft()).toBe(""));
+  // The same key, so a host that already posted it answers with that message.
+  expect(posts[1]!.key).toBe(posts[0]!.key);
+});
+
 it("a draft mentions the members whose @name its text still holds", () => {
   const mentioned = [
     { memberId: "ada", name: "ada@mercier.co" },
@@ -1167,9 +1299,14 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
     return new Response(null, { status: 204 });
   });
   let thread!: FollowController, group!: ReturnType<typeof useGroupFollow>;
+  const changed: Array<[string, boolean]> = [];
   function Consumer() {
-    thread = useThreadFollow("one", "thread");
-    group = useGroupFollow("one", "group");
+    thread = useThreadFollow("one", "thread", {
+      changed: (following) => changed.push(["thread", following]),
+    });
+    group = useGroupFollow("one", "group", {
+      changed: (following) => changed.push(["group", following]),
+    });
     return null;
   }
   render(() => (
@@ -1208,4 +1345,95 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
     { path: "/workspaces/one/groups/group/follow", body: { memberId: "owner" } },
     { path: "/workspaces/one/groups/group/unfollow", body: { memberId: "owner" } },
   ]);
+  expect(changed).toEqual([
+    ["thread", true],
+    ["thread", false],
+    ["group", true],
+    ["group", false],
+  ]);
+});
+
+it("a follow the read does not show settles on what the read says, and one that fails says so", async () => {
+  // Such as someone else stopping it for the reader just after: the read has the last word.
+  let fail = false;
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && fail) return new Response(null, { status: 503 });
+    if (path === "/me/workspaces")
+      return json({
+        memberships: [
+          {
+            workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" },
+            member: {
+              id: "owner",
+              workspaceId: "one",
+              identity: { _tag: "Human", id: "alice" },
+              status: "active",
+            },
+            people: 1,
+          },
+        ],
+        invitations: [],
+      });
+    if (path.endsWith("/groups"))
+      return json([
+        {
+          group: {
+            id: "group",
+            workspaceId: "one",
+            kind: "Team",
+            visibility: "Private",
+            name: "Design",
+            createdBy: "owner",
+            createdAt: minute(0),
+          },
+          latestActivityAt: null,
+          caughtUpAt: null,
+          newActivity: false,
+          following: false,
+          pending: 0,
+          manageable: true,
+          membersRemovable: true,
+          renamable: true,
+        },
+      ]);
+    return new Response(null, { status: 204 });
+  });
+  let group!: ReturnType<typeof useGroupFollow>;
+  const heard: Array<[string, boolean]> = [];
+  function Consumer() {
+    group = useGroupFollow("one", "group", {
+      changed: (following) => heard.push(["changed", following]),
+      failed: (following) => heard.push(["failed", following]),
+    });
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(group.following()).toBe(false));
+  group.toggle();
+  expect([group.following(), group.pending()]).toEqual([true, true]);
+  await waitFor(() => expect(group.pending()).toBe(false));
+  expect(group.following()).toBe(false);
+  expect(group.error()).toBeUndefined();
+  expect(heard).toEqual([]);
+  fail = true;
+  group.toggle();
+  expect(group.following()).toBe(true);
+  await waitFor(() => expect(group.pending()).toBe(false));
+  expect(group.following()).toBe(false);
+  expect(group.error()).toBeDefined();
+  expect(heard).toEqual([["failed", true]]);
 });

@@ -103,7 +103,7 @@ const notification = (
   },
 });
 
-function fixture() {
+function fixture(options: { readonly fail?: boolean } = {}) {
   const inbox = [
     notification("n3", 3, 3, "Can @alice approve it?", ["owner"]),
     notification("n2", 2, 2, "Here is the draft."),
@@ -137,6 +137,7 @@ function fixture() {
       return json({
         pending: inbox.filter((item) => item.notification.state._tag === "Pending").length,
       });
+    if (request.method === "POST" && options.fail) return json({}, 503);
     const acknowledge = /\/notifications\/([^/]+)\/acknowledge$/.exec(path);
     if (request.method === "POST" && acknowledge) {
       acknowledged.push(acknowledge[1]!);
@@ -152,9 +153,10 @@ function fixture() {
   });
   const [filter, setFilter] = createSignal<InboxFilter>("all");
   const [retain, setRetain] = createSignal<string>();
+  const failed: string[] = [];
   let view!: ReturnType<typeof useInboxView>;
   function Consumer() {
-    view = useInboxView("one", filter, retain);
+    view = useInboxView("one", filter, retain, { failed: (change) => failed.push(change) });
     return null;
   }
   render(() => (
@@ -178,6 +180,7 @@ function fixture() {
     setRetain,
     acknowledged,
     through,
+    failed,
   };
 }
 
@@ -227,4 +230,17 @@ it("marks everything seen through the newest notification listed", async () => {
   expect(f.through[0]).toMatchObject({ through: { id: "n3" } });
   await waitFor(() => expect(f.view.entries().every((entry) => !entry.unread)).toBe(true));
   await waitFor(() => expect(f.view.unread()).toBe(0));
+});
+
+it("shows a notification unread again when marking it seen fails, and says so", async () => {
+  const f = fixture({ fail: true });
+  await waitFor(() => expect(f.view.entries()).toHaveLength(3));
+  f.view.open("n2");
+  expect(f.view.entries()[1]?.unread).toBe(false);
+  await waitFor(() => expect(f.failed).toEqual(["seen"]));
+  expect(f.view.entries()[1]?.unread).toBe(true);
+  expect(f.view.seenError()).toBeDefined();
+  f.view.markAllSeen();
+  await waitFor(() => expect(f.failed).toEqual(["seen", "all-seen"]));
+  expect(f.view.entries().every((entry) => entry.unread)).toBe(true);
 });

@@ -129,6 +129,8 @@ export interface PagedView<A> extends Read<ReadonlyArray<A>> {
   readonly complete: Accessor<boolean>;
   /** An older page is loading. */
   readonly loadingEarlier: Accessor<boolean>;
+  /** The last older page failed to load; `loadEarlier` tries it again. */
+  readonly earlierFailed: Accessor<boolean>;
   /** Read one page further back, unless one is loading or nothing older remains. */
   readonly loadEarlier: () => void;
 }
@@ -136,6 +138,7 @@ const unpaged: PagedView<never> = {
   ...unread,
   complete: () => true,
   loadingEarlier: () => false,
+  earlierFailed: () => false,
   loadEarlier: () => {},
 };
 function page<A, E>(read: PagedRead<A, E>): PagedView<A> {
@@ -144,19 +147,25 @@ function page<A, E>(read: PagedRead<A, E>): PagedView<A> {
     requested = useAtomValue(() => read.earlier),
     request = useAtomSet(() => read.earlier);
   const view = () => Option.getOrUndefined(AsyncResult.value(result()));
-  const loadingEarlier = () => {
+  // An older page was asked for and has not arrived.
+  const outstanding = () => {
     const current = view();
-    return current !== undefined && result().waiting && requested() > current.earlier;
+    return current !== undefined && requested() > current.earlier;
   };
+  const loadingEarlier = () => outstanding() && result().waiting;
+  const earlierFailed = () => outstanding() && !result().waiting && AsyncResult.isFailure(result());
   return {
     ...base,
     value: () => view()?.items,
     complete: () => view()?.complete ?? false,
     loadingEarlier,
+    earlierFailed,
     loadEarlier: () => {
       const current = view();
       if (current === undefined || current.complete || loadingEarlier()) return;
-      request(current.earlier + 1);
+      // After a failure the request stands, and writing it again changes nothing: read again.
+      if (outstanding()) base.retry();
+      else request(current.earlier + 1);
     },
   };
 }

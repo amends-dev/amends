@@ -100,8 +100,10 @@ export function ThreadPane(props: ThreadPaneProps) {
                   {(earlier) => (
                     <Earlier
                       loading={earlier().loading}
+                      failed={earlier().failed}
                       onLoad={earlier().onLoad}
                       label="Show earlier messages"
+                      what="earlier messages"
                     />
                   )}
                 </Show>

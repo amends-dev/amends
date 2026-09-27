@@ -46,12 +46,16 @@ const order = (left: Item, right: Item) =>
 /**
  * The reader's inbox, newest first and live while mounted: everything, or only what is still
  * unread. Unread keeps `retain`, the notification open beside it, in place after it is seen, until
- * another opens or it closes. `open` marks a notification seen at once, as opening it does.
+ * another opens or it closes. `open` marks a notification seen at once, as opening it does; if
+ * that fails, it is unread again and `failed` hears of it, as it does when marking all seen fails.
  */
 export function useInboxView(
   workspaceId: string,
   filter: Accessor<InboxFilter>,
   retain: Accessor<string | undefined>,
+  events: {
+    readonly failed?: (change: "seen" | "all-seen", failure: WorkspaceFailure) => void;
+  } = {},
 ) {
   const session = useSession();
   const people = usePeople(workspaceId);
@@ -59,15 +63,24 @@ export function useInboxView(
   const all = useInbox(workspaceId, "all");
   const pending = useInbox(workspaceId, "pending");
   const count = useInboxPending(workspaceId);
-  const seenAll = useMarkAllSeen(workspaceId);
+  const seenAll = useMarkAllSeen(workspaceId, {
+    failed: (failure) => events.failed?.("all-seen", failure),
+  });
   // Notifications the reader opened here, unread no more even before the inbox refreshes.
   const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set());
   const [seenError, setSeenError] = createSignal<WorkspaceFailure>();
   const queue: string[] = [];
   const seen = useRequest(
     seenRequest(useApiClient(), workspaceId),
-    (exit) => {
-      if (Exit.isFailure(exit)) setSeenError(workspaceFailure(exit.cause));
+    (exit, notificationId) => {
+      if (Exit.isFailure(exit)) {
+        const failure = workspaceFailure(exit.cause);
+        const unseen = new Set(opened());
+        unseen.delete(notificationId);
+        setOpened(unseen);
+        setSeenError(failure);
+        events.failed?.("seen", failure);
+      }
       const next = queue.shift();
       if (next !== undefined) seen.run(next);
     },
@@ -124,6 +137,7 @@ export function useInboxView(
     retry: () => read().retry(),
     earlier: () => items() !== undefined && !read().complete(),
     loadingEarlier: () => read().loadingEarlier(),
+    earlierFailed: () => read().earlierFailed(),
     loadEarlier: () => read().loadEarlier(),
     /** How many notifications are still unread, the inbox's own count. */
     unread: count,

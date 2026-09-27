@@ -208,12 +208,13 @@ and `text` fields the screens' timeline takes.
   position to show, reads back to it and reports its message as `focusId`. Both mark what they
   show read while mounted and visible, and report `status`: `loading`, `unavailable` once a
   refresh says the reader lost access (their entries empty until access returns), or `failed`.
-- `useInboxView(workspaceId, filter, retain)` gives the inbox, all or only what is unread, as
+- `useInboxView(workspaceId, filter, retain, events?)` gives the inbox, all or only what is unread, as
   `InboxEntry` values: why each came (`mention`, `reply`, or `thread`), its author, place, message
   parts, and thread, or no reason once its thread is unavailable. `open(id)` marks one seen at
   once, as the reader opens it. Unread keeps `retain`, the notification open beside the inbox, in
   place after it is seen. `unread` is the inbox's count, and `markAllSeen` marks everything
-  through the newest notification listed. `useThreadConversation` reports `focusReason()`, why the
+  through the newest notification listed. A notification whose seen mark fails shows unread
+  again; `events.failed` hears of that failure, `"seen"`, and of `"all-seen"`. `useThreadConversation` reports `focusReason()`, why the
   message at its focus notified the reader, for a thread opened from the inbox.
 - `useMentionCandidates(workspaceId, groupId)` lists a group's other members to mention.
   `useGroupPeople(workspaceId, members)` lists a group's members for its settings, the reader
@@ -234,7 +235,8 @@ first read and `failure` as a `WorkspaceFailure` code.
 
 `useGroupStream(workspaceId, groupId)` and `useThreadTimeline(workspaceId, threadId)` return a
 `PagedView`: items oldest first, opening at the newest page of 50, with `loadEarlier`,
-`loadingEarlier`, and `complete`. Both keep their pages in one atom and read its previous value,
+`loadingEarlier`, `earlierFailed`, and `complete`. An older page that fails reports
+`earlierFailed`, and `loadEarlier` then tries that page again. Both keep their pages in one atom and read its previous value,
 since a paging atom that restarts would drop older pages whenever a change arrives:
 
 - A timeline only grows, so a change reads what followed its newest item (`afterSequence`) and
@@ -252,6 +254,7 @@ touches, and a reset refreshes them all through the collection key.
 it survives remounts and moving between threads, `ready` once it has text and nothing is sending,
 `pending`, an `error` code, and `send`. A send reuses its request key when the same text is
 retried, so a post that succeeded unseen is not repeated, and takes a new key for new text. The
+key is kept with the draft, so a send cut off by unmounting is retried with it after remounting. The
 draft clears once the message is posted. Posting invalidates the reads it changes, the group's
 stream and the groups for a new thread, the thread's timeline and the streams for a reply, so the
 message shows even while the change feed is away.
@@ -279,13 +282,15 @@ message is published, looking again when the soonest runs out. A reply's compose
 thread's readers that the reader is typing when its draft grows, at most every 2.5 seconds; the
 server's signal lasts six.
 
-`useThreadFollow(workspaceId, threadId)` and `useGroupFollow(workspaceId, groupId)` return a
+`useThreadFollow(workspaceId, threadId, events?)` and `useGroupFollow(workspaceId, groupId, events?)` return a
 `FollowController`: `following` once known, `pending`, an `error` code, and `toggle`. Following a
 thread makes the reader take part in it, read from its participants, which change feed
 participation events refresh; unfollowing ends the reader's own participation by its ID. A group
 follows for the reader's own member, from the groups list, and `followable` holds only for team
-groups. A change shows at once and stays pending until the read agrees, since undoing a thread
-follow needs the participation the read returns.
+groups. A change shows at once while pending; the request refreshes the read and waits for it
+before answering, so the read then has the last word, including the participation that undoing a
+thread follow needs. `events.changed` hears of a change the read shows, and `events.failed` of
+one that failed, each with the state asked for.
 
 `useCreateGroup(workspaceId, created)` creates a team group from a `name`, the other `members`
 chosen, always adding the reader, and a `visibility`, private until set to public. A retry of the
@@ -315,8 +320,9 @@ counts as added.
 "earlier" reads 25 older ones, and a refresh reads down to the oldest shown, so new notifications
 arrive at the top. Notifications the change feed delivers to the reader, their read and seen
 signals, and group access changes refresh it. `useMarkSeen(workspaceId, notificationId)` marks one
-seen without opening it, showing `seen` once the host has recorded it; `useMarkAllSeen` marks
-everything still pending through the newest notification shown; and `useInboxPending` reads how many
+seen without opening it, showing `seen` once the host has recorded it; `useMarkAllSeen(workspaceId,
+events?)` marks everything still pending through the newest notification shown, telling
+`events.failed` when it fails; and `useInboxPending` reads how many
 are pending for the Inbox destination, including those from groups the reader left.
 `paths.inboxThread` takes the position that notified the reader as `?at=`. Marking a thread read refreshes the
 inbox, since it settles the reader's notifications from that thread.

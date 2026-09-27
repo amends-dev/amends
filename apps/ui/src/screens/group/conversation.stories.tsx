@@ -22,6 +22,16 @@ export const Stream = {
   },
 } satisfies Story;
 
+/** An older page that failed says so, and offers to try again. */
+export const EarlierFailed = {
+  render: () => <Conversation earlier="failed" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Couldn’t load earlier threads.")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Try again" })).toBeVisible();
+  },
+} satisfies Story;
+
 /** The thread beside it: notes, typing, and following. */
 export const OpenThread = {
   render: () => <Conversation open />,

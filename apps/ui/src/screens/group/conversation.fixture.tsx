@@ -83,7 +83,8 @@ export interface ConversationProps {
   readonly status?: ConversationStatus;
   readonly threadStatus?: ConversationStatus;
   readonly open?: boolean;
-  readonly earlier?: boolean;
+  /** Older threads remain, or the last older page failed. */
+  readonly earlier?: boolean | "failed";
   readonly menu?: boolean;
 }
 
@@ -141,7 +142,9 @@ export function Conversation(props: ConversationProps) {
             days
             status={props.status}
             onRetry={() => {}}
-            earlier={props.earlier ? { onLoad: () => {} } : undefined}
+            earlier={
+              props.earlier ? { failed: props.earlier === "failed", onLoad: () => {} } : undefined
+            }
             openThreadId={open() ? "t1" : undefined}
             onOpenThread={() => setOpen(true)}
             placeholder="Message #general"

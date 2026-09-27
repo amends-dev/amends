@@ -2,6 +2,7 @@ import { For, Match, Show, Switch, createMemo } from "solid-js";
 import { IconAlertTriangle, IconCheck, IconMarkMail, IconMessage } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
+import { Field } from "../../components/field/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import type { MessageAuthor } from "../../components/message/index.ts";
@@ -56,7 +57,12 @@ export interface InboxPaneProps {
   readonly status?: "loading" | "failed";
   readonly onRetry?: () => void;
   /** Older notifications remain; the end of the list offers them. */
-  readonly earlier?: { readonly loading?: boolean; readonly onLoad: () => void };
+  readonly earlier?: {
+    readonly loading?: boolean;
+    /** The last older page failed; loading again tries it once more. */
+    readonly failed?: boolean;
+    readonly onLoad: () => void;
+  };
 }
 
 const titles: Record<NotificationReason, string> = {
@@ -180,12 +186,15 @@ export function InboxPane(props: InboxPaneProps) {
             <Show when={props.earlier}>
               {(earlier) => (
                 <div class={s.earlier}>
+                  <Show when={earlier().failed && !earlier().loading}>
+                    <Field.Alert>Couldn’t load older notifications.</Field.Alert>
+                  </Show>
                   <Button
                     variant="quiet"
                     disabled={earlier().loading}
                     onClick={() => earlier().onLoad()}
                   >
-                    {earlier().loading ? "Loading…" : "Show older"}
+                    {earlier().loading ? "Loading…" : earlier().failed ? "Try again" : "Show older"}
                   </Button>
                 </div>
               )}

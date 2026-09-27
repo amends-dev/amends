@@ -17,7 +17,7 @@ import {
   type GroupSettingsTab,
 } from "@amends/ui/screens/group";
 import { useNavigate, useParams } from "@solidjs/router";
-import { createEffect, createSignal, on, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";
 import { pickerPerson } from "../workspace-layout.tsx";
 
@@ -51,21 +51,17 @@ function Group(props: {
   const conversation = useGroupConversation(workspaceId, groupId);
   const composer = useNewThread(workspaceId, groupId);
   const candidates = useMentionCandidates(workspaceId, groupId);
-  const follow = useGroupFollow(workspaceId, groupId);
   const actions = useWorkspaceActions();
-  // Once a follow change the reader made lands, confirm it.
-  let toggled = false;
-  createEffect(
-    on(
-      () => follow.following(),
-      (following, previous) => {
-        if (!toggled || following === undefined || previous === undefined) return;
-        if (following === previous) return;
-        toggled = false;
-        actions.toast(following ? `Following #${name()}` : `Unfollowed #${name()}`);
-      },
-    ),
-  );
+  const follow = useGroupFollow(workspaceId, groupId, {
+    changed: (following) =>
+      actions.toast(following ? `Following #${name()}` : `Unfollowed #${name()}`),
+    failed: (following) =>
+      actions.toast(
+        following
+          ? `Couldn’t follow #${name()}. Try again.`
+          : `Couldn’t unfollow #${name()}. Try again.`,
+      ),
+  });
   const [selected, setSelected] = createSignal<string[]>([]);
   const members = useGroupMembers(workspaceId, groupId, {
     added: () => setSelected([]),
@@ -98,10 +94,7 @@ function Group(props: {
             ? {
                 following: follow.following() ?? false,
                 pending: follow.pending(),
-                onToggle: () => {
-                  toggled = true;
-                  follow.toggle();
-                },
+                onToggle: follow.toggle,
               }
             : undefined
         }
@@ -114,7 +107,11 @@ function Group(props: {
           onRetry={conversation.retry}
           earlier={
             conversation.earlier()
-              ? { loading: conversation.loadingEarlier(), onLoad: conversation.loadEarlier }
+              ? {
+                  loading: conversation.loadingEarlier(),
+                  failed: conversation.earlierFailed(),
+                  onLoad: conversation.loadEarlier,
+                }
               : undefined
           }
           openThreadId={props.openThread()}

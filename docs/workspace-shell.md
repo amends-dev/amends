@@ -46,7 +46,8 @@ members.
 
 A team group's bell follows it, so new threads there include the reader, or stops: it is filled
 while the reader follows, and a toast confirms each change once it lands ("Following #design",
-"Unfollowed #design"). In the side panel the bell follows the thread, filled the same way. Direct
+"Unfollowed #design"); a change that fails puts the bell back and says so in a toast. In the side
+panel the bell follows the thread, filled the same way. Direct
 conversations have no bell, since everyone takes part in every thread. The member stack and
 the settings button open Group settings: General renames the group and leaves it, and Members
 adds and removes people as the reader may. Visibility is shown but cannot change, since the host
@@ -67,7 +68,9 @@ message that notified the reader, set apart, under "Mention · #general" or the 
 Back returns to the Inbox. Unread keeps that notification in place after it is seen, until another
 opens or the panel closes, and shows "You're all caught up" with "View all activity" only once
 nothing unread and nothing open remains. Mark all seen stays in the header while anything is
-unread. A notification whose thread the reader can no longer read shows as unavailable. Client's
+unread. If marking one seen fails, its dot returns; that failure, and one marking all seen, show a
+toast. Older notifications, like older threads and messages, load with Show older, which becomes
+Try again under a note when a page fails. A notification whose thread the reader can no longer read shows as unavailable. Client's
 `useInboxView` holds these rules; UI's `InboxPane` draws them from the Lunacy Inbox frames.
 
 ## Settings and placeholder pages
