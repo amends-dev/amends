@@ -23,11 +23,27 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
   the takeover time, 35 seconds by default. Cluster's socket transport, which delivers wakes
-  between processes at once, is not authenticated and belongs on a private network.
+  between processes at once, is not authenticated and belongs on a private network. Wakes are not
+  coalesced: a burst of commits that each ask for a run runs the process once per commit.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping
   its ID and all of these, is not designed.
+- Members cannot leave a workspace: only someone who may remove members can remove them.
+- An invitation whose inviter has since been removed stays pending but cannot be accepted, since
+  acceptance checks the inviter's authority, which a removed member no longer has.
+- The directory keeps listing a removed membership, so the apps can explain it, with the
+  workspace's current name, owner, and member count: someone removed still sees later renames and
+  the headcount.
+- Removing someone from a group or the workspace ends each of their thread participations in the
+  same commit, each with its own timeline note, so its cost grows with the threads they take part
+  in: about 6 seconds for 2,000 in one group. Past about 9,500 it exceeds the 30-second commit
+  deadline and the removal fails every time. Bounding it means either ending them together, with
+  one note, or publishing in batches; the general group makes it grow for everyone.
+- Names need not be unique: two members, groups, or workspaces can share a name. Hidden
+  characters that make one name read as another are refused.
+- Catching up with a group records the host's time when the mark arrives, not the newest activity
+  the reader saw, so activity that lands in between counts as read.
 
 ## HTTP coverage
 
@@ -128,6 +144,9 @@ messages in batches, so their store reads do not grow with group size or page le
 reads only those it addresses. A start still publishes one participation fact per starting
 participant, so its storage work grows with its participants, by a few statements each.
 
+A direct group is keyed by its member IDs. On PostgreSQL, one of more than about 70 members
+exceeds the index's 2,704-byte entry limit, and starting it fails.
+
 Member lists and the member-management listing resolve the reader's grants once for every
 member, and the listing loads role choices once. The listing still reads each listed member's
 assignments, one read per member; a batched assignment read across members would remove that.
@@ -155,7 +174,9 @@ are persisted per app origin; System follows operating-system appearance.
 compose headless session/API state from [client](../apps/client/README.md) and
 presentation from [UI](../apps/ui/README.md). Each app owns its route tree and
 maps query state to pages, errors, and navigation. Web uses browser routing and
-an API proxy; Tauri uses hash routing and connects to the existing local host.
+an API proxy; Tauri uses hash routing and connects to the existing local host. Its content
+security policy allows connections only to `http://127.0.0.1:8787`, so the desktop app cannot
+reach a host at any other address until that is configurable.
 Client and UI have no dependency on each other in source, tests, or manifests.
 Stored credentials are scoped by API URL and validated before protected content mounts.
 Changing credentials disposes the previous registry and requests. Session rejection,
@@ -198,9 +219,11 @@ permissions, and custom roles, which a workspace would edit itself, are not impl
 The [change feed](../packages/core/README.md#change-feed) reads the journal, so it carries
 commits from every host over the same storage and resumes from a cursor. Its remaining gaps:
 
-- PostgreSQL wakes followers with `LISTEN`/`NOTIFY`. A commit that notifies takes a lock on the
-  notification queue that serializes such commits across the whole database, which matters only
-  at thousands of commits a second; a batched poll per process is the alternative then. Behind a
+- PostgreSQL wakes followers with `LISTEN`/`NOTIFY`, sent inside the commit. A notifying commit
+  holds the notification queue's lock through its WAL flush, which serializes every notifying
+  commit on the server: measured with durable writes and 32 clients, about 200 commits a second,
+  against about 3,000 with the notification sent after the commit. Moving it after the commit, or
+  a batched poll per process, lifts that. Behind a
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
 - New notifications reach their recipients over the feed, and a human's `Seen` and read positions
   reach their other sessions as signals. An agent's pending notifications discarded when its
@@ -283,11 +306,6 @@ establish correctness for arbitrary session/database isolation settings.
 An explicit isolation choice and coverage for changed defaults remain outstanding.
 
 ## Edge resource controls
-
-There is no active browser change consumer after the web reset. When restoring live
-updates, provide a stable-connection threshold and retry budget: the former consumer
-reset its backoff after every Ready message, allowing repeated Ready/disconnect cycles
-to continually refresh queries near the initial delay.
 
 The [local server](../hosts/local/src/server.ts) refuses request bodies over one mebibyte with
 413, through Bun's own limit. Each process serves at most a thousand live-update streams per
