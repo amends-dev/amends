@@ -41,6 +41,13 @@ export interface Interface {
   /** What a write outside the journal changes: the caller's transaction, or committed state. */
   readonly join: Effect.Effect<MemoryDatabase.Space, Store.Failure>;
   /**
+   * Run a write outside the journal that reads before it writes: in the caller's transaction, or
+   * else holding the workspace's writer over committed state, so no commit lands in between.
+   */
+  readonly exclusive: <A, E, R>(
+    write: (space: MemoryDatabase.Space) => Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | Store.Failure | Store.Conflict, R>;
+  /**
    * The store's transaction primitive, given how to expose the native handle for the session
    * it opens. See Store.Interface for the contract. With `workspace: false` it does not take the
    * workspace's writer, for a standalone append that holds only its log, and commits only logs.
@@ -104,6 +111,39 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
   const join = Effect.map(session, (current) =>
     Option.isSome(current) ? current.value.space : MemoryDatabase.writable(database, workspaceId),
   );
+  /** Take the workspace's writer, which this host's writers wait for and another host's refuse. */
+  const acquire = Effect.fnUntraced(function* (
+    restore: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>,
+  ) {
+    yield* restore(gate.take(1));
+    if (database.writers.has(workspaceId)) {
+      yield* gate.release(1);
+      return yield* new Store.Conflict({
+        operation: "transaction",
+        message: "Another host is writing this workspace",
+      });
+    }
+    database.writers.set(workspaceId, connection);
+  });
+  const release = Effect.suspend(() => {
+    database.writers.delete(workspaceId);
+    return gate.release(1);
+  });
+  const exclusive: Interface["exclusive"] = (write) =>
+    Effect.flatMap(session, (current) =>
+      Option.isSome(current)
+        ? write(current.value.space)
+        : Effect.uninterruptibleMask((restore) =>
+            Effect.gen(function* () {
+              yield* acquire(restore);
+              const exit = yield* Effect.exit(
+                restore(write(MemoryDatabase.writable(database, workspaceId))),
+              );
+              yield* release;
+              return yield* exit;
+            }),
+          ),
+    );
 
   const transaction: Interface["transaction"] = Effect.fn("Binding.transaction")(function* <
     A,
@@ -124,17 +164,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
     return yield* Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         // This host's writers wait for each other; another host's writer is contention.
-        if (exclusive) {
-          yield* restore(gate.take(1));
-          if (database.writers.has(workspaceId)) {
-            yield* gate.release(1);
-            return yield* new Store.Conflict({
-              operation: "transaction",
-              message: "Another host is writing this workspace",
-            });
-          }
-          database.writers.set(workspaceId, connection);
-        }
+        if (exclusive) yield* acquire(restore);
         const state: TransactionState = {
           connection,
           workspaceId,
@@ -169,17 +199,14 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
         }
         for (const logId of state.held)
           yield* MemoryDatabase.logLock(database, workspaceId, logId).release(1);
-        if (exclusive) {
-          database.writers.delete(workspaceId);
-          yield* gate.release(1);
-        }
+        if (exclusive) yield* release;
         if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
         return exit.value;
       }),
     );
   });
 
-  return Service.of({ workspaceId, connection, read, write, join, transaction });
+  return Service.of({ workspaceId, connection, read, write, join, exclusive, transaction });
 });
 
 /**

@@ -269,7 +269,17 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     if (notification.state._tag === "Acknowledged") return notification;
     if (notification.state._tag !== "Pending")
       return yield* new AlreadyHandled({ notificationId: notification.id });
-    yield* notifications.markSeen([notification.id], yield* DateTime.now);
+    // Leaving its group may settle it first, and the store then refuses it or records nothing:
+    // what it reads as afterwards decides.
+    yield* notifications
+      .markSeen([notification.id], yield* DateTime.now)
+      .pipe(Effect.catchTag("NotificationStore.Conflict", () => Effect.void));
+    // Another device may have seen it first; the stored time is the one that holds.
+    const seen = yield* get(notification.id);
+    if (seen.state._tag === "Discarded")
+      return yield* new AlreadyHandled({ notificationId: notification.id });
+    if (seen.state._tag !== "Acknowledged")
+      return yield* new InvalidResponse({ message: "Seen notification still reads as unseen" });
     // The recipient's other sessions hear of it as a signal.
     yield* signals.publish(
       Signal.Value.cases.NotificationsSeen.make({
@@ -278,10 +288,6 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
         notificationIds: [notification.id],
       }),
     );
-    // Another device may have seen it first; the stored time is the one that holds.
-    const seen = yield* get(notification.id);
-    if (seen.state._tag !== "Acknowledged")
-      return yield* new InvalidResponse({ message: "Seen notification still reads as unseen" });
     return seen;
   });
   const acknowledgeThrough = Effect.fn("NotificationApplication.acknowledgeThrough")(function* (
@@ -291,9 +297,8 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     if (target._tag !== "Human") return yield* new HumanRecipientRequired({});
     const through = yield* decodeCursor(input);
     const memberId = (yield* Actor.Service).memberId;
-    let after: NotificationStore.Cursor | undefined;
-    let marked = 0;
-    while (true) {
+    /** One page marked: what it listed and how many of them were due. */
+    const markPage = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
       const page = yield* checked(
         target,
         notifications.listPendingByRecipient(
@@ -311,10 +316,23 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
         yield* signals.publish(
           Signal.Value.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds }),
         );
-        marked += due.length;
       }
+      return { page, due: due.length };
+    });
+    let after: NotificationStore.Cursor | undefined;
+    let marked = 0;
+    while (true) {
+      // Leaving a group settles its notifications, which the store then refuses to mark; they are
+      // no longer pending, so reading the page again leaves them out.
+      const { page, due } = yield* markPage(after).pipe(
+        Effect.retry({
+          times: 2,
+          while: (error) => error._tag === "NotificationStore.Conflict",
+        }),
+      );
+      marked += due;
       const last = page.at(-1);
-      if (last === undefined || page.length < seenBatch || due.length < page.length) return marked;
+      if (last === undefined || page.length < seenBatch || due < page.length) return marked;
       after = { recordedAt: last.recordedAt, id: last.id };
     }
   });

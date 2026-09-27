@@ -244,7 +244,8 @@ order, typically the newest one they are shown, so a notification that arrives m
 pending. It marks them in batches of 100, each written as `acknowledge` writes one and heard by
 the person's other sessions as one `NotificationsSeen` signal, and returns how many it marked;
 nothing left to mark returns zero. Batches are not one transaction: a failure keeps what earlier
-batches marked, and a retry continues. Agents receive `HumanRecipientRequired`.
+batches marked, and a retry continues. A batch that a departure settles part of meanwhile is read
+again without those, up to twice. Agents receive `HumanRecipientRequired`.
 
 ## Resolving a notification source
 
@@ -273,7 +274,8 @@ The state becomes `{ _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledg
 notification stays in inbox history and leaves pending results and counts. Repeating it returns
 the first time stored, including when two devices acknowledge at once. Missing and other
 recipients' IDs return `NotificationApplication.NotFound`; an agent's notification returns
-`HumanRecipientRequired`, and a discarded one `AlreadyHandled`.
+`HumanRecipientRequired`, and a discarded one `AlreadyHandled`, including one that leaving its
+group settles while it is being acknowledged.
 
 `Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
 workspace's write order, and survives rebuilding projections. It creates no activity or

@@ -27,7 +27,9 @@ Commit and entry IDs come from a counter in each storage.
 like one database connection. A transaction copies its workspace's maps, runs against the copy, and
 on success makes the copy the committed state; a failure or interruption discards it. Only the
 transaction writes the journal and projections meanwhile. Read-state writes outside a transaction
-apply at once, so a commit keeps the later of its own and the committed read-state values.
+apply at once, so a commit keeps the later of its own and the committed read-state values. Seen,
+which checks a notification is still pending before recording it, instead waits for the
+workspace's writer, so no commit lands between its check and its write.
 
 A workspace that another connection is writing reports `JournalStore.Conflict` at once, as if
 its lock wait had timed out immediately; the same connection's writers wait for each other.

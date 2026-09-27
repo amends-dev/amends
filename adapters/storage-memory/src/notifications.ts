@@ -62,7 +62,7 @@ const withSeen = (space: MemoryDatabase.Space) => (record: Notification.Record) 
  * @category constructors
  */
 export const make = Effect.fn("Notifications.make")(function* () {
-  const { workspaceId, read, write, join } = yield* Binding.Service;
+  const { workspaceId, read, write, exclusive } = yield* Binding.Service;
   /** Every record as reads show it. */
   const all = Effect.flatMap(read, (space) =>
     Effect.map(rows.all(space.records.notifications), (records) => records.map(withSeen(space))),
@@ -239,25 +239,37 @@ export const make = Effect.fn("Notifications.make")(function* () {
       const seenAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
         at,
       ).pipe(Effect.mapError(storeConflict(NotificationStore, "markSeen")));
-      const space = yield* join.pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
-      // Check every notification before recording any of them.
-      for (const id of ids) {
-        const found = yield* rows
-          .get(space.records.notifications, id)
-          .pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
-        if (
-          Option.isNone(found) ||
-          found.value.recipient._tag !== "Human" ||
-          found.value.state._tag !== "Pending"
-        )
-          return yield* new NotificationStore.Conflict({
-            operation: "markSeen",
-            message: "Expected a pending notification of a human recipient",
-          });
-      }
-      for (const id of ids)
-        if (!space.notificationsSeen.has(id))
-          space.notificationsSeen.set(id, DateTime.toEpochMillis(seenAt));
+      // Checked and recorded without a commit in between, as a row lock orders them on PostgreSQL:
+      // a departure that settles one first makes this conflict, and one after keeps its Seen.
+      yield* exclusive((space) =>
+        Effect.gen(function* () {
+          // Check every notification before recording any of them.
+          for (const id of ids) {
+            const found = yield* rows
+              .get(space.records.notifications, id)
+              .pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
+            if (
+              Option.isNone(found) ||
+              found.value.recipient._tag !== "Human" ||
+              found.value.state._tag !== "Pending"
+            )
+              return yield* new NotificationStore.Conflict({
+                operation: "markSeen",
+                message: "Expected a pending notification of a human recipient",
+              });
+          }
+          for (const id of ids)
+            if (!space.notificationsSeen.has(id))
+              space.notificationsSeen.set(id, DateTime.toEpochMillis(seenAt));
+        }),
+      ).pipe(
+        // The binding's own errors, such as another host writing, are failures of the call.
+        Effect.mapError((error) =>
+          error._tag === "JournalStore.Failure" || error._tag === "JournalStore.Conflict"
+            ? new NotificationStore.Failure({ operation: "markSeen", cause: error })
+            : error,
+        ),
+      );
     }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (input) {

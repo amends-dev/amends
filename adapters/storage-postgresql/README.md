@@ -146,6 +146,8 @@ restores the copy from `notification_seen` in the same statement, so a rebuild k
 `markSeen` checks every notification in one query, then in one statement sets the rows' `seen_at`
 and records `notification_seen`, keeping existing times, in the caller's transaction or on its own;
 updating the rows first makes concurrent calls take turns on their locks and agree on the first time.
+A departure that settles a row between the check and the update leaves it unseen; core reads the
+notification again and reports it handled.
 `pending_agent_notifications_by_participation` finds the pending agent input a departure settles.
 
 ## Transactions

@@ -151,6 +151,27 @@ export const notificationAcknowledgment = (harness: Harness) => {
         return yield* Effect.die("Missing generated notifications");
       return { bound, owner, group, first, humanNote, agentNote, ownerNote };
     });
+    /** Storage whose first Seen write lets `first` commit just before it, as a racing request. */
+    const racingSeen = (bound: Bound, first: Effect.Effect<unknown, unknown>): Bound => {
+      let done = false;
+      const before: Effect.Effect<void> = Effect.suspend(() =>
+        done
+          ? Effect.void
+          : Effect.orDie(first).pipe(
+              Effect.andThen(
+                Effect.sync(() => {
+                  done = true;
+                }),
+              ),
+            ),
+      );
+      return Object.assign({}, bound, {
+        context: Context.add(bound.context, NotificationStore.Service, {
+          ...bound.notifications,
+          markSeen: (ids, at) => Effect.andThen(before, bound.notifications.markSeen(ids, at)),
+        }),
+      });
+    };
     const snapshot = Effect.fnUntraced(function* (p: Effect.Success<ReturnType<typeof prepare>>) {
       return {
         history: yield* history(p.bound),
@@ -396,6 +417,159 @@ export const notificationAcknowledgment = (harness: Harness) => {
             expect((yield* run(p.bound, human, ack(p.humanNote.id))).state._tag).toBe(
               "Acknowledged",
             );
+          }),
+        ),
+      ),
+    );
+
+    it.effect(
+      "seeing notifications that leaving their group settles first reports them handled, not a failure",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const p = yield* prepare();
+              const elsewhere = yield* run(
+                p.bound,
+                p.owner,
+                Effect.flatMap(GroupApplication.Service, (s) =>
+                  s.createTeam({
+                    name: "Elsewhere",
+                    memberIds: [p.owner.memberId, human.memberId],
+                  }),
+                ),
+              );
+              yield* run(
+                p.bound,
+                p.owner,
+                Effect.flatMap(ThreadApplication.Service, (s) =>
+                  s.startInGroup({ groupId: elsewhere.id, mentions: [human.memberId], text: "Hi" }),
+                ),
+              );
+              const other = (yield* notes(p.bound, human)).find(
+                (note) => note.id !== p.humanNote.id,
+              );
+              if (other === undefined) return yield* Effect.die("Missing second notification");
+              const admission = Option.getOrThrow(
+                yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId),
+              );
+              const leave = (membershipId: typeof admission.id) =>
+                run(
+                  p.bound,
+                  human,
+                  Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+                    s.leave({ groupId: p.group.id, membershipId }),
+                  ),
+                );
+              // The human leaves Team after the notification was read as pending, before Seen.
+              const racing = racingSeen(p.bound, leave(admission.id));
+              expect(yield* Effect.flip(run(racing, human, ack(p.humanNote.id)))).toMatchObject({
+                _tag: "NotificationApplication.AlreadyHandled",
+              });
+              expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
+                value: { state: { _tag: "Discarded", reason: "access-lost" } },
+              });
+              // Marking all seen reads the page again without the settled one, and marks the rest.
+              yield* run(
+                p.bound,
+                p.owner,
+                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+                  s.add({ groupId: p.group.id, memberId: human.memberId }),
+                ),
+              );
+              yield* run(
+                p.bound,
+                writer,
+                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
+                  s.publish({
+                    threadId: p.first.thread.id,
+                    mentions: [human.memberId],
+                    text: "Again",
+                  }),
+                ),
+              );
+              const pending = yield* p.bound.notifications.listPendingByRecipient(
+                Notification.ofMember(human.memberId, human.identity),
+                { limit: 100 },
+              );
+              expect(pending).toHaveLength(2);
+              const rejoined = Option.getOrThrow(
+                yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId),
+              );
+              // Through the last listed, so both are due, whichever sorts first.
+              const through = pending.at(-1)!;
+              expect(
+                yield* run(
+                  racingSeen(p.bound, leave(rejoined.id)),
+                  human,
+                  Effect.flatMap(NotificationApplication.Service, (s) =>
+                    s.acknowledgeThrough({ recordedAt: through.recordedAt, id: through.id }),
+                  ),
+                ),
+              ).toBe(1);
+              expect(yield* p.bound.notifications.get(other.id)).toMatchObject({
+                value: { state: { _tag: "Acknowledged" } },
+              });
+              expect(
+                yield* p.bound.notifications.listPendingByRecipient(
+                  Notification.ofMember(human.memberId, human.identity),
+                  { limit: 100 },
+                ),
+              ).toEqual([]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect("a Seen write during a departure's commit agrees with what rebuilding settles", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const p = yield* prepare();
+            const admission = Option.getOrThrow(
+              yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId),
+            );
+            const reached = yield* Deferred.make<void>(),
+              release = yield* Deferred.make<void>();
+            // The departure pauses once it has settled the human's notifications, before committing.
+            const pausing = Object.assign({}, p.bound, {
+              context: Context.add(p.bound.context, NotificationStore.Service, {
+                ...p.bound.notifications,
+                discardPendingForGroup: (memberId, groupId) =>
+                  p.bound.notifications
+                    .discardPendingForGroup(memberId, groupId)
+                    .pipe(
+                      Effect.andThen(Deferred.succeed(reached, undefined)),
+                      Effect.andThen(Deferred.await(release)),
+                    ),
+              }),
+            });
+            const leaving = yield* run(
+              pausing,
+              human,
+              Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+                s.leave({ groupId: p.group.id, membershipId: admission.id }),
+              ),
+            ).pipe(Effect.forkChild);
+            yield* Deferred.await(reached);
+            const seeing = yield* Effect.exit(
+              p.bound.notifications.markSeen([p.humanNote.id], seenAt),
+            ).pipe(Effect.forkChild);
+            yield* Effect.repeat(Effect.yieldNow, { times: 10 });
+            yield* Deferred.succeed(release, undefined);
+            yield* Fiber.join(leaving);
+            // Seen lands first or is refused; either way the stored state is the rebuilt one.
+            yield* Fiber.join(seeing);
+            const live = yield* p.bound.notifications.get(p.humanNote.id);
+            expect(live).toMatchObject({ value: { state: { _tag: "Discarded" } } });
+            yield* storage.discardProjections;
+            yield* facts(
+              p.bound,
+              Effect.flatMap(Journal.Service, (j) => j.replay),
+            );
+            expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(live);
           }),
         ),
       ),
