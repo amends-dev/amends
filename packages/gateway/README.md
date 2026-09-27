@@ -193,7 +193,9 @@ caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its
 cause for host logging. `GatewayErrors.PublicError` is the schema of these
 outcomes, and `GatewayErrors.ExposedError<E>` computes a program's public error
-type from core's.
+type from core's. A domain error core adds reaches callers only once it is listed there;
+otherwise it becomes a defect, which HTTP answers with 500. A server-http test checks that every
+error an HTTP route declares is public here or raised by the HTTP layer itself.
 
 The adapters currently map every failed COMMIT effect to `Uncertain`, including
 some definite failures, and PostgreSQL deadlocks are not mapped to contention.
