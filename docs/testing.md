@@ -76,6 +76,9 @@ lockfile. A new push to a pull request cancels its earlier run. The PostgreSQL s
 throwaway cluster from the runner's installation with `AMENDS_POSTGRES_REQUIRED=true`. The
 migration step regenerates the baseline and fails if anything changes. When one project's tests
 outgrow their job, give it its own matrix entry or more shards; `--shard` splits by test file.
+The `backend` and `postgresql` projects allow each test 20 seconds rather than Vitest's 5: on the
+two-CPU runners, sharing the machine with PostgreSQL, their heaviest tests (such as a commit
+binding more parameters than one statement can) run about three times slower than on a laptop.
 
 [`.github/workflows/native.yml`](../.github/workflows/native.yml) runs desktop's `cargo fmt` and
 `cargo check` only when `apps/desktop/src-tauri` or the workflow changes, with Tauri's Linux

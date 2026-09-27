@@ -12,6 +12,8 @@ export default defineConfig({
         test: {
           name: "backend",
           environment: "node",
+          // Integration tests share CI's two CPUs with PostgreSQL; the 5 s default is too tight.
+          testTimeout: 20_000,
           include: ["packages/*/test/**/*.test.ts", "adapters/storage-memory/test/**/*.test.ts"],
         },
       },
@@ -19,6 +21,7 @@ export default defineConfig({
         test: {
           name: "postgresql",
           environment: "node",
+          testTimeout: 20_000,
           globalSetup: ["adapters/storage-postgresql/test/global-setup.ts"],
           include: ["adapters/storage-postgresql/test/**/*.test.ts", "hosts/*/test/**/*.test.ts"],
         },
