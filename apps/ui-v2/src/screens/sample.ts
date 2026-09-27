@@ -101,7 +101,18 @@ export const threadEntries: readonly TimelineEntry[] = [
 
 const noop = () => {};
 
-export function navigation(threadOpen: boolean): WorkspaceNavigationProps {
+export interface NavigationState {
+  /** Joined groups, in sidebar order. */
+  readonly groups: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  readonly currentGroup?: string;
+  readonly directory?: boolean;
+  readonly threadOpen?: boolean;
+  readonly onOpenGroup?: (id: string) => void;
+  readonly onOpenDirectory?: (tab: "joined" | "discover") => void;
+  readonly onCreateGroup?: () => void;
+}
+
+export function navigation(state: NavigationState): WorkspaceNavigationProps {
   return {
     workspace: { name: "Mercier & Co" },
     account: people.jordan,
@@ -112,27 +123,25 @@ export function navigation(threadOpen: boolean): WorkspaceNavigationProps {
     inbox: { href: "#inbox" },
     triage: { href: "#triage", count: 5 },
     tasks: { href: "#tasks" },
-    groupsDirectory: { href: "#groups" },
-    groups: [
-      {
-        id: "general",
-        name: "general",
-        href: "#general",
-        current: true,
-        threads: [
-          {
-            id: "m5",
-            title: "Composer paste crash",
-            href: "#thread",
-            state: "open",
-            current: threadOpen,
-          },
-        ],
-      },
-      { id: "design", name: "design", href: "#design" },
-      { id: "engineering", name: "engineering", href: "#engineering" },
-      { id: "product", name: "product", href: "#product" },
-    ],
+    groupsDirectory: { href: "#groups", current: state.directory },
+    groups: state.groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      href: `#${group.id}`,
+      current: !state.directory && state.currentGroup === group.id,
+      threads:
+        group.id === "general"
+          ? [
+              {
+                id: "m5",
+                title: "Composer paste crash",
+                href: "#thread",
+                state: "open" as const,
+                current: state.threadOpen && !state.directory && state.currentGroup === "general",
+              },
+            ]
+          : undefined,
+    })),
     directMessages: [
       { id: "alex", name: "Alex Morgan", tone: "sand", href: "#alex" },
       { id: "yumi", name: "Yumi", tone: "lilac", href: "#yumi" },
@@ -140,11 +149,155 @@ export function navigation(threadOpen: boolean): WorkspaceNavigationProps {
     onSearch: noop,
     onSwitchWorkspace: noop,
     onOpenAccount: noop,
-    onBrowseGroups: noop,
-    onCreateGroup: noop,
+    onBrowseGroups: () => state.onOpenDirectory?.("discover"),
+    onCreateGroup: () => state.onCreateGroup?.(),
     onNewMessage: noop,
   };
 }
+
+/** Groups in the workspace: joined ones first, then public groups to discover. */
+export const workspaceGroups: ReadonlyArray<{
+  readonly id: string;
+  readonly name: string;
+  readonly visibility: "public" | "private";
+  readonly memberCount: number;
+  readonly joined: boolean;
+}> = [
+  { id: "design", name: "design", visibility: "public", memberCount: 12, joined: true },
+  { id: "engineering", name: "engineering", visibility: "private", memberCount: 9, joined: true },
+  { id: "general", name: "general", visibility: "private", memberCount: 7, joined: true },
+  { id: "product", name: "product", visibility: "public", memberCount: 8, joined: true },
+  {
+    id: "announcements",
+    name: "announcements",
+    visibility: "public",
+    memberCount: 24,
+    joined: false,
+  },
+  {
+    id: "customer-feedback",
+    name: "customer-feedback",
+    visibility: "public",
+    memberCount: 16,
+    joined: false,
+  },
+  { id: "launches", name: "launches", visibility: "public", memberCount: 8, joined: false },
+  { id: "platform", name: "platform", visibility: "public", memberCount: 11, joined: false },
+  { id: "research", name: "research", visibility: "public", memberCount: 6, joined: false },
+  { id: "watercooler", name: "watercooler", visibility: "public", memberCount: 19, joined: false },
+];
+
+const caleb = { name: "Caleb", tone: "sage" } as const;
+
+export const launchesEntries: readonly TimelineEntry[] = [
+  { kind: "divider", id: "today", label: "Today" },
+  {
+    kind: "message",
+    id: "l1",
+    author: people.sara,
+    time: "9:10 AM",
+    text: ["Sharing the launch plan for next week. Please add questions here."],
+    thread: { replies: 6, people: [people.alex, people.graeme, people.yumi] },
+  },
+  {
+    kind: "message",
+    id: "l2",
+    author: people.alex,
+    time: "9:18 AM",
+    text: ["Docs are ready for review. I’ve added the rollout checklist."],
+  },
+  {
+    kind: "message",
+    id: "l3",
+    author: people.graeme,
+    time: "9:26 AM",
+    text: ["I’ll coordinate the announcement after we confirm the date."],
+  },
+  {
+    kind: "message",
+    id: "l4",
+    author: people.yumi,
+    time: "9:32 AM",
+    text: ["I can help check the release notes when they’re ready."],
+  },
+  {
+    kind: "message",
+    id: "l5",
+    author: caleb,
+    time: "9:40 AM",
+    text: ["I’ll review the checklist this afternoon."],
+  },
+];
+
+export const launchesThread: readonly TimelineEntry[] = [
+  {
+    kind: "message",
+    id: "lt0",
+    author: people.sara,
+    time: "9:10 AM",
+    text: ["Sharing the launch plan for next week. Please add questions here."],
+  },
+  { kind: "divider", id: "replies", label: "6 replies", align: "start" },
+  {
+    kind: "message",
+    id: "lt1",
+    author: people.alex,
+    time: "9:18 AM",
+    text: ["Docs are ready. I’ve added the rollout checklist."],
+  },
+  {
+    kind: "message",
+    id: "lt2",
+    author: people.graeme,
+    time: "9:26 AM",
+    text: ["I’ll coordinate the announcement."],
+  },
+  {
+    kind: "message",
+    id: "lt3",
+    author: people.yumi,
+    time: "9:32 AM",
+    text: ["I can review the release notes."],
+  },
+  {
+    kind: "message",
+    id: "lt4",
+    author: people.oliver,
+    time: "9:35 AM",
+    text: ["Support is covered for launch day."],
+  },
+  {
+    kind: "message",
+    id: "lt5",
+    author: people.aj,
+    time: "9:38 AM",
+    text: ["I’ll check the final build."],
+  },
+  {
+    kind: "message",
+    id: "lt6",
+    author: caleb,
+    time: "9:40 AM",
+    text: ["Reviewing the checklist this afternoon."],
+  },
+];
+
+export const you: PickerPerson = {
+  id: "you",
+  name: "You",
+  initials: "JM",
+  tone: "sage",
+  kind: "Person",
+};
+
+export const creationCandidates: readonly PickerPerson[] = [
+  { id: "alex", name: "Alex Morgan", tone: "sand", kind: "Person" },
+  { id: "caleb", name: "Caleb", tone: "sage", kind: "Person" },
+  { id: "graeme", name: "Graeme", tone: "slate", kind: "Person" },
+  { id: "oliver", name: "Oliver", tone: "olive", kind: "Person" },
+  { id: "sara", name: "Sara", tone: "clay", kind: "Person" },
+  { id: "yumi", name: "Yumi", tone: "lilac", kind: "Agent" },
+];
 
 export const taskPeople = [
   { id: "aj", name: "AJ", tone: "ink" },

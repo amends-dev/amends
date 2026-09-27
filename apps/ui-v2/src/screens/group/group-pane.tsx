@@ -1,4 +1,4 @@
-import { For, type JSX } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import { IconBell, IconMarkChannel, IconMarkSearch, IconMarkSettings } from "@amends/icons";
 import { AvatarStack, type AvatarStackPerson } from "../../components/avatar/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
@@ -31,6 +31,8 @@ export interface GroupPaneProps {
   readonly onOpenNotifications: () => void;
   readonly onOpenSettings: () => void;
   readonly onSearch: () => void;
+  /** Previewing a public group the reader has not joined: Back, a Public badge, fewer actions. */
+  readonly preview?: { readonly onBack: () => void };
   /** The current tab's Pane.Body and Pane.Footer. */
   readonly children: JSX.Element;
 }
@@ -40,8 +42,16 @@ export function GroupPane(props: GroupPaneProps) {
   return (
     <Pane.Root>
       <Pane.Header>
-        <Shell.NavigationToggle />
-        <Pane.Title icon={IconMarkChannel} context={props.workspaceName}>
+        <Show when={props.preview} fallback={<Shell.NavigationToggle />}>
+          {(preview) => (
+            <Pane.Back always aria-label="Back to groups" onClick={() => preview().onBack()} />
+          )}
+        </Show>
+        <Pane.Title
+          icon={IconMarkChannel}
+          context={props.workspaceName}
+          badge={props.preview ? "Public" : undefined}
+        >
           {props.name}
         </Pane.Title>
         <Pane.Actions>
@@ -53,23 +63,25 @@ export function GroupPane(props: GroupPaneProps) {
           >
             <AvatarStack people={props.members} aria-hidden="true" />
           </button>
-          <IconButton
-            icon={IconBell}
-            label="Notifications"
-            class={s.desktopOnly}
-            onClick={() => props.onOpenNotifications()}
-          />
-          <IconButton
-            icon={IconMarkSearch}
-            label="Search"
-            class={s.mobileOnly}
-            onClick={() => props.onSearch()}
-          />
-          <IconButton
-            icon={IconMarkSettings}
-            label="Group settings"
-            onClick={() => props.onOpenSettings()}
-          />
+          <Show when={!props.preview}>
+            <IconButton
+              icon={IconBell}
+              label="Notifications"
+              class={s.desktopOnly}
+              onClick={() => props.onOpenNotifications()}
+            />
+            <IconButton
+              icon={IconMarkSearch}
+              label="Search"
+              class={s.mobileOnly}
+              onClick={() => props.onSearch()}
+            />
+            <IconButton
+              icon={IconMarkSettings}
+              label="Group settings"
+              onClick={() => props.onOpenSettings()}
+            />
+          </Show>
         </Pane.Actions>
         <Pane.Tabs>
           <Tabs.List aria-label={props.name}>

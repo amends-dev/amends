@@ -73,6 +73,7 @@ export const chip = style({
   backgroundColor: vars.color.surface.selected,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
+  selectors: { "&[data-locked]": { paddingInlineEnd: "0.5rem" } },
 });
 
 export const chipRemove = style({
@@ -101,6 +102,8 @@ export const popup = style({
       insetInline: 0,
       top: "calc(100% + 0.375rem)",
       zIndex: 10,
+      display: "flex",
+      flexDirection: "column",
       border: `1px solid ${vars.color.border.default}`,
       backgroundColor: vars.color.surface.popover,
       boxShadow: vars.shadow.popover,
@@ -132,6 +135,8 @@ export const listbox = style({
   margin: 0,
   padding: "0 0.5rem",
   listStyle: "none",
+  flex: "0 1 auto",
+  minHeight: 0,
   maxHeight: "16rem",
   overflowY: "auto",
   selectors: { [`${popup}[data-presentation=list] &`]: { padding: 0, maxHeight: "none" } },

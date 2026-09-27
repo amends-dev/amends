@@ -107,6 +107,7 @@ export const title = style({
   display: "flex",
   alignItems: "center",
   gap: "0.75rem",
+  justifyContent: "flex-start",
   minWidth: 0,
   selectors: { [`${side} &`]: { gap: "0.6875rem" } },
   "@media": {
@@ -247,6 +248,12 @@ export const body = style({
 export const footer = style({
   flex: "none",
   padding: "1.25rem 1.5rem",
+  selectors: {
+    "&[data-divided]": {
+      boxShadow: `inset 0 1px 0 ${vars.color.border.divider}`,
+      paddingBlock: "1.5rem",
+    },
+  },
   "@media": {
     [media.touch]: { padding: "1rem 1.5rem" },
     [media.mobile]: {

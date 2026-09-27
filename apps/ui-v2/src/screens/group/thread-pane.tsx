@@ -1,3 +1,4 @@
+import { Show } from "solid-js";
 import { IconMessage } from "@amends/icons";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
@@ -13,6 +14,8 @@ export interface ThreadPaneProps extends ConversationProps {
   /** The thread's group, for the subtitle and the phone's Back. */
   readonly groupName: string;
   readonly onClose: () => void;
+  /** Hide the composer, as while previewing a group the reader has not joined. */
+  readonly readOnly?: boolean;
 }
 
 /**
@@ -35,7 +38,9 @@ export function ThreadPane(props: ThreadPaneProps) {
         <Pane.Body ref={scroll.ref} onScroll={scroll.onScroll}>
           <Timeline entries={props.entries} onReact={props.onReact} taskHref={props.taskHref} />
         </Pane.Body>
-        <ConversationComposer {...props} />
+        <Show when={!props.readOnly}>
+          <ConversationComposer {...props} />
+        </Show>
       </Pane.Root>
     </Shell.Aside>
   );

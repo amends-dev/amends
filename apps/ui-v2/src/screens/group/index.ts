@@ -1,3 +1,4 @@
+export { CreateGroup, type CreateGroupProps } from "./create-group.tsx";
 export { GroupPane, type GroupPaneProps, type GroupTab } from "./group-pane.tsx";
 export {
   GroupSettings,

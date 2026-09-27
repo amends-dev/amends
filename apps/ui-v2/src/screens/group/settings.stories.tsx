@@ -51,6 +51,7 @@ export const AddMembers = {
     const picker = dialog.getByRole("combobox", { name: "Add members" });
     await userEvent.click(picker);
     await userEvent.keyboard("{ArrowDown}{Enter}");
+    await userEvent.clear(picker);
     await userEvent.type(picker, "tay");
     await userEvent.click(dialog.getByRole("option", { name: /Taylor Reed/ }));
     await expect(dialog.getByRole("button", { name: "Remove Morgan Lee" })).toBeVisible();

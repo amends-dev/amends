@@ -1,6 +1,7 @@
 import { Show, createContext, splitProps, useContext, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { IconMarkBack, IconMarkClose } from "@amends/icons";
+import { Badge } from "../../components/badge/index.ts";
 import { IconButton, type IconButtonProps } from "../../components/icon-button/index.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./pane.css.ts";
@@ -46,12 +47,21 @@ export type TitleProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & 
   icon?: IconComponent;
   /** A second line on phones, such as the workspace name. */
   context?: string;
+  /** A short label after the title, such as "Public". */
+  badge?: string;
   /** Default h1 for main content and h2 for a side pane. */
   level?: 1 | 2;
 };
 
 export function Title(props: TitleProps) {
-  const [local, native] = splitProps(props, ["children", "icon", "context", "level", "class"]);
+  const [local, native] = splitProps(props, [
+    "children",
+    "icon",
+    "context",
+    "badge",
+    "level",
+    "class",
+  ]);
   const variant = useContext(Variant);
   const level = () => local.level ?? (variant === "side" ? 2 : 1);
   return (
@@ -65,6 +75,9 @@ export function Title(props: TitleProps) {
           <span class={s.context}>{local.context}</span>
         </Show>
       </div>
+      <Show when={local.badge}>
+        <Badge>{local.badge}</Badge>
+      </Show>
     </div>
   );
 }
@@ -167,10 +180,19 @@ export function Body(props: BodyProps) {
   );
 }
 
-export type FooterProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type FooterProps = JSX.HTMLAttributes<HTMLDivElement> & {
+  /** A banner above a divider, such as a prompt to join, in place of the composer. */
+  divided?: boolean;
+};
 
 /** The bar under the content, such as the composer. It stays above the phone's home indicator. */
 export function Footer(props: FooterProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.footer, local.class)} />;
+  const [local, native] = splitProps(props, ["class", "divided"]);
+  return (
+    <div
+      {...native}
+      data-divided={local.divided ? "" : undefined}
+      class={classes(s.footer, local.class)}
+    />
+  );
 }

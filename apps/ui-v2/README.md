@@ -124,6 +124,10 @@ keeps the mode. The mocks show menus closed only, so their surface follows the m
 the list, arrows and Enter pick, and Backspace removes the last chip. It is a dropdown on wider
 layouts and an always-shown list on phones.
 
+`Badge` labels a property such as visibility, `EmptyState` centers a note where content will
+appear, and `Toast` shows a short confirmation with an optional action at the bottom of the
+viewport, dismissing itself after five seconds.
+
 `Modal` is the fifth pattern: a Pane with `variant="modal"` in a native dialog, so the page
 behind is inert, Escape and a click outside close it, and focus returns. It is 640 × 600 capped
 to the viewport, and fills the screen on phones. `Modal.Actions` holds its buttons at the end
@@ -138,14 +142,23 @@ and tabs around the current tab, `GroupThreads` is its Threads tab (timeline and
 and assignee filters, and sorting that stay above the task list, with the status and key
 columns giving way on narrower layouts. `TaskPane` opens a task in the side panel with its
 state and assignee pickers, description, a link to where it started, and its activity.
+`CreateGroup` creates a group in a modal with its name, visibility, and first members, the
+reader locked in as "You"; the member list opens upward when the modal has more room there.
+A new group's Threads tab shows a welcome naming its members. `GroupDirectory` is the Groups
+page: Your groups and Discover, with search, visibility, member counts, and Join. A public
+group the reader has not joined opens as a preview: Back, a Public badge, and a prompt to join
+in place of the composer; its threads open without a composer too.
 `GroupSettings` is the settings modal: General (name, visibility, and your membership) and
 Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages and dividers from
 `TimelineEntry` data, and conversations read from the bottom: they open at the newest message
 and follow new ones while the reader is at the end. **Screens / Group threads** composes them
-with the Lunacy sample data, and **Screens / Group tasks** and **Screens / Group settings** add
-the Tasks tab, a task, and the settings modal to the same working harness. Their interaction
+with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, **Create group**,
+and **Browse groups** add the rest of the group flows to the same working workspace: switching
+groups, the directory, previewing and joining, creating a group, and toasts. Their interaction
 stories run as tests.
 
+The preview's join prompt spans the main content only; the open thread beside it simply has no
+composer. Tab counts are plain numbers everywhere, where some mocks draw them as badges.
 The settings copy says "group" where the mocks said "channel", and the visibility help follows
 the chosen option. Task panel messages use the standard message size rather than the mock's
 smaller text. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which

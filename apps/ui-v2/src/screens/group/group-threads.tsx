@@ -1,9 +1,12 @@
-import { createEffect, createSignal, on } from "solid-js";
-import { IconMarkAttach, IconMarkMention } from "@amends/icons";
+import { Show, createEffect, createSignal, on } from "solid-js";
+import { IconMarkAttach, IconMarkMention, IconMessage } from "@amends/icons";
+import { Button } from "../../components/button/index.ts";
+import { EmptyState } from "../../components/empty-state/index.ts";
 import { Composer } from "../../components/composer/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Timeline, type TimelineEntry } from "../timeline/index.ts";
+import * as s from "./group.css.ts";
 
 export interface ConversationProps {
   readonly entries: readonly TimelineEntry[];
@@ -60,7 +63,17 @@ export interface GroupThreadsProps extends ConversationProps {
   /** The message whose thread is open beside the timeline. */
   readonly openThreadId?: string;
   readonly onOpenThread: (messageId: string) => void;
+  /** Shown while the group has no messages yet. */
+  readonly welcome?: { readonly groupName: string; readonly memberNames: readonly string[] };
+  /** Previewing a public group: a prompt to join replaces the composer. */
+  readonly preview?: {
+    readonly groupName: string;
+    readonly onJoin: () => void;
+    readonly joining?: boolean;
+  };
 }
+
+const list = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 /** A group's Threads tab: the timeline and the composer. Place it inside GroupPane. */
 export function GroupThreads(props: GroupThreadsProps) {
@@ -68,15 +81,47 @@ export function GroupThreads(props: GroupThreadsProps) {
   return (
     <>
       <Pane.Body ref={scroll.ref} onScroll={scroll.onScroll}>
-        <Timeline
-          entries={props.entries}
-          activeId={props.openThreadId}
-          onOpenThread={props.onOpenThread}
-          onReact={props.onReact}
-          taskHref={props.taskHref}
-        />
+        <Show
+          when={props.entries.length === 0 && props.welcome}
+          fallback={
+            <Timeline
+              entries={props.entries}
+              activeId={props.openThreadId}
+              onOpenThread={props.onOpenThread}
+              onReact={props.onReact}
+              taskHref={props.taskHref}
+            />
+          }
+        >
+          {(welcome) => (
+            <EmptyState
+              icon={IconMessage}
+              title={`Welcome to #${welcome().groupName}`}
+              lines={[
+                `${list.format(welcome().memberNames)} ${welcome().memberNames.length === 1 ? "is a member" : "are members"}.`,
+                "Send the first message to start the conversation.",
+              ]}
+            />
+          )}
+        </Show>
       </Pane.Body>
-      <ConversationComposer {...props} />
+      <Show when={props.preview} fallback={<ConversationComposer {...props} />}>
+        {(preview) => (
+          <Pane.Footer divided>
+            <div class={s.prompt}>
+              <div class={s.promptText}>
+                <p class={s.promptTitle}>You’re previewing #{preview().groupName}</p>
+                <p class={s.promptNote}>
+                  Read messages, tasks, and files. Join the group to participate.
+                </p>
+              </div>
+              <Button disabled={preview().joining} onClick={() => preview().onJoin()}>
+                Join group
+              </Button>
+            </div>
+          </Pane.Footer>
+        )}
+      </Show>
     </>
   );
 }

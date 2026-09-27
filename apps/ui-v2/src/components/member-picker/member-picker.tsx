@@ -1,4 +1,13 @@
-import { For, Show, createMemo, createSignal, createUniqueId, type JSX } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  onCleanup,
+  type JSX,
+} from "solid-js";
 import { IconChevronDown, IconMarkClose, IconMarkNew, IconMarkSearch } from "@amends/icons";
 import { Avatar } from "../avatar/index.ts";
 import { useField } from "../field/index.ts";
@@ -23,6 +32,8 @@ export interface MemberPickerProps {
   readonly presentation?: "dropdown" | "list";
   /** Default "Search workspace members…". */
   readonly placeholder?: string;
+  /** People who are always included and cannot be removed, such as "You". */
+  readonly locked?: readonly PickerPerson[];
 }
 
 /**
@@ -39,6 +50,43 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
   const [expanded, setExpanded] = createSignal(false);
   const [active, setActive] = createSignal(0);
   const [input, setInput] = createSignal<HTMLInputElement>();
+  const [control, setControl] = createSignal<HTMLDivElement>();
+  const [position, setPosition] = createSignal<JSX.CSSProperties>();
+  // The dropdown is fixed to the viewport so scrolling areas cannot clip it. It stays within
+  // the surrounding dialog when there is one, opening upward when more of it fits above.
+  const place = () => {
+    const field = control();
+    if (!field || presentation() === "list") return;
+    const rect = field.getBoundingClientRect();
+    const height = window.innerHeight;
+    const frame = field.closest("dialog")?.getBoundingClientRect();
+    const below = (frame?.bottom ?? height) - rect.bottom - 12;
+    const above = rect.top - (frame?.top ?? 0) - 12;
+    const up = below < 272 && above > below;
+    setPosition({
+      position: "fixed",
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      ...(up
+        ? { top: "auto", bottom: `${height - rect.top + 6}px` }
+        : { top: `${rect.bottom + 6}px`, bottom: "auto" }),
+      "max-height": `${Math.max(160, up ? above : below)}px`,
+    });
+  };
+  createEffect(() => {
+    if (!expanded() || presentation() === "list") return;
+    const update = () => place();
+    window.addEventListener("resize", update);
+    document.addEventListener("scroll", update, true);
+    onCleanup(() => {
+      window.removeEventListener("resize", update);
+      document.removeEventListener("scroll", update, true);
+    });
+  });
+  const expand = () => {
+    if (!expanded()) place();
+    setExpanded(true);
+  };
   const chosen = createMemo(() =>
     props.selected
       .map((selectedId) => props.candidates.find((person) => person.id === selectedId))
@@ -65,7 +113,7 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
     input()?.focus();
   };
   const move = (step: number) => {
-    setExpanded(true);
+    expand();
     const count = options().length;
     if (count > 0) setActive((index) => (Math.min(index, count - 1) + step + count) % count);
   };
@@ -77,15 +125,30 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
       }}
     >
       <div
+        ref={setControl}
         class={s.control}
         data-open={expanded() ? "" : undefined}
         onClick={(event) => {
           if (event.target === event.currentTarget) input()?.focus();
         }}
       >
-        <Show when={chosen().length === 0}>
+        <Show when={chosen().length === 0 && !props.locked?.length}>
           <IconMarkSearch class={s.searchIcon} />
         </Show>
+        <For each={props.locked}>
+          {(person) => (
+            <span class={s.chip} data-locked="">
+              <Avatar
+                name={person.name}
+                initials={person.initials}
+                tone={person.tone}
+                size={22}
+                decorative
+              />
+              {person.name}
+            </span>
+          )}
+        </For>
         <For each={chosen()}>
           {(person) => (
             <span class={s.chip}>
@@ -125,9 +188,9 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
           onInput={(event) => {
             setQuery(event.currentTarget.value);
             setActive(0);
-            setExpanded(true);
+            expand();
           }}
-          onFocus={() => setExpanded(true)}
+          onFocus={expand}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown") {
               event.preventDefault();
@@ -159,7 +222,8 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
             tabIndex={-1}
             aria-label={expanded() ? "Hide members" : "Show members"}
             onClick={() => {
-              setExpanded(!expanded());
+              if (expanded()) setExpanded(false);
+              else expand();
               input()?.focus();
             }}
           >
@@ -168,7 +232,11 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
         </Show>
       </div>
       <Show when={open()}>
-        <div class={s.popup} data-presentation={presentation()}>
+        <div
+          class={s.popup}
+          data-presentation={presentation()}
+          style={presentation() === "dropdown" ? position() : undefined}
+        >
           <div class={s.popupHeader}>
             <span>Workspace members</span>
             <span class={s.available}>{options().length} available</span>
