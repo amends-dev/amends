@@ -272,8 +272,11 @@ own. A statement PostgreSQL
 refuses aborts its transaction; the commit checks what PostgreSQL actually did,
 so a program that swallowed such a refusal fails rather than losing its writes.
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the
-workspace and log, inside its transaction, so the notification arrives only if the commit
-succeeds. Each pool's listener, started by the first waiting reader or signal subscriber and
+workspace and log once COMMIT succeeds, as one statement of its own on the commit's connection,
+so a notification means a commit and a rolled-back transaction sends none. Inside the
+transaction, the notification queue's lock would be held through the commit's WAL flush and
+serialize every notifying commit on the server. A notice lost to a failure between the two leaves
+waiters to their poll. Each pool's listener, started by the first waiting reader or signal subscriber and
 stopped 30 seconds after the last, holds one pooled connection on `LISTEN` and wakes that log's
 waiters in the process.
 A waiter takes its wakeup signal before checking the log, so an append between the check and the

@@ -222,12 +222,16 @@ permissions, and custom roles, which a workspace would edit itself, are not impl
 The [change feed](../packages/core/README.md#change-feed) reads the journal, so it carries
 commits from every host over the same storage and resumes from a cursor. Its remaining gaps:
 
-- PostgreSQL wakes followers with `LISTEN`/`NOTIFY`, sent inside the commit. A notifying commit
-  holds the notification queue's lock through its WAL flush, which serializes every notifying
-  commit on the server: measured with durable writes and 32 clients, about 200 commits a second,
-  against about 3,000 with the notification sent after the commit. Moving it after the commit, or
-  a batched poll per process, lifts that. Behind a
+- PostgreSQL wakes followers with `LISTEN`/`NOTIFY`, sent just after each commit rather than
+  inside it, where the notification queue's lock would serialize every notifying commit on the
+  server through its WAL flush. A process that stops between its commit and the notice leaves
+  followers to find the commit at their next poll, within five seconds. Behind a
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
+- Writes are limited by the host's own work rather than by PostgreSQL: on a laptop with durable
+  writes, a thread start takes about 250 ms of which its 45 statements spend little on the
+  database, and a member list about 45 ms for 7 statements. A profile shows the time in the Effect
+  runtime, Drizzle's query building, tracing, and output. Thread starts across 16 workspaces
+  reached about 17 a second, up from 14 before notices moved after the commit.
 - New notifications reach their recipients over the feed, and a human's `Seen` and read positions
   reach their other sessions as signals. An agent's pending notifications discarded when its
   participation ends show only through the inbox, beside an unfollow's participation-ended

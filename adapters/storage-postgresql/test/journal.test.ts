@@ -24,12 +24,15 @@ const pools = (url: string) =>
       Effect.flatMap((storage) => storage.forWorkspace(workspaceId)),
       Effect.provide(writer),
     );
-    const append = writing.store.transaction(
-      Effect.flatMap(Store.Transaction, (transaction) =>
-        transaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
-      ),
+    const appending = Effect.flatMap(Store.Transaction, (transaction) =>
+      transaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
     );
-    return { wait: waiting.store.waitForAppend(execution, Option.none()), append };
+    const append = writing.store.transaction(appending);
+    // Appends, then fails, so the transaction rolls back.
+    const abandoned = writing.store.transaction(
+      Effect.andThen(appending, Effect.fail("abandoned" as const)),
+    );
+    return { wait: waiting.store.waitForAppend(execution, Option.none()), append, abandoned };
   });
 
 describe.skipIf(!available)("PostgreSQL", () => {
@@ -40,6 +43,21 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const waiter = yield* Effect.forkChild(wait);
         // Let the reader find the log empty and start waiting; it would otherwise poll hourly.
         yield* Effect.sleep("300 millis");
+        expect(waiter.pollUnsafe()).toBeUndefined();
+        yield* append;
+        yield* Fiber.join(waiter).pipe(Effect.timeout("5 seconds"));
+      }).pipe(Effect.scoped),
+    ),
+  );
+
+  it.live("a commit notifies once it has committed, and one that rolls back never does", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const { wait, append, abandoned } = yield* pools(url);
+        const waiter = yield* Effect.forkChild(wait);
+        yield* Effect.sleep("300 millis");
+        expect(yield* Effect.flip(abandoned)).toBe("abandoned");
+        yield* Effect.sleep("500 millis");
         expect(waiter.pollUnsafe()).toBeUndefined();
         yield* append;
         yield* Fiber.join(waiter).pipe(Effect.timeout("5 seconds"));

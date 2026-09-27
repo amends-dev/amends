@@ -20,6 +20,7 @@ import {
 } from "effect";
 import type { SqlError } from "effect/unstable/sql";
 import { PostgresDatabase } from "./database.ts";
+import { PostgresNotices } from "./notices.ts";
 import { isContention } from "./errors.ts";
 
 export interface Options {
@@ -106,6 +107,12 @@ export interface TransactionState {
   active: boolean;
   /** Writes the transaction staged in memory, run after its program and before COMMIT. */
   beforeCommit: Effect.Effect<void, Store.Failure | Store.Conflict>;
+  /**
+   * Notices to send on `PostgresNotices.channel` once COMMIT succeeds, each once. Notifying inside
+   * the transaction would hold PostgreSQL's notification lock through the commit's WAL flush,
+   * making every notifying commit on the server wait for the one before it.
+   */
+  readonly notices: Set<string>;
 }
 
 /** The session a program runs under; statements check it against their own binding. */
@@ -281,6 +288,7 @@ export const make = Effect.fn("Binding.make")(function* (
               entryCount: 0,
             },
             beforeCommit: Effect.void,
+            notices: new Set(),
           };
           const exit = yield* Effect.exit(
             restore(
@@ -335,6 +343,17 @@ export const make = Effect.fn("Binding.make")(function* (
               operation: "commit",
               cause: "An earlier failed statement aborted the transaction; nothing was committed",
             });
+          // Committed: tell waiting readers in every process, in one statement of its own. A notice
+          // lost to a failure here leaves them to find the commit at their next poll.
+          if (session.notices.size > 0)
+            yield* control("SELECT pg_notify($1, notice) FROM unnest($2::text[]) AS notice", [
+              PostgresNotices.channel,
+              [...session.notices],
+            ]).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("Commit notice not sent; readers will find it by polling", cause),
+              ),
+            );
           return exit.value;
         }),
       ),

@@ -198,12 +198,9 @@ export const make = Effect.fn("Journal.make")(function* () {
         batches.map((batch) => Object.assign({ workspaceId, commitId: session.commit.id }, batch)),
         (chunk) => db.insert(logBatches).values(chunk),
       );
-      // Delivered only if the transaction commits; repeats within it are delivered once.
-      for (const logId of new Set(batches.map((batch) => batch.logId)))
-        yield* database.sql.unsafe("SELECT pg_notify($1, $2)", [
-          PostgresNotices.channel,
-          PostgresNotices.appendNotice(workspaceId, logId),
-        ]);
+      // Sent once the transaction commits, and only then; repeats within it are sent once.
+      for (const batch of batches)
+        session.notices.add(PostgresNotices.appendNotice(workspaceId, batch.logId));
       yield* insertChunked(
         logEntries,
         entries.map((entry) =>

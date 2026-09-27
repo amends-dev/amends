@@ -1,8 +1,9 @@
 /**
  * Notices between pools over one channel: commits that append to a log, so waiting readers look
- * again, and ephemeral signals, relayed to subscribers in every process. A commit notifies inside
- * its transaction, so PostgreSQL delivers that notice only once the commit succeeds. One listener
- * per pool, on one connection, dispatches both.
+ * again, and ephemeral signals, relayed to subscribers in every process. A commit notifies right
+ * after COMMIT succeeds, on its own connection, rather than inside its transaction, where the
+ * notification lock would serialize every notifying commit on the server; a notice lost between
+ * the two leaves readers to their poll. One listener per pool, on one connection, dispatches both.
  */
 import { PgClient } from "@effect/sql-pg";
 import type { Entry } from "@amends/core/journal";
