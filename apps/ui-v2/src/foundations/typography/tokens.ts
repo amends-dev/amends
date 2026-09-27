@@ -30,6 +30,8 @@ export const typeScale = {
   item: step(14, 21),
   /** 15/23: messages, field values, and other reading text. */
   body: step(15, 23),
+  /** 16/24: messages and fields on phones, where smaller input text would zoom the page. */
+  bodyTouch: step(16, 24),
   /** 17/24: pane titles on touch layouts. */
   titleTouch: step(17, 24),
   /** 18/27: the main content title. */

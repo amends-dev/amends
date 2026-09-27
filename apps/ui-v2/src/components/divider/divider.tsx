@@ -1,0 +1,47 @@
+import { Show, splitProps, type JSX } from "solid-js";
+import { classes } from "../../internal/props.ts";
+import * as s from "./divider.css.ts";
+
+function Stitch() {
+  return (
+    <svg class={s.stitch} aria-hidden="true">
+      <line
+        x1="1"
+        x2="100%"
+        y1="1"
+        y2="1"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-dasharray="7 6"
+        stroke-linecap="round"
+      />
+    </svg>
+  );
+}
+
+export type DividerProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
+  /** Shown in capitals, such as "Today" or "4 replies". */
+  label?: string;
+  /** Center the label between two stitches, or lead with it. Default center. */
+  align?: "center" | "start";
+};
+
+/** A stitched line that separates content, optionally labelled. */
+export function Divider(props: DividerProps) {
+  const [local, native] = splitProps(props, ["label", "align", "class"]);
+  return (
+    <div
+      {...native}
+      role={local.label ? undefined : "separator"}
+      class={classes(s.divider, local.class)}
+    >
+      <Show when={local.label && local.align !== "start"}>
+        <Stitch />
+      </Show>
+      <Show when={local.label}>
+        <span class={s.label}>{local.label}</span>
+      </Show>
+      <Stitch />
+    </div>
+  );
+}

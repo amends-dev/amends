@@ -94,6 +94,8 @@ parts. Use props for data, options, and callbacks rather than custom slots carry
 whole components or JSX trees. Follow framework-required render APIs where needed.
 Pages live in `apps/web` and `apps/desktop`; UI owns reusable visual pieces, and
 features owns connected interactions. Neither shared package owns application pages.
+`ui-v2` screens are presentational: they take data and callbacks and render a pane or
+the navigation, while the apps own routes, data, and which screen shows.
 
 Web and desktop compose UI; they do not define styles, inline style objects, or
 local stylesheets. Shared UI stylesheet/font imports and component options are

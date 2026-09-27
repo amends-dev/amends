@@ -36,7 +36,8 @@ export const header = style({
   boxSizing: "border-box",
   minHeight: "6rem",
   paddingInline: "1.5rem",
-  borderBlockEnd: `1px solid ${vars.color.border.divider}`,
+  // Drawn inside the header, so the current tab's underline sits over it as in the mocks.
+  boxShadow: `inset 0 -1px 0 ${vars.color.border.divider}`,
   "@media": {
     [media.touch]: { minHeight: "6.5rem" },
     [media.mobile]: {
@@ -152,7 +153,7 @@ export const actions = style({
   selectors: { [`${side} &`]: { marginInlineEnd: "-0.5rem" } },
   "@media": {
     [media.touch]: { gap: "0.25rem", marginInlineEnd: "-1rem" },
-    [media.mobile]: { marginInlineEnd: "-0.5rem" },
+    [media.mobile]: { marginInlineEnd: "-0.75rem" },
   },
 });
 

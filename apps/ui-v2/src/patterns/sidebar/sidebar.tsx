@@ -3,6 +3,7 @@ import { Dynamic } from "solid-js/web";
 import { IconChevronDown, IconMarkSearch } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Count } from "../../components/count/index.ts";
+import { TaskStatus, type TaskState } from "../../components/task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./sidebar.css.ts";
@@ -155,14 +156,16 @@ export function Item(props: ItemProps) {
 export type SubItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
   href: string;
   children: string;
-  /** A status icon, such as a task's state. */
+  /** An icon before the label. */
   icon?: IconComponent;
+  /** For a task, its state, shown instead of an icon. */
+  state?: TaskState;
   current?: boolean;
 };
 
 /** A thread or task shown under the Item before it, joined by a stitch. */
 export function SubItem(props: SubItemProps) {
-  const [local, native] = splitProps(props, ["children", "icon", "current", "class"]);
+  const [local, native] = splitProps(props, ["children", "icon", "state", "current", "class"]);
   return (
     <li>
       <a
@@ -185,7 +188,8 @@ export function SubItem(props: SubItemProps) {
             stroke-linecap="round"
           />
         </svg>
-        <Show when={local.icon}>
+        <Show when={local.state}>{(state) => <TaskStatus state={state()} />}</Show>
+        <Show when={!local.state && local.icon}>
           {(icon) => <Dynamic component={icon()} class={s.subItemIcon} />}
         </Show>
         <span class={s.itemLabel}>{local.children}</span>

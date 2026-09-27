@@ -101,6 +101,30 @@ the shell inert, and close on Escape or a click on the scrim, returning focus. F
 in the drawer closes it. On phones the pane runs edge to edge and respects safe-area insets. The
 desktop app's title bar is not modelled yet.
 
+## Conversation components
+
+`Message` shows an author's avatar beside the byline and text, with optional `Mention`,
+`Reactions`, an agent's `Activity`, a `TaskReference`, and a `Replies` summary joined to the
+avatar by a stitched elbow; `active` highlights the message whose thread is open. `Divider` is
+the running stitch, optionally labelled ("Today", or "4 replies" leading). `TaskStatus` draws
+triage, open, in-progress, and done. `Composer` is a form around an auto-growing field: Enter
+sends, Shift+Enter starts a new line, and Send waits for non-blank text. The caller owns the
+draft so it survives navigation. Phones use 16px message and field text so the page does not
+zoom, and give reactions and the reply summary 44px targets.
+
+## Screens
+
+Screens take plain data and callbacks; web and desktop fill them from client hooks and own
+routing. `WorkspaceNavigation` is the rail and the Home sidebar. `GroupPane` is a group's header
+and tabs around the current tab, `GroupThreads` is its Threads tab (timeline and composer), and
+`ThreadPane` is an open thread in the side panel. `Timeline` renders messages and dividers from
+`TimelineEntry` data, and conversations read from the bottom: they open at the newest message
+and follow new ones while the reader is at the end. **Screens / Group threads** composes them
+with the Lunacy sample data; its Reply and Send stories run as tests.
+
+The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
+the icon set covers, at every size.
+
 ## Run and verify
 
 From the repository root:

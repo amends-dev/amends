@@ -37,3 +37,11 @@ export const labelled = style({
 });
 
 export const tabsPanel = style([panel, { display: "block", paddingBlockEnd: 0 }]);
+
+export const stack = style({
+  display: "grid",
+  gap: space[6],
+  padding: space[6],
+  backgroundColor: vars.color.surface.panel,
+  border: `1px solid ${vars.color.border.divider}`,
+});
