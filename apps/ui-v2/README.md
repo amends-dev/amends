@@ -43,6 +43,64 @@ patterns, and screens as they are introduced.
   `vars` in `@amends/ui-v2/foundations/theme`. CSS variable names start with `amends-v2-`, so this
   package can load beside `@amends/ui`.
 
+## Components
+
+Small pieces the patterns share: `Logo` (the finalized mark; its patch lifts when the link or
+button holding it is hovered), `IconButton` (32px or 24px compact), `Avatar` and `AvatarStack`
+(square initials in eight tones), `Count` (badge or plain), and `Tabs` (links or buttons, one
+scrolling row, underlined current tab). Below 64rem icon buttons, tabs, and navigation rows grow
+to 44px touch targets.
+
+## The shell
+
+`Shell`, `Rail`, `Sidebar`, and `Pane` implement the first four patterns:
+
+```tsx
+<Shell.Root>
+  <Shell.Navigation>
+    <Rail.Root>…Rail.Brand, Rail.List of Rail.Item, Rail.Footer…</Rail.Root>
+    <Sidebar.Root aria-label="Workspace">…Header, Body, Sections…</Sidebar.Root>
+  </Shell.Navigation>
+  <Shell.Main>
+    <Pane.Root>
+      <Pane.Header>
+        <Shell.NavigationToggle />
+        <Pane.Title icon={IconMarkChannel} context="Mercier & Co">
+          general
+        </Pane.Title>
+        <Pane.Actions>…</Pane.Actions>
+        <Pane.Tabs>
+          <Tabs.List aria-label="Group">…</Tabs.List>
+        </Pane.Tabs>
+      </Pane.Header>
+      <Pane.Body>…</Pane.Body>
+      <Pane.Footer>…composer…</Pane.Footer>
+    </Pane.Root>
+  </Shell.Main>
+  <Show when={thread()}>
+    <Shell.Aside aria-label="Composer paste crash" onClose={closeThread}>
+      <Pane.Root variant="side">…Pane.Back, Pane.Title, Pane.Close, Pane.Subtitle…</Pane.Root>
+    </Shell.Aside>
+  </Show>
+</Shell.Root>
+```
+
+A Pane's header, tabs, and footer stay in place while its body scrolls. Headers are 96px on
+desktop and 104px on touch layouts, so the main and side panes line up. The layout follows the
+viewport width ([layout tokens](src/foundations/layout/tokens.ts)):
+
+| Width           | Navigation                                        | Side panel                                  |
+| --------------- | ------------------------------------------------- | ------------------------------------------- |
+| 80rem (1280px)+ | Rail and 264px sidebar                            | 440px, beside the main content in one card  |
+| 64–80rem        | Rail and sidebar                                  | 440px, floating over a scrim                |
+| 48–64rem        | Rail; the menu button opens the sidebar beside it | Floating                                    |
+| below 48rem     | The menu button opens rail and sidebar together   | Full screen with Back; main keeps its state |
+
+The drawer and a floating side panel behave as modal dialogs: they take focus, make the rest of
+the shell inert, and close on Escape or a click on the scrim, returning focus. Following a link
+in the drawer closes it. On phones the pane runs edge to edge and respects safe-area insets. The
+desktop app's title bar is not modelled yet.
+
 ## Run and verify
 
 From the repository root:

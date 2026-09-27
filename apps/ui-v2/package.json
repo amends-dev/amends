@@ -14,7 +14,17 @@
     "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts",
     "./foundations/space": "./src/foundations/space/tokens.ts",
     "./foundations/elevation": "./src/foundations/elevation/tokens.ts",
-    "./foundations/theme": "./src/foundations/theme/index.ts"
+    "./foundations/theme": "./src/foundations/theme/index.ts",
+    "./foundations/layout": "./src/foundations/layout/tokens.ts",
+    "./components/avatar": "./src/components/avatar/index.ts",
+    "./components/count": "./src/components/count/index.ts",
+    "./components/icon-button": "./src/components/icon-button/index.ts",
+    "./components/logo": "./src/components/logo/index.ts",
+    "./components/tabs": "./src/components/tabs/index.ts",
+    "./patterns/shell": "./src/patterns/shell/index.ts",
+    "./patterns/rail": "./src/patterns/rail/index.ts",
+    "./patterns/sidebar": "./src/patterns/sidebar/index.ts",
+    "./patterns/pane": "./src/patterns/pane/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6010 --no-open --disable-telemetry",

@@ -14,6 +14,7 @@ const uses: Record<TypeRole, { sample: string; weight: FontWeight }> = {
     sample: "found a bug. composer crashes when I paste an image from clipboard lol",
     weight: "regular",
   },
+  titleTouch: { sample: "general", weight: "medium" },
   title: { sample: "general", weight: "medium" },
   heading: { sample: "Group settings", weight: "medium" },
   display: { sample: "Choose a workspace", weight: "medium" },

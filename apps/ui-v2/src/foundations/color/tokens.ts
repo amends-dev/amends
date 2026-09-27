@@ -80,8 +80,10 @@ export interface ColorTokens {
     /** The 2px bar beside the current item and under the current tab. */
     readonly indicator: string;
   };
-  /** The dimming layer behind a modal. */
+  /** The dimming layer behind a modal or a floating side panel. */
   readonly scrim: string;
+  /** The heavier dimming behind the navigation drawer on phones. */
+  readonly scrimStrong: string;
   readonly avatar: Readonly<Record<AvatarToneName, AvatarTone>>;
 }
 
@@ -119,6 +121,7 @@ export const light = {
   },
   action: { primary: "#242528", secondary: "#FFFFFF", indicator: "#242528" },
   scrim: "#24252833",
+  scrimStrong: "#24252866",
   avatar: {
     neutral: { background: "#ECEEF1", foreground: "#575D66" },
     sand: { background: "#EAE2D7", foreground: "#8D6E42" },
@@ -166,6 +169,8 @@ export const dark = {
   },
   action: { primary: "#ECEEF2", secondary: "#25292F", indicator: "#ECEEF2" },
   scrim: "#00000080",
+  // The mocks show the drawer in light mode only; this dark value is a proposal.
+  scrimStrong: "#000000A6",
   avatar: {
     neutral: { background: "#353A44", foreground: "#BEC5D0" },
     sand: { background: "#3B3329", foreground: "#D5B68C" },

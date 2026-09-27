@@ -29,7 +29,7 @@ describe("color roles", () => {
   });
   it("uses opaque hex, or hex with alpha for the scrim", () => {
     for (const [role, value] of [...Object.entries(leaves(light)), ...Object.entries(leaves(dark))])
-      expect(value, role).toMatch(role === "scrim" ? /^#[\dA-F]{8}$/ : /^#[\dA-F]{6}$/);
+      expect(value, role).toMatch(role.startsWith("scrim") ? /^#[\dA-F]{8}$/ : /^#[\dA-F]{6}$/);
   });
 });
 
