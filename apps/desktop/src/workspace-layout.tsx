@@ -1,5 +1,6 @@
 import {
   paths,
+  useAppearance,
   useGroups,
   useInboxPending,
   useWorkspace,
@@ -18,6 +19,7 @@ import {
 } from "@amends/features/conversations";
 import { Live } from "@amends/features/live";
 import { Shell } from "@amends/ui/compositions/shell";
+import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { PageHeader } from "@amends/ui/compositions/page-header";
 import { Navigation } from "@amends/ui/compositions/navigation";
 import { Divider } from "@amends/ui/primitives/divider";
@@ -136,7 +138,18 @@ function AccountControl() {
   );
 }
 /** App-owned composition. The route guard keeps this instance alive while membership remains active. */
+/** Workspace pages still use the previous UI, which brings its own theme and shell. */
 export function WorkspaceLayout(props: ParentProps) {
+  const appearance = useAppearance();
+  return (
+    <ThemeProvider theme={appearance.resolved() === "dark" ? "soot" : "cotton"}>
+      <Shell.Root>
+        <WorkspaceFrame>{props.children}</WorkspaceFrame>
+      </Shell.Root>
+    </ThemeProvider>
+  );
+}
+function WorkspaceFrame(props: ParentProps) {
   const params = useParams<{ workspaceId: string }>(),
     location = useLocation(),
     shell = Shell.useShell();

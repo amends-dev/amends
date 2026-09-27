@@ -87,3 +87,11 @@ export const resend = style({
 export const providers = style({ display: "flex", flexDirection: "column", gap: "0.75rem" });
 
 export const or = style({ marginBlock: "0.625rem 0.125rem" });
+
+// A new code's notice. It stays in place while empty, so screen readers hear it arrive.
+export const sent = style({
+  ...typeScale.hint,
+  margin: 0,
+  color: vars.color.text.secondary,
+  selectors: { "&:not(:empty)": { marginBlockStart: "1rem" } },
+});

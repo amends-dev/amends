@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal, splitProps, type JSX } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup, splitProps, type JSX } from "solid-js";
 import { classes } from "../../internal/props.ts";
 import * as s from "./modal.css.ts";
 
@@ -25,6 +25,10 @@ export function Root(props: RootProps) {
     if (!element) return;
     if (props.open && !element.open) element.showModal();
     else if (!props.open && element.open) element.close();
+  });
+  // Closing, rather than only removing, returns focus to where it was when the dialog opened.
+  onCleanup(() => {
+    if (dialog()?.open) dialog()?.close();
   });
   return (
     <dialog

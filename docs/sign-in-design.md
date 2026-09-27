@@ -4,6 +4,20 @@ Implementation of the [feature development flow](feature-development.md).
 The first slice requests an email code, verifies it, and establishes a session.
 Workspace selection is the next feature.
 
+**Current composition.** This page records the original slice. Web and desktop now render
+the [ui-v2](../apps/ui-v2/README.md) `SignInEmail` and `SignInCode` screens, drawn from the
+Lunacy mocks, and switch between them on the [client controller](../apps/client/src/sign-in/README.md)'s
+step. The screens take its error codes and pending actions and own the wording, the delivery
+hint, and focus; the features `SignIn` parts were removed. The previous UI's forms remain in
+its workshop until that package goes.
+
+```text
+Web/desktop sign-in route
+└─ SignInPage (owned by web or desktop, over useSignIn)
+   ├─ ui-v2 SignInEmail → Field + Input
+   └─ ui-v2 SignInCode → Field + CodeInput
+```
+
 [CodeInput](../apps/ui/src/primitives/code-input/README.md) and both
 [sign-in forms](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
 workshop. The [client controller](../apps/client/src/sign-in/README.md) implements
@@ -38,6 +52,8 @@ local to these forms until another consumer needs a shared composition.
 
 CodeInput adapts its six cells to one field at narrow widths so enlarged text
 stays readable; the native input and its value remain mounted.
+
+The original composition:
 
 ```text
 Web/desktop sign-in route

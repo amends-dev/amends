@@ -70,3 +70,16 @@ export function Label(props: LabelProps) {
   const [local, native] = splitProps(props, ["class"]);
   return <label {...native} for={field?.control} class={classes(s.label, local.class)} />;
 }
+
+export type AlertProps = Omit<JSX.HTMLAttributes<HTMLParagraphElement>, "role">;
+
+/** A form's own error, such as a failed request, outside any one field. Announced when shown. */
+export function Alert(props: AlertProps) {
+  const [local, native] = splitProps(props, ["class", "children"]);
+  return (
+    <p {...native} role="alert" class={classes(s.error, local.class)}>
+      <IconAlertTriangle class={s.errorIcon} />
+      {local.children}
+    </p>
+  );
+}

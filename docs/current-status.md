@@ -226,11 +226,10 @@ The headless [sign-in controller](../apps/client/src/sign-in/README.md) owns ema
 drafts, shared-schema validation, typed HTTP requests, explicit retry/resend, and
 session installation. Each mounted controller owns its requests; changing email,
 unmounting, and credential replacement cancel old work and ignore late responses.
-The declarative `SignIn.Root`, `EmailForm`, and `CodeForm` parts connect it to UI,
-with live HTTP scenarios and app-owned pages in web and desktop.
+Web and desktop wire it to the ui-v2 sign-in screens, which map its codes to wording.
 
-Workspace picker and creation are implemented in both apps over shared connected
-features. [Workspace entry](workspace-entry.md) records composition and recovery.
+Workspace picker and creation are implemented in both apps over client hooks and ui-v2
+screens. [Workspace entry](workspace-entry.md) records composition and recovery.
 The picker lists active memberships and total members; creation refreshes the directory
 before navigation and retries uncertain submissions with the same key while mounted.
 [Workspace settings](workspace-settings.md) now supports rename, role editing, removal,

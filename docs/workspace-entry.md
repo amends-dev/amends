@@ -1,34 +1,35 @@
 # Workspace entry
 
-Sign in → `/workspaces` → choose a workspace or open `/workspaces/new`.
-Creation asks for one name, creates the caller's owned workspace, refreshes the
-directory, and replaces the creation route with `/workspaces/:id`.
+Sign in → `/workspaces` → choose a workspace, accept an invitation, or open
+`/workspaces/new`. Creation asks for a workspace name and what people there will call the
+creator, creates the caller's owned workspace, refresh## Composition
 
-## Composition
+- Client reuses `GET /me/workspaces`. `useWorkspacePicker` shapes it into workspaces and
+  invitations and accepts invitations; `useCreateWorkspace` owns one creation intent;
+  `useWorkspaceAccess` explains an unavailable workspace. A refresh keeps validated pages
+  mounted. Rejected credentials still clear the session.
+- [ui-v2](../apps/ui-v2/README.md) owns the screens, drawn from the Lunacy mocks in
+  `design-system/Amends Group Exploration.free`: `WorkspacePicker` with its Join dialog and
+  toast, the `CreateWorkspace` modal, and the standalone screens. They take client's codes and
+  states as props and own the wording.
+- Web and desktop wire the two in their picker page and browser/hash routes, with no local
+  styles. `/workspaces/new` renders the picker with the creation modal over it; closing the
+  modal returns to `/workspaces`.
 
-- Client reuses `GET /me/workspaces` and owns `useCreateWorkspace`. A refresh keeps
-  validated pages mounted. Rejected credentials still clear the session.
-- UI owns `WorkspaceMark`, declarative `ItemList` parts, and `CreateWorkspaceForm`.
-  Memberships use the same flat, seam-separated rows as the workspace rosters;
-  the new-workspace action keeps a separate dashed outline. Shell's medium width fits the picker;
-  its narrow width fits creation. Theme remains inherited from ThemeProvider.
-- Features connects `WorkspacePicker.Root` with `Summary`, `List`, `Invitations`, `Empty`, and
-  `Status`; `CreateWorkspace.Root` with `Form` and `Result`. URLs and the
-  `onCreated(workspaceId)` navigation callback belong to the app.
-- Web and desktop own both pages and their browser/hash routes, with no local styles.
+The picker shows active memberships with their active member count (humans and agents) and
+owner status. Removed memberships are not selectable. Pending invitations show the workspace
+name and when they expire. Accept invite opens "Join {workspace}", asking what people there
+should call the reader, suggested from their email address; joining refreshes the directory,
+closes the dialog, confirms with a toast, and moves focus to the new workspace. A failure stays
+in the dialog with its reason; after joining, a failed refresh offers Try again, which only
+refreshes. The picker has no manual refresh button; a failed background refresh keeps the
+lists and offers `Try again`. Unknown or removed workspace URLs show `WorkspaceUnavailableScreen`
+under the picker's account header: a pending invitation to that workspace points back to the
+picker to accept it, an ended membership says so, and anything else reads as no access.
+Active workspaces open the [workspace shell](workspace-shell.md). See
+[workspace settings](workspace-settings.md) for issuance and recovery.
 
-The picker shows active memberships, total active members (humans and agents), and
-owner status. Removed memberships are not selectable. Unknown or removed workspace
-URLs show the unavailable page: the picker's account header over a centered explanation from
-`WorkspaceUnavailable` (`@amends/features/workspaces`), following the Sign in reference's
-ended-membership state. A pending invitation to that workspace reads as "Invitation waiting",
-an ended membership as "No longer a member", and anything else as "No access", each in a
-[Notice](../apps/ui/src/compositions/notice/README.md) with a button back to the picker.
-Active workspaces open the
-[workspace shell](workspace-shell.md). Pending invitations show their workspace name
-and recipient, with acceptance that refreshes the directory before showing the membership.
-The picker has no manual refresh button; failed directory reads offer `Try again`.
-See [workspace settings](workspace-settings.md) for issuance and recovery.
+ee [workspace settings](workspace-settings.md) for issuance and recovery.
 
 ## Creation and recovery
 
@@ -37,18 +38,18 @@ intent keeps its idempotency key across retries of the same submitted name. A ne
 submitted name starts a new intent. Duplicate submissions are blocked while pending.
 After a confirmed creation, a failed directory refresh retries only the read.
 Unmounting or changing credentials cancels client work and ignores late completions;
-it cannot undo a server commit. Retry keys are not persisted across leaving the form
+it cannot undo a server commit. Retry keys are not persisted across closing the modal
 or reloading; check the picker before starting another creation after an interruption.
 
-UI stories cover presentation and interactions. Connected stories use isolated real
-HTTP/PostgreSQL scenarios for populated/empty lists, creation, a lost response,
-refresh recovery, pending duplicates, and unmounting. App tests cover browser/hash
-navigation and recovery before entering the created workspace.
+ui-v2 stories cover the screens and their interactions over local state. Client tests cover
+creation retries, refresh recovery, pending duplicates, unmounting, and accepting invitations
+against a stubbed host. App tests cover browser/hash navigation, the creation route, and
+recovery before entering the created workspace.
 
 ## Following slices
 
-The [picker reference](<../design-system/Amends Screen · Sign in.dc.html>) also shows
-invitations and activity. Recipient decline needs a backend contract;
+The earlier [picker reference](<../design-system/Amends Screen · Sign in.dc.html>) also shows
+activity. Recipient decline needs a backend contract;
 separate human/agent counts, general role labels, and activity indicators
 need richer directory data. Remembering the last workspace and arrow-key shortcuts
 are not implemented. Links use native Tab/Enter and modifier-key behavior.
@@ -59,19 +60,17 @@ separate work. This creation form promises only the workspace it actually create
 
 ## Standalone states
 
-Pages outside a workspace share one frame in each app, matching the picker: `amends` at the
-start of the header, the signed-in address and Sign out at the end, and centered content. The
-states follow the Component Inventory's EmptyState (a drawing, a serif line, a sentence, one
-action), where failure reads through the drawing, never red:
+Pages outside a workspace use ui-v2's `StandaloneScreen`, the Centered pattern with the brand
+at the start of the header and, when signed in, the address and Sign out at the end. Each state
+is an EmptyState with one action:
 
-| State                | Drawing        | Title                           | Action                          |
-| -------------------- | -------------- | ------------------------------- | ------------------------------- |
-| Checking the session | none           | Checking your session           | none; the status line announces |
-| Host unreachable     | `Disconnected` | Can’t reach your workspace host | Try again (retries the read)    |
-| Unknown address      | `Bare`         | Nothing at this address         | Your workspaces, or Sign in     |
-| Crashed view         | `Snapped`      | Something went wrong            | Reload                          |
+| State                | Screen                  | Title                           | Action                          |
+| -------------------- | ----------------------- | ------------------------------- | ------------------------------- |
+| Checking the session | `CheckingSessionScreen` | Checking your session           | none; the status line announces |
+| Host unreachable     | `HostUnavailableScreen` | Can’t reach your workspace host | Try again (retries the read)    |
+| Unknown address      | `NotFoundScreen`        | Nothing at this address         | Your workspaces, or Sign in     |
+| Crashed view         | `CrashedScreen`         | Something went wrong            | Reload                          |
 
-These states use EmptyState's page size, whose title matches the other standalone page
-headings. The crashed view sits outside ClientProvider, so it shows no account. An unknown page inside a
-workspace keeps the workspace layout and shows the same `Bare` state with a way back to the
-workspace home. Unavailable workspaces use the Sign in reference's Notice, described above.
+The crashed view sits outside ClientProvider, so it shows no account. An unknown page inside a
+workspace keeps the workspace layout, still in the previous UI, with a way back to the
+workspace home. Unavailable workspaces are described above.

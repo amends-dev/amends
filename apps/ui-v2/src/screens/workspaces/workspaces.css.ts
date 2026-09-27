@@ -3,17 +3,6 @@ import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
 
-export const account = style({
-  ...typeScale.hint,
-  lineHeight: "1.25rem",
-  display: "flex",
-  alignItems: "center",
-  gap: "0.75rem",
-  color: vars.color.text.secondary,
-});
-
-export const accountEmail = style({ "@media": { [media.mobile]: { display: "none" } } });
-
 export const heading = style({
   display: "flex",
   alignItems: "flex-start",
@@ -126,4 +115,20 @@ export const footnote = style({
 
 export const empty = style({ marginBlockStart: "4rem" });
 
-export const emptyAction = style({ alignSelf: "center", marginBlockStart: "1rem" });
+// A failed refresh, under the heading.
+export const notice = style({
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: "0.75rem",
+  marginBlockStart: "1.5rem",
+});
+
+export const form = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });
+
+export const status = style({
+  ...typeScale.item,
+  margin: 0,
+  color: vars.color.text.secondary,
+  selectors: { "&:empty": { display: "none" } },
+});

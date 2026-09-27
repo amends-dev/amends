@@ -18,8 +18,8 @@ platform APIs. Its [workshop](../apps/features/README.md) exercises shared compo
 server fixtures stay outside production exports; boundary checks, tests, and CI
 include the features workspace.
 
-Compose through nested children and named parts, such as `SignIn.Root` containing
-`SignIn.EmailForm` and `SignIn.CodeForm`. Props carry data and callbacks, rather
+Compose through nested children and named parts, such as `Pane.Root` containing
+`Pane.Header` and `Pane.Body`. Props carry data and callbacks, rather
 than complete components. Application pages live in web and desktop.
 
 Apps contain no styling. First inspect shared UI (including Shell), identify any

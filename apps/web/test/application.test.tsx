@@ -71,9 +71,7 @@ it("redirects guests without making authenticated requests and retains the inten
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%3Ftab%3Dmembers");
   expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("link", { name: "Skip to content" }));
-  expect(screen.getByRole("main")).toHaveFocus();
-  expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%3Ftab%3Dmembers");
+  expect(screen.getByRole("textbox", { name: "Email" })).toHaveFocus();
 });
 it("validates a restored credential before mounting protected content and supports sign-out", async () => {
   const pending = deferred<Response>();
@@ -90,7 +88,7 @@ it("validates a restored credential before mounting protected content and suppor
   expect(url instanceof Request ? url.url : url.toString()).toBe("https://host.test/me/workspaces");
   expect(new Headers(options?.headers).get("authorization")).toBe("Bearer alice");
   pending.resolve(response(directory));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(fixture.store.read()).toBeUndefined();
@@ -115,7 +113,7 @@ it("preserves credentials on a temporary host failure and retries explicitly", a
   await screen.findByRole("heading", { name: "Can’t reach your workspace host" });
   expect(fixture.store.read()?.token).toBe("alice");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 it("denies unknown workspaces without treating membership loss as logout", async () => {
@@ -123,14 +121,13 @@ it("denies unknown workspaces without treating membership loss as logout", async
   mount("/workspaces/missing", fixture.store, () => Promise.resolve(response(directory)));
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
   expect(fixture.store.read()?.token).toBe("alice");
-  expect(screen.getByText("No access")).toBeInTheDocument();
   expect(
     screen.getByText("This workspace doesn’t exist, or it hasn’t been shared with alice."),
   ).toBeInTheDocument();
   // The same account header as the picker, and a way back to it.
   expect(screen.getByText("alice")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
 });
 it("aborts old requests on cross-window logout and never renders their late data", async () => {
   const fixture = memoryStore(session("alice"));
@@ -143,7 +140,7 @@ it("aborts old requests on cross-window logout and never renders their late data
   await screen.findByRole("heading", { name: "Sign in to amends" });
   await waitFor(() => expect(signal?.aborted).toBe(true));
   pending.resolve(response(directory));
-  expect(screen.queryByRole("heading", { name: "Where are you working?" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Choose a workspace" })).not.toBeInTheDocument();
 });
 it("renders the not-found route without starting a session request", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
@@ -164,7 +161,7 @@ it("offers a signed-in reader their workspaces from an unknown address", async (
   expect(screen.getByText("alice")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   expect(history.get()).toBe("/workspaces");
 });
 it("keeps an unknown workspace page inside the workspace, with a way back home", async () => {
@@ -222,7 +219,6 @@ it("resolves active workspace scope from the directory and updates it during nav
   expect(screen.queryByText("First workspace")).not.toBeInTheDocument();
   history.set({ value: "/workspaces/removed", scroll: false });
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
-  expect(screen.getByText("No longer a member")).toBeInTheDocument();
   expect(screen.getByText(/Your membership of Removed workspace has ended/)).toBeInTheDocument();
   expect(screen.getByText("Rejoining needs a fresh invitation.")).toBeInTheDocument();
 });
@@ -265,7 +261,7 @@ async function submitEmail() {
     target: { value: "jo@mercier.co" },
   });
   fireEvent.submit(screen.getByRole("form"));
-  return screen.findByRole("textbox", { name: "Six-digit code" });
+  return screen.findByRole("textbox", { name: "Verification code" });
 }
 it("signs in through the composed page and validates before resuming the intended route", async () => {
   const checked = deferred<Response>();
@@ -313,7 +309,7 @@ it("ignores an external return destination after signing in", async () => {
   );
   fireEvent.input(await submitEmail(), { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   expect(history.get()).toBe("/workspaces");
 });
 it("disposes sign-in when navigation leaves the page, even if verification resolves later", async () => {
@@ -337,7 +333,7 @@ it("disposes sign-in when navigation leaves the page, even if verification resol
   expect(history.get()).toBe("/missing");
 });
 
-it("lists only active workspaces and links creation to the app-owned page", async () => {
+it("lists only active workspaces and opens creation at its own address", async () => {
   const history = mount("/workspaces", memoryStore(session("alice")).store, () =>
     Promise.resolve(
       response({
@@ -346,13 +342,17 @@ it("lists only active workspaces and links creation to the app-owned page", asyn
       }),
     ),
   );
-  const link = await screen.findByRole("link", { name: "Studio 1 member · Owner" });
+  const link = await screen.findByRole("link", { name: "Studio" });
   expect(link).toHaveAttribute("href", "/workspaces/one");
-  expect(screen.queryByRole("button", { name: /Refresh workspaces/ })).not.toBeInTheDocument();
+  expect(screen.getByText("1 member · Owner")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Former studio/ })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("link", { name: /New workspace/ }));
-  await screen.findByRole("heading", { name: "Name your workspace" });
+  fireEvent.click(screen.getByRole("button", { name: "Create workspace" }));
+  const dialog = await screen.findByRole("dialog", { name: "Create workspace" });
+  expect(within(dialog).getByRole("textbox", { name: "Your name" })).toHaveValue("");
   expect(history.get()).toBe("/workspaces/new");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(history.get()).toBe("/workspaces");
 });
 it("retains a created workspace through directory failure and navigates after refresh recovery", async () => {
   const created = membership("one", "Studio");
@@ -363,12 +363,14 @@ it("retains a created workspace through directory failure and navigates after re
     .mockResolvedValueOnce(response({}, 503))
     .mockResolvedValueOnce(response({ memberships: [created], invitations: [] }));
   const history = mount("/workspaces/new", memoryStore(session("alice")).store, fetch);
-  const input = await screen.findByRole("textbox", { name: "Workspace name" });
-  fireEvent.input(input, { target: { value: "Studio" } });
-  fireEvent.submit(screen.getByRole("form"));
-  await screen.findByText(/Your workspace was created, but/);
+  const dialog = await screen.findByRole("dialog", { name: "Create workspace" });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Workspace name" }), {
+    target: { value: "Studio" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create workspace" }));
+  await within(dialog).findByText(/Your workspace was created, but/);
   expect(history.get()).toBe("/workspaces/new");
-  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
   await screen.findByRole("heading", { name: "Home" });
   expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
     "Studio",
@@ -633,10 +635,11 @@ it("points an invited identity to its invitation instead of reporting no access"
     ),
   );
   await screen.findByRole("heading", { name: "You haven’t joined this workspace yet" });
-  expect(screen.getByText("Invitation waiting")).toBeInTheDocument();
   expect(screen.getByText(/You’ve been invited to Fold Studio/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
-  await screen.findByRole("button", { name: "Accept invitation" });
+  fireEvent.click(await screen.findByRole("button", { name: "Accept invite to Fold Studio" }));
+  const dialog = await screen.findByRole("dialog", { name: "Join Fold Studio" });
+  expect(within(dialog).getByRole("textbox", { name: "Your name" })).toHaveValue("");
 });
 /** A group with one thread and its reply, as the host answers them. */
 const at = "2026-09-25T12:00:00.000Z";

@@ -1,25 +1,21 @@
-import { paths } from "@amends/client";
-import { WorkspaceUnavailable } from "@amends/features/workspaces";
-import { Button } from "@amends/ui/primitives/button";
-import { Column, Row } from "@amends/ui/primitives/layout";
+import { paths, useSession, useWorkspaceAccess } from "@amends/client";
+import { WorkspaceUnavailableScreen } from "@amends/ui-v2/screens/standalone";
 import { useNavigate } from "@solidjs/router";
-import { StandalonePage } from "../standalone-page.tsx";
+import { useStandaloneAccount } from "../account.ts";
 
 /** Shown when a workspace route has no active membership. */
 export function WorkspaceUnavailablePage(props: { readonly workspaceId: string }) {
+  const session = useSession();
+  const account = useStandaloneAccount();
+  const access = useWorkspaceAccess(() => props.workspaceId);
   const navigate = useNavigate();
   return (
-    <StandalonePage>
-      <WorkspaceUnavailable.Root workspaceId={props.workspaceId}>
-        <Column gap={6}>
-          <WorkspaceUnavailable.Heading />
-          <WorkspaceUnavailable.Reason />
-          <WorkspaceUnavailable.Hint />
-          <Row>
-            <Button onClick={() => navigate(paths.workspaces)}>Your workspaces</Button>
-          </Row>
-        </Column>
-      </WorkspaceUnavailable.Root>
-    </StandalonePage>
+    <WorkspaceUnavailableScreen
+      homeHref="#/"
+      account={account()}
+      identity={session.session?.humanId ?? "this address"}
+      access={access()}
+      onWorkspaces={() => navigate(paths.workspaces)}
+    />
   );
 }

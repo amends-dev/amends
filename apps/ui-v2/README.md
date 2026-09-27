@@ -159,9 +159,22 @@ group the reader has not joined opens as a preview: Back, a Public badge, and a 
 in place of the composer; its threads open without a composer too.
 `SignInEmail` and `SignInCode` are sign-in's two steps: an email address, optionally with other
 providers under "or", then the six-digit code with Change email and Send again; a wrong code
-stays in the cells for editing. `WorkspacePicker` lists the reader's workspaces and
-invitations with Open and Accept invite, falling back to invitations only or a first-workspace
-empty state, and `CreateWorkspace` names a new workspace in a compact modal.
+stays in the cells for editing. They take client's error codes (`SignInEmailError`,
+`SignInCodeError`) and pending actions and own the wording: a problem with the code marks the
+field, while a failed request shows as a `Field.Alert` under it. Each step focuses its field
+when it appears, and a new code is announced and refocuses the cleared field. `WorkspacePicker`
+lists the reader's workspaces and invitations with Open and Accept invite, falling back to
+invitations only or a first-workspace empty state. Accept invite opens "Join {workspace}" to
+choose what people there call the reader; joining closes it with a toast and focuses the
+workspace, and failures (`AcceptInvitationError`) stay in the dialog. A failed refresh shows
+above the lists with Try again. `CreateWorkspace` asks for a workspace name and the reader's
+name there in a compact modal, then shows the created workspace while the list reloads, with
+Try again if that fails. Rows are keyed by id through `internal/keyed.tsx`, so callers may pass
+freshly built arrays without remounting rows. `StandaloneScreen` frames pages outside a
+workspace with the brand and, when signed in, the account and Sign out; `CheckingSessionScreen`,
+`HostUnavailableScreen`, `NotFoundScreen`, `CrashedScreen`, and `WorkspaceUnavailableScreen`
+build the app's other states on it and on EmptyState, which takes a heading `level` and
+actions as children.
 `GroupSettings` is the settings modal: General (name, visibility, and your membership) and
 Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages and dividers from
 `TimelineEntry` data, and conversations read from the bottom: they open at the newest message
@@ -170,11 +183,12 @@ with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, 
 and **Browse groups** add the rest of the group flows to the same working workspace: switching
 groups, the directory, previewing and joining, creating a group, and toasts. **Screens / Sign
 in** and **Screens / Workspaces** walk from email to code (the workshop accepts 314159) to the
-workspace picker, accepting invitations and creating workspaces. Their interaction
-stories run as tests.
+workspace picker, accepting invitations and creating workspaces; **Screens / Standalone** shows
+the other states. Their interaction stories run as tests.
 
-Accepting an invitation joins at once with a toast, as the mocks show; the current app also
-asks what people there should call the reader, which the screen does not model yet. The
+Accepting an invitation asks what people there should call the reader before joining, which the
+mocks skip, and creating a workspace asks the same; the standalone states have no mocks and
+follow the Centered pattern. The
 preview's join prompt spans the main content only; the open thread beside it simply has no
 composer. Tab counts are plain numbers everywhere, where some mocks draw them as badges.
 The settings copy says "group" where the mocks said "channel", and the visibility help follows

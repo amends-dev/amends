@@ -36,7 +36,16 @@ export {
   formatInstant,
   invitationStatus,
 } from "./api/settings.ts";
-export { useAcceptInvitation, type AcceptInvitationError } from "./workspaces/accept-invitation.ts";
+export {
+  useWorkspacePicker,
+  useWorkspaceAccess,
+  type AcceptAttempt,
+  type AcceptInvitationError,
+  type InvitationEntry,
+  type WorkspaceAccess,
+  type WorkspaceEntry,
+  type WorkspacePickerController,
+} from "./workspaces/picker.ts";
 export {
   WorkspaceFeedProvider,
   useWorkspaceFeed,

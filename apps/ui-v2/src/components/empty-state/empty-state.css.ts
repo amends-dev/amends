@@ -37,3 +37,11 @@ export const title = style({
 });
 
 export const line = style({ ...typeScale.item, margin: 0, color: vars.color.text.secondary });
+
+export const actions = style({
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  gap: "0.75rem",
+  marginBlockStart: "1rem",
+});

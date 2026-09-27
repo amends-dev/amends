@@ -19,14 +19,7 @@ export const Code = {
 
 /** The Lunacy "Sign in / Code error" frame: the code stays for editing. */
 export const CodeError = {
-  render: () => (
-    <Entry
-      step="code"
-      email="alex@mercier.example"
-      code="042816"
-      error="That code doesn’t match. Check it and try again."
-    />
-  ),
+  render: () => <Entry step="code" email="alex@mercier.example" code="042816" error="mismatch" />,
 } satisfies Story;
 
 /** The Lunacy "Future provider layout" frame. */
@@ -39,20 +32,38 @@ export const SignInFlow = {
     const canvas = within(canvasElement);
     const email = canvas.getByRole("textbox", { name: "Email" });
     await userEvent.type(email, "alex{Enter}");
-    await expect(canvas.getByText("Enter an email address like you@example.com.")).toBeVisible();
+    await expect(canvas.getByText("Enter a valid email address.")).toBeVisible();
     await expect(email).toHaveAttribute("aria-invalid", "true");
     await userEvent.type(email, "@mercier.example{Enter}");
     const code = await canvas.findByRole("textbox", { name: "Verification code" });
+    await expect(code).toHaveFocus();
     await expect(canvas.getByText("alex@mercier.example")).toBeVisible();
     await userEvent.type(code, "04a2816");
     await expect(code).toHaveValue("042816");
     await expect(
-      canvas.getByText("That code doesn’t match. Check it and try again."),
+      await canvas.findByText("That code doesn’t match. Check it and try again."),
     ).toBeVisible();
     await userEvent.clear(code);
     await userEvent.type(code, workshopCode);
     await waitFor(() =>
       expect(canvas.getByRole("heading", { name: "Choose a workspace" })).toBeVisible(),
     );
+  },
+} satisfies Story;
+
+/** Send again: the new code is announced and the field clears. */
+export const Resend = {
+  render: () => <Entry step="code" email="alex@mercier.example" code="0428" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Send again" }));
+    await waitFor(() =>
+      expect(canvas.getByRole("status")).toHaveTextContent(
+        "We sent a new code. Use the latest one.",
+      ),
+    );
+    const code = canvas.getByRole("textbox", { name: "Verification code" });
+    await expect(code).toHaveValue("");
+    await expect(code).toHaveFocus();
   },
 } satisfies Story;

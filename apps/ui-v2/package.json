@@ -44,6 +44,7 @@
     "./screens/group": "./src/screens/group/index.ts",
     "./screens/groups": "./src/screens/groups/index.ts",
     "./screens/sign-in": "./src/screens/sign-in/index.ts",
+    "./screens/standalone": "./src/screens/standalone/index.ts",
     "./screens/timeline": "./src/screens/timeline/index.ts",
     "./screens/workspace-navigation": "./src/screens/workspace-navigation/index.ts",
     "./screens/workspaces": "./src/screens/workspaces/index.ts"

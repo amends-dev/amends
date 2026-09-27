@@ -8,7 +8,6 @@ import {
 } from "@amends/client";
 import { Live } from "@amends/features/live";
 import * as Settings from "@amends/features/settings";
-import { WorkspacePicker } from "@amends/features/workspaces";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { SegmentedControl } from "@amends/ui/compositions/segmented-control";
 import { ListDetail } from "@amends/ui/compositions/list-detail";
@@ -18,8 +17,8 @@ import { Button } from "@amends/ui/primitives/button";
 import { Text } from "@amends/ui/primitives/text";
 import { Schema } from "effect";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { openScenario, type Scenario } from "./scenario.ts";
-import { api } from "./workspaces.fixture.tsx";
+import { Recipient } from "./recipient.fixture.tsx";
+import { api, openScenario, type Scenario } from "./scenario.ts";
 export async function signIn(scenario: Scenario, email: string) {
   await api(scenario, "/session/email", undefined, { email });
   const code = (await scenario.snapshot()).delivered.at(-1)?.code;
@@ -305,15 +304,7 @@ export function SettingsFixture(props: {
                             </WorkspaceFeedProvider>
                           }
                         >
-                          <WorkspacePicker.Root>
-                            <Column>
-                              <WorkspacePicker.Summary />
-                              <WorkspacePicker.List workspaceHref={(id) => `#workspace:${id}`} />
-                              <WorkspacePicker.Invitations />
-                              <WorkspacePicker.Empty />
-                              <WorkspacePicker.Status />
-                            </Column>
-                          </WorkspacePicker.Root>
+                          <Recipient workspaceHref={(id) => `#workspace:${id}`} />
                         </Show>
                       </Show>
                     </DirectoryProvider>

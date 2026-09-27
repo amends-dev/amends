@@ -4,10 +4,12 @@
 It owns API access, credential-scoped atom registries, session persistence/lifetime,
 directory validation, workspace lookup, and pure route-path helpers.
 
-Client and [UI](../ui/README.md) are independent peers. Neither package depends on
-the other, including in tests and development tooling. Client contains no page markup,
-CSS, router integration, or Storybook. [Features](../features/README.md) connects
-client state to UI. Web and desktop own routes, navigation, and page composition. Solid providers/hooks are headless state bindings.
+Client and the UI packages ([ui](../ui/README.md) and [ui-v2](../ui-v2/README.md)) are
+independent peers. Neither depends on the other, including in tests and development tooling.
+Client contains no page markup, CSS, router integration, or Storybook. Web and desktop wire
+client hooks to ui-v2 screens and own routes, navigation, and page composition; screens not
+yet moved still go through [features](../features/README.md), which is being retired. Solid
+providers/hooks are headless state bindings.
 The package lives under `apps/*` because these bindings use Solid and browser storage;
 portable backend packages under `packages/*` remain Effect-only.
 
@@ -34,6 +36,15 @@ portable backend packages under `packages/*` remain Effect-only.
   a blank one sends none, and changing it starts a new creation key. Its `Ready` state follows a successful refresh;
   `Created` preserves the result when only the refresh needs retry. Keys last for
   the mounted intent, not across reloads. See [workspace entry](../../docs/workspace-entry.md).
+- `useWorkspacePicker()` shapes the directory for the workspace picker: active memberships
+  (`WorkspaceEntry`: name, member count, ownership), pending invitations (`InvitationEntry`,
+  with the expiry as a `Date`), `refreshFailed`, and `retry`. `accept(invitationId, name?)` joins,
+  as the trimmed name or as the identity when blank, one attempt at a time, and refreshes the
+  directory; `accepting()` reports the latest attempt's `pending`, `joined`, and
+  `AcceptInvitationError`. Once joined, accepting again only refreshes, and a later refresh that
+  drops the invitation settles a `refresh-failed` attempt. `suggestedName()` offers a first name.
+- `useWorkspaceAccess(() => workspaceId)` says why a workspace cannot open: `invited` (an
+  invitation outranks an ended membership), `removed`, or `unknown`.
 - `WorkspaceFeedProvider` keeps one workspace's reads current over its change feed while
   mounted, and `useWorkspaceFeed()` exposes `Connecting`, `Live`, `Reconnecting`, or `Ended`.
   Commits invalidate the reads they affect; see [live updates](../../docs/live-updates.md).
@@ -134,7 +145,7 @@ renamed failure fails to compile
 until it is placed. Readers' inputs decode through `command(schema)`, which reports a mismatch as
 `Client.InvalidCommand` (`invalid`); a malformed response is `failed`. `isStale` is true for
 `changed`, `denied`, and `gone`: what the reader sees is out of date. Controllers expose these
-codes; features own the reader-facing text.
+codes; the screens that show them own the reader-facing text.
 
 ## Settings
 
@@ -146,8 +157,7 @@ section identity changes. Its reads are keyed atoms, so the workspace change fee
 them in the background without marking the scope pending; commands refresh them, and the
 directory, before reporting `saved`. Inside operations, `refreshResult` waits for the result a
 refresh produces, because keyed reads can still show their previous settled value when the
-refresh starts. `useAcceptInvitation` joins, optionally with the new member's name, and refreshes
-the directory. `useMemberName(workspaceId, saved)` changes what people in a workspace call the
+refresh starts. `useMemberName(workspaceId, saved)` changes what people in a workspace call the
 reader: `reset` starts from their name there or a suggestion, and `ready` holds while the draft is
 a valid, different name. The rename refreshes the members and the directory, and a
 `workspace.member.renamed` commit on the feed refreshes them for everyone else.

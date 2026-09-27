@@ -1,60 +1,74 @@
-import { paths, useSession } from "@amends/client";
-import { WorkspacePicker } from "@amends/features/workspaces";
-import { Shell } from "@amends/ui/compositions/shell";
-import { ItemList } from "@amends/ui/compositions/item-list";
-import { WorkspaceMark } from "@amends/ui/primitives/workspace-mark";
-import { Button } from "@amends/ui/primitives/button";
-import { Column, Row } from "@amends/ui/primitives/layout";
-import { Text } from "@amends/ui/primitives/text";
+import { paths, useCreateWorkspace, useWorkspacePicker } from "@amends/client";
+import { CreateWorkspace, WorkspacePicker } from "@amends/ui-v2/screens/workspaces";
+import { useMatch, useNavigate } from "@solidjs/router";
+import { createEffect, Show } from "solid-js";
+import { useStandaloneAccount } from "../account.ts";
 
+/** The reader's workspaces and invitations. Creating one opens over it at its own address. */
 export function WorkspacePickerPage() {
-  const session = useSession();
+  const picker = useWorkspacePicker();
+  const account = useStandaloneAccount();
+  const navigate = useNavigate();
+  const creating = useMatch(() => paths.createWorkspace);
   return (
-    <Shell.Body scroll="page">
-      <Shell.Header>
-        <Text as="span" variant="heading">
-          amends
-        </Text>
-        <Row>
-          <Text as="span" variant="mono" tone="secondary">
-            {session.session?.humanId}
-          </Text>
-          <Button variant="secondary" onClick={() => session.replace(undefined)}>
-            Sign out
-          </Button>
-        </Row>
-      </Shell.Header>
-      <Shell.Main>
-        <Shell.Content width="medium">
-          <WorkspacePicker.Root>
-            <Column gap={6}>
-              <Column gap={2}>
-                <Text as="h1" variant="heading">
-                  Where are you working?
-                </Text>
-                <WorkspacePicker.Summary />
-              </Column>
-              <WorkspacePicker.List workspaceHref={paths.workspace} />
-              <WorkspacePicker.Invitations />
-              <WorkspacePicker.Empty />
-              <ItemList.Root variant="outline" aria-label="Workspace actions">
-                <ItemList.Item>
-                  <ItemList.Link href={paths.createWorkspace}>
-                    <ItemList.Leading>
-                      <WorkspaceMark decorative>+</WorkspaceMark>
-                    </ItemList.Leading>
-                    <ItemList.Content>
-                      <ItemList.Title>New workspace</ItemList.Title>
-                      <ItemList.Description>A shared place for your work.</ItemList.Description>
-                    </ItemList.Content>
-                  </ItemList.Link>
-                </ItemList.Item>
-              </ItemList.Root>
-              <WorkspacePicker.Status />
-            </Column>
-          </WorkspacePicker.Root>
-        </Shell.Content>
-      </Shell.Main>
-    </Shell.Body>
+    <Show when={account()}>
+      {(account) => (
+        <>
+          <WorkspacePicker
+            homeHref="/"
+            account={account()}
+            workspaces={picker.workspaces().map((workspace) => ({
+              ...workspace,
+              href: paths.workspace(workspace.id),
+            }))}
+            invitations={picker.invitations()}
+            refreshFailed={picker.refreshFailed()}
+            onRetry={picker.retry}
+            accept={picker.accepting()}
+            suggestedName={picker.suggestedName()}
+            onAccept={picker.accept}
+            onCreateWorkspace={() => navigate(paths.createWorkspace)}
+          />
+          <Show when={creating()}>
+            <CreateWorkspaceDialog />
+          </Show>
+        </>
+      )}
+    </Show>
+  );
+}
+
+/** One creation intent, for as long as the dialog is open; it opens the workspace it creates. */
+function CreateWorkspaceDialog() {
+  const creation = useCreateWorkspace();
+  const navigate = useNavigate();
+  createEffect(() => {
+    const state = creation.state();
+    if (state._tag === "Ready") navigate(paths.workspace(state.workspace.id), { replace: true });
+  });
+  const form = () => {
+    const state = creation.state();
+    return state._tag === "Form" ? state : undefined;
+  };
+  const created = () => {
+    const state = creation.state();
+    return state._tag === "Created"
+      ? { name: state.workspace.name, pending: state.pending, refreshFailed: state.refreshFailed }
+      : undefined;
+  };
+  return (
+    <CreateWorkspace
+      open
+      onClose={() => navigate(paths.workspaces)}
+      name={form()?.name ?? ""}
+      onNameChange={creation.setName}
+      memberName={form()?.memberName ?? ""}
+      onMemberNameChange={creation.setMemberName}
+      pending={form()?.pending}
+      error={form()?.error}
+      onCreate={() => creation.submit()}
+      created={created()}
+      onRetry={creation.retryRefresh}
+    />
   );
 }

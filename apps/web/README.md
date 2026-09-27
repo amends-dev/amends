@@ -43,29 +43,29 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 
 ## Ownership
 
-`src/main.tsx` mounts Solid and loads shared fonts/global styles. `src/app.tsx` chooses
-`Router`, resolves the endpoint (default `/api`), and supplies the session store.
-It nests the router and routes declaratively inside `Application`.
-`src/application.tsx` applies the theme and connects the headless `ClientProvider`
-to its children and error boundary. `src/standalone-page.tsx` frames pages outside a workspace like the picker: the brand, the
-signed-in account with Sign out, and centered content. Session checking, an unreachable host,
-unknown addresses, unavailable workspaces, and the error boundary use it, with the UI
-[EmptyState](../ui/src/compositions/empty-state/README.md) and its drawings, or a Notice for
-unavailable workspaces. See [workspace entry](../../docs/workspace-entry.md#standalone-states). `src/routes.tsx` owns routes,
-redirects, guard presentations, and client-to-UI wiring.
-`src/pages/sign-in.tsx` declares the page header, main, and footer using UI primitives,
-with `SignIn.Root`, `SignIn.EmailForm`, and `SignIn.CodeForm` nested in the content.
-The route validates the new credential before following a safe return path.
-Client supplies session/API/query state; UI supplies presentation.
-Neither library imports the other. Route integration tests live in this app.
-Vite deduplicates Solid and compiles the shared vanilla-extract styles.
+`src/main.tsx` mounts Solid and loads the fonts and global styles of both UI packages.
+`src/app.tsx` chooses `Router`, resolves the endpoint (default `/api`), and supplies the
+session store. It nests the router and routes declaratively inside `Application`.
+`src/application.tsx` applies the ui-v2 `Theme` in the resolved appearance and connects the
+headless `ClientProvider` to its children and error boundary, whose fallback is the ui-v2
+`CrashedScreen`. `src/routes.tsx` owns routes, redirects, and the session guard, which shows
+`CheckingSessionScreen` or `HostUnavailableScreen`.
 
-Page compositions contain no inline styles or local stylesheets. `ThemeProvider`
-owns the theme scope, `Shell.Root` owns the application frame, and page-local
-`Shell.Body`, `Header`, `Main`, `Content`, and `Footer` declarations compose it.
-Sign-in uses `Content width="narrow" centered` with `Body scroll="page"` so long
-content and enlarged text stay reachable. Visual gaps are evaluated and verified
-in UI before app consumption; `check:packages` rejects app-local styles.
+Pages outside a workspace pair client hooks with ui-v2 screens, which own their layout and
+wording: `src/pages/sign-in.tsx` switches `SignInEmail` and `SignInCode` on `useSignIn`'s step,
+`src/pages/workspace-picker.tsx` passes `useWorkspacePicker` to `WorkspacePicker` and, at
+`/workspaces/new`, mounts one `useCreateWorkspace` intent in the `CreateWorkspace` modal over
+it, and the not-found and workspace-unavailable pages use `NotFoundScreen` and
+`WorkspaceUnavailableScreen` with `useWorkspaceAccess`. `src/account.ts` supplies the signed-in
+identity and Sign out to their headers. The route validates a new credential before following a
+safe return path. Client and the UI packages never import each other. Route integration tests
+live in this app. Vite deduplicates Solid and compiles the shared vanilla-extract styles.
+
+Page compositions contain no inline styles or local stylesheets. Workspace pages still use
+the previous UI: `WorkspaceLayout` wraps them in its `ThemeProvider` and `Shell.Root`, and
+page-local `Shell.Body`, `Header`, `Main`, `Content`, and `Footer` declarations compose that
+frame. Visual gaps are evaluated and verified in the UI workshop before app consumption;
+`check:packages` rejects app-local styles.
 
 The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
 composition, idempotent retry, directory refresh, and invitation acceptance.
@@ -75,7 +75,8 @@ routes, four responsive layouts, page headers, and the account popup. Home, Tria
 remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved theme through ThemeProvider.
+with AppearanceProvider and applies the resolved mode through the ui-v2 Theme, as
+WorkspaceLayout does through the previous ThemeProvider.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
 stay current over the change feed; the layout shows `Live.Status` in the page header's
 actions. See [live updates](../../docs/live-updates.md).

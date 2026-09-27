@@ -1,29 +1,45 @@
-import { SignIn } from "@amends/features/sign-in";
-import { Shell } from "@amends/ui/compositions/shell";
-import { Text } from "@amends/ui/primitives/text";
+import { paths, useSignIn } from "@amends/client";
+import { SignInCode, SignInEmail } from "@amends/ui-v2/screens/sign-in";
+import { Match, Switch } from "solid-js";
 
-/** App-owned composition. Shell owns presentation; the route owns session navigation. */
+/** The email and code steps; the route resumes the intended page once a session exists. */
 export function SignInPage() {
+  const flow = useSignIn();
+  const step = <Tag extends "Email" | "Code">(tag: Tag) => {
+    const state = flow.state();
+    return state._tag === tag ? (state as Extract<typeof state, { _tag: Tag }>) : undefined;
+  };
   return (
-    <Shell.Body scroll="page">
-      <Shell.Header>
-        <Text as="span" variant="heading">
-          amends
-        </Text>
-      </Shell.Header>
-      <Shell.Main>
-        <Shell.Content width="narrow" centered>
-          <SignIn.Root>
-            <SignIn.EmailForm />
-            <SignIn.CodeForm deliveryHint="Find your code in the terminal running the local host." />
-          </SignIn.Root>
-        </Shell.Content>
-      </Shell.Main>
-      <Shell.Footer>
-        <Text variant="mono" tone="secondary">
-          amends keeps one identity per address
-        </Text>
-      </Shell.Footer>
-    </Shell.Body>
+    <Switch>
+      <Match when={step("Email")}>
+        {(state) => (
+          <SignInEmail
+            homeHref={`#${paths.signIn}`}
+            email={state().email}
+            onEmailChange={flow.setEmail}
+            onSubmit={() => flow.requestCode()}
+            pending={state().pending}
+            error={state().error}
+          />
+        )}
+      </Match>
+      <Match when={step("Code")}>
+        {(state) => (
+          <SignInCode
+            homeHref={`#${paths.signIn}`}
+            email={state().email}
+            onChangeEmail={flow.changeEmail}
+            code={state().code}
+            onCodeChange={flow.setCode}
+            onSubmit={(code) => flow.verifyCode(code)}
+            pending={state().pending}
+            error={state().error}
+            onResend={flow.resendCode}
+            resent={state().resent}
+            deliveryHint="Find your code in the terminal running the local host."
+          />
+        )}
+      </Match>
+    </Switch>
   );
 }

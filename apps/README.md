@@ -6,10 +6,12 @@
   and compositions, verified in its standalone Storybook workshop.
 - [UI v2](ui-v2/README.md) is the pattern-based design system from the Lunacy mocks: the six
   layout patterns and presentational screens for the group flows, sign-in, and the workspace
-  picker. It replaces UI and features screen by screen; web and desktop do not use it yet.
+  picker. It replaces UI and features screen by screen; web and desktop use it for sign-in,
+  workspace entry, and the states outside a workspace.
 - [client](client/README.md) owns headless sessions, API/query state, and pure route
   helpers. It has no dependency on UI, styling, router libraries, or Storybook.
-- [features](features/README.md) connects client and UI, with a separate live backend workshop.
+- [features](features/README.md) connects client and UI for workspace pages, with a separate
+  live backend workshop. It is being retired as its logic moves into client hooks.
 - [web](web/README.md) composes client and UI with browser routing on port 4321.
 - [desktop](desktop/README.md) composes client and UI in Tauri 2 with hash routing and a
   Solid/Vite webview on development port 1420.

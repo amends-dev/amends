@@ -15,8 +15,7 @@ import { Divider } from "@amends/ui/primitives/divider";
 import { Text } from "@amends/ui/primitives/text";
 import { Schema } from "effect";
 import { createSignal, onCleanup, onMount, Show, type ParentProps } from "solid-js";
-import { openScenario, type Scenario } from "./scenario.ts";
-import { api } from "./workspaces.fixture.tsx";
+import { api, openScenario, type Scenario } from "./scenario.ts";
 function Theme(props: ParentProps) {
   const appearance = useAppearance();
   return (

@@ -25,9 +25,8 @@ import { Button } from "@amends/ui/primitives/button";
 import { Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
 import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
-import { openScenario, type Scenario } from "./scenario.ts";
+import { api, openScenario, type Scenario } from "./scenario.ts";
 import { signIn } from "./settings.fixture.tsx";
-import { api } from "./workspaces.fixture.tsx";
 
 interface Setup {
   readonly scenario: Scenario;

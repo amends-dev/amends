@@ -64,3 +64,17 @@ export async function closeScenarios() {
   await Promise.all([...live].map((dispose) => dispose()));
   await Promise.all(closing);
 }
+
+/** Call the scenario's host directly, as a fixture's setup does. */
+export async function api(scenario: Scenario, path: string, token?: string, body?: unknown) {
+  const response = await fetch(`${scenario.apiBaseUrl}${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      "content-type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`Fixture request failed: ${path} (${response.status})`);
+  return response.status === 202 || response.status === 204 ? undefined : response.json();
+}

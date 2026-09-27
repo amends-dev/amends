@@ -38,15 +38,28 @@ import signInMeta, {
   Code,
   CodeError,
   Email,
+  Resend,
   SignInFlow,
   WithProviders,
 } from "../src/screens/sign-in/sign-in.stories.tsx";
+import standaloneMeta, {
+  CheckingSession,
+  Crashed,
+  HostUnavailable,
+  NotFound,
+  WorkspaceInvited,
+  WorkspaceRemoved,
+  WorkspaceUnknown,
+} from "../src/screens/standalone/standalone.stories.tsx";
 import workspacesMeta, {
+  AcceptFailure,
   AcceptInvitation,
+  CreatedRefreshFailed,
   CreateFirstWorkspace,
   CreateWorkspace,
   FirstWorkspace,
   InvitationsOnly,
+  RefreshFailed,
   WorkspacesAndInvitations,
 } from "../src/screens/workspaces/workspaces.stories.tsx";
 import { viewport } from "./viewport.ts";
@@ -166,6 +179,9 @@ describe("sign in", () => {
   it("validates the email, refuses a wrong code, and continues with the right one", async () => {
     await stories.story(SignInFlow).run();
   });
+  it("announces a new code and clears the field", async () => {
+    await stories.story(Resend).run();
+  });
 });
 
 describe("workspace picker", () => {
@@ -175,11 +191,29 @@ describe("workspace picker", () => {
     await stories.story(InvitationsOnly).run();
     await stories.story(FirstWorkspace).run();
     await stories.story(CreateWorkspace).run();
+    await stories.story(RefreshFailed).run();
+    await stories.story(CreatedRefreshFailed).run();
   });
-  it("accepts an invitation", async () => {
+  it("accepts an invitation under a chosen name", async () => {
     await stories.story(AcceptInvitation).run();
+  });
+  it("keeps the Join dialog open with the reason when accepting fails", async () => {
+    await stories.story(AcceptFailure).run();
   });
   it("creates a first workspace", async () => {
     await stories.story(CreateFirstWorkspace).run();
+  });
+});
+
+describe("standalone screens", () => {
+  const stories = definePreview(preview).meta(standaloneMeta);
+  it("renders the session, host, not-found, crash, and workspace access states", async () => {
+    await stories.story(CheckingSession).run();
+    await stories.story(HostUnavailable).run();
+    await stories.story(NotFound).run();
+    await stories.story(Crashed).run();
+    await stories.story(WorkspaceInvited).run();
+    await stories.story(WorkspaceRemoved).run();
+    await stories.story(WorkspaceUnknown).run();
   });
 });

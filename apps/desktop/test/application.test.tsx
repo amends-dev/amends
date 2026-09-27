@@ -4,7 +4,6 @@ import { HashRouter } from "@solidjs/router";
 import { Session, type SessionStore } from "@amends/client";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
-import { colorThemes } from "@amends/ui/foundations/color/styles";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
 import { committed, withChangeFeed, type Sidebar } from "./change-feed.ts";
@@ -51,20 +50,14 @@ it("uses hash routes for guest redirects and keeps the intended workspace", asyn
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces%2Fone%3Ftab%3Dmembers");
   expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("link", { name: "Skip to content" }));
-  expect(screen.getByRole("main")).toHaveFocus();
-  expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces%2Fone%3Ftab%3Dmembers");
+  expect(screen.getByRole("textbox", { name: "Email" })).toHaveFocus();
 });
 it("composes validated client state with UI and signs out through the desktop router", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(() =>
     Promise.resolve(response({ memberships: [], invitations: [] })),
   );
   const store = mount("/workspaces", "alice", fetch);
-  await screen.findByRole("heading", { name: "Where are you working?" });
-  expect(screen.getByRole("link", { name: /New workspace/ })).toHaveAttribute(
-    "href",
-    "#/workspaces/new",
-  );
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe("Bearer alice");
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
@@ -91,7 +84,7 @@ async function submitEmail() {
     target: { value: "jo@mercier.co" },
   });
   fireEvent.submit(screen.getByRole("form"));
-  return screen.findByRole("textbox", { name: "Six-digit code" });
+  return screen.findByRole("textbox", { name: "Verification code" });
 }
 it("signs in from the desktop page and resumes the workspace query through hash routing", async () => {
   const fetch = vi
@@ -150,7 +143,7 @@ it("keeps a new credential through directory failure and safely resumes after re
   expect(store.read()?.token).toBe("jo@mercier.co");
   expect(window.location.hash).toContain("#/sign-in");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   expect(window.location.hash).toBe("#/workspaces");
 });
 
@@ -177,11 +170,13 @@ it("opens creation from the picker and enters the created workspace through hash
     .mockResolvedValueOnce(response(workspace, 201))
     .mockResolvedValueOnce(response(listing));
   mount("/workspaces", "alice", fetch);
-  fireEvent.click(await screen.findByRole("link", { name: /New workspace/ }));
-  const input = await screen.findByRole("textbox", { name: "Workspace name" });
+  fireEvent.click(await screen.findByRole("button", { name: "Create workspace" }));
+  const dialog = await screen.findByRole("dialog", { name: "Create workspace" });
   expect(window.location.hash).toBe("#/workspaces/new");
-  fireEvent.input(input, { target: { value: "Studio" } });
-  fireEvent.submit(screen.getByRole("form"));
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Workspace name" }), {
+    target: { value: "Studio" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create workspace" }));
   await screen.findByRole("heading", { name: "Home" });
   expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
     "Studio",
@@ -189,7 +184,7 @@ it("opens creation from the picker and enters the created workspace through hash
   expect(window.location.hash).toBe("#/workspaces/one");
   fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));
   fireEvent.click(await screen.findByRole("link", { name: "Switch workspace" }));
-  expect(await screen.findByRole("link", { name: "Studio 1 member · Owner" })).toHaveAttribute(
+  expect(await screen.findByRole("link", { name: "Studio" })).toHaveAttribute(
     "href",
     "#/workspaces/one",
   );
@@ -228,14 +223,8 @@ it("navigates workspace sections with persistent chrome and retains appearance a
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftriage");
-  expect(
-    document.querySelector(
-      colorThemes.soot
-        .split(" ")
-        .map((name) => `.${name}`)
-        .join(""),
-    ),
-  ).not.toBeNull();
+  // Sign-in keeps the dark appearance chosen inside the workspace.
+  expect(document.querySelector('[data-mode="dark"]')).not.toBeNull();
 });
 
 it("redirects the Settings entry to its workspace section and keeps sidebar selection on descendants", async () => {
@@ -345,11 +334,10 @@ it("explains an unavailable workspace under the account header and returns to th
   );
   const store = mount("/workspaces/missing/settings", "jo", fetch);
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
-  expect(screen.getByText("No access")).toBeInTheDocument();
   expect(screen.getByText("jo")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
-  await screen.findByRole("heading", { name: "Where are you working?" });
+  await screen.findByRole("heading", { name: "Choose a workspace" });
   expect(window.location.hash).toBe("#/workspaces");
   expect(store.read()?.token).toBe("jo");
 });
