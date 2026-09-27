@@ -26,7 +26,7 @@ server proxies `/api` here. `bun run dev` restarts the host when its source chan
 | --------------------------- | ----------------- | ---------------------------------------------------------- |
 | `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port. |
 | `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                    |
-| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `2` through `1000`.                           |
+| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                           |
 | `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.         |
 | `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                     |
 | `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.              |
@@ -44,7 +44,10 @@ process exits once ordinary requests finish rather than waiting for them.
 The database must exist; startup applies pending migrations to it before serving, one
 process at a time when several start together.
 A missing or invalid URL fails startup before any connection. A missing port or pool size
-uses its default; an explicitly blank setting fails validation. Database URLs stay
+uses its default; an explicitly blank setting fails validation. Three of the pool's connections
+stay held: the runner-address claim, the cluster's shard locks, and the change feed's listener
+once a stream opens. The minimum of five leaves two for requests, so one long commit does not
+stall every read; with three the host stops answering once a change stream opens. Database URLs stay
 redacted in configuration errors.
 
 ## Background work
@@ -54,7 +57,7 @@ in its own process, on an Effect Cluster runner over the same database pool as i
 wake a commit asks for is stored in that commit's transaction. Cluster keeps its own tables
 beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
 `cluster_migrations`), creating them at startup; reads for due wakes every two seconds; and holds
-two of the pool's connections. Every hour, one runner prunes wakes handled more than seven days
+one of the pool's connections for its shard locks. Every hour, one runner prunes wakes handled more than seven days
 ago.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they

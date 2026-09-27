@@ -20,7 +20,7 @@ it.effect("configuration defaults to port 8787 and a pool of twenty connections"
   }),
 );
 
-it.effect.each([2, 50, 1000])("configuration accepts a pool of %i connections", (size) =>
+it.effect.each([5, 50, 1000])("configuration accepts a pool of %i connections", (size) =>
   Effect.gen(function* () {
     const options = yield* load({
       AMENDS_DATABASE_URL: databaseUrl,
@@ -30,8 +30,9 @@ it.effect.each([2, 50, 1000])("configuration accepts a pool of %i connections", 
   }),
 );
 
-// One connection listens for notifications while readers wait, so a pool needs another to write.
-it.effect.each(["", "0", "1", "1001", "2.5", "many"])(
+// Three connections stay held (the address claim, shard locks, and the change feed's listener), and
+// requests need two more; three hangs once a change stream opens.
+it.effect.each(["", "0", "1", "3", "4", "1001", "5.5", "many"])(
   "configuration rejects a pool size of %j",
   (size) =>
     Effect.gen(function* () {

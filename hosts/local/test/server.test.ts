@@ -16,6 +16,48 @@ const temporary = (run: (url: string) => Promise<unknown>) =>
 
 describe.skipIf(!available)("PostgreSQL", () => {
   it.live(
+    "the smallest pool serves writes and reads while change streams are open",
+    () =>
+      temporary(async (url) =>
+        withServer(
+          url,
+          async (call, base) => {
+            const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+              (await call(alice.id, "POST", "/workspaces", { name: "Pool" })).body,
+            );
+            // Streams hold the change feed's listener; the claim and shard locks hold two more.
+            const streams = Array.from({ length: 2 }, () => new AbortController());
+            for (const stream of streams) {
+              const response = await fetch(`${base}/workspaces/${workspace.id}/changes`, {
+                headers: { authorization: `Bearer ${alice.id}` },
+                signal: stream.signal,
+              });
+              expect(response.status).toBe(200);
+              void response.body
+                ?.getReader()
+                .read()
+                .catch(() => {});
+            }
+            const path = `/workspaces/${workspace.id}/groups`;
+            const results = await Promise.all([
+              ...Array.from({ length: 10 }, (_, index) =>
+                call(alice.id, "POST", path, { name: `pool-${index}`, memberIds: [] }),
+              ),
+              ...Array.from({ length: 20 }, () => call(alice.id, "GET", `${path}?limit=10`)),
+            ]);
+            for (const stream of streams) stream.abort();
+            expect(results.map((result) => result.status).toSorted((a, b) => a - b)).toEqual([
+              ...Array.from({ length: 20 }, () => 200),
+              ...Array.from({ length: 10 }, () => 201),
+            ]);
+          },
+          { env: { AMENDS_DATABASE_POOL_SIZE: "5" } },
+        ),
+      ),
+    20_000,
+  );
+
+  it.live(
     "ownership endpoints transfer to an active human, update directory state, and reject the previous owner's authority",
     () =>
       temporary(async (url) =>

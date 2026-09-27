@@ -46,7 +46,8 @@ export interface Options {
  * The database, and the cluster that runs background work over the same pool: one SQL client, so
  * a wake a commit asks for is stored in that commit's transaction. The process first claims its
  * runner address, so it fails to start while another process runs at it. Cluster keeps its own
- * tables beside the adapter's and holds two of the pool's connections, and the claim a third.
+ * tables beside the adapter's and holds one of the pool's connections for its shard locks, and the
+ * claim another.
  *
  * @category layers
  */

@@ -69,8 +69,10 @@ const runnerTakeover = Config.schema(
   ),
   "AMENDS_RUNNER_TAKEOVER",
 ).pipe(Config.withDefault(Duration.seconds(35)));
+// The runner-address claim, the cluster's shard locks, and the change feed's listener each keep a
+// connection; five leaves two for requests, so one long commit does not stall every read.
 const poolSize = Config.schema(
-  Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 1000 })),
+  Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 1000 })),
   "AMENDS_DATABASE_POOL_SIZE",
 ).pipe(Config.withDefault(20));
 
