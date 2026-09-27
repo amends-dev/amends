@@ -128,10 +128,19 @@ layouts and an always-shown list on phones.
 appear, and `Toast` shows a short confirmation with an optional action at the bottom of the
 viewport, dismissing itself after five seconds.
 
+`CodeInput` takes a six-digit code in one native field drawn as six cells, so typing, pasting,
+and one-time-code autofill work as usual; it can verify as soon as six digits are in. Buttons
+have a large size for centered screens, and field errors carry a warning icon.
+
 `Modal` is the fifth pattern: a Pane with `variant="modal"` in a native dialog, so the page
 behind is inert, Escape and a click outside close it, and focus returns. It is 640 × 600 capped
-to the viewport, and fills the screen on phones. `Modal.Actions` holds its buttons at the end
+to the viewport, or 560px wide and as tall as its content with `size="compact"`, and fills the
+screen on phones. `Modal.Actions` holds its buttons at the end
 of a 64px band, sharing the width on phones.
+
+`Centered` is the sixth pattern, for screens outside a workspace: the canvas frames one white
+card with the brand at the top left and optional actions at the right, over a 420px form in the
+middle or an 800px directory from near the top.
 
 ## Screens
 
@@ -148,16 +157,25 @@ A new group's Threads tab shows a welcome naming its members. `GroupDirectory` i
 page: Your groups and Discover, with search, visibility, member counts, and Join. A public
 group the reader has not joined opens as a preview: Back, a Public badge, and a prompt to join
 in place of the composer; its threads open without a composer too.
+`SignInEmail` and `SignInCode` are sign-in's two steps: an email address, optionally with other
+providers under "or", then the six-digit code with Change email and Send again; a wrong code
+stays in the cells for editing. `WorkspacePicker` lists the reader's workspaces and
+invitations with Open and Accept invite, falling back to invitations only or a first-workspace
+empty state, and `CreateWorkspace` names a new workspace in a compact modal.
 `GroupSettings` is the settings modal: General (name, visibility, and your membership) and
 Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages and dividers from
 `TimelineEntry` data, and conversations read from the bottom: they open at the newest message
 and follow new ones while the reader is at the end. **Screens / Group threads** composes them
 with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, **Create group**,
 and **Browse groups** add the rest of the group flows to the same working workspace: switching
-groups, the directory, previewing and joining, creating a group, and toasts. Their interaction
+groups, the directory, previewing and joining, creating a group, and toasts. **Screens / Sign
+in** and **Screens / Workspaces** walk from email to code (the workshop accepts 314159) to the
+workspace picker, accepting invitations and creating workspaces. Their interaction
 stories run as tests.
 
-The preview's join prompt spans the main content only; the open thread beside it simply has no
+Accepting an invitation joins at once with a toast, as the mocks show; the current app also
+asks what people there should call the reader, which the screen does not model yet. The
+preview's join prompt spans the main content only; the open thread beside it simply has no
 composer. Tab counts are plain numbers everywhere, where some mocks draw them as badges.
 The settings copy says "group" where the mocks said "channel", and the visibility help follows
 the chosen option. Task panel messages use the standard message size rather than the mock's

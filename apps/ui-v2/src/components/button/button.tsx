@@ -15,6 +15,8 @@ export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   chevron?: boolean;
   /** Fill the container's width. */
   wide?: boolean;
+  /** "large" is 44px with larger text, for centered screens. Default "regular". */
+  size?: "regular" | "large";
 };
 
 /** A labelled action: 36px on desktop and 44px on touch layouts. */
@@ -24,6 +26,7 @@ export function Button(props: ButtonProps) {
     "icon",
     "chevron",
     "wide",
+    "size",
     "class",
     "type",
     "children",
@@ -36,6 +39,7 @@ export function Button(props: ButtonProps) {
         s.button,
         s.variant[local.variant ?? "secondary"],
         local.chevron && s.withChevron,
+        local.size === "large" && s.large,
         local.wide && s.wide,
         local.class,
       )}

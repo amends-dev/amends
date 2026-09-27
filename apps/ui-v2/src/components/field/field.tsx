@@ -1,4 +1,5 @@
 import { Show, createContext, createUniqueId, splitProps, useContext, type JSX } from "solid-js";
+import { IconAlertTriangle } from "@amends/icons";
 import { classes } from "../../internal/props.ts";
 import * as s from "./field.css.ts";
 
@@ -53,6 +54,7 @@ export function Root(props: RootProps) {
         </Show>
         <Show when={local.error}>
           <p id={ids.error} class={s.error}>
+            <IconAlertTriangle class={s.errorIcon} />
             {local.error}
           </p>
         </Show>

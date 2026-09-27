@@ -18,10 +18,19 @@ export const dialog = style({
   overflow: "hidden",
   selectors: {
     "&[open]": { display: "flex", flexDirection: "column" },
+    "&[data-size=compact]": {
+      width: "min(35rem, calc(100vw - 2rem))",
+      // A modal dialog is anchored top and bottom, so "auto" would fill the viewport.
+      height: "fit-content",
+      maxHeight: "calc(100dvh - 4rem)",
+    },
     "&::backdrop": { backgroundColor: vars.color.scrim },
   },
   "@media": {
     [media.mobile]: {
+      selectors: {
+        "&[data-size=compact]": { width: "100vw", height: "100dvh", maxHeight: "none" },
+      },
       width: "100vw",
       height: "100dvh",
       border: "none",

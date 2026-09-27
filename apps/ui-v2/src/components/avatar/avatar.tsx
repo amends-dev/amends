@@ -13,7 +13,7 @@ export type AvatarProps = Omit<JSX.HTMLAttributes<HTMLSpanElement>, "children"> 
   tone?: AvatarToneName;
   /** Tile width in CSS pixels. Default 32. */
   size?: s.AvatarSize;
-  /** A workspace mark uses larger initials and the neutral tone by default. */
+  /** A workspace mark shows one larger initial and uses the neutral tone by default. */
   variant?: "person" | "workspace";
   /** Hide from assistive technology when the name is already visible beside it. */
   decorative?: boolean;
@@ -54,7 +54,8 @@ export function Avatar(props: AvatarProps) {
         local.class,
       )}
     >
-      {local.initials ?? initialsOf(local.name)}
+      {local.initials ??
+        (workspace() ? local.name.trim().charAt(0).toUpperCase() : initialsOf(local.name))}
     </span>
   );
 }

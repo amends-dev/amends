@@ -7,6 +7,8 @@ export type RootProps = {
   /** Called on Escape, a click outside, or a close button; the caller closes it. */
   onClose: () => void;
   "aria-label": string;
+  /** "compact" is 560px wide and as tall as its content, for short forms. Default "regular". */
+  size?: "regular" | "compact";
   /** A Pane with variant="modal". */
   children: JSX.Element;
 };
@@ -28,6 +30,7 @@ export function Root(props: RootProps) {
     <dialog
       ref={setDialog}
       class={s.dialog}
+      data-size={props.size ?? "regular"}
       aria-label={props["aria-label"]}
       onCancel={(event) => {
         event.preventDefault();

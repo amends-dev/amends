@@ -24,11 +24,13 @@ export type DividerProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> 
   label?: string;
   /** Center the label between two stitches, or lead with it. Default center. */
   align?: "center" | "start";
+  /** "caps" is a small uppercase label; "text" reads as a word, such as "or". Default caps. */
+  labelStyle?: "caps" | "text";
 };
 
 /** A stitched line that separates content, optionally labelled. */
 export function Divider(props: DividerProps) {
-  const [local, native] = splitProps(props, ["label", "align", "class"]);
+  const [local, native] = splitProps(props, ["label", "align", "labelStyle", "class"]);
   return (
     <div
       {...native}
@@ -39,7 +41,9 @@ export function Divider(props: DividerProps) {
         <Stitch />
       </Show>
       <Show when={local.label}>
-        <span class={s.label}>{local.label}</span>
+        <span class={s.label} data-style={local.labelStyle ?? "caps"}>
+          {local.label}
+        </span>
       </Show>
       <Stitch />
     </div>

@@ -34,6 +34,21 @@ import directoryMeta, {
   ReadPublicThread,
   YourGroups,
 } from "../src/screens/groups/directory.stories.tsx";
+import signInMeta, {
+  Code,
+  CodeError,
+  Email,
+  SignInFlow,
+  WithProviders,
+} from "../src/screens/sign-in/sign-in.stories.tsx";
+import workspacesMeta, {
+  AcceptInvitation,
+  CreateFirstWorkspace,
+  CreateWorkspace,
+  FirstWorkspace,
+  InvitationsOnly,
+  WorkspacesAndInvitations,
+} from "../src/screens/workspaces/workspaces.stories.tsx";
 import { viewport } from "./viewport.ts";
 
 afterEach(() => {
@@ -137,5 +152,34 @@ describe("browse groups", () => {
   it("joins from Discover and opens the group from the toast", async () => {
     viewport(1600);
     await stories.story(JoinFromDiscover).run();
+  });
+});
+
+describe("sign in", () => {
+  const stories = definePreview(preview).meta(signInMeta);
+  it("renders the email, code, error, and provider layouts", async () => {
+    await stories.story(Email).run();
+    await stories.story(Code).run();
+    await stories.story(CodeError).run();
+    await stories.story(WithProviders).run();
+  });
+  it("validates the email, refuses a wrong code, and continues with the right one", async () => {
+    await stories.story(SignInFlow).run();
+  });
+});
+
+describe("workspace picker", () => {
+  const stories = definePreview(preview).meta(workspacesMeta);
+  it("renders workspaces, invitations only, the first workspace, and creation", async () => {
+    await stories.story(WorkspacesAndInvitations).run();
+    await stories.story(InvitationsOnly).run();
+    await stories.story(FirstWorkspace).run();
+    await stories.story(CreateWorkspace).run();
+  });
+  it("accepts an invitation", async () => {
+    await stories.story(AcceptInvitation).run();
+  });
+  it("creates a first workspace", async () => {
+    await stories.story(CreateFirstWorkspace).run();
   });
 });

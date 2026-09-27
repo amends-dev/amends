@@ -22,5 +22,14 @@ export const label = style({
   color: vars.color.text.muted,
   fontWeight: fontWeight.medium,
   textTransform: "uppercase",
+  selectors: {
+    "&[data-style=text]": {
+      ...typeScale.control,
+      lineHeight: "1.125rem",
+      fontWeight: fontWeight.regular,
+      textTransform: "none",
+      color: vars.color.text.secondary,
+    },
+  },
   "@media": { [media.touch]: { color: vars.color.text.secondary } },
 });

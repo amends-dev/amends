@@ -4,8 +4,9 @@
   and a separate metadata catalog through `@amends/icons`.
 - [UI](ui/README.md) provides the shared Solid foundations, primitives,
   and compositions, verified in its standalone Storybook workshop.
-- [UI v2](ui-v2/README.md) is the pattern-based design system from the Lunacy mocks. It
-  replaces UI and features screen by screen; so far it has its foundations.
+- [UI v2](ui-v2/README.md) is the pattern-based design system from the Lunacy mocks: the six
+  layout patterns and presentational screens for the group flows, sign-in, and the workspace
+  picker. It replaces UI and features screen by screen; web and desktop do not use it yet.
 - [client](client/README.md) owns headless sessions, API/query state, and pure route
   helpers. It has no dependency on UI, styling, router libraries, or Storybook.
 - [features](features/README.md) connects client and UI, with a separate live backend workshop.

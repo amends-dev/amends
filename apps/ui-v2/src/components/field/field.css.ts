@@ -20,4 +20,20 @@ export const hint = style({
   color: vars.color.text.secondary,
 });
 
-export const error = style({ ...typeScale.hint, margin: 0, color: vars.color.text.danger });
+export const error = style({
+  ...typeScale.hint,
+  lineHeight: "1.25rem",
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "0.5rem",
+  margin: 0,
+  marginBlockStart: "0.25rem",
+  color: vars.color.text.danger,
+});
+
+export const errorIcon = style({
+  flex: "none",
+  width: "0.875rem",
+  height: "0.875rem",
+  marginBlockStart: "0.1875rem",
+});

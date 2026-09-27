@@ -13,6 +13,7 @@
     "./components/badge": "./src/components/badge/index.ts",
     "./components/button": "./src/components/button/index.ts",
     "./components/choice": "./src/components/choice/index.ts",
+    "./components/code-input": "./src/components/code-input/index.ts",
     "./components/composer": "./src/components/composer/index.ts",
     "./components/count": "./src/components/count/index.ts",
     "./components/divider": "./src/components/divider/index.ts",
@@ -34,6 +35,7 @@
     "./foundations/theme": "./src/foundations/theme/index.ts",
     "./foundations/typography": "./src/foundations/typography/tokens.ts",
     "./foundations/typography/fonts": "./src/foundations/typography/fonts.ts",
+    "./patterns/centered": "./src/patterns/centered/index.ts",
     "./patterns/modal": "./src/patterns/modal/index.ts",
     "./patterns/pane": "./src/patterns/pane/index.ts",
     "./patterns/rail": "./src/patterns/rail/index.ts",
@@ -41,8 +43,10 @@
     "./patterns/sidebar": "./src/patterns/sidebar/index.ts",
     "./screens/group": "./src/screens/group/index.ts",
     "./screens/groups": "./src/screens/groups/index.ts",
+    "./screens/sign-in": "./src/screens/sign-in/index.ts",
     "./screens/timeline": "./src/screens/timeline/index.ts",
-    "./screens/workspace-navigation": "./src/screens/workspace-navigation/index.ts"
+    "./screens/workspace-navigation": "./src/screens/workspace-navigation/index.ts",
+    "./screens/workspaces": "./src/screens/workspaces/index.ts"
   },
   "scripts": {
     "dev": "bun run --bun storybook dev --host 127.0.0.1 --port 6010 --no-open --disable-telemetry",

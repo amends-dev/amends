@@ -71,6 +71,9 @@ export const variant = styleVariants({
   },
 });
 
+/** 44px with item text, for centered screens such as sign-in. */
+export const large = style({ ...typeScale.item, minHeight: "2.75rem", paddingInline: "1.25rem" });
+
 /** Fills its container, as in phone action bars. */
 export const wide = style({ width: "100%" });
 
