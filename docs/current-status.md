@@ -56,8 +56,9 @@ following the thread, stopping, leaving the group, or being removed, between its
 by writing or being mentioned shows only in the message. A group's stream shows its threads, not
 people joining or leaving the group.
 
-Every workspace starts with a general group that each person joins with the workspace and never
-leaves; workspaces created before it existed have none. The sidebar lists teammates the reader has
+Every workspace starts with a general group that every member joins with the workspace and leaves
+only by leaving the workspace; workspaces created before it existed have none. Agents join no
+workspace through the apps yet, so none join it. The sidebar lists teammates the reader has
 not messaged under Direct messages, capped at six, and opens a first message to them. There is no
 conversation with oneself, since a direct group needs another member.
 

@@ -204,7 +204,7 @@ it words notes such as "Sara followed this thread" or "You were removed from the
 left out) and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
 message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
 report change errors; for a direct conversation it shows only members, and for the workspace's
-`general` group it says everyone belongs and offers no Leave. `GroupDirectory` takes
+`general` group it says everyone belongs and offers no Leave; the apps hide adding there too. `GroupDirectory` takes
 optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join
 error, and loading states. `InboxPane` is the Inbox from the Lunacy Inbox frames: All and
 Unread tabs with the unread count, Mark all seen while anything is unread, and notifications

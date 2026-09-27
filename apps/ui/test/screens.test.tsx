@@ -166,7 +166,7 @@ describe("group settings modal", () => {
     await stories.story(General).run();
     await stories.story(Members).run();
   });
-  it("offers no Leave in the workspace's general group, and removes only agents", async () => {
+  it("offers no Leave, adding, or removing in the workspace's general group", async () => {
     viewport(1600);
     await stories.story(WorkspaceGeneral).run();
   });

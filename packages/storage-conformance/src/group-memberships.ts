@@ -175,7 +175,7 @@ export const groupMemberships = (harness: Harness) => {
       });
 
     it.effect(
-      "starts each workspace with a general group that people never leave and agents may",
+      "starts each workspace with a general group that nobody leaves until they leave the workspace",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -199,19 +199,17 @@ export const groupMemberships = (harness: Harness) => {
               const refused = new GroupMembershipApplication.GeneralMembership({
                 groupId: Group.GeneralId,
               });
-              // People neither leave it nor are removed from it, however broad their authority.
+              // Nobody, person or agent, leaves it or is removed, however broad the authority.
               expect(yield* Effect.flip(run(bound, owner, leave(own)))).toEqual(refused);
-              const person = yield* run(bound, owner, add(Group.GeneralId, humanId));
-              expect(yield* Effect.flip(run(bound, owner, remove(person)))).toEqual(refused);
-              expect(yield* Effect.flip(run(bound, memberActor(humanId), leave(person)))).toEqual(
-                refused,
-              );
-              // Agents join and are removed as in any team group.
-              const agent = yield* run(bound, owner, add(Group.GeneralId, agentId));
-              expect(yield* run(bound, owner, remove(agent))).toMatchObject({
-                memberId: agentId,
-                status: "removed",
-              });
+              for (const memberId of [humanId, agentId]) {
+                const admission = yield* run(bound, owner, add(Group.GeneralId, memberId));
+                expect(yield* Effect.flip(run(bound, owner, remove(admission)))).toEqual(refused);
+                expect(
+                  yield* Effect.flip(run(bound, memberActor(memberId), leave(admission))),
+                ).toEqual(refused);
+              }
+              // Leaving the workspace ends the admission.
+              yield* run(bound, owner, removeWorkspaceMember(agentId));
               expect(
                 (yield* bound.groupMemberships.listByGroup(Group.GeneralId))
                   .filter((record) => record.status === "active")

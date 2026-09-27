@@ -145,7 +145,7 @@ it("suggests only a few teammates", async () => {
   expect(views.directs().map((entry) => entry.name)).toEqual(["Bea, Scout", "Ada", "Bea", "Scout"]);
 });
 
-it("offers no leaving the general group, and removes only agents from it", async () => {
+it("offers no leaving the general group, and removes nobody from it", async () => {
   const views = fixture();
   await waitFor(() => expect(views.people.roster()).toHaveLength(3));
   expect(views.general.general()).toBe(true);
@@ -154,6 +154,6 @@ it("offers no leaving the general group, and removes only agents from it", async
   expect(views.people.roster().map((entry) => [entry.name, entry.removable])).toEqual([
     ["Alice", false],
     ["Ada", false],
-    ["Scout", true],
+    ["Scout", false],
   ]);
 });

@@ -218,7 +218,7 @@ and `text` fields the screens' timeline takes.
 - `useMentionCandidates(workspaceId, groupId)` lists a group's other members to mention.
   `useGroupPeople(workspaceId, members)` lists a group's members for its settings, the reader
   first, with who the reader may remove, and the workspace's other active members to add. In the
-  general group only agents can be removed, and `useGroupMembers` reports it `general` and not
+  general group nobody can be removed, and `useGroupMembers` reports it `general` and not
   `leavable`.
   `useWorkspacePeople(workspaceId)` lists the workspace's other active members and agents.
 

@@ -164,7 +164,8 @@ function Group(props: {
         onRemove={members.remove}
         removingId={members.changing()}
         membersError={members.error()}
-        canAdd={members.manageable()}
+        // Everyone joins the general group with the workspace.
+        canAdd={members.manageable() && !group()?.general}
         candidates={people.candidates().map(pickerPerson)}
         selected={selected()}
         onSelectedChange={setSelected}

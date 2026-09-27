@@ -30,9 +30,9 @@ export interface TeamRecord extends Schema.Schema.Type<typeof TeamRecord> {}
 
 /**
  * Every workspace has one general group, a public team group created with the workspace under
- * this ID, so finding it needs no lookup. Each person joins it as they join the workspace and
- * stays in it: people neither leave it nor are removed from it. Agents join, leave, and are
- * removed as in any team group. It may be renamed.
+ * this ID, so finding it needs no lookup. Every member, person or agent, joins it as they join the
+ * workspace, in the same commit, and stays in it until they leave the workspace: nobody leaves it
+ * or is removed from it. It may be renamed.
  */
 export const GeneralId = Id.make("general");
 /** The general group's name when a workspace is created. */

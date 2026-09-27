@@ -20,8 +20,8 @@ export const Members = {
 } satisfies Story;
 
 /**
- * The workspace's general group: everyone belongs to it, so there is no Leave, and only agents can
- * be removed.
+ * The workspace's general group: everyone joins it with the workspace, so there is no Leave, no
+ * adding, and no removing.
  */
 export const WorkspaceGeneral = {
   render: () => <GroupWorkspace settings="general" general />,
@@ -34,8 +34,9 @@ export const WorkspaceGeneral = {
     ).toBeVisible();
     await expect(dialog.queryByRole("button", { name: "Leave group" })).toBeNull();
     await userEvent.click(dialog.getByRole("button", { name: /Members/ }));
-    await expect(dialog.getByRole("button", { name: "Remove Yumi" })).toBeVisible();
-    await expect(dialog.queryByRole("button", { name: "Remove Sara" })).toBeNull();
+    await expect(dialog.getByText("Yumi")).toBeVisible();
+    await expect(dialog.queryByRole("button", { name: /^Remove / })).toBeNull();
+    await expect(dialog.queryByRole("combobox", { name: "Add members" })).toBeNull();
   },
 } satisfies Story;
 

@@ -275,8 +275,8 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
         memberId: member.id,
         acceptedAt,
       });
-      // A person joins the workspace's general group as they join it; a workspace created before
-      // general groups existed has none.
+      // Every member joins the workspace's general group as they join it; a workspace created
+      // before general groups existed has none.
       if (Option.isSome(yield* groups.get(Group.GeneralId)))
         yield* journal.publish(GroupMembershipFacts.Added, {
           id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),

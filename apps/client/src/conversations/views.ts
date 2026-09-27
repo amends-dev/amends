@@ -435,7 +435,7 @@ export function useGroupPeople(
   members: {
     readonly roster: Accessor<ReadonlyArray<GroupMembership.Record> | undefined>;
     readonly membersRemovable: Accessor<boolean>;
-    /** The workspace's general group, which people are not removed from. */
+    /** The workspace's general group, which nobody is removed from. */
     readonly general?: Accessor<boolean>;
   },
 ) {
@@ -451,10 +451,7 @@ export function useGroupPeople(
           name: memberName(member),
           agent: member?.identity._tag === "Agent",
           you,
-          removable:
-            !you &&
-            members.membersRemovable() &&
-            (member?.identity._tag === "Agent" || !members.general?.()),
+          removable: !you && members.membersRemovable() && !members.general?.(),
         };
       })
       .toSorted((left, right) =>

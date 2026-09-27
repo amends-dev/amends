@@ -18,8 +18,8 @@ export class FixedMembership extends Schema.TaggedError<FixedMembership>()(
   { groupId: Group.Id },
 ) {}
 /**
- * Everyone in the workspace belongs to its general group: people neither leave it nor are removed
- * from it. Leaving the workspace ends the admission.
+ * Everyone in the workspace belongs to its general group: nobody leaves it or is removed from it.
+ * Leaving the workspace ends the admission.
  */
 export class GeneralMembership extends Schema.TaggedError<GeneralMembership>()(
   "GroupMembershipApplication.GeneralMembership",

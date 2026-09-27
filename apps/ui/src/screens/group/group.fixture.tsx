@@ -132,9 +132,7 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
   const [name, setName] = createSignal("general");
   const [visibility, setVisibility] = createSignal<GroupVisibility>("private");
   const [members, setMembers] = createSignal(
-    props.general
-      ? groupMembers.map((person) => ({ ...person, removable: person.agent === true }))
-      : groupMembers,
+    props.general ? groupMembers.map((person) => ({ ...person, removable: false })) : groupMembers,
   );
   const [candidates, setCandidates] = createSignal(workspaceCandidates);
   const [selected, setSelected] = createSignal<string[]>([]);
@@ -433,6 +431,7 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
         }
         member={current()?.joined ?? true}
         general={props.general}
+        canAdd={!props.general}
         onLeave={() =>
           setGroups(
             groups().map((group) =>

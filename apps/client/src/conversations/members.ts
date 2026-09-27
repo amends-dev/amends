@@ -24,7 +24,7 @@ export interface GroupMembersController {
   readonly own: Accessor<GroupMembership.Record | undefined>;
   /** The reader may leave: a team group they belong to, other than the general group. */
   readonly leavable: Accessor<boolean>;
-  /** The workspace's general group: people neither leave it nor are removed from it. */
+  /** The workspace's general group: everyone joins it with the workspace, and nobody leaves it. */
   readonly general: Accessor<boolean>;
   /** What is being changed: "add", or the admission being removed or left. */
   readonly changing: Accessor<string | undefined>;
