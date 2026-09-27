@@ -99,7 +99,11 @@ viewport width ([layout tokens](src/foundations/layout/tokens.ts)):
 The drawer and a floating side panel behave as modal dialogs: they take focus, make the rest of
 the shell inert, and close on Escape or a click on the scrim, returning focus. Following a link
 in the drawer closes it. On phones the pane runs edge to edge and respects safe-area insets. The
-desktop app's title bar is not modelled yet.
+desktop app's title bar is not modelled yet. A rail destination is a section, so the current one
+is marked `aria-current="true"`; the sidebar marks the page within it. Sidebar items take a count
+or, for unseen activity, a dot. `LiveStatus` is a live region at the bottom of the screen that
+says "Connecting…" or "Reconnecting…" while workspace changes have stopped arriving, and stays
+empty otherwise.
 
 ## Conversation components
 
@@ -109,8 +113,18 @@ avatar by a stitched elbow; `active` highlights the message whose thread is open
 the running stitch, optionally labelled ("Today", or "4 replies" leading). `TaskStatus` draws
 triage, open, in-progress, and done. `Composer` is a form around an auto-growing field: Enter
 sends, Shift+Enter starts a new line, and Send waits for non-blank text. The caller owns the
-draft so it survives navigation. Phones use 16px message and field text so the page does not
-zoom, and give reactions and the reply summary 44px targets.
+draft so it survives navigation. Given `mentionCandidates`, typing `@` opens suggestions above the
+field: arrows move, Enter or Tab choose (inserting `@name` and calling `onMention`), and Escape
+closes; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a send
+failed. Phones use 16px message and field text so the page does not zoom, and give reactions and
+the reply summary 44px targets.
+
+A message takes its time as text or as `at`, a `Date` it words as the time of day with the full
+date as its title. The reply summary adds an unread dot and a note such as who is typing; a
+message with no replies offers `Message.Reply` ("Reply in thread"), shown while the message is
+hovered or focused where there is a pointer, and always on touch screens. `focused` sets a
+message apart and scrolls to it. Screens word times, days, and typing through `internal/when.ts`,
+and key rows by id through `internal/keyed.tsx`, so callers may pass freshly built arrays.
 
 ## Form components and the modal
 
@@ -176,9 +190,23 @@ workspace with the brand and, when signed in, the account and Sign out; `Checkin
 build the app's other states on it and on EmptyState, which takes a heading `level` and
 actions as children.
 `GroupSettings` is the settings modal: General (name, visibility, and your membership) and
-Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages and dividers from
+Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages, dividers, and participation notes from
 `TimelineEntry` data, and conversations read from the bottom: they open at the newest message
-and follow new ones while the reader is at the end. **Screens / Group threads** composes them
+and follow new ones while the reader is at the end. With `days` it puts a seam (Today,
+Yesterday, a weekday within the week, then the date) before each new day of dated entries, and
+it words notes such as "Sara followed this thread" or "You were removed from the group".
+`GroupThreads` and `ThreadPane` take a `status` (loading, unavailable, failed with Try again),
+`earlier` to load older entries, a `sendError` code, and a `follow` bell; `GroupPane` takes the
+tabs to show (with one, the header's second line says what following means) and optional
+settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
+message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
+report change errors; for a direct conversation it shows only members. `GroupDirectory` takes
+optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join
+error, and loading states. `ChangeName` and `NewMessage` are compact modals for the account
+menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
+destinations to show, an optional search, and an account menu (identity, appearance, switch
+workspace, settings, change name, sign out). **Screens / Live conversation** and **Screens /
+Workspace dialogs** exercise these over dated data. **Screens / Group threads** composes them
 with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, **Create group**,
 and **Browse groups** add the rest of the group flows to the same working workspace: switching
 groups, the directory, previewing and joining, creating a group, and toasts. **Screens / Sign

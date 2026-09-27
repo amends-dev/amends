@@ -37,7 +37,9 @@ export const CreateAndOpen = {
       canvas.getByRole("heading", { name: "Welcome to #release-planning" }),
     ).toBeVisible();
     await expect(canvas.getByText("You, Alex Morgan, and Sara are members.")).toBeVisible();
-    await expect(canvas.getByRole("status")).toHaveTextContent("Group created");
+    await expect(
+      within(canvas.getByRole("list", { name: "Notifications" })).getByRole("status"),
+    ).toHaveTextContent("Group created");
     await expect(canvas.getByRole("link", { name: "release-planning" })).toHaveAttribute(
       "aria-current",
       "page",

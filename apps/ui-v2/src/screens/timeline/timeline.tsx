@@ -1,9 +1,11 @@
-import { For, Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch, createMemo } from "solid-js";
+import { Keyed } from "../../internal/keyed.tsx";
 import { IconMarkNew, IconMarkResources } from "@amends/icons";
 import type { AvatarStackPerson } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { Message, type MessageAuthor } from "../../components/message/index.ts";
 import type { TaskState } from "../../components/task-status/index.ts";
+import { clockTime, dayLabel, dayOf, fullTime, typingText } from "../../internal/when.ts";
 import * as s from "./timeline.css.ts";
 
 /** Plain text, or a mentioned name such as "@Caleb". */
@@ -15,6 +17,8 @@ export interface TimelineMessage {
   readonly author: MessageAuthor;
   /** As shown, such as "10:02 AM". */
   readonly time?: string;
+  /** When it was sent: the time shown unless `time` is given, and its day seam. */
+  readonly at?: Date;
   readonly text: readonly MessagePart[];
   /** A step an agent took, such as "Checked codebase". */
   readonly activity?: string;
@@ -24,8 +28,15 @@ export interface TimelineMessage {
     readonly reacted?: boolean;
   }>;
   readonly task?: { readonly key: string; readonly title: string; readonly state: TaskState };
-  /** The message started a thread. */
-  readonly thread?: { readonly replies: number; readonly people: readonly AvatarStackPerson[] };
+  /** The message started a thread. With no replies yet, it offers "Reply in thread". */
+  readonly thread?: {
+    readonly replies: number;
+    readonly people?: readonly AvatarStackPerson[];
+    /** Replies the reader has not seen. */
+    readonly unread?: boolean;
+    /** The people typing a reply now. */
+    readonly typing?: readonly string[];
+  };
 }
 
 export interface TimelineDivider {
@@ -43,7 +54,63 @@ export interface TimelineEvent {
   readonly text: string;
 }
 
-export type TimelineEntry = TimelineMessage | TimelineDivider | TimelineEvent;
+/** How someone's part in a thread changed. Joining by writing or being mentioned has no note. */
+export type ParticipationChange =
+  | "followed"
+  | "unfollowed"
+  | "left-group"
+  | "removed-from-group"
+  | "removed-from-workspace";
+
+/** A quiet line where someone followed a thread or stopped taking part in it. */
+export interface TimelineNote {
+  readonly kind: "note";
+  readonly id: string;
+  readonly at: Date;
+  readonly change: ParticipationChange;
+  /** Who it happened to, by name. */
+  readonly who: string;
+  /** It happened to the reader, who reads as "You". */
+  readonly self?: boolean;
+}
+
+export type TimelineEntry = TimelineMessage | TimelineDivider | TimelineEvent | TimelineNote;
+
+function noteText(note: TimelineNote) {
+  const who = note.self ? "You" : note.who;
+  const were = note.self ? "were" : "was";
+  switch (note.change) {
+    case "followed":
+      return `${who} followed this thread`;
+    case "unfollowed":
+      return `${who} stopped following`;
+    case "left-group":
+      return `${who} left the group`;
+    case "removed-from-group":
+      return `${who} ${were} removed from the group`;
+    case "removed-from-workspace":
+      return `${who} ${were} removed from the workspace`;
+  }
+}
+
+const atOf = (entry: TimelineEntry) =>
+  entry.kind === "message" || entry.kind === "note" ? entry.at : undefined;
+
+/** Entries with a day seam before the first entry of each new local day. */
+function withDays(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
+  const out: TimelineEntry[] = [];
+  let last: number | undefined;
+  for (const entry of entries) {
+    const at = atOf(entry);
+    if (at) {
+      const day = dayOf(at);
+      if (day !== last) out.push({ kind: "divider", id: `day:${day}`, label: dayLabel(day) });
+      last = day;
+    }
+    out.push(entry);
+  }
+  return out;
+}
 
 export interface TimelineProps {
   readonly entries: readonly TimelineEntry[];
@@ -51,22 +118,28 @@ export interface TimelineProps {
   readonly activeId?: string;
   readonly onOpenThread?: (messageId: string) => void;
   readonly onReact?: (messageId: string, emoji: string) => void;
-  readonly taskHref: (key: string) => string;
+  /** Where a task reference leads. */
+  readonly taskHref?: (key: string) => string;
   /** Conversations rest against the bottom; a task's activity reads from the top. */
   readonly anchor?: "bottom" | "top";
+  /** Put a day seam, such as "Today", before each new day of dated entries. */
+  readonly days?: boolean;
+  /** The message the reader came to see: set apart and scrolled to. */
+  readonly focusId?: string;
 }
 
 /** Messages, dividers, and events, oldest first. */
 export function Timeline(props: TimelineProps) {
+  const entries = createMemo(() => (props.days ? withDays(props.entries) : props.entries));
   return (
     <div class={s.timeline} data-anchor={props.anchor ?? "bottom"}>
-      <For each={props.entries}>
+      <Keyed each={entries()} by={(entry) => entry.id}>
         {(entry) => (
           <Switch>
-            <Match when={entry.kind === "divider" && entry}>
+            <Match when={entry().kind === "divider" && (entry() as TimelineDivider)}>
               {(divider) => <Divider label={divider().label} align={divider().align} />}
             </Match>
-            <Match when={entry.kind === "event" && entry}>
+            <Match when={entry().kind === "event" && (entry() as TimelineEvent)}>
               {(event) => (
                 <p class={s.event}>
                   <IconMarkNew class={s.eventIcon} />
@@ -74,12 +147,28 @@ export function Timeline(props: TimelineProps) {
                 </p>
               )}
             </Match>
-            <Match when={entry.kind === "message" && entry}>
+            <Match when={entry().kind === "note" && (entry() as TimelineNote)}>
+              {(note) => (
+                <p class={s.event}>
+                  {noteText(note())}
+                  <time
+                    class={s.eventTime}
+                    dateTime={note().at.toISOString()}
+                    title={fullTime(note().at)}
+                  >
+                    {clockTime(note().at)}
+                  </time>
+                </p>
+              )}
+            </Match>
+            <Match when={entry().kind === "message" && (entry() as TimelineMessage)}>
               {(message) => (
                 <Message.Root
                   author={message().author}
                   time={message().time}
+                  at={message().at}
                   active={props.activeId === message().id}
+                  focused={props.focusId === message().id}
                 >
                   <Show when={message().activity}>
                     {(activity) => (
@@ -114,7 +203,7 @@ export function Timeline(props: TimelineProps) {
                   <Show when={message().task}>
                     {(task) => (
                       <Message.TaskReference
-                        href={props.taskHref(task().key)}
+                        href={props.taskHref?.(task().key) ?? "#"}
                         taskKey={task().key}
                         state={task().state}
                       >
@@ -124,12 +213,27 @@ export function Timeline(props: TimelineProps) {
                   </Show>
                   <Show when={message().thread}>
                     {(thread) => (
-                      <Message.Replies
-                        count={thread().replies}
-                        people={thread().people}
-                        aria-expanded={props.activeId === message().id}
-                        onClick={() => props.onOpenThread?.(message().id)}
-                      />
+                      <Show
+                        when={thread().replies > 0}
+                        fallback={
+                          <Show when={props.onOpenThread}>
+                            <Message.Reply
+                              note={typingText(thread().typing ?? [])}
+                              aria-expanded={props.activeId === message().id}
+                              onClick={() => props.onOpenThread?.(message().id)}
+                            />
+                          </Show>
+                        }
+                      >
+                        <Message.Replies
+                          count={thread().replies}
+                          people={thread().people}
+                          unread={thread().unread}
+                          note={typingText(thread().typing ?? [])}
+                          aria-expanded={props.activeId === message().id}
+                          onClick={() => props.onOpenThread?.(message().id)}
+                        />
+                      </Show>
                     )}
                   </Show>
                 </Message.Root>
@@ -137,7 +241,7 @@ export function Timeline(props: TimelineProps) {
             </Match>
           </Switch>
         )}
-      </For>
+      </Keyed>
     </div>
   );
 }

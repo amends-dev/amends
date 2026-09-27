@@ -189,7 +189,23 @@ export const itemAvatar = style({
   "@media": { [media.touch]: { width: "1.75rem", height: "1.75rem", fontSize: "0.63rem" } },
 });
 
-export const itemLabel = style({ ...ellipsis, flex: 1 });
+export const itemLabel = style({
+  ...ellipsis,
+  flex: 1,
+  // Unseen activity reads in the primary weight.
+  selectors: {
+    [`${item}[data-unread] &`]: { color: vars.color.text.primary, fontWeight: fontWeight.medium },
+  },
+});
+
+export const unread = style({
+  flex: "none",
+  width: "0.4375rem",
+  height: "0.4375rem",
+  marginInlineEnd: "0.25rem",
+  borderRadius: "50%",
+  backgroundColor: vars.color.action.indicator,
+});
 
 export const section = style({
   display: "flex",

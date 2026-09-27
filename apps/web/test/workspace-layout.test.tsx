@@ -31,7 +31,7 @@ const listing = (name: string) => ({
 });
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-it("retains shell, open popup, and appearance controls through directory refresh and recovery", async () => {
+it("retains the shell and an open account menu through directory refresh and recovery", async () => {
   const held = Promise.withResolvers<Response>();
   const fetch = vi
     .fn<typeof globalThis.fetch>()
@@ -73,22 +73,21 @@ it("retains shell, open popup, and appearance controls through directory refresh
     </Application>
   ));
   await screen.findByText("Studio");
-  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
-  const trigger = screen.getByRole("button", { name: "Your account: alice" });
-  fireEvent.click(trigger);
-  const choice = await screen.findByRole("radio", { name: "Soot" });
-  fireEvent.click(choice);
+  const sidebar = screen.getByRole("navigation", { name: "Workspace" });
+  const trigger = screen.getByRole("button", { name: "Account: alice" });
+  fireEvent.keyDown(trigger, { key: "Enter" });
+  const choice = await screen.findByRole("menuitemradio", { name: "System" });
+  expect(choice).toHaveAttribute("aria-checked", "true");
   directory.retry();
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   held.resolve(json({}, 503));
   await waitFor(() =>
     expect(directory.state()).toMatchObject({ _tag: "Ready", refreshFailed: true }),
   );
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
-  expect(screen.getByRole("radio", { name: "Soot" })).toBe(choice);
-  expect(choice).toBeChecked();
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toBe(sidebar);
+  expect(screen.getByRole("menuitemradio", { name: "System" })).toBe(choice);
   directory.retry();
   await screen.findByText("Renamed studio");
-  expect(screen.getByRole("button", { name: "Your account: alice" })).toBe(trigger);
-  expect(screen.getByRole("radio", { name: "Soot" })).toBe(choice);
+  expect(screen.getByRole("button", { name: "Account: alice" })).toBe(trigger);
+  expect(screen.getByRole("menuitemradio", { name: "System" })).toBe(choice);
 });

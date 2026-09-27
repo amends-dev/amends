@@ -52,3 +52,28 @@ export const separator = style({
   border: "none",
   backgroundColor: vars.color.border.divider,
 });
+
+export const header = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.125rem",
+  padding: "0.5rem 0.625rem 0.625rem",
+  minWidth: 0,
+});
+
+export const headerTitle = style({
+  ...typeScale.control,
+  color: vars.color.text.primary,
+  fontWeight: fontWeight.medium,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+});
+
+export const headerDetail = style({
+  ...typeScale.hint,
+  color: vars.color.text.secondary,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+});

@@ -50,13 +50,15 @@ at once; the feed then delivers the same commit and refreshes those reads again.
   without delivering anything, and the client cannot see the server's heartbeats.
 - `401` signs out. `403`/`404` end the feed and refresh the directory; the route guard then
   shows that the workspace is unavailable. Removal arrives as a commit, then the stream ends.
-- `Live.Status` from `@amends/features/live` stays silent while live and for two seconds after
-  a drop, then shows "Connecting…" or "Reconnecting…" in a live region.
+- Client's `useLiveStatus()` stays silent while live and for two seconds after a drop, then
+  reports `connecting` or `reconnecting`; the apps pass it to UI v2's `LiveStatus`, a live region
+  that says "Connecting…" or "Reconnecting…" at the bottom of the screen.
 
 ## Pages under live data
 
-Refreshes replace decoded objects, so connected features key list rows by domain ID
-(`apps/features/src/internal/keyed.ts`); rows keep focus, open dialogs, and state. Editors
+Refreshes replace decoded objects, so lists key their rows by domain ID: UI v2 screens through
+`internal/keyed.tsx`, and the remaining connected features through
+`apps/features/src/internal/keyed.ts`. Rows keep focus, open dialogs, and state. Editors
 follow stored values until edited. A draft keeps the value it was made against, so a change
 saved elsewhere meanwhile makes the save conflict instead of overwriting it; an explicit
 refresh discards drafts. Background refreshes never mark settings pending or lock commands.

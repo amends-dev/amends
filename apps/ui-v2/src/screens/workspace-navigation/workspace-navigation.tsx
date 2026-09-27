@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import {
   IconMarkAgents,
   IconMarkChannel,
@@ -14,6 +14,8 @@ import {
   IconMessage,
 } from "@amends/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
+import { Menu } from "../../components/menu/index.ts";
+import { Keyed } from "../../internal/keyed.tsx";
 import type { TaskState } from "../../components/task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { Rail } from "../../patterns/rail/index.ts";
@@ -46,6 +48,10 @@ export interface NavigationGroup extends NavigationLink {
   readonly name: string;
   /** Open threads and tasks shown under the group. */
   readonly threads?: readonly NavigationThread[];
+  /** Notifications addressed to the reader from the group. */
+  readonly pending?: number;
+  /** Activity the reader has not seen. */
+  readonly unread?: boolean;
 }
 
 export interface NavigationDirect extends NavigationLink {
@@ -53,6 +59,23 @@ export interface NavigationDirect extends NavigationLink {
   readonly name: string;
   readonly initials?: string;
   readonly tone?: AvatarToneName;
+  /** Notifications addressed to the reader from the conversation. */
+  readonly pending?: number;
+  /** Activity the reader has not seen. */
+  readonly unread?: boolean;
+}
+
+export type Appearance = "system" | "light" | "dark";
+
+/** The account menu the rail's avatar opens. */
+export interface AccountMenu {
+  /** The address the reader signs in with. */
+  readonly identity: string;
+  readonly appearance: Appearance;
+  readonly onAppearanceChange: (appearance: Appearance) => void;
+  readonly onOpenSettings: () => void;
+  readonly onChangeName: () => void;
+  readonly onSignOut: () => void;
 }
 
 export interface WorkspaceNavigationProps {
@@ -61,9 +84,14 @@ export interface WorkspaceNavigationProps {
     readonly name: string;
     readonly initials?: string;
     readonly tone?: AvatarToneName;
+    /** Opens from the avatar, in place of `onOpenAccount`. */
+    readonly menu?: AccountMenu;
   };
   readonly homeHref: string;
-  readonly destination: Destination;
+  /** The rail's destinations. Default all four. */
+  readonly destinations?: readonly Destination[];
+  /** The current destination, if the page is one. */
+  readonly destination?: Destination;
   readonly destinationHref: (destination: Destination) => string;
   readonly settings: NavigationLink;
   readonly inbox: NavigationLink & { readonly unread?: number };
@@ -73,11 +101,13 @@ export interface WorkspaceNavigationProps {
   readonly groupsDirectory: NavigationLink;
   readonly groups: readonly NavigationGroup[];
   readonly directMessages: readonly NavigationDirect[];
-  readonly onSearch: () => void;
+  /** Shows the rail's Search and the sidebar's "Find anything". */
+  readonly onSearch?: () => void;
   readonly onSwitchWorkspace: () => void;
-  readonly onOpenAccount: () => void;
+  readonly onOpenAccount?: () => void;
   readonly onBrowseGroups: () => void;
-  readonly onCreateGroup: () => void;
+  /** Shows Create group, for readers who may create groups. */
+  readonly onCreateGroup?: () => void;
   readonly onNewMessage: () => void;
 }
 
@@ -88,7 +118,13 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
       <Rail.Root>
         <Rail.Brand href={props.homeHref} />
         <Rail.List>
-          <For each={destinations}>
+          <For
+            each={destinations.filter((destination) =>
+              (props.destinations ?? destinations.map((entry) => entry.id)).includes(
+                destination.id,
+              ),
+            )}
+          >
             {(destination) => (
               <Rail.Item
                 href={props.destinationHref(destination.id)}
@@ -98,7 +134,11 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
               />
             )}
           </For>
-          <Rail.Item icon={IconMarkSearch} label="Search" onClick={() => props.onSearch()} />
+          <Show when={props.onSearch}>
+            {(search) => (
+              <Rail.Item icon={IconMarkSearch} label="Search" onClick={() => search()()} />
+            )}
+          </Show>
         </Rail.List>
         <Rail.Footer>
           <Rail.Item
@@ -107,12 +147,47 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
             label="Settings"
             current={props.settings.current}
           />
-          <Rail.Account
-            name={props.account.name}
-            initials={props.account.initials}
-            tone={props.account.tone}
-            onClick={() => props.onOpenAccount()}
-          />
+          <Show
+            when={props.account.menu}
+            fallback={
+              <Rail.Account
+                name={props.account.name}
+                initials={props.account.initials}
+                tone={props.account.tone}
+                onClick={() => props.onOpenAccount?.()}
+              />
+            }
+          >
+            {(menu) => (
+              <Menu.Root placement="right-end">
+                <Rail.Account
+                  menu
+                  name={props.account.name}
+                  initials={props.account.initials}
+                  tone={props.account.tone}
+                />
+                <Menu.Content>
+                  <Menu.Header title={props.account.name} detail={menu().identity} />
+                  <Menu.Separator />
+                  <Menu.RadioGroup
+                    label="Appearance"
+                    value={menu().appearance}
+                    onChange={(value) => menu().onAppearanceChange(value as Appearance)}
+                  >
+                    <Menu.RadioItem value="system">System</Menu.RadioItem>
+                    <Menu.RadioItem value="light">Light</Menu.RadioItem>
+                    <Menu.RadioItem value="dark">Dark</Menu.RadioItem>
+                  </Menu.RadioGroup>
+                  <Menu.Separator />
+                  <Menu.Item onSelect={() => props.onSwitchWorkspace()}>Switch workspace</Menu.Item>
+                  <Menu.Item onSelect={() => menu().onOpenSettings()}>Workspace settings</Menu.Item>
+                  <Menu.Item onSelect={() => menu().onChangeName()}>Change your name…</Menu.Item>
+                  <Menu.Separator />
+                  <Menu.Item onSelect={() => menu().onSignOut()}>Sign out</Menu.Item>
+                </Menu.Content>
+              </Menu.Root>
+            )}
+          </Show>
         </Rail.Footer>
       </Rail.Root>
       <Sidebar.Root aria-label="Workspace">
@@ -122,9 +197,13 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
             initials={props.workspace.initials}
             onClick={() => props.onSwitchWorkspace()}
           />
-          <Sidebar.Search shortcut="⌘ K" onClick={() => props.onSearch()}>
-            Find anything…
-          </Sidebar.Search>
+          <Show when={props.onSearch}>
+            {(search) => (
+              <Sidebar.Search shortcut="⌘ K" onClick={() => search()()}>
+                Find anything…
+              </Sidebar.Search>
+            )}
+          </Show>
         </Sidebar.Header>
         <Sidebar.Body>
           <Sidebar.List>
@@ -166,21 +245,32 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                 size="compact"
                 onClick={() => props.onBrowseGroups()}
               />
-              <IconButton
-                icon={IconMarkNew}
-                label="Create group"
-                size="compact"
-                onClick={() => props.onCreateGroup()}
-              />
+              <Show when={props.onCreateGroup}>
+                {(create) => (
+                  <IconButton
+                    icon={IconMarkNew}
+                    label="Create group"
+                    size="compact"
+                    onClick={() => create()()}
+                  />
+                )}
+              </Show>
             </Sidebar.SectionHeader>
             <Sidebar.List>
-              <For each={props.groups}>
+              <Keyed each={props.groups} by={(group) => group.id}>
                 {(group) => (
                   <>
-                    <Sidebar.Item href={group.href} icon={IconMarkChannel} current={group.current}>
-                      {group.name}
+                    <Sidebar.Item
+                      href={group().href}
+                      icon={IconMarkChannel}
+                      current={group().current}
+                      count={group().pending || undefined}
+                      countLabel={`${group().pending ?? 0} for you`}
+                      unread={group().unread}
+                    >
+                      {group().name}
                     </Sidebar.Item>
-                    <For each={group.threads}>
+                    <For each={group().threads}>
                       {(thread) => (
                         <Sidebar.SubItem
                           href={thread.href}
@@ -194,7 +284,7 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                     </For>
                   </>
                 )}
-              </For>
+              </Keyed>
             </Sidebar.List>
           </Sidebar.Section>
           <Sidebar.Section>
@@ -207,17 +297,24 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
               />
             </Sidebar.SectionHeader>
             <Sidebar.List>
-              <For each={props.directMessages}>
+              <Keyed each={props.directMessages} by={(direct) => direct.id}>
                 {(direct) => (
                   <Sidebar.Item
-                    href={direct.href}
-                    current={direct.current}
-                    person={{ name: direct.name, initials: direct.initials, tone: direct.tone }}
+                    href={direct().href}
+                    current={direct().current}
+                    person={{
+                      name: direct().name,
+                      initials: direct().initials,
+                      tone: direct().tone,
+                    }}
+                    count={direct().pending || undefined}
+                    countLabel={`${direct().pending ?? 0} for you`}
+                    unread={direct().unread}
                   >
-                    {direct.name}
+                    {direct().name}
                   </Sidebar.Item>
                 )}
-              </For>
+              </Keyed>
             </Sidebar.List>
           </Sidebar.Section>
         </Sidebar.Body>

@@ -1,4 +1,4 @@
-import { createUniqueId } from "solid-js";
+import { Show, createUniqueId } from "solid-js";
 import { Button } from "../../components/button/index.ts";
 import { Choice } from "../../components/choice/index.ts";
 import { Field } from "../../components/field/index.ts";
@@ -6,8 +6,16 @@ import { Input } from "../../components/input/index.ts";
 import { MemberPicker, type PickerPerson } from "../../components/member-picker/index.ts";
 import { Modal } from "../../patterns/modal/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
-import type { GroupVisibility } from "./group-settings.tsx";
+import type { GroupChangeError, GroupVisibility } from "./group-settings.tsx";
 import * as s from "./settings.css.ts";
+
+const createErrors: { readonly [Error in GroupChangeError]: string } = {
+  changed: "Something changed while you were choosing. Try again.",
+  denied: "You can no longer create groups here.",
+  gone: "Someone you added is no longer in this workspace. Remove them and try again.",
+  invalid: "Check the name and try again.",
+  failed: "The group could not be created. Try again when the host is available.",
+};
 
 export interface CreateGroupProps {
   readonly open: boolean;
@@ -23,6 +31,8 @@ export interface CreateGroupProps {
   readonly selected: readonly string[];
   readonly onSelectedChange: (ids: string[]) => void;
   readonly creating?: boolean;
+  /** Why the last attempt failed; the form stays for another try. */
+  readonly error?: GroupChangeError;
   readonly onCreate: () => void;
 }
 
@@ -89,6 +99,9 @@ export function CreateGroup(props: CreateGroupProps) {
                 onSelectedChange={props.onSelectedChange}
               />
             </Field.Root>
+            <Show when={props.error}>
+              {(error) => <Field.Alert>{createErrors[error()]}</Field.Alert>}
+            </Show>
           </form>
         </Pane.Body>
         <Modal.Actions>

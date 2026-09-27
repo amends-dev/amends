@@ -113,9 +113,9 @@ The [SignInEmailForm](../apps/ui/src/features/sign-in/README.md) tests cover con
 drafts, native and caller-supplied validation, pending guards, retry, and reset ownership.
 Validation, Request Recovery, and Layout run as portable stories. Browser review covers
 real Enter/Tab, focus retention, inherited disabled-fieldset submission, both themes,
-RTL, long content, enlarged text, and accessibility. These are presentation fixtures;
-the [feature workshop](../apps/features/README.md) verifies the connected flow
-through the real HTTP host and PostgreSQL.
+RTL, long content, enlarged text, and accessibility. These previous-UI forms no longer back the
+apps: sign-in now renders the [UI v2](../apps/ui-v2/README.md) screens, whose stories and the app
+route tests cover the flow.
 SignInCodeForm adds portable scenarios for validation, verification recovery, resend
 failure/retry, changing email while pending, and resizing. DOM/type checks cover
 exclusive pending actions, explicit submission, leading zeros, caller-owned feedback,
@@ -354,13 +354,12 @@ abort. It covers contract validation, payloads, rejection reasons, malformed ses
 responses, explicit retry/resend, duplicate guards, and session installation. Explicit
 response resolvers and observable abort signals verify email changes, form disposal,
 credential replacement, and concurrent controllers without sleeps. These headless
-tests complement the connected feature scenarios below.
+tests complement the app route tests.
 
-The features suite runs the same eight Storybook play scenarios against the real
-local HTTP handlers, gateway, development authentication, and PostgreSQL. Each
-scenario owns a temporary database, captured codes, and an in-memory session.
-Success also validates the credential against the directory. Request gates and an
-auth-only clock offset exercise pending work, expiry, and recovery without sleeps.
+The features suite runs its Storybook play scenarios, for the Inbox and the Settings pages,
+against the real local HTTP handlers, gateway, development authentication, and PostgreSQL. Each
+scenario owns a temporary database, captured codes, and an in-memory session. Request gates and
+host controls exercise pending work and recovery without sleeps.
 The subprocess fixture disables environment-file loading and ignores
 `AMENDS_DATABASE_URL`; PostgreSQL discovery uses `AMENDS_POSTGRES_URL` or a local
 installation, and fails clearly if neither exists. Tests close scenarios before

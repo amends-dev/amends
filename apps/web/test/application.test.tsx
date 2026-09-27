@@ -169,7 +169,7 @@ it("keeps an unknown workspace page inside the workspace, with a way back home",
     Promise.resolve(response({ memberships: [membership("one", "Studio")], invitations: [] })),
   );
   await screen.findByRole("heading", { name: "Nothing on this page" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBeInTheDocument();
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Workspace home" }));
   await screen.findByRole("heading", { name: "Home" });
   expect(history.get()).toBe("/workspaces/one");
@@ -211,7 +211,7 @@ it("resolves active workspace scope from the directory and updates it during nav
     Promise.resolve(response(listing)),
   );
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "First workspace",
   );
   history.set({ value: "/workspaces/two", scroll: false });
@@ -250,7 +250,7 @@ it("resumes a safe return path only after a stored session validates", async () 
       ),
   );
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "First workspace",
   );
   expect(history.get()).toBe("/workspaces/one");
@@ -291,7 +291,7 @@ it("signs in through the composed page and validates before resuming the intende
     response({ memberships: [membership("one", "First workspace")], invitations: [] }),
   );
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "First workspace",
   );
   expect(history.get()).toBe("/workspaces/one?tab=members");
@@ -372,14 +372,12 @@ it("retains a created workspace through directory failure and navigates after re
   expect(history.get()).toBe("/workspaces/new");
   fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
-    "Studio",
-  );
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Studio");
   expect(history.get()).toBe("/workspaces/one");
   expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
 
-it("keeps the sidebar and account trigger mounted across workspace pages and switches", async () => {
+it("keeps the sidebar and account trigger mounted across workspace pages, and rebuilds them for another workspace", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const path = new URL(new Request(input, init).url).pathname;
     const entry = membership("two", "Other studio");
@@ -412,30 +410,25 @@ it("keeps the sidebar and account trigger mounted across workspace pages and swi
   });
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByText("Workspace / Home")).toBeInTheDocument();
-  expect(screen.getByRole("main", { name: "Home" }).querySelector("h1, h2")).toBeNull();
-  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
-  const trigger = screen.getByRole("button", { name: "Your account: alice" });
+  const sidebar = screen.getByRole("navigation", { name: "Workspace" });
+  const trigger = screen.getByRole("button", { name: "Account: alice" });
   fireEvent.click(screen.getByRole("link", { name: "Tasks" }));
   await screen.findByRole("heading", { name: "Tasks" });
-  expect(screen.getByText("Workspace / Tasks")).toBeInTheDocument();
   expect(history.get()).toBe("/workspaces/one/tasks");
   expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("aria-current", "page");
-  expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
-  expect(screen.getByRole("button", { name: "Your account: alice" })).toBe(trigger);
+  // Tasks is part of Home, the rail's destination.
+  expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toBe(sidebar);
+  expect(screen.getByRole("button", { name: "Account: alice" })).toBe(trigger);
   for (const page of ["Triage", "Environments", "Connections"] as const) {
     fireEvent.click(screen.getByRole("link", { name: page }));
     await screen.findByRole("heading", { name: page });
-    expect(
-      screen.getByText(`${page === "Triage" ? "Workspace" : "Configure"} / ${page}`),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("main", { name: page }).querySelector("h1, h2")).toBeNull();
   }
+  expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "true");
   history.set({ value: "/workspaces/two/settings", scroll: false });
-  await screen.findByRole("heading", { name: "Workspace" });
-  expect(screen.getByText("Configure / Settings")).toBeInTheDocument();
-  expect(sidebar).toHaveTextContent("Other studio");
+  await screen.findByRole("heading", { name: "Settings" });
+  // Another workspace gets its own shell, reading its own groups and names.
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
   // The directory, then the second workspace's settings and ownership; the feed stays separate.
@@ -455,13 +448,11 @@ it("preserves a nested destination through sign-in and denies unavailable worksp
   expect(history.get()).toBe("/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftasks%3Ffilter%3Dmine");
   fixture.change(session("alice"));
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
-  expect(
-    screen.queryByRole("complementary", { name: "Workspace sidebar" }),
-  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("navigation", { name: "Workspace" })).not.toBeInTheDocument();
   expect(history.get()).toBe("/workspaces/one/tasks?filter=mine");
 });
 
-it("redirects the Settings entry to its workspace section and keeps sidebar selection on descendants", async () => {
+it("redirects the Settings entry to its workspace section and keeps the rail's selection on descendants", async () => {
   const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
   const member = {
     id: "owner",
@@ -498,13 +489,12 @@ it("redirects the Settings entry to its workspace section and keeps sidebar sele
   const history = mount("/workspaces/one/settings", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(history.get()).toBe("/workspaces/one/settings/workspace");
-  expect(
-    screen.getByRole("navigation", { name: "Workspace" }).querySelector("a[aria-current=page]"),
-  ).toHaveTextContent("Settings");
+  expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
   expect(screen.getByRole("radio", { name: "Workspace" })).toBeChecked();
   fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/settings/members"));
   expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
+  expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
 });
 
 function liveWorkspace(options: { name: () => string; status?: () => string }) {
@@ -542,7 +532,7 @@ it("shows a rename committed elsewhere without a reload, keeping the draft being
     liveWorkspace({ name: () => name }),
   );
   const input = await screen.findByRole("textbox", { name: "Workspace name" });
-  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
+  const sidebar = screen.getByRole("navigation", { name: "Workspace" });
   expect(input).toHaveValue("Studio");
   fireEvent.input(input, { target: { value: "My draft" } });
   name = "Atelier";
@@ -697,20 +687,21 @@ it("shows a group's stream at its route and an open thread beside it", async () 
     memoryStore(session("alice")).store,
     fetch,
   );
-  const stream = await screen.findByRole("region", { name: "Conversation" });
-  await within(stream).findByText("Can you look at the terms?");
-  expect(screen.getByText("Workspace / Groups")).toBeInTheDocument();
-  const link = within(stream).getByRole("link", { name: /^1 reply/ });
-  expect(link).toHaveAttribute("href", "/workspaces/one/groups/g1/threads/t1");
-  expect(link).toHaveAttribute("aria-current", "page");
-  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  await screen.findByRole("navigation", { name: "Workspace" });
+  const main = screen.getByRole("main");
+  const opening = (await within(main).findByText("Can you look at the terms?")).closest("article");
+  const replies = screen.getByRole("button", { name: /1 reply/ });
+  expect(replies).toHaveAttribute("aria-expanded", "true");
+  const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("On it.");
-  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g1"));
-  await waitFor(() => expect(screen.queryByRole("region", { name: "Thread messages" })).toBeNull());
-  expect(link).not.toHaveAttribute("aria-current");
+  await waitFor(() => expect(screen.queryByLabelText("Thread", { selector: "aside" })).toBeNull());
+  expect(replies).toHaveAttribute("aria-expanded", "false");
   // The stream stays mounted while threads open and close beside it.
-  expect(screen.getByRole("region", { name: "Conversation" })).toBe(stream);
+  expect(within(main).getByText("Can you look at the terms?").closest("article")).toBe(opening);
+  fireEvent.click(replies);
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g1/threads/t1"));
 });
 
 /** One pending mention of the reader in thread t1, as their inbox lists it. */
@@ -752,13 +743,13 @@ it("lists the inbox at its route, opens a thread beside it, and marks one seen",
     );
   });
   const history = mount("/workspaces/one/inbox", memoryStore(session("alice")).store, fetch);
-  const list = await screen.findByRole("list", { name: "Notifications" });
+  await screen.findByRole("navigation", { name: "Workspace" });
+  const list = await within(screen.getByRole("main")).findByRole("list", { name: "Notifications" });
   await within(list).findByText("On it.");
   expect(within(list).getByText(/mentioned you/)).toBeInTheDocument();
   expect(within(list).getByRole("img", { name: "unread" })).toBeInTheDocument();
-  expect(screen.getByText("Workspace / Inbox")).toBeInTheDocument();
   const sidebar = screen.getByRole("navigation", { name: "Workspace" });
-  const destination = within(sidebar).getByRole("link", { name: "Inbox" });
+  const destination = within(sidebar).getByRole("link", { name: /^Inbox/ });
   expect(destination).toHaveAttribute("aria-current", "page");
   const open = within(list).getByRole("link", { name: "Open thread" });
   // It opens the thread at the message that notified the reader.
@@ -767,18 +758,15 @@ it("lists the inbox at its route, opens a thread beside it, and marks one seen",
   await waitFor(() =>
     expect(history.get()).toBe("/workspaces/one/inbox/groups/g1/threads/t1?at=2"),
   );
-  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("Can you look at the terms?");
   // The message that notified the reader is set apart.
   await waitFor(() =>
-    expect(within(thread).getByText("On it.").closest("li")).toHaveAttribute(
-      "data-focused",
-      "true",
-    ),
+    expect(within(thread).getByText("On it.").closest("article")).toHaveAttribute("data-active"),
   );
-  expect(within(thread).getByText("Can you look at the terms?").closest("li")).not.toHaveAttribute(
-    "data-focused",
-  );
+  expect(
+    within(thread).getByText("Can you look at the terms?").closest("article"),
+  ).not.toHaveAttribute("data-active");
   expect(open).toHaveAttribute("aria-current", "page");
   // The inbox stays the current destination while a thread is open beside it.
   expect(destination).toHaveAttribute("aria-current", "page");
@@ -786,11 +774,11 @@ it("lists the inbox at its route, opens a thread beside it, and marks one seen",
   await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
   expect(acknowledged).toEqual(["/workspaces/one/notifications/n1/acknowledge"]);
   expect(within(list).queryByRole("button", { name: "Mark seen" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/inbox"));
-  await waitFor(() => expect(screen.queryByRole("region", { name: "Thread messages" })).toBeNull());
+  await waitFor(() => expect(screen.queryByLabelText("Thread", { selector: "aside" })).toBeNull());
   // The inbox stays mounted while threads open and close beside it.
-  expect(screen.getByRole("list", { name: "Notifications" })).toBe(list);
+  expect(within(screen.getByRole("main")).getByRole("list", { name: "Notifications" })).toBe(list);
 });
 
 it("offers a new group only to those who may create one, and opens the group it creates", async () => {
@@ -820,16 +808,16 @@ it("offers a new group only to those who may create one, and opens the group it 
     permissions: ["group.create"],
   });
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
-  fireEvent.click(await within(sidebar).findByRole("button", { name: "New group" }));
-  const dialog = await screen.findByRole("dialog", { name: "New group" });
-  fireEvent.input(within(dialog).getByRole("textbox", { name: "Name" }), {
+  fireEvent.click(await within(sidebar).findByRole("button", { name: "Create group" }));
+  const dialog = await screen.findByRole("dialog", { name: "Create group" });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Group name" }), {
     target: { value: "Receipts" },
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "Create group" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g2"));
   // The reader is always a member of a group they create.
   expect(created).toEqual([{ name: "Receipts", memberIds: ["owner-one"], visibility: "Private" }]);
-  await screen.findByText("Nothing said yet");
+  await screen.findByText("Group created");
 });
 it("browses public groups from the sidebar, and joining one opens it", async () => {
   const joins: Array<string> = [];
@@ -864,11 +852,11 @@ it("browses public groups from the sidebar, and joining one opens it", async () 
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
   // Anyone may browse, even before belonging to any group.
-  fireEvent.click(await within(sidebar).findByRole("link", { name: /Browse groups/ }));
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups"));
-  await screen.findByRole("heading", { name: "Browse groups" });
+  fireEvent.click(await within(sidebar).findByRole("button", { name: "Browse groups" }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups?tab=discover"));
+  await screen.findByRole("heading", { name: "Groups" });
   await waitFor(() =>
-    expect(within(sidebar).getByRole("link", { name: /Browse groups/ })).toHaveAttribute(
+    expect(within(sidebar).getByRole("link", { name: "Groups" })).toHaveAttribute(
       "aria-current",
       "page",
     ),
@@ -885,8 +873,8 @@ it("shows no new group action to a reader who may not create one", async () => {
   );
   mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("navigation", { name: "Workspace" });
-  await screen.findByText("Workspace / Home");
-  expect(screen.queryByRole("button", { name: "New group" })).toBeNull();
+  await screen.findByRole("heading", { name: "Home" });
+  expect(screen.queryByRole("button", { name: "Create group" })).toBeNull();
 });
 
 /** Group g1 in the reader's sidebar, as someone who manages its members. */
@@ -945,19 +933,20 @@ it("manages a group's members from its header, and leaving returns to the worksp
     { groups: [managed] },
   );
   fireEvent.click(await screen.findByRole("button", { name: "2 members" }));
-  const dialog = await screen.findByRole("dialog", { name: "Members" });
+  const dialog = await screen.findByRole("dialog", { name: "Group settings" });
   const list = within(dialog).getByRole("list", { name: "Members" });
   await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2));
-  expect(within(dialog).getByRole("combobox", { name: "Add people" })).toBeInTheDocument();
-  const [own, other] = within(list).getAllByRole("listitem");
-  // Removing asks first, then removes.
-  fireEvent.click(within(other!).getByRole("button", { name: "Remove" }));
-  fireEvent.click(within(other!).getByRole("button", { name: "Remove" }));
+  expect(within(dialog).getByRole("combobox", { name: "Add members" })).toBeInTheDocument();
+  // The reader is listed as "You", with no way to remove themselves from the list.
+  const [own] = within(list).getAllByRole("listitem");
+  expect(own).toHaveTextContent("You");
+  expect(within(own!).queryByRole("button")).toBeNull();
+  fireEvent.click(within(list).getByRole("button", { name: /^Remove / }));
   await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(1));
-  fireEvent.click(within(own!).getByRole("button", { name: "Leave" }));
-  fireEvent.click(within(own!).getByRole("button", { name: "Leave" }));
+  // Leaving is on the General tab.
+  fireEvent.click(within(dialog).getByRole("button", { name: "General" }));
+  fireEvent.click(await within(dialog).findByRole("button", { name: "Leave group" }));
   await waitFor(() => expect(changes).toEqual(["remove a2", "leave a1"]));
-  console.log("DEBUG", own!.textContent, screen.queryByRole("alert")?.textContent);
   await waitFor(() => expect(history.get()).toBe("/workspaces/one"));
   expect(changes).toEqual(["remove a2", "leave a1"]);
 });
@@ -986,18 +975,18 @@ it("drafts a first message to someone new and opens the conversation it starts",
     memoryStore(session("alice")).store,
     fetch,
   );
-  await screen.findByText("Workspace / Direct");
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
   // Everyone may start a direct message.
   expect(within(sidebar).getByRole("button", { name: "New message" })).toBeInTheDocument();
-  const composer = await screen.findByRole("textbox", { name: /^Message / });
+  await screen.findByText("Send the first message to start the conversation.");
+  const composer = await screen.findByRole("combobox", { name: /^Message / });
   fireEvent.input(composer, { target: { value: "Are you free?" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g9"));
   expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }]);
 });
 
-it("renames a group from beside its name", async () => {
+it("renames a group from its settings", async () => {
   let name = "Design",
     expectedName: string | undefined;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -1015,12 +1004,12 @@ it("renames a group from beside its name", async () => {
     groups: [managed],
   });
   await screen.findByRole("heading", { name: "Design" });
-  fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
-  const dialog = await screen.findByRole("dialog", { name: "Rename group" });
-  const field = within(dialog).getByRole("textbox", { name: "Name" });
+  fireEvent.click(await screen.findByRole("button", { name: "Group settings" }));
+  const dialog = await screen.findByRole("dialog", { name: "Group settings" });
+  const field = within(dialog).getByRole("textbox", { name: "Group name" });
   expect(field).toHaveValue("Design");
   fireEvent.input(field, { target: { value: "Product design" } });
-  fireEvent.click(within(dialog).getByRole("button", { name: "Save name" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
   await waitFor(() => expect(name).toBe("Product design"));
   // It renames from the name the dialog started from, so a rename made meanwhile is not lost.
   expect(expectedName).toBe("Design");

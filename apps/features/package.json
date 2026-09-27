@@ -4,8 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./account": "./src/account/index.ts",
-    "./live": "./src/live/index.ts",
     "./settings": "./src/settings/index.ts",
     "./conversations": "./src/conversations/index.ts"
   },

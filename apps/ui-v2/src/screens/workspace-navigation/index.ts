@@ -1,5 +1,7 @@
 export {
   WorkspaceNavigation,
+  type AccountMenu,
+  type Appearance,
   type Destination,
   type NavigationDirect,
   type NavigationGroup,

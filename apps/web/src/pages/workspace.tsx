@@ -1,40 +1,89 @@
 import { paths } from "@amends/client";
-import { EmptyState } from "@amends/ui/compositions/empty-state";
-import { Button } from "@amends/ui/primitives/button";
-import { Drawing } from "@amends/ui/primitives/drawing";
-import { Text } from "@amends/ui/primitives/text";
+import { Button } from "@amends/ui-v2/components/button";
+import { EmptyState } from "@amends/ui-v2/components/empty-state";
+import { Pane } from "@amends/ui-v2/patterns/pane";
+import { Shell } from "@amends/ui-v2/patterns/shell";
 import { useNavigate, useParams } from "@solidjs/router";
+import type { JSX } from "solid-js";
+
+/** A workspace page that is still a placeholder: its title and what it will hold. */
+function Placeholder(props: {
+  readonly title: string;
+  /** What the page will hold. */
+  readonly heading: string;
+  readonly line: string;
+  readonly children?: JSX.Element;
+}) {
+  return (
+    <Pane.Root>
+      <Pane.Header>
+        <Shell.NavigationToggle />
+        <Pane.Title>{props.title}</Pane.Title>
+      </Pane.Header>
+      <Pane.Body>
+        <EmptyState title={props.heading} lines={[props.line]}>
+          {props.children}
+        </EmptyState>
+      </Pane.Body>
+    </Pane.Root>
+  );
+}
 
 export function HomePage() {
-  return <Text tone="secondary">Your workspace is ready. Work and activity will appear here.</Text>;
+  return (
+    <Placeholder
+      title="Home"
+      heading="Your workspace is ready"
+      line="Work and activity will appear here."
+    />
+  );
 }
 export function TriagePage() {
-  return <Text tone="secondary">A place to review what needs your attention.</Text>;
+  return (
+    <Placeholder
+      title="Triage"
+      heading="Nothing to triage"
+      line="A place to review what needs your attention."
+    />
+  );
 }
 export function TasksPage() {
-  return <Text tone="secondary">A place to track work and follow its progress.</Text>;
+  return (
+    <Placeholder
+      title="Tasks"
+      heading="No tasks yet"
+      line="A place to track work and follow its progress."
+    />
+  );
 }
 export function EnvironmentsPage() {
-  return <Text tone="secondary">Configure where your agents work.</Text>;
+  return (
+    <Placeholder
+      title="Environments"
+      heading="No environments yet"
+      line="Configure where your agents work."
+    />
+  );
 }
 export function ConnectionsPage() {
-  return <Text tone="secondary">Manage the services your workspace connects to.</Text>;
+  return (
+    <Placeholder
+      title="Connections"
+      heading="No connections yet"
+      line="Manage the services your workspace connects to."
+    />
+  );
 }
 export function MissingWorkspacePage() {
   const params = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   return (
-    <EmptyState.Root>
-      <Drawing.Bare />
-      <EmptyState.Text>
-        <EmptyState.Title>Nothing on this page</EmptyState.Title>
-        <EmptyState.Description>This page doesn’t exist in the workspace.</EmptyState.Description>
-      </EmptyState.Text>
-      <EmptyState.Actions>
-        <Button onClick={() => navigate(paths.workspace(params.workspaceId))}>
-          Workspace home
-        </Button>
-      </EmptyState.Actions>
-    </EmptyState.Root>
+    <Placeholder
+      title="Not found"
+      heading="Nothing on this page"
+      line="This page doesn’t exist in the workspace."
+    >
+      <Button onClick={() => navigate(paths.workspace(params.workspaceId))}>Workspace home</Button>
+    </Placeholder>
   );
 }

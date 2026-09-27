@@ -1,7 +1,24 @@
-import { paths } from "@amends/client";
-import { GroupStream } from "@amends/features/conversations";
-import { useParams } from "@solidjs/router";
-import { Show } from "solid-js";
+import {
+  paths,
+  useGroupConversation,
+  useGroupFollow,
+  useGroupMembers,
+  useGroupPeople,
+  useMentionCandidates,
+  useNewThread,
+  useRenameGroup,
+  useWorkspace,
+  useWorkspaceGroups,
+} from "@amends/client";
+import {
+  GroupPane,
+  GroupSettings,
+  GroupThreads,
+  type GroupSettingsTab,
+} from "@amends/ui-v2/screens/group";
+import { useNavigate, useParams } from "@solidjs/router";
+import { createSignal, Show } from "solid-js";
+import { pickerPerson } from "../workspace-layout.tsx";
 
 const href = (path: string) => path;
 /** A group's stream; the workspace layout shows an open thread beside it. */
@@ -10,14 +27,131 @@ export function GroupPage() {
   return (
     <Show when={params.groupId} keyed>
       {(groupId) => (
-        <GroupStream
+        <Group
           workspaceId={params.workspaceId}
           groupId={groupId}
-          label="Conversation"
-          threadHref={(threadId) => href(paths.thread(params.workspaceId, groupId, threadId))}
-          currentThread={params.threadId}
+          openThread={() => params.threadId}
         />
       )}
     </Show>
+  );
+}
+
+function Group(props: {
+  readonly workspaceId: string;
+  readonly groupId: string;
+  readonly openThread: () => string | undefined;
+}) {
+  const { workspaceId, groupId } = props;
+  const navigate = useNavigate();
+  const workspace = useWorkspace(() => workspaceId);
+  const groups = useWorkspaceGroups(workspaceId);
+  const group = () => groups.group(groupId);
+  const conversation = useGroupConversation(workspaceId, groupId);
+  const composer = useNewThread(workspaceId, groupId);
+  const candidates = useMentionCandidates(workspaceId, groupId);
+  const follow = useGroupFollow(workspaceId, groupId);
+  const [selected, setSelected] = createSignal<string[]>([]);
+  const members = useGroupMembers(workspaceId, groupId, {
+    added: () => setSelected([]),
+    left: () => navigate(paths.workspace(workspaceId)),
+  });
+  const people = useGroupPeople(workspaceId, members);
+  const [settings, setSettings] = createSignal<GroupSettingsTab>();
+  const rename = useRenameGroup(workspaceId, groupId, () => setSettings(undefined));
+  const open = (tab: GroupSettingsTab) => {
+    rename.reset();
+    setSelected([]);
+    setSettings(tab);
+  };
+  const name = () => group()?.name ?? "";
+  const direct = () => group()?.kind === "direct";
+  return (
+    <>
+      <GroupPane
+        name={name()}
+        kind={group()?.kind}
+        workspaceName={workspace()?.workspace.name ?? ""}
+        members={people.roster().slice(0, 3)}
+        memberCount={people.roster().length}
+        tabs={["threads"]}
+        tab="threads"
+        tabHref={() => href(paths.group(workspaceId, groupId))}
+        onOpenMembers={() => open("members")}
+        follow={
+          follow.followable() && follow.following() !== undefined
+            ? {
+                following: follow.following() ?? false,
+                pending: follow.pending(),
+                onToggle: follow.toggle,
+              }
+            : undefined
+        }
+        onOpenSettings={direct() ? undefined : () => open("general")}
+      >
+        <GroupThreads
+          entries={conversation.entries()}
+          days
+          status={conversation.status()}
+          onRetry={conversation.retry}
+          earlier={
+            conversation.earlier()
+              ? { loading: conversation.loadingEarlier(), onLoad: conversation.loadEarlier }
+              : undefined
+          }
+          openThreadId={props.openThread()}
+          onOpenThread={(threadId) => navigate(paths.thread(workspaceId, groupId, threadId))}
+          welcome={
+            group()
+              ? {
+                  groupName: name(),
+                  memberNames: people.roster().map((person) => (person.you ? "You" : person.name)),
+                  direct: direct(),
+                }
+              : undefined
+          }
+          placeholder={direct() ? `Message ${name()}` : `Message #${name()}`}
+          draft={composer.draft()}
+          onDraftChange={composer.setDraft}
+          onSend={() => composer.send()}
+          sending={composer.pending()}
+          sendError={composer.error()}
+          mentionCandidates={candidates()}
+          onMention={(candidate) => composer.mention(candidate.id, candidate.name)}
+        />
+      </GroupPane>
+      <GroupSettings
+        open={settings() !== undefined}
+        onClose={() => setSettings(undefined)}
+        kind={group()?.kind}
+        groupName={name()}
+        tab={settings() ?? "general"}
+        onTabChange={setSettings}
+        name={rename.name()}
+        onNameChange={rename.setName}
+        renamable={rename.renamable()}
+        saveError={rename.error()}
+        visibility={group()?.visibility ?? "private"}
+        onVisibilityChange={() => {}}
+        visibilityLocked
+        changed={rename.ready()}
+        saving={rename.pending()}
+        onSave={rename.save}
+        member
+        leavable={members.leavable()}
+        leaving={members.changing() !== undefined && members.changing() === members.own()?.id}
+        onLeave={members.leave}
+        members={people.roster()}
+        onRemove={members.remove}
+        removingId={members.changing()}
+        membersError={members.error()}
+        canAdd={members.manageable()}
+        candidates={people.candidates().map(pickerPerson)}
+        selected={selected()}
+        onSelectedChange={setSelected}
+        onAdd={() => members.add(selected())}
+        adding={members.changing() === "add"}
+      />
+    </>
   );
 }

@@ -6,6 +6,7 @@ export type {
   ReactionProps as MessageReactionProps,
   ReactionsProps as MessageReactionsProps,
   RepliesProps as MessageRepliesProps,
+  ReplyProps as MessageReplyProps,
   RootProps as MessageRootProps,
   TaskReferenceProps as MessageTaskReferenceProps,
   TextProps as MessageTextProps,

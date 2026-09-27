@@ -38,9 +38,10 @@ workspace-wide oversight of private groups or direct groups by design.
 
 ## Conversations in the apps
 
-Web and desktop list the reader's groups in the sidebar, show a group's stream of threads by
-their opening messages, and open a thread's messages in the inspector, all live over the change
-feed. The page composer starts a thread and the thread composer replies, keeping drafts per group
+Web and desktop run the workspace on the UI v2 shell: they list the reader's groups in the
+sidebar, show a group's stream of threads by their opening messages, and open a thread's messages
+in the side panel, all live over the change feed. A message with no replies offers "Reply in
+thread" while hovered or focused. The page composer starts a thread and the thread composer replies, keeping drafts per group
 and thread within the session, and both mention group members picked after `@`. A name typed
 without picking it addresses no one. An open thread is read through the newest activity it
 shows, and a visible group's stream catches the reader up with the group, clearing the stream's
@@ -48,8 +49,8 @@ unread dots, the sidebar's new-activity dot, and the pending counts of what was 
 while the page is visible. A thread counts as read when it opens, however far back the reader has
 scrolled. Someone writing a reply shows as typing in the thread panel and on the thread's row in
 the stream until their signal runs out or their message arrives; starting a thread sends no
-typing, since there is no thread yet. The thread panel follows and unfollows its thread, and a
-team group's page header follows the group so that threads started there afterwards include the
+typing, since there is no thread yet. The thread panel's bell follows and unfollows its thread, and a
+team group's header bell follows the group so that threads started there afterwards include the
 reader; following agents on someone's behalf has no control. The thread panel notes someone
 following the thread, stopping, leaving the group, or being removed, between its messages; joining
 by writing or being mentioned shows only in the message. A group's stream shows its threads, not
@@ -61,39 +62,40 @@ invitation, suggesting one from an email address, and the account menu changes i
 member names only themselves: nobody renames another member, and agents, which join through no
 app flow, have no way to be named from the apps. There are no profile photos.
 
-Everyone gets a "New group" action on the sidebar's Groups heading (every role holds
-`group.create`): a dialog names a team group, picks its people and agents
+Everyone gets "Create group" on the sidebar's Groups heading and the Groups page (every role holds
+`group.create`): a modal names a team group, picks its people and agents
 as chips, with the reader always included, and makes it private or public, then opens the new
-group. Everyone gets "Browse groups" in the same section, a page listing the public groups they may
-join by name with their member counts; joining one opens it, and one they belong to links there.
+group with a "Group created" note. The Groups heading links to the Groups page: Your groups, and
+Discover, the public groups the reader may join, with their member counts; joining one opens it.
+Private groups show no member count there, since the groups list does not carry one.
 New public groups appear on it live, while renames and member counts of groups the reader is not
 in update when it next loads. The apps read what the reader may do from
 `GET /workspaces/:id/permissions`, which lists workspace-wide permissions only.
 
-A group's header shows its member count, which opens its members: the reader first, then everyone
-by name. Any member of a team group adds people and agents with the chip picker (`manageable` on
-each item of their groups list); in a private group any member also removes others after a
-confirming second click, while in a public one only administrators and the owner do
-(`membersRemovable`). Anyone may leave a team group the same way, which returns them to the
-workspace home. Direct groups list their members without changes. Nobody manages a group they are
+A group's header shows its member stack, which opens Group settings on Members: the reader first as
+"You", then everyone by name. Any member of a team group adds people and agents with the member
+picker (`manageable` on each item of their groups list); in a private group any member also
+removes others, while in a public one only administrators and the owner do
+(`membersRemovable`). Anyone may leave a team group from its General tab, which returns them to
+the workspace home. Removing and leaving act on the first click, as the mocks show, where the
+previous UI asked for a second confirming click. Direct groups list their members without changes. Nobody manages a group they are
 not in: administrators moderate a public group by joining it. Leaving settles the reader's pending
 notifications from the group: they leave the Inbox count and its Unread filter at once and stay in
 All as history, noting the thread is no longer visible. A stream or thread open when the reader loses
 access, from any session, turns into an unavailable state rather than showing what it last read,
 and comes back if access returns.
 
-A team group's name has a quiet "Rename" beside it on its page for its members (every role holds
-`group.rename`), opening a dialog focused on the current name. The new name
-shows in the header, sidebar, and composer, and reaches other members over the change feed. A
-rename made elsewhere while the dialog is open refuses the save and names the new name; saving
-again replaces it knowingly.
+A team group's settings rename it for its members (every role holds `group.rename`), starting from
+the current name. The new name shows in the header, sidebar, and composer, and reaches other
+members over the change feed. A rename made elsewhere while settings are open refuses the save
+and says so; saving again replaces it knowingly. Visibility shows there but cannot change.
 
-Direct groups have their own Direct section in the sidebar, whose "+" offers everyone a New message
-dialog. Choosing people opens the conversation the reader already has with exactly them, or a
+Direct groups have their own Direct messages section in the sidebar, whose "+" offers everyone a
+New message modal. Choosing people opens the conversation the reader already has with exactly them, or a
 draft page at `/direct?to=…` whose first message starts it, creating their direct group; the group
 then replaces the draft in history. A draft keeps its text per set of people within the session.
-A direct group's page lists its members without changes, since its membership is fixed; including
-someone else means a new conversation.
+A direct group's member stack lists its members without changes, since its membership is fixed;
+including someone else means a new conversation.
 
 The Inbox destination lists the reader's notifications newest first, live, with the sidebar
 counting everything still pending for them: why each came (a mention, a reply in a followed
@@ -104,6 +106,10 @@ seen without opening it, "Mark all seen" marks everything through the newest one
 later arrivals stay unread, and the list narrows to what is unread. The inbox reads each listed
 notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
+
+Inbox and the Settings pages have no UI v2 design yet: they keep the previous UI's content inside
+a UI v2 pane, in its theme, until they are designed. The mocks' Agents destination, search, group
+Tasks and Files tabs, reactions, and task references have no backend and are not shown.
 
 ## Storage cost
 

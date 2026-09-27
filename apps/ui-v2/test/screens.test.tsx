@@ -42,6 +42,22 @@ import signInMeta, {
   SignInFlow,
   WithProviders,
 } from "../src/screens/sign-in/sign-in.stories.tsx";
+import dialogsMeta, {
+  ChangeNameFailed,
+  ChangeYourName,
+  NewMessageDialog,
+} from "../src/screens/account/dialogs.stories.tsx";
+import conversationMeta2, {
+  AccountMenu,
+  Failed,
+  Follow,
+  Loading,
+  Mentions,
+  OpenThread,
+  ReplyInThread,
+  Stream,
+  Unavailable,
+} from "../src/screens/group/conversation.stories.tsx";
 import standaloneMeta, {
   CheckingSession,
   Crashed,
@@ -215,5 +231,35 @@ describe("standalone screens", () => {
     await stories.story(WorkspaceInvited).run();
     await stories.story(WorkspaceRemoved).run();
     await stories.story(WorkspaceUnknown).run();
+  });
+});
+
+describe("live conversation", () => {
+  const stories = definePreview(preview).meta(conversationMeta2);
+  it("renders day seams, reply summaries, notes, typing, and states", async () => {
+    await stories.story(Stream).run();
+    await stories.story(OpenThread).run();
+    await stories.story(Loading).run();
+    await stories.story(Unavailable).run();
+    await stories.story(Failed).run();
+  });
+  it("replies in a thread with no replies yet", async () => {
+    await stories.story(ReplyInThread).run();
+  });
+  it("suggests people after @ and sends the mention", async () => {
+    await stories.story(Mentions).run();
+  });
+  it("follows the group and opens the account menu", async () => {
+    await stories.story(Follow).run();
+    await stories.story(AccountMenu).run();
+  });
+});
+
+describe("workspace dialogs", () => {
+  const stories = definePreview(preview).meta(dialogsMeta);
+  it("changes a name and chooses people to message", async () => {
+    await stories.story(ChangeYourName).run();
+    await stories.story(ChangeNameFailed).run();
+    await stories.story(NewMessageDialog).run();
   });
 });

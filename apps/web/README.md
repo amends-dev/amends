@@ -61,22 +61,25 @@ identity and Sign out to their headers. The route validates a new credential bef
 safe return path. Client and the UI packages never import each other. Route integration tests
 live in this app. Vite deduplicates Solid and compiles the shared vanilla-extract styles.
 
-Page compositions contain no inline styles or local stylesheets. Workspace pages still use
-the previous UI: `WorkspaceLayout` wraps them in its `ThemeProvider` and `Shell.Root`, and
-page-local `Shell.Body`, `Header`, `Main`, `Content`, and `Footer` declarations compose that
-frame. Visual gaps are evaluated and verified in the UI workshop before app consumption;
-`check:packages` rejects app-local styles.
+Page compositions contain no inline styles or local stylesheets. `src/workspace-layout.tsx` builds
+the workspace on the ui-v2 Shell: `WorkspaceNavigation` with the account menu, one pane per page in
+`Shell.Main`, the thread panel as `ThreadPane`, and the Create group, New message, and Change your
+name modals, over client view hooks. Group, directory, direct-draft, and placeholder pages compose
+ui-v2 screens; Inbox and Settings keep their features content inside `src/legacy.tsx`'s pane, in the
+previous UI's theme, until they are designed. `src/workspace-actions.ts` lets pages offer the
+layout's Create group. Visual gaps are evaluated and verified in the UI workshop before app
+consumption; `check:packages` rejects app-local styles.
 
 The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
 composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
-routes, four responsive layouts, page headers, and the account popup. Home, Triage, Tasks, Environments, and Connections
-remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings.md)
+routes, the responsive shell, groups and threads, and the account menu. Home, Triage, Tasks,
+Environments, and Connections remain placeholders. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved mode through the ui-v2 Theme, as
-WorkspaceLayout does through the previous ThemeProvider.
+with AppearanceProvider and applies the resolved mode through the ui-v2 Theme, as the legacy
+pane does through the previous ThemeProvider.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
-stay current over the change feed; the layout shows `Live.Status` in the page header's
-actions. See [live updates](../../docs/live-updates.md).
+stay current over the change feed; the layout shows `LiveStatus` from `useLiveStatus()`. See
+[live updates](../../docs/live-updates.md).

@@ -6,7 +6,6 @@ import {
   type SessionStore,
   type SettingsSection,
 } from "@amends/client";
-import { Live } from "@amends/features/live";
 import * as Settings from "@amends/features/settings";
 import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { SegmentedControl } from "@amends/ui/compositions/segmented-control";
@@ -215,7 +214,6 @@ export function SettingsFixture(props: {
                           when={picker()}
                           fallback={
                             <WorkspaceFeedProvider workspaceId={workspaceId()}>
-                              <Live.Status />
                               <SegmentedControl.Root
                                 aria-label="Settings sections"
                                 value={section()}

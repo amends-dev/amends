@@ -52,6 +52,7 @@ export {
   type WorkspaceFeedScope,
 } from "./live/workspace-feed.tsx";
 export type { WorkspaceFeedState } from "./api/changes.ts";
+export { useLiveStatus, liveGrace } from "./live/status.ts";
 export {
   useGroups,
   useGroupRoster,
@@ -77,6 +78,27 @@ export type {
   ThreadTimeline,
 } from "./api/conversations.ts";
 export { toDate } from "./conversations/time.ts";
+export {
+  memberName,
+  useGroupConversation,
+  useGroupPeople,
+  useMentionCandidates,
+  usePeople,
+  useThreadConversation,
+  useWorkspaceGroups,
+  useWorkspacePeople,
+  type Author,
+  type ConversationStatus,
+  type GroupEntry,
+  type MentionCandidate,
+  type MessagePart,
+  type ParticipationChange,
+  type RosterEntry,
+  type StreamEntry,
+  type ThreadEntry,
+  type ThreadMessageEntry,
+  type ThreadNoteEntry,
+} from "./conversations/views.ts";
 export {
   useNewThread,
   useDirectMessage,

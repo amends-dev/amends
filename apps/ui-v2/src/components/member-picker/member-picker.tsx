@@ -34,6 +34,8 @@ export interface MemberPickerProps {
   readonly placeholder?: string;
   /** People who are always included and cannot be removed, such as "You". */
   readonly locked?: readonly PickerPerson[];
+  /** Focus the search when it appears, as the first field of a dialog. */
+  readonly autofocus?: boolean;
 }
 
 /**
@@ -172,6 +174,7 @@ export function MemberPicker(props: MemberPickerProps): JSX.Element {
           )}
         </For>
         <input
+          autofocus={props.autofocus}
           ref={setInput}
           id={field?.id}
           aria-describedby={field?.describedBy()}

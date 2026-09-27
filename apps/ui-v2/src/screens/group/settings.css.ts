@@ -85,3 +85,5 @@ export const memberKind = style({ ...typeScale.hint, color: vars.color.text.seco
 export const avatar = style({
   "@media": { [media.mobile]: { width: "2rem", height: "2rem", fontSize: "0.72rem" } },
 });
+
+export const readonly = style({ display: "flex", flexDirection: "column", gap: "0.25rem" });

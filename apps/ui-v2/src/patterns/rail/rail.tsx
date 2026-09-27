@@ -1,5 +1,6 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
+import { Menu } from "../../components/menu/index.ts";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Logo } from "../../components/logo/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
@@ -93,7 +94,8 @@ export function Item(props: ItemProps) {
           {...(native as JSX.AnchorHTMLAttributes<HTMLAnchorElement>)}
           aria-label={local.label}
           title={local.label}
-          aria-current={local.current ? "page" : undefined}
+          // A destination is a section; the sidebar marks the page within it.
+          aria-current={local.current ? "true" : undefined}
           class={classes(s.item, local.class)}
         >
           {icon()}
@@ -116,11 +118,31 @@ export type AccountProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "ch
   name: string;
   initials?: string;
   tone?: AvatarToneName;
+  /** Inside a Menu.Root: the avatar opens that menu, whose Content follows. */
+  menu?: boolean;
 };
 
 /** The signed-in person's avatar, opening account actions. */
 export function Account(props: AccountProps) {
-  const [local, native] = splitProps(props, ["name", "initials", "tone", "class"]);
+  const [local, native] = splitProps(props, ["name", "initials", "tone", "menu", "class"]);
+  if (local.menu)
+    return (
+      <li class={s.entry}>
+        <Menu.PlainTrigger
+          aria-label={`Account: ${local.name}`}
+          title={local.name}
+          class={classes(s.account, local.class)}
+        >
+          <Avatar
+            name={local.name}
+            initials={local.initials}
+            tone={local.tone}
+            size={30}
+            decorative
+          />
+        </Menu.PlainTrigger>
+      </li>
+    );
   return (
     <li class={s.entry}>
       <button

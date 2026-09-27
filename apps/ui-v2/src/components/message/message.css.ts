@@ -216,3 +216,51 @@ export const repliesCount = style({
     [media.mobile]: { ...typeScale.item, lineHeight: "1.25rem", background: "transparent" },
   },
 });
+
+// A dot before the count while the thread has replies the reader has not seen.
+export const unread = style({
+  display: "inline-block",
+  width: "0.4375rem",
+  height: "0.4375rem",
+  marginInlineEnd: "0.4375rem",
+  borderRadius: "50%",
+  backgroundColor: vars.color.action.indicator,
+});
+
+export const repliesNote = style({
+  ...typeScale.meta,
+  color: vars.color.text.muted,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+});
+
+// "Reply in thread" waits for the message to be hovered or focused where there is a pointer.
+export const reply = style({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.625rem",
+  alignSelf: "flex-start",
+  minHeight: "1.5rem",
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  color: vars.color.text.muted,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  selectors: {
+    "&:hover": { color: vars.color.text.primary },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+  },
+  "@media": {
+    "(hover: hover)": {
+      selectors: {
+        [`${message}:not(:hover):not(:focus-within) &:not([data-noted])`]: {
+          opacity: 0,
+        },
+      },
+    },
+  },
+});
+
+export const replyLabel = style({ ...typeScale.control, fontWeight: fontWeight.medium });

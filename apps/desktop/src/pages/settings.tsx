@@ -6,6 +6,7 @@ import { PageColumns } from "@amends/ui/compositions/page-columns";
 import { Column, Container } from "@amends/ui/primitives/layout";
 import { useLocation, useNavigate, useParams, useSearchParams, Navigate } from "@solidjs/router";
 import { Show, type ParentProps } from "solid-js";
+import { LegacyPage } from "../legacy.tsx";
 const href = (path: string) => `#${path}`;
 export function SettingsLayout(props: ParentProps) {
   const params = useParams<{ workspaceId: string }>(),
@@ -16,21 +17,23 @@ export function SettingsLayout(props: ParentProps) {
     return segment === "members" || segment === "invites" ? segment : "workspace";
   };
   return (
-    <Column gap={4}>
-      <SegmentedControl.Root
-        aria-label="Settings sections"
-        value={section()}
-        onValueChange={(next) => {
-          if (next === "workspace" || next === "members" || next === "invites")
-            navigate(paths.settingsSection(params.workspaceId, next));
-        }}
-      >
-        <SegmentedControl.Item value="members">People</SegmentedControl.Item>
-        <SegmentedControl.Item value="invites">Invites</SegmentedControl.Item>
-        <SegmentedControl.Item value="workspace">Workspace</SegmentedControl.Item>
-      </SegmentedControl.Root>
-      {props.children}
-    </Column>
+    <LegacyPage title="Settings">
+      <Column gap={4}>
+        <SegmentedControl.Root
+          aria-label="Settings sections"
+          value={section()}
+          onValueChange={(next) => {
+            if (next === "workspace" || next === "members" || next === "invites")
+              navigate(paths.settingsSection(params.workspaceId, next));
+          }}
+        >
+          <SegmentedControl.Item value="members">People</SegmentedControl.Item>
+          <SegmentedControl.Item value="invites">Invites</SegmentedControl.Item>
+          <SegmentedControl.Item value="workspace">Workspace</SegmentedControl.Item>
+        </SegmentedControl.Root>
+        {props.children}
+      </Column>
+    </LegacyPage>
   );
 }
 export function SettingsIndex() {

@@ -120,7 +120,7 @@ it("signs in from the desktop page and resumes the workspace query through hash 
   fireEvent.input(code, { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "Desktop workspace",
   );
   expect(window.location.hash).toBe("#/workspaces/one?tab=members");
@@ -178,12 +178,12 @@ it("opens creation from the picker and enters the created workspace through hash
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "Create workspace" }));
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
-    "Studio",
-  );
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Studio");
   expect(window.location.hash).toBe("#/workspaces/one");
-  fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));
-  fireEvent.click(await screen.findByRole("link", { name: "Switch workspace" }));
+  fireEvent.keyDown(screen.getByRole("button", { name: "Account: alice" }), { key: "Enter" });
+  fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Switch workspace" }), {
+    key: "Enter",
+  });
   expect(await screen.findByRole("link", { name: "Studio" })).toHaveAttribute(
     "href",
     "#/workspaces/one",
@@ -208,26 +208,24 @@ it("navigates workspace sections with persistent chrome and retains appearance a
   };
   mount("/workspaces/one", "alice", () => Promise.resolve(response(listing)));
   await screen.findByRole("heading", { name: "Home" });
-  expect(screen.getByText("Workspace / Home")).toBeInTheDocument();
-  expect(screen.getByRole("main", { name: "Home" }).querySelector("h1, h2")).toBeNull();
-  const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
+  const sidebar = screen.getByRole("navigation", { name: "Workspace" });
   fireEvent.click(screen.getByRole("link", { name: "Triage" }));
   await screen.findByRole("heading", { name: "Triage" });
-  expect(screen.getByText("Workspace / Triage")).toBeInTheDocument();
   expect(window.location.hash).toBe("#/workspaces/one/triage");
-  expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toBe(sidebar);
-  fireEvent.click(screen.getByRole("button", { name: "Your account: alice" }));
-  const dark = await screen.findByRole("radio", { name: "Soot" });
-  fireEvent.click(dark);
-  expect(dark).toBeChecked();
-  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  expect(screen.getByRole("navigation", { name: "Workspace" })).toBe(sidebar);
+  const account = screen.getByRole("button", { name: "Account: alice" });
+  fireEvent.keyDown(account, { key: "Enter" });
+  fireEvent.keyDown(await screen.findByRole("menuitemradio", { name: "Dark" }), { key: "Enter" });
+  await waitFor(() => expect(document.querySelector('[data-mode="dark"]')).not.toBeNull());
+  fireEvent.keyDown(account, { key: "Enter" });
+  fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Sign out" }), { key: "Enter" });
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(window.location.hash).toBe("#/sign-in?returnTo=%2Fworkspaces%2Fone%2Ftriage");
   // Sign-in keeps the dark appearance chosen inside the workspace.
   expect(document.querySelector('[data-mode="dark"]')).not.toBeNull();
 });
 
-it("redirects the Settings entry to its workspace section and keeps sidebar selection on descendants", async () => {
+it("redirects the Settings entry to its workspace section and keeps the rail's selection on descendants", async () => {
   const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
   const member = {
     id: "owner",
@@ -264,13 +262,12 @@ it("redirects the Settings entry to its workspace section and keeps sidebar sele
   mount("/workspaces/one/settings", "alice", fetch);
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
-  expect(
-    screen.getByRole("navigation", { name: "Workspace" }).querySelector("a[aria-current=page]"),
-  ).toHaveTextContent("Settings");
+  expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
   expect(screen.getByRole("radio", { name: "Workspace" })).toBeChecked();
   fireEvent.change(screen.getByRole("radio", { name: "People" }), { target: { checked: true } });
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/settings/members"));
   expect(screen.getByRole("radio", { name: "People" })).toBeChecked();
+  expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
 });
 
 it("keeps a workspace current through its change feed over the desktop host connection", async () => {
@@ -320,9 +317,7 @@ it("keeps a workspace current through its change feed over the desktop host conn
     ]),
   );
   await waitFor(() =>
-    expect(screen.getByRole("complementary", { name: "Workspace sidebar" })).toHaveTextContent(
-      "Atelier",
-    ),
+    expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Atelier"),
   );
   expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue("Atelier");
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
@@ -414,17 +409,20 @@ it("shows a group's stream at its route and an open thread beside it", async () 
     );
   });
   mount("/workspaces/one/groups/g1/threads/t1", "alice", fetch);
-  const stream = await screen.findByRole("region", { name: "Conversation" });
-  await within(stream).findByText("Can you look at the terms?");
-  const link = within(stream).getByRole("link", { name: /^1 reply/ });
-  expect(link).toHaveAttribute("href", "#/workspaces/one/groups/g1/threads/t1");
-  expect(link).toHaveAttribute("aria-current", "page");
-  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  await screen.findByRole("navigation", { name: "Workspace" });
+  const main = screen.getByRole("main");
+  const opening = (await within(main).findByText("Can you look at the terms?")).closest("article");
+  const replies = screen.getByRole("button", { name: /1 reply/ });
+  expect(replies).toHaveAttribute("aria-expanded", "true");
+  const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("On it.");
-  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g1"));
-  await waitFor(() => expect(screen.queryByRole("region", { name: "Thread messages" })).toBeNull());
-  expect(screen.getByRole("region", { name: "Conversation" })).toBe(stream);
+  await waitFor(() => expect(screen.queryByLabelText("Thread", { selector: "aside" })).toBeNull());
+  // The stream stays mounted while threads open and close beside it.
+  expect(within(main).getByText("Can you look at the terms?").closest("article")).toBe(opening);
+  fireEvent.click(replies);
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g1/threads/t1"));
 });
 
 /** One pending mention of the reader in thread t1, as their inbox lists it. */
@@ -485,7 +483,8 @@ it("lists the inbox at its hash route, opens a thread beside it, and marks one s
     );
   });
   mount("/workspaces/one/inbox", "alice", fetch);
-  const list = await screen.findByRole("list", { name: "Notifications" });
+  await screen.findByRole("navigation", { name: "Workspace" });
+  const list = await within(screen.getByRole("main")).findByRole("list", { name: "Notifications" });
   await within(list).findByText("On it.");
   const open = within(list).getByRole("link", { name: "Open thread" });
   expect(open).toHaveAttribute("href", "#/workspaces/one/inbox/groups/g1/threads/t1?at=2");
@@ -493,13 +492,13 @@ it("lists the inbox at its hash route, opens a thread beside it, and marks one s
   await waitFor(() =>
     expect(window.location.hash).toBe("#/workspaces/one/inbox/groups/g1/threads/t1?at=2"),
   );
-  const thread = await screen.findByRole("region", { name: "Thread messages" });
+  const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("Can you look at the terms?");
   fireEvent.click(within(list).getByRole("button", { name: "Mark seen" }));
   await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Close thread" }));
+  fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/inbox"));
-  expect(screen.getByRole("list", { name: "Notifications" })).toBe(list);
+  expect(within(screen.getByRole("main")).getByRole("list", { name: "Notifications" })).toBe(list);
 });
 
 it("creates a group from the sidebar and opens it at its hash route", async () => {
@@ -538,14 +537,14 @@ it("creates a group from the sidebar and opens it at its hash route", async () =
   });
   mount("/workspaces/one", "alice", fetch, { permissions: ["group.create"] });
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
-  fireEvent.click(await within(sidebar).findByRole("button", { name: "New group" }));
-  const dialog = await screen.findByRole("dialog", { name: "New group" });
-  fireEvent.input(within(dialog).getByRole("textbox", { name: "Name" }), {
+  fireEvent.click(await within(sidebar).findByRole("button", { name: "Create group" }));
+  const dialog = await screen.findByRole("dialog", { name: "Create group" });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Group name" }), {
     target: { value: "Receipts" },
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "Create group" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g2"));
-  await screen.findByText("Nothing said yet");
+  await screen.findByText("Group created");
 });
 
 it("browses public groups from the sidebar, and joining one opens it", async () => {
@@ -595,11 +594,11 @@ it("browses public groups from the sidebar, and joining one opens it", async () 
   mount("/workspaces/one", "alice", fetch);
   const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
   // Anyone may browse, even before belonging to any group.
-  fireEvent.click(await within(sidebar).findByRole("link", { name: /Browse groups/ }));
-  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups"));
-  await screen.findByRole("heading", { name: "Browse groups" });
+  fireEvent.click(await within(sidebar).findByRole("button", { name: "Browse groups" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups?tab=discover"));
+  await screen.findByRole("heading", { name: "Groups" });
   await waitFor(() =>
-    expect(within(sidebar).getByRole("link", { name: /Browse groups/ })).toHaveAttribute(
+    expect(within(sidebar).getByRole("link", { name: "Groups" })).toHaveAttribute(
       "aria-current",
       "page",
     ),
@@ -641,7 +640,8 @@ it("drafts a first direct message at its hash route and opens the conversation",
     });
   });
   mount("/workspaces/one/direct?to=ada-one", "alice", fetch);
-  const composer = await screen.findByRole("textbox", { name: /^Message / });
+  await screen.findByText("Send the first message to start the conversation.");
+  const composer = await screen.findByRole("combobox", { name: /^Message / });
   fireEvent.input(composer, { target: { value: "Are you free?" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g9"));

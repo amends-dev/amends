@@ -14,6 +14,8 @@ export type RootProps = {
   children: JSX.Element;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Where the list opens from its trigger. Default "bottom-start". */
+  placement?: "bottom-start" | "bottom-end" | "top-start" | "right-end";
 };
 
 /** A menu of actions or a single choice, opened from a Trigger. */
@@ -22,7 +24,7 @@ export function Root(props: RootProps) {
   return (
     <TriggerContext.Provider value={{ element, setElement }}>
       <Primitive.Root
-        placement="bottom-start"
+        placement={props.placement ?? "bottom-start"}
         gutter={6}
         open={props.open}
         onOpenChange={props.onOpenChange}
@@ -53,6 +55,29 @@ export function Trigger(props: TriggerProps) {
         />
       )}
     />
+  );
+}
+
+export type PlainTriggerProps = {
+  /** The trigger's own look, such as an avatar button's. */
+  class?: string;
+  "aria-label": string;
+  title?: string;
+  children: JSX.Element;
+};
+
+/** Opens the menu from a button styled by its caller, such as an avatar. */
+export function PlainTrigger(props: PlainTriggerProps) {
+  const context = useContext(TriggerContext);
+  return (
+    <Primitive.Trigger
+      ref={(element: HTMLElement) => context?.setElement(element)}
+      class={props.class}
+      aria-label={props["aria-label"]}
+      title={props.title}
+    >
+      {props.children}
+    </Primitive.Trigger>
   );
 }
 
@@ -131,6 +156,23 @@ export function Item(props: ItemProps) {
     <Primitive.Item class={s.item} onSelect={() => local.onSelect()} disabled={local.disabled}>
       <Primitive.ItemLabel class={s.itemLabel}>{local.children}</Primitive.ItemLabel>
     </Primitive.Item>
+  );
+}
+
+export type HeaderProps = {
+  /** Such as the signed-in person's name. */
+  title: string;
+  /** Such as their email address. */
+  detail?: string;
+};
+
+/** Who or what the menu is about, above its choices. */
+export function Header(props: HeaderProps) {
+  return (
+    <div class={s.header}>
+      <span class={s.headerTitle}>{props.title}</span>
+      {props.detail ? <span class={s.headerDetail}>{props.detail}</span> : null}
+    </div>
   );
 }
 

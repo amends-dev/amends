@@ -36,18 +36,6 @@ databases and its temporary cluster. A crashed tab may retain a scenario until s
 the host limits active scenarios to twelve. A static Storybook build needs this
 backend/proxy to run live stories.
 
-## Account
-
-`@amends/features/account` connects the UI AccountMenu parts to session and
-appearance state. Compose Account.Root with Trigger and Content; place Identity,
-Appearance, Actions, Link, ChangeName, and SignOut inside. Mount under ClientProvider and
-AppearanceProvider. The apps supply destination hrefs and Shell placement. Given a
-`workspaceId`, Trigger and Identity show the name the reader chose there. ChangeName closes
-the menu and calls back, so the app opens `NameDialog`, which it places outside Root, since
-the menu's panel closes as the dialog opens. The account workshop signs in through the real
-backend and verifies that sign-out retains appearance; **ChangeName** renames the account
-holder in a workspace from the menu. See [workspace shell](../../docs/workspace-shell.md).
-
 ## Settings
 
 `@amends/features/settings` exports Root and Feedback, WorkspaceName, WorkspaceDetails,
@@ -64,110 +52,16 @@ through another member's credential and wait for the change without refreshing; 
 uses the workshop's `drop-changes` control, and `RefreshRecovery` uses `break-directory` and
 `restore-directory`, because background refreshes also read the directory.
 
-## Live
+## Inbox
 
-`@amends/features/live` exports `Live.Status`, which maps `useWorkspaceFeed()` to a Status in a
-persistent live region. It is empty while live and for two seconds after a drop, then shows
-"Connecting…" or "Reconnecting…". Mount it inside `WorkspaceFeedProvider`; the apps place it in
-the page header's actions. See [live updates](../../docs/live-updates.md).
+`@amends/features/conversations` exports `Inbox`, the reader's notifications newest first with
+the previous UI's Inbox cards: why each came, from where, what was said, a link that opens its
+thread, and "Mark seen" while it is pending. "All" or "Unread" choose what it lists, "Mark all
+seen" marks everything through the newest shown, and "Show older" reads further back. The app
+supplies each thread's `href`, given the position that notified the reader, and the thread open
+beside it. The **Features / Inbox** story runs it through the real host: the owner sees a
+member's mention and reply, marks one seen, takes a new mention over the live feed, narrows to
+what is unread, and marks all seen.
 
-## Conversations
-
-`@amends/features/conversations` connects the conversation reads to UI:
-
-- `GroupsNavigation` renders the reader's groups as two navigation sections: Groups, teams by name
-  with a `#` glyph, and Direct, direct groups by the other people in them with `@`. A group shows a
-  count of what is addressed to the reader and a dot when it has new activity. The app supplies
-  `href` and the current group. Groups shows once the groups load, with a "Browse groups" link to
-  the app's `browseHref`, marked current while `browsing`. Readers with `group.create`, which every
-  role holds, also get a
-  "New group" action in its heading that opens `NewGroupDialog`, and the app's `onCreated`
-  decides where the new group leads. Direct always
-  shows once the groups load, with a "New message" action that opens `NewMessageDialog`; the app's
-  `onMessage` receives the conversation or the people chosen.
-- `NewMessageDialog` chooses people and agents to message with the ChipPicker. When the reader
-  already has a direct group with exactly them, it says so and offers to open it; otherwise it
-  offers to start one, handing the people to the app.
-- `DirectDraft` is the page for a conversation that does not exist yet: an empty state and a docked
-  composer whose first message creates the direct group, with the chosen people as mention
-  suggestions. When the reader has, or gains, a conversation with exactly them, `onGroup` hands it
-  over. `DirectDraftName` names the people, as the page title.
-- `NewGroupDialog` names a team group and chooses its active people and agents with the UI
-  ChipPicker, the reader fixed as "you", and asks who can find it: private for only the people
-  added, or public for anyone in the workspace to find and join. Create stays disabled until the
-  name has text, failures explain themselves and keep the input, and closing clears it.
-- `PublicGroups` lists the public groups the reader may join by name, with member counts, live
-  while mounted. One they belong to links to the app's `href`; the others offer Join, and `onJoined`
-  receives a group once the reader belongs to it. It has loading, empty, and unavailable states.
-- `GroupRenameAction` is a quiet "Rename" for beside a team group's name, shown to readers who may
-  rename it. Its dialog opens on the current name, focused and selected, and saves only a
-  different valid name. If someone renamed the group meanwhile, it names their name and keeps the
-  draft, and saving again replaces it.
-- `GroupMembersAction` is a group header's member count, opening its members: the reader first,
-  then everyone by name, keyed by admission so live refreshes keep rows and focus. Members add
-  people with the ChipPicker, and remove others where they may (any member of a private group,
-  administrators in a public one); anyone leaves a team group. Removing and leaving
-  ask first in the row, moving focus to the answer and back on Cancel. The app's `onLeft` decides
-  where leaving leads.
-- `GroupStream` renders a group's stream as a Transcript: each thread's opening message with day
-  seams, oldest first, opening at the newest. Each links to its thread with its reply count and
-  when the last reply came, or "reply in thread"; the open thread's link is marked current, and a
-  thread with activity the reader has not seen carries an unread dot. While the stream is visible,
-  it catches the reader up with the group whenever the group has something new. A thread's row shows
-  who is typing in it in place of when its last reply came.
-  "Show earlier threads" reads further back. It has loading, empty, unavailable, and retry
-  states.
-- `ThreadPanel` is the content of the shell's inspector for one thread: its header with a message
-  count and close action, and the thread's messages in compact density, with "Show earlier
-  messages". Between them, quiet notes say when someone followed the thread, stopped following,
-  left the group, or was removed from the group or workspace, naming the reader "You"; joining by
-  writing or being mentioned shows in the message itself. Notes add nothing to the count. Given a `focus` position, such as the message that notified the reader, it reads back
-  until that message is loaded, sets it apart, and opens at it. While visible, it reads the thread through the newest activity it shows, and it shows who else
-  is typing under the messages. The app places it in `Shell.Inspector` and owns where closing leads.
-  Once a refresh says the reader can no longer read the thread, it shows that instead of the
-  messages it last read, and the stream does the same for its group, as does the header's member
-  count, until access returns.
-  **LosingAccess** covers both: the owner leaves from another session, and the member adds them back.
-- `GroupName` renders a group's name as text, the same way the navigation names it.
-- `Inbox` renders the reader's inbox newest first with the UI Inbox cards: why each notification
-  came (who mentioned them, replied in a thread they follow, or started a thread in a group they
-  follow, and where), when, what was said, a link that opens its thread, and "Mark seen" while it
-  is pending. "All" or "Unread" choose what it lists, "Mark all seen" marks everything through the
-  newest one listed while any are pending, and "Show older" reads further back. A notification
-  whose thread the reader can no longer see says so, without a link. The app supplies each thread's
-  `href`, given the position that notified the reader, and the thread open beside it.
-- `GroupFollowAction` follows or stops following a team group, and `GroupFollowNote` says what
-  following means for the reader now; direct groups show no action. The thread panel's header
-  follows or unfollows its thread, and its meta line says when the reader follows it.
-- `NewThreadComposer` and `ReplyComposer` write a new thread in a group and a reply in a thread.
-  They show what sending does, or why it failed, and keep the draft for another try. Typing `@`
-  suggests the group's other members from its roster, and a chosen member is mentioned while
-  their `@name` stays in the text; messages show their mentions set apart. The stream
-  docks the first under itself while the group is readable, and the thread panel docks the
-  second under the thread.
-
-Authors are named by the name they chose in the workspace, or by their identity until they
-choose one. Times use the reader's locale: a
-message shows its time of day with the full date as its title, and day seams read Today,
-Yesterday, a weekday within the week, or the date. The **Features / Conversations** stories run a
-group through the real host: the owner reads a stream a member started, opens a thread, and its
-controls post as the member, so replies and new threads arrive over the live feed. **Writing**
-starts a thread from the page, mentions the other member, replies in a thread, and returns to
-find a draft kept. **Reading** shows the member's threads unread, clears the group's dot by
-viewing it, and clears a reply's dot and count by opening its thread. **Typing** shows the member
-typing in the open thread and its row until their reply arrives. **Following** follows the group
-and sees the member's next thread reach the owner, then follows and unfollows a thread, noted in
-its timeline. **Departures** sees the member leave the group from their own session and the open
-thread note it live.
-**CreateGroup** creates a public group with the other member from the sidebar and opens it empty.
-**Browse** lists two public groups the owner is not in, joins one, which opens and joins the
-sidebar, and finds it linked on returning.
-**Members** adds a third person to the group, removes the member, and leaves.
-**Rename** renames the group and sees the new name wherever it is named. **RenameConflict** has
-the owner rename it from another session while the dialog is open, sees the save refused with the
-new name, and saves again to replace it.
-**DirectMessage** messages the member for the first time from Direct, lands in the new
-conversation, and finds it again from New message.
-**Inbox** shows the owner's inbox with the member's mention and reply newest first, marks one
-seen, opens the other's thread beside the inbox to settle it, takes a new mention over the live
-feed, and narrows to what is unread.
+The workspace navigation, groups, threads, direct messages, account menu, and live status moved
+to client hooks and UI v2 screens; see [workspace shell](../../docs/workspace-shell.md).

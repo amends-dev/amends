@@ -1,0 +1,189 @@
+// Workshop harness: a group and thread shaped like the connected app's data, with dated
+// messages, reply summaries, notes, mentions, and loading states. Not exported.
+import { Show, createSignal } from "solid-js";
+import type { MentionCandidate } from "../../components/composer/index.ts";
+import { Shell } from "../../patterns/shell/index.ts";
+import { people } from "../sample.ts";
+import type { TimelineEntry } from "../timeline/index.ts";
+import { WorkspaceNavigation, type Appearance } from "../workspace-navigation/index.ts";
+import { navigation } from "../sample.ts";
+import { GroupPane } from "./group-pane.tsx";
+import { GroupThreads, type ConversationStatus } from "./group-threads.tsx";
+import { ThreadPane } from "./thread-pane.tsx";
+
+const now = new Date();
+const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+const daysAgo = (days: number, hour: number) => {
+  const date = new Date(now);
+  date.setDate(date.getDate() - days);
+  date.setHours(hour, 5, 0, 0);
+  return date;
+};
+
+export const candidates: readonly MentionCandidate[] = [
+  { id: "alex", name: "Alex Morgan" },
+  { id: "sara", name: "Sara Lind" },
+  { id: "yumi", name: "Yumi", agent: true },
+];
+
+const openings: readonly TimelineEntry[] = [
+  {
+    kind: "message",
+    id: "t1",
+    author: people.alex,
+    at: daysAgo(1, 16),
+    text: ["The preview is ready for another look."],
+    thread: { replies: 2, unread: true },
+  },
+  {
+    kind: "message",
+    id: "t2",
+    author: people.sara,
+    at: minutesAgo(40),
+    text: ["Can ", { mention: "@Yumi" }, " check the release notes?"],
+    thread: { replies: 0, typing: ["Yumi"] },
+  },
+  {
+    kind: "message",
+    id: "t3",
+    author: people.aj,
+    at: minutesAgo(12),
+    text: ["Lunch at noon?"],
+    thread: { replies: 0 },
+  },
+];
+
+const thread: readonly TimelineEntry[] = [
+  {
+    kind: "message",
+    id: "r0",
+    author: people.alex,
+    at: daysAgo(1, 16),
+    text: ["The preview is ready for another look."],
+  },
+  { kind: "note", id: "n1", at: daysAgo(1, 16), change: "followed", who: "Sara" },
+  {
+    kind: "message",
+    id: "r1",
+    author: people.sara,
+    at: daysAgo(1, 17),
+    text: ["Looks good to me."],
+  },
+  { kind: "note", id: "n2", at: minutesAgo(30), change: "unfollowed", who: "You", self: true },
+  {
+    kind: "message",
+    id: "r2",
+    author: people.yumi,
+    at: minutesAgo(5),
+    text: ["Checked the build: all green."],
+  },
+];
+
+export interface ConversationProps {
+  readonly status?: ConversationStatus;
+  readonly threadStatus?: ConversationStatus;
+  readonly open?: boolean;
+  readonly earlier?: boolean;
+  readonly menu?: boolean;
+}
+
+/** A group and its open thread over dated data, as the app drives them. */
+export function Conversation(props: ConversationProps) {
+  const [draft, setDraft] = createSignal("");
+  const [reply, setReply] = createSignal("");
+  const [open, setOpen] = createSignal(props.open ?? false);
+  const [following, setFollowing] = createSignal(true);
+  const [appearance, setAppearance] = createSignal<Appearance>("system");
+  const [entries, setEntries] = createSignal(openings);
+  const { onSearch: _search, ...base } = navigation({
+    groups: [{ id: "general", name: "general" }],
+    currentGroup: "general",
+  });
+  return (
+    <Shell.Root>
+      <WorkspaceNavigation
+        {...base}
+        destinations={["home", "environments", "connections"]}
+        account={{
+          ...base.account,
+          menu: props.menu
+            ? {
+                identity: "jordan@mercier.example",
+                appearance: appearance(),
+                onAppearanceChange: setAppearance,
+                onOpenSettings: () => {},
+                onChangeName: () => {},
+                onSignOut: () => {},
+              }
+            : undefined,
+        }}
+        groups={[
+          { id: "general", name: "general", href: "#general", current: true },
+          { id: "design", name: "design", href: "#design", pending: 2 },
+          { id: "product", name: "product", href: "#product", unread: true },
+        ]}
+      />
+      <Shell.Main>
+        <GroupPane
+          name="general"
+          workspaceName="Mercier & Co"
+          members={[people.alex, people.sara, people.yumi]}
+          memberCount={3}
+          tabs={["threads"]}
+          tab="threads"
+          tabHref={() => "#threads"}
+          onOpenMembers={() => {}}
+          follow={{ following: following(), onToggle: () => setFollowing(!following()) }}
+          onOpenSettings={() => {}}
+        >
+          <GroupThreads
+            entries={entries()}
+            days
+            status={props.status}
+            onRetry={() => {}}
+            earlier={props.earlier ? { onLoad: () => {} } : undefined}
+            openThreadId={open() ? "t1" : undefined}
+            onOpenThread={() => setOpen(true)}
+            placeholder="Message #general"
+            draft={draft()}
+            onDraftChange={setDraft}
+            mentionCandidates={candidates}
+            onMention={() => {}}
+            onSend={(text) => {
+              setEntries([
+                ...entries(),
+                {
+                  kind: "message",
+                  id: `sent-${entries().length}`,
+                  author: people.jordan,
+                  at: new Date(),
+                  text: [text],
+                  thread: { replies: 0 },
+                },
+              ]);
+              setDraft("");
+            }}
+          />
+        </GroupPane>
+      </Shell.Main>
+      <Show when={open()}>
+        <ThreadPane
+          title="Thread"
+          groupName="general"
+          entries={thread}
+          days
+          status={props.threadStatus}
+          typing={["Sara"]}
+          follow={{ following: false, onToggle: () => {} }}
+          onClose={() => setOpen(false)}
+          placeholder="Reply in thread"
+          draft={reply()}
+          onDraftChange={setReply}
+          mentionCandidates={candidates}
+          onSend={() => setReply("")}
+          sendError={reply() === "fail" ? "failed" : undefined}
+        />
+      </Show>
+    </Shell.Root>
+  );
+}

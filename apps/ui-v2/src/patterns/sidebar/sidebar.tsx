@@ -110,6 +110,8 @@ export type ItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "child
   count?: number;
   /** Names the count for assistive technology, such as "5 unread". */
   countLabel?: string;
+  /** A dot for activity the reader has not seen, when there is no count. */
+  unread?: boolean;
   current?: boolean;
 };
 
@@ -121,6 +123,7 @@ export function Item(props: ItemProps) {
     "person",
     "count",
     "countLabel",
+    "unread",
     "current",
     "class",
   ]);
@@ -130,6 +133,7 @@ export function Item(props: ItemProps) {
         {...native}
         aria-current={local.current ? "page" : undefined}
         class={classes(s.item, local.class)}
+        data-unread={local.unread ? "" : undefined}
       >
         <Show when={local.icon}>{(icon) => <Dynamic component={icon()} class={s.itemIcon} />}</Show>
         <Show when={local.person}>
@@ -145,7 +149,14 @@ export function Item(props: ItemProps) {
           )}
         </Show>
         <span class={s.itemLabel}>{local.children}</span>
-        <Show when={local.count}>
+        <Show
+          when={local.count}
+          fallback={
+            <Show when={local.unread}>
+              <span class={s.unread} role="img" aria-label="new activity" />
+            </Show>
+          }
+        >
           {(count) => <Count value={count()} aria-label={local.countLabel} />}
         </Show>
       </a>

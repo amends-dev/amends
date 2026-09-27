@@ -1,101 +1,90 @@
 # Workspace shell
 
-Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout.
-Nested routes provide Inbox, Triage, Tasks, Environments, Connections, and
-[Settings](workspace-settings.md). Settings manages workspace metadata, members, and
-invitations. The sidebar lists the reader's groups between the workspace pages and Configure;
-`/workspaces/:workspaceId/groups/:groupId` shows a group's stream, and
-`…/threads/:threadId` opens a thread beside it. A reader who may create groups gets a "+" on the
-Groups heading that opens a New group dialog and then the group it creates; the section shows
-for them even before they belong to any group. Direct groups have their own Direct section,
-whose "+" starts a New message; `/workspaces/:workspaceId/direct?to=…` drafts the first message to
-people with no conversation yet, and sending it replaces the draft with their group. A group's
-header shows its member count, which
-opens its members to add, remove, or leave; leaving returns to Home. A team group's name has a
-"Rename" beside it for readers who may rename it. Inbox, after Home, counts what is pending for the
-reader and lists their notifications; `/inbox/groups/:groupId/threads/:threadId` opens a thread
-beside it, and Inbox stays the current destination. The other pages remain scaffolding; task data,
-activity, configuration operations, dynamic Channels/Agents sections, and keyboard-shortcut
-help remain separate features.
+Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout, built on the
+[ui-v2](../apps/ui-v2/README.md) Shell pattern from the Lunacy mocks in
+`design-system/Amends Group Exploration.free`: a rail, a sidebar, the main content, and a side
+panel.
 
-Both apps compose Shell, PageHeader, Navigation, and page content through children.
-The shared workspace frame uses a 256px dark sidebar at 1024px and wider and a 60px
-dark rail from 768px to 1023px. Below 768px, a header toggle opens the full
-navigation drawer. The drawer closes from its backdrop, Escape, or a destination link;
-it has no close button or bottom navigation. The sidebar content remains mounted while
-moving into that drawer. Ordinary navigation closes it; modifier clicks retain
-native link behavior. A missing or removed membership shows the
-[unavailable page](workspace-entry.md) outside the workspace layout. Sign-in preserves supported nested destinations.
+- **Rail**: the brand, the Home, Environments, and Connections destinations, then Settings and
+  the reader's avatar, which opens the account menu. A destination is a section, marked
+  `aria-current="true"`; Home covers Inbox, Triage, Tasks, groups, and direct messages.
+- **Sidebar**: the workspace (which switches workspace), Inbox with the count of what is pending
+  for the reader, Triage, Tasks, then Groups and Direct messages. Groups' title links to the
+  directory at `/groups`, with Browse groups (the Discover tab) and, for readers who may create
+  groups, Create group. Each group shows the reader's pending count, or a dot for activity they
+  have not seen. Direct messages lists direct groups by their other people, with New message.
+- **Main**: one pane per page. `/groups/:groupId` shows the group's pane: its name, member stack,
+  follow bell, settings, and its threads with the composer. `/groups` is the directory: Your
+  groups and Discover, with Join.
+- **Side panel**: `…/groups/:groupId/threads/:threadId` opens a thread beside its group, and
+  `/inbox/groups/:groupId/threads/:threadId` beside the inbox, at the message that notified the
+  reader. Closing returns to the group or the inbox. The panel sits beside the content from 80rem,
+  floats over it below that, and fills the screen on phones.
 
-## Screen layout reference
+Below 64rem the sidebar moves into a drawer beside the rail, opened from each pane's menu button;
+below 48rem rail and sidebar open together. Following a link, Escape, or the scrim closes it. The
+shell is keyed by workspace: switching workspaces builds a new one for its groups and names.
+A missing or removed membership shows the [unavailable page](workspace-entry.md) outside the
+workspace layout. Sign-in preserves supported nested destinations.
 
-The `Amends Shell v2` and `Amends Screen · …` mocks in `design-system/` use 30px
-horizontal gutters beside the workspace navigation and 18px on phones. The
-repeated workspace page header has a location line (`Workspace / …` or
-`Configure / …`) above its 34px Instrument Serif title
-(26px on phones), optional actions, and compact mono metadata. Page section
-pickers sit below the header as separate controls. Sign-in and workspace selection
-use standalone layouts.
+## Groups and threads
 
-| Screens                                               | Content layout                                                                                                                                                  |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Home, Policy, Tasks                                   | One flowing column; cards or rows form internal grids and stack as space shrinks.                                                                               |
-| Agents, Channels, Environments, Connections, Accounts | Full-width roster or list; a selected record replaces it with a full-width view.                                                                                |
-| Settings                                              | Main content plus a 310px aside and 34px gap on desktop/laptop. Selected person details replace the list on tablet/phone; Workspace and Invites sections stack. |
-| Task detail, Session, Resource                        | Main reading column plus a 300px, 290px, or 310px aside respectively on desktop/laptop; one pane at a time on tablet/phone.                                     |
-| Triage, Agent messages                                | Main queue or stream with an optional 400px session log or thread panel.                                                                                        |
-| First run                                             | Dedicated onboarding content and setup cards.                                                                                                                   |
-| Sign in                                               | Standalone centered form outside the workspace shell.                                                                                                           |
+Client view hooks shape the conversation reads for the screens: `useWorkspaceGroups`,
+`useGroupConversation`, `useThreadConversation`, `useMentionCandidates`, and `useGroupPeople`
+name people and groups, resolve mentions, and report loading, unavailable, and failed states;
+the screens word them. A group's stream shows each thread's opening message, oldest first under
+day seams, with its reply count, an unread dot, and who is typing. A message with no replies
+offers "Reply in thread" while hovered or focused, and always on touch screens. Seeing a group
+catches the reader up with it, and an open thread is read through its newest message. The
+composer starts a thread; in the side panel it replies. Typing `@` suggests the group's other
+members.
 
-At 1280px and wider, the 256px sidebar, at least 560px of content, and the Shell
-v2 400px session log can coexist. From 1024px to 1279px, that log is a deliberate
-overlay and the sidebar stays full width. The smaller page asides are separate
-layouts. Tablet keeps the rail and uses a navigation sheet; phone has one content
-column and sheets. Settings is the last item in the shared workspace navigation.
+Without tabs, the group header's second line says what following means: new threads include the
+reader once they follow, and everyone takes part in every thread of a direct conversation. The
+bell follows or stops following; in the side panel it follows the thread. The member stack and
+the settings button open Group settings: General renames the group and leaves it, and Members
+adds and removes people as the reader may. Visibility is shown but cannot change, since the host
+offers no such operation. A direct conversation's settings show only its fixed members.
 
-The current apps implement the shared page frame, header, reading-edge gutters,
-responsive navigation, Settings member detail, and group streams with a thread in the 400px
-Shell inspector, following the Agent messages mock: beside the stream at 1280px and wider, a
-sheet at the inline end below it, and a full-width sheet on phones. The workspace layout owns the
-inspector and opens it while a thread route matches; closing it returns to the group, or to the
-inbox for a thread opened from there. The same
-inspector will hold session logs. ListDetail uses the Settings
-mock's 310px aside and switches to one pane on tablet/phone. Most other domain
-screens remain scaffolding, so their own detail and card grids will be composed
-as those features are built.
+Create group and New message are compact modals. New message opens an existing conversation with
+exactly the people chosen, or `/direct?to=…`, which drafts the first message; sending it creates
+the direct group and replaces the draft with it. The directory's Discover tab lists public groups
+the reader has not joined; the host lets only members read a group's threads, so there is no
+preview before joining, and Join opens the group.
+
+## Pages without a UI v2 design
+
+Inbox and the Settings pages have no mocks yet. They keep their previous UI content inside a
+UI v2 pane with the page's title, in the previous UI's theme, until they are designed. Home,
+Triage, Tasks, Environments, and Connections are placeholders drawn with UI v2's EmptyState.
+The mocks' Agents destination, search, the Tasks and Files tabs, reactions, and task references
+have no backend and are not shown.
 
 ## Account and appearance
 
-UI supplies AccountMenu parts over Popover, Avatar, IconButton, and shared controls.
-Its wide panel contains identity, ThemeChoice, and app-supplied action links.
-Features connects identity/sign-out to the session and theme selection to the
-headless AppearanceProvider. Inside a workspace, the trigger and identity show the name the
-reader chose there above the identifier they sign in as, and the app adds "Change your name",
-which opens a dialog over the page as the menu closes. Outside one, only the identifier shows.
-There is no profile photo or Google-account integration.
+The rail's avatar opens the account menu: the reader's name in this workspace and the address they
+sign in with, Appearance (System, Light, or Dark), Switch workspace, Workspace settings,
+Change your name (a compact modal), and Sign out. There is no profile photo or Google-account
+integration.
 
-The application owns an appearance source for storage and system appearance.
-Client stores light/dark/system state without UI dependencies. The outer
-ThemeProvider maps light to Cotton and dark to Soot; Shell receives no theme prop.
-System is the default. Preference persists under `amends.appearance` in local storage,
-survives sign-out, and synchronizes same-origin windows. Web and desktop origins
-remain independent. Blocked storage retains the choice in memory.
+The application owns an appearance source for storage and system appearance. Client stores
+light/dark/system state without UI dependencies, and the app applies the resolved mode through
+the UI v2 `Theme`; pages still in the previous UI get the matching Cotton or Soot theme. System is
+the default. Preference persists under `amends.appearance` in local storage, survives sign-out,
+and synchronizes same-origin windows. Web and desktop origins remain independent. Blocked storage
+retains the choice in memory.
 
-Sidebar and its account popup inherit the fixed Soot scope. This follows the existing
-Popover inheritance contract; the reference's always-light popup is not copied.
-Theme previews show both palettes and the selected option. The branded WorkspaceMark
-uses the reference persimmon pair with verified text contrast; neutral marks remain
-the picker default. Shell supports manual desktop collapse for compositions that
-expose its toggle; the apps keep the mock's expanded desktop sidebar. The reference
-inspector remains future work.
+When workspace changes stop arriving for two seconds, a note at the bottom of the screen says
+"Connecting…" or "Reconnecting…" until they resume; see [live updates](live-updates.md).
 
 ## Verification
 
-UI stories cover theme choice, popup interaction, long identity, and responsive
-utility placement. The connected account story signs in against isolated real HTTP
-and PostgreSQL data, changes appearance, and signs out without resetting it.
-App tests cover nested browser/hash routes, active links, shell lifetime, directory
-refresh recovery, storage failures, and system/cross-window preference updates.
-Browser review covers both palettes, reload persistence, keyboard interaction,
-tablet rail placement, and the popup inside the navigation drawer. Native desktop and
-other platform/browser-engine validation remain separate checks.
+UI v2 stories cover the shell, the group screens with the Lunacy sample data, and the Live
+conversation stories over dated data: day seams, reply summaries, notes, typing, mentions,
+following, the account menu, and loading and failure states. Client tests cover the view hooks'
+naming, mentions, notes, and states. App tests cover nested browser and hash routes, current
+destinations, shell lifetime across pages and workspaces, directory refresh recovery, the group
+stream and thread panel, the inbox's thread, creating, browsing, and joining groups, members,
+renaming, a first direct message, live status, and appearance after sign-out. Browser review
+covered both modes at desktop, tablet, and phone widths against a local host. Native desktop and
+other platform validation remain separate checks.

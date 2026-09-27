@@ -18,18 +18,40 @@ import * as s from "./settings.css.ts";
 export type GroupSettingsTab = "general" | "members";
 export type GroupVisibility = "public" | "private";
 
+/** Why a change to the group was not made. */
+export type GroupChangeError = "changed" | "denied" | "gone" | "invalid" | "failed";
+
+const renameErrors: { readonly [Error in GroupChangeError]: string } = {
+  changed: "Someone renamed this group meanwhile. Save again to replace their name.",
+  denied: "You can no longer rename this group.",
+  gone: "This group is no longer available to you.",
+  invalid: "Give the group a name.",
+  failed: "The name could not be saved. Try again when the host is available.",
+};
+const memberErrors: { readonly [Error in GroupChangeError]: string } = {
+  changed: "The members changed meanwhile. Check the list and try again.",
+  denied: "You can no longer change this group’s members.",
+  gone: "That person is no longer in the workspace or this group.",
+  invalid: "That change isn’t possible here.",
+  failed: "The change could not be made. Try again when the host is available.",
+};
+
 export interface SettingsMember {
   readonly id: string;
   readonly name: string;
   readonly initials?: string;
   readonly tone?: AvatarToneName;
   readonly agent?: boolean;
+  /** The reader, shown as "You". */
+  readonly you?: boolean;
   /** The reader may remove this member. */
   readonly removable?: boolean;
 }
 
 export interface GroupSettingsProps {
   readonly open: boolean;
+  /** A direct conversation shows only its fixed members. Default "team". */
+  readonly kind?: "team" | "direct";
   readonly onClose: () => void;
   /** The saved name, shown as the dialog's context. */
   readonly groupName: string;
@@ -39,16 +61,31 @@ export interface GroupSettingsProps {
   readonly name: string;
   readonly onNameChange: (name: string) => void;
   readonly nameError?: string;
+  /** The reader may rename the group. Default true. */
+  readonly renamable?: boolean;
+  /** Why the last save failed. */
+  readonly saveError?: GroupChangeError;
   readonly visibility: GroupVisibility;
   readonly onVisibilityChange: (visibility: GroupVisibility) => void;
+  /** Visibility is shown but cannot change. */
+  readonly visibilityLocked?: boolean;
   /** Name or visibility differs from what is saved. */
   readonly changed: boolean;
   readonly saving?: boolean;
   readonly onSave: () => void;
   /** The reader belongs to the group. */
   readonly member: boolean;
+  /** The reader may leave. Default true. */
+  readonly leavable?: boolean;
+  readonly leaving?: boolean;
   readonly onLeave: () => void;
-  readonly onJoin: () => void;
+  readonly onJoin?: () => void;
+  /** The reader may add members. Default true. */
+  readonly canAdd?: boolean;
+  /** The member being removed, if any. */
+  readonly removingId?: string;
+  /** Why the last change to the members failed. */
+  readonly membersError?: GroupChangeError;
   readonly members: readonly SettingsMember[];
   readonly onRemove: (id: string) => void;
   /** Workspace members who are not in the group. */
@@ -120,30 +157,36 @@ export function GroupSettings(props: GroupSettingsProps) {
       >
         <Pane.Root variant="modal">
           <Pane.Header>
-            <Pane.Title context={`# ${props.groupName}`}>Group settings</Pane.Title>
+            <Pane.Title
+              context={props.kind === "direct" ? props.groupName : `# ${props.groupName}`}
+            >
+              {props.kind === "direct" ? "Members" : "Group settings"}
+            </Pane.Title>
             <Pane.Actions>
               <Pane.Close label="Close settings" onClick={close} />
             </Pane.Actions>
-            <Pane.Tabs>
-              <Tabs.List aria-label="Group settings">
-                <Tabs.Tab
-                  current={props.tab === "general"}
-                  onClick={() => props.onTabChange("general")}
-                >
-                  General
-                </Tabs.Tab>
-                <Tabs.Tab
-                  current={props.tab === "members"}
-                  count={props.members.length}
-                  onClick={() => props.onTabChange("members")}
-                >
-                  Members
-                </Tabs.Tab>
-              </Tabs.List>
-            </Pane.Tabs>
+            <Show when={props.kind !== "direct"}>
+              <Pane.Tabs>
+                <Tabs.List aria-label="Group settings">
+                  <Tabs.Tab
+                    current={props.tab === "general"}
+                    onClick={() => props.onTabChange("general")}
+                  >
+                    General
+                  </Tabs.Tab>
+                  <Tabs.Tab
+                    current={props.tab === "members"}
+                    count={props.members.length}
+                    onClick={() => props.onTabChange("members")}
+                  >
+                    Members
+                  </Tabs.Tab>
+                </Tabs.List>
+              </Pane.Tabs>
+            </Show>
           </Pane.Header>
           <Switch>
-            <Match when={props.tab === "general"}>
+            <Match when={props.tab === "general" && props.kind !== "direct"}>
               <Pane.Body>
                 <form
                   id={formId}
@@ -153,24 +196,51 @@ export function GroupSettings(props: GroupSettingsProps) {
                     if (props.changed && !props.saving) props.onSave();
                   }}
                 >
-                  <Field.Root hint="Everyone in this group sees this name." error={props.nameError}>
+                  <Field.Root
+                    hint={
+                      props.renamable === false
+                        ? "Only people who manage this group can rename it."
+                        : "Everyone in this group sees this name."
+                    }
+                    error={
+                      props.nameError ??
+                      (props.saveError === "invalid" ? renameErrors.invalid : undefined)
+                    }
+                  >
                     <Field.Label>Group name</Field.Label>
                     <Input
                       value={props.name}
                       onInput={(event) => props.onNameChange(event.currentTarget.value)}
                       autocomplete="off"
+                      disabled={props.renamable === false || props.saving}
                       required
                     />
                   </Field.Root>
-                  <Choice.Group
-                    label="Visibility"
-                    value={props.visibility}
-                    onChange={(value) => props.onVisibilityChange(value as GroupVisibility)}
-                    hint={visibilityHints[props.visibility]}
+                  <Show when={props.saveError && props.saveError !== "invalid" && props.saveError}>
+                    {(error) => <Field.Alert>{renameErrors[error()]}</Field.Alert>}
+                  </Show>
+                  <Show
+                    when={!props.visibilityLocked}
+                    fallback={
+                      <div class={s.readonly}>
+                        <h3 class={s.heading}>Visibility</h3>
+                        <p class={s.note}>
+                          {props.visibility === "public" ? "Public. " : "Private. "}
+                          {visibilityHints[props.visibility]}
+                        </p>
+                      </div>
+                    }
                   >
-                    <Choice.Option value="public">Public</Choice.Option>
-                    <Choice.Option value="private">Private</Choice.Option>
-                  </Choice.Group>
+                    <Choice.Group
+                      label="Visibility"
+                      value={props.visibility}
+                      onChange={(value) => props.onVisibilityChange(value as GroupVisibility)}
+                      hint={visibilityHints[props.visibility]}
+                    >
+                      <Choice.Option value="public">Public</Choice.Option>
+                      <Choice.Option value="private">Private</Choice.Option>
+                    </Choice.Group>
+                  </Show>
                   <Divider />
                   <div class={s.membership}>
                     <div class={s.membershipText}>
@@ -183,9 +253,17 @@ export function GroupSettings(props: GroupSettingsProps) {
                     </div>
                     <Show
                       when={props.member}
-                      fallback={<Button onClick={() => props.onJoin()}>Join group</Button>}
+                      fallback={
+                        <Show when={props.onJoin}>
+                          {(join) => <Button onClick={() => join()()}>Join group</Button>}
+                        </Show>
+                      }
                     >
-                      <Button onClick={() => props.onLeave()}>Leave group</Button>
+                      <Show when={props.leavable !== false}>
+                        <Button disabled={props.leaving} onClick={() => props.onLeave()}>
+                          Leave group
+                        </Button>
+                      </Show>
                     </Show>
                   </div>
                 </form>
@@ -202,35 +280,40 @@ export function GroupSettings(props: GroupSettingsProps) {
                 </Button>
               </Modal.Actions>
             </Match>
-            <Match when={props.tab === "members"}>
+            <Match when={props.tab === "members" || props.kind === "direct"}>
               <Pane.Body>
                 <div class={s.members}>
-                  <Show
-                    when={!phone()}
-                    fallback={
-                      <Button icon={IconMarkNew} wide onClick={() => setAddView(true)}>
-                        Add members
-                      </Button>
-                    }
-                  >
-                    <Field.Root>
-                      <Field.Label>Add members</Field.Label>
-                      <div class={s.addRow}>
-                        <MemberPicker
-                          candidates={props.candidates}
-                          selected={props.selected}
-                          onSelectedChange={props.onSelectedChange}
-                        />
-                        <Button
-                          variant={props.selected.length > 0 ? "primary" : "secondary"}
-                          class={s.addButton}
-                          disabled={props.selected.length === 0 || props.adding}
-                          onClick={() => props.onAdd()}
-                        >
-                          {addLabel()}
+                  <Show when={props.membersError}>
+                    {(error) => <Field.Alert>{memberErrors[error()]}</Field.Alert>}
+                  </Show>
+                  <Show when={props.canAdd !== false}>
+                    <Show
+                      when={!phone()}
+                      fallback={
+                        <Button icon={IconMarkNew} wide onClick={() => setAddView(true)}>
+                          Add members
                         </Button>
-                      </div>
-                    </Field.Root>
+                      }
+                    >
+                      <Field.Root>
+                        <Field.Label>Add members</Field.Label>
+                        <div class={s.addRow}>
+                          <MemberPicker
+                            candidates={props.candidates}
+                            selected={props.selected}
+                            onSelectedChange={props.onSelectedChange}
+                          />
+                          <Button
+                            variant={props.selected.length > 0 ? "primary" : "secondary"}
+                            class={s.addButton}
+                            disabled={props.selected.length === 0 || props.adding}
+                            onClick={() => props.onAdd()}
+                          >
+                            {addLabel()}
+                          </Button>
+                        </div>
+                      </Field.Root>
+                    </Show>
                   </Show>
                   <div class={s.count}>
                     <span class={s.countLabel}>
@@ -252,6 +335,9 @@ export function GroupSettings(props: GroupSettingsProps) {
                           />
                           <span class={s.memberText}>
                             <span class={s.memberName}>{person.name}</span>
+                            <Show when={person.you}>
+                              <span class={s.memberKind}>You</span>
+                            </Show>
                             <Show when={person.agent}>
                               <span class={s.memberKind}>Agent</span>
                             </Show>
@@ -260,6 +346,7 @@ export function GroupSettings(props: GroupSettingsProps) {
                             <Button
                               variant="quiet"
                               aria-label={`Remove ${person.name}`}
+                              disabled={props.removingId === person.id}
                               onClick={() => props.onRemove(person.id)}
                             >
                               Remove

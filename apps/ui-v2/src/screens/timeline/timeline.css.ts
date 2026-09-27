@@ -24,3 +24,5 @@ export const event = style({
 });
 
 export const eventIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+
+export const eventTime = style({ ...typeScale.meta, color: vars.color.text.muted });

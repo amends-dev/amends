@@ -1,16 +1,33 @@
-import { Show, createEffect, createSignal, on } from "solid-js";
-import { IconMarkAttach, IconMarkMention, IconMessage } from "@amends/icons";
+import { Match, Show, Switch, createEffect, createSignal, on } from "solid-js";
+import { IconAlertTriangle, IconMarkAttach, IconMessage } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
-import { Composer } from "../../components/composer/index.ts";
+import { Composer, type MentionCandidate } from "../../components/composer/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Timeline, type TimelineEntry } from "../timeline/index.ts";
 import * as s from "./group.css.ts";
 
+/** Why a message was not sent; the draft stays for another try. */
+export type SendError = "changed" | "denied" | "gone" | "invalid" | "failed";
+
+const sendErrors: { readonly [Error in SendError]: string } = {
+  changed: "This conversation changed while you were sending. Try again.",
+  denied: "You can’t post here.",
+  gone: "This conversation is no longer available to you.",
+  invalid: "Write something to send.",
+  failed: "We couldn’t send this. Try again when the host is reachable.",
+};
+
+/**
+ * Why a conversation shows no messages: still loading, closed to the reader (such as after
+ * leaving its group), or failed to load and worth retrying.
+ */
+export type ConversationStatus = "loading" | "unavailable" | "failed";
+
 export interface ConversationProps {
   readonly entries: readonly TimelineEntry[];
-  readonly taskHref: (key: string) => string;
+  readonly taskHref?: (key: string) => string;
   readonly onReact?: (messageId: string, emoji: string) => void;
   /** The composer's placeholder and name, such as "Message #general". */
   readonly placeholder: string;
@@ -18,8 +35,20 @@ export interface ConversationProps {
   readonly onDraftChange: (draft: string) => void;
   readonly onSend: (text: string) => void;
   readonly sending?: boolean;
+  readonly sendError?: SendError;
   readonly onAttach?: () => void;
-  readonly onMention?: () => void;
+  /** People the draft can mention after "@", which also shows the Mention action. */
+  readonly mentionCandidates?: readonly MentionCandidate[];
+  readonly onMention?: (candidate: MentionCandidate) => void;
+  /** In place of the timeline, while it loads or when it cannot. */
+  readonly status?: ConversationStatus;
+  readonly onRetry?: () => void;
+  /** Older entries remain; the top of the timeline offers to load them. */
+  readonly earlier?: { readonly loading?: boolean; readonly onLoad: () => void };
+  /** Put a day seam before each new day. */
+  readonly days?: boolean;
+  /** The message the reader came to see: set apart and scrolled to. */
+  readonly focusId?: string;
 }
 
 /** Keeps a timeline at its newest entry when it opens and while the reader is at the bottom. */
@@ -47,15 +76,84 @@ export function ConversationComposer(props: ConversationProps) {
         onValueChange={props.onDraftChange}
         onSend={props.onSend}
         disabled={props.sending}
+        mentionCandidates={props.mentionCandidates}
+        onMention={props.onMention}
       >
         <Composer.Input placeholder={props.placeholder} />
         <Composer.Toolbar>
-          <IconButton icon={IconMarkAttach} label="Attach" onClick={() => props.onAttach?.()} />
-          <IconButton icon={IconMarkMention} label="Mention" onClick={() => props.onMention?.()} />
+          <Show when={props.onAttach}>
+            {(attach) => (
+              <IconButton icon={IconMarkAttach} label="Attach" onClick={() => attach()()} />
+            )}
+          </Show>
+          <Show when={props.mentionCandidates}>
+            <Composer.Mention />
+          </Show>
           <Composer.Send />
         </Composer.Toolbar>
+        <Show when={props.sendError}>
+          {(error) => <Composer.Alert>{sendErrors[error()]}</Composer.Alert>}
+        </Show>
       </Composer.Root>
     </Pane.Footer>
+  );
+}
+
+/** A conversation's loading or unavailable state, in place of its timeline. */
+export function ConversationState(props: {
+  readonly status: ConversationStatus;
+  readonly subject: "group" | "thread";
+  readonly onRetry?: () => void;
+}) {
+  return (
+    <Switch>
+      <Match when={props.status === "loading"}>
+        <p class={s.loading} role="status">
+          {props.subject === "group" ? "Loading the conversation…" : "Loading the thread…"}
+        </p>
+      </Match>
+      <Match when={props.status === "unavailable"}>
+        <EmptyState
+          icon={IconAlertTriangle}
+          title={
+            props.subject === "group" ? "This group isn’t available" : "This thread isn’t available"
+          }
+          lines={[
+            props.subject === "group"
+              ? "You may no longer be a member of it."
+              : "It may be in a group you no longer belong to.",
+          ]}
+        />
+      </Match>
+      <Match when={props.status === "failed"}>
+        <EmptyState
+          icon={IconAlertTriangle}
+          title={
+            props.subject === "group" ? "Can’t load this conversation" : "Can’t load this thread"
+          }
+          lines={["Try again once the host is reachable."]}
+        >
+          <Show when={props.onRetry}>
+            {(retry) => <Button onClick={() => retry()()}>Try again</Button>}
+          </Show>
+        </EmptyState>
+      </Match>
+    </Switch>
+  );
+}
+
+/** Loads older entries, above the timeline. */
+export function Earlier(props: {
+  readonly loading?: boolean;
+  readonly onLoad: () => void;
+  readonly label: string;
+}) {
+  return (
+    <div class={s.earlier}>
+      <Button variant="quiet" disabled={props.loading} onClick={() => props.onLoad()}>
+        {props.loading ? "Loading…" : props.label}
+      </Button>
+    </div>
   );
 }
 
@@ -64,7 +162,12 @@ export interface GroupThreadsProps extends ConversationProps {
   readonly openThreadId?: string;
   readonly onOpenThread: (messageId: string) => void;
   /** Shown while the group has no messages yet. */
-  readonly welcome?: { readonly groupName: string; readonly memberNames: readonly string[] };
+  readonly welcome?: {
+    readonly groupName: string;
+    readonly memberNames: readonly string[];
+    /** A direct conversation, named by the people in it. */
+    readonly direct?: boolean;
+  };
   /** Previewing a public group: a prompt to join replaces the composer. */
   readonly preview?: {
     readonly groupName: string;
@@ -81,31 +184,65 @@ export function GroupThreads(props: GroupThreadsProps) {
   return (
     <>
       <Pane.Body ref={scroll.ref} onScroll={scroll.onScroll}>
-        <Show
-          when={props.entries.length === 0 && props.welcome}
+        <Switch
           fallback={
-            <Timeline
-              entries={props.entries}
-              activeId={props.openThreadId}
-              onOpenThread={props.onOpenThread}
-              onReact={props.onReact}
-              taskHref={props.taskHref}
-            />
+            <>
+              <Show when={props.earlier}>
+                {(earlier) => (
+                  <Earlier
+                    loading={earlier().loading}
+                    onLoad={earlier().onLoad}
+                    label="Show earlier threads"
+                  />
+                )}
+              </Show>
+              <Timeline
+                entries={props.entries}
+                activeId={props.openThreadId}
+                onOpenThread={props.onOpenThread}
+                onReact={props.onReact}
+                taskHref={props.taskHref}
+                days={props.days}
+                focusId={props.focusId}
+              />
+            </>
           }
         >
-          {(welcome) => (
-            <EmptyState
-              icon={IconMessage}
-              title={`Welcome to #${welcome().groupName}`}
-              lines={[
-                `${list.format(welcome().memberNames)} ${welcome().memberNames.length === 1 ? "is a member" : "are members"}.`,
-                "Send the first message to start the conversation.",
-              ]}
-            />
-          )}
-        </Show>
+          <Match when={props.status}>
+            {(status) => (
+              <ConversationState status={status()} subject="group" onRetry={props.onRetry} />
+            )}
+          </Match>
+          <Match when={props.entries.length === 0 && props.welcome}>
+            {(welcome) => (
+              <EmptyState
+                icon={IconMessage}
+                title={
+                  welcome().direct
+                    ? `Your conversation with ${welcome().groupName}`
+                    : `Welcome to #${welcome().groupName}`
+                }
+                lines={[
+                  ...(welcome().direct
+                    ? []
+                    : [
+                        `${list.format(welcome().memberNames)} ${welcome().memberNames.length === 1 ? "is a member" : "are members"}.`,
+                      ]),
+                  "Send the first message to start the conversation.",
+                ]}
+              />
+            )}
+          </Match>
+        </Switch>
       </Pane.Body>
-      <Show when={props.preview} fallback={<ConversationComposer {...props} />}>
+      <Show
+        when={props.preview}
+        fallback={
+          <Show when={props.status !== "unavailable"}>
+            <ConversationComposer {...props} />
+          </Show>
+        }
+      >
         {(preview) => (
           <Pane.Footer divided>
             <div class={s.prompt}>

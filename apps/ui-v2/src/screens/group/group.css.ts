@@ -52,3 +52,24 @@ export const promptNote = style({
   margin: 0,
   color: vars.color.text.secondary,
 });
+
+export const loading = style({
+  ...typeScale.control,
+  margin: "auto",
+  color: vars.color.text.secondary,
+});
+
+// "Show earlier threads" above the oldest loaded entry.
+export const earlier = style({
+  display: "flex",
+  justifyContent: "center",
+  paddingBlockEnd: "1rem",
+});
+
+// Who is typing, under the thread's timeline; empty and out of the way otherwise.
+export const typing = style({
+  ...typeScale.meta,
+  margin: 0,
+  color: vars.color.text.muted,
+  selectors: { "&:not(:empty)": { paddingBlockStart: "0.75rem" } },
+});

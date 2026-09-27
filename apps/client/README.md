@@ -52,7 +52,10 @@ portable backend packages under `packages/*` remain Effect-only.
   them before reporting. `revision` counts explicit refreshes so editors can discard drafts.
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
-  presentation to format.
+  presentation to format. The view hooks shape them for screens; see [Views](#views).
+- `useLiveStatus()` reports `connecting` or `reconnecting` once workspace changes have stopped
+  arriving for two seconds (`liveGrace`), and nothing while live or through brief drops. Mount it
+  inside `WorkspaceFeedProvider`.
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
@@ -163,6 +166,32 @@ a valid, different name. The rename refreshes the members and the directory, and
 `workspace.member.renamed` commit on the feed refreshes them for everyone else.
 Requests are credential-scoped and cancelled on disposal. See
 [workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.
+
+## Views
+
+The view hooks shape conversation reads for the UI v2 screens, which word what they show: client
+names people and groups and reports codes, and entries carry the `kind`, `id`, `at`, `author`,
+and `text` fields the screens' timeline takes.
+
+- `memberName(member)` is the name a member chose in the workspace, their identity until they
+  choose one, or "Former member". `usePeople(workspaceId)` names members and message authors,
+  and splits a message's text into plain runs and `{ mention, memberId }` parts.
+- `useWorkspaceGroups(workspaceId)` lists the reader's groups as `GroupEntry` values: teams by
+  name, direct groups by their other people ("Only you" when alone), with pending counts, unseen
+  activity, and what the reader may do. `directWith(memberIds)` finds the direct group of exactly
+  those other people.
+- `useGroupConversation(workspaceId, groupId)` gives a group's stream as `StreamEntry` values,
+  each thread's opening message with its reply count, whether replies are unread, and who is
+  typing. `useThreadConversation(workspaceId, threadId, focus?)` gives a thread's messages and
+  participation notes (`followed`, `unfollowed`, `left-group`, `removed-from-group`,
+  `removed-from-workspace`, with the reader as `self`), who is typing, and, given a timeline
+  position to show, reads back to it and reports its message as `focusId`. Both mark what they
+  show read while mounted and visible, and report `status`: `loading`, `unavailable` once a
+  refresh says the reader lost access (their entries empty until access returns), or `failed`.
+- `useMentionCandidates(workspaceId, groupId)` lists a group's other members to mention.
+  `useGroupPeople(workspaceId, members)` lists a group's members for its settings, the reader
+  first, with who the reader may remove, and the workspace's other active members to add.
+  `useWorkspacePeople(workspaceId)` lists the workspace's other active members and agents.
 
 ## Conversations
 

@@ -116,3 +116,5 @@ export const empty = style({
   padding: "2rem 0.75rem",
   color: vars.color.text.secondary,
 });
+
+export const alert = style({ paddingInline: "1.5rem", paddingBlockEnd: "0.75rem" });

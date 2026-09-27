@@ -1,9 +1,10 @@
-import { Show, splitProps, type JSX } from "solid-js";
+import { Show, createEffect, createSignal, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { Avatar, AvatarStack, type AvatarStackPerson } from "../avatar/index.ts";
 import { TaskStatus, type TaskState } from "../task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
+import { clockTime, fullTime } from "../../internal/when.ts";
 import * as s from "./message.css.ts";
 
 export interface Author {
@@ -18,18 +19,36 @@ export type RootProps = JSX.HTMLAttributes<HTMLElement> & {
   author: Author;
   /** When it was sent, as shown, such as "10:02 AM" or "Yesterday". */
   time?: string;
+  /** When it was sent; shown as the time of day unless `time` says otherwise. */
+  at?: Date;
   /** Its thread is open beside the timeline. */
   active?: boolean;
+  /** The message the reader came to see, such as one that notified them: set apart and scrolled to. */
+  focused?: boolean;
 };
 
 /** One message: the author's avatar beside a column of the byline, text, and any extras. */
 export function Root(props: RootProps) {
-  const [local, native] = splitProps(props, ["author", "time", "active", "children", "class"]);
+  const [local, native] = splitProps(props, [
+    "author",
+    "time",
+    "at",
+    "active",
+    "focused",
+    "children",
+    "class",
+  ]);
+  const [element, setElement] = createSignal<HTMLElement>();
+  createEffect(() => {
+    if (local.focused) element()?.scrollIntoView?.({ block: "center" });
+  });
+  const shown = () => local.time ?? (local.at ? clockTime(local.at) : undefined);
   return (
     <article
       {...native}
+      ref={setElement}
       class={classes(s.message, local.class)}
-      data-active={local.active ? "" : undefined}
+      data-active={local.active || local.focused ? "" : undefined}
       aria-current={local.active ? "true" : undefined}
     >
       <Avatar
@@ -44,8 +63,16 @@ export function Root(props: RootProps) {
           <span class={s.author} data-agent={local.author.agent ? "" : undefined}>
             {local.author.name}
           </span>
-          <Show when={local.time}>
-            <span class={s.time}>{local.time}</span>
+          <Show when={shown()}>
+            {(time) => (
+              <time
+                class={s.time}
+                dateTime={local.at?.toISOString()}
+                title={local.at ? fullTime(local.at) : undefined}
+              >
+                {time()}
+              </time>
+            )}
           </Show>
         </div>
         {local.children}
@@ -149,12 +176,16 @@ export function TaskReference(props: TaskReferenceProps) {
 export type RepliesProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   count: number;
   /** The people who replied, most recent last. */
-  people: readonly AvatarStackPerson[];
+  people?: readonly AvatarStackPerson[];
+  /** The thread has replies the reader has not seen. */
+  unread?: boolean;
+  /** A quiet line after the count, such as who is typing. */
+  note?: string;
 };
 
 /** Opens the message's thread. */
 export function Replies(props: RepliesProps) {
-  const [local, native] = splitProps(props, ["count", "people", "class"]);
+  const [local, native] = splitProps(props, ["count", "people", "unread", "note", "class"]);
   const label = () => `${local.count} ${local.count === 1 ? "reply" : "replies"}`;
   return (
     <button {...native} type="button" class={classes(s.replies, local.class)}>
@@ -167,8 +198,44 @@ export function Replies(props: RepliesProps) {
           stroke-linecap="round"
         />
       </svg>
-      <AvatarStack people={local.people} aria-hidden="true" />
-      <span class={s.repliesCount}>{label()}</span>
+      <Show when={local.people?.length}>
+        <AvatarStack people={local.people ?? []} aria-hidden="true" />
+      </Show>
+      <span class={s.repliesCount}>
+        <Show when={local.unread}>
+          <span class={s.unread} role="img" aria-label="unread" />
+        </Show>
+        {label()}
+      </span>
+      <Show when={local.note}>
+        <span class={s.repliesNote}>{local.note}</span>
+      </Show>
+    </button>
+  );
+}
+
+export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
+  /** A quiet line after the action, such as who is typing; it keeps the action in view. */
+  note?: string;
+};
+
+/**
+ * Opens the thread of a message with no replies yet. It shows while the message is hovered or
+ * focused, and always on touch screens.
+ */
+export function Reply(props: ReplyProps) {
+  const [local, native] = splitProps(props, ["note", "class"]);
+  return (
+    <button
+      {...native}
+      type="button"
+      class={classes(s.reply, local.class)}
+      data-noted={local.note ? "" : undefined}
+    >
+      <span class={s.replyLabel}>Reply in thread</span>
+      <Show when={local.note}>
+        <span class={s.repliesNote}>{local.note}</span>
+      </Show>
     </button>
   );
 }

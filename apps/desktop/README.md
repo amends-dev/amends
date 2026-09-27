@@ -77,8 +77,9 @@ screens: sign-in with `useSignIn`, the workspace picker with `useWorkspacePicker
 `CreateWorkspace` modal at `#/workspaces/new`, and the session, not-found, and
 workspace-unavailable states with the standalone screens; their links use hash hrefs.
 The route validates new credentials before following a safe hash return path.
-`src/routes.tsx` owns routes, the session guard, and redirects. Workspace pages still use
-the previous UI inside `WorkspaceLayout`'s `ThemeProvider` and `Shell.Root`. Both platform
+`src/routes.tsx` owns routes, the session guard, and redirects. The workspace layout and its
+group pages are built on ui-v2, as in web; Inbox and Settings keep their features content inside
+a ui-v2 pane in the previous UI's theme. Both platform
 apps import `@amends/client`, `@amends/ui-v2`, and `@amends/ui` independently: client supplies
 headless state, and the UI packages supply presentation. Each app loads both packages' fonts
 and `@amends/ui/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
@@ -93,22 +94,19 @@ Credentials are scoped to the normalized API URL and this webview origin. Web an
 desktop do not automatically share a login. OS credential storage and host selection
 UI remain later work.
 
-Page compositions contain no inline styles or local stylesheets. `ThemeProvider`
-owns the theme scope, `Shell.Root` owns the application frame, and page-local
-`Shell.Body`, `Header`, `Main`, `Content`, and `Footer` declarations compose it.
-Sign-in uses `Content width="narrow" centered` with `Body scroll="page"` so long
-content and enlarged text stay reachable. Visual gaps are evaluated and verified
+Page compositions contain no inline styles or local stylesheets. The ui-v2 `Theme` owns the
+theme scope; standalone screens use the Centered pattern and the workspace its Shell, as in
+web. Visual gaps are evaluated and verified
 in UI before app consumption; `check:packages` rejects app-local styles.
 
 The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
 composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
-routes, four responsive layouts, page headers, and the account popup. Home, Triage, Tasks, Environments, and Connections
-remain scaffolding. The app-owned [Settings pages](../../docs/workspace-settings.md)
+routes, the responsive shell, groups and threads, and the account menu. Home, Triage, Tasks,
+Environments, and Connections remain placeholders. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose workspace, members, and invites over shared features. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved theme through ThemeProvider.
+with AppearanceProvider and applies the resolved mode through the ui-v2 Theme.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
-stay current over the change feed; the layout shows `Live.Status` in the page header's
-actions. The content security policy's `connect-src` already covers the stream, which uses the same API origin. See [live updates](../../docs/live-updates.md).
+stay current over the change feed; the layout shows `LiveStatus` from `useLiveStatus()`. The content security policy's `connect-src` already covers the stream, which uses the same API origin. See [live updates](../../docs/live-updates.md).
