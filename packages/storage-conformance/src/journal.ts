@@ -365,6 +365,9 @@ export const journal = (harness: Harness) => {
             yield* initialized(bound);
             const live = yield* bound.checkpoints.listLive(journalLog);
             expect(live.length).toBeGreaterThan(0);
+            // Live versions read in binary name order, however they were written.
+            const names = live.map(({ name }) => name);
+            expect(names).toEqual(names.toSorted((left, right) => (left < right ? -1 : 1)));
             for (const version of live)
               expect(
                 yield* bound.checkpoints.get(Object.assign({ logId: journalLog }, version)),

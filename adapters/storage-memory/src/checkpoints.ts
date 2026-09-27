@@ -2,7 +2,7 @@ import { Checkpoint, Store } from "@amends/core/journal";
 import { Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
-import { keyOf, Rows } from "./rows.ts";
+import { compareBinary, keyOf, Rows } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Checkpoint.Cursor));
 /** A log's live versions, stored together as one row. */
@@ -41,7 +41,9 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
     listLive: Effect.fn("Checkpoints.listLive")(
       function* (logId) {
         const live = yield* liveRows.get((yield* read).records.liveProjections, keyOf(logId));
-        return live._tag === "Some" ? live.value : [];
+        return live._tag === "Some"
+          ? live.value.toSorted((left, right) => compareBinary(left.name, right.name))
+          : [];
       },
       Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
     ),

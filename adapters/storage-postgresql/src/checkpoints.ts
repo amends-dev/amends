@@ -1,5 +1,5 @@
 import { Checkpoint, Store } from "@amends/core/journal";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -83,7 +83,8 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
           .from(liveProjections)
           .where(
             and(eq(liveProjections.workspaceId, workspaceId), eq(liveProjections.logId, logId)),
-          ),
+          )
+          .orderBy(sql`${liveProjections.name} COLLATE "C"`),
       ).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(Checkpoint.LiveVersions)),
         Effect.mapError(storeFailure(Store, "checkpoint.listLive")),

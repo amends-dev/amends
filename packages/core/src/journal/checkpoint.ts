@@ -57,7 +57,7 @@ export interface Interface {
     cursor: Cursor,
   ) => Effect.Effect<void, Store.Failure | Store.Conflict, Store.Transaction>;
   /**
-   * The projection versions live on this log, in unspecified order. A version is live when
+   * The projection versions live on this log, in binary name order. A version is live when
    * every commit since it went live applied it, so it needs no progress of its own. Use the
    * current transaction's view when present, otherwise committed state.
    */
