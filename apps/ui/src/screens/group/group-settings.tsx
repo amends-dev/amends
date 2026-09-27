@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createSignal, createUniqueId } from "solid-js";
+import { Match, Show, Switch, createSignal, createUniqueId } from "solid-js";
 import { IconMarkNew } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
@@ -13,6 +13,7 @@ import { media } from "../../foundations/layout/tokens.ts";
 import { createMediaQuery } from "../../internal/media.ts";
 import { Modal } from "../../patterns/modal/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
+import { Keyed } from "../../internal/keyed.tsx";
 import * as s from "./settings.css.ts";
 
 export type GroupSettingsTab = "general" | "members";
@@ -326,39 +327,39 @@ export function GroupSettings(props: GroupSettingsProps) {
                     <Divider class={s.countStitch} />
                   </div>
                   <ul class={s.list} aria-label="Members">
-                    <For each={props.members}>
+                    <Keyed each={props.members} by={(person) => person.id}>
                       {(person) => (
                         <li class={s.member}>
                           <Avatar
-                            name={person.name}
-                            initials={person.initials}
-                            tone={person.tone}
+                            name={person().name}
+                            initials={person().initials}
+                            tone={person().tone}
                             size={28}
                             class={s.avatar}
                             decorative
                           />
                           <span class={s.memberText}>
-                            <span class={s.memberName}>{person.name}</span>
-                            <Show when={person.you}>
+                            <span class={s.memberName}>{person().name}</span>
+                            <Show when={person().you}>
                               <span class={s.memberKind}>You</span>
                             </Show>
-                            <Show when={person.agent}>
+                            <Show when={person().agent}>
                               <span class={s.memberKind}>Agent</span>
                             </Show>
                           </span>
-                          <Show when={person.removable}>
+                          <Show when={person().removable}>
                             <Button
                               variant="quiet"
-                              aria-label={`Remove ${person.name}`}
-                              disabled={props.removingId === person.id}
-                              onClick={() => props.onRemove(person.id)}
+                              aria-label={`Remove ${person().name}`}
+                              disabled={props.removingId === person().id}
+                              onClick={() => props.onRemove(person().id)}
                             >
                               Remove
                             </Button>
                           </Show>
                         </li>
                       )}
-                    </For>
+                    </Keyed>
                   </ul>
                 </div>
               </Pane.Body>

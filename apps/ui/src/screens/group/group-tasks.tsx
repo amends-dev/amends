@@ -8,6 +8,7 @@ import { Menu } from "../../components/menu/index.ts";
 import { TaskStatus, taskStateLabel, type TaskState } from "../../components/task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { Pane } from "../../patterns/pane/index.ts";
+import { Keyed } from "../../internal/keyed.tsx";
 import * as s from "./tasks.css.ts";
 
 export interface TaskPerson {
@@ -151,27 +152,27 @@ export function GroupTasks(props: GroupTasksProps) {
           fallback={<p class={s.empty}>No tasks match these filters.</p>}
         >
           <ul class={s.list} aria-label="Tasks">
-            <For each={props.tasks}>
+            <Keyed each={props.tasks} by={(task) => task.key}>
               {(task) => (
                 <li>
                   <a
-                    href={props.taskHref(task.key)}
+                    href={props.taskHref(task().key)}
                     class={s.row}
-                    aria-current={props.openTaskKey === task.key ? "true" : undefined}
+                    aria-current={props.openTaskKey === task().key ? "true" : undefined}
                     onClick={(event) => {
                       if (!props.onOpenTask) return;
                       event.preventDefault();
-                      props.onOpenTask(task.key);
+                      props.onOpenTask(task().key);
                     }}
                   >
-                    <TaskStatus state={task.state} size="1rem" />
-                    <span class={s.key}>{task.key}</span>
-                    <span class={s.title} data-done={task.state === "done" ? "" : undefined}>
-                      {task.title}
+                    <TaskStatus state={task().state} size="1rem" />
+                    <span class={s.key}>{task().key}</span>
+                    <span class={s.title} data-done={task().state === "done" ? "" : undefined}>
+                      {task().title}
                     </span>
-                    <span class={s.status}>{taskStateLabel(task.state)}</span>
+                    <span class={s.status}>{taskStateLabel(task().state)}</span>
                     <Show
-                      when={task.assignee}
+                      when={task().assignee}
                       fallback={
                         <span class={s.assignee} data-unassigned="">
                           <span class={s.unassigned}>
@@ -193,11 +194,11 @@ export function GroupTasks(props: GroupTasksProps) {
                         </span>
                       )}
                     </Show>
-                    <span class={s.activity}>{task.activity}</span>
+                    <span class={s.activity}>{task().activity}</span>
                   </a>
                 </li>
               )}
-            </For>
+            </Keyed>
           </ul>
         </Show>
       </Pane.Body>

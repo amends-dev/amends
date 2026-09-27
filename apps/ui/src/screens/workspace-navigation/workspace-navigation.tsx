@@ -275,18 +275,18 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                     >
                       {group().name}
                     </Sidebar.Item>
-                    <For each={group().threads}>
+                    <Keyed each={group().threads ?? []} by={(thread) => thread.id}>
                       {(thread) => (
                         <Sidebar.SubItem
-                          href={thread.href}
+                          href={thread().href}
                           icon={IconMessage}
-                          state={thread.state}
-                          current={thread.current}
+                          state={thread().state}
+                          current={thread().current}
                         >
-                          {thread.title}
+                          {thread().title}
                         </Sidebar.SubItem>
                       )}
-                    </For>
+                    </Keyed>
                   </>
                 )}
               </Keyed>

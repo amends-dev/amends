@@ -200,8 +200,11 @@ export function WorkspacePicker(props: WorkspacePickerProps) {
                   <span class={s.text}>
                     <a
                       ref={(link) => {
-                        links.set(workspace().id, link);
-                        onCleanup(() => links.delete(workspace().id));
+                        // Rows are keyed by ID; read it now, since the row's accessor is stale
+                        // by the time a removed row cleans up.
+                        const id = workspace().id;
+                        links.set(id, link);
+                        onCleanup(() => links.delete(id));
                       }}
                       href={workspace().href}
                       class={s.name}

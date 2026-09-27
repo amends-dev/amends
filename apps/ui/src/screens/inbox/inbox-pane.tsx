@@ -157,13 +157,14 @@ export function InboxPane(props: InboxPaneProps) {
               class={s.list}
               aria-label={props.tab === "unread" ? "Unread notifications" : "Notifications"}
             >
-              <For each={days()}>
+              {/* Days are rebuilt on every change; keying them by day keeps their rows, and focus. */}
+              <Keyed each={days()} by={(day) => String(day.day)}>
                 {(day) => (
                   <>
                     <li class={s.day} aria-hidden="true">
-                      <Divider label={dayLabel(day.day)} align="start" />
+                      <Divider label={dayLabel(day().day)} align="start" />
                     </li>
-                    <Keyed each={day.items} by={(item) => item.id}>
+                    <Keyed each={day().items} by={(item) => item.id}>
                       {(item) => (
                         <Row
                           item={item()}
@@ -174,7 +175,7 @@ export function InboxPane(props: InboxPaneProps) {
                     </Keyed>
                   </>
                 )}
-              </For>
+              </Keyed>
             </ul>
             <Show when={props.earlier}>
               {(earlier) => (

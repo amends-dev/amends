@@ -217,6 +217,9 @@ export function Input(props: InputProps) {
         onBlur={() => setDismissed(query()?.start)}
         onFocus={() => setDismissed(undefined)}
         onKeyDown={(event) => {
+          // Keys while an input method composes text, such as the Enter that confirms a Japanese
+          // conversion, belong to it. Safari reports that Enter as keyCode 229 instead.
+          if (event.isComposing || event.keyCode === 229) return;
           if (open()) {
             const count = suggestions().length;
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -237,7 +240,7 @@ export function Input(props: InputProps) {
               return;
             }
           }
-          if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             state.form()?.requestSubmit();
           }

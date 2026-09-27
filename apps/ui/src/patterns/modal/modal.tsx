@@ -26,8 +26,12 @@ export function Root(props: RootProps) {
     if (props.open && !element.open) element.showModal();
     else if (!props.open && element.open) element.close();
   });
+  let mounted = true;
+  // A click closes only when the press began on the backdrop too, not a drag from inside.
+  let pressedBackdrop = false;
   // Closing, rather than only removing, returns focus to where it was when the dialog opened.
   onCleanup(() => {
+    mounted = false;
     if (dialog()?.open) dialog()?.close();
   });
   return (
@@ -40,9 +44,24 @@ export function Root(props: RootProps) {
         event.preventDefault();
         props.onClose();
       }}
+      onClose={() => {
+        // The browser can close the dialog itself, such as on a second Escape while the caller
+        // keeps it open. Ask the caller, and show it again if it stays open.
+        if (!mounted || !props.open) return;
+        props.onClose();
+        queueMicrotask(() => {
+          const element = dialog();
+          if (mounted && props.open && element && !element.open) element.showModal();
+        });
+      }}
+      onPointerDown={(event) => {
+        pressedBackdrop = event.target === event.currentTarget;
+      }}
       onClick={(event) => {
         // A click on the backdrop lands on the dialog itself.
-        if (event.target === event.currentTarget) props.onClose();
+        const backdrop = pressedBackdrop && event.target === event.currentTarget;
+        pressedBackdrop = false;
+        if (backdrop) props.onClose();
       }}
     >
       <Show when={props.open}>{props.children}</Show>
