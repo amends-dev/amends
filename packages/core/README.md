@@ -127,8 +127,9 @@ through `GroupStore.findDirect`; internal `DirectGroups.establish` finds or crea
 
 Internal `GroupAudience.require` checks current workspace and group membership, with no action
 permission and no management bypass; each application checks its own action grant alongside it,
-inside its commit for writes. `GroupMembershipDeparture` records a group departure and ends the
-member's thread participations; workspace-member removal uses it for every admission. See
+inside its commit for writes. `GroupMembershipDeparture` records a group departure as one fact;
+projections end the member's follow of the group and every thread participation held through the
+admission together, without thread activity. Workspace-member removal uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
 
 ## Read state
@@ -173,7 +174,7 @@ no action checks of their own; they are excluded from `Core.Operations`:
 | `ThreadCreation`               | Validates and records a new thread for `ThreadStart`                                                  |
 | `ThreadMessagePublication`     | Publishes a message with its admissions, activity, and recipients                                     |
 | `ThreadParticipationAdmission` | Finds eligible members and current participants, and admits new ones                                  |
-| `ThreadParticipationDeparture` | Ends a participation with its activity, for unfollow and group departure alike                        |
+| `ThreadParticipationDeparture` | Ends a participation with its activity when its member unfollows the thread                           |
 | `ThreadActivityPublisher`      | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
 | `ThreadActivityRecording`      | Assigns the next timeline position and records `ThreadActivityFacts.Recorded`                         |
 | `ThreadAccess`                 | Checks current group access to a thread, shared by reads and writes                                   |

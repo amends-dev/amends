@@ -579,13 +579,14 @@ export const threadReplies = (harness: Harness) => {
               });
               yield* TestClock.adjust("2 seconds");
               const addressed = yield* run(bound, owner, reply(first.thread.id, [agentId]));
-              expect(addressed.activity.sequence).toBe(5);
+              // The opening and two replies; leaving took no place in the timeline.
+              expect(addressed.activity.sequence).toBe(4);
               const current = (yield* bound.participations.listByThread(first.thread.id)).find(
                 (p) =>
                   ThreadParticipation.memberOf(p.participant) === agentId && p.status === "active",
               );
               expect(current).toMatchObject({
-                joinedAtSequence: 5,
+                joinedAtSequence: 4,
                 joinedAt: addressed.message.publishedAt,
               });
               expect(current?.id).not.toBe(old.id);

@@ -20,6 +20,7 @@ import {
 import {
   ThreadApplication,
   ThreadMessageApplication,
+  ThreadParticipation,
   ThreadParticipationActivity,
 } from "@amends/core/thread";
 import { InvitationApplication, Member, MemberPermissions } from "@amends/core/workspace";
@@ -316,9 +317,16 @@ export const journal = (harness: Harness) => {
             expect(live.groupLatest).toHaveLength(1);
             expect(live.threadLatest).toHaveLength(1);
             expect(live.messages).toHaveLength(2);
-            expect(live.activities.flat().map((activity) => activity.kind)).toContain(
+            // Leaving ended the agent's participation with the departure, not in the thread.
+            expect(live.activities.flat().map((activity) => activity.kind)).not.toContain(
               ThreadParticipationActivity.Ended.name,
             );
+            expect(
+              live.participations
+                .flat()
+                .filter((p) => ThreadParticipation.memberOf(p.participant) === agent.memberId)
+                .map((p) => p.status),
+            ).toEqual(["ended"]);
             // Leaving settled the agent's pending notifications.
             expect(live.notifications[2]?.map((notification) => notification.state._tag)).toEqual([
               "Discarded",

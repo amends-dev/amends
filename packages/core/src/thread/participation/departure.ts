@@ -1,6 +1,5 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { DateTime } from "effect";
-import { GroupMembership } from "../../group/membership/membership.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
@@ -22,14 +21,13 @@ export type Error =
   | InvalidReference;
 export interface Interface {
   readonly workspaceId: ThreadParticipation.Record["workspaceId"];
+  /**
+   * End one active participation because its member unfollowed the thread, with a quiet ending
+   * in its timeline. Leaving or being removed from the group ends participations with the
+   * departure instead, all together and without thread activity.
+   */
   readonly end: (
     departure: ThreadParticipation.Departure,
-    reason: ThreadParticipation.EndReason,
-    occurredAt: DateTime.Utc,
-  ) => Effect.Effect<void, Error, Store.Transaction | Publication.Service>;
-  readonly endByAdmission: (
-    membership: GroupMembership.Record,
-    reason: ThreadParticipation.EndReason,
     occurredAt: DateTime.Utc,
   ) => Effect.Effect<void, Error, Store.Transaction | Publication.Service>;
 }
@@ -62,9 +60,9 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
   });
   const end = Effect.fn("ThreadParticipationDeparture.end")(function* (
     input: ThreadParticipation.Departure,
-    reason: ThreadParticipation.EndReason,
     occurredAt: DateTime.Utc,
   ) {
+    const reason: ThreadParticipation.EndReason = "unfollowed";
     yield* Store.Transaction;
     const departure = yield* Schema.decodeEffect(ThreadParticipation.Departure)(input);
     const found = yield* participations.get(departure.participationId);
@@ -106,45 +104,7 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
         ),
     });
   });
-  const endByAdmission = Effect.fn("ThreadParticipationDeparture.endByAdmission")(function* (
-    input: GroupMembership.Record,
-    reason: ThreadParticipation.EndReason,
-    occurredAt: DateTime.Utc,
-  ) {
-    yield* Store.Transaction;
-    const membership = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(input);
-    if (membership.workspaceId !== workspaceId)
-      return yield* new InvalidReference({ message: "Admission belongs to another workspace" });
-    const seen = new Set<ThreadParticipation.Id>();
-    for (const row of yield* participations.listByAdmission(membership.id)) {
-      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-        row,
-      ).pipe(Effect.mapError(invalid));
-      if (
-        participant.workspaceId !== workspaceId ||
-        participant.participant._tag !== "Member" ||
-        participant.participant.groupMembershipId !== membership.id ||
-        participant.participant.memberId !== membership.memberId ||
-        seen.has(participant.id)
-      )
-        return yield* new InvalidReference({
-          message: "Admission returned inconsistent participation",
-        });
-      seen.add(participant.id);
-      if (participant.status === "ended") continue;
-      const thread = yield* threadOf(participant);
-      if (thread.groupId !== membership.groupId)
-        return yield* new InvalidReference({
-          message: "Participation belongs to another group or thread",
-        });
-      yield* end(
-        { workspaceId, threadId: participant.threadId, participationId: participant.id },
-        reason,
-        occurredAt,
-      );
-    }
-  });
-  return Service.of({ workspaceId, end, endByAdmission });
+  return Service.of({ workspaceId, end });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadParticipationDeparture from "./departure.ts";

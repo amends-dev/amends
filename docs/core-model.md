@@ -2711,7 +2711,7 @@ reassignment workflow so the task is not left assigned to someone outside its th
 
 | Action                                | Access effect                                           | Participation and notification effect                                                                           |
 | ------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Unfollow a thread                     | Inherited group access remains, subject to permissions. | Ends participation and future recipient selection until an authorized rejoin.                                   |
+| Unfollow a thread                     | Inherited group access remains, subject to permissions. | Ends participation and future recipient selection until an authorized rejoin. Not offered in direct groups.     |
 | Unfollow a team group                 | Access remains.                                         | Stops joining its new threads; current participation is unchanged.                                              |
 | Leave or be removed from a team group | Removes inherited access to all its threads.            | Ends participation in those threads and following of the group; the agent departure rules apply where relevant. |
 | Lose workspace membership             | Removes access to its groups and threads.               | Ends the corresponding active participation; the agent departure rules apply where relevant.                    |
@@ -2727,9 +2727,16 @@ Self-follow/unfollow is implemented for current group members. Follow requires `
 on the Thread target and records a quiet joining activity; repeated follow retains the current
 participation. Unfollow needs no action grant and addresses the actor’s exact participation ID.
 It preserves group access, records a quiet participation-ended activity, ends future recipient
-selection, and atomically discards that participation’s pending agent input. Group and workspace
-departures use the same per-participation lifecycle and record the corresponding ending activities. A later rejoin has a fresh ID and boundary. See
-[following and unfollowing](thread-workflows.md#following-and-unfollowing).
+selection, and atomically discards that participation’s pending agent input. Everyone in a direct
+group takes part in all of its threads, so its threads cannot be unfollowed.
+
+A group or workspace departure is a group event, not a thread one: its one membership fact ends
+every participation held through that admission together, records nothing in the threads, and
+settles the member's pending notifications from the group, so its cost does not grow with how many
+threads the member took part in. Cancelling an agent's active turns on departure will likewise
+find them across the group rather than per participation. A later rejoin has a fresh ID and
+boundary. See [following and unfollowing](thread-workflows.md#following-and-unfollowing) and
+[departure and pending input](thread-workflows.md#departure-and-pending-input).
 
 Muting does not acknowledge notifications, advance input progress, or cancel agent work.
 It is a human presentation preference. Its exact UI and alert settings remain open.

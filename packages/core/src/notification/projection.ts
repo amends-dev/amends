@@ -7,8 +7,9 @@ import { ThreadParticipationActivity } from "../thread/participation/activity.ts
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 /**
- * Activity generates notifications and settles departure; leaving a group settles what a person
- * had pending from it; human Seen is private state, outside the journal. Everything comes from the
+ * Activity generates notifications, and an unfollow's ending settles an agent's pending input
+ * from that participation; leaving a group settles what a member had pending from it; human Seen
+ * is private state, outside the journal. Everything comes from the
  * recorded facts and this read model's own notifications, so it rebuilds without reading other
  * read models: recipients were selected when the activity was recorded.
  */
@@ -41,7 +42,9 @@ export const definition = Projection.make("notifications", { version: 2 })
     }),
   )
   // Someone who leaves a group, or is removed from it or the workspace, can no longer open its
-  // threads, so what they had pending from it stops waiting for them.
+  // threads, and takes part in none of them, so what they had pending from it stops waiting for
+  // them. Journals from before recorded each participation's ending after this as well, which
+  // then finds nothing left pending.
   .on(
     GroupMembershipFacts.Removed,
     Effect.fn("NotificationProjection.departure")(function* (event) {

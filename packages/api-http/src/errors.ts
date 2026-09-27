@@ -168,6 +168,7 @@ export const participation = [
   ThreadParticipationApplication.ThreadNotFound.pipe(HttpApiSchema.status(404)),
   ThreadParticipationApplication.NotFound.pipe(HttpApiSchema.status(404)),
   ThreadParticipationApplication.AlreadyEnded.pipe(HttpApiSchema.status(409)),
+  ThreadParticipationApplication.FixedParticipation.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** Read-state outcomes: only people keep it, and a position cannot pass the latest activity. */

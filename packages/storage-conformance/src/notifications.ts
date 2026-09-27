@@ -809,7 +809,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect(
-      "settling a group departure discards only the member's pending, unseen notifications from it",
+      "settling a group departure discards only the member's pending notifications from it: a person's unseen ones, and an agent's input",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -833,6 +833,7 @@ export const notifications = (harness: Harness) => {
                 record("elsewhere", from("kept", 1)),
                 record("someone-else", { ...from("left", 4), recipient: another }),
                 record("agent-there", { ...from("left", 5), recipient: agent }),
+                record("agent-elsewhere", { ...from("kept", 6), recipient: agent }),
                 record("no-thread"),
               ];
               yield* bound.store.transaction(
@@ -863,6 +864,26 @@ export const notifications = (harness: Harness) => {
               // Settling again finds nothing pending and changes nothing.
               yield* leave;
               expect(yield* bound.notifications.countPendingByRecipient(human)).toBe(2);
+              // An agent's departure ends its participation there, and with it its pending input.
+              yield* bound.store.transaction(
+                bound.notifications.discardPendingForGroup(
+                  Member.Id.make("agent-member"),
+                  Group.Id.make("left"),
+                ),
+              );
+              const [agentThere, agentElsewhere] = kept.filter(
+                (note) => note.recipient._tag === "Agent",
+              );
+              expect(yield* bound.notifications.get(agentThere!.id)).toEqual(
+                Option.some(
+                  Object.assign({}, agentThere, {
+                    state: { _tag: "Discarded", reason: "participation-ended" },
+                  }),
+                ),
+              );
+              expect(yield* bound.notifications.get(agentElsewhere!.id)).toEqual(
+                Option.some(agentElsewhere),
+              );
             }),
           ),
         ),

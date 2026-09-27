@@ -35,11 +35,6 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - The directory keeps listing a removed membership, so the apps can explain it, with the
   workspace's current name, owner, and member count: someone removed still sees later renames and
   the headcount.
-- Removing someone from a group or the workspace ends each of their thread participations in the
-  same commit, each with its own timeline note, so its cost grows with the threads they take part
-  in: about 6 seconds for 2,000 in one group. Past about 9,500 it exceeds the 30-second commit
-  deadline and the removal fails every time. Bounding it means either ending them together, with
-  one note, or publishing in batches; the general group makes it grow for everyone.
 - Names need not be unique: two members, groups, or workspaces can share a name. Hidden
   characters that make one name read as another are refused.
 - Catching up with a group records the host's time when the mark arrives, not the newest activity
@@ -65,12 +60,14 @@ unread dots, the sidebar's new-activity dot, and the pending counts of what was 
 while the page is visible. A thread counts as read when it opens, however far back the reader has
 scrolled. Someone writing a reply shows as typing in the thread panel and on the thread's row in
 the stream until their signal runs out or their message arrives; starting a thread sends no
-typing, since there is no thread yet. The thread panel's bell follows and unfollows its thread, and a
-team group's header bell follows the group so that threads started there afterwards include the
-reader, filled while following and confirmed by a toast; following agents on someone's behalf has no control. The thread panel notes someone
-following the thread, stopping, leaving the group, or being removed, between its messages; joining
-by writing or being mentioned shows only in the message. A group's stream shows its threads, not
-people joining or leaving the group.
+typing, since there is no thread yet. In a team group, the thread panel's bell follows and
+unfollows its thread, and the header bell follows the group so that threads started there
+afterwards include the reader, filled while following and confirmed by a toast; direct
+conversations have neither, since everyone takes part in all of them. Following agents on someone's
+behalf has no control. The thread panel notes someone following the thread or stopping, between its
+messages; joining by writing or being mentioned shows only in the message. Leaving or being removed
+from a group shows in its members, not in its threads or stream, though threads keep the notes
+recorded before departures stopped writing to them.
 
 Every workspace starts with a general group that every member joins with the workspace and leaves
 only by leaving the workspace; workspaces created before it existed have none. Agents join no
@@ -227,7 +224,8 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
 - New notifications reach their recipients over the feed, and a human's `Seen` and read positions
   reach their other sessions as signals. An agent's pending notifications discarded when its
-  participation ends show only through the participation-ended activity and the inbox.
+  participation ends show only through the inbox, beside an unfollow's participation-ended
+  activity or the group departure.
 - While a newer host records a fact version an older host does not know, as during a deployment
   that changes a fact, each such commit ends every subscription on the older host, which
   reconnects with a reset and refreshes its view.

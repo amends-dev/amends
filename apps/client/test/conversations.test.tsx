@@ -1301,7 +1301,7 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
   let thread!: FollowController, group!: ReturnType<typeof useGroupFollow>;
   const changed: Array<[string, boolean]> = [];
   function Consumer() {
-    thread = useThreadFollow("one", "thread", {
+    thread = useThreadFollow("one", "group", "thread", {
       changed: (following) => changed.push(["thread", following]),
     });
     group = useGroupFollow("one", "group", {
@@ -1436,4 +1436,85 @@ it("a follow the read does not show settles on what the read says, and one that 
   expect(group.following()).toBe(false);
   expect(group.error()).toBeDefined();
   expect(heard).toEqual([["failed", true]]);
+});
+
+it("offers no following in a direct conversation, where everyone takes part in everything", async () => {
+  const requests: Array<string> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST") requests.push(path);
+    if (path === "/me/workspaces")
+      return json({
+        memberships: [
+          {
+            workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" },
+            member: {
+              id: "owner",
+              workspaceId: "one",
+              identity: { _tag: "Human", id: "alice" },
+              status: "active",
+            },
+            people: 2,
+          },
+        ],
+        invitations: [],
+      });
+    if (path.endsWith("/participants"))
+      return json([
+        {
+          id: "participation",
+          workspaceId: "one",
+          threadId: "thread",
+          participant: { _tag: "Member", memberId: "owner" },
+          joinedAt: minute(1),
+          joinedAtSequence: 1,
+        },
+      ]);
+    if (path.endsWith("/groups"))
+      return json([
+        {
+          group: {
+            id: "dm",
+            workspaceId: "one",
+            kind: "Direct",
+            memberIds: ["ada", "owner"],
+            createdBy: "owner",
+            createdAt: minute(0),
+          },
+          latestActivityAt: null,
+          caughtUpAt: null,
+          newActivity: false,
+          following: false,
+          pending: 0,
+          manageable: false,
+          membersRemovable: false,
+          renamable: false,
+        },
+      ]);
+    return new Response(null, { status: 204 });
+  });
+  let thread!: FollowController;
+  function Consumer() {
+    thread = useThreadFollow("one", "dm", "thread");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(thread.following()).toBe(true));
+  expect(thread.followable()).toBe(false);
+  thread.toggle();
+  expect(thread.pending()).toBe(false);
+  expect(requests).toEqual([]);
 });

@@ -111,6 +111,10 @@ export const Departure = Schema.Struct({
   ...UnfollowInput.fields,
 });
 export interface Departure extends Schema.Schema.Type<typeof Departure> {}
+/**
+ * Why a participation ended. Only unfollowing records an ending now; the departure reasons name
+ * endings recorded before a group departure ended participations itself, and stay readable.
+ */
 export const EndReason = Schema.Literals([
   "unfollowed",
   "group-left",

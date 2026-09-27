@@ -284,7 +284,7 @@ function ThreadPanel(props: {
   const reply = useReply(props.workspaceId, props.threadId);
   const candidates = useMentionCandidates(props.workspaceId, props.groupId);
   const actions = useWorkspaceActions();
-  const follow = useThreadFollow(props.workspaceId, props.threadId, {
+  const follow = useThreadFollow(props.workspaceId, props.groupId, props.threadId, {
     failed: (following) =>
       actions.toast(
         following
@@ -316,7 +316,7 @@ function ThreadPanel(props: {
       focusId={thread.focusId()}
       typing={thread.typing()}
       follow={
-        follow.following() === undefined
+        !follow.followable() || follow.following() === undefined
           ? undefined
           : {
               following: follow.following() ?? false,

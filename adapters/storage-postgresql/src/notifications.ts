@@ -383,22 +383,28 @@ export const make = Effect.fn("Notifications.make")(function* () {
         const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput).pipe(
           Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
         );
-        // The same predicate as the pending counts, so pending_notifications_by_group finds them.
-        yield* guard(
-          db
-            .update(notifications)
-            .set({ state: "Discarded", discardReason: "access-lost" })
-            .where(
-              and(
-                inWorkspace,
-                eq(notifications.recipientKind, "Human"),
-                eq(inbox, memberId),
-                pendingOnly,
-                eq(notifications.threadGroupId, groupId),
+        // The same predicate as the pending counts, so pending_notifications_by_group finds them:
+        // an agent never has Seen, so its pending rows match it too.
+        const settlements = [
+          { kind: "Human", reason: "access-lost" },
+          { kind: "Agent", reason: "participation-ended" },
+        ] as const;
+        for (const { kind, reason } of settlements)
+          yield* guard(
+            db
+              .update(notifications)
+              .set({ state: "Discarded", discardReason: reason })
+              .where(
+                and(
+                  inWorkspace,
+                  eq(notifications.recipientKind, kind),
+                  eq(inbox, memberId),
+                  pendingOnly,
+                  eq(notifications.threadGroupId, groupId),
+                ),
               ),
-            ),
-          true,
-        ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForGroup")));
+            true,
+          ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForGroup")));
       },
     ),
     insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),

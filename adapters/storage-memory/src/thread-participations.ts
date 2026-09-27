@@ -73,18 +73,33 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "findActive")),
     ),
-    listByAdmission: Effect.fn("ThreadParticipations.listByAdmission")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);
-        return (yield* all)
-          .filter(
-            (record) =>
-              record.participant._tag === "Member" && record.participant.groupMembershipId === id,
-          )
-          .toSorted(byId);
-      },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "listByAdmission")),
-    ),
+    endByAdmission: Effect.fn("ThreadParticipations.endByAdmission")(function* (input, time) {
+      yield* Store.Transaction;
+      const id = yield* Schema.decodeEffect(GroupMembership.Id)(input).pipe(
+        Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")),
+      );
+      const endedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
+        time,
+      ).pipe(Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")));
+      const space = yield* write.pipe(
+        Effect.mapError(storeFailure(ThreadParticipationStore, "endByAdmission")),
+      );
+      const records = yield* rows
+        .all(space.records.threadParticipations)
+        .pipe(Effect.mapError(storeFailure(ThreadParticipationStore, "endByAdmission")));
+      for (const record of records) {
+        if (
+          record.status !== "active" ||
+          record.participant._tag !== "Member" ||
+          record.participant.groupMembershipId !== id
+        )
+          continue;
+        const row = yield* rows
+          .encode({ ...record, status: "ended", endedAt })
+          .pipe(Effect.mapError(storeFailure(ThreadParticipationStore, "endByAdmission")));
+        space.records.threadParticipations.set(record.id, row);
+      }
+    }),
     end: Effect.fn("ThreadParticipations.end")(function* (input, time) {
       yield* Store.Transaction;
       const departure = yield* Schema.decodeEffect(ThreadParticipation.Departure)(input).pipe(

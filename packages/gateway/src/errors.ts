@@ -105,6 +105,7 @@ export const PublicError = Schema.Union([
   ThreadParticipationApplication.ThreadNotFound,
   ThreadParticipationApplication.NotFound,
   ThreadParticipationApplication.AlreadyEnded,
+  ThreadParticipationApplication.FixedParticipation,
   GroupApplication.MemberNotFound,
   GroupApplication.NotFound,
   GroupApplication.InactiveMember,

@@ -450,6 +450,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
         // The same people always share one direct group.
         expect(second.thread.groupId).toBe(direct.thread.groupId);
         const groupId = direct.thread.groupId;
+        // Everyone in it takes part in every thread, so none of them can be unfollowed.
+        const participants = yield* asBob.threads.participants({
+          params: { workspaceId, threadId: direct.thread.id },
+          query: { limit: 10 },
+        });
+        const own = participants.find(
+          (participant) =>
+            participant.participant._tag === "Member" && participant.participant.memberId === bobId,
+        )!;
+        expect(
+          yield* asBob.threads
+            .unfollow({
+              params: { workspaceId, threadId: direct.thread.id },
+              payload: { participationId: own.id },
+            })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "ThreadParticipationApplication.FixedParticipation" });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({
           group: { id: groupId, kind: "Direct", memberIds: [aliceId, bobId].sort() },

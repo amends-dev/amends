@@ -10,7 +10,12 @@ import {
   type Target,
 } from "@amends/core/authorization";
 
-import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+import {
+  Group,
+  GroupApplication,
+  GroupMembershipApplication,
+  GroupMembershipFacts,
+} from "@amends/core/group";
 
 import { Actor, Identity } from "@amends/core/identity";
 
@@ -1210,7 +1215,7 @@ export const threadParticipation = (harness: Harness) => {
     );
 
     it.effect(
-      "group and workspace departures record one ending per active participation and roll back a partial cascade",
+      "group and workspace departures end every active participation at once, without thread activity, and roll back a partial cascade",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -1229,19 +1234,25 @@ export const threadParticipation = (harness: Harness) => {
                 start(otherGroup.id, [owner.memberId, agentId]),
               );
               const threads = [first.thread.id, second.thread.id, third.thread.id];
+              const agentParticipations = Effect.map(
+                Effect.forEach(threads, (id) => bound.participations.listByThread(id)),
+                (all) =>
+                  all.flat().filter((p) => ThreadParticipation.memberOf(p.participant) === agentId),
+              );
               const before = yield* Effect.forEach(threads, (id) => snapshot(bound, id));
-              let endings = 0;
-              const context = Context.add(bound.context, ThreadActivityStore.Service, {
-                ...bound.activities,
-                insert: (activity) =>
-                  activity.kind === ThreadParticipationActivity.Ended.name && ++endings === 2
+              // Removing the agent from the workspace departs both groups; the second fails.
+              let departures = 0;
+              const context = Context.add(bound.context, ThreadParticipationStore.Service, {
+                ...bound.participations,
+                endByAdmission: (id, endedAt) =>
+                  ++departures === 2
                     ? Effect.fail(
-                        new ThreadActivityStore.Failure({
-                          operation: "insert",
-                          cause: "second ending failed",
+                        new ThreadParticipationStore.Failure({
+                          operation: "endByAdmission",
+                          cause: "second departure failed",
                         }),
                       )
-                    : bound.activities.insert(activity),
+                    : bound.participations.endByAdmission(id, endedAt),
               });
               expect(
                 Exit.isFailure(
@@ -1254,13 +1265,16 @@ export const threadParticipation = (harness: Harness) => {
                   ),
                 ),
               ).toBe(true);
+              expect(departures).toBe(2);
               expect(yield* Effect.forEach(threads, (id) => snapshot(bound, id))).toEqual(before);
               expect(yield* bound.members.get(agentId)).toMatchObject({
                 value: { status: "active" },
               });
+              // Each departure ends every participation it held, together, when it happens.
               const admission = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(group.id, agentId),
               );
+              yield* TestClock.adjust("1 second");
               yield* run(
                 bound,
                 owner,
@@ -1268,9 +1282,11 @@ export const threadParticipation = (harness: Harness) => {
                   s.remove({ groupId: group.id, membershipId: admission.id }),
                 ),
               );
+              const removedAt = yield* DateTime.now;
               const otherAdmission = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(otherGroup.id, agentId),
               );
+              yield* TestClock.adjust("1 second");
               yield* run(
                 bound,
                 agent,
@@ -1278,16 +1294,23 @@ export const threadParticipation = (harness: Harness) => {
                   s.leave({ groupId: otherGroup.id, membershipId: otherAdmission.id }),
                 ),
               );
-              for (const [index, threadId] of threads.entries()) {
-                const activities = yield* bound.activities.listByThread(threadId);
-                expect(activities).toHaveLength(2);
-                expect(activities[1]).toMatchObject({
-                  kind: ThreadParticipationActivity.Ended.name,
-                  sequence: 2,
-                  details: { reason: index < 2 ? "group-removed" : "group-left" },
-                });
-                expect(yield* run(bound, owner, timeline(threadId))).toHaveLength(2);
+              const leftAt = yield* DateTime.now;
+              expect(
+                (yield* agentParticipations).map((p) => [p.threadId, p.status, p.endedAt]),
+              ).toEqual([
+                [first.thread.id, "ended", removedAt],
+                [second.thread.id, "ended", removedAt],
+                [third.thread.id, "ended", leftAt],
+              ]);
+              // Threads record nothing of it: their timelines hold only their messages.
+              for (const threadId of threads) {
+                expect((yield* bound.activities.listByThread(threadId)).map((a) => a.kind)).toEqual(
+                  [ThreadMessageActivity.Published.name],
+                );
+                expect(yield* run(bound, owner, timeline(threadId))).toHaveLength(1);
               }
+              // Back in the group, a mention admits the agent afresh, and leaving the workspace
+              // ends that participation too.
               yield* run(
                 bound,
                 owner,
@@ -1301,45 +1324,145 @@ export const threadParticipation = (harness: Harness) => {
                 owner,
                 Effect.flatMap(MemberApplication.Service, (s) => s.remove(agentId)),
               );
-              const final = yield* bound.activities.listByThread(first.thread.id);
-              expect(final.map((a) => a.kind)).toEqual([
-                ThreadMessageActivity.Published.name,
-                ThreadParticipationActivity.Ended.name,
-                ThreadMessageActivity.Published.name,
-                ThreadParticipationActivity.Ended.name,
-              ]);
-              expect(final[3]).toMatchObject({
-                details: { reason: "workspace-removed" },
-                sequence: 4,
-              });
+              const all = yield* agentParticipations;
+              expect(all).toHaveLength(4);
+              expect(all.every((p) => p.status === "ended")).toBe(true);
               expect(
-                yield* bound.notifications.listPendingByRecipient(
-                  Notification.ofMember(agent.memberId, agent.identity),
-                  { limit: 100 },
+                (yield* bound.activities.listByThread(first.thread.id)).map((a) => a.kind),
+              ).toEqual([
+                ThreadMessageActivity.Published.name,
+                ThreadMessageActivity.Published.name,
+              ]);
+              // Every piece of input the agent had pending ended with its participation.
+              expect((yield* notifications(bound, agentId)).map((n) => n.state)).toEqual(
+                Array.from({ length: 4 }, () => ({
+                  _tag: "Discarded",
+                  reason: "participation-ended",
+                })),
+              );
+              // The journal holds no ending per participation, and rebuilds to the same state.
+              expect(
+                yield* facts(
+                  bound,
+                  Effect.flatMap(Journal.Service, (j) =>
+                    j.read({ name: ThreadParticipationFacts.Ended.name, limit: 100 }),
+                  ),
                 ),
               ).toEqual([]);
-              const events = yield* facts(
+              const live = yield* Effect.forEach(threads, (id) => snapshot(bound, id));
+              yield* storage.discardProjections;
+              yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) =>
-                  j
-                    .read({ name: ThreadActivityFacts.Recorded.name, limit: 100 })
-                    .pipe(
-                      Effect.flatMap((rows) =>
-                        Effect.forEach(rows, (r) => Event.decode(ThreadActivityFacts.Recorded, r)),
-                      ),
-                    ),
-                ),
+                Effect.flatMap(Journal.Service, (j) => j.replay),
               );
-              expect(events).toHaveLength(8);
-              for (const event of events.filter(
-                (e) => e.payload.activity.kind === ThreadParticipationActivity.Ended.name,
-              )) {
-                expect(event.payload.recipients).toEqual([]);
-                expect(event.provenance.causedBy).not.toBeNull();
-              }
+              expect(yield* Effect.forEach(threads, (id) => snapshot(bound, id))).toEqual(live);
             }),
           ),
         ),
+    );
+
+    it.effect(
+      "a departure recorded with an ending for each participation, as before, rebuilds to the same state",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, group, first } = yield* prepare();
+              const participant = (yield* bound.participations.listByThread(first.thread.id)).find(
+                (p) => ThreadParticipation.memberOf(p.participant) === agentId,
+              );
+              if (participant === undefined) return yield* Effect.die("Missing agent");
+              // Leaving used to record the departure, then an ending for each participation.
+              yield* facts(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.commit(
+                    Effect.gen(function* () {
+                      const recorder = yield* ThreadActivityRecording.make();
+                      const occurredAt = yield* DateTime.now;
+                      const removed = yield* journal
+                        .publish(GroupMembershipFacts.Removed, {
+                          workspaceId,
+                          groupId: group.id,
+                          membershipId: memberParticipant(participant).groupMembershipId,
+                          memberId: agentId,
+                          reason: "left",
+                        })
+                        .pipe(Publication.withOccurredAt(occurredAt));
+                      const ended = yield* journal
+                        .publish(ThreadParticipationFacts.Ended, {
+                          workspaceId,
+                          groupId: group.id,
+                          threadId: first.thread.id,
+                          participationId: participant.id,
+                          reason: "group-left",
+                        })
+                        .pipe(Publication.withCause(removed, occurredAt));
+                      yield* recorder
+                        .record({
+                          threadId: first.thread.id,
+                          sequence: yield* recorder.nextSequence(first.thread.id),
+                          occurredAt,
+                          kind: ThreadParticipationActivity.Ended,
+                          details: { participationId: participant.id, reason: "group-left" },
+                          recipients: [],
+                        })
+                        .pipe(Publication.withCause(ended, occurredAt));
+                    }),
+                  ),
+                ),
+              );
+              const live = yield* snapshot(bound, first.thread.id);
+              expect(live.participants.find((p) => p.id === participant.id)).toMatchObject({
+                status: "ended",
+              });
+              expect(live.activities.map((a) => a.kind)).toEqual([
+                ThreadMessageActivity.Published.name,
+                ThreadParticipationActivity.Ended.name,
+              ]);
+              expect(live.agent.map((n) => n.state)).toEqual([
+                { _tag: "Discarded", reason: "participation-ended" },
+              ]);
+              yield* storage.discardProjections;
+              yield* facts(
+                bound,
+                Effect.flatMap(Journal.Service, (j) => j.replay),
+              );
+              expect(yield* snapshot(bound, first.thread.id)).toEqual(live);
+            }),
+          ),
+        ),
+    );
+
+    it.effect("a direct conversation's threads cannot be unfollowed, and nothing is recorded", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner } = yield* prepare();
+            const started = yield* run(
+              bound,
+              owner,
+              Effect.flatMap(ThreadApplication.Service, (s) =>
+                s.startDirect({ memberIds: [humanId], text: "Hi", mentions: [] }),
+              ),
+            );
+            const own = (yield* bound.participations.listByThread(started.thread.id)).find(
+              (p) => ThreadParticipation.memberOf(p.participant) === owner.memberId,
+            );
+            if (own === undefined) return yield* Effect.die("Missing author");
+            const before = yield* snapshot(bound, started.thread.id);
+            expect(
+              yield* Effect.flip(run(bound, owner, unfollow(started.thread.id, own.id))),
+            ).toMatchObject({
+              _tag: "ThreadParticipationApplication.FixedParticipation",
+              threadId: started.thread.id,
+            });
+            expect(yield* snapshot(bound, started.thread.id)).toEqual(before);
+          }),
+        ),
+      ),
     );
 
     it.effect(

@@ -983,10 +983,11 @@ export const threads = (harness: Harness) => {
                 ...bound,
                 context: Context.add(bound.context, NotificationStore.Service, {
                   ...bound.notifications,
-                  discardPendingForParticipation: () =>
+                  // Leaving settles the agent's pending input with the departure itself.
+                  discardPendingForGroup: () =>
                     Effect.fail(
                       new NotificationStore.Failure({
-                        operation: "discardPendingForParticipation",
+                        operation: "discardPendingForGroup",
                         cause: "injected",
                       }),
                     ),

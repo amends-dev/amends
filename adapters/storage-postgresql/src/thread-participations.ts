@@ -172,19 +172,29 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "findActive")),
     ),
-    listByAdmission: Effect.fn("ThreadParticipations.listByAdmission")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);
-        return yield* guard(
-          db
-            .select()
-            .from(threadParticipations)
-            .where(and(inWorkspace, eq(threadParticipations.groupMembershipId, id)))
-            .orderBy(sql`${threadParticipations.id} COLLATE "C"`),
-        ).pipe(Effect.flatMap(decodeRows));
-      },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "listByAdmission")),
-    ),
+    endByAdmission: Effect.fn("ThreadParticipations.endByAdmission")(function* (input, time) {
+      yield* Store.Transaction;
+      const id = yield* Schema.decodeEffect(GroupMembership.Id)(input).pipe(
+        Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")),
+      );
+      const endedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
+        time,
+      ).pipe(Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")));
+      // One statement however many there are; participations_by_admission finds them.
+      yield* guard(
+        db
+          .update(threadParticipations)
+          .set({ status: "ended", endedAt: DateTime.toDate(endedAt) })
+          .where(
+            and(
+              inWorkspace,
+              eq(threadParticipations.groupMembershipId, id),
+              eq(threadParticipations.status, "active"),
+            ),
+          ),
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "endByAdmission")));
+    }),
     end: Effect.fn("ThreadParticipations.end")(function* (input, time) {
       yield* Store.Transaction;
       const departure = yield* Schema.decodeEffect(ThreadParticipation.Departure)(input).pipe(

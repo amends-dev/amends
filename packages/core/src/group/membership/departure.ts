@@ -1,9 +1,10 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { DateTime } from "effect";
 import { Journal } from "../../journal/journal.ts";
+import type { Log } from "../../journal/log.ts";
+import type { Projection } from "../../journal/projection.ts";
 import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
-import { ThreadParticipationDeparture } from "../../thread/participation/departure.ts";
 import { GroupMembership } from "./membership.ts";
 import { GroupMembershipFacts } from "./facts.ts";
 import { GroupMembershipStore } from "./store.ts";
@@ -13,11 +14,18 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
   { message: Schema.String },
 ) {}
 export type Error =
-  | ThreadParticipationDeparture.Error
+  | Projection.Error
+  | Log.WriteError
   | GroupMembershipStore.Failure
+  | Schema.SchemaError
   | InvalidReference;
 export interface Interface {
   readonly workspaceId: GroupMembership.Record["workspaceId"];
+  /**
+   * End an active admission, recording why. The departure is one fact however much the member
+   * took part: projections end their follow of the group and every thread participation held
+   * through the admission, and settle what they had pending from the group, all together.
+   */
   readonly remove: (
     input: GroupMembership.Removal,
     occurredAt: DateTime.Utc,
@@ -28,13 +36,8 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 export const make = Effect.fn("GroupMembershipDeparture.make")(function* () {
   const memberships = yield* GroupMembershipStore.Service;
-  const departures = yield* ThreadParticipationDeparture.Service;
   const journal = yield* Journal.Service;
   const workspaceId = memberships.workspaceId;
-  if (departures.workspaceId !== workspaceId)
-    return yield* new InvalidReference({
-      message: "Group departure services belong to different workspaces",
-    });
   const remove = Effect.fn("GroupMembershipDeparture.remove")(function* (
     input: GroupMembership.Removal,
     occurredAt: DateTime.Utc,
@@ -58,18 +61,9 @@ export const make = Effect.fn("GroupMembershipDeparture.make")(function* () {
       return yield* new InvalidReference({
         message: "Admission is inconsistent or already removed",
       });
-    const removed = yield* journal
+    yield* journal
       .publish(GroupMembershipFacts.Removed, request)
       .pipe(Publication.withOccurredAt(occurredAt));
-    const reason =
-      request.reason === "left"
-        ? "group-left"
-        : request.reason === "removed"
-          ? "group-removed"
-          : "workspace-removed";
-    yield* departures
-      .endByAdmission(membership, reason, occurredAt)
-      .pipe(Publication.withCause(removed, occurredAt));
   });
   return Service.of({ workspaceId, remove });
 });

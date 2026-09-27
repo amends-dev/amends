@@ -152,8 +152,10 @@ export interface Interface {
     id: ThreadParticipationId.Id,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
-   * Settle a person's pending, unseen notifications from a group's threads once they no longer
-   * belong to it, as `access-lost`, keeping them as history. Seen ones and everyone else's stay.
+   * Settle what a member had pending from a group's threads once they no longer belong to it,
+   * keeping it as history: a person's unseen notifications as `access-lost`, and an agent's
+   * pending input as `participation-ended`, since every participation it held there ended with
+   * the departure. A person's seen ones and everyone else's stay.
    */
   readonly discardPendingForGroup: (
     memberId: MemberId.Id,

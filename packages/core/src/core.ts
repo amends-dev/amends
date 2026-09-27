@@ -156,7 +156,7 @@ const publisher = ThreadActivityPublisher.layer.pipe(
   Layer.provide(Layer.mergeAll(admissions, recording)),
 );
 const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(publisher));
-const groupDeparture = GroupMembershipDeparture.layer.pipe(Layer.provide(departures));
+const groupDeparture = GroupMembershipDeparture.layer;
 const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(publisher));
 const threadStart = ThreadStart.layer.pipe(
   Layer.provide(Layer.mergeAll(ThreadCreation.layer, messagePublication)),

@@ -14,8 +14,9 @@ import { ThreadParticipationStore } from "./store.ts";
 import { ThreadParticipationAdmission } from "./admission.ts";
 import { ThreadParticipationDeparture } from "./departure.ts";
 import { ThreadParticipationPermissions } from "./permissions.ts";
-import { AlreadyEnded, NotFound, ThreadNotFound } from "./errors.ts";
-export { AlreadyEnded, NotFound, ThreadNotFound } from "./errors.ts";
+import { GroupStore } from "../../group/store.ts";
+import { AlreadyEnded, FixedParticipation, NotFound, ThreadNotFound } from "./errors.ts";
+export { AlreadyEnded, FixedParticipation, NotFound, ThreadNotFound } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "ThreadParticipationApplication.InvalidResponse",
@@ -27,9 +28,11 @@ export type Error =
   | ThreadParticipationAdmission.Error
   | ThreadActivityPublisher.Error
   | ThreadParticipationDeparture.Error
+  | GroupStore.Failure
   | ThreadNotFound
   | NotFound
   | AlreadyEnded
+  | FixedParticipation
   | InvalidResponse;
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
@@ -37,7 +40,10 @@ export interface Interface {
   readonly follow: (
     threadId: Thread.Id,
   ) => Effect.Effect<ThreadParticipation.Summary, Error, Actor.Service>;
-  /** End only the actor's addressed participation, with no action grant required. */
+  /**
+   * End only the actor's addressed participation, with no action grant required. Threads of a
+   * direct conversation, where everyone takes part in everything, cannot be unfollowed.
+   */
   readonly unfollow: (
     input: ThreadParticipation.UnfollowInput,
   ) => Effect.Effect<void, Error, Actor.Service>;
@@ -55,6 +61,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
   const participations = yield* ThreadParticipationStore.Service;
   const publisher = yield* ThreadActivityPublisher.Service;
   const departures = yield* ThreadParticipationDeparture.Service;
+  const groups = yield* GroupStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
@@ -65,6 +72,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
       participations.workspaceId,
       publisher.workspaceId,
       departures.workspaceId,
+      groups.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({
@@ -134,6 +142,11 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
     function* (input: ThreadParticipation.UnfollowInput) {
       const request = yield* Schema.decodeEffect(ThreadParticipation.UnfollowInput)(input);
       const thread = yield* requireAccess(request.threadId);
+      const group = yield* groups.get(thread.groupId);
+      if (Option.isNone(group))
+        return yield* new InvalidResponse({ message: "Thread group is missing" });
+      if (group.value.kind === "Direct")
+        return yield* new FixedParticipation({ threadId: thread.id });
       const actor = yield* Actor.Service;
       const found = yield* participations.get(request.participationId);
       if (Option.isNone(found)) return yield* new NotFound(request);
@@ -161,7 +174,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         return yield* new InvalidResponse({
           message: "Participation no longer has a current group admission",
         });
-      yield* departures.end({ ...request, workspaceId }, "unfollowed", yield* DateTime.now);
+      yield* departures.end({ ...request, workspaceId }, yield* DateTime.now);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

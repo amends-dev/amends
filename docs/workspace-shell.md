@@ -47,8 +47,8 @@ members.
 A team group's bell follows it, so new threads there include the reader, or stops: it is filled
 while the reader follows, and a toast confirms each change once it lands ("Following #design",
 "Unfollowed #design"); a change that fails puts the bell back and says so in a toast. In the side
-panel the bell follows the thread, filled the same way. Direct
-conversations have no bell, since everyone takes part in every thread. The member stack and
+panel the bell follows the thread, filled the same way. Direct conversations have neither bell, in
+the header or the side panel, since everyone takes part in every thread. The member stack and
 the settings button open Group settings: General renames the group and leaves it, and Members
 adds and removes people as the reader may. Visibility is shown but cannot change, since the host
 offers no such operation. A direct conversation's settings show only its fixed members.

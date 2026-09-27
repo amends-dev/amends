@@ -282,12 +282,13 @@ message is published, looking again when the soonest runs out. A reply's compose
 thread's readers that the reader is typing when its draft grows, at most every 2.5 seconds; the
 server's signal lasts six.
 
-`useThreadFollow(workspaceId, threadId, events?)` and `useGroupFollow(workspaceId, groupId, events?)` return a
-`FollowController`: `following` once known, `pending`, an `error` code, and `toggle`. Following a
-thread makes the reader take part in it, read from its participants, which change feed
-participation events refresh; unfollowing ends the reader's own participation by its ID. A group
-follows for the reader's own member, from the groups list, and `followable` holds only for team
-groups. A change shows at once while pending; the request refreshes the read and waits for it
+`useThreadFollow(workspaceId, groupId, threadId, events?)` and `useGroupFollow(workspaceId, groupId,
+events?)` return a `FollowController`: `following` once known, `pending`, an `error` code,
+`followable`, and `toggle`. Following a thread makes the reader take part in it, read from its
+participants, which change feed participation events refresh; unfollowing ends the reader's own
+participation by its ID. A group follows for the reader's own member, from the groups list. Both
+are `followable` only in team groups, from the groups list: everyone in a direct conversation takes
+part in all of it, and `toggle` there does nothing. A change shows at once while pending; the request refreshes the read and waits for it
 before answering, so the read then has the last word, including the participation that undoing a
 thread follow needs. `events.changed` hears of a change the read shows, and `events.failed` of
 one that failed, each with the state asked for.

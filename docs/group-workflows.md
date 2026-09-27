@@ -178,9 +178,10 @@ Direct groups have fixed membership: adding to, removing from, or leaving one re
 Everyone stays in the [general group](#the-general-group): leaving it, or removing anyone from
 it, returns `GroupMembershipApplication.GeneralMembership`.
 
-A departure records its reason, `removed`, `left`, or `workspace-removed`, and ends the member's
-participation in the group's threads, discarding their pending agent input; see
-[departure and pending input](thread-workflows.md#departure-and-pending-input).
+A departure records its reason, `removed`, `left`, or `workspace-removed`, as one fact however much
+the member took part. It ends their follow of the group and their participation in all of its
+threads together, without recording anything in the threads, and settles what they had pending
+from it; see [departure and pending input](thread-workflows.md#departure-and-pending-input).
 
 ## Workspace-member removal
 

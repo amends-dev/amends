@@ -204,9 +204,12 @@ key, `new_activity`, and the kind's encoded `details` as `jsonb`, the one field 
 columns, so a new kind needs no migration. A unique index on the workspace and `occurrence` keeps a
 kind recorded once per subject, as with one activity per message or per participation ending;
 repeatable kinds leave it null. Core defines and validates each kind; the table has no per-kind
-constraint. Ending activity follows the participation's ending in the same commit and preserves its reason.
-Unfollow, group departure, and workspace removal record the same per-participation ending facts and
-activity; pending agent input is discarded in the same commit. Every kind uses the common
+constraint. An unfollow's ending activity follows the participation's ending in the same commit and
+preserves its reason, and discards that participation's pending agent input. A group or workspace
+departure ends every participation of the admission in one `UPDATE` through
+`participations_by_admission`, and settles the member's pending notifications from the group in
+one statement per recipient kind through `pending_notifications_by_group`, however many threads
+they took part in. Every kind uses the common
 activity-recorded fact and notification generator. The participation suite covers scoped grants,
 quiet follows, rejoining, stale requests, concurrent publication, rollback, historical reads, and
 replay. Participation lifecycle activity updates the development baseline: recreate disposable

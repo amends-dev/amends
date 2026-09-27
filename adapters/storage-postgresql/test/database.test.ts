@@ -213,10 +213,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
               condition: "thread_id =",
               query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${thread.id} AND member_id = ${memberIds[0]!}`,
             },
+            // A group departure ends every participation it held in one statement.
             {
               index: "participations_by_admission",
               condition: "group_membership_id =",
-              query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND group_membership_id = ${admission!.id} ORDER BY id COLLATE "C"`,
+              query: sql`UPDATE thread_participations SET status = 'ended', ended_at = now() WHERE workspace_id = ${workspaceId} AND group_membership_id = ${admission!.id} AND status = 'active'`,
             },
             {
               index: "group_memberships_by_member",
@@ -315,6 +316,43 @@ describe.skipIf(!available)("PostgreSQL", () => {
           );
           expect(pendingPlan).toMatch(/Index Scan using pending_notifications_by_recipient /);
           expect(pendingPlan).not.toMatch(/Rows Removed by Filter/);
+          // An agent that leaves has its pending input from the group settled through the same
+          // index, among the input agents elsewhere in the workspace have waiting.
+          const sample = inbox[0]!;
+          yield* bound.store.transaction(
+            bound.notifications.insertMany(
+              Array.makeBy(200, (index) =>
+                Object.assign({}, sample, {
+                  id: Notification.Id.make(`agent-input-${index}`),
+                  source: { ...sample.source, logId: `agent-input-${index}` },
+                  thread: {
+                    threadId: `agent-thread-${index}`,
+                    groupId: `agent-group-${index % 10}`,
+                    sequence: 1,
+                  },
+                  recipient: Notification.ofMember(Member.Id.make(`agent-${index % 20}`), {
+                    _tag: "Agent",
+                    id: Identity.AgentId.make(`agent-${index % 20}`),
+                  }),
+                }),
+              ),
+            ),
+          );
+          yield* sql`ANALYZE notifications`;
+          const agentPlan = yield* sql.withTransaction(
+            Effect.gen(function* () {
+              yield* sql`SET LOCAL enable_seqscan = off`;
+              yield* sql`SET LOCAL enable_bitmapscan = off`;
+              const rows = yield* sql<{
+                "QUERY PLAN": string;
+              }>`EXPLAIN UPDATE notifications SET state = 'Discarded', discard_reason = 'participation-ended' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Agent' AND coalesce(recipient_member_id, recipient_id, '') = ${"agent-0"} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${"agent-group-0"}`;
+              return rows.map((row) => row["QUERY PLAN"]).join("\n");
+            }),
+          );
+          expect(agentPlan).toMatch(/Index Scan using pending_notifications_by_group /);
+          expect(agentPlan.split("\n").find((line) => line.includes("Index Cond:"))).toContain(
+            "thread_group_id =",
+          );
         }),
       ),
     ),

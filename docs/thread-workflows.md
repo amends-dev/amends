@@ -153,10 +153,13 @@ participation. It requires current workspace and group membership but no action 
 can unfollow after losing the follow permission. Other members' IDs, another thread's IDs, and
 missing participations share `ThreadParticipationApplication.NotFound`; one's own ended
 participation returns `AlreadyEnded`. An inaccessible or missing thread returns
-`ThreadParticipationApplication.ThreadNotFound`.
+`ThreadParticipationApplication.ThreadNotFound`. Everyone in a direct conversation takes part in
+all of its threads, so unfollowing one returns `ThreadParticipationApplication.FixedParticipation`
+and records nothing.
 
-Unfollowing records a `participation.ended` activity with its reason and keeps the participation's
-history. Pending agent notifications for that participation are discarded in the same commit;
+Unfollowing records a `participation.ended` activity with reason `unfollowed` and keeps the
+participation's history. It is the only ending a thread records: leaving a group ends
+participations without thread activity ([departure and pending input](#departure-and-pending-input)). Pending agent notifications for that participation are discarded in the same commit;
 human notification history remains. A later follow, own reply, or mention can establish a fresh
 participation, which an old unfollow request cannot end. Unmentioned messages do not re-enroll an
 unfollowed member. Muting is not implemented.
@@ -212,7 +215,9 @@ and kind-specific `details`. Message items (`message.published`) contain `{ acti
 with `details: { messageId }`. Participation items (`participation.followed` and
 `participation.ended`) contain `{ activity, participant }`, where `participant` is a public joining
 summary, even for a participation that later ended, and `details` holds the `participationId`; an
-ending adds the departure `reason`, at the activity's `occurredAt`. Use `activity.kind` to tell them
+ending adds its `reason`, at the activity's `occurredAt`: `unfollowed`, or, in history recorded
+before departures stopped writing to threads, `group-left`, `group-removed`, or
+`workspace-removed`. Use `activity.kind` to tell them
 apart. Missing or inconsistent subjects, and kinds this host has no resolver for, fail the read
 instead of producing partial pages. See [activity kinds](../packages/core/README.md#activity-kinds).
 
@@ -318,19 +323,22 @@ repeats within two seconds are dropped. It is never stored.
 ## Departure and pending input
 
 Each member participation belongs to the group admission that established it. Leaving or being
-removed from the group, or from the workspace, ends every active participation under that admission,
-each recording a participation-ended activity with reason `unfollowed`, `group-left`,
-`group-removed`, or `workspace-removed`. Already ended participations keep their history, and
-rejoining never revives old work.
+removed from the group, or from the workspace, is one `group.membership.removed` fact however many
+threads the member took part in. Projections end every active participation under that admission
+with it, at the departure's time, and record nothing in the threads: the departure is a group event,
+seen in the group's roster. Already ended participations keep their history, and rejoining never
+revives old work. Journals recorded before this also hold an ending activity per participation
+after the departure; rebuilding reads them as already ended and reaches the same state.
 
 Pending agent notifications from an ended participation become
-`Discarded { reason: "participation-ended" }`, keeping their source, recipient, and time. A person's
-notifications stay pending when they only unfollow a thread, since they can still read it. Leaving
-or being removed from the group, or from the workspace, ends their access, so their pending, unseen
-notifications from its threads become `Discarded { reason: "access-lost" }`: out of the pending
-count and pending lists, kept in the full inbox as history. Ones already seen keep their Seen. All
-of it shares the departure's commit, and rebuilding from the journal settles them the same way,
-since the notification projection derives it from the recorded departure.
+`Discarded { reason: "participation-ended" }`, keeping their source, recipient, and time: an
+unfollow's ending settles that participation's, and a departure settles all of the agent's from the
+group. A person's notifications stay pending when they only unfollow a thread, since they can still
+read it. Leaving or being removed from the group, or from the workspace, ends their access, so their
+pending, unseen notifications from its threads become `Discarded { reason: "access-lost" }`: out of
+the pending count and pending lists, kept in the full inbox as history. Ones already seen keep their
+Seen. All of it shares the departure's commit, and rebuilding from the journal settles them the same
+way, since the projections derive it from the recorded departure.
 
 ## Recorded history and delivery
 

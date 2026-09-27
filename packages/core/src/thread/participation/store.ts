@@ -49,9 +49,14 @@ export interface Interface {
     id: ThreadId.Id,
     participants: ReadonlyArray<ThreadParticipation.Reference>,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
-  readonly listByAdmission: (
+  /**
+   * End every active participation held through this group admission at `endedAt`, however many
+   * there are, in one write; ended ones keep their time. A departure from the group ends them all.
+   */
+  readonly endByAdmission: (
     id: GroupMembership.Id,
-  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    endedAt: DateTime.Utc,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** End exactly the addressed active participation; mismatched or terminal records conflict. */
   readonly end: (
     departure: ThreadParticipation.Departure,

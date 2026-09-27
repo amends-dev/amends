@@ -315,16 +315,18 @@ export const make = Effect.fn("Notifications.make")(function* () {
           .all(space.records.notifications)
           .pipe(Effect.mapError(storeFailure(NotificationStore, "discardPendingForGroup")));
         for (const record of records) {
+          const { recipient } = record;
           if (
-            record.recipient._tag !== "Human" ||
-            record.recipient.memberId !== memberId ||
+            (recipient._tag !== "Human" && recipient._tag !== "Agent") ||
+            recipient.memberId !== memberId ||
             record.thread?.groupId !== groupId ||
             record.state._tag !== "Pending" ||
             space.notificationsSeen.has(record.id)
           )
             continue;
+          const reason = recipient._tag === "Agent" ? "participation-ended" : "access-lost";
           const row = yield* rows
-            .encode({ ...record, state: { _tag: "Discarded", reason: "access-lost" } })
+            .encode({ ...record, state: { _tag: "Discarded", reason } })
             .pipe(Effect.mapError(storeFailure(NotificationStore, "discardPendingForGroup")));
           space.records.notifications.set(record.id, row);
         }

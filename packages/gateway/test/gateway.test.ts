@@ -175,7 +175,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       listByThread: unexpected,
       pageActiveByThread: unexpected,
       findActive: unexpected,
-      listByAdmission: unexpected,
+      endByAdmission: unexpected,
       insert: unexpected,
       end: unexpected,
     }),

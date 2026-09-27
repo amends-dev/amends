@@ -98,6 +98,7 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "Client.InvalidCommand": "invalid",
   "GroupMembershipApplication.FixedMembership": "invalid",
   "GroupMembershipApplication.GeneralMembership": "invalid",
+  "ThreadParticipationApplication.FixedParticipation": "invalid",
   "GroupFollowApplication.NotFollowable": "invalid",
   "ThreadApplication.DirectMembersRequired": "invalid",
   "Gateway.InvalidInput": "invalid",
