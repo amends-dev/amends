@@ -1,6 +1,7 @@
 export * as Sidebar from "./sidebar.tsx";
 export type {
   BodyProps as SidebarBodyProps,
+  EmptyProps as SidebarEmptyProps,
   HeaderProps as SidebarHeaderProps,
   ItemPerson as SidebarItemPerson,
   ItemProps as SidebarItemProps,

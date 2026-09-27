@@ -217,6 +217,14 @@ export function Section(props: SectionProps) {
   return <div {...native} class={classes(s.section, local.class)} />;
 }
 
+export type EmptyProps = JSX.HTMLAttributes<HTMLParagraphElement>;
+
+/** A quiet line where a section has no items yet, such as "No groups yet". */
+export function Empty(props: EmptyProps) {
+  const [local, native] = splitProps(props, ["class"]);
+  return <p {...native} class={classes(s.empty, local.class)} />;
+}
+
 export type SectionHeaderProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "title"> & {
   /** Shown in capitals. */
   title: string;

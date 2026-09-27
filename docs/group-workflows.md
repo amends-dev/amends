@@ -26,11 +26,22 @@ anyone outside, such a group answers as missing. The built-in roles hold these g
 | Add people         | its members                 | its members                                 | no one       |
 | Rename             | its members                 | its members                                 | not named    |
 | Remove others      | its members                 | its members who moderate (`group.moderate`) | no one       |
-| Leave              | anyone in it                | anyone in it                                | cannot       |
+| Leave              | anyone in it                | anyone in it; people not the general group  | cannot       |
 
 Every built-in role holds `group.create`, `group.read`, `group.follow`, `group.rename`,
 `group.membership.manage`, and `group.join`; Administrator and Owner also hold `group.moderate`.
 An administrator moderates a public group from inside it, joining it first.
+
+## The general group
+
+Every workspace starts with a general group: a public team group named `general`, created with the
+workspace under the fixed ID `general` (`Group.GeneralId`), holding the creator. Each person who
+accepts an invitation joins it in the same commit. People never leave it and are not removed from
+it: leaving it, or removing a person from it, is `GroupMembershipApplication.GeneralMembership`,
+whatever the actor's authority. Leaving the workspace ends the admission, as it ends any other.
+Agents join, leave, and are removed as in any team group. It can be renamed, like any team group,
+and groups are never deleted. A workspace created before general groups existed has none, and its
+new members join nothing.
 
 ## Creating a group
 
@@ -162,6 +173,8 @@ which no earlier removal or leave request can end. Leaving grants no authority t
 
 Direct groups have fixed membership: adding to, removing from, or leaving one returns
 `GroupMembershipApplication.FixedMembership`. Including someone else needs another direct group.
+People stay in the [general group](#the-general-group): leaving it, or removing a person from it,
+returns `GroupMembershipApplication.GeneralMembership`.
 
 A departure records its reason, `removed`, `left`, or `workspace-removed`, and ends the member's
 participation in the group's threads, discarding their pending agent input; see

@@ -48,6 +48,8 @@ const sidebarRead = /^\/workspaces\/[^/]+\/(groups|members|permissions|notificat
 export interface Sidebar {
   readonly permissions?: ReadonlyArray<string>;
   readonly groups?: ReadonlyArray<unknown>;
+  /** The workspace's members, naming groups and listing teammates. */
+  readonly members?: ReadonlyArray<unknown>;
   readonly pending?: number;
 }
 /**
@@ -75,7 +77,9 @@ export function withChangeFeed(
                 ? (sidebar.groups ?? [])
                 : path.endsWith("/notifications/count")
                   ? { pending: sidebar.pending ?? 0 }
-                  : [],
+                  : path.endsWith("/members")
+                    ? (sidebar.members ?? [])
+                    : [],
           ),
           {
             headers: { "content-type": "application/json" },

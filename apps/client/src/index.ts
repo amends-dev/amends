@@ -98,6 +98,7 @@ export type {
 export { toDate } from "./conversations/time.ts";
 export {
   memberName,
+  useDirectMessages,
   useGroupConversation,
   useGroupPeople,
   useMentionCandidates,
@@ -107,6 +108,7 @@ export {
   useWorkspacePeople,
   type Author,
   type ConversationStatus,
+  type DirectEntry,
   type GroupEntry,
   type MentionCandidate,
   type MessagePart,

@@ -650,3 +650,34 @@ it("drafts a first direct message at its hash route and opens the conversation",
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g9"));
 });
+
+it("links teammates to a first message within the hash router", async () => {
+  const owner = {
+    id: "owner-one",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "jo" },
+    status: "active",
+  };
+  const directory = {
+    memberships: [
+      {
+        workspace: { id: "one", name: "Studio", createdBy: "jo", ownerMemberId: "owner-one" },
+        member: owner,
+        people: 2,
+      },
+    ],
+    invitations: [],
+  };
+  mount("/workspaces/one", "jo", () => Promise.resolve(response(directory)), {
+    members: [
+      owner,
+      { ...owner, id: "ada", identity: { _tag: "Human", id: "ada@example.test" }, name: "Ada" },
+    ],
+  });
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  expect(await within(sidebar).findByRole("link", { name: "Ada" })).toHaveAttribute(
+    "href",
+    "#/workspaces/one/direct?to=ada",
+  );
+  expect(within(sidebar).getByText("No groups yet")).toBeInTheDocument();
+});

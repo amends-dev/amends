@@ -11,8 +11,13 @@ panel.
 - **Sidebar**: the workspace (which switches workspace), Inbox with the count of what is pending
   for the reader, Triage, Tasks, then Groups and Direct messages. Groups' title links to the
   directory at `/groups`, with Browse groups (the Discover tab) and, for readers who may create
-  groups, Create group. Each group shows the reader's pending count, or a dot for activity they
-  have not seen. Direct messages lists direct groups by their other people, with New message.
+  groups, Create group. The general group comes first, then the rest by name; each shows the
+  reader's pending count, or a dot for activity they have not seen. With no groups, once they
+  load, the section says "No groups yet". Direct messages lists the reader's direct groups by their
+  other people, the most recently active first, then up to six teammates, people and agents, they
+  have no one-to-one conversation with yet, by name, with New message. A teammate's row opens a
+  first message to them; the conversation starts when it is sent. The reader is not listed:
+  a direct group needs at least one other member.
 - **Main**: one pane per page. `/groups/:groupId` shows the group's pane: its name, member stack,
   follow bell, settings, and its threads with the composer. `/groups` is the directory: Your
   groups and Discover, with Join.

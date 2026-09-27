@@ -159,8 +159,10 @@ export const gateway = (harness: Harness) => {
               );
               const batches = yield* bound.store.read(journalLog, { limit: 10 });
               expect(batches).toHaveLength(1);
-              expect(batches[0]?.entries).toHaveLength(7);
-              expect(batches[0]?.commit.entryCount).toBe(7);
+              // The workspace, its owner, three roles and their revision, the owner's assignment,
+              // and the general group with the owner in it.
+              expect(batches[0]?.entries).toHaveLength(9);
+              expect(batches[0]?.commit.entryCount).toBe(9);
             }
           }),
         ),
@@ -280,8 +282,8 @@ export const gateway = (harness: Harness) => {
           const bound = yield* forWorkspace(yield* storage.connect(), outcome.a.id);
           const batches = yield* bound.store.read(journalLog, { limit: 10 });
           expect(batches.map((batch) => Number(batch.position))).toEqual([0, 1, 2, 3]);
-          expect(batches[0]?.entries).toHaveLength(7);
-          expect(batches[0]?.commit.entryCount).toBe(7);
+          expect(batches[0]?.entries).toHaveLength(9);
+          expect(batches[0]?.commit.entryCount).toBe(9);
           const second = batches[1];
           if (second === undefined) return yield* Effect.die("Missing second batch");
           expect(yield* bound.store.get(journalLog, second.commit.id)).toEqual(Option.some(second));

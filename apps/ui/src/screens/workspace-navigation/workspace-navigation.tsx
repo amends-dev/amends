@@ -100,6 +100,8 @@ export interface WorkspaceNavigationProps {
   /** The directory of groups the title links to. */
   readonly groupsDirectory: NavigationLink;
   readonly groups: readonly NavigationGroup[];
+  /** The groups are still loading, so an empty list says nothing yet. */
+  readonly groupsLoading?: boolean;
   readonly directMessages: readonly NavigationDirect[];
   /** Shows the rail's Search and the sidebar's "Find anything". */
   readonly onSearch?: () => void;
@@ -256,6 +258,9 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                 )}
               </Show>
             </Sidebar.SectionHeader>
+            <Show when={!props.groupsLoading && props.groups.length === 0}>
+              <Sidebar.Empty>No groups yet</Sidebar.Empty>
+            </Show>
             <Sidebar.List>
               <Keyed each={props.groups} by={(group) => group.id}>
                 {(group) => (

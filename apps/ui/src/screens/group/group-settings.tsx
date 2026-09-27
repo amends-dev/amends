@@ -75,6 +75,8 @@ export interface GroupSettingsProps {
   readonly onSave: () => void;
   /** The reader belongs to the group. */
   readonly member: boolean;
+  /** The workspace's general group: everyone belongs to it, and people never leave it. */
+  readonly general?: boolean;
   /** The reader may leave. Default true. */
   readonly leavable?: boolean;
   readonly leaving?: boolean;
@@ -246,9 +248,11 @@ export function GroupSettings(props: GroupSettingsProps) {
                     <div class={s.membershipText}>
                       <h3 class={s.heading}>Membership</h3>
                       <p class={s.note}>
-                        {props.member
-                          ? "You’re a member of this group."
-                          : "You’re not a member of this group."}
+                        {props.general
+                          ? "Everyone in the workspace belongs to this group."
+                          : props.member
+                            ? "You’re a member of this group."
+                            : "You’re not a member of this group."}
                       </p>
                     </div>
                     <Show
@@ -259,7 +263,7 @@ export function GroupSettings(props: GroupSettingsProps) {
                         </Show>
                       }
                     >
-                      <Show when={props.leavable !== false}>
+                      <Show when={props.leavable !== false && !props.general}>
                         <Button disabled={props.leaving} onClick={() => props.onLeave()}>
                           Leave group
                         </Button>

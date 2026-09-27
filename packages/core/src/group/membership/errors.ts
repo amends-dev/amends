@@ -17,6 +17,14 @@ export class FixedMembership extends Schema.TaggedError<FixedMembership>()(
   "GroupMembershipApplication.FixedMembership",
   { groupId: Group.Id },
 ) {}
+/**
+ * Everyone in the workspace belongs to its general group: people neither leave it nor are removed
+ * from it. Leaving the workspace ends the admission.
+ */
+export class GeneralMembership extends Schema.TaggedError<GeneralMembership>()(
+  "GroupMembershipApplication.GeneralMembership",
+  { groupId: Group.Id },
+) {}
 export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
   "GroupMembershipApplication.GroupNotFound",
   { groupId: Group.Id },

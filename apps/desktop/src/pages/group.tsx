@@ -156,6 +156,7 @@ function Group(props: {
         saving={rename.pending()}
         onSave={rename.save}
         member
+        general={group()?.general}
         leavable={members.leavable()}
         leaving={members.changing() !== undefined && members.changing() === members.own()?.id}
         onLeave={members.leave}

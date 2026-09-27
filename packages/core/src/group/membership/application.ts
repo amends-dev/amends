@@ -24,6 +24,7 @@ import {
   AlreadyMember,
   AlreadyRemoved,
   FixedMembership,
+  GeneralMembership,
   GroupNotFound,
   InactiveMember,
   MemberNotFound,
@@ -33,6 +34,7 @@ export {
   AlreadyMember,
   AlreadyRemoved,
   FixedMembership,
+  GeneralMembership,
   GroupNotFound,
   InactiveMember,
   MemberNotFound,
@@ -61,6 +63,7 @@ export type Error =
   | NotFound
   | AlreadyRemoved
   | FixedMembership
+  | GeneralMembership
   | GroupAudience.InvalidResponse
   | InvalidResponse;
 
@@ -89,7 +92,7 @@ export interface Interface {
   /**
    * End this team-group admission, requiring group.membership.manage on its group and membership
    * of it. Any member may remove others from a private group; removing someone else from a public
-   * one also requires group.moderate.
+   * one also requires group.moderate. People are not removed from the general group.
    */
   readonly remove: (
     input: GroupMembership.RemoveInput,
@@ -100,7 +103,10 @@ export interface Interface {
    * returns the actor's current admission and records nothing.
    */
   readonly join: (groupId: Group.Id) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /** End only the actor's own team-group admission; active workspace membership is sufficient. */
+  /**
+   * End only the actor's own team-group admission; active workspace membership is sufficient.
+   * People do not leave the general group.
+   */
   readonly leave: (
     input: GroupMembership.LeaveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
@@ -280,6 +286,17 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     if (membership.groupId !== input.groupId) return yield* new NotFound(input);
     return membership;
   });
+  /** Whether a workspace member is a person, as opposed to an agent. */
+  const isPerson = Effect.fnUntraced(function* (memberId: Member.Id) {
+    const found = yield* members.get(memberId);
+    if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
+    const member = yield* decodeMember(found.value).pipe(Effect.mapError(invalidRecord));
+    if (member.workspaceId !== workspaceId || member.id !== memberId)
+      return yield* new InvalidResponse({
+        message: "Member store returned another member or workspace",
+      });
+    return member.identity._tag === "Human";
+  });
   const depart = Effect.fnUntraced(function* (
     membership: GroupMembership.Record,
     reason: "removed" | "left",
@@ -316,6 +333,8 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       const group = yield* loadManagedGroup(checked.groupId);
       const membership = yield* loadMembership(checked);
       // Removing someone from a public group is moderation; a private one is its members' to tidy.
+      if (Group.isGeneral(group) && (yield* isPerson(membership.memberId)))
+        return yield* new GeneralMembership({ groupId: group.id });
       const actor = yield* Actor.Service;
       if (group.visibility === "Public" && membership.memberId !== actor.memberId)
         yield* authorization.require([
@@ -338,7 +357,9 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       const membership = yield* loadMembership(checked);
       // Do not disclose another member's admission or departure state through self-service.
       if (membership.memberId !== actor.memberId) return yield* new NotFound(checked);
-      yield* loadManagedGroup(checked.groupId);
+      const group = yield* loadManagedGroup(checked.groupId);
+      if (Group.isGeneral(group) && actor.identity._tag === "Human")
+        return yield* new GeneralMembership({ groupId: group.id });
       return yield* depart(membership, "left");
     },
     Publication.withActor,

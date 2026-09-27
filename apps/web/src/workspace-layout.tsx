@@ -11,6 +11,7 @@ import {
   useThreadConversation,
   useThreadFollow,
   useWorkspace,
+  useDirectMessages,
   useWorkspaceGroups,
   useWorkspacePeople,
   useWorkspacePermission,
@@ -55,6 +56,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const appearance = useAppearance();
   const membership = useWorkspace(() => workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
+  const directs = useDirectMessages(workspaceId);
   const pending = useInboxPending(workspaceId);
   const creator = useWorkspacePermission(workspaceId, "group.create");
   const live = useLiveStatus();
@@ -64,7 +66,8 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
   );
   const browsing = useMatch(() => "/workspaces/:workspaceId/groups");
-  const [search] = useSearchParams<{ at?: string }>();
+  const [search] = useSearchParams<{ at?: string; to?: string }>();
+  const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
   const [dialog, setDialog] = createSignal<"create-group" | "new-message" | "name">();
   const [toasts, setToasts] = createSignal<ReadonlyArray<{ id: number; text: string }>>([]);
   let toastId = 0;
@@ -162,14 +165,25 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             pending: group.pending,
             unread: group.unread,
           }))}
-          directMessages={groups.directs().map((group) => ({
-            id: group.id,
-            name: group.name,
-            href: href(paths.group(workspaceId, group.id)),
-            current: groupId() === group.id,
-            pending: group.pending,
-            unread: group.unread,
-          }))}
+          groupsLoading={groups.all() === undefined}
+          directMessages={directs().map((entry) =>
+            entry.kind === "conversation"
+              ? {
+                  id: entry.id,
+                  name: entry.name,
+                  href: href(paths.group(workspaceId, entry.id)),
+                  current: groupId() === entry.id,
+                  pending: entry.pending,
+                  unread: entry.unread,
+                }
+              : {
+                  id: entry.id,
+                  name: entry.name,
+                  // A first message; the conversation starts when it is sent.
+                  href: href(paths.directDraft(workspaceId, entry.memberIds)),
+                  current: drafting() !== undefined && search.to === entry.id,
+                },
+          )}
           onSwitchWorkspace={() => navigate(paths.workspaces)}
           onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
           onCreateGroup={creator() ? openCreate : undefined}

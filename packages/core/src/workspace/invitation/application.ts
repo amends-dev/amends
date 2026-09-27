@@ -8,6 +8,10 @@ import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
+import { Group } from "../../group/group.ts";
+import { GroupMembershipFacts } from "../../group/membership/facts.ts";
+import { GroupMembership } from "../../group/membership/membership.ts";
+import { GroupStore } from "../../group/store.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Identity } from "../../identity/identity.ts";
 import { Journal } from "../../journal/journal.ts";
@@ -37,6 +41,7 @@ export type Error =
   | PlatformError.PlatformError
   | InvitationStore.Failure
   | MemberStore.Failure
+  | GroupStore.Failure
   | NotFound
   | NotRecipient
   | AlreadyMember
@@ -82,6 +87,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   InvalidResponse,
   | InvitationStore.Service
   | MemberStore.Service
+  | GroupStore.Service
   | Authorization.Service
   | Delegation.Service
   | Journal.Service
@@ -90,6 +96,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
 > {
   const invitations = yield* InvitationStore.Service;
   const members = yield* MemberStore.Service;
+  const groups = yield* GroupStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -100,6 +107,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     [
       invitations.workspaceId,
       members.workspaceId,
+      groups.workspaceId,
       authorization.workspaceId,
       delegation.workspaceId,
     ].some((id) => id !== workspaceId)
@@ -267,6 +275,17 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
         memberId: member.id,
         acceptedAt,
       });
+      // A person joins the workspace's general group as they join it; a workspace created before
+      // general groups existed has none.
+      if (Option.isSome(yield* groups.get(Group.GeneralId)))
+        yield* journal.publish(GroupMembershipFacts.Added, {
+          id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
+          workspaceId,
+          groupId: Group.GeneralId,
+          memberId: member.id,
+          admittedAt: acceptedAt,
+          status: "active",
+        });
       return member;
     }).pipe(Effect.provideService(Publication.Service, provenance));
   }, journal.commit);

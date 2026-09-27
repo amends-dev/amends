@@ -19,6 +19,26 @@ export const Members = {
   render: () => <GroupWorkspace settings="members" />,
 } satisfies Story;
 
+/**
+ * The workspace's general group: everyone belongs to it, so there is no Leave, and only agents can
+ * be removed.
+ */
+export const WorkspaceGeneral = {
+  render: () => <GroupWorkspace settings="general" general />,
+  play: async ({ canvasElement }) => {
+    const dialog = within(
+      await within(canvasElement).findByRole("dialog", { name: "Group settings" }),
+    );
+    await expect(
+      dialog.getByText("Everyone in the workspace belongs to this group."),
+    ).toBeVisible();
+    await expect(dialog.queryByRole("button", { name: "Leave group" })).toBeNull();
+    await userEvent.click(dialog.getByRole("button", { name: /Members/ }));
+    await expect(dialog.getByRole("button", { name: "Remove Yumi" })).toBeVisible();
+    await expect(dialog.queryByRole("button", { name: "Remove Sara" })).toBeNull();
+  },
+} satisfies Story;
+
 /** Renaming and making the group public; Save waits for a change and a name. */
 export const Rename = {
   render: () => <GroupWorkspace settings="general" />,

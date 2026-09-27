@@ -28,6 +28,18 @@ export const TeamRecord = Schema.Struct({
 });
 export interface TeamRecord extends Schema.Schema.Type<typeof TeamRecord> {}
 
+/**
+ * Every workspace has one general group, a public team group created with the workspace under
+ * this ID, so finding it needs no lookup. Each person joins it as they join the workspace and
+ * stays in it: people neither leave it nor are removed from it. Agents join, leave, and are
+ * removed as in any team group. It may be renamed.
+ */
+export const GeneralId = Id.make("general");
+/** The general group's name when a workspace is created. */
+export const generalName: Name = "general";
+/** Whether a group is its workspace's general group. */
+export const isGeneral = (group: { readonly id: string }) => group.id === GeneralId;
+
 /** Canonical member order for a direct group; its key depends on nothing else. */
 const ascending = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
 

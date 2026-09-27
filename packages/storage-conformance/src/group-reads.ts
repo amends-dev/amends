@@ -205,8 +205,11 @@ export const groupReads = (harness: Harness) => {
               expect(memberships.map((value) => value.memberId).sort()).toEqual(
                 [agentId, readerId].sort(),
               );
-              // Creation and broad owner grants do not establish audience membership.
-              expect(yield* run(bound, owner, mine)).toEqual([]);
+              // Creation and broad owner grants do not establish audience membership: the owner is
+              // only in the workspace's general group.
+              expect((yield* run(bound, owner, mine)).map((group) => group.id)).toEqual([
+                Group.GeneralId,
+              ]);
               for (const who of [reader, owner])
                 expect(yield* Effect.flip(run(bound, who, get(hidden.id)))).toEqual(
                   new GroupApplication.NotFound({ groupId: hidden.id }),
@@ -725,8 +728,10 @@ export const groupReads = (harness: Harness) => {
                 service.listMine({ limit: 100 }),
               ),
             );
+            // The direct group, then the general group, whose members the owner manages.
             expect(listed.map((item) => [item.group.kind, item.manageable])).toEqual([
               ["Direct", false],
+              ["Team", true],
             ]);
           }),
         ),

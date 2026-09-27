@@ -997,7 +997,8 @@ export const notifications = (harness: Harness) => {
                 memberships.add({ groupId: group.id, memberId: second.id }),
               ),
             );
-            expect((yield* sidebar).map(({ pending }) => pending)).toEqual([0]);
+            // General and Private: nothing waits in either.
+            expect((yield* sidebar).map(({ pending }) => pending)).toEqual([0, 0]);
             // What reaches his new membership is his.
             const again = yield* mention(group.id, second.id);
             const [notification] = yield* pending;
@@ -1005,7 +1006,8 @@ export const notifications = (harness: Harness) => {
               recipient: { _tag: "Human", id: bob.id, memberId: second.id },
               thread: { threadId: again.thread.id },
             });
-            expect((yield* sidebar).map(({ pending }) => pending)).toEqual([1]);
+            // Private, then general by group ID.
+            expect((yield* sidebar).map(({ pending }) => pending)).toEqual([1, 0]);
           }),
         ),
       ),

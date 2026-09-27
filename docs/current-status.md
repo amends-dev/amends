@@ -56,6 +56,11 @@ following the thread, stopping, leaving the group, or being removed, between its
 by writing or being mentioned shows only in the message. A group's stream shows its threads, not
 people joining or leaving the group.
 
+Every workspace starts with a general group that each person joins with the workspace and never
+leaves; workspaces created before it existed have none. The sidebar lists teammates the reader has
+not messaged under Direct messages, capped at six, and opens a first message to them. There is no
+conversation with oneself, since a direct group needs another member.
+
 People are shown by the name they chose in the workspace, or by the identity they sign in as
 until they choose one. The apps ask for a name when creating a workspace or accepting an
 invitation, suggesting one from an email address, and the account menu changes it later. Each

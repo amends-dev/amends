@@ -1139,6 +1139,48 @@ it("drafts a first message to someone new and opens the conversation it starts",
   expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }]);
 });
 
+it("lists teammates under Direct messages and says when there are no groups", async () => {
+  const person = (id: string, name: string, kind = "Human") => ({
+    id,
+    workspaceId: "one",
+    identity: { _tag: kind, id: kind === "Human" ? `${id}@example.test` : id },
+    name,
+    status: "active",
+  });
+  const history = mount(
+    "/workspaces/one",
+    memoryStore(session("alice")).store,
+    () =>
+      Promise.resolve(response({ memberships: [membership("one", "Studio")], invitations: [] })),
+    undefined,
+    {
+      groups: [],
+      members: [
+        { ...person("owner-one", "Alice"), identity: { _tag: "Human", id: "alice" } },
+        person("ada", "Ada"),
+        person("scout", "Scout", "Agent"),
+      ],
+    },
+  );
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  await within(sidebar).findByText("No groups yet");
+  // People and agents alike, without the reader; a row opens a first message.
+  const ada = await within(sidebar).findByRole("link", { name: "Ada" });
+  expect(within(sidebar).getByRole("link", { name: "Scout" })).toHaveAttribute(
+    "href",
+    "/workspaces/one/direct?to=scout",
+  );
+  expect(within(sidebar).queryByRole("link", { name: "Alice" })).toBeNull();
+  fireEvent.click(ada);
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/direct?to=ada"));
+  await waitFor(() =>
+    expect(within(sidebar).getByRole("link", { name: "Ada" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    ),
+  );
+});
+
 it("renames a group from its settings", async () => {
   let name = "Design",
     expectedName: string | undefined;

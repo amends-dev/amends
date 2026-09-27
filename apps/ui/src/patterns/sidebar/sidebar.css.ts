@@ -215,6 +215,19 @@ export const section = style({
   "@media": { [media.touch]: { gap: "0.25rem", marginBlockStart: "0.5rem" } },
 });
 
+// Lined up with an item's label, in the quieter hint type.
+export const empty = style({
+  ...typeScale.control,
+  display: "flex",
+  alignItems: "center",
+  boxSizing: "border-box",
+  minHeight: "2.375rem",
+  margin: 0,
+  paddingInline: "0.75rem",
+  color: vars.color.text.muted,
+  "@media": { [media.touch]: { minHeight: "2.75rem" } },
+});
+
 export const sectionHeader = style({
   position: "relative",
   display: "flex",

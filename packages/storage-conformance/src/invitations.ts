@@ -1,4 +1,5 @@
 import { BuiltinRoles } from "@amends/core/authorization";
+import { Group } from "@amends/core/group";
 import { Actor } from "@amends/core/identity";
 import { Journal, Log } from "@amends/core/journal";
 import { Invitation, InvitationApplication, Member } from "@amends/core/workspace";
@@ -133,6 +134,12 @@ export const invitations = (harness: Harness) => {
                   if (first === undefined) throw new Error("Missing acceptance");
                   expect(accepted[1]?.id).toBe(first.id);
                   expect(yield* bound.assignments.listActiveByMember(first.id)).toHaveLength(1);
+                  // A person joins the general group as they join the workspace, once.
+                  expect(
+                    (yield* bound.groupMemberships.listByGroup(Group.GeneralId)).filter(
+                      (record) => record.memberId === first.id,
+                    ),
+                  ).toMatchObject([{ status: "active" }]);
                   expect(
                     (yield* Operations.getMember(workspace.id, bob, workspace.ownerMemberId))
                       .identity,
@@ -144,7 +151,8 @@ export const invitations = (harness: Harness) => {
                   ).toMatchObject({ _tag: "Authorization.Denied" });
                   const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
                   expect(before).toHaveLength(3);
-                  expect(before[2]?.entries).toHaveLength(3);
+                  // The member, their role, the acceptance, and their admission to general.
+                  expect(before[2]?.entries).toHaveLength(4);
                   yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
                   expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
                     before,

@@ -151,7 +151,8 @@ export const invitationReplay = (harness: Harness) => {
               });
               const after = yield* bound.store.read(journalLog, { limit: 20 });
               expect(after).toHaveLength(before.length + 1);
-              expect(after.at(-1)?.entries).toHaveLength(3);
+              // The removal, the member's departure from the general group, and two revocations.
+              expect(after.at(-1)?.entries).toHaveLength(4);
               for (const record of pending) {
                 expect(yield* bound.invitations.get(record.details.id)).toMatchObject({
                   _tag: "Some",

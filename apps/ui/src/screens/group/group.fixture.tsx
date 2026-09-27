@@ -93,6 +93,8 @@ export interface GroupWorkspaceProps {
   readonly task?: string;
   readonly settings?: GroupSettingsTab;
   readonly creating?: boolean;
+  /** The group is the workspace's general group: people never leave it or are removed. */
+  readonly general?: boolean;
 }
 
 /**
@@ -129,7 +131,11 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
   const [settingsTab, setSettingsTab] = createSignal<GroupSettingsTab>(props.settings ?? "general");
   const [name, setName] = createSignal("general");
   const [visibility, setVisibility] = createSignal<GroupVisibility>("private");
-  const [members, setMembers] = createSignal(groupMembers);
+  const [members, setMembers] = createSignal(
+    props.general
+      ? groupMembers.map((person) => ({ ...person, removable: person.agent === true }))
+      : groupMembers,
+  );
   const [candidates, setCandidates] = createSignal(workspaceCandidates);
   const [selected, setSelected] = createSignal<string[]>([]);
   const [creating, setCreating] = createSignal(props.creating ?? false);
@@ -426,6 +432,7 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
           )
         }
         member={current()?.joined ?? true}
+        general={props.general}
         onLeave={() =>
           setGroups(
             groups().map((group) =>

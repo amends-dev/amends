@@ -84,18 +84,28 @@ export const provenance = (harness: Harness) => {
                 performedBy: { _tag: "Identity", identity: bob },
                 causedBy: null,
               });
-            const [removed, revoked] = removal;
-            if (!removed || !revoked || !removed.event.provenance || !revoked.event.provenance)
+            // The removal, the member's departure from the general group, then the revocation.
+            const [removed, departed, revoked] = removal;
+            if (
+              !removed ||
+              !departed ||
+              !revoked ||
+              !removed.event.provenance ||
+              !departed.event.provenance ||
+              !revoked.event.provenance
+            )
               return yield* Effect.die("Missing removal provenance");
             expect(removed.event.name).toBe("workspace.member.removed");
             expect(removed.event.provenance.causedBy).toBeNull();
+            expect(departed.event.name).toBe("group.membership.removed");
             expect(revoked.event.name).toBe("workspace.invitation.revoked");
-            expect(revoked.event.provenance.causedBy).toEqual({
-              workspaceId: workspace.id,
-              logId: removed.logId,
-              commitId: removed.commitId,
-              id: removed.id,
-            });
+            for (const caused of [departed, revoked])
+              expect(caused.event.provenance?.causedBy).toEqual({
+                workspaceId: workspace.id,
+                logId: removed.logId,
+                commitId: removed.commitId,
+                id: removed.id,
+              });
             expect(DateTime.isDateTime(revoked.event.provenance.occurredAt)).toBe(true);
           }),
         ),

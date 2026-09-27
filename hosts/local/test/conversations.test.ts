@@ -1,4 +1,4 @@
-import { Api, Authentication, type ThreadTimeline } from "@amends/api-http";
+import { Api, Authentication, Group, type ThreadTimeline } from "@amends/api-http";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
 import { Request } from "@amends/core/request";
@@ -119,7 +119,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         expect(
           yield* asAlice.groups.list({ params: { workspaceId }, query: { limit: 10 } }),
-        ).toMatchObject([{ group: { id: group.id }, manageable: true, renamable: true }]);
+        ).toMatchObject([
+          { group: { id: group.id }, manageable: true, renamable: true },
+          // The workspace's general group, which Alice starts in, sorts after generated IDs.
+          { group: { id: Group.GeneralId } },
+        ]);
         // Alice renames it; Bob may too, and the same name again changes nothing.
         const renamed = yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
@@ -321,9 +325,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
           params: { workspaceId, groupId },
           payload: { memberId: bobId },
         });
+        // Bob is also in the workspace's general group, which he does not follow.
         expect(
           yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } }),
-        ).toMatchObject([{ following: true }]);
+        ).toMatchObject([
+          { following: true },
+          { group: { id: Group.GeneralId }, following: false },
+        ]);
         yield* asBob.groups.unfollow({
           params: { workspaceId, groupId },
           payload: { memberId: bobId },
@@ -357,9 +365,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           }),
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status)));
         expect(statuses).toEqual([404, 404, 404, 404]);
-        expect(yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } })).toEqual(
-          [],
-        );
+        // Only the general group remains, which nobody leaves.
+        expect(
+          (yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } })).map(
+            (item) => item.group.id,
+          ),
+        ).toEqual([Group.GeneralId]);
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );
@@ -388,8 +399,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
           payload: { text: "Welcome, everyone.", mentions: [] },
         });
         // Bob, a member, finds the public group but not the private one, and cannot read in yet.
+        // He is already in the general group, which he joined with the workspace.
         const browse = () =>
-          asBob.groups.listPublic({ params: { workspaceId }, query: { limit: 10 } });
+          asBob.groups
+            .listPublic({ params: { workspaceId }, query: { limit: 10 } })
+            .pipe(Effect.map((items) => items.filter((item) => !Group.isGeneral(item.group))));
         expect(yield* browse()).toEqual([{ group: lobby, members: 1, joined: false }]);
         expect(
           yield* asBob.threads
@@ -408,7 +422,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           (yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } })).map(
             (item) => item.group.id,
           ),
-        ).toEqual([groupId]);
+        ).toEqual([groupId, Group.GeneralId]);
         // A private group answers as missing, as it does to anyone outside it.
         expect(
           yield* asBob.groups

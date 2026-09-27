@@ -18,11 +18,17 @@ import tasksMeta, {
   FilterAndOpen,
   TaskOpen,
 } from "../src/screens/group/tasks.stories.tsx";
+import navigationMeta, {
+  GroupsLoading,
+  Home as NavigationHome,
+  NoGroups,
+} from "../src/screens/workspace-navigation/workspace-navigation.stories.tsx";
 import settingsMeta, {
   AddMembers,
   General,
   Members,
   Rename,
+  WorkspaceGeneral,
 } from "../src/screens/group/settings.stories.tsx";
 import formsMeta, { Buttons, Fields } from "../src/components/forms.stories.tsx";
 import createMeta, { CreateAndOpen, OpenForm } from "../src/screens/group/create.stories.tsx";
@@ -159,6 +165,10 @@ describe("group settings modal", () => {
     viewport(1600);
     await stories.story(General).run();
     await stories.story(Members).run();
+  });
+  it("offers no Leave in the workspace's general group, and removes only agents", async () => {
+    viewport(1600);
+    await stories.story(WorkspaceGeneral).run();
   });
   it("saves a new name and visibility only when changed and named", async () => {
     viewport(1600);
@@ -335,5 +345,15 @@ describe("workspace settings", () => {
   });
   it("keeps a stale draft through a refresh", async () => {
     await stories.story(StaleRename).run();
+  });
+});
+
+describe("workspace navigation", () => {
+  const stories = definePreview(preview).meta(navigationMeta);
+  it("lists groups and direct messages, and says when there are no groups once they load", async () => {
+    viewport(1600);
+    await stories.story(NavigationHome).run();
+    await stories.story(NoGroups).run();
+    await stories.story(GroupsLoading).run();
   });
 });

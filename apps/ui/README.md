@@ -102,7 +102,7 @@ the shell inert, and close on Escape or a click on the scrim, returning focus. F
 in the drawer closes it. On phones the pane runs edge to edge and respects safe-area insets. The
 desktop app's title bar is not modelled yet. A rail destination is a section, so the current one
 is marked `aria-current="true"`; the sidebar marks the page within it. Sidebar items take a count
-or, for unseen activity, a dot. `LiveStatus` is a live region at the bottom of the screen that
+or, for unseen activity, a dot, and `Sidebar.Empty` is a quiet line in a section with no items. `LiveStatus` is a live region at the bottom of the screen that
 says "Connecting…" or "Reconnecting…" while workspace changes have stopped arriving, and stays
 empty otherwise.
 
@@ -203,7 +203,8 @@ it words notes such as "Sara followed this thread" or "You were removed from the
 (`IconBellFilled`) while following; `GroupPane` takes the tabs to show (with one, the tab row is
 left out) and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
 message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
-report change errors; for a direct conversation it shows only members. `GroupDirectory` takes
+report change errors; for a direct conversation it shows only members, and for the workspace's
+`general` group it says everyone belongs and offers no Leave. `GroupDirectory` takes
 optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join
 error, and loading states. `InboxPane` is the Inbox from the Lunacy Inbox frames: All and
 Unread tabs with the unread count, Mark all seen while anything is unread, and notifications
@@ -230,7 +231,8 @@ inviting, changing a role, removing, revoking, transferring, and a stale rename.
 `NewMessage` are compact modals for the account
 menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
 destinations to show, an optional search, and an account menu (identity, appearance, switch
-workspace, settings, change name, sign out). **Screens / Live conversation** and **Screens /
+workspace, settings, change name, sign out); once groups load (`groupsLoading`), an empty Groups
+section says "No groups yet". **Screens / Workspace navigation** shows it with and without groups. **Screens / Live conversation** and **Screens /
 Workspace dialogs** exercise these over dated data. **Screens / Group threads** composes them
 with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, **Create group**,
 and **Browse groups** add the rest of the group flows to the same working workspace: switching

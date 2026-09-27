@@ -175,6 +175,55 @@ export const groupMemberships = (harness: Harness) => {
       });
 
     it.effect(
+      "starts each workspace with a general group that people never leave and agents may",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner } = yield* prepare();
+              expect(yield* bound.groups.get(Group.GeneralId)).toEqual(
+                Option.some({
+                  id: Group.GeneralId,
+                  workspaceId,
+                  kind: "Team",
+                  visibility: "Public",
+                  name: "general",
+                  createdBy: owner.memberId,
+                  createdAt: expect.anything(),
+                }),
+              );
+              const own = Option.getOrThrow(
+                yield* bound.groupMemberships.findActive(Group.GeneralId, owner.memberId),
+              );
+              const refused = new GroupMembershipApplication.GeneralMembership({
+                groupId: Group.GeneralId,
+              });
+              // People neither leave it nor are removed from it, however broad their authority.
+              expect(yield* Effect.flip(run(bound, owner, leave(own)))).toEqual(refused);
+              const person = yield* run(bound, owner, add(Group.GeneralId, humanId));
+              expect(yield* Effect.flip(run(bound, owner, remove(person)))).toEqual(refused);
+              expect(yield* Effect.flip(run(bound, memberActor(humanId), leave(person)))).toEqual(
+                refused,
+              );
+              // Agents join and are removed as in any team group.
+              const agent = yield* run(bound, owner, add(Group.GeneralId, agentId));
+              expect(yield* run(bound, owner, remove(agent))).toMatchObject({
+                memberId: agentId,
+                status: "removed",
+              });
+              expect(
+                (yield* bound.groupMemberships.listByGroup(Group.GeneralId))
+                  .filter((record) => record.status === "active")
+                  .map((record) => record.memberId)
+                  .sort(),
+              ).toEqual([humanId, owner.memberId].sort());
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
       "adds human and agent members with group-scoped authority and records the actual actor and admission time",
       () =>
         harness.withStorage((storage) =>
@@ -501,14 +550,17 @@ export const groupMemberships = (harness: Harness) => {
               const [first, second] = [lobby, quiet].toSorted((left, right) =>
                 left.id < right.id ? -1 : 1,
               );
-              // Only public groups are listed, in group-ID order, with how many belong to each.
-              expect(yield* run(bound, human, listPublic({ limit: 10 }))).toEqual(
-                [first!, second!].map((listed) => ({
+              // Only public groups are listed, in group-ID order, with how many belong to each. The
+              // workspace's general group holds its owner; its ID sorts after generated ones.
+              const general = Option.getOrThrow(yield* bound.groups.get(Group.GeneralId));
+              expect(yield* run(bound, human, listPublic({ limit: 10 }))).toEqual([
+                ...[first!, second!].map((listed) => ({
                   group: listed,
                   members: listed.id === lobby.id ? 1 : 0,
                   joined: false,
                 })),
-              );
+                { group: general, members: 1, joined: false },
+              ]);
               expect(yield* run(bound, human, listPublic({ limit: 1 }))).toMatchObject([
                 { group: { id: first!.id } },
               ]);
@@ -788,10 +840,12 @@ export const groupMemberships = (harness: Harness) => {
                     journal.read({ name: GroupMembershipFacts.Added.name, limit: 100 }),
                   ),
                 );
-                // One fact per admission, including the prepared groups' own: none twice.
+                // One fact per admission, including the prepared groups' own and the owner's in the
+                // general group: none twice.
                 const admissions = [
                   ...(yield* bound.groupMemberships.listByGroup(saved.group.id)),
                   ...(yield* bound.groupMemberships.listByGroup(saved.otherGroup.id)),
+                  ...(yield* bound.groupMemberships.listByGroup(Group.GeneralId)),
                 ];
                 expect(events).toHaveLength(admissions.length);
               }),

@@ -193,8 +193,13 @@ and `text` fields the screens' timeline takes.
   and splits a message's text into plain runs and `{ mention, memberId }` parts.
 - `useWorkspaceGroups(workspaceId)` lists the reader's groups as `GroupEntry` values: teams by
   name, direct groups by their other people ("Only you" when alone), with pending counts, unseen
-  activity, and what the reader may do. `directWith(memberIds)` finds the direct group of exactly
+  activity, when they were last active, whether a team is the workspace's general group, and what
+  the reader may do. `teams()` puts the general group first, then the rest by name; `directs()`
+  puts the most recently active first. `directWith(memberIds)` finds the direct group of exactly
   those other people.
+- `useDirectMessages(workspaceId, suggestions?)` gives what Direct messages lists as
+  `DirectEntry` values: the reader's conversations, then up to six (`suggestions`) teammates,
+  people and agents, with no one-to-one conversation with the reader yet, by name.
 - `useGroupConversation(workspaceId, groupId)` gives a group's stream as `StreamEntry` values,
   each thread's opening message with its reply count, whether replies are unread, and who is
   typing. `useThreadConversation(workspaceId, threadId, focus?)` gives a thread's messages and
@@ -212,7 +217,9 @@ and `text` fields the screens' timeline takes.
   message at its focus notified the reader, for a thread opened from the inbox.
 - `useMentionCandidates(workspaceId, groupId)` lists a group's other members to mention.
   `useGroupPeople(workspaceId, members)` lists a group's members for its settings, the reader
-  first, with who the reader may remove, and the workspace's other active members to add.
+  first, with who the reader may remove, and the workspace's other active members to add. In the
+  general group only agents can be removed, and `useGroupMembers` reports it `general` and not
+  `leavable`.
   `useWorkspacePeople(workspaceId)` lists the workspace's other active members and agents.
 
 ## Conversations

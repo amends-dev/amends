@@ -1,7 +1,7 @@
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { membershipRequest, type GroupMembership } from "../api/conversations.ts";
+import { Group, membershipRequest, type GroupMembership } from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useWorkspace } from "../session/directory.tsx";
@@ -22,8 +22,10 @@ export interface GroupMembersController {
   readonly membersRemovable: Accessor<boolean>;
   /** The reader's own admission, which leaving ends; direct groups cannot be left. */
   readonly own: Accessor<GroupMembership.Record | undefined>;
-  /** The reader may leave: a team group they belong to. */
+  /** The reader may leave: a team group they belong to, other than the general group. */
   readonly leavable: Accessor<boolean>;
+  /** The workspace's general group: people neither leave it nor are removed from it. */
+  readonly general: Accessor<boolean>;
   /** What is being changed: "add", or the admission being removed or left. */
   readonly changing: Accessor<string | undefined>;
   /** Why the last change failed. */
@@ -77,7 +79,11 @@ export function useGroupMembers(
     manageable: () => item()?.manageable ?? false,
     membersRemovable: () => item()?.membersRemovable ?? false,
     own,
-    leavable: () => item()?.group.kind === "Team" && own() !== undefined,
+    leavable: () => {
+      const group = item()?.group;
+      return group?.kind === "Team" && !Group.isGeneral(group) && own() !== undefined;
+    },
+    general: () => Group.isGeneral({ id: groupId }),
     changing,
     error,
     add: (memberIds) => {

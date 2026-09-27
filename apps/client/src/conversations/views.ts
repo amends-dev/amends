@@ -1,10 +1,10 @@
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
-import type {
+import {
   Group,
-  GroupMembership,
-  Member,
-  Thread,
-  ThreadTimeline,
+  type GroupMembership,
+  type Member,
+  type Thread,
+  type ThreadTimeline,
 } from "../api/conversations.ts";
 import type { WorkspaceFailure } from "../api/failures.ts";
 import { useWorkspace } from "../session/directory.tsx";
@@ -123,6 +123,10 @@ export interface GroupEntry {
   /** A team's name, or a direct group's other people. */
   readonly name: string;
   readonly visibility?: "public" | "private";
+  /** The workspace's general group, which everyone belongs to and people never leave. */
+  readonly general: boolean;
+  /** When any of its threads last had activity. */
+  readonly latestAt: Date | undefined;
   /** For a direct group: its other members. */
   readonly memberIds: ReadonlyArray<string>;
   /** Notifications addressed to the reader from the group's threads. */
@@ -151,6 +155,8 @@ export function useWorkspaceGroups(workspaceId: string) {
       name: group.kind === "Team" ? group.name : others.map(people.name).join(", ") || "Only you",
       visibility:
         group.kind === "Team" ? (group.visibility === "Public" ? "public" : "private") : undefined,
+      general: Group.isGeneral(group),
+      latestAt: item.latestActivityAt === null ? undefined : toDate(item.latestActivityAt),
       memberIds: others,
       pending: item.pending,
       unread: item.newActivity,
@@ -161,11 +167,25 @@ export function useWorkspaceGroups(workspaceId: string) {
     };
   };
   const entries = createMemo(() => groups.value()?.map(entryOf));
+  const latest = (entry: GroupEntry) => entry.latestAt?.getTime() ?? 0;
   return {
     /** Every group once loaded, in the host's order. */
     all: entries,
-    teams: () => (entries() ?? []).filter((entry) => entry.kind === "team"),
-    directs: () => (entries() ?? []).filter((entry) => entry.kind === "direct"),
+    /** Team groups, the general group first and then by name. */
+    teams: () =>
+      (entries() ?? [])
+        .filter((entry) => entry.kind === "team")
+        .toSorted(
+          (left, right) =>
+            Number(right.general) - Number(left.general) || left.name.localeCompare(right.name),
+        ),
+    /** Direct groups, the most recently active first. */
+    directs: () =>
+      (entries() ?? [])
+        .filter((entry) => entry.kind === "direct")
+        .toSorted(
+          (left, right) => latest(right) - latest(left) || left.name.localeCompare(right.name),
+        ),
     /** One group, once loaded. */
     group: (groupId: string) => entries()?.find((entry) => entry.id === groupId),
     /** The direct group of exactly these other members, if the reader has one. */
@@ -415,6 +435,8 @@ export function useGroupPeople(
   members: {
     readonly roster: Accessor<ReadonlyArray<GroupMembership.Record> | undefined>;
     readonly membersRemovable: Accessor<boolean>;
+    /** The workspace's general group, which people are not removed from. */
+    readonly general?: Accessor<boolean>;
   },
 ) {
   const people = usePeople(workspaceId);
@@ -429,7 +451,10 @@ export function useGroupPeople(
           name: memberName(member),
           agent: member?.identity._tag === "Agent",
           you,
-          removable: !you && members.membersRemovable(),
+          removable:
+            !you &&
+            members.membersRemovable() &&
+            (member?.identity._tag === "Agent" || !members.general?.()),
         };
       })
       .toSorted((left, right) =>
@@ -461,4 +486,56 @@ export function useWorkspacePeople(workspaceId: string): Accessor<ReadonlyArray<
         agent: member.identity._tag === "Agent",
       })),
   );
+}
+
+/** A row under Direct messages: a conversation the reader has, or a teammate not yet messaged. */
+export interface DirectEntry {
+  /** The direct group's ID, or the teammate's member ID. */
+  readonly id: string;
+  readonly kind: "conversation" | "teammate";
+  /** The conversation's other people, or the teammate. */
+  readonly name: string;
+  /** The conversation's other members, or the teammate alone. */
+  readonly memberIds: ReadonlyArray<string>;
+  readonly pending: number;
+  readonly unread: boolean;
+}
+
+/**
+ * What Direct messages lists: the reader's conversations, the most recently active first, then
+ * up to `suggestions` teammates, people and agents, whom the reader has no one-to-one
+ * conversation with yet, by name. A teammate's row opens a first message; the conversation starts
+ * when it is sent.
+ */
+export function useDirectMessages(workspaceId: string, suggestions = 6) {
+  const groups = useWorkspaceGroups(workspaceId);
+  const people = useWorkspacePeople(workspaceId);
+  return createMemo((): ReadonlyArray<DirectEntry> => {
+    const conversations = groups.directs();
+    const messaged = new Set(
+      conversations.flatMap((entry) => (entry.memberIds.length === 1 ? entry.memberIds : [])),
+    );
+    const teammates = people()
+      .filter((person) => !messaged.has(person.id))
+      .toSorted((left, right) => left.name.localeCompare(right.name))
+      .slice(0, suggestions);
+    return [
+      ...conversations.map((entry) => ({
+        id: entry.id,
+        kind: "conversation" as const,
+        name: entry.name,
+        memberIds: entry.memberIds,
+        pending: entry.pending,
+        unread: entry.unread,
+      })),
+      ...teammates.map((person) => ({
+        id: person.id,
+        kind: "teammate" as const,
+        name: person.name,
+        memberIds: [person.id],
+        pending: 0,
+        unread: false,
+      })),
+    ];
+  });
 }

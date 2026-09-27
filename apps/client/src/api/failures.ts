@@ -97,6 +97,7 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "NotificationApplication.SourceUnavailable": "gone",
   "Client.InvalidCommand": "invalid",
   "GroupMembershipApplication.FixedMembership": "invalid",
+  "GroupMembershipApplication.GeneralMembership": "invalid",
   "GroupFollowApplication.NotFollowable": "invalid",
   "ThreadApplication.DirectMembersRequired": "invalid",
   "Gateway.InvalidInput": "invalid",

@@ -139,6 +139,7 @@ export const groupMembership = [
   GroupMembershipApplication.AlreadyMember.pipe(HttpApiSchema.status(409)),
   GroupMembershipApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409)),
   GroupMembershipApplication.FixedMembership.pipe(HttpApiSchema.status(409)),
+  GroupMembershipApplication.GeneralMembership.pipe(HttpApiSchema.status(409)),
 ] as const;
 export const groupFollow = [
   GroupFollowApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),

@@ -104,7 +104,8 @@ be granted through an invitation. `GET …/invitations` requires `invitation.man
 
 Only the named authenticated human can accept. Acceptance rechecks the original
 inviter's active membership, permissions, and current authority to delegate the
-referenced role, then commits membership, a role assignment, and acceptance together.
+referenced role, then commits membership, a role assignment, acceptance, and the new member's
+admission to the workspace's [general group](group-workflows.md#the-general-group) together.
 The role's current stored permissions apply; they are not copied into direct grants.
 Invitations use stable human IDs; email delivery is outside this workflow.
 
@@ -170,7 +171,8 @@ requires one matching active human Owner assignment before and after the change.
 ## Initialization and permissions
 
 Creating a workspace records, in one commit, its initialization, the creator's membership,
-the three built-in roles, and the creator's Owner assignment. A repeated initialization
+the three built-in roles, the creator's Owner assignment, and its
+[general group](group-workflows.md#the-general-group) with the creator in it. A repeated initialization
 returns `WorkspaceInitialization.AlreadyInitialized` without changing ownership or access.
 Creation attribution is kept separately from current ownership.
 
