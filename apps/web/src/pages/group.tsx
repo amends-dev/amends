@@ -17,7 +17,8 @@ import {
   type GroupSettingsTab,
 } from "@amends/ui-v2/screens/group";
 import { useNavigate, useParams } from "@solidjs/router";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, on, Show } from "solid-js";
+import { useWorkspaceActions } from "../workspace-actions.ts";
 import { pickerPerson } from "../workspace-layout.tsx";
 
 const href = (path: string) => path;
@@ -51,6 +52,20 @@ function Group(props: {
   const composer = useNewThread(workspaceId, groupId);
   const candidates = useMentionCandidates(workspaceId, groupId);
   const follow = useGroupFollow(workspaceId, groupId);
+  const actions = useWorkspaceActions();
+  // Once a follow change the reader made lands, confirm it.
+  let toggled = false;
+  createEffect(
+    on(
+      () => follow.following(),
+      (following, previous) => {
+        if (!toggled || following === undefined || previous === undefined) return;
+        if (following === previous) return;
+        toggled = false;
+        actions.toast(following ? `Following #${name()}` : `Unfollowed #${name()}`);
+      },
+    ),
+  );
   const [selected, setSelected] = createSignal<string[]>([]);
   const members = useGroupMembers(workspaceId, groupId, {
     added: () => setSelected([]),
@@ -83,7 +98,10 @@ function Group(props: {
             ? {
                 following: follow.following() ?? false,
                 pending: follow.pending(),
-                onToggle: follow.toggle,
+                onToggle: () => {
+                  toggled = true;
+                  follow.toggle();
+                },
               }
             : undefined
         }

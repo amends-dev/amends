@@ -51,7 +51,7 @@ scrolled. Someone writing a reply shows as typing in the thread panel and on the
 the stream until their signal runs out or their message arrives; starting a thread sends no
 typing, since there is no thread yet. The thread panel's bell follows and unfollows its thread, and a
 team group's header bell follows the group so that threads started there afterwards include the
-reader; following agents on someone's behalf has no control. The thread panel notes someone
+reader, filled while following and confirmed by a toast; following agents on someone's behalf has no control. The thread panel notes someone
 following the thread, stopping, leaving the group, or being removed, between its messages; joining
 by writing or being mentioned shows only in the message. A group's stream shows its threads, not
 people joining or leaving the group.

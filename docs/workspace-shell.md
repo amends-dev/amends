@@ -39,9 +39,10 @@ catches the reader up with it, and an open thread is read through its newest mes
 composer starts a thread; in the side panel it replies. Typing `@` suggests the group's other
 members.
 
-Without tabs, the group header's second line says what following means: new threads include the
-reader once they follow, and everyone takes part in every thread of a direct conversation. The
-bell follows or stops following; in the side panel it follows the thread. The member stack and
+A team group's bell follows it, so new threads there include the reader, or stops: it is filled
+while the reader follows, and a toast confirms each change once it lands ("Following #design",
+"Unfollowed #design"). In the side panel the bell follows the thread, filled the same way. Direct
+conversations have no bell, since everyone takes part in every thread. The member stack and
 the settings button open Group settings: General renames the group and leaves it, and Members
 adds and removes people as the reader may. Visibility is shown but cannot change, since the host
 offers no such operation. A direct conversation's settings show only its fixed members.

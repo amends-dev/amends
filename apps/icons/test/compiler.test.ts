@@ -133,3 +133,13 @@ it("checks the closing edge of closed polygons for parallel gaps", () => {
   );
   expect(() => compile([drawing])).toThrow(/parallel/);
 });
+
+it("fills a drawing only when asked, with a boolean", () => {
+  expect(parseDrawing(source, "sample.icon.json").fill).toBe(false);
+  expect(parseDrawing({ ...source, fill: true }, "sample.icon.json").fill).toBe(true);
+  expect(() => parseDrawing({ ...source, fill: "yes" }, "sample.icon.json")).toThrow(
+    /fill must be boolean/,
+  );
+  const [compiled] = compile([parseDrawing({ ...source, fill: true }, "sample.icon.json")]);
+  expect(compiled).toMatchObject({ fill: true, path: "M4 6L20 6" });
+});

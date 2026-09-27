@@ -4,6 +4,7 @@ export { iconSizes, iconWeights, type IconProps, type IconSize, type IconWeight 
 export type { IconName } from "./catalog.ts";
 export { IconAlertTriangle } from "./generated/alert-triangle.tsx";
 export { IconBell } from "./generated/bell.tsx";
+export { IconBellFilled } from "./generated/bell-filled.tsx";
 export { IconCheck } from "./generated/check.tsx";
 export { IconChevronDown } from "./generated/chevron-down.tsx";
 export { IconCircleCheck } from "./generated/circle-check.tsx";

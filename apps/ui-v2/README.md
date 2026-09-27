@@ -196,9 +196,9 @@ and follow new ones while the reader is at the end. With `days` it puts a seam (
 Yesterday, a weekday within the week, then the date) before each new day of dated entries, and
 it words notes such as "Sara followed this thread" or "You were removed from the group".
 `GroupThreads` and `ThreadPane` take a `status` (loading, unavailable, failed with Try again),
-`earlier` to load older entries, a `sendError` code, and a `follow` bell; `GroupPane` takes the
-tabs to show (with one, the header's second line says what following means) and optional
-settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
+`earlier` to load older entries, a `sendError` code, and a `follow` bell, filled
+(`IconBellFilled`) while following; `GroupPane` takes the tabs to show (with one, the tab row is
+left out) and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
 message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
 report change errors; for a direct conversation it shows only members. `GroupDirectory` takes
 optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join

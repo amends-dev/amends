@@ -23,6 +23,8 @@ export interface Drawing {
   title: string;
   categories: string[];
   keywords: string[];
+  /** Paint the enclosed areas as well as the strokes, for an active state such as a set bell. */
+  fill: boolean;
   shapes: Shape[];
 }
 export interface CompiledIcon extends Drawing {
@@ -173,7 +175,7 @@ function parseShape(input: unknown, context: string): Shape {
 
 export function parseDrawing(input: unknown, file: string): Drawing {
   const d = object(input, file);
-  keys(d, ["name", "title", "categories", "keywords", "shapes"], file);
+  keys(d, ["name", "title", "categories", "keywords", "fill", "shapes"], file);
   if (typeof d.name !== "string" || !/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(d.name))
     fail(file, "name must be kebab-case");
   if (file !== `${d.name}.icon.json`) fail(file, "filename must match the icon name");
@@ -183,11 +185,13 @@ export function parseDrawing(input: unknown, file: string): Drawing {
     if (!(spec.categories as readonly string[]).includes(category))
       fail(file, `unknown category ${category}`);
   if (!Array.isArray(d.shapes) || !d.shapes.length) fail(file, "shapes must be a nonempty list");
+  if (d.fill !== undefined && typeof d.fill !== "boolean") fail(file, "fill must be boolean");
   return {
     name: d.name,
     title: d.title,
     categories,
     keywords: strings(d.keywords, file),
+    fill: d.fill ?? false,
     shapes: d.shapes.map((s, index) => parseShape(s, `${file}: shape ${index}`)),
   };
 }

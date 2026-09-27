@@ -120,6 +120,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         get createGroup() {
           return creator() ? openCreate : undefined;
         },
+        toast,
       }}
     >
       <Shell.Root>

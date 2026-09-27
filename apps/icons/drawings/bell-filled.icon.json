@@ -1,0 +1,8 @@
+{
+  "name": "bell-filled",
+  "title": "Following",
+  "categories": ["controls"],
+  "keywords": ["alert", "notify", "ring", "following", "subscribed", "on"],
+  "fill": true,
+  "shapes": [{ "use": "bell" }, { "rect": [7, 10, 10, 5], "radius": 0 }]
+}

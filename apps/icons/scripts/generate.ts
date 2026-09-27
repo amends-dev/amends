@@ -25,13 +25,13 @@ for (const icon of icons) {
     `${header}
 import { IconSvg, type IconProps } from "../icon.tsx";
 export function ${icon.exportName}(props: IconProps) {
-  return <IconSvg {...props}><path d="${icon.path}" /></IconSvg>;
+  return <IconSvg {...props}><path d="${icon.path}"${icon.fill ? ' fill="currentColor"' : ""} /></IconSvg>;
 }
 `,
   );
   outputs.set(
     `svg/${icon.name}.svg`,
-    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${spec.stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${icon.path}"/></svg>\n`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${spec.stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${icon.path}"${icon.fill ? ' fill="currentColor"' : ""}/></svg>\n`,
   );
 }
 outputs.set(

@@ -1014,3 +1014,34 @@ it("renames a group from its settings", async () => {
   // It renames from the name the dialog started from, so a rename made meanwhile is not lost.
   expect(expectedName).toBe("Design");
 });
+
+it("follows a group from its bell, confirming each change with a toast", async () => {
+  let following = false;
+  const changes: Array<string> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && /\/groups\/g1\/(un)?follow$/.test(path)) {
+      following = path.endsWith("/follow");
+      changes.push(path.split("/").at(-1)!);
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/workspaces/one/groups/g1/members") return response([]);
+    const answer = conversation(path);
+    return response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] });
+  });
+  mount("/workspaces/one/groups/g1", memoryStore(session("alice")).store, fetch, undefined, {
+    groups: () => [{ ...managed, following }],
+  });
+  await screen.findByRole("heading", { name: "Design" });
+  const bell = await screen.findByRole("button", { name: "Follow" });
+  expect(bell).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(bell);
+  await screen.findByText("Following #Design");
+  expect(screen.getByRole("button", { name: "Following" })).toHaveAttribute("aria-pressed", "true");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Following" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Following" }));
+  await screen.findByText("Unfollowed #Design");
+  expect(screen.getByRole("button", { name: "Follow" })).toHaveAttribute("aria-pressed", "false");
+  expect(changes).toEqual(["follow", "unfollow"]);
+});

@@ -47,7 +47,8 @@ const sidebarRead = /^\/workspaces\/[^/]+\/(groups|members|permissions|notificat
  */
 export interface Sidebar {
   readonly permissions?: ReadonlyArray<string>;
-  readonly groups?: ReadonlyArray<unknown>;
+  /** The groups list, or a function reading its current state. */
+  readonly groups?: ReadonlyArray<unknown> | (() => ReadonlyArray<unknown>);
   readonly pending?: number;
 }
 /**
@@ -72,7 +73,9 @@ export function withChangeFeed(
             path.endsWith("/permissions")
               ? (sidebar.permissions ?? [])
               : path.endsWith("/groups")
-                ? (sidebar.groups ?? [])
+                ? typeof sidebar.groups === "function"
+                  ? sidebar.groups()
+                  : (sidebar.groups ?? [])
                 : path.endsWith("/notifications/count")
                   ? { pending: sidebar.pending ?? 0 }
                   : [],

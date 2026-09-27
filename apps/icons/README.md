@@ -21,7 +21,7 @@ The 26 `mark-*` drawings reinterpret the named glyphs in the
 portable SVGs. They are the visual reference for frontend navigation and actions when
 the reference names the control. The earlier 23 outline utility icons remain for
 controls without a corresponding mark, including the mobile hamburger, sidebar toggles,
-notifications, and delete. `IconMarkMenu` is the reference's downward menu caret;
+notifications, and delete. `IconBellFilled` is the bell's filled state, for following. `IconMarkMenu` is the reference's downward menu caret;
 `IconMenu` remains the mobile hamburger. Named exports and individual subpaths both
 point to generated Solid source.
 Consumers must compile dependency TSX with their Solid plugin, as our Vite apps do.
@@ -109,6 +109,11 @@ Stroke centers may reach the safe-area boundary. Distinct overlapping parallel
 horizontal/vertical strokes must be at least 3 units apart, including reused shapes
 and closed-polyline closing edges. Curves and diagonals require visual spacing review.
 
+A drawing with `"fill": true` paints the areas its shapes enclose as well as its strokes, for
+an active state such as `bell-filled`. Each open shape fills as if closed by a straight line, so
+build a filled state from the outline drawing and add closed shapes, such as a rect, where the
+outline leaves an area open.
+
 Supported primitives are `line`, straight-point `polyline`, `rect`, `circle`, `arc`,
 `dot`, and `use`. Polylines get geometric rounded corners, default radius 2, capped
 at 40% of the shorter adjacent segment. Set `corner` between 0 and 4 in half-unit
@@ -160,6 +165,6 @@ our drawings, not embedded text glyphs, so they keep the package's theming, sizi
 accessibility contract across platforms.
 
 Intentional differences are Solid output, Bun execution, rem-based named sizes,
-constant default stroke weight, separate metadata, and Storybook review. Tonal/filled
-variants, sprites, automatic optical-balance reports, transforms, and public npm
-publishing are not implemented. Add them only with a concrete consumer and verification.
+constant default stroke weight, separate metadata, and Storybook review. Tonal variants,
+sprites, automatic optical-balance reports, transforms, and public npm publishing are not
+implemented. Add them only with a concrete consumer and verification.

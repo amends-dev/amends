@@ -17,6 +17,13 @@ export const iconCatalog = [
     exportName: "IconBell",
   },
   {
+    name: "bell-filled",
+    title: "Following",
+    keywords: ["alert", "notify", "ring", "following", "subscribed", "on"],
+    categories: ["controls"],
+    exportName: "IconBellFilled",
+  },
+  {
     name: "check",
     title: "Check",
     keywords: ["tick", "done", "confirm", "selected"],

@@ -1,5 +1,5 @@
 import { Show } from "solid-js";
-import { IconBell, IconMessage } from "@amends/icons";
+import { IconBell, IconBellFilled, IconMessage } from "@amends/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { typingText } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
@@ -66,15 +66,10 @@ export function ThreadPane(props: ThreadPaneProps) {
             <Show when={props.follow}>
               {(follow) => (
                 <IconButton
-                  icon={IconBell}
+                  icon={follow().following ? IconBellFilled : IconBell}
                   label={follow().following ? "Following thread" : "Follow thread"}
                   aria-pressed={follow().following}
                   disabled={follow().pending}
-                  title={
-                    follow().following
-                      ? "Following: replies here reach you."
-                      : "Follow to get replies here."
-                  }
                   onClick={() => follow().onToggle()}
                 />
               )}

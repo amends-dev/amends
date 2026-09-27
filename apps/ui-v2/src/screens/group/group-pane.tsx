@@ -1,6 +1,7 @@
 import { For, Show, type JSX } from "solid-js";
 import {
   IconBell,
+  IconBellFilled,
   IconMarkChannel,
   IconMarkSearch,
   IconMarkSettings,
@@ -61,14 +62,6 @@ export interface GroupPaneProps {
 /** A group in the main content: its name, member stack, actions, and tabs above the current tab. */
 export function GroupPane(props: GroupPaneProps) {
   const shownTabs = () => tabs.filter((tab) => props.tabs?.includes(tab.id) ?? true);
-  // Without tabs, the header's second line says what following means here.
-  const followNote = () => {
-    if (props.kind === "direct") return "Everyone here takes part in every thread.";
-    if (!props.follow) return undefined;
-    return props.follow.following
-      ? "Following: new threads here include you."
-      : "Follow to take part in new threads here.";
-  };
   return (
     <Pane.Root>
       <Pane.Header>
@@ -122,15 +115,10 @@ export function GroupPane(props: GroupPaneProps) {
             >
               {(follow) => (
                 <IconButton
-                  icon={IconBell}
+                  icon={follow().following ? IconBellFilled : IconBell}
                   label={follow().following ? "Following" : "Follow"}
                   aria-pressed={follow().following}
                   disabled={follow().pending}
-                  title={
-                    follow().following
-                      ? "Following: new threads here include you."
-                      : "Follow to take part in new threads here."
-                  }
                   onClick={() => follow().onToggle()}
                 />
               )}
@@ -156,9 +144,6 @@ export function GroupPane(props: GroupPaneProps) {
             </Show>
           </Show>
         </Pane.Actions>
-        <Show when={shownTabs().length <= 1 && !props.preview && followNote()}>
-          {(note) => <Pane.Subtitle>{note()}</Pane.Subtitle>}
-        </Show>
         <Show when={shownTabs().length > 1}>
           <Pane.Tabs>
             <Tabs.List aria-label={props.name}>
