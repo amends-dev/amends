@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./settings": "./src/settings/index.ts",
-    "./conversations": "./src/conversations/index.ts"
+    "./settings": "./src/settings/index.ts"
   },
   "scripts": {
     "dev": "bun run ../../scripts/features-dev.ts",

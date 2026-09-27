@@ -202,7 +202,14 @@ left out) and optional settings, search, and member actions. `ThreadPane` can ad
 message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
 report change errors; for a direct conversation it shows only members. `GroupDirectory` takes
 optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join
-error, and loading states. `ChangeName` and `NewMessage` are compact modals for the account
+error, and loading states. `InboxPane` is the Inbox from the Lunacy Inbox frames: All and
+Unread tabs with the unread count, Mark all seen while anything is unread, and notifications
+under day seams with who mentioned the reader, replied, or started a thread, where, what was
+said, how long ago, and an unread dot; the open one is set apart. Opening one calls `onOpen`.
+Unread's empty state is "You're all caught up" with View all activity; All's is "No activity yet".
+`ThreadPane` takes a notification `reason` for its subtitle ("Mention · #general") and a
+`backLabel` for phones. **Screens / Inbox** walks the mocks' selection flow. `ChangeName` and
+`NewMessage` are compact modals for the account
 menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
 destinations to show, an optional search, and an account menu (identity, appearance, switch
 workspace, settings, change name, sign out). **Screens / Live conversation** and **Screens /

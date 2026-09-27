@@ -356,7 +356,7 @@ response resolvers and observable abort signals verify email changes, form dispo
 credential replacement, and concurrent controllers without sleeps. These headless
 tests complement the app route tests.
 
-The features suite runs its Storybook play scenarios, for the Inbox and the Settings pages,
+The features suite runs its Storybook play scenarios, for the Settings pages,
 against the real local HTTP handlers, gateway, development authentication, and PostgreSQL. Each
 scenario owns a temporary database, captured codes, and an in-memory session. Request gates and
 host controls exercise pending work and recovery without sleeps.

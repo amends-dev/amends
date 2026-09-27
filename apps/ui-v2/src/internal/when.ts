@@ -35,3 +35,15 @@ export function typingText(names: readonly string[]) {
   if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
   return "Several people are typing…";
 }
+const shortDate = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+/** How long ago, as a list shows it: "Just now", "12m ago", "3h ago", then the day. */
+export function agoLabel(at: Date, now = new Date()) {
+  const minutes = Math.floor((now.getTime() - at.getTime()) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (dayOf(at) === dayOf(now)) return `${Math.floor(minutes / 60)}h ago`;
+  const days = Math.round((dayOf(now) - dayOf(at)) / 86_400_000);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return weekday.format(at);
+  return shortDate.format(at);
+}

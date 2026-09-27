@@ -345,6 +345,18 @@ export function useThreadConversation(
       const item = timeline.value()?.find((entry) => entry.activity.sequence === target);
       return item && isMessage(item) ? (item.message.id as string) : undefined;
     },
+    /**
+     * Why the message at `focus` notified the reader, as the inbox says: it mentions them, it
+     * started the thread, or it replied.
+     */
+    focusReason: (): "mention" | "reply" | "thread" | undefined => {
+      const target = focus?.();
+      const item = timeline.value()?.find((entry) => entry.activity.sequence === target);
+      if (!item || !isMessage(item)) return undefined;
+      const self = people.selfId();
+      if (item.message.mentions.some((memberId) => memberId === self)) return "mention";
+      return item.activity.sequence === 1 ? "thread" : "reply";
+    },
     /** The names of people typing a reply now. */
     typing: () => typing(threadId).map(people.name),
     earlier: () => !timeline.complete() && timeline.value() !== undefined && !lost(),

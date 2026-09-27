@@ -187,6 +187,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
               threadId={thread.threadId}
               // Opened from the inbox, the thread opens at the message that notified the reader.
               focus={fromInbox() && search.at ? Number(search.at) || undefined : undefined}
+              fromInbox={fromInbox() !== undefined}
               onClose={closePanel}
             />
           )}
@@ -259,6 +260,8 @@ function ThreadPanel(props: {
   readonly groupId: string;
   readonly threadId: string;
   readonly focus?: number;
+  /** Opened from the inbox: it says why the notification came, and Back leads to the inbox. */
+  readonly fromInbox?: boolean;
   readonly onClose: () => void;
 }) {
   const groups = useWorkspaceGroups(props.workspaceId);
@@ -272,6 +275,8 @@ function ThreadPanel(props: {
       title="Thread"
       groupName={group()?.name ?? ""}
       groupKind={group()?.kind}
+      reason={props.fromInbox ? thread.focusReason() : undefined}
+      backLabel={props.fromInbox ? "Inbox" : undefined}
       entries={thread.entries()}
       days
       repliesDivider

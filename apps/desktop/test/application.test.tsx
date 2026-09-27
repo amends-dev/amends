@@ -442,7 +442,7 @@ const mentioned = () => ({
     message: { ...message("m2", "On it."), mentions: ["owner-one"] },
   },
 });
-it("lists the inbox at its hash route, opens a thread beside it, and marks one seen", async () => {
+it("lists the inbox at its hash route, and opening one marks it seen and shows its thread", async () => {
   const inbox = [mentioned()];
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
@@ -486,7 +486,7 @@ it("lists the inbox at its hash route, opens a thread beside it, and marks one s
   await screen.findByRole("navigation", { name: "Workspace" });
   const list = await within(screen.getByRole("main")).findByRole("list", { name: "Notifications" });
   await within(list).findByText("On it.");
-  const open = within(list).getByRole("link", { name: "Open thread" });
+  const open = within(list).getByRole("link", { name: /mentioned you$/ });
   expect(open).toHaveAttribute("href", "#/workspaces/one/inbox/groups/g1/threads/t1?at=2");
   fireEvent.click(open);
   await waitFor(() =>
@@ -494,7 +494,7 @@ it("lists the inbox at its hash route, opens a thread beside it, and marks one s
   );
   const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("Can you look at the terms?");
-  fireEvent.click(within(list).getByRole("button", { name: "Mark seen" }));
+  // Opening it marked it seen.
   await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
   fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/inbox"));

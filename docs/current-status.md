@@ -97,18 +97,21 @@ then replaces the draft in history. A draft keeps its text per set of people wit
 A direct group's member stack lists its members without changes, since its membership is fixed;
 including someone else means a new conversation.
 
-The Inbox destination lists the reader's notifications newest first, live, with the sidebar
-counting everything still pending for them: why each came (a mention, a reply in a followed
-thread, or a new thread in a followed group), what was said, and a link that opens the thread
-beside the inbox at the message that notified them, reading back as far as it takes and setting
-that message apart. Reading the thread settles its notifications. A notification can be marked
-seen without opening it, "Mark all seen" marks everything through the newest one listed so that
-later arrivals stay unread, and the list narrows to what is unread. The inbox reads each listed
+The Inbox destination lists the reader's notifications newest first under day seams, live, with
+the sidebar counting everything still pending for them: why each came (a mention, a reply in a
+followed thread, or a new thread in a followed group), from where, what was said, and how long
+ago. Opening one marks it seen at once and opens its thread beside the inbox at the message that
+notified the reader, reading back as far as it takes and setting that message apart; the panel
+says why it came, such as "Mention · #general". Reading the thread settles its notifications too.
+Unread keeps the open notification in place after it is seen, until another opens or its thread
+closes, and shows "You're all caught up" only once nothing unread and nothing open remains.
+"Mark all seen" marks everything through the newest one listed so that later arrivals stay
+unread. There is no way to mark one seen without opening it. The inbox reads each listed
 notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
 
-Inbox and the Settings pages have no UI v2 design yet: they keep the previous UI's content inside
-a UI v2 pane, in its theme, until they are designed. The mocks' Agents destination, search, group
+The Settings pages have no UI v2 design yet: they keep the previous UI's content inside a UI v2
+pane, in its theme, until they are designed. The mocks' Agents destination, search, group
 Tasks and Files tabs, reactions, and task references have no backend and are not shown.
 
 ## Storage cost

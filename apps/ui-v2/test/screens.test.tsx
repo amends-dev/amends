@@ -58,6 +58,15 @@ import conversationMeta2, {
   Stream,
   Unavailable,
 } from "../src/screens/group/conversation.stories.tsx";
+import inboxMeta, {
+  AllActivity,
+  CaughtUp,
+  FirstUse,
+  Loading as InboxLoading,
+  MarkAllSeen,
+  SelectionFlow,
+  UnreadWithThread,
+} from "../src/screens/inbox/inbox.stories.tsx";
 import standaloneMeta, {
   CheckingSession,
   Crashed,
@@ -261,5 +270,22 @@ describe("workspace dialogs", () => {
     await stories.story(ChangeYourName).run();
     await stories.story(ChangeNameFailed).run();
     await stories.story(NewMessageDialog).run();
+  });
+});
+
+describe("inbox", () => {
+  const stories = definePreview(preview).meta(inboxMeta);
+  it("renders all activity, unread with a thread, caught up, first use, and loading", async () => {
+    await stories.story(AllActivity).run();
+    await stories.story(UnreadWithThread).run();
+    await stories.story(CaughtUp).run();
+    await stories.story(FirstUse).run();
+    await stories.story(InboxLoading).run();
+  });
+  it("keeps the open row in Unread until another opens or it closes", async () => {
+    await stories.story(SelectionFlow).run();
+  });
+  it("marks all seen", async () => {
+    await stories.story(MarkAllSeen).run();
   });
 });

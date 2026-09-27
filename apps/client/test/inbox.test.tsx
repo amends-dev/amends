@@ -1,0 +1,230 @@
+import { afterEach, expect, it, vi } from "@effect/vitest";
+import { cleanup, render, waitFor } from "@solidjs/testing-library";
+import { Layer, Schema } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
+import { createSignal } from "solid-js";
+import {
+  ClientProvider,
+  DirectoryProvider,
+  Session,
+  useInboxView,
+  type InboxFilter,
+  type SessionStore,
+} from "../src/index.ts";
+
+afterEach(cleanup);
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+const store: SessionStore = { read: () => session, write: () => {}, subscribe: () => () => {} };
+const at = (minute: number) => new Date(Date.UTC(2026, 8, 25, 12, minute)).toISOString();
+
+const members = [
+  { id: "owner", workspaceId: "one", identity: { _tag: "Human", id: "alice" }, status: "active" },
+  {
+    id: "ada",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "ada@example.test" },
+    name: "Ada",
+    status: "active",
+  },
+];
+const listing = {
+  memberships: [
+    {
+      workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" },
+      member: members[0],
+      people: 2,
+    },
+  ],
+  invitations: [],
+};
+const groups = [
+  {
+    group: {
+      id: "g1",
+      workspaceId: "one",
+      kind: "Team",
+      visibility: "Private",
+      name: "Design",
+      createdBy: "owner",
+      createdAt: at(0),
+    },
+    latestActivityAt: null,
+    caughtUpAt: null,
+    newActivity: false,
+    following: true,
+    pending: 1,
+    manageable: true,
+    membersRemovable: true,
+    renamable: true,
+  },
+];
+const message = (id: string, text: string, mentions: string[]) => ({
+  id,
+  workspaceId: "one",
+  threadId: "t1",
+  author: { _tag: "Member", memberId: "ada" },
+  text,
+  mentions,
+  publishedAt: at(1),
+});
+const notification = (
+  id: string,
+  sequence: number,
+  minute: number,
+  text: string,
+  mentions: string[] = [],
+) => ({
+  notification: {
+    id,
+    workspaceId: "one",
+    source: { logId: "journal", entryId: `e${sequence}` },
+    participationId: "p1",
+    thread: { threadId: "t1", groupId: "g1", sequence },
+    recipient: { _tag: "Human", id: "alice", memberId: "owner" },
+    recordedAt: at(minute),
+    state: { _tag: "Pending" } as Record<string, unknown>,
+  },
+  source: {
+    activity: {
+      id: `activity-${sequence}`,
+      workspaceId: "one",
+      threadId: "t1",
+      sequence,
+      occurredAt: at(minute),
+      kind: "message.published",
+      subject: `message:m${sequence}`,
+      occurrence: `message:m${sequence}`,
+      newActivity: true,
+      details: { messageId: `m${sequence}` },
+    },
+    message: message(`m${sequence}`, text, mentions),
+  },
+});
+
+function fixture() {
+  const inbox = [
+    notification("n3", 3, 3, "Can @alice approve it?", ["owner"]),
+    notification("n2", 2, 2, "Here is the draft."),
+    notification("n1", 1, 1, "Starting the review."),
+  ];
+  const acknowledged: string[] = [];
+  const through: unknown[] = [];
+  const settle = (id: string) => {
+    const entry = inbox.find((item) => item.notification.id === id);
+    if (entry)
+      entry.notification.state = {
+        _tag: "Acknowledged",
+        outcome: { _tag: "Seen" },
+        acknowledgedAt: at(9),
+      };
+  };
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    const path = url.pathname;
+    if (path === "/me/workspaces") return json(listing);
+    if (path === "/workspaces/one/members") return json(members);
+    if (path === "/workspaces/one/groups") return json(groups);
+    if (path === "/workspaces/one/notifications/inbox") {
+      const pendingOnly = url.searchParams.get("pendingOnly") === "true";
+      return json(
+        inbox.filter((item) => !pendingOnly || item.notification.state._tag === "Pending"),
+      );
+    }
+    if (path === "/workspaces/one/notifications/count")
+      return json({
+        pending: inbox.filter((item) => item.notification.state._tag === "Pending").length,
+      });
+    const acknowledge = /\/notifications\/([^/]+)\/acknowledge$/.exec(path);
+    if (request.method === "POST" && acknowledge) {
+      acknowledged.push(acknowledge[1]!);
+      settle(acknowledge[1]!);
+      return json(inbox.find((item) => item.notification.id === acknowledge[1])!.notification);
+    }
+    if (request.method === "POST" && path === "/workspaces/one/notifications/acknowledge") {
+      through.push(await request.json());
+      for (const item of inbox) settle(item.notification.id);
+      return json({ acknowledged: 3 });
+    }
+    return json({}, 404);
+  });
+  const [filter, setFilter] = createSignal<InboxFilter>("all");
+  const [retain, setRetain] = createSignal<string>();
+  let view!: ReturnType<typeof useInboxView>;
+  function Consumer() {
+    view = useInboxView("one", filter, retain);
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  return {
+    get view() {
+      return view;
+    },
+    setFilter,
+    setRetain,
+    acknowledged,
+    through,
+  };
+}
+
+it("says why each notification came, from where, and what was said", async () => {
+  const f = fixture();
+  expect(f.view.status()).toBe("loading");
+  await waitFor(() => expect(f.view.entries()).toHaveLength(3));
+  await waitFor(() =>
+    expect(f.view.entries()[0]?.place).toEqual({ name: "Design", direct: false }),
+  );
+  expect(f.view.entries().map((entry) => entry.reason)).toEqual(["mention", "reply", "thread"]);
+  expect(f.view.entries()[0]).toMatchObject({
+    id: "n3",
+    unread: true,
+    author: { name: "Ada" },
+    text: ["Can ", { mention: "@alice", memberId: "owner" }, " approve it?"],
+    thread: { groupId: "g1", threadId: "t1", sequence: 3 },
+  });
+  await waitFor(() => expect(f.view.unread()).toBe(3));
+});
+
+it("marks a notification seen as it opens, and keeps it in Unread while it stays open", async () => {
+  const f = fixture();
+  f.setFilter("pending");
+  await waitFor(() => expect(f.view.entries()).toHaveLength(3));
+  f.setRetain("n2");
+  f.view.open("n2");
+  // Seen at once, before the inbox refreshes.
+  expect(f.view.entries().find((entry) => entry.id === "n2")?.unread).toBe(false);
+  await waitFor(() => expect(f.acknowledged).toEqual(["n2"]));
+  await waitFor(() => expect(f.view.unread()).toBe(2));
+  // The refreshed Unread no longer holds it, but the open one stays in place.
+  expect(f.view.entries().map((entry) => entry.id)).toEqual(["n3", "n2", "n1"]);
+  // Opening another drops it.
+  f.setRetain("n1");
+  expect(f.view.entries().map((entry) => entry.id)).toEqual(["n3", "n1"]);
+  // Opening one already seen asks nothing more.
+  f.view.open("n2");
+  expect(f.acknowledged).toEqual(["n2"]);
+});
+
+it("marks everything seen through the newest notification listed", async () => {
+  const f = fixture();
+  await waitFor(() => expect(f.view.entries()).toHaveLength(3));
+  f.view.markAllSeen();
+  await waitFor(() => expect(f.through).toHaveLength(1));
+  expect(f.through[0]).toMatchObject({ through: { id: "n3" } });
+  await waitFor(() => expect(f.view.entries().every((entry) => !entry.unread)).toBe(true));
+  await waitFor(() => expect(f.view.unread()).toBe(0));
+});

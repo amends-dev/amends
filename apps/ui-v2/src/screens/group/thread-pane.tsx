@@ -30,14 +30,19 @@ export interface ThreadPaneProps extends ConversationProps {
   readonly typing?: readonly string[];
   /** Put an "N replies" divider after the first message, as the thread's replies begin. */
   readonly repliesDivider?: boolean;
+  /** Opened from a notification: the subtitle says why, such as "Mention · #general". */
+  readonly reason?: "mention" | "reply" | "thread";
+  /** What Back returns to on phones. Default the group's name. */
+  readonly backLabel?: string;
 }
+
+const reasons = { mention: "Mention", reply: "Reply", thread: "New thread" } as const;
 
 /** The entries with a replies divider after the first message. */
 function withReplies(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
   const first = entries.findIndex((entry) => entry.kind === "message");
   if (first === -1) return entries;
   const replies = entries.slice(first + 1).filter((entry) => entry.kind === "message").length;
-  if (replies === 0) return entries;
   return [
     ...entries.slice(0, first + 1),
     {
@@ -60,7 +65,9 @@ export function ThreadPane(props: ThreadPaneProps) {
     <Shell.Aside aria-label={props.title} onClose={() => props.onClose()}>
       <Pane.Root variant="side">
         <Pane.Header>
-          <Pane.Back onClick={() => props.onClose()}>{props.groupName}</Pane.Back>
+          <Pane.Back onClick={() => props.onClose()}>
+            {props.backLabel ?? props.groupName}
+          </Pane.Back>
           <Pane.Title icon={IconMessage}>{props.title}</Pane.Title>
           <Pane.Actions>
             <Show when={props.follow}>
@@ -77,9 +84,11 @@ export function ThreadPane(props: ThreadPaneProps) {
             <Pane.Close label="Close thread" onClick={() => props.onClose()} />
           </Pane.Actions>
           <Pane.Subtitle>
-            {props.groupKind === "direct"
-              ? `Thread with ${props.groupName}`
-              : `Thread in #${props.groupName}`}
+            {props.reason
+              ? `${reasons[props.reason]} · ${props.groupKind === "direct" ? props.groupName : `#${props.groupName}`}`
+              : props.groupKind === "direct"
+                ? `Thread with ${props.groupName}`
+                : `Thread in #${props.groupName}`}
           </Pane.Subtitle>
         </Pane.Header>
         <Pane.Body ref={scroll.ref} onScroll={scroll.onScroll}>

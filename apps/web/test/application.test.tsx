@@ -721,7 +721,7 @@ const mentioned = () => ({
     message: { ...message("m2", "On it."), mentions: ["owner-one"] },
   },
 });
-it("lists the inbox at its route, opens a thread beside it, and marks one seen", async () => {
+it("lists the inbox at its route, and opening one marks it seen and shows its thread beside it", async () => {
   const inbox = [mentioned()];
   const acknowledged: Array<string> = [];
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
@@ -737,7 +737,16 @@ it("lists the inbox at its route, opens a thread beside it, and marks one seen",
       } as { _tag: string };
       return Promise.resolve(response(inbox[0]!.notification));
     }
-    const answer = conversation(path);
+    // The reply in the thread mentions the reader, as the notification says.
+    const answer = path.endsWith("/threads/t1/timeline")
+      ? [
+          item(1, "m1", "Can you look at the terms?"),
+          {
+            ...item(2, "m2", "On it."),
+            message: { ...message("m2", "On it."), mentions: ["owner-one"] },
+          },
+        ]
+      : conversation(path);
     return Promise.resolve(
       response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] }),
     );
@@ -751,29 +760,31 @@ it("lists the inbox at its route, opens a thread beside it, and marks one seen",
   const sidebar = screen.getByRole("navigation", { name: "Workspace" });
   const destination = within(sidebar).getByRole("link", { name: /^Inbox/ });
   expect(destination).toHaveAttribute("aria-current", "page");
-  const open = within(list).getByRole("link", { name: "Open thread" });
+  const open = within(list).getByRole("link", { name: /mentioned you$/ });
   // It opens the thread at the message that notified the reader.
   expect(open).toHaveAttribute("href", "/workspaces/one/inbox/groups/g1/threads/t1?at=2");
   fireEvent.click(open);
   await waitFor(() =>
     expect(history.get()).toBe("/workspaces/one/inbox/groups/g1/threads/t1?at=2"),
   );
+  // Opening it marks it seen at once.
+  await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
+  await waitFor(() =>
+    expect(acknowledged).toEqual(["/workspaces/one/notifications/n1/acknowledge"]),
+  );
   const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("Can you look at the terms?");
-  // The message that notified the reader is set apart.
+  // The message that notified the reader is set apart, and the panel says why it came.
   await waitFor(() =>
     expect(within(thread).getByText("On it.").closest("article")).toHaveAttribute("data-active"),
   );
   expect(
     within(thread).getByText("Can you look at the terms?").closest("article"),
   ).not.toHaveAttribute("data-active");
-  expect(open).toHaveAttribute("aria-current", "page");
+  await within(thread).findByText(/^Mention · /);
+  expect(open).toHaveAttribute("aria-current", "true");
   // The inbox stays the current destination while a thread is open beside it.
   expect(destination).toHaveAttribute("aria-current", "page");
-  fireEvent.click(within(list).getByRole("button", { name: "Mark seen" }));
-  await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
-  expect(acknowledged).toEqual(["/workspaces/one/notifications/n1/acknowledge"]);
-  expect(within(list).queryByRole("button", { name: "Mark seen" })).toBeNull();
   fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/inbox"));
   await waitFor(() => expect(screen.queryByLabelText("Thread", { selector: "aside" })).toBeNull());

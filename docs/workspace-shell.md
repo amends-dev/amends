@@ -53,10 +53,22 @@ the direct group and replaces the draft with it. The directory's Discover tab li
 the reader has not joined; the host lets only members read a group's threads, so there is no
 preview before joining, and Join opens the group.
 
+## Inbox
+
+The Inbox lists what came to the reader, All or Unread, newest first under day seams: who
+mentioned them, replied, or started a thread, where, what was said, and how long ago, with a dot
+while unread. Opening one marks it seen at once and opens its thread in the side panel at the
+message that notified the reader, set apart, under "Mention · #general" or the like; on phones
+Back returns to the Inbox. Unread keeps that notification in place after it is seen, until another
+opens or the panel closes, and shows "You're all caught up" with "View all activity" only once
+nothing unread and nothing open remains. Mark all seen stays in the header while anything is
+unread. A notification whose thread the reader can no longer read shows as unavailable. Client's
+`useInboxView` holds these rules; UI v2's `InboxPane` draws them from the Lunacy Inbox frames.
+
 ## Pages without a UI v2 design
 
-Inbox and the Settings pages have no mocks yet. They keep their previous UI content inside a
-UI v2 pane with the page's title, in the previous UI's theme, until they are designed. Home,
+The Settings pages have no mocks yet. They keep their previous UI content inside a UI v2 pane
+with the page's title, in the previous UI's theme, until they are designed. Home,
 Triage, Tasks, Environments, and Connections are placeholders drawn with UI v2's EmptyState.
 The mocks' Agents destination, search, the Tasks and Files tabs, reactions, and task references
 have no backend and are not shown.

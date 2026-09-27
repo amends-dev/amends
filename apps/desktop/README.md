@@ -78,7 +78,7 @@ screens: sign-in with `useSignIn`, the workspace picker with `useWorkspacePicker
 workspace-unavailable states with the standalone screens; their links use hash hrefs.
 The route validates new credentials before following a safe hash return path.
 `src/routes.tsx` owns routes, the session guard, and redirects. The workspace layout and its
-group pages are built on ui-v2, as in web; Inbox and Settings keep their features content inside
+group and Inbox pages are built on ui-v2, as in web; Settings keeps its features content inside
 a ui-v2 pane in the previous UI's theme. Both platform
 apps import `@amends/client`, `@amends/ui-v2`, and `@amends/ui` independently: client supplies
 headless state, and the UI packages supply presentation. Each app loads both packages' fonts

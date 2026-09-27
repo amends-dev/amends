@@ -52,16 +52,6 @@ through another member's credential and wait for the change without refreshing; 
 uses the workshop's `drop-changes` control, and `RefreshRecovery` uses `break-directory` and
 `restore-directory`, because background refreshes also read the directory.
 
-## Inbox
-
-`@amends/features/conversations` exports `Inbox`, the reader's notifications newest first with
-the previous UI's Inbox cards: why each came, from where, what was said, a link that opens its
-thread, and "Mark seen" while it is pending. "All" or "Unread" choose what it lists, "Mark all
-seen" marks everything through the newest shown, and "Show older" reads further back. The app
-supplies each thread's `href`, given the position that notified the reader, and the thread open
-beside it. The **Features / Inbox** story runs it through the real host: the owner sees a
-member's mention and reply, marks one seen, takes a new mention over the live feed, narrows to
-what is unread, and marks all seen.
-
-The workspace navigation, groups, threads, direct messages, account menu, and live status moved
-to client hooks and UI v2 screens; see [workspace shell](../../docs/workspace-shell.md).
+The workspace navigation, groups, threads, direct messages, the Inbox, the account menu, and live
+status moved to client hooks and UI v2 screens; see [workspace shell](../../docs/workspace-shell.md).
+Only Settings remains here.

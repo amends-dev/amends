@@ -65,7 +65,8 @@ Page compositions contain no inline styles or local stylesheets. `src/workspace-
 the workspace on the ui-v2 Shell: `WorkspaceNavigation` with the account menu, one pane per page in
 `Shell.Main`, the thread panel as `ThreadPane`, and the Create group, New message, and Change your
 name modals, over client view hooks. Group, directory, direct-draft, and placeholder pages compose
-ui-v2 screens; Inbox and Settings keep their features content inside `src/legacy.tsx`'s pane, in the
+ui-v2 screens, as does the Inbox with `useInboxView` and `InboxPane`; Settings keeps its features
+content inside `src/legacy.tsx`'s pane, in the
 previous UI's theme, until they are designed. `src/workspace-actions.ts` lets pages offer the
 layout's Create group. Visual gaps are evaluated and verified in the UI workshop before app
 consumption; `check:packages` rejects app-local styles.

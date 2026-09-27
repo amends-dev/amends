@@ -99,6 +99,7 @@ export {
   type ThreadMessageEntry,
   type ThreadNoteEntry,
 } from "./conversations/views.ts";
+export { useInboxView, type InboxEntry, type NotificationReason } from "./conversations/inbox.ts";
 export {
   useNewThread,
   useDirectMessage,

@@ -188,6 +188,13 @@ and `text` fields the screens' timeline takes.
   position to show, reads back to it and reports its message as `focusId`. Both mark what they
   show read while mounted and visible, and report `status`: `loading`, `unavailable` once a
   refresh says the reader lost access (their entries empty until access returns), or `failed`.
+- `useInboxView(workspaceId, filter, retain)` gives the inbox, all or only what is unread, as
+  `InboxEntry` values: why each came (`mention`, `reply`, or `thread`), its author, place, message
+  parts, and thread, or no reason once its thread is unavailable. `open(id)` marks one seen at
+  once, as the reader opens it. Unread keeps `retain`, the notification open beside the inbox, in
+  place after it is seen. `unread` is the inbox's count, and `markAllSeen` marks everything
+  through the newest notification listed. `useThreadConversation` reports `focusReason()`, why the
+  message at its focus notified the reader, for a thread opened from the inbox.
 - `useMentionCandidates(workspaceId, groupId)` lists a group's other members to mention.
   `useGroupPeople(workspaceId, members)` lists a group's members for its settings, the reader
   first, with who the reader may remove, and the workspace's other active members to add.

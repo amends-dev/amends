@@ -77,8 +77,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   the same UI-only rules and replaces `ui` and `features` screen by screen: its screens are
   presentational, the connected logic in `features` moves into `client` as hooks, and web and
   desktop connect the two. Sign-in, workspace entry, the standalone states, the workspace shell,
-  and groups, threads, and direct messages have moved; Inbox and Settings still use `ui` and
-  `features` inside a ui-v2 pane until they are designed.
+  groups, threads, direct messages, and the Inbox have moved; Settings still uses `ui` and
+  `features` inside a ui-v2 pane until it is designed.
   The legacy UI implementation and `design-system` package were removed; the current
   `ui` package is the renamed shared workshop. Apps may install UI
   dependencies and consume shared packages. Run desktop's `check:native` after
