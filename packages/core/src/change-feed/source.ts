@@ -67,13 +67,24 @@ export const Options = Schema.Struct({
 });
 export interface Options extends Schema.Schema.Type<typeof Options> {}
 
+/** A delivered fact this host cannot read, and why. */
+interface Unreadable {
+  readonly name: string;
+  readonly version: number;
+  /**
+   * `unknown-version`: written by a newer host or no longer registered. `undecodable`: a version
+   * this host knows, with a payload its schema rejects, as a damaged record or a schema changed
+   * without a new version would leave.
+   */
+  readonly reason: "unknown-version" | "undecodable";
+}
 /**
- * A prepared commit. An unreadable one holds a delivered fact in a version this host does not
- * know, written by a newer host or no longer registered: nobody can be told what it changed or
- * whom it reaches, so its subscribers must refresh instead.
+ * A prepared commit. An unreadable one holds a delivered fact this host cannot read: nobody can be
+ * told what it changed or whom it reaches, so its subscribers must refresh instead. Reading it
+ * again would fail the same way, so the feed goes on past it.
  */
 interface Prepared extends Delivery {
-  readonly unreadable: ReadonlyArray<ChangeFeedEvents.UnknownVersion>;
+  readonly unreadable: ReadonlyArray<Unreadable>;
 }
 
 type Item =
@@ -115,15 +126,20 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
 
   const prepare = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
     const events: Array<ChangeFeedEvents.Prepared> = [];
-    const unreadable: Array<ChangeFeedEvents.UnknownVersion> = [];
+    const unreadable: Array<Unreadable> = [];
     for (const entry of batch.entries) {
+      const skip = (reason: Unreadable["reason"]) =>
+        Effect.sync(() => {
+          const { name, version } = entry.payload;
+          unreadable.push({ name, version, reason });
+          return Option.none<ChangeFeedEvents.Prepared>();
+        });
       const prepared = yield* ChangeFeedEvents.prepare(entry).pipe(
-        Effect.catchTag("ChangeFeedEvents.UnknownVersion", (unknown) =>
-          Effect.sync(() => {
-            unreadable.push(unknown);
-            return Option.none<ChangeFeedEvents.Prepared>();
-          }),
-        ),
+        Effect.catchTag("ChangeFeedEvents.UnknownVersion", () => skip("unknown-version")),
+        Effect.catchTags({
+          SchemaError: () => skip("undecodable"),
+          "Journal.FactMismatch": () => skip("undecodable"),
+        }),
       );
       if (Option.isSome(prepared)) events.push(prepared.value);
     }
@@ -159,7 +175,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
           ? Effect.void
           : Effect.logWarning("Change feed met a commit this host cannot read", {
               position: delivery.position,
-              facts: delivery.unreadable.map(({ name, version }) => ({ name, version })),
+              facts: delivery.unreadable,
             }),
       ),
       Stream.runForEach((delivery) =>

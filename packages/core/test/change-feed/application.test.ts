@@ -1055,6 +1055,36 @@ it.effect(
     ),
 );
 
+it.effect(
+  "a commit this host cannot decode ends each subscription, and the feed goes on past it",
+  () =>
+    run(() =>
+      Effect.gen(function* () {
+        // A fact name and version this host delivers, with a payload its schema rejects, as a
+        // damaged row or a schema changed without a new version would leave.
+        const Damaged = Fact.make(MemberFacts.Added.name, {
+          version: MemberFacts.Added.version,
+          payload: Schema.String,
+          subject: () => Subject.make("member", "damaged"),
+        });
+        const feed = yield* listen();
+        yield* feed.next;
+        yield* commit(publish(InvitationFacts.Issued, invitation("before")));
+        const before = committed(yield* feed.next).cursor;
+        yield* commit(publish(Damaged, "not a member"));
+        const exit = yield* Fiber.await(feed.fiber);
+        expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
+          Option.some(new ChangeFeed.Unavailable({})),
+        );
+        // Reconnecting from the last cursor resets, and later commits keep arriving.
+        const resumed = yield* listen({ after: before });
+        expect(yield* resumed.next).toMatchObject({ _tag: "Ready", cursor: "1", reset: true });
+        yield* commit(publish(InvitationFacts.Issued, invitation("after")));
+        expect(committed(yield* resumed.next).cursor).toBe("2");
+      }),
+    ),
+);
+
 it.effect("a removed member cannot subscribe", () =>
   run(({ fixture }) =>
     Effect.gen(function* () {

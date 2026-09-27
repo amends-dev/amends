@@ -228,7 +228,8 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   activity or the group departure.
 - While a newer host records a fact version an older host does not know, as during a deployment
   that changes a fact, each such commit ends every subscription on the older host, which
-  reconnects with a reset and refreshes its view.
+  reconnects with a reset and refreshes its view. A commit whose payload a known version cannot
+  decode does the same, and the feed goes on past it.
 - An older host that reads a timeline holding an activity kind it has no resolver for, recorded by
   a newer host during a deployment that adds the kind, fails the read with an invalid response
   rather than skipping the item.
