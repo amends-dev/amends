@@ -276,8 +276,11 @@ unreadSince)` record what the reader has seen while mounted and the page is visi
 (`usePageVisible`). Each takes an accessor that grows with newer activity: a thread's newest
 timeline position shown, or when a group's latest unread activity happened, undefined when there
 is none. Each value is sent once, one at a time; a failed mark is retried only once something
-newer is due. Marks invalidate the groups and streams, as the reader's own read signal does when
-it arrives, and the server moves positions forward only and acknowledges the notifications read.
+newer is due. Marks invalidate the groups and streams themselves, so they show even while the
+change feed is away, and the server moves positions forward only and acknowledges the
+notifications read. Each mark, and seeing one notification, expects the reader's own signal it
+causes for ten seconds: when that signal comes back through the feed, before or after the answer,
+it refreshes nothing more, while a signal from another session's different mark still does.
 
 `useTyping(workspaceId)` returns who is typing in a thread now, from the change feed's typing
 signals, without the reader: each until the moment its signal names, or until that member's

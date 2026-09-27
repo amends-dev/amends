@@ -7,6 +7,8 @@ import {
   ClientProvider,
   DirectoryProvider,
   Session,
+  useGroups,
+  useMarkThreadRead,
   useSettings,
   useTyping,
   useWorkspaceFeed,
@@ -93,7 +95,15 @@ function stream(request: Request) {
   };
 }
 
-function fixture(options: { changes?: (request: Request) => Response | undefined } = {}) {
+function fixture(
+  options: {
+    changes?: (request: Request) => Response | undefined;
+    /** Answers the test's own requests before the fixture's. */
+    respond?: (request: Request, path: string) => Promise<Response> | undefined;
+    /** Mounts more of the client beside the feed. */
+    mount?: () => void;
+  } = {},
+) {
   let name = "Studio";
   const streams: Array<ReturnType<typeof stream>> = [];
   const reads: Array<string> = [];
@@ -108,6 +118,8 @@ function fixture(options: { changes?: (request: Request) => Response | undefined
       return Promise.resolve(created.response);
     }
     reads.push(path);
+    const answered = options.respond?.(request, path);
+    if (answered) return answered;
     if (path === "/me/workspaces")
       return Promise.resolve(
         json({
@@ -162,6 +174,7 @@ function fixture(options: { changes?: (request: Request) => Response | undefined
     feed = useWorkspaceFeed();
     settings = useSettings("one", "workspace");
     typing = useTyping("one");
+    options.mount?.();
     return null;
   }
   render(() => (
@@ -381,4 +394,48 @@ it("shows who is typing until their signal runs out or their message arrives, ne
   stream.send(typing("rae", 300));
   await waitFor(() => expect(f.typing("thread")).toEqual(["rae"]));
   await waitFor(() => expect(f.typing("thread")).toEqual([]), { timeout: 2000 });
+});
+
+it("a read mark refreshes the reads it changes once, not again when its own signal comes back", async () => {
+  const marked = Promise.withResolvers<Response>();
+  const [through, setThrough] = createSignal<number>();
+  const f = fixture({
+    respond: (request, path) => {
+      if (path === "/workspaces/one/groups") return Promise.resolve(json([]));
+      if (request.method === "POST" && path === "/workspaces/one/threads/thread/read")
+        return marked.promise;
+      return undefined;
+    },
+    mount: () => {
+      useGroups("one");
+      useMarkThreadRead("one", "thread", through);
+    },
+  });
+  const stream = await f.connected(0);
+  stream.send(ready("1", false));
+  await waitFor(() => expect(f.count("/groups")).toBe(1));
+  const read = (readThrough: number) => ({
+    _tag: "Signal",
+    workspaceId: "one",
+    signal: {
+      _tag: "ThreadRead",
+      workspaceId: "one",
+      memberId: "owner",
+      threadId: "thread",
+      readThrough,
+    },
+  });
+  setThrough(3);
+  await waitFor(() => expect(f.count("/threads/thread/read")).toBe(1));
+  // The server's signal can arrive before its answer to the mark does.
+  stream.send(read(3));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(f.count("/groups")).toBe(1);
+  marked.resolve(new Response(null, { status: 204 }));
+  await waitFor(() => expect(f.count("/groups")).toBe(2));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(f.count("/groups")).toBe(2);
+  // Reading further on another device is news to this one.
+  stream.send(read(5));
+  await waitFor(() => expect(f.count("/groups")).toBe(3));
 });

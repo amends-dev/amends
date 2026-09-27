@@ -4,6 +4,7 @@ import { Sse } from "effect/unstable/encoding";
 import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
 import { watchWake } from "../live/wake.ts";
 import { isUnauthorized, type ApiClient } from "./client.ts";
+import { consume, echoesAtom, echoOf } from "./echoes.ts";
 import { posted, typing, typistsAtom } from "./typing.ts";
 import {
   collectionKey,
@@ -280,6 +281,14 @@ const run = Effect.fnUntraced(function* (
         const signal = message.signal;
         if (signal._tag === "Typing")
           registry.update(typists, (current) => typing(current, signal, Date.now()));
+        // The reader's own request already refreshed what its signal changes.
+        const echo = echoOf(signal);
+        if (echo !== undefined) {
+          const echoes = echoesAtom(workspaceId);
+          const { expected, next } = consume(registry.get(echoes), echo, Date.now());
+          registry.set(echoes, next);
+          if (expected) return Effect.void;
+        }
         const keys = signalKeys(workspaceId, signal);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
       }

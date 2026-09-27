@@ -14,6 +14,7 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
 import { command } from "./failures.ts";
+import { expecting, groupCaughtUp, notificationSeen, threadRead } from "./echoes.ts";
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
 import { requestAtom } from "./request.ts";
 import { refreshResult } from "./refresh.ts";
@@ -391,24 +392,29 @@ export const seenThroughRequest = (client: ApiClient, workspace: string) =>
   );
 
 /**
- * Record that the reader saw a notification, then invalidate their inbox and pending counts, as
- * their own signal would when it arrives. Seeing it again keeps the first time.
+ * Record that the reader saw a notification, then invalidate their inbox and pending counts; their
+ * own signal for it then refreshes nothing more. Seeing it again keeps the first time.
  */
 export const seenRequest = (client: ApiClient, workspace: string) =>
-  requestAtom(client, (notificationId: string) =>
-    Effect.gen(function* () {
-      const api = yield* client;
-      yield* api.notifications.acknowledge({
-        params: {
-          workspaceId: yield* command(Workspace.Id)(workspace),
-          notificationId: yield* command(Notification.Id)(notificationId),
-        },
-      });
-      yield* Reactivity.invalidate([
-        workspaceKey(workspace, "inbox"),
-        workspaceKey(workspace, "groups"),
-      ]);
-    }),
+  requestAtom(client, (notificationId: string, get) =>
+    expecting(
+      get,
+      workspace,
+      notificationSeen(notificationId),
+      Effect.gen(function* () {
+        const api = yield* client;
+        yield* api.notifications.acknowledge({
+          params: {
+            workspaceId: yield* command(Workspace.Id)(workspace),
+            notificationId: yield* command(Notification.Id)(notificationId),
+          },
+        });
+        yield* Reactivity.invalidate([
+          workspaceKey(workspace, "inbox"),
+          workspaceKey(workspace, "groups"),
+        ]);
+      }),
+    ),
   );
 
 /**
@@ -643,30 +649,40 @@ export type ReadMark =
   | { readonly kind: "thread"; readonly threadId: string; readonly through: number }
   | { readonly kind: "group"; readonly groupId: string };
 /**
- * Record a read mark, then invalidate the unread state and pending counts it changes, as the
- * reader's own read signal would when it arrives. Positions only move forward on the server.
+ * Record a read mark, then invalidate the unread state and pending counts it changes, so they show
+ * even while the change feed is away. The reader's own read signal for it then refreshes nothing
+ * more. Positions only move forward on the server.
  */
 export const readRequest = (client: ApiClient, workspace: string) =>
-  requestAtom(client, (mark: ReadMark) =>
-    Effect.gen(function* () {
-      const api = yield* client;
-      const workspaceId = yield* command(Workspace.Id)(workspace);
-      if (mark.kind === "thread")
-        yield* api.threads.markRead({
-          params: { workspaceId, threadId: yield* command(Thread.Id)(mark.threadId) },
-          payload: { throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through) },
-        });
-      else
-        yield* api.groups.markRead({
-          params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
-        });
-      // Reading a thread settles the reader's notifications from it.
-      yield* Reactivity.invalidate([
-        workspaceKey(workspace, "groups"),
-        collectionKey(workspace, "streams"),
-        ...(mark.kind === "thread" ? [workspaceKey(workspace, "inbox")] : []),
-      ]);
-    }),
+  requestAtom(client, (mark: ReadMark, get) =>
+    expecting(
+      get,
+      workspace,
+      mark.kind === "thread"
+        ? threadRead(mark.threadId, mark.through)
+        : groupCaughtUp(mark.groupId),
+      Effect.gen(function* () {
+        const api = yield* client;
+        const workspaceId = yield* command(Workspace.Id)(workspace);
+        if (mark.kind === "thread")
+          yield* api.threads.markRead({
+            params: { workspaceId, threadId: yield* command(Thread.Id)(mark.threadId) },
+            payload: {
+              throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through),
+            },
+          });
+        else
+          yield* api.groups.markRead({
+            params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
+          });
+        // Reading a thread settles the reader's notifications from it.
+        yield* Reactivity.invalidate([
+          workspaceKey(workspace, "groups"),
+          collectionKey(workspace, "streams"),
+          ...(mark.kind === "thread" ? [workspaceKey(workspace, "inbox")] : []),
+        ]);
+      }),
+    ),
   );
 
 /** Following a thread, which makes the reader take part in it, or a team group, or stopping. */
