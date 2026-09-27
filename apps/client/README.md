@@ -4,10 +4,10 @@
 It owns API access, credential-scoped atom registries, session persistence/lifetime,
 directory validation, workspace lookup, and pure route-path helpers.
 
-Client and the UI packages ([ui](../ui/README.md) and [ui-v2](../ui-v2/README.md)) are
+Client and [UI](../ui/README.md) are
 independent peers. Neither depends on the other, including in tests and development tooling.
 Client contains no page markup, CSS, router integration, or Storybook. Web and desktop wire
-client hooks to ui-v2 screens and own routes, navigation, and page composition. Solid
+client hooks to UI screens and own routes, navigation, and page composition. Solid
 providers/hooks are headless state bindings.
 The package lives under `apps/*` because these bindings use Solid and browser storage;
 portable backend packages under `packages/*` remain Effect-only.
@@ -118,7 +118,7 @@ cursor resume, wake restarts, lost membership, rejected credentials, and closing
 on unmount or credential change. Web tests cover
 route guards, safe redirects, workspace changes, and cache/request disposal. Desktop
 tests verify its independent composition with the real hash router. UI owns component
-stories and portable interaction tests at port 6007; client has no workshop.
+stories and portable interaction tests at port 6010; client has no workshop.
 
 After validation, directory refresh retains `Ready` with the last listing,
 `refreshing`, and `refreshFailed`, so consumers keep their drafts mounted. A failed
@@ -184,7 +184,7 @@ now shown. An invitation retried with the same recipient and role reuses its req
 
 ## Views
 
-The view hooks shape conversation reads for the UI v2 screens, which word what they show: client
+The view hooks shape conversation reads for the UI screens, which word what they show: client
 names people and groups and reports codes, and entries carry the `kind`, `id`, `at`, `author`,
 and `text` fields the screens' timeline takes.
 

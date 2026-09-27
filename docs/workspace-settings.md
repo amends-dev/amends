@@ -32,8 +32,8 @@ invitations include `workspaceName` when available.
 
 Client's `useWorkspaceSettings` reads one tab: settings and ownership for Workspace, plus the
 roster and invitations for Members. It shapes them for the screens, keeps each draft with what it
-was made against, and reports failures as codes by the change that failed; UI v2's
-[settings screens](../apps/ui-v2/README.md) word them. The pages in web and desktop own routes,
+was made against, and reports failures as codes by the change that failed; UI's
+[settings screens](../apps/ui/README.md) word them. The pages in web and desktop own routes,
 the open member, and which modal shows.
 
 Name edits carry the name the draft started from. Role changes carry the assignment IDs the
@@ -53,7 +53,7 @@ Tabs stay current through the workspace change feed, which the app mounts around
 layout: changes made elsewhere refresh the affected reads without replacing drafts. Rows are
 keyed by ID, so refreshes keep focus and open dialogs. See [live updates](live-updates.md).
 
-The UI v2 workshop plays the settings flows over a local fixture. Client tests cover the hook's
+The UI workshop plays the settings flows over a local fixture. Client tests cover the hook's
 shaping, stale drafts, invitation retries, and refresh recovery over a scripted transport; app
 tests cover the routes, inviting, and removing. Conformance tests cover rename permissions, stale
 writes, rollback, directory updates, and replay on both adapters. Members are listed by the name

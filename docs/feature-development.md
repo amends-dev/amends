@@ -9,7 +9,7 @@ to an application page. [Sign-in](sign-in-design.md) is the first slice.
 | -------------------------- | ------------------------------------------------------------------------------------- |
 | Backend and HTTP packages  | Business rules, host capabilities, contracts, and handlers.                           |
 | `apps/client`              | Headless operations, request state, session lifetime, and view hooks for each screen. |
-| `apps/ui-v2`               | Reusable visual components, patterns, and presentational screens.                     |
+| `apps/ui`                  | Reusable visual components, patterns, and presentational screens.                     |
 | `apps/web`, `apps/desktop` | Route trees, page composition, navigation, configuration, and platform integration.   |
 
 Client and UI remain independent. A client view hook shapes state into what a screen shows,

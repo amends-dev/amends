@@ -1,168 +1,116 @@
-import { For, type JSX } from "solid-js";
+import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import Color from "colorjs.io";
-import { colors, type ColorTheme } from "@amends/ui/foundations/color";
-import { colorThemes, colorVars } from "@amends/ui/foundations/color/styles";
-import * as s from "./color.stories.css.ts";
+import { avatarTones, dark, light } from "./tokens.ts";
+import { vars } from "../theme/vars.css.ts";
+import * as s from "../foundations.stories.css.ts";
 
-const labels = { cotton: "Cotton", soot: "Soot" } as const;
-const roles = [
-  { group: "surface", name: "canvas", usage: "The main background." },
-  { group: "surface", name: "panel", usage: "A distinct content surface." },
-  { group: "surface", name: "skeleton", usage: "Decorative first-paint bars on canvas or panel." },
-  { group: "text", name: "primary", usage: "Headings and main content." },
-  { group: "text", name: "secondary", usage: "Supporting information; still readable body text." },
+type Group = "surface" | "text" | "border" | "action";
+const groups: ReadonlyArray<{ group: Group; title: string; note: string }> = [
   {
     group: "surface",
-    name: "tooltip",
-    usage: "Dark tooltip surface in either theme; use text.onTooltip.",
+    title: "Surfaces",
+    note: "Canvas frames the app; panels, modals, and popovers sit on it in that order.",
   },
-  { group: "text", name: "onTooltip", usage: "Light text paired only with surface.tooltip." },
-  { group: "text", name: "link", usage: "Links within content, on canvas or panel." },
-] as const;
+  {
+    group: "text",
+    title: "Text",
+    note: "Primary for reading, secondary for navigation and support, muted for metadata.",
+  },
+  {
+    group: "border",
+    title: "Borders",
+    note: "Dividers split regions; default outlines controls; the stitch is decoration.",
+  },
+  {
+    group: "action",
+    title: "Actions",
+    note: "The primary action and the current-item indicator are the darkest shade.",
+  },
+];
 
-function Pairings(props: { theme: ColorTheme; surface: "canvas" | "panel" }) {
+function Swatch(props: { group: Group; role: string }) {
+  const color = () =>
+    (vars.color[props.group] as Record<string, string>)[props.role] ?? "transparent";
+  const values = () =>
+    [light, dark].map((mode) => (mode[props.group] as Record<string, string>)[props.role]);
   return (
-    <div class={props.surface === "canvas" ? s.canvasSample : s.panelSample}>
-      <h3 class={s.sampleTitle}>Text on surface.{props.surface}</h3>
-      <For each={["primary", "secondary", "link"] as const}>
-        {(tone) => (
-          <>
-            <p class={`${s.sampleText} ${s[tone]}`} data-color-pair={`${tone}/${props.surface}`}>
-              {tone === "primary"
-                ? "Primary text carries the message."
-                : "Secondary text adds context."}
-            </p>
-            <p class={s.ratio}>
-              text.{tone} ·{" "}
-              {new Color(colors[props.theme].text[tone])
-                .contrastWCAG21(colors[props.theme].surface[props.surface])
-                .toFixed(2)}
-              :1 contrast · minimum 4.5:1
-            </p>
-          </>
-        )}
-      </For>
-    </div>
+    <li class={s.swatch}>
+      {props.group === "text" ? (
+        <span
+          class={s.chip}
+          style={{
+            color: color(),
+            // Text on the primary action is only meaningful on that fill.
+            "background-color": props.role === "onPrimary" ? vars.color.action.primary : undefined,
+          }}
+          aria-hidden="true"
+        >
+          Aa
+        </span>
+      ) : (
+        <span class={s.chip} style={{ "background-color": color() }} aria-hidden="true" />
+      )}
+      <span>
+        <span class={s.name}>
+          {props.group}.{props.role}
+        </span>
+        <span class={s.value}>{values().join(" / ")}</span>
+      </span>
+    </li>
   );
 }
 
-function ColorSpecimen(props: { theme: ColorTheme; children?: JSX.Element }) {
-  return (
-    <article
-      class={`${colorThemes[props.theme]} ${s.specimen}`}
-      aria-label={`${labels[props.theme]} colors`}
-      data-color-theme={props.theme}
-    >
-      <h2 class={s.title}>{labels[props.theme]}</h2>
-      <p class={s.description}>
-        Primary and secondary text work on canvas and panel. Skeleton is decorative; tooltip has a
-        dedicated dark/light pair.
-      </p>
-      <dl class={s.tokens}>
-        <For each={roles}>
-          {(role) => (
-            <div class={s.token}>
-              <dt>
-                <code>
-                  {role.group}.{role.name}
-                </code>
-              </dt>
-              <dd class={s.tokenValue}>
-                <div
-                  class={s.swatch}
-                  style={{
-                    "background-color":
-                      role.group === "surface"
-                        ? colorVars.surface[role.name]
-                        : colorVars.text[role.name],
-                  }}
-                  aria-hidden="true"
-                />
-                <code>
-                  {role.group === "surface"
-                    ? colors[props.theme].surface[role.name]
-                    : colors[props.theme].text[role.name]}
-                </code>
-                <div>{role.usage}</div>
-              </dd>
-            </div>
-          )}
-        </For>
-      </dl>
-      <Pairings theme={props.theme} surface="canvas" />
-      <Pairings theme={props.theme} surface="panel" />
-      <div
-        style={{
-          padding: "1rem",
-          "background-color": colorVars.surface.tooltip,
-          color: colorVars.text.onTooltip,
-        }}
-      >
-        Compact tooltip text on its dedicated dark surface.
-      </div>
-      <p class={s.ratio}>
-        text.onTooltip / surface.tooltip ·{" "}
-        {new Color(colors[props.theme].text.onTooltip)
-          .contrastWCAG21(colors[props.theme].surface.tooltip)
-          .toFixed(2)}
-        :1 contrast · minimum 4.5:1
-      </p>
-      {props.children}
-    </article>
-  );
-}
-
-const meta = {
-  title: "Foundations/Color",
-  component: ColorSpecimen,
-  render: (props) => (
-    <main>
-      <ColorSpecimen {...props} />
-    </main>
-  ),
-  args: { theme: "cotton" },
-  argTypes: {
-    theme: { control: "select", options: ["cotton", "soot"] },
-    children: { table: { disable: true } },
-  },
-  parameters: {
-    layout: "fullscreen",
-    docs: {
-      description: {
-        component:
-          "The four reading color roles, plus decorative skeleton fill and the dedicated tooltip pair, use production tokens and scoped theme classes. Primary and secondary text support canvas and panel at a minimum contrast of 4.5:1. Neutral filled-action colors have separate stories under Color / Actions. Specimen layout and system fonts are workshop scaffolding.",
-      },
-    },
-  },
-  tags: ["autodocs"],
-} satisfies Meta<typeof ColorSpecimen>;
+const meta = { title: "Foundations/Color" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Comparison = {
+export const Roles = {
   render: () => (
-    <main class={s.comparison}>
-      <ColorSpecimen theme="cotton" />
-      <ColorSpecimen theme="soot" />
-    </main>
+    <div class={s.page}>
+      <For each={groups}>
+        {(entry) => (
+          <section class={s.section}>
+            <h2 class={s.heading}>{entry.title}</h2>
+            <p class={s.note}>{entry.note}</p>
+            <ul class={s.grid}>
+              <For each={Object.keys(light[entry.group])}>
+                {(role) => <Swatch group={entry.group} role={role} />}
+              </For>
+            </ul>
+          </section>
+        )}
+      </For>
+      <section class={s.section}>
+        <h2 class={s.heading}>Avatar tones</h2>
+        <p class={s.note}>
+          Square initials; a person keeps one tone. Ink marks the current reader.
+        </p>
+        <ul class={s.grid}>
+          <For each={avatarTones}>
+            {(tone) => (
+              <li class={s.swatch}>
+                <span
+                  class={s.chip}
+                  style={{
+                    "background-color": vars.color.avatar[tone].background,
+                    color: vars.color.avatar[tone].foreground,
+                    border: "none",
+                  }}
+                  aria-hidden="true"
+                >
+                  AM
+                </span>
+                <span>
+                  <span class={s.name}>avatar.{tone}</span>
+                  <span class={s.value}>
+                    {light.avatar[tone].background} / {dark.avatar[tone].background}
+                  </span>
+                </span>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
+    </div>
   ),
-  parameters: { controls: { disable: true } },
-} satisfies Story;
-
-export const Cotton = { args: { theme: "cotton" } } satisfies Story;
-export const Soot = { args: { theme: "soot" } } satisfies Story;
-
-export const NestedThemes = {
-  render: () => (
-    <main class={s.comparison}>
-      <ColorSpecimen theme="cotton">
-        <ColorSpecimen theme="soot" />
-      </ColorSpecimen>
-      <ColorSpecimen theme="soot">
-        <ColorSpecimen theme="cotton" />
-      </ColorSpecimen>
-    </main>
-  ),
-  parameters: { controls: { disable: true } },
 } satisfies Story;

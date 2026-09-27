@@ -45,16 +45,20 @@ for (const { path, manifest } of packages) {
   }
 }
 
-// Reject the old UI package name and the retired design-system package.
+// Reject the old UI package names and the retired design-system package.
 for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })) {
   const manifest: PackageManifest = await Bun.file(`${root}/${path}`).json();
   for (const section of sections) {
     for (const name of Object.keys(manifest[section] ?? {})) {
-      if (name === "@amends/frontend" || name === "@amends/design-system") {
+      if (
+        name === "@amends/frontend" ||
+        name === "@amends/ui-v2" ||
+        name === "@amends/design-system"
+      ) {
         errors.push(`${path}: ${section}.${name} is renamed or retired; use @amends/ui.`);
       }
       if (
-        (path === "apps/ui/package.json" || path === "apps/ui-v2/package.json") &&
+        path === "apps/ui/package.json" &&
         ((name.startsWith("@amends/") && name !== "@amends/icons") ||
           name === "effect" ||
           name.startsWith("@effect/atom-") ||
@@ -92,7 +96,7 @@ for await (const path of new Bun.Glob(
 
 // UI owns presentation; client/api owns shared client contract imports.
 for await (const path of new Bun.Glob(
-  "apps/{icons,ui,ui-v2,client,web,desktop}/{src,test,.storybook}/**/*.{ts,tsx}",
+  "apps/{icons,ui,client,web,desktop}/{src,test,.storybook}/**/*.{ts,tsx}",
 ).scan({
   cwd: root,
 })) {
@@ -145,12 +149,13 @@ for await (const path of new Bun.Glob(
     if (
       dependency === "@amends/frontend" ||
       dependency.startsWith("@amends/frontend/") ||
+      dependency === "@amends/ui-v2" ||
+      dependency.startsWith("@amends/ui-v2/") ||
       dependency === "@amends/design-system" ||
       dependency.startsWith("@amends/design-system/")
     )
       errors.push(`${path}: ${dependency} is renamed or retired; use @amends/ui.`);
     const uiImport = dependency === "@amends/ui" || dependency.startsWith("@amends/ui/");
-    const uiV2Import = dependency === "@amends/ui-v2" || dependency.startsWith("@amends/ui-v2/");
     const clientImport =
       dependency === "@amends/client" || dependency.startsWith("@amends/client/");
     const contractImport =
@@ -175,24 +180,6 @@ for await (const path of new Bun.Glob(
     )
       errors.push(
         `${path}: UI must remain presentation-only and must not import client, API, or platform code (${dependency}).`,
-      );
-    if (
-      path.startsWith("apps/ui-v2/") &&
-      ((dependency.startsWith("@amends/") && !uiV2Import && !iconImport) ||
-        dependency === "effect" ||
-        dependency.startsWith("effect/") ||
-        dependency.startsWith("@effect/atom-") ||
-        dependency === "@solidjs/router" ||
-        dependency.startsWith("@solidjs/router/") ||
-        dependency.startsWith("@tauri-apps/") ||
-        (target.startsWith(resolve(root, "apps") + "/") &&
-          !target.startsWith(resolve(root, "apps/ui-v2") + "/")) ||
-        target.startsWith(resolve(root, "packages") + "/") ||
-        target.startsWith(resolve(root, "adapters") + "/") ||
-        target.startsWith(resolve(root, "hosts") + "/"))
-    )
-      errors.push(
-        `${path}: UI v2 must remain presentation-only and must not import client, API, or platform code (${dependency}).`,
       );
     if (
       path.startsWith("apps/client/") &&
@@ -224,6 +211,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and icons/ui/ui-v2/client/web/desktop import boundaries.`,
+    `Checked ${packages.length} shared packages and icons/ui/client/web/desktop import boundaries.`,
   );
 }

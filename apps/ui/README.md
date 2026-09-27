@@ -1,320 +1,264 @@
 # Amends UI
 
-Shared Solid UI foundations and components for web and Tauri desktop.
-The [color foundation](src/foundations/color/README.md) defines reading, action, control-border,
-decorative seam, focus, and semantic status colors for Cotton and Soot, with scoped theme styles and Storybook specimens. The
-[typography foundation](src/foundations/typography/README.md) adds body, heading, and mono
-styles with explicit font loading. The first [Text primitive](src/primitives/text/README.md)
-composes those foundations into native paragraphs, spans, headings, and inline code. The
-[spacing foundation](src/foundations/spacing/README.md) adds steps 0–6 as quarter-rem values.
-The [radius foundation](src/foundations/radius/README.md) adds square, medium (10px), and pill corners.
-The [focus foundation](src/foundations/focus/README.md) adds a 2px outline with a 2px offset and
-a reusable `:focus-visible` class. The [Button primitive](src/primitives/button/README.md)
-composes these foundations into primary, secondary, and ghost actions with native button behavior.
-No app uses this package any more: [web](../web/README.md) and
-[desktop](../desktop/README.md) compose [UI v2](../ui-v2/README.md) with the
-[client package](../client/README.md). It remains as its own workshop until it is removed.
-Neither this package nor client depends on the other.
-`@amends/ui/styles` supplies an opt-in document reset. This package was renamed from `@amends/frontend`;
-it replaces the removed legacy UI implementation. The `design-system` package remains retired.
+The pattern-based design system for web and desktop, built from the Lunacy mocks in
+[`design-system/Amends Group Exploration.free`](../../design-system/). The mocks are the
+reference: open the file in Lunacy and compare a screen with its story.
 
-[ThemeProvider](src/foundations/theme/README.md) applies the reviewed color and
-body typography scope. Shell and other components inherit it; application code
-selects the theme without defining styles. Shell's named Content width, centering,
-and whole-page scrolling mode cover standalone pages as well as workspace layouts.
+This package was built as `@amends/ui-v2` and took the `@amends/ui` name once it had replaced
+the earlier UI and the retired `@amends/features` in web and desktop. Screens here are
+presentation only: data arrives as props and actions leave as callbacks. Connected logic lives
+in [client](../client/README.md) as hooks, and web and desktop join the two. `@amends/ui/styles`
+holds the global styles app entry points load.
+
+## Structure
+
+The design is six layout patterns built from a small set of components:
+
+1. **Rail**: the leftmost column of global destinations.
+2. **Sidebar**: the destination's items, such as Inbox, Triage, Tasks, groups, and direct messages.
+3. **Main content**: a header, tabs, a scrolling body, and a bottom bar such as the composer.
+   Header, tabs, and bottom bar stay in place while the body scrolls.
+4. **Side panel**: further content beside the main content, such as an open thread.
+5. **Modal**: the main-content structure in a dialog: header, tabs, body, and actions.
+6. **Centered screen**: standalone screens such as sign-in and the workspace picker.
+
+Source follows that order: `foundations` (color, type, space, elevation, theme), then components,
+patterns, and screens as they are introduced.
+
+## Foundations
+
+- **Color** ([tokens](src/foundations/color/tokens.ts)): semantic roles for surfaces, text,
+  borders, actions, the modal scrim, and eight avatar tones. Every value is the exact light or
+  dark color the mocks use. The dark error colors are proposals; the mocks have no dark error
+  state yet.
+- **Typography** ([tokens](src/foundations/typography/tokens.ts)): Inter at 400, 500, and 600,
+  in eight roles from `meta` (11/16) to `display` (28/36). The mocks' half-pixel sizes round to
+  the nearest role. Import `@amends/ui/foundations/typography/fonts` once at an app entry point.
+- **Space** ([tokens](src/foundations/space/tokens.ts)): a 4px grid with 2, 6, and 10px half
+  steps. Corners are square throughout; there is no radius scale.
+- **Elevation** ([tokens](src/foundations/elevation/tokens.ts)): shadows for modals, popovers,
+  and toasts only. Panels are flat and separated by dividers.
+- **Theme** ([Theme](src/foundations/theme/theme.tsx)): `<Theme mode="light">` applies a mode's
+  variables, Inter, and body text. A nested Theme starts its own scope. Styles read values from
+  `vars` in `@amends/ui/foundations/theme`. CSS variable names start with `amends-`.
+- **Icons** (**Foundations / Icons**): every drawing from [`@amends/icons`](../icons/README.md),
+  searchable, with sizes, weights, and accessible names. Review new drawings here.
+
+## Components
+
+Small pieces the patterns share: `Logo` (the finalized mark; its patch lifts when the link or
+button holding it is hovered), `IconButton` (32px or 24px compact), `Avatar` and `AvatarStack`
+(square initials in eight tones), `Count` (badge or plain), and `Tabs` (links or buttons, one
+scrolling row, underlined current tab). Below 64rem icon buttons, tabs, and navigation rows grow
+to 44px touch targets.
+
+## The shell
+
+`Shell`, `Rail`, `Sidebar`, and `Pane` implement the first four patterns:
+
+```tsx
+<Shell.Root>
+  <Shell.Navigation>
+    <Rail.Root>…Rail.Brand, Rail.List of Rail.Item, Rail.Footer…</Rail.Root>
+    <Sidebar.Root aria-label="Workspace">…Header, Body, Sections…</Sidebar.Root>
+  </Shell.Navigation>
+  <Shell.Main>
+    <Pane.Root>
+      <Pane.Header>
+        <Shell.NavigationToggle />
+        <Pane.Title icon={IconMarkChannel} context="Mercier & Co">
+          general
+        </Pane.Title>
+        <Pane.Actions>…</Pane.Actions>
+        <Pane.Tabs>
+          <Tabs.List aria-label="Group">…</Tabs.List>
+        </Pane.Tabs>
+      </Pane.Header>
+      <Pane.Body>…</Pane.Body>
+      <Pane.Footer>…composer…</Pane.Footer>
+    </Pane.Root>
+  </Shell.Main>
+  <Show when={thread()}>
+    <Shell.Aside aria-label="Composer paste crash" onClose={closeThread}>
+      <Pane.Root variant="side">…Pane.Back, Pane.Title, Pane.Close, Pane.Subtitle…</Pane.Root>
+    </Shell.Aside>
+  </Show>
+</Shell.Root>
+```
+
+A Pane's header, tabs, and footer stay in place while its body scrolls. Headers are 96px on
+desktop and 104px on touch layouts, so the main and side panes line up. The layout follows the
+viewport width ([layout tokens](src/foundations/layout/tokens.ts)):
+
+| Width           | Navigation                                        | Side panel                                  |
+| --------------- | ------------------------------------------------- | ------------------------------------------- |
+| 80rem (1280px)+ | Rail and 264px sidebar                            | 440px, beside the main content in one card  |
+| 64–80rem        | Rail and sidebar                                  | 440px, floating over a scrim                |
+| 48–64rem        | Rail; the menu button opens the sidebar beside it | Floating                                    |
+| below 48rem     | The menu button opens rail and sidebar together   | Full screen with Back; main keeps its state |
+
+The drawer and a floating side panel behave as modal dialogs: they take focus, make the rest of
+the shell inert, and close on Escape or a click on the scrim, returning focus. Following a link
+in the drawer closes it. On phones the pane runs edge to edge and respects safe-area insets. The
+desktop app's title bar is not modelled yet. A rail destination is a section, so the current one
+is marked `aria-current="true"`; the sidebar marks the page within it. Sidebar items take a count
+or, for unseen activity, a dot. `LiveStatus` is a live region at the bottom of the screen that
+says "Connecting…" or "Reconnecting…" while workspace changes have stopped arriving, and stays
+empty otherwise.
+
+## Conversation components
+
+`Message` shows an author's avatar beside the byline and text, with optional `Mention`,
+`Reactions`, an agent's `Activity`, a `TaskReference`, and a `Replies` summary joined to the
+avatar by a stitched elbow; `active` highlights the message whose thread is open. `Divider` is
+the running stitch, optionally labelled ("Today", or "4 replies" leading). `TaskStatus` draws
+triage, open, in-progress, and done. `Composer` is a form around an auto-growing field: Enter
+sends, Shift+Enter starts a new line, and Send waits for non-blank text. The caller owns the
+draft so it survives navigation. Given `mentionCandidates`, typing `@` opens suggestions above the
+field: arrows move, Enter or Tab choose (inserting `@name` and calling `onMention`), and Escape
+closes; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a send
+failed. Phones use 16px message and field text so the page does not zoom, and give reactions and
+the reply summary 44px targets.
+
+A message takes its time as text or as `at`, a `Date` it words as the time of day with the full
+date as its title. The reply summary adds an unread dot and a note such as who is typing; a
+message with no replies offers `Message.Reply` ("Reply in thread"), shown while the message is
+hovered or focused where there is a pointer, and always on touch screens. `focused` sets a
+message apart and scrolls to it. Screens word times, days, and typing through `internal/when.ts`,
+and key rows by id through `internal/keyed.tsx`, so callers may pass freshly built arrays.
+
+## Form components and the modal
+
+`Button` is primary, secondary, or quiet, with an optional icon or menu chevron. `Field` gives
+one control a label, help, and error text, and `Input` and the member picker pick those
+associations up. `SearchField` is the quiet filled search. `Choice` is one choice among boxed
+options, such as Public and Private, over native radio inputs. `Select` is one choice from a
+short list shaped like an Input, such as a role: Kobalte's listbox opens as wide as the field
+with a check by the current option, and inside a Field it takes the label and help. `Menu` wraps
+Kobalte's dropdown menu for filters, sorting, and pickers; it attaches inside the nearest dialog
+or Theme so it keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
+`MemberPicker` chooses several people by name: chosen people become removable chips and leave
+the list, arrows and Enter pick, and Backspace removes the last chip. It is a dropdown on wider
+layouts and an always-shown list on phones.
+
+`Badge` labels a property such as visibility, `EmptyState` centers a note where content will
+appear, and `Toast` shows a short confirmation with an optional action at the bottom of the
+viewport, dismissing itself after five seconds.
+
+`CodeInput` takes a six-digit code in one native field drawn as six cells, so typing, pasting,
+and one-time-code autofill work as usual; it can verify as soon as six digits are in. Buttons
+have a large size for centered screens, and field errors carry a warning icon.
+
+`Modal` is the fifth pattern: a Pane with `variant="modal"` in a native dialog, so the page
+behind is inert, Escape and a click outside close it, and focus returns. It is 640 × 600 capped
+to the viewport, or 560px wide and as tall as its content with `size="compact"`, and fills the
+screen on phones. `Modal.Actions` holds its buttons at the end
+of a 64px band, sharing the width on phones.
+
+`Centered` is the sixth pattern, for screens outside a workspace: the canvas frames one white
+card with the brand at the top left and optional actions at the right, over a 420px form in the
+middle or an 800px directory from near the top.
+
+## Screens
+
+Screens take plain data and callbacks; web and desktop fill them from client hooks and own
+routing. `WorkspaceNavigation` is the rail and the Home sidebar. `GroupPane` is a group's header
+and tabs around the current tab, `GroupThreads` is its Threads tab (timeline and composer), and
+`ThreadPane` is an open thread in the side panel. `GroupTasks` is the Tasks tab: search, status
+and assignee filters, and sorting that stay above the task list, with the status and key
+columns giving way on narrower layouts. `TaskPane` opens a task in the side panel with its
+state and assignee pickers, description, a link to where it started, and its activity.
+`CreateGroup` creates a group in a modal with its name, visibility, and first members, the
+reader locked in as "You"; the member list opens upward when the modal has more room there.
+A new group's Threads tab shows a welcome naming its members. `GroupDirectory` is the Groups
+page: Your groups and Discover, with search, visibility, member counts, and Join. A public
+group the reader has not joined opens as a preview: Back, a Public badge, and a prompt to join
+in place of the composer; its threads open without a composer too.
+`SignInEmail` and `SignInCode` are sign-in's two steps: an email address, optionally with other
+providers under "or", then the six-digit code with Change email and Send again; a wrong code
+stays in the cells for editing. They take client's error codes (`SignInEmailError`,
+`SignInCodeError`) and pending actions and own the wording: a problem with the code marks the
+field, while a failed request shows as a `Field.Alert` under it. Each step focuses its field
+when it appears, and a new code is announced and refocuses the cleared field. `WorkspacePicker`
+lists the reader's workspaces and invitations with Open and Accept invite, falling back to
+invitations only or a first-workspace empty state. Accept invite opens "Join {workspace}" to
+choose what people there call the reader; joining closes it with a toast and focuses the
+workspace, and failures (`AcceptInvitationError`) stay in the dialog. A failed refresh shows
+above the lists with Try again. `CreateWorkspace` asks for a workspace name and the reader's
+name there in a compact modal, then shows the created workspace while the list reloads, with
+Try again if that fails. Rows are keyed by id through `internal/keyed.tsx`, so callers may pass
+freshly built arrays without remounting rows. `StandaloneScreen` frames pages outside a
+workspace with the brand and, when signed in, the account and Sign out; `CheckingSessionScreen`,
+`HostUnavailableScreen`, `NotFoundScreen`, `CrashedScreen`, and `WorkspaceUnavailableScreen`
+build the app's other states on it and on EmptyState, which takes a heading `level` and
+actions as children.
+`GroupSettings` is the settings modal: General (name, visibility, and your membership) and
+Members (add and remove people); on phones, adding members opens its own full-screen view. `Timeline` renders messages, dividers, and participation notes from
+`TimelineEntry` data, and conversations read from the bottom: they open at the newest message
+and follow new ones while the reader is at the end. With `days` it puts a seam (Today,
+Yesterday, a weekday within the week, then the date) before each new day of dated entries, and
+it words notes such as "Sara followed this thread" or "You were removed from the group".
+`GroupThreads` and `ThreadPane` take a `status` (loading, unavailable, failed with Try again),
+`earlier` to load older entries, a `sendError` code, and a `follow` bell, filled
+(`IconBellFilled`) while following; `GroupPane` takes the tabs to show (with one, the tab row is
+left out) and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
+message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
+report change errors; for a direct conversation it shows only members. `GroupDirectory` takes
+optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join
+error, and loading states. `InboxPane` is the Inbox from the Lunacy Inbox frames: All and
+Unread tabs with the unread count, Mark all seen while anything is unread, and notifications
+under day seams with who mentioned the reader, replied, or started a thread, where, what was
+said, how long ago, and an unread dot; the open one is set apart. Opening one calls `onOpen`.
+Unread's empty state is "You're all caught up" with View all activity; All's is "No activity yet".
+`ThreadPane` takes a notification `reason` for its subtitle ("Mention · #general") and a
+`backLabel` for phones. **Screens / Inbox** walks the mocks' selection flow.
+`SettingsPane` is Settings from the Lunacy "Workspace settings" frames, with Workspace and
+Members tabs, the member count, Invite people on Members, and loading and failed states.
+`WorkspaceSettings` is the Workspace tab: the name with Save changes, the owner with Transfer
+ownership, and details (the workspace ID with Copy ID, and its creator); touch layouts stack
+the details under the rest. `MemberSettings` is the Members tab: search and an Active/Removed
+filter above the roster's member, role, and status columns, then pending invitations with
+Revoke and View history; on phones the roster lists each role under the name, and the
+invitations become one card that opens the history. `MemberDetails` opens a member in the side
+panel with their role (`Select`, and Save role), access, and Remove member. `InviteMember`,
+`InvitationHistory`, `TransferOwnership`, `ConfirmRemoveMember`, and `ConfirmRevokeInvitation`
+are its modals. They take client's settings codes (`SettingsError`, by `SettingsAction`) and own
+the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
+completed change. A `Shell.Aside` rendered inside `Shell.Main`, as a page renders member details,
+attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
+inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and
+`NewMessage` are compact modals for the account
+menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
+destinations to show, an optional search, and an account menu (identity, appearance, switch
+workspace, settings, change name, sign out). **Screens / Live conversation** and **Screens /
+Workspace dialogs** exercise these over dated data. **Screens / Group threads** composes them
+with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, **Create group**,
+and **Browse groups** add the rest of the group flows to the same working workspace: switching
+groups, the directory, previewing and joining, creating a group, and toasts. **Screens / Sign
+in** and **Screens / Workspaces** walk from email to code (the workshop accepts 314159) to the
+workspace picker, accepting invitations and creating workspaces; **Screens / Standalone** shows
+the other states. Their interaction stories run as tests.
+
+Accepting an invitation asks what people there should call the reader before joining, which the
+mocks skip, and creating a workspace asks the same; the standalone states have no mocks and
+follow the Centered pattern. The
+preview's join prompt spans the main content only; the open thread beside it simply has no
+composer. Tab counts are plain numbers everywhere, where some mocks draw them as badges.
+The settings copy says "group" where the mocks said "channel", and the visibility help follows
+the chosen option. Task panel messages use the standard message size rather than the mock's
+smaller text. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
+the icon set covers, at every size.
 
 ## Run and verify
 
 From the repository root:
 
 ```sh
-bun install
 bun run --filter @amends/ui dev
-bun run --filter @amends/ui test
+bun run test --project @amends/ui
 bun run --filter @amends/ui build
 bun run check
 ```
 
-Development serves Storybook at `http://127.0.0.1:6007`. Open **Setup / Workshop / Rendering** to check the Solid renderer: typing
-in the native input updates the output. The story's play function verifies typing and
-clearing, and the portable-story test runs that same scenario in Bun/Vitest. The root
-`bun run test` includes this project.
-
-Open **Foundations / Color / Comparison** to review both themes, or use the Cotton/Soot
-stories and their theme control. Nested Themes shows independent scopes in both directions.
-The eight reading text/background pairings have contrast tests using Color.js; browser review
-verifies the generated CSS and the accessibility addon checks the rendered specimens.
-
-**Foundations / Color / Actions** shows default, hover, pressed, and disabled pairings on
-both surfaces, with theme controls, nested scopes, and enlarged text. Six enabled pairings
-have contrast tests; browser play checks verify computed colors, transparency, and disabled
-semantics. Disabled readability is reviewed separately. These are static color specimens.
-The Button primitive has separate component and interaction stories.
-
-**Foundations / Color / Controls** shows default/strong borders and translucent hover/pressed
-backgrounds on both surfaces. Tests measure text and border contrast after compositing; browser
-play checks compare the actual CSS colors and an independent canvas blend. Nested themes,
-theme controls, and enlarged-text stories support visual review. The secondary Button consumes
-these reviewed color pairings.
-
-**Foundations / Color / Status** adds success, warning, pending, danger, idle, and running
-roles, with separate text/indicator colors and soft backgrounds for the colored statuses.
-Warning and pending share amber but retain distinct meaning and labels. Tests target WCAG
-2.2 AA contrast for supported pairings, verify sRGB gamut, and keep validation aligned with
-danger. Browser stories check rendered colors, alpha blending, nested themes, portal theme
-switching, and enlarged text. Status meaning also uses visible words and shapes. Decorative
-`line.seam` divisions are separate from the high-contrast control borders.
-
-**Foundations / Typography** shows the three styles in both themes, a narrow container,
-and enlarged text. Its browser play checks verify actual font loading, rendered metrics,
-and wrapping. These checks require a browser and are not part of the Happy DOM test suite.
-
-**Primitives / Text** covers variants, tones, semantic elements, inline content, inheritance,
-and narrow layouts. Its Reactive Props story also runs through the portable-story test suite.
-Focused DOM and type checks verify the component's native-prop and reactivity contracts.
-Semantic Tones adds success, warning, danger, and pending text on plain and matching soft
-backgrounds. Tone changes preserve the element and add no announcement semantics.
-
-**Foundations / Spacing** uses Text for labels and measures all seven scale steps,
-four-sided padding, and horizontal/vertical gaps in both themes. Its enlarged-text story
-verifies scaling at a larger root size. These geometry checks run in the browser.
-
-**Foundations / Radius** compares square, medium, and pill corners on different specimen sizes
-in both themes. Browser checks cover dimensions, corner values, and actual corner hit
-boundaries, including enlarged text and root-size restoration.
-
-**Foundations / Focus** uses native controls to review real Tab/Shift+Tab navigation, skipped
-disabled controls, and the shared focus style on square and pill shapes. The stories cover both
-surfaces, themes, nested scopes, and enlarged text. Four ring/surface contrast tests run in the
-suite; browser play checks measure ring clearance without taking focus. Actual focus visibility,
-outline geometry, and clipping require real browser keyboard input and visual review.
-
-**Primitives / Button** covers all three Button variants on both surfaces and themes, native
-disabled/fieldset behavior, controlled pending and recovery, activation, form submission, reactive props, and long labels.
-Activation, Forms, and Pending for all three variants, plus Reactive Props, run in the portable-story suite. Real browser
-checks establish actual hover/pressed/focus styles, native keyboard activation, wrapping,
-coarse-pointer sizing, forced colors, enlarged text, pending layout stability, and reduced motion.
-Pending stories include both static specimens and caller-controlled success/failure/retry scenarios.
-Comparison also checks the rendered Button colors against the current palette, including
-native disabled states, so stale shared-style references fail visibly in Storybook.
-Button's independent `tone="danger"` supports all three variants with reviewed filled,
-outlined, and ghost states. Danger stories cover both themes, disabled fieldsets, pending
-recovery, long labels, and enlarged text. IconButton consumes the same tone/variant styling.
-**Foundations / Color / Danger actions** shows the supporting `action.danger` tokens.
-
-**Primitives / Input** provides native text, email, password, search, tel, and URL entry with
-empty/filled, read-only, disabled/fieldset, and invalid states. Editing and Forms run as
-portable stories; browser review covers focus, native validation/submission, FormData,
-placeholder contrast, long content, and enlarged text. `line.invalid` has independent
-control-color specimens and contrast tests. See the [Input contract](src/primitives/input/README.md).
-
-**Primitives / CodeInput** adds six-digit entry through one native text input with
-decorative cells, Field associations, and native editing/form behavior. It adapts
-to one field in narrow containers without remounting. Stories cover both themes,
-RTL, enlarged text, editing, forms, and resizing. See the
-[CodeInput contract](src/primitives/code-input/README.md).
-
-**Compositions / Field** combines a label, required marker, help, and error text around one
-control. A render function supplies reactive associations without coupling Input to Field.
-Labels use compact uppercase mono, supporting text uses smaller mono, and errors use
-body text with a decorative danger dot. The form owns values and validation timing. Comparison, reactive-association, form, and
-long/enlarged-text stories cover the composition; the two interaction stories also run as
-portable tests. See the [Field contract](src/compositions/field/README.md).
-
-**Primitives / Radio** introduces the visible circular native radio, with selected/unselected,
-focus, disabled, and inherited-disabled specimens in both themes. Interaction and form stories
-exercise native grouping and reset. Labels/fieldsets in the workshop are scaffolding; RadioGroup and its card presentation are available as a separate composition. See the [Radio contract](src/primitives/radio/README.md).
-
-**Compositions / RadioGroup** uses Radio for plain and card choices with a native group label,
-help/error associations, required state, and disabled options. Its legend and errors share
-Field's form feedback treatment; option names and descriptions have their own compact hierarchy.
-Selection and reset belong to
-the caller. Stories cover both variants, refreshed options, forms, and narrow/enlarged layouts.
-See the [RadioGroup contract](src/compositions/radio-group/README.md).
-
-**Primitives / Checkbox**, **Switch**, and **Select** add native checkbox/mixed state, binary
-switch semantics, and a styled single-choice popup. Each has independent comparisons, interaction/
-form stories, and narrow/enlarged specimens. Switch also covers RTL. Select shares private
-field-control styling with Input and composes with Field. Kobalte supplies its popup behavior;
-Open Menu stories review the reference design in both themes.
-See the [Checkbox](src/primitives/checkbox/README.md), [Switch](src/primitives/switch/README.md),
-and [Select](src/primitives/select/README.md) contracts.
-
-**Primitives / Layout** introduces Container, Row, Column, Grid, and GridItem. Gaps and
-gutters use the spacing scale; Grid fits equal-width columns to its container and supports
-an optional column cap and full-width items. Responsive Form demonstrates three fields
-becoming two columns and then one while keeping their values. Separate stories cover each
-primitive, nested layouts, RTL, and enlarged text. See the [layout contract](src/primitives/layout/README.md).
-
-**Primitives / Avatar** provides human, agent, contact, and system identity marks with
-named/decorative usage and declarative text fallbacks. New neutral avatar surface/text
-pairs have their own foundation specimens and contrast tests. **Primitives / Status**
-composes semantic indicators and visible labels without automatic live announcements.
-Both include theme/surface comparisons, reactive stories, RTL, and enlarged-text examples.
-See the [Avatar](src/primitives/avatar/README.md) and [Status](src/primitives/status/README.md)
-contracts.
-
-**Primitives / Divider** adds a shared dashed Line, composable Root, and compact Label.
-Stories cover plain, start/center/end labels, actions, both themes, long text, and RTL.
-Navigation section headers consume the same parts, keeping accessible section names and
-hiding trailing actions in the icon rail. See the [Divider contract](src/primitives/divider/README.md).
-
-**Primitives / Skeleton** adds static, decorative first-paint bars using a dedicated neutral
-color in Cotton and Soot. The reference story matches the mock's three bars; comparison and
-narrow stories check both surfaces and constrained layout. The containing region owns its
-loading semantics. See the [Skeleton contract](src/primitives/skeleton/README.md).
-
-**Primitives / IconButton** and **Tooltip** provide named compact actions and supplemental
-hover/focus labels. IconButton supports circular text glyphs at the mock's compact size while
-retaining its existing square default. Tooltip matches the compact dark monospace label in the Primitives v2
-reference, with top-start placement, a soft shadow, and wrapping for long content. Reference,
-both-theme, and enlarged-text stories support visual comparison.
-**Compositions / Navigation**, **Drawer**, and **Shell** compose them into
-an expanded desktop sidebar, tablet icon rail, phone header toggle, and navigation drawer. Content is supplied through
-declarative child slots. One mounted sidebar tree preserves local state through collapse and
-viewport changes, including nested Select controls. Stories cover each supporting piece as
-well as themes, mobile/desktop, long navigation, RTL, enlarged text, and independent scroll regions.
-See the [Shell usage example](src/compositions/shell/README.md),
-[Navigation](src/compositions/navigation/README.md), [Drawer](src/compositions/drawer/README.md),
-[IconButton](src/primitives/icon-button/README.md), and [Tooltip](src/primitives/tooltip/README.md) contracts.
-
-**Compositions / Dialog** adds a centered native modal with declarative Title, Description,
-Body, Footer, and Close parts. It shares modal behavior with Drawer and supports controlled
-forms, pending/error recovery, focus return, and nested popups. **Compositions / Toast**
-adds a scoped queue, composable messages/actions, timer pausing, and keyboard access.
-Both match the Primitives v2 references using the reviewed palette and controls.
-See the [Dialog](src/compositions/dialog/README.md) and [Toast](src/compositions/toast/README.md)
-contracts. **Foundations / Color / Toast** shows its dedicated dark surface, light text,
-and amber action pairings in both themes.
-
-**Compositions / Popover** adds a declarative, nonmodal anchored panel with Trigger, Content,
-Title, Description, and Close parts. Its Ada reference composes Avatar and Text while the
-popover owns positioning, focus, and dismissal. It inherits the trigger's theme and direction
-inside or outside native Dialog and Drawer. See the [Popover contract](src/compositions/popover/README.md).
-
-**Compositions / Breadcrumb** adds a page-header location trail with native ancestor links,
-a non-link current page, decorative slashes, and ordered-list navigation semantics. Stories
-cover the task-detail reference, one through four levels, both themes, narrow wrapping,
-RTL, and link activation. See the [Breadcrumb contract](src/compositions/breadcrumb/README.md).
-
-The shared [icons package](../icons/README.md) now includes all 26 SVG redraws from the
-Primitives v2 Marks reference. Select's caret/check, Drawer and Toast close controls,
-navigation actions, and the workshop shell use the matching marks. Utility drawings remain
-for controls the mock does not name, including the mobile hamburger and sidebar toggles.
-**Foundations / Icons / Marks** shows the reference order in both themes; Gallery, Matrix,
-enlarged root text, and reactive accessibility specimens cover the full package. Components
-import `@amends/icons`; catalog lookup stays in story code.
-
-The build produces a static workshop in `apps/ui/dist`. Production exports point
-to the foundations, primitives, compositions, and feature presentations, separately from the workshop. Stories are discovered
-under `src/**/*.stories.tsx` and import the public source exports.
-
-**Features / Sign in / Email form** introduces `SignInEmailForm`, a controlled
-presentation built from Field, Input, Button, Text, and Column. It handles native
-validation feedback, pending submission guards, and request-error presentation;
-the caller owns the request and next step. Stories cover themes, validation,
-retry, RTL, and narrow/enlarged layouts. See the
-[sign-in presentation contract](src/features/sign-in/README.md).
-
-**Features / Sign in / Code form** adds `SignInCodeForm` over Field, CodeInput, and
-Button. Verification and resend have distinct pending states; change email stays
-available while either request runs. The caller owns requests, code/error updates,
-delivery guidance, and resend notices. Stories cover recovery, validation, themes,
-RTL, and narrow/enlarged layouts using the same production form.
-
-Storybook 10.6.0 and `storybook-solidjs-vite` 10.7.2 use the existing compatible toolchain.
-The builder loads the Solid and vanilla-extract plugins from `vite.config.ts`. Tests use the public `/next`
-portable-story factory and the repository's explicit DOM-matcher setup. No Storybook
-Vitest addon is installed; its 10.6.0 peer range excludes this repository's Vitest 5.
-
-## Introduce one piece at a time
-
-These are the intended layers, created only as their first piece is introduced:
-
-| Layer          | Scope                                         | Storybook coverage                                          |
-| -------------- | --------------------------------------------- | ----------------------------------------------------------- |
-| `foundations`  | Tokens, themes, typography, and global styles | Color palettes, spacing, radius, type specimens, and themes |
-| `primitives`   | Individual controls and elements              | Button, text, and input variants and states                 |
-| `compositions` | Reusable structures                           | Shell, page headers, and form layouts                       |
-| `features`     | Product-specific presentations                | Invitation forms and thread interactions                    |
-
-For each addition:
-
-1. Identify the piece needed and compare its existing implementation with the design
-   references. Bring only the dependencies required for that piece.
-2. Add its source and colocated stories. Token stories display the actual exported
-   values; component stories render the actual component.
-3. Cover meaningful variants and states, adding interaction tests when there is behavior.
-4. Run checks and the workshop build, then inspect the result in the browser for design
-   consistency, accessibility, and relevant viewport sizes. When a foundation changes,
-   revisit existing consumers too, including Button Comparison for color changes.
-5. Review that slice before starting another piece or changing an app to consume it.
-
-Application pages belong in web and desktop. Compose reusable UI with nested
-children and named parts, while props carry data, options, and callbacks. Shared
-code binds those parts to client state; UI does not own a page or route tree.
-
-The setup story intentionally uses unstyled native HTML. It verifies tooling and is not
-a design reference. Reading-color specimens retain their system-font scaffolding; typography specimens
-use the introduced fonts and styles. Action-color, spacing, radius, and focus specimens compose Text with the
-reviewed foundations. Additional radii and global styles remain separate future slices.
-Color.js is a development
-dependency used by the contrast tests and specimens, not the production exports.
-The accessibility addon is available; automated screenshot-baseline testing and native
-desktop validation are not configured. Tauri integration remains a later step.
-
-**Workspace entry** adds the neutral [WorkspaceMark](src/primitives/workspace-mark/README.md),
-compound [ItemList](src/compositions/item-list/README.md), and controlled
-[CreateWorkspaceForm](src/features/workspaces/README.md). Each has isolated workshop
-coverage; connected state remained outside UI and pages remain in the apps.
-
-**Workspace shell** adds [ThemeChoice](src/features/appearance/README.md) and
-[AccountMenu](src/features/account/README.md), Popover's wide size, and Shell's
-SidebarUtility. The branded WorkspaceMark has shared palette tokens and contrast
-coverage. These remain presentation components; apps own routes and preferences.
-
-**Settings** adds [KeyValue](src/compositions/key-value/README.md),
-[ListDetail](src/compositions/list-detail/README.md),
-[PageColumns](src/compositions/page-columns/README.md), ItemList rows/actions, and
-[controlled forms](src/features/settings/README.md). All use existing tokens;
-permission state and workflows remain in client/features, with app-owned pages.
-The [PageHeader](src/compositions/page-header/README.md) supplies the common title,
-breadcrumbs, actions, and metadata structure; its Lead keeps one quiet action, such as Rename,
-beside the title. Settings section choices use the
-shared SegmentedControl as a separate page-content row.
-
-**Primitives / Filters and pickers** composes the Primitives v2 reference for review.
-[SegmentedControl](src/compositions/segmented-control/README.md) supplies a compact
-single choice, [FilterChip](src/primitives/filter-chip/README.md) independently toggles
-filters, and [Combobox](src/primitives/combobox/README.md) searches and selects rich
-options. The shared `action.selected` tint has color/contrast coverage in both themes.
-These pieces are available in UI and have not been substituted into application pages.
-
-**Compositions / Notice** is the Component Inventory's soft status panel, the only
-component filled with a status tint. Danger, pending, and success tones pair a toned mono
-label with primary body text; the Sign in reference's ended-membership state sets its
-dimensions. See [Notice](src/compositions/notice/README.md).
-
-**Compositions / EmptyState** and **Primitives / Drawing** supply the Inventory's house state
-for empty regions and failures: a drawing, a serif line, a sentence, and one action. Failures
-read through the drawing, never red. See [EmptyState](src/compositions/empty-state/README.md)
-and [Drawing](src/primitives/drawing/README.md).
-
-**Compositions / Message** and **Compositions / Transcript** are the Inventory's Message and
-Thread, following the Agent messages reference: an entry with its author, time, text, and a link
-to its thread's replies, and the ordered column with day seams that keeps the reader's place as
-entries arrive at either end. Reply counts use the Foundations' link color, `text.link`, the one
-place persimmon appears in content. See [Message](src/compositions/message/README.md) and
-[Transcript](src/compositions/transcript/README.md). **Compositions / Composer** is the reference's
-page and thread composer, sending with Enter or its button and docking at the bottom of its
-region. See [Composer](src/compositions/composer/README.md). **Compositions / Inbox** lists what
-has come to the reader as the Home reference's "Needs you" cards: a pending dot, why it came, what
-was said as a serif quote, and a link to open it beside a button to mark it seen. See
-[Inbox](src/compositions/inbox/README.md). **Compositions / ChipPicker** chooses several people or
-other options as removable dashed chips above the picker reference's Combobox. See
-[ChipPicker](src/compositions/chip-picker/README.md).
-
-**Compositions / KeyValue** follows the Primitives v2 Key and value reference:
-compact mono keys/values at opposite edges, content-driven wrapping, and seams
-between rows. Reference, Comparison, Narrow, Long Content, RTL, Enlarged Text, and
-Composed Values demonstrate reuse through semantic `dl`/`dt`/`dd` parts.
+Storybook serves at `http://127.0.0.1:6010` with hot reload on port 6011. The **Mode** toolbar
+switches between light, dark, and both side by side.

@@ -71,16 +71,16 @@ features need them. The production content security policy permits bundled asset
 API; development additionally permits the local Vite connection.
 
 `src/app.tsx` nests `HashRouter` and the routes inside `Application`.
-That composition applies the ui-v2 `Theme`, headless `ClientProvider`, and an error boundary
-showing `CrashedScreen`. As in web, pages outside a workspace pair client hooks with ui-v2
+That composition applies the UI `Theme`, headless `ClientProvider`, and an error boundary
+showing `CrashedScreen`. As in web, pages outside a workspace pair client hooks with UI
 screens: sign-in with `useSignIn`, the workspace picker with `useWorkspacePicker` and a
 `CreateWorkspace` modal at `#/workspaces/new`, and the session, not-found, and
 workspace-unavailable states with the standalone screens; their links use hash hrefs.
 The route validates new credentials before following a safe hash return path.
 `src/routes.tsx` owns routes, the session guard, and redirects. The workspace layout and its
-group, Inbox, and Settings pages are built on ui-v2, as in web. Both platform apps import
-`@amends/client` and `@amends/ui-v2` independently: client supplies headless state, and UI v2
-supplies presentation. Each app loads UI v2's fonts and `@amends/ui-v2/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
+group, Inbox, and Settings pages are built on UI, as in web. Both platform apps import
+`@amends/client` and `@amends/ui` independently: client supplies headless state, and UI
+supplies presentation. Each app loads UI's fonts and `@amends/ui/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
 stay in this app.
 
 The default API URL is `http://127.0.0.1:8787`. The content security policy permits
@@ -92,7 +92,7 @@ Credentials are scoped to the normalized API URL and this webview origin. Web an
 desktop do not automatically share a login. OS credential storage and host selection
 UI remain later work.
 
-Page compositions contain no inline styles or local stylesheets. The ui-v2 `Theme` owns the
+Page compositions contain no inline styles or local stylesheets. The UI `Theme` owns the
 theme scope; standalone screens use the Centered pattern and the workspace its Shell, as in
 web. Visual gaps are evaluated and verified
 in UI before app consumption; `check:packages` rejects app-local styles.
@@ -105,6 +105,6 @@ routes, the responsive shell, groups and threads, and the account menu. Home, Tr
 Environments, and Connections remain placeholders. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved mode through the ui-v2 Theme.
+with AppearanceProvider and applies the resolved mode through the UI Theme.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
 stay current over the change feed; the layout shows `LiveStatus` from `useLiveStatus()`. The content security policy's `connect-src` already covers the stream, which uses the same API origin. See [live updates](../../docs/live-updates.md).

@@ -38,7 +38,7 @@ workspace-wide oversight of private groups or direct groups by design.
 
 ## Conversations in the apps
 
-Web and desktop run the workspace on the UI v2 shell: they list the reader's groups in the
+Web and desktop run the workspace on the UI Shell: they list the reader's groups in the
 sidebar, show a group's stream of threads by their opening messages, and open a thread's messages
 in the side panel, all live over the change feed. A message with no replies offers "Reply in
 thread" while hovered or focused. The page composer starts a thread and the thread composer replies, keeping drafts per group
@@ -110,7 +110,7 @@ unread. There is no way to mark one seen without opening it. The inbox reads eac
 notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
 
-Settings follows the UI v2 mocks: Workspace and Members tabs, with invitations as modals from
+Settings follows the Lunacy mocks: Workspace and Members tabs, with invitations as modals from
 Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. The mocks' Agents destination, search, group
 Tasks and Files tabs, reactions, and task references have no backend and are not shown.
@@ -128,96 +128,21 @@ assignments, one read per member; a batched assignment read across members would
 
 ## Design-system coverage
 
-The new [UI workshop](../apps/ui/README.md) contains four surface/text color
-roles for Cotton and Soot, scoped theme styles, and specimens for their supported pairings
-and nested scopes. Six neutral filled-action color roles add default, hover, pressed,
-and disabled specimens on both surfaces; enabled label contrast has automated checks.
-Control-border colors and translucent hover/pressed backgrounds have scoped specimens and
-contrast checks after compositing. The tinted specimens pair primary text with the strong border.
-Semantic status roles now include success, warning, pending, danger, idle, and running, with
-separate text and indicator colors; the colored roles also have soft tints. Warning and
-pending share amber but remain distinct meanings. Validation colors alias danger values.
-All tokens are tested for sRGB gamut, with WCAG 2.2 AA contrast targets for supported text
-and indicator pairings, including composited backgrounds. Status specimens include visible
-labels and shapes. Decorative `line.seam` dividers are separated from control borders in
-Shell, Navigation, and Drawer. These checks do not establish whole-app WCAG conformance.
-The focus foundation adds a themed 2px outline with 2px offset, applied through a reusable
-`:focus-visible` class. Storybook provides native controls for real keyboard review and
-browser checks of ring colors and clearance. The Button primitive provides primary filled,
-secondary outlined, and ghost actions in one regular size, native disabled/form behavior, and portable
-interaction stories. Controlled pending blocks repeated activation while preserving focus and layout,
-with a running stitch and reduced-motion treatment. Danger tone supports all three variants
-through a tested `action.danger` palette, with dedicated hover/pressed fills and tinted states.
-Disabled appearance and focus remain shared across tones. Additional sizes remain
-unimplemented in UI. IconButton provides named square actions using Button's variants and tones;
-Tooltip supplies supplemental hover/focus text as a compact dark monospace label matching
-the Primitives v2 reference. Its dedicated surface/foreground pair stays dark/light in both
-themes, with top-start placement, viewport wrapping, and forced-colors treatment.
-The shared [icons package](../apps/icons/README.md) supplies 23 generated outline icons
-from canonical drawings, with Solid components, raw SVGs, and a separate metadata catalog.
-Select, Drawer, Shell, and workshop glyphs consume it. Compiler, reactivity, naming,
-generated-file, and consumer-bundle checks cover this slice. Tonal variants, sprites,
-automatic optical-balance reports, and the rest of Regen's drawing language are not implemented.
-Body, heading, and mono typography styles include their normal-weight
-Latin fonts and browser checks for font loading, sizing, and wrapping. The first Text
-primitive composes those foundations with semantic element selection and native attributes.
-It also supports success, warning, danger, and pending text tones; announcements and visible
-status wording remain caller-owned.
-Spacing steps 0–6 are available as quarter-rem values, with browser-measured scale, padding,
-and gap specimens at normal and enlarged root text sizes.
-Square, medium (10px), and pill radius values have browser-verified corner specimens across sizes and themes.
-The Input primitive supports native text/email/password/search/tel/URL entry with read-only,
-disabled, and caller-controlled invalid states. `line.invalid` supplies the reviewed invalid
-border. The Field composition provides a label, required marker, help, and error text with explicit
-reactive association props; form state and validation timing stay with the consuming feature.
-`text.invalid` adds a verified error-text role. CodeInput adds six-digit native text entry
-with decorative cells and a compact presentation for narrow containers. SignInEmailForm
-adds controlled email entry, validation feedback, pending guards, and request errors in
-the UI workshop. SignInCodeForm adds code verification/resend presentation, independent
-pending states, recovery feedback, and change-email callbacks. Web and desktop now own
-sign-in over client hooks and UI v2 screens. Textarea and other specialized input types remain future
-pieces. The visible Radio primitive supports native selection and
-form semantics; RadioGroup composes it into controlled plain/card choices with native grouping, required/disabled
-behavior, and associated help/errors. Extra layouts, previews, and option metadata remain deferred. Checkbox (including mixed),
-binary Switch, and styled single-choice Select primitives are available. Select uses Kobalte
-for its listbox behavior with a themed popup and native form-value bridge. Searchable
-comboboxes, grouped options, multi-select, and higher-level settings compositions remain future work.
-Container, Row, Column, Grid, and GridItem provide token-based spacing, centered width limits,
-wrapping groups, and equal-width grids that respond to their own container. Full-row items,
-nested layouts, RTL, and enlarged-text specimens are available. Numeric column spans,
-asymmetric grids, and responsive prop objects remain outside this initial layout slice.
-Avatar provides four neutral identity treatments with text fallbacks and explicit accessible
-naming or decorative usage. Filled avatar text pairs have separate contrast verification.
-Status provides semantic dots, hollow rings, and visible labels; domain mappings and live
-announcements belong to callers. Both have theme, narrow/enlarged, RTL, and reactive stories.
-Image avatars and identity/data integration remain future work.
-Divider provides shared horizontal dashed lines and composable labels/actions, using the
-existing seam and typography foundations. Navigation section headers reuse it; collapsed
-headers retain accessible names, hide action controls, and recover focus to a link when needed.
-Declarative Navigation, Drawer, and Shell compositions add native destination links, a
-desktop expanded sidebar, tablet icon rail, phone header toggle, and modal navigation sheets. The sidebar remains mounted
-through viewport changes, preserving drafts and selection. Desktop collapse preference is
-independent of mobile open state. Native dialog behavior, modal-aware Select/Tooltip portals,
-focus return, reduced motion, and independent sidebar/main scroll regions are available.
-An optional 400px Shell inspector moves from an inline desktop column to a
-right-side laptop/tablet sheet and full-width phone sheet; no product page feeds it yet.
-Centered Dialog shares the native modal implementation with Drawer and composes titles,
-descriptions, scrolling bodies, and actions. Controlled form recovery is demonstrated.
-Toast provides provider-scoped queues, polite feedback, persistent actions, paused timers,
-and keyboard access, with dedicated dark-surface color pairings. Modal feedback uses a
-viewport inside that modal. Neither component is integrated into product flows or backend
-notifications. Workspace-shell integration and theme persistence are implemented. Collapse preference
-persistence and component-level Tauri validation remain pending.
-Other foundations, additional font weights/subsets, and other production components remain
-unimplemented in UI.
-Each needed piece is introduced and verified separately, with Storybook coverage at every
-layer. Both apps compose headless client state and UI presentation independently.
+The [UI package](../apps/ui/README.md) is built from the Lunacy mocks in
+`design-system/Amends Group Exploration.free`: light and dark color roles taken from the mocks,
+Inter in eight type roles, a 4px spacing grid, shadows for modals, popovers, and toasts, and the
+[icons package](../apps/icons/README.md)'s 51 generated drawings, including the mocks' marks.
+Its components, the six layout patterns, and the screens cover every page the apps show; each has
+Storybook stories in both modes, run as portable tests in Happy DOM. The dark error colors are
+proposals, since the mocks have no dark error state. Contrast, gamut, font loading, and layout
+have no automated checks: stories are compared with their Lunacy frames in a browser at phone,
+touch, and desktop widths. Right-to-left layouts and forced colors are not reviewed.
 
 ## Shared client foundation
 
-`ThemeProvider` supplies the shared color and body typography scope. Shell inherits
-it and provides page/region scrolling plus named content widths and centering.
-Web and desktop compose those parts without local styles. Appearance preferences
+UI's `Theme` supplies the chosen mode's variables and body typography, and its Shell and
+Centered patterns lay out pages inside and outside a workspace. Web and desktop compose those
+parts without local styles. Appearance preferences
 are persisted per app origin; System follows operating-system appearance.
 
 [Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
@@ -234,9 +159,9 @@ The headless [sign-in controller](../apps/client/src/sign-in/README.md) owns ema
 drafts, shared-schema validation, typed HTTP requests, explicit retry/resend, and
 session installation. Each mounted controller owns its requests; changing email,
 unmounting, and credential replacement cancel old work and ignore late responses.
-Web and desktop wire it to the ui-v2 sign-in screens, which map its codes to wording.
+Web and desktop wire it to the UI sign-in screens, which map its codes to wording.
 
-Workspace picker and creation are implemented in both apps over client hooks and ui-v2
+Workspace picker and creation are implemented in both apps over client hooks and UI
 screens. [Workspace entry](workspace-entry.md) records composition and recovery.
 The picker lists active memberships and total members; creation refreshes the directory
 before navigation and retries uncertain submissions with the same key while mounted.

@@ -62,21 +62,18 @@ currently run through TypeScript. Check compatibility before changing this setup
   take a contract as a development dependency to act as a client.
 - `apps/*`: user-facing clients and shared UI. `icons` holds canonical drawings and generated
   Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume it.
-  `ui` holds shared visual foundations, primitives, and compositions with a
-  standalone Storybook workshop. Introduce and verify one foundation or component
-  at a time. It is UI-only and must not depend on client state, routing, or API
-  contracts. `client` owns headless session lifetime, typed API access, query state,
-  and pure route helpers. Client and UI must not depend on each other in any dependency
-  section or source import. `web` and `desktop` consume these libraries and own route
-  trees, page composition, API URL, and persistence configuration. `desktop` owns the
+  `ui` is the pattern-based design system built from the Lunacy mocks in
+  `design-system/Amends Group Exploration.free`, which are its visual reference: foundations,
+  components, the six layout patterns, and presentational screens, with a standalone Storybook
+  workshop. Introduce and verify one piece at a time. It is UI-only and must not depend on
+  client state, routing, or API contracts. `client` owns headless session lifetime, typed API
+  access, query state, the view hooks screens connect through, and pure route helpers. Client
+  and UI must not depend on each other in any dependency section or source import. `web` and
+  `desktop` consume these libraries and own route trees, page composition, API URL, and
+  persistence configuration; each page connects client hooks to UI screens. `desktop` owns the
   Tauri shell; platform APIs stay in the entry apps.
-  `ui-v2` is the pattern-based design system built from the Lunacy mocks in
-  `design-system/Amends Group Exploration.free`, which are its visual reference. It follows
-  the same UI-only rules and has replaced `ui` and the retired `features` package in the apps:
-  its screens are presentational, connected logic lives in `client` as hooks, and web and
-  desktop connect the two. `ui` remains only as its own workshop until it is removed.
-  The legacy UI implementation and `design-system` package were removed; the current
-  `ui` package is the renamed shared workshop. Apps may install UI
+  The earlier UI implementations, the `design-system` package, and the `features` package
+  were removed; `ui` was built as `ui-v2` and took the name when it replaced them. Apps may install UI
   dependencies and consume shared packages. Run desktop's `check:native` after
   changing Rust or Tauri configuration; root checks cover its TypeScript only.
 
@@ -92,7 +89,7 @@ for data, options, and callbacks rather than custom slots carrying whole compone
 JSX trees. Follow framework-required render APIs where needed. Pages live in `apps/web`
 and `apps/desktop`; UI owns reusable visual pieces, and client owns connected state and
 actions as hooks. Neither shared package owns application pages.
-`ui-v2` screens are presentational: they take data and callbacks and render a pane or
+UI screens are presentational: they take data and callbacks and render a pane or
 the navigation, while the apps own routes, data, and which screen shows.
 
 Web and desktop compose UI; they do not define styles, inline style objects, or

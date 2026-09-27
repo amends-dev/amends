@@ -1,1 +1,2 @@
-export { ThemeProvider, type ThemeProviderProps } from "./theme-provider.tsx";
+export { Theme, type ThemeProps } from "./theme.tsx";
+export { vars } from "./vars.css.ts";

@@ -16,7 +16,7 @@ import {
   TransferOwnership,
   WorkspaceSettings,
   settingsToast,
-} from "@amends/ui-v2/screens/settings";
+} from "@amends/ui/screens/settings";
 import { Navigate, useParams, useSearchParams } from "@solidjs/router";
 import { Show, createSignal } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

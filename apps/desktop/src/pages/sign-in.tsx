@@ -1,5 +1,5 @@
 import { paths, useSignIn } from "@amends/client";
-import { SignInCode, SignInEmail } from "@amends/ui-v2/screens/sign-in";
+import { SignInCode, SignInEmail } from "@amends/ui/screens/sign-in";
 import { Match, Switch } from "solid-js";
 
 /** The email and code steps; the route resumes the intended page once a session exists. */

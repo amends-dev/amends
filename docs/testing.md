@@ -16,7 +16,6 @@ bun run test --project backend
 bun run test --project postgresql
 bun run test --project @amends/icons
 bun run test --project @amends/ui
-bun run test --project @amends/ui-v2
 bun run test --project @amends/client
 bun run test --project @amends/web
 bun run test --project @amends/desktop
@@ -37,171 +36,20 @@ environment on Bun, invoke the generator with a timeout, and verify that individ
 icon imports exclude unrelated geometry and metadata-only imports exclude Solid.
 `bun run check:icons` verifies generated files without writing; it is included in
 `bun run check` and the pre-commit hook. The UI package's Foundations / Icons stories
-provide Marks selection, gallery search, and reactive naming portable tests. Browser
-review compares all 26 SVG marks with the Primitives v2 reference at 15px, then checks
-sizes, weights, both themes, affected controls, RTL, and enlarged root text.
+run gallery search and reactive naming as portable tests. Browser review checks new drawings
+against their Lunacy reference, then sizes, weights, both modes, and the controls using them.
 
-The new [UI workshop](../apps/ui/README.md) uses portable Storybook render/play scenarios to verify its Solid rendering and interaction setup. Build it independently
-with `bun run --filter @amends/ui build`; no existing UI is imported into this package.
-Its [color foundation](../apps/ui/src/foundations/color/README.md) tests eight reading
-pairings and six enabled action pairings with Color.js. Storybook specimens support browser
-checks of the actual CSS variables, theme switching, nested scopes, and contrast. Action-color
-play checks verify computed text/fill/surface colors and alpha, enabled contrast, and disabled
-semantics; they need a browser and are excluded from Happy DOM. Visually review disabled colors
-on canvas and panel, narrow layouts, and enlarged text separately.
-Control-color tests add twelve plain border pairings and eight overlay/surface combinations.
-The development-only blend helper has endpoint and unsupported-input tests. Browser play
-checks verify actual colors and alpha, compare text/border contrast after compositing, and
-cross-check the blend against an sRGB canvas render. Review all Controls stories, including
-nested themes, theme switching, and narrow/enlarged layouts; these browser checks do not run
-under Happy DOM.
-Status tests cover text/indicator pairs on canvas, panel, and their own composited soft
-backgrounds, plus focus contrast on the tints. The full token tree is checked for sRGB gamut,
-opacity, matching theme keys, and validation/danger aliases. Decorative seams are deliberately
-excluded from control-boundary contrast assertions. Status story play checks verify rendered
-values and blending; Portal Themes checks nested status variables through Tooltip's portal.
-Review visible labels/shapes and forced colors as well as contrast, and rerun existing Button,
-Input, Select, and Shell browser specimens after changing the shared color contract.
-The [typography stories](../apps/ui/src/foundations/typography/README.md) run browser
-play checks for real font loading, computed metrics, and wrapping. They are intentionally
-excluded from Happy DOM portable-story tests because that environment cannot verify font
-rendering. Review their Interactions and Accessibility panels in Storybook, including the
-narrow and enlarged-text scenarios.
-The [Text primitive](../apps/ui/src/primitives/text/README.md) has DOM tests for
-native semantics, forwarding, refs, class merging, and reactive updates, plus compile-time
-usage checks. Its Reactive Props story also runs through the portable-story suite; actual
-colors, typography, margins, and wrapping are verified in the browser.
-Semantic Text stories check actual status colors and 4.5:1 contrast on plain and matching
-soft backgrounds, including nested inheritance. DOM/type tests verify semantic tone changes
-preserve the element and do not add live-region semantics.
-The [Button primitive](../apps/ui/src/primitives/button/README.md) has DOM and type checks
-for native semantics, prop/ref/event forwarding, disabled activation, explicit form submission,
-preventing default, and reactive updates, including variant changes that preserve focus and the element. Activation
-and Forms for all three variants, plus Reactive Props and the three pending-recovery stories, run as portable
-stories. Real browser checks cover native Enter/Space/Tab input, actual state colors and outlines,
-inherited fieldset disabling, narrow/enlarged labels, coarse pointers, and forced colors. Pending
-checks cover repeat-activation blocking, submit/reset cancellation and recovery, caller ARIA
-restoration, retained focus/layout, and reduced motion. The consuming form also guards direct submissions.
-Button Comparison additionally checks all three variants' computed fills, text, borders, and
-composited contrast against the current palette. Run it
-after shared color changes to catch stale dependent styles in the development server, even
-when the standalone color stories and production build pass.
-The same comparison checks cover danger variants, disabled fieldsets, and pending specimens.
-Danger recovery stories run as portable tests for all three variants; IconButton has its own
-danger activation story. Contrast tests cover the dedicated `action.danger` fill/tint/border
-pairings, and foundation stories display the tokens separately from the real Button consumers.
-IconButton's Circular Interaction story runs pointer and keyboard activation with a text glyph;
-browser review checks its 34px circular geometry, coarse-pointer target, both themes,
-enlarged text, and forced colors.
-The [Input primitive](../apps/ui/src/primitives/input/README.md) has native-prop, ref/event,
-reactivity, selection, validity, form-data, reset-default, and type checks. Editing and Forms
-run as portable stories. Browser Comparison verifies actual themed colors, placeholders,
-radius, and inherited-disabled form-data exclusion (Happy DOM does not model that exclusion).
-Use Playwright for native typing/Enter/Tab, invalid focus, read-only selection, forced colors,
-long values, 320px layouts, and enlarged text. Radius specimens include the 10px medium token;
-Controls specimens include the invalid-border role independently of Input.
-Field Comparison also checks the mock-aligned label/help/error typography and semantic
-colors in both themes. Reference shows the compact field treatments; the error prefix stays
-in accessible descriptions while its decorative dot supplies the visible marker.
-The [CodeInput primitive](../apps/ui/src/primitives/code-input/README.md) has DOM/type
-tests for native associations, validity, reset defaults, and reactive selection. Editing,
-Forms, and Layout run as portable stories; Comparison checks glyph alignment in the browser.
-Review real keyboard replacement, paste, undo, Enter/Tab, forced colors, RTL, and 320px
-layouts with enlarged text. Resizing between six cells and compact entry must retain the
-input, value, and selection. Device autofill and native desktop remain platform checks.
-The [SignInEmailForm](../apps/ui/src/features/sign-in/README.md) tests cover controlled
-drafts, native and caller-supplied validation, pending guards, retry, and reset ownership.
-Validation, Request Recovery, and Layout run as portable stories. Browser review covers
-real Enter/Tab, focus retention, inherited disabled-fieldset submission, both themes,
-RTL, long content, enlarged text, and accessibility. These previous-UI forms no longer back the
-apps: sign-in now renders the [UI v2](../apps/ui-v2/README.md) screens, whose stories and the app
-route tests cover the flow.
-SignInCodeForm adds portable scenarios for validation, verification recovery, resend
-failure/retry, changing email while pending, and resizing. DOM/type checks cover
-exclusive pending actions, explicit submission, leading zeros, caller-owned feedback,
-reset, and isolated instances. Browser review checks native keyboard/paste, focus,
-inherited disabled-fieldset guards, RTL, and enlarged text. Resend must bypass code
-validation; changing email must remain available during either request.
-The [Field composition](../apps/ui/src/compositions/field/README.md) has DOM/type tests for
-unique identities, native label/description associations, external-description deduplication,
-wrapper props, required/disabled/error changes, and control identity/focus/selection retention.
-Its reactive and form stories run as portable tests. Browser review verifies real label clicks,
-validation focus, native submission, disabled tab stops, narrow/enlarged message wrapping,
-forced colors, and error-text contrast. Four additional contrast tests cover `text.invalid`.
-The [Radio primitive](../apps/ui/src/primitives/radio/README.md) has DOM/type tests for
-forwarding, reactive checked/disabled props, native grouping, form values/reset, and fieldset
-disabling. Interaction and Forms run as portable stories. Use Playwright for native Tab/arrows/
-Space, label activation, state colors, forced colors, and narrow/enlarged labels.
-The [RadioGroup composition](../apps/ui/src/compositions/radio-group/README.md) tests
-controlled callbacks, group isolation, associations, refreshed-option identity/focus, removed
-or disabled selections, native attributes, and duplicate values. Plain/card interaction and
-form stories plus refreshed options run as portable tests. Browser verification covers card
-contrast, compact legend/option/help typography, the shared error dot and accessible prefix,
-native navigation/validation, reset, external form data, disabled fieldsets, forced colors,
-and narrow/enlarged layouts.
-Checkbox/Switch tests cover forwarding/ref/events, reactive checked/disabled state, native
-form values/reset and required validity, and checkbox mixed clearing. Select tests cover
-initial/reactive values, refreshed options, Field associations, validity, form data/reset, and
-disabled popup handling. Real browser checks also verify inherited fieldset disabling.
-The UI test setup supplies the browser's initial `animation-name: none` value,
-which Happy DOM omits, so Kobalte popup presence can finish cleanup.
-Select stories extend axe's overlay-region matcher to include labelled listbox popups:
-they are connected to their trigger but portaled outside page landmarks. All other region,
-label, role, focus, and contrast checks remain enabled; scan with the popup open too.
-Each primitive's interaction and form stories run as portable tests. Playwright verifies
-Space, Select navigation/typeahead/dismissal/focus return, popup themes/collision, actual marks/thumb positions, RTL, forced colors, and
-narrow/enlarged layouts. Recheck Input after changes to shared private field-control styles.
-Layout tests verify semantic form/list composition, native refs and events, and preservation of
-input identity, focus, and selection through layout-prop changes. The Responsive Form portable
-story checks that changing container width keeps values and submission intact. Container,
-Row, Column, and Grid browser stories measure actual gutters, centering, wrapping, gaps,
-track widths/counts, and full-row spans. Use Playwright for viewport resize, real focus/tab
-order, nested layouts, RTL, and enlarged text; these geometry checks require a browser.
-Avatar/Status DOM and type tests cover named/decorative semantics, fallback content,
-reactivity, native refs/classes, and explicit announcement behavior. Their portable stories
-exercise identity changes, keyboard button composition, and status presentation changes.
-Avatar text/surface pairs join the color contrast/gamut tests. Browser review checks both
-surfaces/themes, actual shapes and colors, long labels, enlarged text, RTL, and forced colors.
-Divider's portable action story and DOM/type tests keep labels/headings and buttons accessible
-while only line segments are hidden. Its Layout story checks centering, equal line lengths,
-full-width standalone lines, and actual dashed borders in the browser. Review long labels,
-RTL, enlarged text, and forced colors. Navigation's interaction story and DOM tests cover
-retained section actions, collapsed visibility, section names, and focus recovery to a link.
-Shell tests cover declarative slots, accessible navigation names, modified/canceled anchor
-activation, retained sidebar instances, and independent desktop/mobile state. IconButton,
-Tooltip, Navigation, Drawer, and desktop Shell interaction stories also run as portable tests.
-The mobile interaction story uses Storybook's phone viewport and must run in the browser.
-Use Playwright for native dialog inertness, Escape/backdrop dismissal, focus return, scrolling,
-reduced motion, rail tooltip placement, and resizing with a nested Select open. Verify that
-the dialog and popup close on desktop return and that drafts survive. Shell/Tooltip stories
-extend the same axe overlay-region matcher to tooltips; scan open drawers and popups too.
-Tooltip's Reference and Comparison stories support checking the Primitives v2 label's type,
-padding, corners, shadow, and start alignment. Check pointer movement into the popup, Escape,
-keyboard focus, narrow/long content, and enlarged text in the browser. The color tests verify
-the dedicated tooltip foreground/background pair independently from canvas/panel pairings.
-Dialog and Toast have focused DOM and portable-story tests for modal state/associations,
-drafts, pending/error recovery, toast queue isolation, remaining-time pauses, action persistence,
-and focus recovery. Timer tests use Vitest fake timers in these synchronous UI tests.
-Use their browser stories for native Tab containment, dismissal, nested Select and toast
-interaction inside a dialog, Alt+T, viewport overflow, enlarged text, forced colors, and reduced motion.
-Toast text/action colors have dedicated contrast tests and a foundation specimen.
-The [Popover composition](../apps/ui/src/compositions/popover/README.md) runs portable
-stories for content actions, guarded closing, controlled state, icon triggers, and mounting
-in native Dialog and Drawer. Browser checks cover Escape/outside focus behavior, edge
-placement, narrow and enlarged text, RTL, theme colors, forced colors, and Storybook accessibility.
-The [spacing stories](../apps/ui/src/foundations/spacing/README.md) measure every
-quarter-rem step, all four padding edges, and horizontal/vertical gaps with the browser's
-layout engine. Check all seven control values and the enlarged-root scenario; these
-geometry assertions are not run under Happy DOM.
-The [radius stories](../apps/ui/src/foundations/radius/README.md) use the browser to
-check dimensions, all four corner values, and curved hit boundaries across specimen sizes.
-They also cover enlarged text and restore document scrolling after their checks.
-The [focus stories](../apps/ui/src/foundations/focus/README.md) check ring colors,
-surface contrast, and room for the outline. Four ring/surface contrast tests run in Vitest.
-Use real browser Tab/Shift+Tab presses to verify `:focus-visible`, disabled tab stops, computed
-outline dimensions, no layout shift, and clipping. Story play checks deliberately do not
-move focus; synthetic events cannot establish native input modality. Review both themes,
-nested scopes, narrow/enlarged layouts, pointer behavior, and forced-colors emulation.
+The [UI workshop](../apps/ui/README.md) runs its Storybook stories as portable tests in Happy
+DOM: renders for every foundation, component, pattern, and screen state, and play functions for
+their interactions, from sending with Enter and choosing members to the screens' flows such as
+sign-in, the workspace picker, the Inbox's selection, and Settings. Each screen's workshop fixture
+applies its rules over local state, so those flows play through without a backend. Focused tests
+cover the Shell: the navigation drawer below desktop and the side panel beside or over the
+content, driven through `test/viewport.ts`, which evaluates the width queries against a width
+the test sets. `test/browser-defaults.ts` supplies the browser's initial `animation-name: none`,
+which Happy DOM omits, so Kobalte popups can finish unmounting. Happy DOM does not lay out or
+paint: compare stories with their Lunacy frames in a browser, in both modes and at phone, touch,
+and desktop widths, before relying on them.
 
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin
@@ -333,7 +181,7 @@ tests do not prove that startup works against a database you configure. Follow t
 ## Application foundation
 
 Web and desktop declare their router trees as children of `Application`. Each
-owns a sign-in page over client hooks and UI v2 screens.
+owns a sign-in page over client hooks and UI screens.
 Their tests exercise real form submission through the generated client, directory
 validation before navigation, persistence, safe return destinations, and explicit
 recovery. Web also verifies disposal when navigation interrupts verification.
@@ -345,7 +193,7 @@ state, authorization failure, and retry with isolated transports. They require n
 package or router. Web's application suite verifies safe redirects, route guards,
 workspace changes, and credential/request cleanup. Desktop's application suite tests
 its independent composition with the real hash router. Each app composes its screens
-from UI v2, whose workshop at port 6010 covers the patterns, components, and screens;
+from UI, whose workshop at port 6010 covers the patterns, components, and screens;
 client has no Storybook dependency or workshop.
 
 Client's [sign-in suite](../apps/client/test/sign-in.test.tsx) exercises the generated
@@ -359,7 +207,7 @@ tests complement the app route tests.
 Client's settings suite exercises `useWorkspaceSettings` over a scripted transport: how it
 shapes the roster and invitations, a stale role change kept through a refresh, an invitation
 retried with the same request key, and an invitation whose list refresh failed and completes
-once a refresh succeeds. UI v2's settings stories play the flows over a local fixture, and the
+once a refresh succeeds. UI's settings stories play the flows over a local fixture, and the
 apps' tests cover the settings routes, inviting, and removing.
 
 The local host's HTTP tests exercise desktop CORS preflights, including the generated

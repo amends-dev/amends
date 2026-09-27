@@ -1,245 +1,187 @@
-/** A status swatch is not automatically suitable for text. Pair each role with its documented surface. */
-export interface StatusForegroundColors {
-  readonly text: string;
-  readonly indicator: string;
-}
-export interface StatusColors extends StatusForegroundColors {
-  /** Decorative tint over canvas or panel, paired with this status's text and indicator. */
-  readonly soft: string;
-}
-export interface StatusPalette {
-  readonly idle: StatusForegroundColors;
-  readonly running: StatusForegroundColors;
-  readonly success: StatusColors;
-  readonly warning: StatusColors;
-  readonly pending: StatusColors;
-  readonly danger: StatusColors;
-}
-export type StatusTone = keyof StatusPalette;
-
-/** Enabled action colors. Disabled appearance and focus are shared across tones. */
-export interface ActionToneColors {
-  readonly fill: string;
-  readonly fillHover: string;
-  readonly fillPressed: string;
-  readonly onFill: string;
-  readonly text: string;
-  readonly border: string;
-  readonly borderStrong: string;
-  readonly hover: string;
-  readonly pressed: string;
+/**
+ * Color roles for the neutral design mocked in `design-system/Amends Group Exploration.free`.
+ * Values are the exact light and dark fills and strokes the Lunacy screens use; components
+ * consume roles, never raw values. Everything is a shade of gray except the avatar tones, the
+ * agent name, and danger, which the screens use for identity and errors.
+ */
+export interface AvatarTone {
+  readonly background: string;
+  readonly foreground: string;
 }
 
-/** Semantic colors. Disabled text is only for inactive controls; seams are decorative. */
+export const avatarTones = [
+  "neutral",
+  "sand",
+  "lilac",
+  "clay",
+  "olive",
+  "slate",
+  "sage",
+  "ink",
+] as const;
+export type AvatarToneName = (typeof avatarTones)[number];
+
 export interface ColorTokens {
-  /** The sole branded identity surface, shared by both themes. */
-  readonly workspaceMark: { readonly surface: string; readonly text: string };
-  /** Neutral identity treatments. Agent avatars use text.secondary and line.control on the parent surface. */
-  readonly avatar: Readonly<
-    Record<"human" | "contact" | "system", { readonly surface: string; readonly text: string }>
-  >;
-  /** Toast is always dark, with its own readable text, action, and focus pairings. */
-  readonly toast: { readonly surface: string; readonly text: string; readonly action: string };
   readonly surface: {
+    /** The outer frame: title bar, rail, and the gutter around panels. */
     readonly canvas: string;
+    /** Sidebar, main content, side panel, and centered screens. */
     readonly panel: string;
-    /** Decorative first-paint placeholder on canvas or panel; never a text surface. */
-    readonly skeleton: string;
-    /** Compact dark tooltip surface in either theme; pair only with text.onTooltip. */
-    readonly tooltip: string;
+    /** Modal dialogs. */
+    readonly raised: string;
+    /** Menus, dropdowns, and toasts, which sit above a modal. */
+    readonly popover: string;
+    /** Inputs and the composer. */
+    readonly field: string;
+    /** The quiet "Find anything" field. */
+    readonly search: string;
+    /** A row under the pointer. */
+    readonly hover: string;
+    /** The message whose thread is open. */
+    readonly active: string;
+    /** The current sidebar row. */
+    readonly selected: string;
+    /** The current rail destination, on canvas. */
+    readonly railSelected: string;
+    /** Badges, counts, reactions, a chosen option, and disabled actions. */
+    readonly subtle: string;
+    /** An inline mention and the workspace mark. */
+    readonly mention: string;
   };
   readonly text: {
     readonly primary: string;
+    /** Navigation items, supporting copy, and secondary actions. */
     readonly secondary: string;
-    readonly onTooltip: string;
-    /** Links in content: persimmon text, the one place it appears inside the shell's content. */
-    readonly link: string;
-    /** Error messages on canvas and panel. */
-    readonly invalid: string;
+    /** Timestamps, section labels, placeholders, and toolbar icons. */
+    readonly muted: string;
     readonly disabled: string;
+    /** An agent's name. */
+    readonly agent: string;
+    readonly danger: string;
+    /** Text and icons on the primary action. */
+    readonly onPrimary: string;
   };
-  readonly line: {
-    /** Decorative division only; never a control boundary or state indicator. */
-    readonly seam: string;
-    readonly control: string;
+  readonly border: {
+    /** 1px lines between panel regions. */
+    readonly divider: string;
+    /** Outlines of buttons, inputs, the composer, and modals. */
+    readonly default: string;
+    /** An open or focused picker field. */
     readonly strong: string;
-    /** Invalid-control border on canvas and panel; not an error-text color. */
-    readonly invalid: string;
+    /** The outline of a chosen option. */
+    readonly selected: string;
+    readonly danger: string;
+    /** The dashed running stitch; decorative only. */
+    readonly stitch: string;
   };
   readonly action: {
-    readonly fill: string;
-    readonly fillHover: string;
-    readonly fillPressed: string;
-    readonly onFill: string;
-    /** Translucent backgrounds for text.primary, over canvas or panel. */
-    readonly hover: string;
-    readonly pressed: string;
-    /** Persistent selected state for compact choices, on canvas or panel. */
-    readonly selected: string;
-    /** Translucent fill, supported on canvas and panel surfaces. */
-    readonly disabled: string;
-    readonly danger: ActionToneColors;
+    readonly primary: string;
+    readonly secondary: string;
+    /** The 2px bar beside the current item and under the current tab. */
+    readonly indicator: string;
   };
-  readonly focus: { readonly ring: string };
-  readonly status: StatusPalette;
+  /** The dimming layer behind a modal or a floating side panel. */
+  readonly scrim: string;
+  /** The heavier dimming behind the navigation drawer on phones. */
+  readonly scrimStrong: string;
+  readonly avatar: Readonly<Record<AvatarToneName, AvatarTone>>;
 }
 
-// Warning (caution) and pending (waiting) share amber, but remain distinct semantic roles.
-// Chroma 0.085 keeps Cotton's amber text inside sRGB; the old UI's 0.1 required gamut mapping.
-const cottonAmber = {
-  text: "oklch(0.42 0.085 78)",
-  indicator: "oklch(0.58 0.12 78)",
-  soft: "oklch(0.58 0.12 78 / 0.12)",
-} as const satisfies StatusColors;
-const sootAmber = {
-  text: "oklch(0.82 0.12 82)",
-  indicator: "oklch(0.82 0.12 82)",
-  soft: "oklch(0.82 0.12 82 / 0.12)",
-} as const satisfies StatusColors;
-const cottonStatus = {
-  idle: { text: "oklch(0.41 0.014 84)", indicator: "oklch(0.62 0.014 84)" },
-  running: { text: "oklch(0.41 0.014 84)", indicator: "oklch(0.41 0.014 84)" },
-  success: {
-    text: "oklch(0.36 0.1 148)",
-    indicator: "oklch(0.52 0.14 148)",
-    soft: "oklch(0.52 0.14 148 / 0.1)",
-  },
-  warning: cottonAmber,
-  pending: cottonAmber,
-  danger: {
-    text: "oklch(0.42 0.14 28)",
-    indicator: "oklch(0.51 0.17 28)",
-    soft: "oklch(0.51 0.17 28 / 0.1)",
-  },
-} as const satisfies StatusPalette;
-const sootStatus = {
-  idle: { text: "oklch(0.74 0.008 86)", indicator: "oklch(0.56 0.012 84)" },
-  running: { text: "oklch(0.74 0.008 86)", indicator: "oklch(0.74 0.008 86)" },
-  success: {
-    text: "oklch(0.78 0.14 150)",
-    indicator: "oklch(0.78 0.14 150)",
-    soft: "oklch(0.78 0.14 150 / 0.12)",
-  },
-  warning: sootAmber,
-  pending: sootAmber,
-  danger: {
-    text: "oklch(0.78 0.12 30)",
-    indicator: "oklch(0.72 0.15 30)",
-    soft: "oklch(0.72 0.15 30 / 0.12)",
-  },
-} as const satisfies StatusPalette;
-
-const toastColors = {
-  surface: "oklch(0.2 0.008 84)",
-  text: "oklch(0.95 0.006 90)",
-  action: "oklch(0.82 0.09 60)",
-} as const;
-
-export const cotton = {
-  workspaceMark: { surface: "oklch(0.56 0.13 42)", text: "oklch(0.99 0.01 90)" },
-  avatar: {
-    human: { surface: "oklch(0.88 0.018 86)", text: "oklch(0.32 0.014 84)" },
-    contact: { surface: "oklch(0.9 0.014 88)", text: "oklch(0.4 0.014 84)" },
-    system: { surface: "oklch(0.24 0.014 84)", text: "oklch(0.95 0.006 90)" },
-  },
-  toast: toastColors,
+export const light = {
   surface: {
-    canvas: "oklch(0.955 0.012 88)",
-    panel: "oklch(0.978 0.008 92)",
-    skeleton: "oklch(0.92 0.014 88)",
-    tooltip: "oklch(0.2 0.008 84)",
+    canvas: "#F7F7F8",
+    panel: "#FFFFFF",
+    raised: "#FFFFFF",
+    popover: "#FFFFFF",
+    field: "#FFFFFF",
+    search: "#F6F6F7",
+    hover: "#F8F8F9",
+    active: "#F5F5F6",
+    selected: "#F0F0F2",
+    railSelected: "#E9E9EC",
+    subtle: "#F3F3F5",
+    mention: "#ECEEF1",
   },
   text: {
-    primary: "oklch(0.24 0.014 84)",
-    secondary: "oklch(0.41 0.014 84)",
-    onTooltip: "oklch(0.95 0.006 90)",
-    link: "oklch(0.47 0.12 40)",
-    invalid: cottonStatus.danger.text,
-    disabled: "oklch(0.62 0.014 84)",
+    primary: "#242528",
+    secondary: "#73757B",
+    muted: "#9C9EA4",
+    disabled: "#9C9EA4",
+    agent: "#8755DD",
+    danger: "#89221C",
+    onPrimary: "#FFFFFF",
   },
-  line: {
-    seam: "oklch(0.78 0.016 84)",
-    control: "oklch(0.6 0.016 84)",
-    strong: "oklch(0.42 0.016 84)",
-    invalid: cottonStatus.danger.indicator,
+  border: {
+    divider: "#EDEEF0",
+    default: "#E5E6E9",
+    strong: "#73757B",
+    selected: "#9C9EA4",
+    danger: "#B32F28",
+    stitch: "#BCB7AC",
   },
-  action: {
-    fill: "oklch(0.24 0.014 84)",
-    fillHover: "oklch(0.32 0.014 84)",
-    fillPressed: "oklch(0.17 0.008 84)",
-    onFill: "oklch(0.97 0.01 90)",
-    hover: "oklch(0.24 0.014 84 / 0.05)",
-    pressed: "oklch(0.24 0.014 84 / 0.12)",
-    selected: "oklch(0.24 0.014 84 / 0.09)",
-    disabled: "oklch(0.24 0.014 84 / 0.08)",
-    danger: {
-      fill: cottonStatus.danger.text,
-      fillHover: "oklch(0.48 0.16 28)",
-      fillPressed: "oklch(0.36 0.12 28)",
-      onFill: "oklch(0.97 0.01 90)",
-      text: cottonStatus.danger.text,
-      border: cottonStatus.danger.indicator,
-      borderStrong: cottonStatus.danger.text,
-      hover: cottonStatus.danger.soft,
-      pressed: "oklch(0.51 0.17 28 / 0.18)",
-    },
-  },
-  focus: { ring: "oklch(0.24 0.014 84)" },
-  status: cottonStatus,
-} as const satisfies ColorTokens;
-
-export const soot = {
-  workspaceMark: cotton.workspaceMark,
+  action: { primary: "#242528", secondary: "#FFFFFF", indicator: "#242528" },
+  scrim: "#24252833",
+  scrimStrong: "#24252866",
   avatar: {
-    human: { surface: "oklch(0.31 0.012 86)", text: "oklch(0.95 0.006 90)" },
-    contact: { surface: "oklch(0.29 0.012 88)", text: "oklch(0.9 0.008 86)" },
-    system: { surface: "oklch(0.95 0.006 90)", text: "oklch(0.2 0.008 84)" },
+    neutral: { background: "#ECEEF1", foreground: "#575D66" },
+    sand: { background: "#EAE2D7", foreground: "#8D6E42" },
+    lilac: { background: "#EEE7F8", foreground: "#8863B2" },
+    clay: { background: "#E8E2DF", foreground: "#8C6D61" },
+    olive: { background: "#E6E9E1", foreground: "#61714E" },
+    slate: { background: "#E2E8EC", foreground: "#5C7485" },
+    sage: { background: "#E0E5DE", foreground: "#56654F" },
+    ink: { background: "#28292D", foreground: "#FFFFFF" },
   },
-  toast: toastColors,
+} satisfies ColorTokens;
+
+export const dark = {
   surface: {
-    canvas: "oklch(0.185 0.008 84)",
-    panel: "oklch(0.215 0.009 84)",
-    skeleton: "oklch(0.31 0.01 84)",
-    tooltip: "oklch(0.2 0.008 84)",
+    canvas: "#111215",
+    panel: "#1B1D21",
+    raised: "#24272D",
+    popover: "#2B2F36",
+    field: "#181A1E",
+    search: "#181A1E",
+    hover: "#22252B",
+    active: "#24272D",
+    selected: "#30343B",
+    railSelected: "#30353D",
+    subtle: "#262A30",
+    mention: "#353A44",
   },
   text: {
-    primary: "oklch(0.95 0.006 90)",
-    secondary: "oklch(0.74 0.008 86)",
-    onTooltip: "oklch(0.95 0.006 90)",
-    link: "oklch(0.72 0.12 44)",
-    invalid: sootStatus.danger.text,
-    disabled: "oklch(0.5 0.012 84)",
+    primary: "#ECEEF2",
+    secondary: "#B3B8C2",
+    muted: "#959CA8",
+    disabled: "#777E8A",
+    agent: "#C2A1FA",
+    // The mocks have no dark error state yet; these are proposals.
+    danger: "#F0A8A0",
+    onPrimary: "#191B20",
   },
-  line: {
-    seam: "oklch(0.44 0.012 84)",
-    control: "oklch(0.57 0.012 84)",
-    strong: "oklch(0.74 0.008 86)",
-    invalid: sootStatus.danger.indicator,
+  border: {
+    divider: "#343942",
+    default: "#4B515C",
+    strong: "#9CA5B5",
+    selected: "#727D8F",
+    danger: "#E58A80",
+    stitch: "#626B79",
   },
-  action: {
-    fill: "oklch(0.95 0.006 90)",
-    fillHover: "oklch(0.87 0.008 86)",
-    fillPressed: "oklch(0.8 0.008 86)",
-    onFill: "oklch(0.17 0.008 84)",
-    hover: "oklch(0.95 0.006 90 / 0.06)",
-    pressed: "oklch(0.95 0.006 90 / 0.14)",
-    selected: "oklch(0.95 0.006 90 / 0.09)",
-    disabled: "oklch(0.95 0.006 90 / 0.08)",
-    danger: {
-      fill: sootStatus.danger.text,
-      fillHover: "oklch(0.84 0.08 30)",
-      fillPressed: "oklch(0.70 0.14 30)",
-      onFill: "oklch(0.17 0.008 84)",
-      text: sootStatus.danger.text,
-      border: sootStatus.danger.indicator,
-      borderStrong: sootStatus.danger.text,
-      hover: sootStatus.danger.soft,
-      pressed: "oklch(0.72 0.15 30 / 0.2)",
-    },
+  action: { primary: "#ECEEF2", secondary: "#25292F", indicator: "#ECEEF2" },
+  scrim: "#00000080",
+  // The mocks show the drawer in light mode only; this dark value is a proposal.
+  scrimStrong: "#000000A6",
+  avatar: {
+    neutral: { background: "#353A44", foreground: "#BEC5D0" },
+    sand: { background: "#3B3329", foreground: "#D5B68C" },
+    lilac: { background: "#382D49", foreground: "#C7ACEB" },
+    clay: { background: "#3C3030", foreground: "#D4ADA0" },
+    olive: { background: "#303A2C", foreground: "#B3C59D" },
+    slate: { background: "#2C3741", foreground: "#AFC5D8" },
+    sage: { background: "#2E392F", foreground: "#AEC0A5" },
+    ink: { background: "#383C45", foreground: "#ECEEF2" },
   },
-  focus: { ring: "oklch(0.95 0.006 90)" },
-  status: sootStatus,
-} as const satisfies ColorTokens;
+} satisfies ColorTokens;
 
-export const colors = { cotton, soot } as const;
-export type ColorTheme = keyof typeof colors;
+export const colorModes = { light, dark } as const;
+export type ColorMode = keyof typeof colorModes;

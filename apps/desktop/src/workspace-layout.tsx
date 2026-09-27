@@ -17,14 +17,14 @@ import {
   type MentionCandidate,
   type WorkspacePage,
 } from "@amends/client";
-import type { PickerPerson } from "@amends/ui-v2/components/member-picker";
-import { LiveStatus } from "@amends/ui-v2/components/live-status";
-import { Toast } from "@amends/ui-v2/components/toast";
-import { Shell } from "@amends/ui-v2/patterns/shell";
-import { ChangeName } from "@amends/ui-v2/screens/account";
-import { NewMessage } from "@amends/ui-v2/screens/direct";
-import { CreateGroup, ThreadPane } from "@amends/ui-v2/screens/group";
-import { WorkspaceNavigation, type Destination } from "@amends/ui-v2/screens/workspace-navigation";
+import type { PickerPerson } from "@amends/ui/components/member-picker";
+import { LiveStatus } from "@amends/ui/components/live-status";
+import { Toast } from "@amends/ui/components/toast";
+import { Shell } from "@amends/ui/patterns/shell";
+import { ChangeName } from "@amends/ui/screens/account";
+import { NewMessage } from "@amends/ui/screens/direct";
+import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
+import { WorkspaceNavigation, type Destination } from "@amends/ui/screens/workspace-navigation";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createMemo, createSignal, For, Show, type ParentProps } from "solid-js";
 import { WorkspaceActionsContext } from "./workspace-actions.ts";

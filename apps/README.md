@@ -2,12 +2,9 @@
 
 - [icons](icons/README.md) provides canonical drawings, generated Solid icons/SVGs,
   and a separate metadata catalog through `@amends/icons`.
-- [UI](ui/README.md) holds the previous Solid foundations, primitives, and compositions in
-  their standalone Storybook workshop. No app uses it any more.
-- [UI v2](ui-v2/README.md) is the pattern-based design system from the Lunacy mocks: the six
-  layout patterns and presentational screens for every page. Web and desktop use it for
-  sign-in, workspace entry, the states outside a workspace, the workspace shell, groups and
-  threads, the Inbox, and Settings.
+- [UI](ui/README.md) is the pattern-based design system from the Lunacy mocks: foundations,
+  components, the six layout patterns, and presentational screens for every page, verified in
+  its standalone Storybook workshop.
 - [client](client/README.md) owns headless sessions, API/query state, the view hooks screens
   are connected through, and pure route helpers. It has no dependency on UI, styling, router
   libraries, or Storybook.
@@ -15,17 +12,16 @@
 - [desktop](desktop/README.md) composes client and UI in Tauri 2 with hash routing and a
   Solid/Vite webview on development port 1420.
 
-The legacy UI implementation and `design-system` workspace were removed. The current
-`ui` workspace is the renamed `frontend` workshop. The old web
-screens, routes, sessions, API integrations, and their tests were removed with
-that reset. Both apps compose the independent client and UI v2 packages. They own route
+The earlier UI implementations and the `design-system` and `features` workspaces were removed;
+`ui` was built as `ui-v2` and took the name when it replaced them. Both apps compose the
+independent client and UI packages. They own route
 trees and page composition, while client owns session/API state and the hooks that shape
 it for each screen. Workspace pages use the persistent Shell/Navigation layout and the
 account menu. Appearance state is headless, with platform persistence and system
 appearance supplied by each app. See [workspace shell](../docs/workspace-shell.md).
 
 The [feature development flow](../docs/feature-development.md) describes adding a screen:
-its presentational parts in UI v2, its state and actions as client hooks, and the page in
+its presentational parts in UI, its state and actions as client hooks, and the page in
 each app. The [sign-in design](../docs/sign-in-design.md) identifies the first UI pieces.
 
 ## Development
@@ -36,11 +32,10 @@ From the repository root after `bun install`:
 bun run --filter @amends/web dev
 bun run --filter @amends/desktop dev
 bun run --filter @amends/ui dev
-bun run --filter @amends/ui-v2 dev
 ```
 
-Run each in its own terminal. The UI workshop serves at
-`http://127.0.0.1:6007/` and UI v2 at `http://127.0.0.1:6010/`. Client has no workshop.
+Run each in its own terminal. The UI workshop serves at `http://127.0.0.1:6010/`. Client has
+no workshop.
 Desktop requires [native tools](desktop/README.md#run-and-verify); web and UI
 Storybook need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
 

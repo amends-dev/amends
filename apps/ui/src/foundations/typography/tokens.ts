@@ -1,44 +1,44 @@
-export const fontFamilies = {
-  sans: '"IBM Plex Sans", system-ui, sans-serif',
-  serif: '"Instrument Serif", Georgia, serif',
-  mono: '"IBM Plex Mono", ui-monospace, monospace',
-} as const;
+/**
+ * Inter at three weights and eight sizes. The mocks' half-pixel variants (10.5, 11.5, 12.5,
+ * 13.5, 14.5) are rounded to the nearest step here, so the same role reads the same everywhere.
+ * Sizes are rem at a 16px root so they follow the reader's text-size preference.
+ */
+export const fontFamily =
+  '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-/** Complete visual styles. Sizes scale with the root; line height is unitless. */
-export interface TypographyStyle {
-  readonly fontFamily: string;
-  readonly fontSize: `${number}rem`;
-  readonly fontWeight: number;
-  readonly fontStyle: "normal";
-  readonly lineHeight: number;
-  readonly letterSpacing: `${number}em`;
+export const fontWeight = { regular: 400, medium: 500, semibold: 600 } as const;
+export type FontWeight = keyof typeof fontWeight;
+
+export interface TypeStep {
+  readonly fontSize: string;
+  readonly lineHeight: string;
 }
 
-export const typography = {
-  body: {
-    fontFamily: fontFamilies.sans,
-    fontSize: "0.9375rem",
-    fontWeight: 400,
-    fontStyle: "normal",
-    lineHeight: 1.6,
-    letterSpacing: "0em",
-  },
-  heading: {
-    fontFamily: fontFamilies.serif,
-    fontSize: "1.875rem",
-    fontWeight: 400,
-    fontStyle: "normal",
-    lineHeight: 1.1,
-    letterSpacing: "-0.015em",
-  },
-  mono: {
-    fontFamily: fontFamilies.mono,
-    fontSize: "0.8125rem",
-    fontWeight: 400,
-    fontStyle: "normal",
-    lineHeight: 1.5,
-    letterSpacing: "0em",
-  },
-} as const satisfies Record<string, TypographyStyle>;
+const step = (size: number, line: number): TypeStep => ({
+  fontSize: `${size / 16}rem`,
+  lineHeight: `${line / 16}rem`,
+});
 
-export type TypographyRole = keyof typeof typography;
+export const typeScale = {
+  /** 11/16: timestamps, counts, and uppercase section labels. */
+  meta: step(11, 16),
+  /** 12/18: help text, badges, and task references. */
+  hint: step(12, 18),
+  /** 13/20: buttons, compact rows, and pane subtitles. */
+  control: step(13, 20),
+  /** 14/21: navigation items, names, tabs, and form labels. */
+  item: step(14, 21),
+  /** 15/23: messages, field values, and other reading text. */
+  body: step(15, 23),
+  /** 16/24: messages and fields on phones, where smaller input text would zoom the page. */
+  bodyTouch: step(16, 24),
+  /** 17/24: pane titles on touch layouts. */
+  titleTouch: step(17, 24),
+  /** 18/27: the main content title. */
+  title: step(18, 27),
+  /** 20/28: the modal title. */
+  heading: step(20, 28),
+  /** 28/36: the centered screen title. */
+  display: step(28, 36),
+} as const satisfies Record<string, TypeStep>;
+export type TypeRole = keyof typeof typeScale;

@@ -5,37 +5,29 @@ The first slice requests an email code, verifies it, and establishes a session.
 Workspace selection is the next feature.
 
 **Current composition.** This page records the original slice. Web and desktop now render
-the [ui-v2](../apps/ui-v2/README.md) `SignInEmail` and `SignInCode` screens, drawn from the
-Lunacy mocks, and switch between them on the [client controller](../apps/client/src/sign-in/README.md)'s
+the [UI](../apps/ui/README.md) `SignInEmail` and `SignInCode` screens, drawn from the Lunacy
+mocks, and switch between them on the [client controller](../apps/client/src/sign-in/README.md)'s
 step. The screens take its error codes and pending actions and own the wording, the delivery
-hint, and focus; the features `SignIn` parts were removed. The previous UI's forms remain in
-its workshop until that package goes.
+hint, and focus. The original slice's UI pieces and the features `SignIn` parts described below
+lived in packages that have since been removed; the sections that follow are historical.
 
 ```text
 Web/desktop sign-in route
 └─ SignInPage (owned by web or desktop, over useSignIn)
-   ├─ ui-v2 SignInEmail → Field + Input
-   └─ ui-v2 SignInCode → Field + CodeInput
+   ├─ UI SignInEmail → Field + Input
+   └─ UI SignInCode → Field + CodeInput
 ```
-
-[CodeInput](../apps/ui/src/primitives/code-input/README.md) and both
-[sign-in forms](../apps/ui/src/features/sign-in/README.md) are implemented in the UI
-workshop. The [client controller](../apps/client/src/sign-in/README.md) implements
-the headless flow. Web and desktop own their sign-in pages, pairing `useSignIn` with the
-UI v2 sign-in screens behind their existing session guards.
 
 ## UI pieces
 
-Reuse [Input](../apps/ui/src/primitives/input/README.md),
-[Field](../apps/ui/src/compositions/field/README.md),
-[Button](../apps/ui/src/primitives/button/README.md), Text, and layout primitives.
+The original slice reused the previous UI's Input, Field, Button, Text, and layout primitives.
 Existing tokens, field errors, and Button pending behavior cover their basic states.
 
-| New piece         | Location in `apps/ui/src` | Responsibility                                                                                                                                                                                                                          |
-| ----------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CodeInput`       | `primitives/code-input`   | One native text input with six visual cells, one value, and one tab stop. Supports paste, selection, leading zeros, numeric input mode, and one-time-code autocomplete. Accepts Field associations; owns no verification or submission. |
-| `SignInEmailForm` | `features/sign-in`        | Heading, email field, submit action, and inline request feedback.                                                                                                                                                                       |
-| `SignInCodeForm`  | `features/sign-in`        | Heading, delivery guidance, code field, verify action, resend, change email, and inline feedback.                                                                                                                                       |
+| New piece         | Location in the old UI  | Responsibility                                                                                                                                                                                                                          |
+| ----------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CodeInput`       | `primitives/code-input` | One native text input with six visual cells, one value, and one tab stop. Supports paste, selection, leading zeros, numeric input mode, and one-time-code autocomplete. Accepts Field associations; owns no verification or submission. |
+| `SignInEmailForm` | `features/sign-in`      | Heading, email field, submit action, and inline request feedback.                                                                                                                                                                       |
+| `SignInCodeForm`  | `features/sign-in`      | Heading, delivery guidance, code field, verify action, resend, change email, and inline feedback.                                                                                                                                       |
 
 The `SignInPage` compositions live in `apps/web/src/pages` and
 `apps/desktop/src/pages`; UI supplies reusable visual pieces. The app's

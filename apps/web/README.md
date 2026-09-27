@@ -1,9 +1,9 @@
 # Amends web
 
 Solid/Vite browser application composing the independent [client](../client/README.md)
-and [UI v2](../ui-v2/README.md) packages.
+and [UI](../ui/README.md) packages.
 It supplies browser-history routing, API configuration, and browser session persistence.
-The app owns its sign-in, workspace picker, and creation pages, pairing client hooks with UI v2
+The app owns its sign-in, workspace picker, and creation pages, pairing client hooks with UI
 screens; workspace pages share the persistent sidebar layout.
 
 ## Run and verify
@@ -43,15 +43,15 @@ never a place for secrets. Sessions are stored separately for each normalized AP
 
 ## Ownership
 
-`src/main.tsx` mounts Solid and loads UI v2's fonts and global styles.
+`src/main.tsx` mounts Solid and loads UI's fonts and global styles.
 `src/app.tsx` chooses `Router`, resolves the endpoint (default `/api`), and supplies the
 session store. It nests the router and routes declaratively inside `Application`.
-`src/application.tsx` applies the ui-v2 `Theme` in the resolved appearance and connects the
-headless `ClientProvider` to its children and error boundary, whose fallback is the ui-v2
+`src/application.tsx` applies the UI `Theme` in the resolved appearance and connects the
+headless `ClientProvider` to its children and error boundary, whose fallback is the UI
 `CrashedScreen`. `src/routes.tsx` owns routes, redirects, and the session guard, which shows
 `CheckingSessionScreen` or `HostUnavailableScreen`.
 
-Pages outside a workspace pair client hooks with ui-v2 screens, which own their layout and
+Pages outside a workspace pair client hooks with UI screens, which own their layout and
 wording: `src/pages/sign-in.tsx` switches `SignInEmail` and `SignInCode` on `useSignIn`'s step,
 `src/pages/workspace-picker.tsx` passes `useWorkspacePicker` to `WorkspacePicker` and, at
 `/workspaces/new`, mounts one `useCreateWorkspace` intent in the `CreateWorkspace` modal over
@@ -62,10 +62,10 @@ safe return path. Client and the UI packages never import each other. Route inte
 live in this app. Vite deduplicates Solid and compiles the shared vanilla-extract styles.
 
 Page compositions contain no inline styles or local stylesheets. `src/workspace-layout.tsx` builds
-the workspace on the ui-v2 Shell: `WorkspaceNavigation` with the account menu, one pane per page in
+the workspace on the UI Shell: `WorkspaceNavigation` with the account menu, one pane per page in
 `Shell.Main`, the thread panel as `ThreadPane`, and the Create group, New message, and Change your
 name modals, over client view hooks. Group, directory, direct-draft, and placeholder pages compose
-ui-v2 screens, as do the Inbox with `useInboxView` and `InboxPane` and Settings with
+UI screens, as do the Inbox with `useInboxView` and `InboxPane` and Settings with
 `useWorkspaceSettings` and the settings screens. A page may render a `Shell.Aside`, such as
 Settings' member details, and it attaches beside the main content. `src/workspace-actions.ts`
 lets pages offer the layout's Create group and show toasts. Visual gaps are evaluated and verified in the UI workshop before app
@@ -79,7 +79,7 @@ routes, the responsive shell, groups and threads, and the account menu. Home, Tr
 Environments, and Connections remain placeholders. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved mode through the ui-v2 Theme.
+with AppearanceProvider and applies the resolved mode through the UI Theme.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
 stay current over the change feed; the layout shows `LiveStatus` from `useLiveStatus()`. See
 [live updates](../../docs/live-updates.md).

@@ -28,8 +28,7 @@ remaining gaps with links to their owning code.
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                            |
 | [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                      |
 | [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, view hooks, and route helpers.                                         |
-| [UI](../apps/ui/README.md)                                           | The previous UI workshop, which no app uses any more.                                                               |
-| [UI v2](../apps/ui-v2/README.md)                                     | Pattern-based design system from the Lunacy mocks, with every app screen.                                           |
+| [UI](../apps/ui/README.md)                                           | Pattern-based design system from the Lunacy mocks, with every app screen.                                           |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
 drawings, generation, and visual review in the UI workshop.
@@ -55,7 +54,7 @@ drawings, generation, and visual review in the UI workshop.
 
 [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
 lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md),
-[UI](../apps/ui/AGENTS.md), [UI v2](../apps/ui-v2/AGENTS.md), [client](../apps/client/AGENTS.md),
+[UI](../apps/ui/AGENTS.md), [client](../apps/client/AGENTS.md),
 [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
 the root guidance rather than maintaining a second copy.
 

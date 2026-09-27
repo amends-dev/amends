@@ -12,6 +12,6 @@ Read [README.md](README.md) before editing this package.
 - Test compiler contract changes and generated-output drift. Verify Solid reactivity,
   accessible naming, and consumer tree shaking when changing the rendering/export layer.
 - Extend the UI package's Foundations / Icons stories for new rendering capabilities.
-  Compare additions at actual sizes beside related glyphs in Cotton and Soot. Review
+  Compare additions at actual sizes beside related glyphs in light and dark. Review
   affected controls in a real browser, including root-text scaling and relevant RTL.
 - Run `bun run check`, `bun run test`, and `bun run --filter @amends/ui build`.

@@ -1,5 +1,7 @@
 import { styleVariants } from "@vanilla-extract/css";
-import { typography } from "./tokens.ts";
+import { fontWeight, typeScale } from "./tokens.ts";
 
-/** Visual styles only: the consumer owns HTML semantics, color, spacing, and wrapping. */
-export const typographyStyles = styleVariants(typography);
+/** Size and line height only; weight, color, and wrapping belong to the consumer. */
+export const typeStyles = styleVariants(typeScale);
+
+export const weightStyles = styleVariants(fontWeight, (value) => ({ fontWeight: value }));

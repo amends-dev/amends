@@ -1,7 +1,7 @@
 # Workspace shell
 
 Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout, built on the
-[ui-v2](../apps/ui-v2/README.md) Shell pattern from the Lunacy mocks in
+[UI](../apps/ui/README.md) Shell pattern from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: a rail, a sidebar, the main content, and a side
 panel.
 
@@ -63,13 +63,14 @@ Back returns to the Inbox. Unread keeps that notification in place after it is s
 opens or the panel closes, and shows "You're all caught up" with "View all activity" only once
 nothing unread and nothing open remains. Mark all seen stays in the header while anything is
 unread. A notification whose thread the reader can no longer read shows as unavailable. Client's
-`useInboxView` holds these rules; UI v2's `InboxPane` draws them from the Lunacy Inbox frames.
+`useInboxView` holds these rules; UI's `InboxPane` draws them from the Lunacy Inbox frames.
 
-## Pages without a UI v2 design
+## Settings and placeholder pages
 
-The Settings pages have no mocks yet. They keep their previous UI content inside a UI v2 pane
-with the page's title, in the previous UI's theme, until they are designed. Home,
-Triage, Tasks, Environments, and Connections are placeholders drawn with UI v2's EmptyState.
+Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
+side panel, such as Settings' member details, attaches beside the main content like the thread
+panel. Home, Triage, Tasks, Environments, and Connections are placeholders drawn with UI's
+EmptyState.
 The mocks' Agents destination, search, the Tasks and Files tabs, reactions, and task references
 have no backend and are not shown.
 
@@ -82,7 +83,7 @@ integration.
 
 The application owns an appearance source for storage and system appearance. Client stores
 light/dark/system state without UI dependencies, and the app applies the resolved mode through
-the UI v2 `Theme`; pages still in the previous UI get the matching Cotton or Soot theme. System is
+the UI `Theme`. System is
 the default. Preference persists under `amends.appearance` in local storage, survives sign-out,
 and synchronizes same-origin windows. Web and desktop origins remain independent. Blocked storage
 retains the choice in memory.
@@ -92,7 +93,7 @@ When workspace changes stop arriving for two seconds, a note at the bottom of th
 
 ## Verification
 
-UI v2 stories cover the shell, the group screens with the Lunacy sample data, and the Live
+UI stories cover the shell, the group screens with the Lunacy sample data, and the Live
 conversation stories over dated data: day seams, reply summaries, notes, typing, mentions,
 following, the account menu, and loading and failure states. Client tests cover the view hooks'
 naming, mentions, notes, and states. App tests cover nested browser and hash routes, current

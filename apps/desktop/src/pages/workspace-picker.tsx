@@ -1,5 +1,5 @@
 import { paths, useCreateWorkspace, useWorkspacePicker } from "@amends/client";
-import { CreateWorkspace, WorkspacePicker } from "@amends/ui-v2/screens/workspaces";
+import { CreateWorkspace, WorkspacePicker } from "@amends/ui/screens/workspaces";
 import { useMatch, useNavigate } from "@solidjs/router";
 import { createEffect, Show } from "solid-js";
 import { useStandaloneAccount } from "../account.ts";

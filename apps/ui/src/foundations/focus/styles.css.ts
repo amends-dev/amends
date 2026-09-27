@@ -1,13 +1,16 @@
 import { style } from "@vanilla-extract/css";
-import { colorVars } from "../color/theme.css.ts";
-import { focus } from "./tokens.ts";
+import { vars } from "../theme/vars.css.ts";
 
-/** Apply to a focusable element inside a color theme. The browser owns focus visibility. */
-export const focusVisible = style({
+/** A 2px outline in the primary text color, outside the control. */
+export const focusRing = style({
   selectors: {
-    "&:focus-visible": {
-      outline: `${focus.width} solid ${colorVars.focus.ring}`,
-      outlineOffset: focus.offset,
-    },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+  },
+});
+
+/** The same outline drawn inside, for full-width rows that would clip an outer one. */
+export const focusInset = style({
+  selectors: {
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
   },
 });

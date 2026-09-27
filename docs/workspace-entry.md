@@ -8,7 +8,7 @@ creator, creates the caller's owned workspace, refresh## Composition
   invitations and accepts invitations; `useCreateWorkspace` owns one creation intent;
   `useWorkspaceAccess` explains an unavailable workspace. A refresh keeps validated pages
   mounted. Rejected credentials still clear the session.
-- [ui-v2](../apps/ui-v2/README.md) owns the screens, drawn from the Lunacy mocks in
+- [UI](../apps/ui/README.md) owns the screens, drawn from the Lunacy mocks in
   `design-system/Amends Group Exploration.free`: `WorkspacePicker` with its Join dialog and
   toast, the `CreateWorkspace` modal, and the standalone screens. They take client's codes and
   states as props and own the wording.
@@ -41,7 +41,7 @@ Unmounting or changing credentials cancels client work and ignores late completi
 it cannot undo a server commit. Retry keys are not persisted across closing the modal
 or reloading; check the picker before starting another creation after an interruption.
 
-ui-v2 stories cover the screens and their interactions over local state. Client tests cover
+UI stories cover the screens and their interactions over local state. Client tests cover
 creation retries, refresh recovery, pending duplicates, unmounting, and accepting invitations
 against a stubbed host. App tests cover browser/hash navigation, the creation route, and
 recovery before entering the created workspace.
@@ -60,7 +60,7 @@ separate work. This creation form promises only the workspace it actually create
 
 ## Standalone states
 
-Pages outside a workspace use ui-v2's `StandaloneScreen`, the Centered pattern with the brand
+Pages outside a workspace use UI's `StandaloneScreen`, the Centered pattern with the brand
 at the start of the header and, when signed in, the address and Sign out at the end. Each state
 is an EmptyState with one action:
 

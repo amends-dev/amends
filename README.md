@@ -50,8 +50,7 @@ hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/
   icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
-  ui/                 @amends/ui: the previous Solid components and their Storybook
-  ui-v2/              @amends/ui-v2: the Lunacy design system, screens, and Storybook
+  ui/                 @amends/ui: the Lunacy design system, screens, and Storybook
   client/             @amends/client: headless sessions, API/query state, and route helpers
   web/                @amends/web: browser routes and client/UI composition
   desktop/            @amends/desktop: Tauri 2 routes and client/UI composition

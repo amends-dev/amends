@@ -25,8 +25,7 @@ notifications, and delete. `IconBellFilled` is the bell's filled state, for foll
 `IconMenu` remains the mobile hamburger. Named exports and individual subpaths both
 point to generated Solid source.
 Consumers must compile dependency TSX with their Solid plugin, as our Vite apps do.
-The UI package uses the package in Select, Drawer, Shell, and workshop glyphs. Other
-workspaces can adopt it incrementally.
+The UI package draws every icon it shows from this package.
 
 ## Rendering contract
 
@@ -140,13 +139,11 @@ consumers exclude Solid. Raw assets are available at `@amends/icons/svg/<name>.s
 copy them to a public location if needed. External images do not inherit the page's
 text color; use Solid inline icons for themed UI.
 
-Open **Foundations / Icons / Marks** in the UI Storybook to review all 26 in the
-reference order, in Cotton and Soot at the mock's 15px display size. Clicking one names it.
-Gallery searches names, keywords, and categories across marks and utility icons. Matrix compares
-representative glyphs at all supported weights and named sizes plus 32px, in both
-themes, with real IconButtons and text. Enlarged Text checks rem scaling; Reactive
-Props demonstrates decorative/named transitions without replacing the SVG. Gallery
-search and reactive semantics also run as portable stories.
+Open **Foundations / Icons** in the UI Storybook to review the set in light and dark. Gallery
+searches names, keywords, and categories across marks and utility icons. Sizes compares
+representative glyphs at every supported weight and named size plus 32px. Accessible Names
+demonstrates decorative and named transitions without replacing the SVG. Gallery search and
+accessible names also run as portable stories.
 
 Judge additions at their actual small sizes beside related icons and inside their
 controls. Check gaps, balance, centering, disabled appearance, theme inheritance,

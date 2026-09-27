@@ -15,7 +15,7 @@ import {
   GroupSettings,
   GroupThreads,
   type GroupSettingsTab,
-} from "@amends/ui-v2/screens/group";
+} from "@amends/ui/screens/group";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createEffect, createSignal, on, Show } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

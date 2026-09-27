@@ -1,5 +1,5 @@
 import { paths, useSession } from "@amends/client";
-import { NotFoundScreen } from "@amends/ui-v2/screens/standalone";
+import { NotFoundScreen } from "@amends/ui/screens/standalone";
 import { useNavigate } from "@solidjs/router";
 import { useStandaloneAccount } from "../account.ts";
 
