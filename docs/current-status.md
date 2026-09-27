@@ -208,6 +208,12 @@ and cross-platform installer verification are pending.
 
 Fact and projection versions remain at 1, and each storage adapter has one development baseline
 with no upgrade migrations: recreate development databases after a schema or fact change.
+The PostgreSQL adapter applies its migrations itself when a host starts, as Effect Cluster does
+with its own tables, so upgrading the adapter is what upgrades a database. Before a public
+release, freeze the last baseline as the first released migration and add each later schema
+change as a new migration instead of replacing it; check in CI that released migrations are
+never edited, test the upgrade from the previous migrations, and remove or rename in two
+releases: first add the new shape and stop using the old one, then drop it.
 Built-in roles are managed by the product: a later bundle revision replaces their names and
 permissions, and custom roles, which a workspace would edit itself, are not implemented.
 
