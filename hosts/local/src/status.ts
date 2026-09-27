@@ -72,7 +72,8 @@ export const render = (status: PostgresClusterStorage.Status): string => {
 const program = Effect.gen(function* () {
   const { databaseUrl } = yield* LocalConfig.load();
   const status = yield* PostgresClusterStorage.backgroundStatus().pipe(
-    Effect.provide(PostgresDatabase.layer({ url: databaseUrl, maxConnections: 2 })),
+    // Reading the status leaves the schema as it is, whichever version applied it.
+    Effect.provide(PostgresDatabase.layerClient({ url: databaseUrl, maxConnections: 2 })),
   );
   yield* Console.log(
     process.argv.includes("--json") ? JSON.stringify(toJson(status), null, 2) : render(status),

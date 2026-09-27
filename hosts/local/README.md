@@ -74,7 +74,8 @@ sent meanwhile wait in the database.
 `AMENDS_DATABASE_URL`: per process, the wakes due, scheduled, retrying, and dropped, then the
 latest retries and drops with their workspaces. For output to process further, run
 `bun hosts/local/src/status.ts --json` from the repository root, which prefixes no lines.
-Failures and drops are also logged as they happen.
+It only reads: it applies no migrations, so it is safe against a database another version of the
+host serves. Failures and drops are also logged as they happen.
 
 With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes coordinate through the database
 alone, so a wake for a workspace another process runs arrives at that process's next read,

@@ -1,5 +1,6 @@
+import { PgClient } from "@effect/sql-pg";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Effect, Option } from "effect";
+import { DateTime, Effect, Option, Redacted } from "effect";
 import { fileURLToPath } from "node:url";
 import { LocalStatus } from "../src/status.ts";
 import { setup } from "./database.ts";
@@ -58,30 +59,50 @@ it("the status reads as a table, with the latest retries and drops beneath it", 
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
-  it.live("the status command reports a database that has run no background work", () =>
-    withDatabase((url) =>
-      Effect.promise(async () => {
-        const run = async (...args: ReadonlyArray<string>) => {
-          const child = Bun.spawn(
-            [process.execPath, "--no-env-file", "hosts/local/src/status.ts", ...args],
-            {
-              cwd: fileURLToPath(new URL("../../../", import.meta.url)),
-              env: { PATH: process.env.PATH ?? "", AMENDS_DATABASE_URL: url },
-              stdout: "pipe",
-              stderr: "pipe",
-            },
+  it.live(
+    "the status command reports a database that has run no background work, and changes nothing",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(async () => {
+            const run = async (...args: ReadonlyArray<string>) => {
+              const child = Bun.spawn(
+                [process.execPath, "--no-env-file", "hosts/local/src/status.ts", ...args],
+                {
+                  cwd: fileURLToPath(new URL("../../../", import.meta.url)),
+                  env: { PATH: process.env.PATH ?? "", AMENDS_DATABASE_URL: url },
+                  stdout: "pipe",
+                  stderr: "pipe",
+                },
+              );
+              const [out, err, code] = await Promise.all([
+                new Response(child.stdout).text(),
+                new Response(child.stderr).text(),
+                child.exited,
+              ]);
+              expect({ code, err }).toEqual({ code: 0, err: "" });
+              return out;
+            };
+            expect(await run()).toBe("No background work is waiting, retrying, or dropped.\n");
+            expect(JSON.parse(await run("--json"))).toEqual({
+              processes: [],
+              retries: [],
+              drops: [],
+            });
+          });
+          // Reading the status applies no migrations: the database is as empty as it started.
+          const tables = yield* Effect.flatMap(
+            PgClient.PgClient,
+            (sql) =>
+              sql<{ readonly count: number }>`
+              SELECT count(*)::int AS count FROM pg_tables
+              WHERE schemaname NOT IN ('pg_catalog', 'information_schema')`,
+          ).pipe(
+            Effect.scoped,
+            Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 1 })),
           );
-          const [out, err, code] = await Promise.all([
-            new Response(child.stdout).text(),
-            new Response(child.stderr).text(),
-            child.exited,
-          ]);
-          expect({ code, err }).toEqual({ code: 0, err: "" });
-          return out;
-        };
-        expect(await run()).toBe("No background work is waiting, retrying, or dropped.\n");
-        expect(JSON.parse(await run("--json"))).toEqual({ processes: [], retries: [], drops: [] });
-      }),
-    ),
+          expect(tables[0]?.count).toBe(0);
+        }),
+      ),
   );
 });

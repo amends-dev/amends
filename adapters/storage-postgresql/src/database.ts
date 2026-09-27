@@ -2,7 +2,7 @@ import { PgClient } from "@effect/sql-pg";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import { migrate } from "drizzle-orm/effect-postgres/migrator";
 import { Context, Effect, Layer } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { SqlClient, SqlError } from "effect/unstable/sql";
 import { fileURLToPath } from "node:url";
 import { PostgresNotices } from "./notices.ts";
 import { PostgresReads } from "./reads.ts";
@@ -68,5 +68,15 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
  */
 export const layer = (config: PgClient.PgPoolConfig) =>
   Layer.effect(Service, make()).pipe(Layer.provideMerge(PgClient.layer(config)));
+
+/**
+ * Connect a pool without bringing the schema up to date, for tools that only read, such as the
+ * background status, and must not change a database a newer or older host serves.
+ *
+ * @category layers
+ */
+export const layerClient = (
+  config: PgClient.PgPoolConfig,
+): Layer.Layer<SqlClient.SqlClient, SqlError.SqlError> => PgClient.layer(config);
 
 export * as PostgresDatabase from "./database.ts";

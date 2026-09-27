@@ -6,6 +6,7 @@
 import { ClusterBackground } from "@amends/gateway";
 import { Clock, DateTime, Effect, Option, Schema } from "effect";
 import { Snowflake } from "effect/unstable/cluster";
+import { SqlClient } from "effect/unstable/sql";
 import { PostgresDatabase } from "./database.ts";
 
 /** Another live process runs background work at this runner address. */
@@ -126,12 +127,13 @@ const fromJson = <S extends Schema.Top>(schema: S) =>
 /**
  * What background work waits, retries, and was dropped, from the wakes Cluster keeps: per
  * process, and the latest `limit` (twenty by default) retries and drops. Empty before any host
- * has run background work over this database.
+ * has run background work over this database. It only reads, over any client of the database,
+ * such as `PostgresDatabase.layerClient`, which leaves the schema as it is.
  */
 export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStatus")(function* (
   options: { readonly limit?: number | undefined } = {},
 ) {
-  const { sql } = yield* PostgresDatabase.Service;
+  const sql = yield* SqlClient.SqlClient;
   const limit = options.limit ?? 20;
   const [tables] = yield* sql<{ readonly present: boolean }>`
     SELECT to_regclass('cluster_messages') IS NOT NULL AS present`;

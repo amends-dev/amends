@@ -18,7 +18,8 @@ needs, with a check constraint that they agree. Invitations store a required rol
 development, update `src/schema.ts`, remove the previous generated baseline, and
 run `bun run --filter @amends/storage-postgresql generate --name=workspace_storage`.
 Commit the replacement baseline and reset the development database.
-`PostgresDatabase.make()` applies that baseline once before returning the service. `PostgresDatabase.layer(config)` uses that constructor.
+`PostgresDatabase.make()` applies that baseline once before returning the service. `PostgresDatabase.layer(config)` uses that constructor;
+`PostgresDatabase.layerClient(config)` connects the same pool without migrating, for tools that only read.
 
 Journal entries keep `subject`, `fact_name`, and `fact_version` in columns and only the domain
 payload as binary. Provenance has separate performer, cause, correlation, and time
@@ -316,7 +317,8 @@ messages, a thousand by default.
 `PostgresClusterStorage.backgroundStatus(options?)` reports the workspaces' background work from
 those tables: per process, the wakes due, scheduled, and retrying, when the longest-waiting due
 wake became due, and how many wakes were dropped; then the latest retries and drops, with their
-workspaces. It reports nothing before any host has run background work over the database.
+workspaces. It reports nothing before any host has run background work over the database. It
+needs only a SQL client, such as `PostgresDatabase.layerClient`, so reading it changes no schema.
 
 `PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
 processes over the database never run Cluster at one address: it fails with `AddressTaken`
