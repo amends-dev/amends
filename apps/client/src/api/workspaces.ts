@@ -10,11 +10,12 @@ import { refreshResult } from "./refresh.ts";
 import { requestAtom } from "./request.ts";
 
 export type CreatedWorkspace = WorkspaceDirectory.Membership["workspace"];
-export const isWorkspaceName = Schema.is(
-  WorkspaceDirectory.Membership.to.fields.workspace.fields.name,
-);
-/** Whether text can name a member: 1 to 80 characters without surrounding space, once trimmed. */
-export const isMemberName = (name: string) => Schema.is(Member.Name)(name.trim());
+export const isWorkspaceName = Schema.is(Workspace.NewName);
+/**
+ * Whether text can name a member: 1 to 80 characters without surrounding space, once trimmed, and
+ * without hidden ones.
+ */
+export const isMemberName = (name: string) => Schema.is(Member.NewName)(name.trim());
 /**
  * A first suggestion for what people call someone, from their identity: an email's local part,
  * its first letter capitalized, or nothing when the identity is not an email.
@@ -78,7 +79,7 @@ export const renameSelfRequest = (client: ApiClient, workspace: string) =>
       const api = yield* client;
       const renamed = yield* api.members.rename({
         params: { workspaceId: yield* command(Workspace.Id)(workspace) },
-        payload: { name: yield* command(Member.Name)(name.trim()) },
+        payload: { name: yield* command(Member.NewName)(name.trim()) },
       });
       yield* Reactivity.invalidate([workspaceKey(workspace, "members"), directoryKey]);
       return renamed;

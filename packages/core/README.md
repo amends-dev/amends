@@ -28,6 +28,7 @@ The current domains contain these features:
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
 | `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
 | `background`    | Processes the domains run outside requests, the wakes commits ask for, and the runs hosts perform.               |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these

@@ -3,7 +3,7 @@ import { Assignment } from "../../authorization/assignment/assignment.ts";
 import { Member } from "../member/member.ts";
 import { Workspace } from "../workspace.ts";
 export const RenameInput = Schema.Struct({
-  name: Workspace.Name,
+  name: Workspace.NewName,
   expectedName: Workspace.Name,
 }).annotate({ identifier: "WorkspaceRenameInput" });
 export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}

@@ -27,7 +27,8 @@ const start = (groupId: Group.Id) =>
 ```
 
 The result contains `thread`, `message`, and `activity`. The operation accepts non-whitespace
-text and preserves it verbatim, including indentation and newlines. `mentions` is an explicit
+text and preserves it verbatim, including indentation and newlines. NUL characters and unpaired
+surrogate halves, which storage cannot keep as given, are rejected as invalid input. `mentions` is an explicit
 array of distinct workspace-member IDs; text such as `@Reviewer` does not itself address anyone.
 
 Authorization and validation run in the same commit as the start:

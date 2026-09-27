@@ -14,7 +14,7 @@ export class MembersGroup extends HttpApiGroup.make("members")
   .add(
     HttpApiEndpoint.put("rename", "/me/name", {
       params: { workspaceId: Workspace.Id },
-      payload: Schema.Struct({ name: Member.Name }),
+      payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Record,
       error: [...ApiErrors.member, ApiErrors.MemberNotFound],
     }),

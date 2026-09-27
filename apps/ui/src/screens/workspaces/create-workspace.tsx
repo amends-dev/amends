@@ -15,8 +15,8 @@ export type CreateWorkspaceError =
   | "request-failed";
 
 const errors: { readonly [Error in CreateWorkspaceError]: string } = {
-  "invalid-name": "Enter a workspace name.",
-  "invalid-member-name": "Use up to 80 characters.",
+  "invalid-name": "Use 1 to 80 characters, with no invisible ones.",
+  "invalid-member-name": "Use 1 to 80 characters, with no invisible ones.",
   denied: "This identity can’t create workspaces.",
   "request-reused":
     "This request was already used for a different name. Close this and start again.",
@@ -84,6 +84,7 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                       value={props.name}
                       onInput={(event) => props.onNameChange(event.currentTarget.value)}
                       autocomplete="organization"
+                      maxLength={80}
                       disabled={props.pending}
                       autofocus
                       required

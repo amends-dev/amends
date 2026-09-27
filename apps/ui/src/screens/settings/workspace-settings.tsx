@@ -112,6 +112,7 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
                 value={props.name}
                 onInput={(event) => props.onNameChange(event.currentTarget.value)}
                 autocomplete="organization"
+                maxLength={80}
                 disabled={!props.renamable || props.saving}
                 required
               />

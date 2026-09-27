@@ -5,6 +5,7 @@ import { WorkspaceId } from "../../workspace/id.ts";
 import { MemberId } from "../../workspace/member/id.ts";
 import { Identity } from "../../identity/identity.ts";
 import { ThreadMessageActivity } from "./activity.ts";
+import { Text as Characters } from "../../text/text.ts";
 export const Id = ThreadMessageId.Id;
 export type Id = ThreadMessageId.Id;
 /** Preserve the submitted text, including indentation; reject whitespace-only messages. */
@@ -12,6 +13,7 @@ export const Text = Schema.NonEmptyString.check(
   Schema.makeFilter(
     (text) => /\S/u.test(text) || "Message text must contain non-whitespace content",
   ),
+  Characters.isStorable,
 );
 /**
  * Who wrote a message: a member, human or agent, writing in a thread, or a contact whose message a

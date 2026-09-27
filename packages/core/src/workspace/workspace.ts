@@ -3,17 +3,21 @@ import { Identity } from "../identity/identity.ts";
 import { WorkspaceId } from "./id.ts";
 import { MemberId } from "./member/id.ts";
 import { Member } from "./member/member.ts";
+import { Text } from "../text/text.ts";
 
 export const Id = WorkspaceId.Id;
 export type Id = WorkspaceId.Id;
 
+/** A workspace's name as recorded; names chosen now are `NewName`. */
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
 export type Name = typeof Name.Type;
+/** A name chosen for a workspace: 1 to 80 characters, without hidden ones. */
+export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
 
 /** A new workspace's name, and what its creator is called there. */
 export const CreateInput = Schema.Struct({
-  name: Name,
-  memberName: Schema.optionalKey(Member.Name),
+  name: NewName,
+  memberName: Schema.optionalKey(Member.NewName),
 }).annotate({
   identifier: "WorkspaceCreateInput",
 });

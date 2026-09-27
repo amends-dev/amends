@@ -197,7 +197,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     const name =
       options.name === undefined
         ? undefined
-        : yield* Schema.decodeEffect(Member.Name)(options.name);
+        : yield* Schema.decodeEffect(Member.NewName)(options.name);
     const invitation = yield* load(id);
     const { details, state } = invitation;
     if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });

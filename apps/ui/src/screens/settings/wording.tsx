@@ -57,7 +57,7 @@ const gone: { readonly [Action in SettingsAction]: string } = {
   revoke: "This invitation is no longer available. Refresh to see where it stands.",
 };
 const invalid: { readonly [Action in SettingsAction]: string } = {
-  rename: "Enter a workspace name.",
+  rename: "Use 1 to 80 characters, with no invisible ones.",
   transfer: "Choose a new owner.",
   role: "Choose a role.",
   remove: "That change isn’t possible.",

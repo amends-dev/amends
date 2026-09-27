@@ -48,7 +48,8 @@ new members join nothing.
 
 `GroupApplication.createTeam({ name, memberIds, visibility? })` requires `group.create` on the
 workspace. `visibility` is `Private` (the default) or `Public`; see
-[public groups](#public-groups). It is chosen at creation and does not change. The name must be nonempty and trimmed. `memberIds` is an explicit list of distinct
+[public groups](#public-groups). It is chosen at creation and does not change. The name must be 1 to 80 characters without surrounding space, control characters, direction overrides or isolates, or invisible spaces; names recorded before
+this rule stay as they are. `memberIds` is an explicit list of distinct
 workspace membership IDs, each an active membership in the same workspace; humans and agents are
 both eligible. Adding an agent does not invoke it or grant permission to use it.
 
@@ -63,7 +64,7 @@ creator, and offer creation to members whose workspace permissions, read through
 `GroupApplication.rename({ groupId, name, expectedName })` requires `group.rename` on the group,
 which every built-in role holds, and membership of the group. To anyone outside it, the group is
 `GroupApplication.NotFound`, as a missing or foreign one is, and a direct group, named by its
-members, is `GroupApplication.NotRenamable`. The name follows creation's rule: nonempty and trimmed. Renaming
+members, is `GroupApplication.NotRenamable`. The name follows creation's rule, while `expectedName` may be any recorded name. Renaming
 records `group.renamed` with the new name and returns the group; the same name again records
 nothing. Otherwise `expectedName`, the name the renamer last saw, must still be the group's name:
 one renamed meanwhile is `GroupApplication.Changed`, so a rename is never silently replaced, and

@@ -26,7 +26,7 @@ const renameErrors: { readonly [Error in GroupChangeError]: string } = {
   changed: "Someone renamed this group meanwhile. Save again to replace their name.",
   denied: "You can no longer rename this group.",
   gone: "This group is no longer available to you.",
-  invalid: "Give the group a name.",
+  invalid: "Use 1 to 80 characters, with no invisible ones.",
   failed: "The name could not be saved. Try again when the host is available.",
 };
 const memberErrors: { readonly [Error in GroupChangeError]: string } = {
@@ -215,6 +215,7 @@ export function GroupSettings(props: GroupSettingsProps) {
                       value={props.name}
                       onInput={(event) => props.onNameChange(event.currentTarget.value)}
                       autocomplete="off"
+                      maxLength={80}
                       disabled={props.renamable === false || props.saving}
                       required
                     />

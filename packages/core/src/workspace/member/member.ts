@@ -3,6 +3,7 @@ import { Audience } from "../../journal/audience.ts";
 import { Identity } from "../../identity/identity.ts";
 import { WorkspaceId } from "../id.ts";
 import { MemberId } from "./id.ts";
+import { Text } from "../../text/text.ts";
 
 /** Identifies one admission to a workspace; rejoining creates a new membership. */
 export const Id = MemberId.Id;
@@ -16,6 +17,8 @@ export const Name = Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLeng
   identifier: "MemberName",
 });
 export type Name = typeof Name.Type;
+/** A name a member chooses now: a `Name` without hidden characters. */
+export const NewName = Name.check(Text.isName);
 
 /**
  * Removed memberships retain their identity for historical references. A name is what the member

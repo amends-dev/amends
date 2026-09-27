@@ -422,7 +422,7 @@ export interface NewGroup {
   readonly key: ReturnType<typeof newWorkspaceRequestKey>;
 }
 /** Whether a name can name a group: it has something besides surrounding whitespace. */
-export const isGroupName = (name: string) => Schema.is(Group.Name)(name.trim());
+export const isGroupName = (name: string) => Schema.is(Group.NewName)(name.trim());
 /**
  * Create a team group, then invalidate the reader's groups and the public ones, as the change feed
  * would when the commit arrives. A retry with the same key returns the first attempt's group.
@@ -466,7 +466,7 @@ export const renameGroupRequest = (client: ApiClient, workspace: string) =>
               groupId: yield* command(Group.Id)(rename.groupId),
             },
             payload: {
-              name: yield* command(Group.Name)(rename.name.trim()),
+              name: yield* command(Group.NewName)(rename.name.trim()),
               expectedName: yield* command(Group.Name)(rename.expectedName),
             },
           })

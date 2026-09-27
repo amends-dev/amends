@@ -2,12 +2,16 @@ import { Schema } from "effect";
 import { Audience } from "../journal/audience.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { WorkspaceId } from "../workspace/id.ts";
+import { Text } from "../text/text.ts";
 import { GroupId } from "./id.ts";
 
 export const Id = GroupId.Id;
 export type Id = GroupId.Id;
+/** A team group's name as recorded; names chosen now are `NewName`. */
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
 export type Name = typeof Name.Type;
+/** A name chosen for a team group: 1 to 80 characters, without hidden ones. */
+export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
 
 /**
  * Who can find a team group: only its members see a private one, while anyone in the workspace
@@ -125,7 +129,7 @@ export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
  * A team group's new name, and the name the renamer last saw, so a rename made meanwhile is not
  * silently replaced.
  */
-export const RenameInput = Schema.Struct({ groupId: Id, name: Name, expectedName: Name });
+export const RenameInput = Schema.Struct({ groupId: Id, name: NewName, expectedName: Name });
 export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 /** What renaming a team group records. */
 export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name });
@@ -133,7 +137,7 @@ export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
 
 /** A new team group, private unless it says otherwise. */
 export const CreateTeamInput = Schema.Struct({
-  name: Name,
+  name: NewName,
   memberIds: Schema.UniqueArray(MemberId.Id),
   visibility: Schema.optionalKey(Visibility),
 });

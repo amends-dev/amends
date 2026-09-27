@@ -13,7 +13,7 @@ const errors: { readonly [Error in ChangeNameError]: string } = {
   changed: "Your name changed meanwhile. Try again.",
   denied: "You can no longer change your name here.",
   gone: "You are no longer in this workspace.",
-  invalid: "Use 1 to 80 characters.",
+  invalid: "Use 1 to 80 characters, with no invisible ones.",
   failed: "Your name could not be saved. Try again when the host is available.",
 };
 

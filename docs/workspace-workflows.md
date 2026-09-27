@@ -7,9 +7,9 @@ The examples assume the local host on port 8787 with its development bearer iden
 
 ## Workspaces and members
 
-`POST /workspaces` requires a JSON body with a non-empty, trimmed `name`. It creates
+`POST /workspaces` requires a JSON body with a `name` of 1 to 80 characters without surrounding space, control characters, direction overrides or isolates, or invisible spaces. It creates
 a workspace owned by the caller and returns `id`, `name`, `createdBy`, and
-`ownerMemberId`. Missing, blank, or untrimmed names return HTTP 400 without creating
+`ownerMemberId`. Missing, blank, untrimmed, long, or hidden-character names return HTTP 400 without creating
 a workspace. Names are display labels; IDs remain the stable routing identity. An optional
 `memberName` says what people in the workspace call the creator; see
 [member names](#member-names).
@@ -60,8 +60,9 @@ ID with the new invitation's role, and inherits no group admissions.
 
 Each workspace member may have a `name`: what people in that workspace call them. It belongs to
 the membership, not the identity, so the same person can go by different names in different
-workspaces, and a rejoined membership starts without one. Names are 1 to 80 characters with no
-surrounding whitespace; invalid names return HTTP 400. A member without a name has no `name`
+workspaces, and a rejoined membership starts without one. Names chosen now are 1 to 80 characters without surrounding space, control characters, direction overrides or isolates, or invisible spaces, since each
+can make one name read as another; invalid names return HTTP 400. Names recorded before stay
+readable. Joiners stay allowed, for emoji and scripts that need them. A member without a name has no `name`
 field, and the apps show their identity instead.
 
 A member names themselves when creating the workspace (`memberName`), when accepting an

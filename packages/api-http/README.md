@@ -57,7 +57,10 @@ so a client can import the complete contract without loading server code.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships;
   `GET` and `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one.
   `PUT …/members/me/name` accepts `{ name }` and returns the caller's own renamed member.
-  Member records carry an optional `name` (`Member.Name`, 1 to 80 trimmed characters).
+  Member records carry an optional `name` (`Member.Name`, 1 to 80 trimmed characters); a name
+  chosen now is `Member.NewName`, which also refuses control, direction, and invisible
+  characters. Group and workspace names chosen now are `Group.NewName` and `Workspace.NewName`,
+  the same rule, while records keep the lenient `Name` so earlier names still read.
 - `assignments`: `GET …/permissions` lists the caller's own workspace-wide permission names, such
   as `group.create`, for any active member; `GET …/roles` lists built-in role choices;
   `GET …/members/:memberId/assignments` reads access; `POST …/assignments` adds a role;

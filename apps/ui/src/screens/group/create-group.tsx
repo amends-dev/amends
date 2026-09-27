@@ -13,7 +13,7 @@ const createErrors: { readonly [Error in GroupChangeError]: string } = {
   changed: "Something changed while you were choosing. Try again.",
   denied: "You can no longer create groups here.",
   gone: "Someone you added is no longer in this workspace. Remove them and try again.",
-  invalid: "Check the name and try again.",
+  invalid: "Use 1 to 80 characters, with no invisible ones.",
   failed: "The group could not be created. Try again when the host is available.",
 };
 
@@ -71,6 +71,7 @@ export function CreateGroup(props: CreateGroupProps) {
                 placeholder="e.g. release-planning"
                 onInput={(event) => props.onNameChange(event.currentTarget.value)}
                 autocomplete="off"
+                maxLength={80}
                 autofocus
                 required
               />

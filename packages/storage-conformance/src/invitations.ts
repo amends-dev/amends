@@ -74,7 +74,14 @@ export const invitations = (harness: Harness) => {
                   expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 50 })).toEqual(
                     before,
                   );
-                  for (const name of ["", " Bob", "x".repeat(81)])
+                  for (const name of [
+                    "",
+                    " Bob",
+                    "x".repeat(81),
+                    "Bob\u0000",
+                    "Bob\u202E",
+                    "Bob\u200B",
+                  ])
                     expect(
                       (yield* Effect.flip(
                         Operations.renameMember(workspace.id, bob, name as Member.Name),

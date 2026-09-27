@@ -15,6 +15,33 @@ const temporary = (run: (url: string) => Promise<unknown>) =>
   withDatabase((url) => Effect.promise(() => run(url)));
 
 describe.skipIf(!available)("PostgreSQL", () => {
+  it.live("names and messages storage cannot keep as given are refused as invalid", () =>
+    temporary(async (url) =>
+      withServer(url, async (call) => {
+        const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+          (await call(alice.id, "POST", "/workspaces", { name: "Names" })).body,
+        );
+        const base = `/workspaces/${workspace.id}`;
+        const statuses = [
+          (await call(alice.id, "POST", "/workspaces", { name: "a\u0000b" })).status,
+          (await call(alice.id, "POST", "/workspaces", { name: "x".repeat(81) })).status,
+          (await call(alice.id, "POST", `${base}/groups`, { name: "a\u0000b", memberIds: [] }))
+            .status,
+          (await call(alice.id, "POST", `${base}/groups`, { name: "a\u202Eb", memberIds: [] }))
+            .status,
+          (await call(alice.id, "PUT", `${base}/members/me/name`, { name: "a\u0000b" })).status,
+          (
+            await call(alice.id, "POST", `${base}/groups/general/threads`, {
+              text: "a\u0000b",
+              mentions: [],
+            })
+          ).status,
+        ];
+        expect(statuses).toEqual([400, 400, 400, 400, 400, 400]);
+      }),
+    ),
+  );
+
   it.live(
     "the smallest pool serves writes and reads while change streams are open",
     () =>

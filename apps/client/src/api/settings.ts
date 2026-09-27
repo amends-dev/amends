@@ -185,7 +185,7 @@ export const acceptInvitationRequest = (client: ApiClient) =>
               workspaceId: yield* command(Workspace.Id)(input.workspaceId),
               invitationId: yield* command(Invitation.Id)(input.invitationId),
             },
-            payload: input.name ? { name: yield* command(Member.Name)(input.name.trim()) } : {},
+            payload: input.name ? { name: yield* command(Member.NewName)(input.name.trim()) } : {},
           });
         }
         const refreshed = yield* Effect.exit(

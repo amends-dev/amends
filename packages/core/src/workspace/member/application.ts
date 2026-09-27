@@ -261,7 +261,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
 
   const rename = Effect.fn("MemberApplication.rename")(
     function* (input: Member.Name) {
-      const name = yield* Schema.decodeEffect(Member.Name)(input);
+      const name = yield* Schema.decodeEffect(Member.NewName)(input);
       yield* authorization.require([]);
       const member = yield* load((yield* Actor.Service).memberId);
       if (member.name === name) return member;
