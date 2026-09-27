@@ -4,6 +4,7 @@ import type { Store } from "../journal/store.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
 import type { GroupId } from "../group/id.ts";
+import type { MemberId } from "../workspace/member/id.ts";
 import type { ThreadId } from "../thread/id.ts";
 import type { ThreadParticipationId } from "../thread/participation/id.ts";
 
@@ -149,6 +150,14 @@ export interface Interface {
   /** Settle pending agent input for this ended participation, preserving source and recipient history. */
   readonly discardPendingForParticipation: (
     id: ThreadParticipationId.Id,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
+   * Settle a person's pending, unseen notifications from a group's threads once they no longer
+   * belong to it, as `access-lost`, keeping them as history. Seen ones and everyone else's stay.
+   */
+  readonly discardPendingForGroup: (
+    memberId: MemberId.Id,
+    groupId: GroupId.Id,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 

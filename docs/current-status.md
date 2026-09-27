@@ -76,9 +76,9 @@ each item of their groups list); in a private group any member also removes othe
 confirming second click, while in a public one only administrators and the owner do
 (`membersRemovable`). Anyone may leave a team group the same way, which returns them to the
 workspace home. Direct groups list their members without changes. Nobody manages a group they are
-not in: administrators moderate a public group by joining it. After leaving, the
-reader's pending notifications from the group stay in the inbox, and in its count, as
-notifications whose thread they can no longer see. A stream or thread open when the reader loses
+not in: administrators moderate a public group by joining it. Leaving settles the reader's pending
+notifications from the group: they leave the Inbox count and its Unread filter at once and stay in
+All as history, noting the thread is no longer visible. A stream or thread open when the reader loses
 access, from any session, turns into an unavailable state rather than showing what it last read,
 and comes back if access returns.
 

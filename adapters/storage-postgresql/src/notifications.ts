@@ -1,4 +1,5 @@
 import { Thread, ThreadParticipation } from "@amends/core/thread";
+import { Member } from "@amends/core/workspace";
 import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
@@ -371,6 +372,33 @@ export const make = Effect.fn("Notifications.make")(function* () {
             ),
           true,
         ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForParticipation")));
+      },
+    ),
+    discardPendingForGroup: Effect.fn("Notifications.discardPendingForGroup")(
+      function* (memberInput, groupInput) {
+        yield* Store.Transaction;
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput).pipe(
+          Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
+        );
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput).pipe(
+          Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
+        );
+        // The same predicate as the pending counts, so pending_notifications_by_group finds them.
+        yield* guard(
+          db
+            .update(notifications)
+            .set({ state: "Discarded", discardReason: "access-lost" })
+            .where(
+              and(
+                inWorkspace,
+                eq(notifications.recipientKind, "Human"),
+                eq(inbox, memberId),
+                pendingOnly,
+                eq(notifications.threadGroupId, groupId),
+              ),
+            ),
+          true,
+        ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForGroup")));
       },
     ),
     insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),

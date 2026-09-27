@@ -96,6 +96,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     insert: unexpected,
     insertMany: unexpected,
     discardPendingForParticipation: unexpected,
+    discardPendingForGroup: unexpected,
     markSeen: unexpected,
     ...overrides,
   });

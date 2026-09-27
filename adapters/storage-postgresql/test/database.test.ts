@@ -255,6 +255,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
               condition: "thread_group_id =",
               query: sql`SELECT thread_group_id, count(*) FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = any(${[thread.groupId]}::text[]) GROUP BY thread_group_id`,
             },
+            // Leaving a group settles the leaver's pending notifications from it through the same index.
+            {
+              index: "pending_notifications_by_group",
+              condition: "thread_group_id =",
+              query: sql`UPDATE notifications SET state = 'Discarded', discard_reason = 'access-lost' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${thread.groupId}`,
+            },
             {
               index: "pending_notifications_by_thread",
               condition: "thread_id =",

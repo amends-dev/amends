@@ -65,7 +65,11 @@ export const acceptsAcknowledgment = (recipient: Recipient, outcome: Acknowledgm
 
 export const State = Schema.TaggedUnion({
   Pending: {},
-  Discarded: { reason: Schema.Literal("participation-ended") },
+  /**
+   * Settled without handling: an agent's input when its participation ends, or a person's pending
+   * notifications from a group they no longer belong to, whose threads they cannot open.
+   */
+  Discarded: { reason: Schema.Literals(["participation-ended", "access-lost"]) },
   Acknowledged: Acknowledgment.fields,
   /**
    * The source told this recipient something without asking anything of it, as another agent's

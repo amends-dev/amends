@@ -321,8 +321,13 @@ each recording a participation-ended activity with reason `unfollowed`, `group-l
 rejoining never revives old work.
 
 Pending agent notifications from an ended participation become
-`Discarded { reason: "participation-ended" }`, keeping their source, recipient, and time. Human
-notification history is kept. All of it shares the departure's commit.
+`Discarded { reason: "participation-ended" }`, keeping their source, recipient, and time. A person's
+notifications stay pending when they only unfollow a thread, since they can still read it. Leaving
+or being removed from the group, or from the workspace, ends their access, so their pending, unseen
+notifications from its threads become `Discarded { reason: "access-lost" }`: out of the pending
+count and pending lists, kept in the full inbox as history. Ones already seen keep their Seen. All
+of it shares the departure's commit, and rebuilding from the journal settles them the same way,
+since the notification projection derives it from the recorded departure.
 
 ## Recorded history and delivery
 

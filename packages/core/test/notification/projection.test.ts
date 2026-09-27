@@ -23,6 +23,8 @@ import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Group } from "../../src/group/group.ts";
+import { GroupMembership } from "../../src/group/membership/membership.ts";
+import { GroupMembershipFacts } from "../../src/group/membership/facts.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { NotificationProjection } from "../../src/notification/projection.ts";
@@ -55,6 +57,7 @@ const refusing: NotificationStore.Interface = {
   insert: () => Effect.die("Unexpected notification write"),
   insertMany: () => Effect.die("Unexpected notification write"),
   discardPendingForParticipation: () => Effect.die("Unexpected notification write"),
+  discardPendingForGroup: () => Effect.die("Unexpected notification write"),
   markSeen: () => Effect.die("Unexpected notification write"),
 };
 /** Only the notification store is provided, so the projection can read no other read model. */
@@ -218,5 +221,51 @@ it.effect("notifications rebuild from recorded activity alone", () =>
       }),
       notifications,
     );
+  }),
+);
+
+it.effect("leaving a group settles what the member had pending from it, live and on rebuild", () =>
+  Effect.gen(function* () {
+    const departure = (reason: "left" | "removed" | "workspace-removed", group: string) => ({
+      workspaceId,
+      groupId: Group.Id.make(group),
+      membershipId: GroupMembership.Id.make(`${group}-admission`),
+      memberId: Member.Id.make("human-member"),
+      reason,
+    });
+    // Leaving, removal, and workspace removal all end access, so each settles.
+    const departures = [
+      departure("left", "design"),
+      departure("removed", "ops"),
+      departure("workspace-removed", "lobby"),
+    ];
+    const expected = departures.map((value) => [value.memberId, value.groupId]);
+    for (const rebuild of [false, true]) {
+      const fixture = yield* make();
+      const settled: Array<readonly [Member.Id, Group.Id]> = [];
+      const notifications: NotificationStore.Interface = {
+        ...refusing,
+        discardPendingForGroup: (memberId, groupId) =>
+          Effect.sync(() => void settled.push([memberId, groupId])),
+      };
+      yield* run(
+        fixture,
+        Effect.gen(function* () {
+          // A rebuild finds the departures recorded before the projection ran.
+          const recorder = rebuild
+            ? yield* Journal.make({ logId, projections: [] })
+            : yield* Journal.make({ logId, projections: [NotificationProjection.definition] });
+          for (const value of departures)
+            yield* recorder.publish(GroupMembershipFacts.Removed, value);
+          if (rebuild)
+            yield* (yield* Journal.make({
+              logId,
+              projections: [NotificationProjection.definition],
+            })).replay;
+          expect(settled).toEqual(expected);
+        }),
+        notifications,
+      );
+    }
   }),
 );

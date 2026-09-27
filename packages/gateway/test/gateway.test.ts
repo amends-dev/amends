@@ -143,6 +143,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       NotificationStore.Service,
       NotificationStore.Service.of({
         discardPendingForParticipation: unexpected,
+        discardPendingForGroup: unexpected,
         markSeen: unexpected,
         workspaceId: boundWorkspaceId,
         get: unexpected,

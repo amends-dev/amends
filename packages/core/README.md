@@ -38,7 +38,7 @@ management.
 contract, `NotificationApplication`, and the projection that generates notifications. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient (one Triage
 recipient per workspace, `{ _tag: "Triage" }`), and is `Pending`, `Discarded` when its agent
-participation ends, `Acknowledged` once a human saw it, or `Informational` from the start when
+participation ends or its person leaves the source's group, `Acknowledged` once a human saw it, or `Informational` from the start when
 its activity asks an agent for no work, as another agent's message does. Each activity recipient
 records `requestsWork`. A human or agent recipient names the
 membership notified as well as the identity (`Notification.ofMember`), so an inbox belongs to one

@@ -148,7 +148,9 @@ leaving does. `group.create`, creator attribution, and role names do not authori
 `GroupMembershipApplication.leave({ groupId, membershipId })` requires active workspace membership
 and an admission belonging to the acting member, with no management or read grant. Humans, agents,
 creators, and workspace owners follow the same rule. Leaving does not change workspace membership,
-ownership, or grants, and the group may become empty.
+ownership, or grants, and the group may become empty. A person who leaves or is removed no longer
+waits on the group's notifications: their pending ones from it are settled as `access-lost`; see
+[departure and pending input](thread-workflows.md#departure-and-pending-input).
 
 Both address a specific admission and return it with `status: "removed"`, keeping its group,
 member, and admission time. Missing, foreign, and wrong-group admission IDs return

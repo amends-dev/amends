@@ -133,7 +133,9 @@ by recorded time and ID using `COLLATE "C"`, which orders IDs by their bytes.
 Notification IDs and source/recipient associations are unique within the workspace.
 Inserts join the journal transaction; source existence and recipient selection
 remain generation responsibilities. The notification projection generates opening and reply message notifications from recorded thread activity
-and discards pending agent input when its participation ends.
+and discards pending agent input when its participation ends, and a person's pending notifications
+from a group they leave, with one update through `pending_notifications_by_group`, which the plan
+test checks. Adding the `access-lost` reason replaced the development baseline.
 The row's `state` holds what the journal settles: `Pending`, `Discarded`, or `Informational`. A human's `Seen` lives
 in `notification_seen`, keyed by workspace and notification with the first `seen_at`, which is not
 a projection table: it has no foreign key to `notifications`, so truncating and rebuilding them keeps

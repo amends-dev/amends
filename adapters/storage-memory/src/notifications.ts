@@ -2,6 +2,7 @@ import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
+import { Member } from "@amends/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import type { MemoryDatabase } from "./database.ts";
@@ -282,6 +283,37 @@ export const make = Effect.fn("Notifications.make")(function* () {
             .pipe(
               Effect.mapError(storeFailure(NotificationStore, "discardPendingForParticipation")),
             );
+          space.records.notifications.set(record.id, row);
+        }
+      },
+    ),
+    discardPendingForGroup: Effect.fn("Notifications.discardPendingForGroup")(
+      function* (memberInput, groupInput) {
+        yield* Store.Transaction;
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput).pipe(
+          Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
+        );
+        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput).pipe(
+          Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
+        );
+        const space = yield* write.pipe(
+          Effect.mapError(storeFailure(NotificationStore, "discardPendingForGroup")),
+        );
+        const records = yield* rows
+          .all(space.records.notifications)
+          .pipe(Effect.mapError(storeFailure(NotificationStore, "discardPendingForGroup")));
+        for (const record of records) {
+          if (
+            record.recipient._tag !== "Human" ||
+            record.recipient.memberId !== memberId ||
+            record.thread?.groupId !== groupId ||
+            record.state._tag !== "Pending" ||
+            space.notificationsSeen.has(record.id)
+          )
+            continue;
+          const row = yield* rows
+            .encode({ ...record, state: { _tag: "Discarded", reason: "access-lost" } })
+            .pipe(Effect.mapError(storeFailure(NotificationStore, "discardPendingForGroup")));
           space.records.notifications.set(record.id, row);
         }
       },

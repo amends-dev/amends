@@ -304,8 +304,13 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   );
                 }),
               );
+              // Removal from the workspace ended their access, which settled what was pending.
               expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(
-                Option.some(p.humanNote),
+                Option.some(
+                  Object.assign({}, p.humanNote, {
+                    state: { _tag: "Discarded", reason: "access-lost" },
+                  }),
+                ),
               );
             }),
           ),
@@ -320,21 +325,12 @@ export const notificationAcknowledgment = (harness: Harness) => {
             storage,
             Effect.gen(function* () {
               const p = yield* prepare();
+              // Still in the group, the reader has lost the source through their grants.
               expect(
                 yield* Effect.flip(run(p.bound, human, resolve(p.humanNote.id))),
               ).toMatchObject({
                 _tag: "NotificationApplication.SourceUnavailable",
               });
-              const admission = Option.getOrThrow(
-                yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId),
-              );
-              yield* run(
-                p.bound,
-                human,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.leave({ groupId: p.group.id, membershipId: admission.id }),
-                ),
-              );
               const before = yield* snapshot(p);
               const bound = {
                 ...p.bound,
@@ -352,6 +348,20 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 _tag: "NotificationApplication.SourceUnavailable",
               });
               expect((yield* snapshot(p)).participation).toEqual(before.participation);
+              // Leaving afterwards keeps what they saw as seen; only the pending is settled.
+              const admission = Option.getOrThrow(
+                yield* p.bound.groupMemberships.findActive(p.group.id, human.memberId),
+              );
+              yield* run(
+                p.bound,
+                human,
+                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
+                  s.leave({ groupId: p.group.id, membershipId: admission.id }),
+                ),
+              );
+              expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
+                value: { state: { _tag: "Acknowledged" } },
+              });
               const missing = changed(p.humanNote, {
                 id: Notification.Id.make("missing-source"),
                 source: { logId: Log.Id.make("other-log"), entryId: p.humanNote.source.entryId },

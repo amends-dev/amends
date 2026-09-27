@@ -808,6 +808,137 @@ export const notifications = (harness: Harness) => {
       ),
     );
 
+    it.effect(
+      "settling a group departure discards only the member's pending, unseen notifications from it",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const bound = yield* boundTo(workspaceId);
+              yield* initialized(bound);
+              const from = (groupId: string, sequence: number) => ({
+                thread: {
+                  threadId: Thread.Id.make(`thread-${groupId}`),
+                  groupId: Group.Id.make(groupId),
+                  sequence,
+                },
+              });
+              const settled = [
+                record("left-first", from("left", 1)),
+                record("left-second", from("left", 2)),
+              ];
+              const seen = record("left-seen", from("left", 3));
+              const kept = [
+                record("elsewhere", from("kept", 1)),
+                record("someone-else", { ...from("left", 4), recipient: another }),
+                record("agent-there", { ...from("left", 5), recipient: agent }),
+                record("no-thread"),
+              ];
+              yield* bound.store.transaction(
+                bound.notifications.insertMany([...settled, seen, ...kept]),
+              );
+              yield* bound.notifications.markSeen([seen.id], recordedAt);
+              const before = yield* bound.notifications.get(seen.id);
+              const leave = bound.store.transaction(
+                bound.notifications.discardPendingForGroup(
+                  Member.Id.make("recipient-member"),
+                  Group.Id.make("left"),
+                ),
+              );
+              yield* leave;
+              for (const note of settled)
+                expect(yield* bound.notifications.get(note.id)).toEqual(
+                  Option.some(
+                    Object.assign({}, note, {
+                      state: { _tag: "Discarded", reason: "access-lost" },
+                    }),
+                  ),
+                );
+              // What was seen stays as it was seen; others' notifications are untouched.
+              expect(yield* bound.notifications.get(seen.id)).toEqual(before);
+              for (const note of kept)
+                expect(yield* bound.notifications.get(note.id)).toEqual(Option.some(note));
+              expect(yield* bound.notifications.countPendingByRecipient(human)).toBe(2);
+              // Settling again finds nothing pending and changes nothing.
+              yield* leave;
+              expect(yield* bound.notifications.countPendingByRecipient(human)).toBe(2);
+            }),
+          ),
+        ),
+    );
+
+    it.effect("leaving a group settles what was pending from it, and nothing from elsewhere", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const gateway = yield* Gateway.Service;
+            const alice = Identity.Reference.cases.Human.make({
+              id: Identity.HumanId.make("alice"),
+            });
+            const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
+            const workspace = yield* createWorkspace(alice.id);
+            const asAlice = <A, E, R extends Core.Operations | Actor.Service>(
+              program: Effect.Effect<A, E, R>,
+            ) => gateway.asMember(workspace.id, alice, program);
+            const asBob = <A, E, R extends Core.Operations | Actor.Service>(
+              program: Effect.Effect<A, E, R>,
+            ) => gateway.asMember(workspace.id, bob, program);
+            const invitation = yield* invite(workspace.id, alice, {
+              recipientId: bob.id,
+              roleId: BuiltinRoles.MemberId,
+              expiresAt: yield* future,
+            });
+            const member = yield* acceptInvitation(workspace.id, bob.id, invitation.details.id);
+            const create = (name: string) =>
+              asAlice(
+                GroupApplication.Service.use((groups) =>
+                  groups.createTeam({ name, memberIds: [workspace.ownerMemberId, member.id] }),
+                ),
+              );
+            const mention = (groupId: Group.Id) =>
+              asAlice(
+                ThreadApplication.Service.use((threads) =>
+                  threads.startInGroup({ groupId, text: "Bob?", mentions: [member.id] }),
+                ),
+              );
+            const count = asBob(
+              NotificationApplication.Service.use((notifications) => notifications.countPending),
+            );
+            const left = yield* create("Left");
+            const kept = yield* create("Kept");
+            yield* mention(left.id);
+            yield* mention(left.id);
+            yield* mention(kept.id);
+            expect(yield* count).toBe(3);
+            const [admission] = (yield* asBob(
+              GroupMembershipApplication.Service.use((memberships) =>
+                memberships.listCurrent(left.id, page),
+              ),
+            )).filter((value) => value.memberId === member.id);
+            yield* asBob(
+              GroupMembershipApplication.Service.use((memberships) =>
+                memberships.leave({ groupId: left.id, membershipId: admission!.id }),
+              ),
+            );
+            // What he can no longer open stops waiting for him, and stays as history.
+            expect(yield* count).toBe(1);
+            const all = yield* asBob(
+              NotificationApplication.Service.use((notifications) => notifications.list(page)),
+            );
+            const settledIn = (groupId: Group.Id) =>
+              all.filter((note) => note.thread?.groupId === groupId).map((note) => note.state);
+            expect(settledIn(left.id)).toEqual([
+              { _tag: "Discarded", reason: "access-lost" },
+              { _tag: "Discarded", reason: "access-lost" },
+            ]);
+            expect(settledIn(kept.id)).toEqual([{ _tag: "Pending" }]);
+          }),
+        ),
+      ),
+    );
+
     it.effect("someone invited back after removal starts with an empty inbox", () =>
       harness.withStorage((storage) =>
         runGateway(

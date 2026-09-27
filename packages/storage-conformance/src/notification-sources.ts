@@ -357,7 +357,11 @@ export const notificationSources = (harness: Harness) => {
                   }),
                 ),
               );
-              expect(yield* run(bound, human, inboxGet(note.id))).toEqual(note);
+              // Leaving settles what was pending from the group; it stays as history.
+              const settled = Object.assign({}, note, {
+                state: { _tag: "Discarded", reason: "access-lost" },
+              });
+              expect(yield* run(bound, human, inboxGet(note.id))).toEqual(settled);
               expect(
                 yield* Effect.flip(asActor(service.resolveSource(note.id), human)),
               ).toMatchObject({
@@ -377,7 +381,8 @@ export const notificationSources = (harness: Harness) => {
               expect(yield* bound.participations.get(part.id)).toMatchObject({
                 value: { status: "ended" },
               });
-              expect(yield* notifications(bound, humanId)).toEqual([note]);
+              // Rejoining resolves its source again but does not revive it as pending.
+              expect(yield* notifications(bound, humanId)).toEqual([settled]);
             }),
           ),
         ),
@@ -433,7 +438,8 @@ export const notificationSources = (harness: Harness) => {
               expect(
                 (yield* inbox({ limit: 10, pendingOnly: true })).map((item) => item.notification),
               ).toEqual([newer]);
-              // Leaving the group keeps the notifications without what they point to.
+              // Leaving the group keeps the notifications without what they point to, and settles
+              // the pending one: the reader no longer waits on a thread they cannot open.
               const part = Option.getOrThrow(
                 yield* bound.participations.get(
                   newer.participationId ?? ThreadParticipation.Id.make("missing"),
@@ -450,9 +456,14 @@ export const notificationSources = (harness: Harness) => {
                 ),
               );
               expect(yield* inbox({ limit: 10 })).toEqual([
-                { notification: newer },
+                {
+                  notification: Object.assign({}, newer, {
+                    state: { _tag: "Discarded", reason: "access-lost" },
+                  }),
+                },
                 { notification: seen },
               ]);
+              expect(yield* inbox({ limit: 10, pendingOnly: true })).toEqual([]);
               // Nobody else reads this inbox.
               expect(
                 yield* run(

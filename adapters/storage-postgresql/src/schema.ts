@@ -268,7 +268,7 @@ export const notifications = pgTable(
     sourceLogId: text("source_log_id").notNull(),
     sourceEntryId: text("source_entry_id").notNull(),
     participationId: text("participation_id"),
-    discardReason: text("discard_reason", { enum: ["participation-ended"] }),
+    discardReason: text("discard_reason", { enum: ["participation-ended", "access-lost"] }),
     recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
     recipientId: text("recipient_id"),
     // The membership a human or agent is notified as; its inbox is the membership's.
@@ -287,7 +287,7 @@ export const notifications = pgTable(
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "notification_state",
-      sql`(${table.state} IN ('Pending', 'Informational') AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} = 'participation-ended')`,
+      sql`(${table.state} IN ('Pending', 'Informational') AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} IN ('participation-ended', 'access-lost'))`,
     ),
     check(
       "notification_seen_state",
