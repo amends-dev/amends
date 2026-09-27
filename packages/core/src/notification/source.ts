@@ -1,11 +1,13 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { Actor } from "../identity/actor.ts";
+import type { Authorization } from "../authorization/authorization.ts";
 import { Journal } from "../journal/journal.ts";
 import { Event } from "../journal/event.ts";
 import type { Log } from "../journal/log.ts";
 import { Thread } from "../thread/thread.ts";
 import { ThreadActivity } from "../thread/activity/activity.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
+import type { ThreadAccess } from "../thread/access.ts";
 import { ThreadActivityReading } from "../thread/activity/reading.ts";
 import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
@@ -19,8 +21,12 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
   "NotificationSource.InvalidReference",
   { message: Schema.String },
 ) {}
+/** Losing access to the source, or its activity gone missing, surface as Unavailable or InvalidReference. */
 export type Error =
-  | ThreadActivityReading.Error
+  | Exclude<
+      ThreadActivityReading.Error,
+      ThreadAccess.NotFound | Authorization.Denied | ThreadActivityReading.NotFound
+    >
   | ThreadParticipationStore.Failure
   | Log.ReadError
   | InvalidReference

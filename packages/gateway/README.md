@@ -201,7 +201,10 @@ cause for host logging. `GatewayErrors.PublicError` is the schema of these
 outcomes, and `GatewayErrors.ExposedError<E>` computes a program's public error
 type from core's. A domain error core adds reaches callers only once it is listed there;
 otherwise it becomes a defect, which HTTP answers with 500. A server-http test checks that every
-error an HTTP route declares is public here or raised by the HTTP layer itself.
+error an HTTP route declares is public here or raised by the HTTP layer itself, and a gateway
+type test that every error a core application operation can fail with is either public or one of
+the internal failures it names (storage, commit, projection, and consistency failures), so a
+new domain outcome fails the build until it is classified.
 
 The adapters currently map every failed COMMIT effect to `Uncertain`, including
 some definite failures, and PostgreSQL deadlocks are not mapped to contention.
