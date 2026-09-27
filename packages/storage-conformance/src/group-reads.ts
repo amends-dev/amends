@@ -85,7 +85,7 @@ export const groupReads = (harness: Harness) => {
       );
     const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createPrivateTeam({ name, memberIds }),
+        service.createTeam({ name, memberIds }),
       );
     const add = (groupId: Group.Id, memberId: Member.Id) =>
       Effect.flatMap(GroupMembershipApplication.Service, (service) =>

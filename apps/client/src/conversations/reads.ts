@@ -9,6 +9,7 @@ import {
   membersRead,
   pendingCountRead,
   permissionsRead,
+  publicGroupsRead,
   rosterRead,
   streamRead,
   timelineRead,
@@ -60,6 +61,15 @@ function connect<A, E>(atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>): Read<A> 
 /** The reader's groups in a workspace, live while mounted. */
 export function useGroups(workspaceId: string): Read<ReadonlyArray<Group.ListItem>> {
   const read = groupsRead(useApiClient(), workspaceId);
+  return read ? connect(read) : unread;
+}
+
+/**
+ * The public groups the reader may join, with how many belong to each and whether the reader
+ * does, live while mounted as groups are created, renamed, joined, and left.
+ */
+export function usePublicGroups(workspaceId: string): Read<ReadonlyArray<Group.PublicItem>> {
+  const read = publicGroupsRead(useApiClient(), workspaceId);
   return read ? connect(read) : unread;
 }
 

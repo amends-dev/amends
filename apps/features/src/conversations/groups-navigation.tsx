@@ -15,6 +15,10 @@ export interface GroupsNavigationProps {
   readonly href: (groupId: string) => string;
   /** The group whose page is open. */
   readonly current?: string;
+  /** Where browsing the workspace's public groups leads. */
+  readonly browseHref?: string;
+  /** The public groups are open. */
+  readonly browsing?: boolean;
   /** A group the reader created here; the app decides where that leads. */
   readonly onCreated?: (groupId: string) => void;
   /**
@@ -76,8 +80,8 @@ function Action(props: { readonly label: string; readonly onClick: () => void })
 /**
  * The reader's groups as two navigation sections, live while mounted: team groups by name, and
  * direct groups by the other people in them, each marked when it has new activity or something
- * for the reader. Groups offers "New group" to a reader who may create groups, shown even before
- * they belong to any; Direct offers everyone "New message".
+ * for the reader. Groups offers "New group" to a reader who may create groups, and "Browse
+ * groups" to everyone, even before they belong to any; Direct offers everyone "New message".
  */
 export function GroupsNavigation(props: GroupsNavigationProps) {
   const groups = useGroups(props.workspaceId);
@@ -88,7 +92,7 @@ export function GroupsNavigation(props: GroupsNavigationProps) {
   const [messaging, setMessaging] = createSignal(false);
   return (
     <>
-      <Show when={teams().length > 0 || creator()}>
+      <Show when={groups.value() !== undefined || creator()}>
         <Navigation.Section>
           <Navigation.SectionHeader>
             <Navigation.SectionLabel>Groups</Navigation.SectionLabel>
@@ -103,6 +107,14 @@ export function GroupsNavigation(props: GroupsNavigationProps) {
             href={props.href}
             current={props.current}
           />
+          <Show when={props.browseHref}>
+            {(href) => (
+              <Navigation.Link href={href()} aria-current={props.browsing ? "page" : undefined}>
+                <Navigation.Icon>+</Navigation.Icon>
+                <Navigation.Label>Browse groups</Navigation.Label>
+              </Navigation.Link>
+            )}
+          </Show>
           <Show when={creator()}>
             <NewGroupDialog
               workspaceId={props.workspaceId}

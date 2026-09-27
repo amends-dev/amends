@@ -349,6 +349,60 @@ describe.skipIf(!available)("PostgreSQL", () => {
     ),
   );
 
+  it.live("a public group is found and joined over HTTP; its threads stay with its members", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const { asAlice, asBob, workspace, aliceId, bobId } = yield* workspaceWithBob;
+        const workspaceId = workspace.id;
+        const lobby = yield* asAlice.groups.create({
+          params: { workspaceId },
+          headers: {},
+          payload: { name: "Lobby", memberIds: [aliceId], visibility: "Public" },
+        });
+        const secret = yield* asAlice.groups.create({
+          params: { workspaceId },
+          headers: {},
+          payload: { name: "Secret", memberIds: [aliceId] },
+        });
+        expect(lobby).toMatchObject({ kind: "Team", visibility: "Public" });
+        expect(secret).toMatchObject({ kind: "Team", visibility: "Private" });
+        const groupId = lobby.id;
+        yield* asAlice.threads.start({
+          params: { workspaceId, groupId },
+          headers: {},
+          payload: { text: "Welcome, everyone.", mentions: [] },
+        });
+        // Bob, a viewer, finds the public group but not the private one, and cannot read in yet.
+        const browse = () =>
+          asBob.groups.listPublic({ params: { workspaceId }, query: { limit: 10 } });
+        expect(yield* browse()).toEqual([{ group: lobby, members: 1, joined: false }]);
+        expect(
+          yield* asBob.threads
+            .list({ params: { workspaceId, groupId }, query: { limit: 10 } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+        // Joining admits him, once; he then reads its threads like any member.
+        const joined = yield* asBob.groups.join({ params: { workspaceId, groupId } });
+        expect(joined).toMatchObject({ groupId, memberId: bobId, status: "active" });
+        expect(yield* asBob.groups.join({ params: { workspaceId, groupId } })).toEqual(joined);
+        expect(yield* browse()).toEqual([{ group: lobby, members: 2, joined: true }]);
+        expect(
+          yield* asBob.threads.list({ params: { workspaceId, groupId }, query: { limit: 10 } }),
+        ).toHaveLength(1);
+        expect(
+          (yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } })).map(
+            (item) => item.group.id,
+          ),
+        ).toEqual([groupId]);
+        // A private group answers as missing, as it does to anyone outside it.
+        expect(
+          yield* asBob.groups
+            .join({ params: { workspaceId, groupId: secret.id } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+      }).pipe(Effect.scoped, Effect.provide(server(url))),
+    ),
+  );
   it.live("direct threads, thread pages, rosters, and outsiders over HTTP", () =>
     withDatabase((url) =>
       Effect.gen(function* () {

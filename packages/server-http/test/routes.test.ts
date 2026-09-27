@@ -88,10 +88,11 @@ const conversations = Layer.mergeAll(
     GroupApplication.Service,
     GroupApplication.Service.of({
       workspaceId,
-      createPrivateTeam: record("group.create", () => Effect.succeed(team)),
+      createTeam: record("group.create", () => Effect.succeed(team)),
       rename: record("group.rename", () => Effect.succeed(team)),
       get: record("group.get", (id) => Effect.fail(new GroupApplication.NotFound({ groupId: id }))),
       listMine: record("group.listMine", () => Effect.succeed([])),
+      listPublic: record("group.listPublic", () => Effect.succeed([])),
       getForManagement: () => Effect.die("unused"),
     }),
   ),
@@ -101,6 +102,9 @@ const conversations = Layer.mergeAll(
       workspaceId,
       add: record("group.add", (input) =>
         Effect.fail(new GroupMembershipApplication.AlreadyMember(input)),
+      ),
+      join: record("group.join", (groupId) =>
+        Effect.fail(new GroupMembershipApplication.GroupNotFound({ groupId })),
       ),
       remove: record("group.remove", (input) =>
         Effect.fail(new GroupMembershipApplication.FixedMembership({ groupId: input.groupId })),
@@ -621,10 +625,15 @@ it.effect(
           client.groups.create({
             params: { workspaceId },
             headers: { "idempotency-key": Request.Key.make("group-1") },
-            payload: { name: "Studio", memberIds: [memberId] },
+            payload: { name: "Studio", memberIds: [memberId], visibility: "Public" },
             responseMode: "response-only",
           }),
           client.groups.list({
+            params: { workspaceId },
+            query: { limit: 20, after: groupId },
+            responseMode: "response-only",
+          }),
+          client.groups.listPublic({
             params: { workspaceId },
             query: { limit: 20, after: groupId },
             responseMode: "response-only",
@@ -648,6 +657,7 @@ it.effect(
             params: { workspaceId, groupId, membershipId },
             responseMode: "response-only",
           }),
+          client.groups.join({ params: { workspaceId, groupId }, responseMode: "response-only" }),
           client.groups.follow({
             params: { workspaceId, groupId },
             payload: { memberId },
@@ -726,20 +736,25 @@ it.effect(
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
       );
       expect(statuses).toEqual([
-        201, 200, 404, 200, 409, 409, 409, 204, 409, 204, 200, 200, 409, 400, 404, 200, 200, 403,
-        404, 409, 409, 404, 409,
+        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 200,
+        200, 403, 404, 409, 409, 404, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
           operation: "group.create",
-          arguments: [{ name: "Studio", memberIds: [memberId] }, { requestKey: "group-1" }],
+          arguments: [
+            { name: "Studio", memberIds: [memberId], visibility: "Public" },
+            { requestKey: "group-1" },
+          ],
         },
         { operation: "group.listMine", arguments: [{ limit: 20, after: groupId }] },
+        { operation: "group.listPublic", arguments: [{ limit: 20, after: groupId }] },
         { operation: "group.get", arguments: [groupId] },
         { operation: "group.members", arguments: [groupId, { limit: 5 }] },
         { operation: "group.add", arguments: [{ groupId, memberId }] },
         { operation: "group.remove", arguments: [{ groupId, membershipId }] },
         { operation: "group.leave", arguments: [{ groupId, membershipId }] },
+        { operation: "group.join", arguments: [groupId] },
         { operation: "group.follow", arguments: [{ groupId, memberId }] },
         { operation: "group.unfollow", arguments: [{ groupId, memberId }] },
         { operation: "group.markRead", arguments: [{ groupId }] },

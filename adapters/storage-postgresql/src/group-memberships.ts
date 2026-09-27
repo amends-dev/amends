@@ -15,6 +15,8 @@ const decode = Schema.decodeUnknownEffect(
   ),
 );
 
+const decodeSummaries = Schema.decodeUnknownEffect(Schema.Array(Group.Summary));
+
 /** Recorded group admissions; one active admission per group and workspace membership. @category constructors */
 export const make = Effect.fn("GroupMemberships.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
@@ -87,6 +89,31 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
         ).pipe(Effect.flatMap(decode));
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
+    ),
+    summarize: Effect.fn("GroupMemberships.summarize")(
+      function* (groupInput, memberInput) {
+        const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+        if (groupIds.length === 0) return [];
+        return yield* guard(
+          db
+            .select({
+              groupId: groupMemberships.groupId,
+              members: sql<number>`count(*)::int`,
+              joined: sql<boolean>`bool_or(${groupMemberships.memberId} = ${memberId})`,
+            })
+            .from(groupMemberships)
+            .where(
+              and(
+                inWorkspace,
+                eq(groupMemberships.status, "active"),
+                inIds(groupMemberships.groupId, groupIds),
+              ),
+            )
+            .groupBy(groupMemberships.groupId),
+        ).pipe(Effect.flatMap(decodeSummaries));
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "summarize")),
     ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
       function* (input) {

@@ -289,7 +289,7 @@ export const threadStarts = (harness: Harness) => {
                 bound,
                 owner,
                 Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createPrivateTeam({ name: "Support", memberIds: [owner.memberId, humanId] }),
+                  s.createTeam({ name: "Support", memberIds: [owner.memberId, humanId] }),
                 ),
               );
               const contact: Notification.Recipient = { _tag: "Contact", id: contactId };
@@ -395,7 +395,7 @@ export const threadStarts = (harness: Harness) => {
                   counted.bound,
                   owner,
                   Effect.flatMap(GroupApplication.Service, (s) =>
-                    s.createPrivateTeam({
+                    s.createTeam({
                       name: `Team ${size}`,
                       memberIds: [owner.memberId, ...extra.slice(0, size)],
                     }),
@@ -483,7 +483,7 @@ export const threadStarts = (harness: Harness) => {
                   bound,
                   owner,
                   Effect.flatMap(GroupApplication.Service, (s) =>
-                    s.createPrivateTeam({
+                    s.createTeam({
                       name: `Team ${size}`,
                       memberIds: [owner.memberId, ...extra.slice(0, size)],
                     }),

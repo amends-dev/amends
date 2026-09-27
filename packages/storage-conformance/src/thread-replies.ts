@@ -105,7 +105,7 @@ export const threadReplies = (harness: Harness) => {
       });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(GroupApplication.Service, (s) =>
-        s.createPrivateTeam({ name: "Engineering", memberIds }),
+        s.createTeam({ name: "Engineering", memberIds }),
       );
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(ThreadApplication.Service, (s) =>

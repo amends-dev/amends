@@ -223,6 +223,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       findActive: unexpected,
       listByGroup: unexpected,
       findActiveMany: unexpected,
+      summarize: unexpected,
       pageActiveByGroup: unexpected,
       pageActiveByMember: unexpected,
       listActiveByMember: (memberId) =>

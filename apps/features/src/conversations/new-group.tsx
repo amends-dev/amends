@@ -2,6 +2,7 @@ import { useCreateGroup, useMembers, useWorkspace, type WorkspaceFailure } from 
 import { ChipPicker } from "@amends/ui/compositions/chip-picker";
 import { Dialog } from "@amends/ui/compositions/dialog";
 import { Field } from "@amends/ui/compositions/field";
+import { RadioGroup } from "@amends/ui/compositions/radio-group";
 import { Button } from "@amends/ui/primitives/button";
 import { Input } from "@amends/ui/primitives/input";
 import { Column } from "@amends/ui/primitives/layout";
@@ -23,9 +24,19 @@ export interface NewGroupDialogProps {
   /** The group was created, with the reader in it. */
   readonly onCreated: (groupId: string) => void;
 }
+/** Who can find a new group; either way, only its members read its threads. */
+const visibilities = [
+  { value: "Private", label: "Private", description: "Only the people you add." },
+  {
+    value: "Public",
+    label: "Public",
+    description: "Anyone in the workspace can find it and join.",
+  },
+] as const;
 /**
- * Create a private team group: a name and the workspace's people and agents to include, with the
- * reader always among them. Closing clears it; failures keep what was chosen for another try.
+ * Create a team group: a name, the workspace's people and agents to include, with the reader
+ * always among them, and whether anyone else may find and join it. Closing clears it; failures
+ * keep what was chosen for another try.
  */
 export function NewGroupDialog(props: NewGroupDialogProps) {
   const form = createUniqueId();
@@ -68,7 +79,7 @@ export function NewGroupDialog(props: NewGroupDialogProps) {
         <Dialog.Header>
           <Dialog.Title>New group</Dialog.Title>
           <Dialog.Description>
-            A private group for the people and agents you add. Everyone in it reads its threads.
+            A group for the people and agents you add. Everyone in it reads its threads.
           </Dialog.Description>
         </Dialog.Header>
         <Dialog.Body>
@@ -107,6 +118,16 @@ export function NewGroupDialog(props: NewGroupDialogProps) {
                   />
                 )}
               </Field>
+              <RadioGroup
+                label="Who can find it"
+                name={`${form}-visibility`}
+                options={visibilities}
+                value={group.visibility()}
+                onValueChange={(value) =>
+                  group.setVisibility(value === "Public" ? "Public" : "Private")
+                }
+                disabled={group.pending()}
+              />
               <Show when={group.error()}>
                 {(failure) => (
                   <Text role="alert" tone="danger">

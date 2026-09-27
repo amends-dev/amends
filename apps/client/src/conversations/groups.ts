@@ -1,7 +1,13 @@
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { createGroupRequest, isGroupName, type NewGroup } from "../api/conversations.ts";
+import {
+  createGroupRequest,
+  isGroupName,
+  joinGroupRequest,
+  type Group,
+  type NewGroup,
+} from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { newWorkspaceRequestKey } from "../api/workspaces.ts";
 import { useRequest } from "../request/use-request.ts";
@@ -15,6 +21,9 @@ export interface CreateGroupController {
   /** The other members chosen, in the order they were added; the reader is always included. */
   readonly members: Accessor<ReadonlyArray<string>>;
   readonly setMembers: (memberIds: ReadonlyArray<string>) => void;
+  /** Whether anyone in the workspace may find and join the group; private until chosen. */
+  readonly visibility: Accessor<Group.Visibility>;
+  readonly setVisibility: (visibility: Group.Visibility) => void;
   /** The name names a group and nothing is being created. */
   readonly ready: Accessor<boolean>;
   readonly pending: Accessor<boolean>;
@@ -26,8 +35,8 @@ export interface CreateGroupController {
   readonly reset: () => void;
 }
 /**
- * A private team group being created by the reader, who is always one of its members. A retry of
- * the same group keeps its key, so a group created unseen is not created twice.
+ * A team group being created by the reader, who is always one of its members. A retry of the same
+ * group keeps its key, so a group created unseen is not created twice.
  */
 export function useCreateGroup(
   workspaceId: string,
@@ -37,6 +46,7 @@ export function useCreateGroup(
   const membership = useWorkspace(() => workspaceId);
   const [name, setName] = createSignal(""),
     [members, setMembers] = createSignal<ReadonlyArray<string>>([]),
+    [visibility, setVisibility] = createSignal<Group.Visibility>("Private"),
     [error, setError] = createSignal<WorkspaceFailure>();
   let attempt: { readonly body: string; readonly key: NewGroup["key"] } | undefined;
   const request = useRequest(
@@ -63,6 +73,11 @@ export function useCreateGroup(
       setMembers(memberIds);
       setError(undefined);
     },
+    visibility,
+    setVisibility: (value) => {
+      setVisibility(value);
+      setError(undefined);
+    },
     ready,
     pending: request.pending,
     error,
@@ -70,17 +85,60 @@ export function useCreateGroup(
       const self = membership()?.member.id;
       if (!ready() || self === undefined) return;
       const memberIds = [...new Set([self, ...members()])];
-      const body = JSON.stringify([name().trim(), memberIds]);
+      const body = JSON.stringify([name().trim(), memberIds, visibility()]);
       if (attempt?.body !== body) attempt = { body, key: newWorkspaceRequestKey() };
       setError(undefined);
-      request.run({ name: name(), memberIds, key: attempt.key });
+      request.run({ name: name(), memberIds, visibility: visibility(), key: attempt.key });
     },
     reset: () => {
       request.cancel();
       attempt = undefined;
       setName("");
       setMembers([]);
+      setVisibility("Private");
       setError(undefined);
+    },
+  };
+}
+
+export interface JoinGroupController {
+  /** The public group being joined, while it is; one join runs at a time. */
+  readonly joining: Accessor<string | undefined>;
+  /** Why the last join failed, and which group it was for. */
+  readonly error: Accessor<
+    { readonly groupId: string; readonly failure: WorkspaceFailure } | undefined
+  >;
+  /** Join a public group as the reader; `joined` receives its ID once they belong to it. */
+  readonly join: (groupId: string) => void;
+}
+/** Joining public groups as the reader, one at a time. */
+export function useJoinGroup(
+  workspaceId: string,
+  joined: (groupId: string) => void,
+): JoinGroupController {
+  const session = useSession();
+  const [joining, setJoining] = createSignal<string>(),
+    [error, setError] = createSignal<{ groupId: string; failure: WorkspaceFailure }>();
+  const request = useRequest(
+    joinGroupRequest(useApiClient(), workspaceId),
+    (exit, groupId) => {
+      setJoining(undefined);
+      if (Exit.isFailure(exit)) {
+        setError({ groupId, failure: workspaceFailure(exit.cause) });
+        return;
+      }
+      joined(exit.value);
+    },
+    { when: () => session.session !== undefined },
+  );
+  return {
+    joining,
+    error,
+    join: (groupId) => {
+      if (request.pending()) return;
+      setError(undefined);
+      setJoining(groupId);
+      if (!request.run(groupId)) setJoining(undefined);
     },
   };
 }

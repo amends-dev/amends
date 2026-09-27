@@ -8,6 +8,7 @@ export type WorkspaceResource =
   | "members"
   | "invitations"
   | "groups"
+  | "public-groups"
   | "inbox"
   | "permissions";
 export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
@@ -16,6 +17,7 @@ export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "members",
   "invitations",
   "groups",
+  "public-groups",
   "inbox",
   "permissions",
 ];

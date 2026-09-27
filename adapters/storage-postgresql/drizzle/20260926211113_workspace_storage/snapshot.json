@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "09ca4a4d-5e34-46b1-a8b9-afc40bc304d9",
+  "id": "bc1f9208-1114-45d8-9c6f-aa8114d6df74",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -2729,6 +2729,34 @@
           "opclass": null
         },
         {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"visibility\" = 'Public'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "public_groups",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "direct_key",
           "isExpression": false,
           "asc": true,
@@ -4046,7 +4074,7 @@
       "table": "group_memberships"
     },
     {
-      "value": "(\"kind\" = 'Team' AND \"visibility\" = 'Private' AND \"name\" IS NOT NULL AND \"member_ids\" IS NULL AND \"direct_key\" IS NULL) OR (\"kind\" = 'Direct' AND \"visibility\" IS NULL AND \"name\" IS NULL AND cardinality(\"member_ids\") >= 2 AND \"direct_key\" IS NOT NULL)",
+      "value": "(\"kind\" = 'Team' AND \"visibility\" IN ('Private', 'Public') AND \"name\" IS NOT NULL AND \"member_ids\" IS NULL AND \"direct_key\" IS NULL) OR (\"kind\" = 'Direct' AND \"visibility\" IS NULL AND \"name\" IS NULL AND cardinality(\"member_ids\") >= 2 AND \"direct_key\" IS NOT NULL)",
       "name": "groups_kind",
       "entityType": "checks",
       "schema": "public",

@@ -101,7 +101,7 @@ export const groups = pgTable(
     id: text("id").notNull(),
     kind: text("kind", { enum: groupKinds }).notNull(),
     // Team groups carry a visibility and name; direct groups carry their fixed members and key.
-    visibility: text("visibility", { enum: ["Private"] }),
+    visibility: text("visibility", { enum: ["Private", "Public"] }),
     name: text("name"),
     memberIds: text("member_ids").array(),
     directKey: text("direct_key"),
@@ -114,8 +114,12 @@ export const groups = pgTable(
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "groups_kind",
-      sql`(${table.kind} = 'Team' AND ${table.visibility} = 'Private' AND ${table.name} IS NOT NULL AND ${table.memberIds} IS NULL AND ${table.directKey} IS NULL) OR (${table.kind} = 'Direct' AND ${table.visibility} IS NULL AND ${table.name} IS NULL AND cardinality(${table.memberIds}) >= 2 AND ${table.directKey} IS NOT NULL)`,
+      sql`(${table.kind} = 'Team' AND ${table.visibility} IN ('Private', 'Public') AND ${table.name} IS NOT NULL AND ${table.memberIds} IS NULL AND ${table.directKey} IS NULL) OR (${table.kind} = 'Direct' AND ${table.visibility} IS NULL AND ${table.name} IS NULL AND cardinality(${table.memberIds}) >= 2 AND ${table.directKey} IS NOT NULL)`,
     ),
+    // The workspace's public groups, paged in group-ID order for browsing.
+    index("public_groups")
+      .on(table.workspaceId, sql`${table.id} COLLATE "C"`)
+      .where(sql`${table.visibility} = 'Public'`),
     // One direct group per exact member set.
     uniqueIndex("direct_groups_by_members")
       .on(table.workspaceId, table.directKey)

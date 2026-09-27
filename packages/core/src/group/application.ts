@@ -69,8 +69,8 @@ export interface Interface {
    * initial admissions in one commit. No extra membership-management grant is required
    * for the initial audience. New invocations create new groups; this is not a retry receipt.
    */
-  readonly createPrivateTeam: (
-    input: Group.CreatePrivateTeamInput,
+  readonly createTeam: (
+    input: Group.CreateTeamInput,
     options?: Request.Options,
   ) => Effect.Effect<Group.Record, CreateError, Actor.Service>;
   /**
@@ -93,6 +93,14 @@ export interface Interface {
   readonly listMine: (
     options: Group.ListOptions,
   ) => Effect.Effect<ReadonlyArray<Group.ListItem>, ReadError, Actor.Service>;
+  /**
+   * A page of the workspace's public team groups that `group.join` covers for the actor, in
+   * group-ID order, each with its member count and whether the actor belongs to it. Their threads
+   * stay with their members. Each page reads a fixed number of times, however large.
+   */
+  readonly listPublic: (
+    options: Group.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<Group.PublicItem>, ReadError, Actor.Service>;
   /** Inspect a known group's metadata with management authority, without granting audience access. */
   readonly getForManagement: (
     groupId: Group.Id,
@@ -139,16 +147,14 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
-  const createPrivateTeam = Effect.fn("GroupApplication.createPrivateTeam")(
-    function* (input: Group.CreatePrivateTeamInput, options: Request.Options = {}) {
-      const request = yield* Schema.decodeEffect(Schema.toType(Group.CreatePrivateTeamInput))(
-        input,
-      );
+  const createTeam = Effect.fn("GroupApplication.createTeam")(
+    function* (input: Group.CreateTeamInput, options: Request.Options = {}) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input);
       return yield* receipts.once(
         {
           operation: "group.create",
           key: options.requestKey,
-          input: Group.CreatePrivateTeamInput,
+          input: Group.CreateTeamInput,
           value: request,
           result: CreatedReference,
           resultOf: (group: Group.Record) => ({ groupId: group.id }),
@@ -181,7 +187,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
             id: Group.Id.make(yield* crypto.randomUUIDv4),
             workspaceId,
             kind: "Team",
-            visibility: "Private",
+            visibility: request.visibility ?? "Private",
             name: request.name,
             createdBy: actor.memberId,
             createdAt,
@@ -426,13 +432,71 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     }
     return items;
   });
+  const listPublic = Effect.fn("GroupApplication.listPublic")(function* (input: Group.ListOptions) {
+    const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
+    yield* authorization.require([]);
+    const actor = yield* Actor.Service;
+    const items: Array<Group.PublicItem> = [];
+    let after = options.after;
+    // Fill the page with groups the actor may join, reading further when grants skip some.
+    while (items.length < options.limit) {
+      const page: Array<Group.TeamRecord> = [];
+      for (const found of yield* groups.pagePublic(
+        after === undefined ? { limit: options.limit } : { after, limit: options.limit },
+      )) {
+        const group = yield* Schema.decodeEffect(Schema.toType(Group.TeamRecord))(found).pipe(
+          Effect.mapError(decodeFailure),
+        );
+        const previous = page.at(-1)?.id ?? after;
+        if (
+          group.workspaceId !== workspaceId ||
+          group.visibility !== "Public" ||
+          (previous !== undefined && group.id <= previous)
+        )
+          return yield* invalidList("Group store returned an inconsistent public listing");
+        page.push(group);
+      }
+      if (page.length === 0) break;
+      const allowed = yield* authorization.permitted(
+        page.map((group) =>
+          Requirement.make(GroupMembershipPermissions.Join, {
+            _tag: "Group",
+            workspaceId,
+            groupId: group.id,
+          }),
+        ),
+      );
+      const joinable = page.filter((_, index) => allowed[index] === true);
+      const ids = new Set(joinable.map((group) => group.id));
+      const summaries = new Map<Group.Id, Group.Summary>();
+      for (const found of yield* memberships.summarize([...ids], actor.memberId)) {
+        const summary = yield* Schema.decodeEffect(Group.Summary)(found).pipe(
+          Effect.mapError(decodeFailure),
+        );
+        if (!ids.has(summary.groupId) || summaries.has(summary.groupId))
+          return yield* invalidList("Membership store summarized another group");
+        summaries.set(summary.groupId, summary);
+      }
+      for (const group of joinable)
+        if (items.length < options.limit)
+          items.push({
+            group,
+            members: summaries.get(group.id)?.members ?? 0,
+            joined: summaries.get(group.id)?.joined ?? false,
+          });
+      after = page.at(-1)?.id;
+      if (page.length < options.limit) break;
+    }
+    return items;
+  });
 
   return Service.of({
     workspaceId,
-    createPrivateTeam,
+    createTeam,
     rename,
     get,
     listMine,
+    listPublic,
     getForManagement,
   });
 });

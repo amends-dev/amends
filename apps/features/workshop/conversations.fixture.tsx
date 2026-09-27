@@ -15,6 +15,7 @@ import {
   GroupStream,
   GroupsNavigation,
   Inbox,
+  PublicGroups,
   ThreadPanel,
 } from "@amends/features/conversations";
 import { Navigation } from "@amends/ui/compositions/navigation";
@@ -23,7 +24,7 @@ import { ThemeProvider } from "@amends/ui/foundations/theme";
 import { Button } from "@amends/ui/primitives/button";
 import { Row } from "@amends/ui/primitives/layout";
 import { Text } from "@amends/ui/primitives/text";
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { openScenario, type Scenario } from "./scenario.ts";
 import { signIn } from "./settings.fixture.tsx";
 import { api } from "./workspaces.fixture.tsx";
@@ -52,7 +53,7 @@ export function ConversationsFixture(props: {
   baseUrl?: string;
   threads?: number;
   theme?: "cotton" | "soot";
-  view?: "group" | "inbox" | "members";
+  view?: "group" | "inbox" | "members" | "browse";
 }) {
   const [setup, setSetup] = createSignal<Setup>();
   const [credential, setCredential] = createSignal<Session>();
@@ -127,6 +128,17 @@ export function ConversationsFixture(props: {
           await api(scenario, `${path}/threads/${threads[1]}/messages`, owner.token, {
             text,
             mentions: [],
+          });
+      if (props.view === "browse")
+        // Public groups the owner does not belong to yet, one with the member in it.
+        for (const [name, memberIds] of [
+          ["Lobby", [joined.id]],
+          ["Announcements", []],
+        ] as const)
+          await api(scenario, `${path}/groups`, owner.token, {
+            name,
+            memberIds,
+            visibility: "Public",
           });
       if (props.view === "inbox" && threads[1]) {
         // The owner takes part in the thread they replied to, so the member's reply reaches them.
@@ -231,6 +243,8 @@ export function ConversationsFixture(props: {
                           workspaceId={value().workspaceId}
                           href={(groupId) => `#group=${groupId}`}
                           current={shownGroup() || value().groupId}
+                          browseHref="#browse"
+                          browsing={props.view === "browse" && !shownGroup()}
                           onCreated={(groupId) => {
                             window.location.hash = `group=${groupId}`;
                           }}
@@ -324,8 +338,7 @@ export function ConversationsFixture(props: {
                         </Button>
                       </Row>
                     </Shell.Header>
-                    <Show
-                      when={props.view === "inbox"}
+                    <Switch
                       fallback={
                         <Shell.Main workspace aria-label="Design">
                           <Shell.Content fill>
@@ -360,18 +373,33 @@ export function ConversationsFixture(props: {
                         </Shell.Main>
                       }
                     >
-                      <Shell.Main workspace aria-label="Inbox">
-                        <Shell.Content>
-                          <Inbox
-                            workspaceId={value().workspaceId}
-                            threadHref={(_, threadId, sequence) =>
-                              `#thread=${threadId}&at=${sequence}`
-                            }
-                            currentThread={thread() || undefined}
-                          />
-                        </Shell.Content>
-                      </Shell.Main>
-                    </Show>
+                      <Match when={props.view === "inbox"}>
+                        <Shell.Main workspace aria-label="Inbox">
+                          <Shell.Content>
+                            <Inbox
+                              workspaceId={value().workspaceId}
+                              threadHref={(_, threadId, sequence) =>
+                                `#thread=${threadId}&at=${sequence}`
+                              }
+                              currentThread={thread() || undefined}
+                            />
+                          </Shell.Content>
+                        </Shell.Main>
+                      </Match>
+                      <Match when={props.view === "browse" && !shownGroup()}>
+                        <Shell.Main workspace aria-label="Browse groups">
+                          <Shell.Content>
+                            <PublicGroups
+                              workspaceId={value().workspaceId}
+                              href={(groupId) => `#group=${groupId}`}
+                              onJoined={(groupId) => {
+                                window.location.hash = `group=${groupId}`;
+                              }}
+                            />
+                          </Shell.Content>
+                        </Shell.Main>
+                      </Match>
+                    </Switch>
                   </Shell.Body>
                   <Shell.Inspector
                     title="Thread"

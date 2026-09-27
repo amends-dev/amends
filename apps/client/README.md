@@ -219,9 +219,16 @@ follows for the reader's own member, from the groups list, and `followable` hold
 groups. A change shows at once and stays pending until the read agrees, since undoing a thread
 follow needs the participation the read returns.
 
-`useCreateGroup(workspaceId, created)` creates a private team group from a `name` and the other
-`members` chosen, always adding the reader. A retry of the same group keeps its idempotency key,
-failures keep the input, `created` receives the new group's ID, and `reset` clears it.
+`useCreateGroup(workspaceId, created)` creates a team group from a `name`, the other `members`
+chosen, always adding the reader, and a `visibility`, private until set to public. A retry of the
+same group keeps its idempotency key, failures keep the input, `created` receives the new group's
+ID, and `reset` clears it.
+
+`usePublicGroups(workspaceId)` reads every page of the public groups the reader may join, with
+`members` and `joined`, live over group creation, renames, and membership changes the feed brings.
+`useJoinGroup(workspaceId, joined)` joins one at a time, naming the group in `joining`, then
+refreshes the groups, public groups, and inbox; a failure names its group in `error`.
+`paths.groups(workspaceId)` is where browsing public groups lives.
 
 `useRenameGroup(workspaceId, groupId, renamed)` renames a team group where the list says the reader
 may (`renamable`): `reset` starts from the current name, `ready` holds for a different valid name,

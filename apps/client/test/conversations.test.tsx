@@ -15,6 +15,8 @@ import {
   useInboxPending,
   useMarkAllSeen,
   useCreateGroup,
+  useJoinGroup,
+  usePublicGroups,
   useDirectMessage,
   useRenameGroup,
   useGroupMembers,
@@ -26,6 +28,7 @@ import {
   useThreadTimeline,
   type ComposerController,
   type CreateGroupController,
+  type JoinGroupController,
   type RenameGroupController,
   type GroupMembersController,
   type NotificationInbox,
@@ -154,10 +157,12 @@ it("maps conversation facts and signals to the reads of their groups and threads
   ]);
   // Leaving a group also changes which notification sources the reader can still read.
   // Every open thread checks its access again, since the fact names no threads.
+  // Public groups show who belongs, so their listing refreshes too.
   expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
     "workspace/one/groups",
     "workspace/one/inbox",
     "workspace/one/participants",
+    "workspace/one/public-groups",
     "workspace/one/rosters:group",
     "workspace/one/streams:group",
     "workspace/one/timelines",
@@ -169,9 +174,15 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/timelines",
   ]);
   expect(keys([{ name: "workspace.assignment.revoked" }])).toContain("workspace/one/streams");
-  // A new name shows wherever the groups list names the group.
+  // A new name shows wherever the groups list names the group, and among public groups.
   expect(keys([{ name: "group.renamed", payload: { groupId: "group" } }])).toEqual([
     "workspace/one/groups",
+    "workspace/one/public-groups",
+  ]);
+  // A public group's creation reaches everyone who might join it.
+  expect(keys([{ name: "group.created", payload: { id: "group" } }])).toEqual([
+    "workspace/one/groups",
+    "workspace/one/public-groups",
   ]);
   // Each read refreshes once: a notification repeats no key, and a collection covers its items.
   expect(
@@ -515,9 +526,108 @@ it("creates a group with the reader in it, retrying with the same key, and reads
   await waitFor(() => expect(opened).toEqual(["g2"]));
   expect(posts).toHaveLength(2);
   expect(posts[0]?.key).toBe(posts[1]?.key);
-  expect(posts[1]?.body).toEqual({ name: "Receipts", memberIds: ["alice-one", "bob-one"] });
+  expect(posts[1]?.body).toEqual({
+    name: "Receipts",
+    memberIds: ["alice-one", "bob-one"],
+    visibility: "Private",
+  });
+  // A public group is another group, with its own key.
+  group.setName("Lobby");
+  group.setVisibility("Public");
+  group.create();
+  await waitFor(() => expect(posts).toHaveLength(3));
+  expect(posts[2]?.body).toEqual({
+    name: "Lobby",
+    memberIds: ["alice-one", "bob-one"],
+    visibility: "Public",
+  });
+  expect(posts[2]?.key).not.toBe(posts[1]?.key);
+  await waitFor(() => expect(opened).toEqual(["g2", "g2"]));
   group.reset();
-  expect([group.name(), group.members(), group.error()]).toEqual(["", [], undefined]);
+  expect([group.name(), group.members(), group.visibility(), group.error()]).toEqual([
+    "",
+    [],
+    "Private",
+    undefined,
+  ]);
+});
+
+it("lists public groups and joins one, refreshing the list; a group gone says so", async () => {
+  let joined = false;
+  const team = (id: string, name: string) => ({
+    id,
+    workspaceId: "one",
+    kind: "Team",
+    visibility: "Public",
+    name,
+    createdBy: "alice-one",
+    createdAt: minute(0),
+  });
+  const joins: Array<string> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/groups/public")
+      return json([
+        { group: team("g1", "Lobby"), members: joined ? 3 : 2, joined },
+        { group: team("g2", "Gone"), members: 1, joined: false },
+      ]);
+    if (path === "/workspaces/one/groups/g1/join") {
+      joins.push(path);
+      joined = true;
+      return json({
+        id: "a-1",
+        workspaceId: "one",
+        groupId: "g1",
+        memberId: "alice-one",
+        admittedAt: minute(1),
+        status: "active",
+      });
+    }
+    if (path === "/workspaces/one/groups/g2/join")
+      return new Response(
+        JSON.stringify({ _tag: "GroupMembershipApplication.GroupNotFound", groupId: "g2" }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    return json([]);
+  });
+  const opened: Array<string> = [];
+  let groups!: ReturnType<typeof usePublicGroups>;
+  let join!: JoinGroupController;
+  function Consumer() {
+    groups = usePublicGroups("one");
+    join = useJoinGroup("one", (groupId) => opened.push(groupId));
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <Consumer />
+    </ClientProvider>
+  ));
+  await waitFor(() =>
+    expect(groups.value()?.map((item) => [item.group.name, item.members, item.joined])).toEqual([
+      ["Lobby", 2, false],
+      ["Gone", 1, false],
+    ]),
+  );
+  join.join("g1");
+  expect(join.joining()).toBe("g1");
+  // One join at a time.
+  join.join("g2");
+  await waitFor(() => expect(opened).toEqual(["g1"]));
+  expect(joins).toHaveLength(1);
+  expect(join.joining()).toBeUndefined();
+  // Joining refreshes the list, which now shows the reader among its members.
+  await waitFor(() => expect(groups.value()?.[0]).toMatchObject({ members: 3, joined: true }));
+  join.join("g2");
+  await waitFor(() => expect(join.error()).toEqual({ groupId: "g2", failure: "gone" }));
+  expect(opened).toEqual(["g1"]);
 });
 
 it("adds, removes, and leaves a group's members, refreshing its roster each time", async () => {

@@ -825,8 +825,56 @@ it("offers a new group only to those who may create one, and opens the group it 
   fireEvent.click(within(dialog).getByRole("button", { name: "Create group" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g2"));
   // The reader is always a member of a group they create.
-  expect(created).toEqual([{ name: "Receipts", memberIds: ["owner-one"] }]);
+  expect(created).toEqual([{ name: "Receipts", memberIds: ["owner-one"], visibility: "Private" }]);
   await screen.findByText("Nothing said yet");
+});
+it("browses public groups from the sidebar, and joining one opens it", async () => {
+  const joins: Array<string> = [];
+  const lobby = {
+    id: "g5",
+    workspaceId: "one",
+    kind: "Team",
+    visibility: "Public",
+    name: "Lobby",
+    createdBy: "owner-one",
+    createdAt: at,
+  };
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/groups/public")
+      return response([{ group: lobby, members: 1, joined: false }]);
+    if (request.method === "POST" && path === "/workspaces/one/groups/g5/join") {
+      joins.push(path);
+      return response({
+        id: "a5",
+        workspaceId: "one",
+        groupId: "g5",
+        memberId: "owner-one",
+        admittedAt: at,
+        status: "active",
+      });
+    }
+    if (path.endsWith("/groups/g5/openings")) return response([]);
+    return response({ memberships: [membership("one", "Studio")], invitations: [] });
+  });
+  const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  // Anyone may browse, even before belonging to any group.
+  fireEvent.click(await within(sidebar).findByRole("link", { name: /Browse groups/ }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups"));
+  await screen.findByRole("heading", { name: "Browse groups" });
+  await waitFor(() =>
+    expect(within(sidebar).getByRole("link", { name: /Browse groups/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    ),
+  );
+  const list = await screen.findByRole("list", { name: "Public groups" });
+  expect(within(list).getByRole("listitem")).toHaveTextContent("1 member");
+  fireEvent.click(within(list).getByRole("button", { name: "Join Lobby" }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g5"));
+  expect(joins).toHaveLength(1);
 });
 it("shows no new group action to a reader who may not create one", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(() =>

@@ -72,7 +72,7 @@ export const groupMemberships = (harness: Harness) => {
       );
     const create = (name: string) =>
       Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createPrivateTeam({ name, memberIds: [] }),
+        service.createTeam({ name, memberIds: [] }),
       );
     const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
@@ -369,6 +369,128 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
 
+    it.effect(
+      "anyone who may join finds the public groups with their sizes and joins them as themselves",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, group } = yield* prepare();
+              // The human is a viewer, so they may join; the agent holds no role and may not.
+              yield* publish(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.publish(AssignmentFacts.Created, {
+                    workspaceId,
+                    assignmentId: Assignment.Id.make("viewer-new-human"),
+                    memberId: humanId,
+                    source: {
+                      _tag: "Role",
+                      roleId: BuiltinRoles.ViewerId,
+                      scope: { _tag: "Workspace", workspaceId },
+                    },
+                  }),
+                ),
+              );
+              const createPublic = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
+                Effect.flatMap(GroupApplication.Service, (service) =>
+                  service.createTeam({ name, memberIds, visibility: "Public" }),
+                );
+              const listPublic = (options: Group.ListOptions) =>
+                Effect.flatMap(GroupApplication.Service, (service) => service.listPublic(options));
+              const join = (groupId: Group.Id) =>
+                Effect.flatMap(GroupMembershipApplication.Service, (service) =>
+                  service.join(groupId),
+                );
+              const lobby = yield* run(bound, owner, createPublic("Lobby", [managerId]));
+              const quiet = yield* run(bound, owner, createPublic("Quiet", []));
+              expect(lobby).toMatchObject({ kind: "Team", visibility: "Public" });
+              expect(group).toMatchObject({ kind: "Team", visibility: "Private" });
+              const human = memberActor(humanId);
+              const [first, second] = [lobby, quiet].toSorted((left, right) =>
+                left.id < right.id ? -1 : 1,
+              );
+              // Only public groups are listed, in group-ID order, with how many belong to each.
+              expect(yield* run(bound, human, listPublic({ limit: 10 }))).toEqual(
+                [first!, second!].map((listed) => ({
+                  group: listed,
+                  members: listed.id === lobby.id ? 1 : 0,
+                  joined: false,
+                })),
+              );
+              expect(yield* run(bound, human, listPublic({ limit: 1 }))).toMatchObject([
+                { group: { id: first!.id } },
+              ]);
+              expect(
+                yield* run(bound, human, listPublic({ limit: 1, after: first!.id })),
+              ).toMatchObject([{ group: { id: second!.id } }]);
+              // Joining admits the reader alone, attributed to them; again, it records nothing.
+              const before = yield* history(bound);
+              const joined = yield* run(bound, human, join(lobby.id));
+              expect(joined).toMatchObject({
+                workspaceId,
+                groupId: lobby.id,
+                memberId: humanId,
+                status: "active",
+              });
+              expect(yield* bound.groupMemberships.findActive(lobby.id, humanId)).toEqual(
+                Option.some(joined),
+              );
+              const recorded = yield* publish(
+                bound,
+                Effect.flatMap(Journal.Service, (journal) => journal.log.read({ limit: 100 })),
+              );
+              expect(recorded).toHaveLength(before.length + 1);
+              const entry = recorded.at(-1)?.entries[0];
+              expect(entry?.payload.name).toBe(GroupMembershipFacts.Added.name);
+              expect(entry?.payload.provenance.performedBy).toMatchObject({
+                _tag: "Member",
+                memberId: humanId,
+              });
+              expect(yield* run(bound, human, join(lobby.id))).toEqual(joined);
+              expect(yield* history(bound)).toHaveLength(before.length + 1);
+              expect(yield* run(bound, human, listPublic({ limit: 10 }))).toContainEqual({
+                group: lobby,
+                members: 2,
+                joined: true,
+              });
+              // Private, direct, and missing groups cannot be joined and say nothing of themselves.
+              const direct = {
+                id: Group.Id.make("direct-pair"),
+                workspaceId,
+                kind: "Direct",
+                memberIds: Group.directMembers([managerId, owner.memberId]),
+                createdBy: owner.memberId,
+                createdAt: group.createdAt,
+              } satisfies Group.Record;
+              yield* bound.store.transaction(bound.groups.insert(direct));
+              for (const id of [group.id, direct.id, Group.Id.make("missing")])
+                expect(yield* Effect.flip(run(bound, human, join(id)))).toMatchObject({
+                  _tag: "GroupMembershipApplication.GroupNotFound",
+                  groupId: id,
+                });
+              // Someone without group.join neither finds public groups nor joins one.
+              const agent = memberActor(agentId);
+              expect(yield* run(bound, agent, listPublic({ limit: 10 }))).toEqual([]);
+              expect(yield* Effect.flip(run(bound, agent, join(lobby.id)))).toMatchObject({
+                _tag: "Authorization.Denied",
+              });
+              // Leaving works as for any team group, and the listing follows.
+              yield* run(bound, human, leave(joined));
+              const listed = yield* run(bound, human, listPublic({ limit: 10 }));
+              expect(listed).toContainEqual({ group: lobby, members: 1, joined: false });
+              // Rebuilding from the journal keeps each group's visibility and its admissions.
+              yield* storage.discardProjections;
+              yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                Effect.provide(core(bound)),
+              );
+              expect(yield* bound.groups.get(lobby.id)).toEqual(Option.some(lobby));
+              expect(yield* run(bound, human, listPublic({ limit: 10 }))).toEqual(listed);
+            }),
+          ),
+        ),
+    );
     it.effect("a failure after the admission projection rolls back its row and fact", () =>
       harness.withStorage((storage) =>
         runHost(

@@ -88,6 +88,12 @@ export interface Interface {
   readonly remove: (
     input: GroupMembership.RemoveInput,
   ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
+  /**
+   * Join a public team group as the actor, under group.join on it. Private and direct groups are
+   * GroupNotFound like missing ones, so joining discloses nothing about them. Joining again
+   * returns the actor's current admission and records nothing.
+   */
+  readonly join: (groupId: Group.Id) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
   /** End only the actor's own team-group admission; active workspace membership is sufficient. */
   readonly leave: (
     input: GroupMembership.LeaveInput,
@@ -177,6 +183,38 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     return group;
   });
 
+  /** The member's current admission to the group, checked against what was asked for. */
+  const activeAdmission = Effect.fnUntraced(function* (groupId: Group.Id, memberId: Member.Id) {
+    const found = yield* memberships.findActive(groupId, memberId);
+    if (Option.isNone(found)) return Option.none<GroupMembership.Record>();
+    const membership = yield* decodeMembership(found.value).pipe(Effect.mapError(invalidRecord));
+    if (
+      membership.workspaceId !== workspaceId ||
+      membership.groupId !== groupId ||
+      membership.memberId !== memberId ||
+      membership.status !== "active"
+    )
+      return yield* new InvalidResponse({
+        message: "Membership store returned another group, member, workspace, or state",
+      });
+    return Option.some(membership);
+  });
+  /** Publish a fresh admission of the member to the group. */
+  const admit = Effect.fnUntraced(function* (groupId: Group.Id, memberId: Member.Id) {
+    const admittedAt = yield* DateTime.now;
+    const membership = {
+      id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
+      workspaceId,
+      groupId,
+      memberId,
+      admittedAt,
+      status: "active",
+    } satisfies GroupMembership.Record;
+    yield* journal
+      .publish(GroupMembershipFacts.Added, membership)
+      .pipe(Publication.withOccurredAt(admittedAt));
+    return membership;
+  });
   const add = Effect.fn("GroupMembershipApplication.add")(
     function* (input: GroupMembership.AddInput) {
       const { groupId, memberId } = yield* decodeInput(input);
@@ -191,37 +229,30 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
           message: "Member store returned another member or workspace",
         });
       if (member.status !== "active") return yield* new InactiveMember({ memberId });
-
-      const foundMembership = yield* memberships.findActive(groupId, memberId);
-      if (Option.isSome(foundMembership)) {
-        const membership = yield* decodeMembership(foundMembership.value).pipe(
-          Effect.mapError(invalidRecord),
-        );
-        if (
-          membership.workspaceId !== workspaceId ||
-          membership.groupId !== groupId ||
-          membership.memberId !== memberId ||
-          membership.status !== "active"
-        )
-          return yield* new InvalidResponse({
-            message: "Membership store returned another group, member, workspace, or state",
-          });
+      if (Option.isSome(yield* activeAdmission(groupId, memberId)))
         return yield* new AlreadyMember({ groupId, memberId });
-      }
-
-      const admittedAt = yield* DateTime.now;
-      const membership = {
-        id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        groupId,
-        memberId,
-        admittedAt,
-        status: "active",
-      } satisfies GroupMembership.Record;
-      yield* journal
-        .publish(GroupMembershipFacts.Added, membership)
-        .pipe(Publication.withOccurredAt(admittedAt));
-      return membership;
+      return yield* admit(groupId, memberId);
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+  const join = Effect.fn("GroupMembershipApplication.join")(
+    function* (input: Group.Id) {
+      const groupId = yield* Schema.decodeEffect(Group.Id)(input);
+      yield* authorization.require([
+        Requirement.make(
+          GroupMembershipPermissions.Join,
+          Target.Reference.cases.Group.make({ workspaceId, groupId }),
+        ),
+      ]);
+      const actor = yield* Actor.Service;
+      const group = yield* loadGroup(groupId);
+      if (group.kind !== "Team" || group.visibility !== "Public")
+        return yield* new GroupNotFound({ groupId });
+      const current = yield* activeAdmission(groupId, actor.memberId);
+      if (Option.isSome(current)) return current.value;
+      return yield* admit(groupId, actor.memberId);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -381,7 +412,15 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     },
   );
 
-  return Service.of({ workspaceId, add, remove, leave, listCurrent, listCurrentForManagement });
+  return Service.of({
+    workspaceId,
+    add,
+    join,
+    remove,
+    leave,
+    listCurrent,
+    listCurrentForManagement,
+  });
 });
 
 /** Provide membership operations over the workspace's existing stores and journal. @category layers */

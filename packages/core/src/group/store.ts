@@ -25,6 +25,10 @@ export interface Interface {
   readonly getMany: (
     ids: ReadonlyArray<Group.Id>,
   ) => Effect.Effect<ReadonlyArray<Group.Record>, Failure>;
+  /** A page of the workspace's public team groups in binary group-ID order, after the cursor. */
+  readonly pagePublic: (
+    options: Group.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<Group.TeamRecord>, Failure>;
   /** The direct group with exactly these members, in any order. */
   readonly findDirect: (
     memberIds: ReadonlyArray<MemberId.Id>,

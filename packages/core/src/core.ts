@@ -109,6 +109,7 @@ export const permissions = [
   GroupPermissions.Follow,
   GroupPermissions.Rename,
   GroupMembershipPermissions.Manage,
+  GroupMembershipPermissions.Join,
   ThreadPermissions.Start,
   ThreadPermissions.Read,
   ThreadMessagePermissions.Publish,

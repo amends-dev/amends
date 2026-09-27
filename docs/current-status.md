@@ -9,8 +9,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 
 ## Domain gaps
 
-- Public groups, and joining or discovering them, are not implemented. Direct groups exist, with
-  fixed membership.
+- A group's visibility is chosen at creation and cannot change afterwards. Public groups show
+  their threads only to members, with no read-only preview before joining. Direct groups exist,
+  with fixed membership.
 - Only member workflows exist. Task and channel workflows, which will start threads with contacts
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
@@ -62,10 +63,13 @@ member names only themselves: nobody renames another member, and agents, which j
 app flow, have no way to be named from the apps. There are no profile photos.
 
 A reader who may create groups (owners and administrators, by `group.create`) gets a "New group"
-action on the sidebar's Groups heading: a dialog names a private team group and picks its people
-and agents as chips, with the reader always included, then opens the new group. Viewers are not
-offered it; the apps read what the reader may do from `GET /workspaces/:id/permissions`, which
-lists workspace-wide permissions only.
+action on the sidebar's Groups heading: a dialog names a team group, picks its people and agents
+as chips, with the reader always included, and makes it private or public, then opens the new
+group. Everyone gets "Browse groups" in the same section, a page listing the public groups they may
+join by name with their member counts; joining one opens it, and one they belong to links there.
+New public groups appear on it live, while renames and member counts of groups the reader is not
+in update when it next loads. Viewers are not offered New group; the apps read what the reader may
+do from `GET /workspaces/:id/permissions`, which lists workspace-wide permissions only.
 
 A group's header shows its member count, which opens its members: the reader first, then everyone
 by name. Where the reader manages the group, flagged `manageable` on each item of their groups list,

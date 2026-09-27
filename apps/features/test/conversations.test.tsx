@@ -3,6 +3,7 @@ import { cleanup } from "@solidjs/testing-library";
 import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.ts";
 import meta, {
+  Browse,
   CreateGroup,
   Departures,
   DirectMessage,
@@ -48,6 +49,9 @@ it("lists the inbox newest first, settles what is seen or read, and takes new me
 });
 it("creates a group with a picked member and opens it", async () => {
   await stories.story(CreateGroup).run();
+});
+it("finds public groups by name and joins one, which opens and leads there after", async () => {
+  await stories.story(Browse).run();
 });
 it("adds and removes a group's members and leaves it", async () => {
   await stories.story(Members).run();

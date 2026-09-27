@@ -75,6 +75,32 @@ const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
 export const groupsRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId) ? groupsOf(client, workspaceId) : undefined;
 
+/** Every public group the reader may join, read page by page, in group-ID order. */
+const publicGroupsOf = perClient((client: ApiClient, workspaceId: string) =>
+  client.runtime
+    .atom(
+      Effect.gen(function* () {
+        const api = yield* client;
+        const params = { workspaceId: Workspace.Id.make(workspaceId) };
+        const groups: Array<Group.PublicItem> = [];
+        let after: Group.Id | undefined;
+        while (true) {
+          const page = yield* api.groups.listPublic({
+            params,
+            query: after === undefined ? { limit: 100 } : { limit: 100, after },
+          });
+          groups.push(...page);
+          const last = page.at(-1);
+          if (page.length < 100 || last === undefined) return groups;
+          after = last.group.id;
+        }
+      }),
+    )
+    .pipe(Atom.withReactivity([workspaceKey(workspaceId, "public-groups")])),
+);
+export const publicGroupsRead = (client: ApiClient, workspaceId: string) =>
+  valid(workspaceId) ? publicGroupsOf(client, workspaceId) : undefined;
+
 /** A group's current admissions, read page by page: whom its messages can mention. */
 const rosterOf = perClient((client: ApiClient, key: string) => {
   const { workspaceId, id } = split(key);
@@ -384,17 +410,21 @@ export const seenRequest = (client: ApiClient, workspace: string) =>
     }),
   );
 
-/** A private team group to create: its name and everyone admitted to it, the creator included. */
+/**
+ * A team group to create: its name, everyone admitted to it, the creator included, and whether
+ * anyone in the workspace may find and join it.
+ */
 export interface NewGroup {
   readonly name: string;
   readonly memberIds: ReadonlyArray<string>;
+  readonly visibility: Group.Visibility;
   readonly key: ReturnType<typeof newWorkspaceRequestKey>;
 }
 /** Whether a name can name a group: it has something besides surrounding whitespace. */
 export const isGroupName = (name: string) => Schema.is(Group.Name)(name.trim());
 /**
- * Create a private team group, then invalidate the reader's groups, as the change feed would when
- * the commit arrives. A retry with the same key returns the first attempt's group.
+ * Create a team group, then invalidate the reader's groups and the public ones, as the change feed
+ * would when the commit arrives. A retry with the same key returns the first attempt's group.
  */
 export const createGroupRequest = (client: ApiClient, workspace: string) =>
   requestAtom(client, (group: NewGroup) =>
@@ -403,12 +433,16 @@ export const createGroupRequest = (client: ApiClient, workspace: string) =>
       const created = yield* api.groups.create({
         params: { workspaceId: yield* command(Workspace.Id)(workspace) },
         headers: { "idempotency-key": group.key },
-        payload: yield* command(Group.CreatePrivateTeamInput)({
+        payload: yield* command(Group.CreateTeamInput)({
           name: group.name.trim(),
           memberIds: group.memberIds,
+          visibility: group.visibility,
         }),
       });
-      yield* Reactivity.invalidate([workspaceKey(workspace, "groups")]);
+      yield* Reactivity.invalidate([
+        workspaceKey(workspace, "groups"),
+        workspaceKey(workspace, "public-groups"),
+      ]);
       return created.id;
     }),
   );
@@ -447,6 +481,29 @@ export const renameGroupRequest = (client: ApiClient, workspace: string) =>
       }),
   );
 
+/**
+ * Join a public group as the reader, then invalidate the groups, the public ones, and the inbox,
+ * whose sources follow group access. Joining a group already joined returns the same admission.
+ */
+export const joinGroupRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (groupId: string) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const admission = yield* api.groups.join({
+        params: {
+          workspaceId: yield* command(Workspace.Id)(workspace),
+          groupId: yield* command(Group.Id)(groupId),
+        },
+      });
+      yield* Reactivity.invalidate([
+        workspaceKey(workspace, "groups"),
+        workspaceKey(workspace, "public-groups"),
+        workspaceKey(workspace, "inbox"),
+      ]);
+      return admission.groupId as string;
+    }),
+  );
+
 /** A change to who belongs to a team group: adding members, removing one, or leaving. */
 export type MembershipChange =
   | { readonly kind: "add"; readonly groupId: string; readonly memberIds: ReadonlyArray<string> }
@@ -469,6 +526,7 @@ export const membershipRequest = (client: ApiClient, workspace: string) =>
         itemKey(workspace, "rosters", change.groupId),
         itemKey(workspace, "streams", change.groupId),
         workspaceKey(workspace, "groups"),
+        workspaceKey(workspace, "public-groups"),
         workspaceKey(workspace, "inbox"),
       ]);
       switch (change.kind) {

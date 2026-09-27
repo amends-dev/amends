@@ -78,12 +78,13 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
   ],
-  "group.created": ["groups"],
-  // A team group's name shows in the sidebar and on its page.
-  "group.renamed": ["groups"],
-  // Group access decides the same for the group's threads.
-  "group.membership.added": ["groups", "inbox"],
-  "group.membership.removed": ["groups", "inbox"],
+  // A public group's creation reaches everyone who might join it.
+  "group.created": ["groups", "public-groups"],
+  // A team group's name shows in the sidebar, on its page, and among public groups.
+  "group.renamed": ["groups", "public-groups"],
+  // Group access decides the same for the group's threads; public groups show who belongs.
+  "group.membership.added": ["groups", "public-groups", "inbox"],
+  "group.membership.removed": ["groups", "public-groups", "inbox"],
   "group.follow.started": ["groups"],
   "group.follow.ended": ["groups"],
   // A group's latest activity, and whether it is new to the reader.

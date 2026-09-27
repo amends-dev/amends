@@ -59,6 +59,25 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
     ),
+    summarize: Effect.fn("GroupMemberships.summarize")(
+      function* (groupInput, memberInput) {
+        const groupIds = new Set(yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput));
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+        if (groupIds.size === 0) return [];
+        const summaries = new Map<Group.Id, Group.Summary>();
+        for (const record of yield* all) {
+          if (record.status !== "active" || !groupIds.has(record.groupId)) continue;
+          const summary = summaries.get(record.groupId);
+          summaries.set(record.groupId, {
+            groupId: record.groupId,
+            members: (summary?.members ?? 0) + 1,
+            joined: (summary?.joined ?? false) || record.memberId === memberId,
+          });
+        }
+        return [...summaries.values()];
+      },
+      Effect.mapError(storeFailure(GroupMembershipStore, "summarize")),
+    ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
       function* (input) {
         const groupId = yield* Schema.decodeEffect(Group.Id)(input);

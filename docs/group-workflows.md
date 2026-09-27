@@ -1,6 +1,7 @@
 # Group workflows
 
-Private team groups: creating them, reading them, managing their members, and following them.
+Team groups: creating them, reading them, finding and joining public ones, managing their members,
+and following them.
 The operations are `GroupApplication`, `GroupMembershipApplication`, and `GroupFollowApplication`
 in a workspace context, such as `Gateway.asMember`. The gateway preserves the outcomes named below
 and maps malformed input to `Gateway.InvalidInput`. Direct groups (DMs and group DMs) start with
@@ -11,8 +12,9 @@ operations, except the management reads `getForManagement` and `listCurrentForMa
 
 ## Creating a group
 
-`GroupApplication.createPrivateTeam({ name, memberIds })` requires `group.create` on the
-workspace. The name must be nonempty and trimmed. `memberIds` is an explicit list of distinct
+`GroupApplication.createTeam({ name, memberIds, visibility? })` requires `group.create` on the
+workspace. `visibility` is `Private` (the default) or `Public`; see
+[public groups](#public-groups). It is chosen at creation and does not change. The name must be nonempty and trimmed. `memberIds` is an explicit list of distinct
 workspace membership IDs, each an active membership in the same workspace; humans and agents are
 both eligible. Adding an agent does not invoke it or grant permission to use it.
 
@@ -36,6 +38,29 @@ nothing is recorded. Members read
 the new name through their groups list, and the change feed delivers the fact to the group's
 readers. Each listed group says whether the reader may rename it (`renamable`), from the same grant
 resolution as reading it.
+
+## Public groups
+
+A public team group can be found and joined by anyone in the workspace who holds `group.join` on
+it, in every built-in role since bundle revision 4. Its threads still belong to its members alone:
+joining is what grants access, under the same read rules as any group, and a non-member reads
+nothing of its conversations.
+
+`GroupApplication.listPublic({ limit, after? })` returns a page of `Group.PublicItem` values, in
+group-ID order, for the public groups the caller may join: each group's record, how many active
+members it has (`members`), and whether the caller is one (`joined`). It needs no `group.read` and
+no admission, reads a fixed number of times per page, and keeps reading until the page is full when
+grants skip groups. Private and direct groups are never listed.
+
+`GroupMembershipApplication.join(groupId)` requires `group.join` on the group, then admits the
+caller, recording `group.membership.added` attributed to them, like an addition. Private, direct,
+and missing groups are `GroupMembershipApplication.GroupNotFound`, so joining discloses nothing
+about them. Joining a group the caller already belongs to returns their admission and records
+nothing. Leaving, removal, following, and renaming work as for any team group.
+
+A public group's `group.created` fact reaches the whole workspace as well as its members, so a
+list of public groups can take new ones live. Renames and membership changes reach members only,
+so a non-member's list shows them when it next reads.
 
 ## Reading groups
 
@@ -155,7 +180,7 @@ Group creation, admissions, departures, and follows are journal facts, recorded 
 operation's checks in one commit; a failure leaves nothing behind. Each admission has its own ID,
 so readmission never revives an old one, and replay applies the recorded history without
 rechecking anyone's current permissions or membership. Recording the same fact again reuses the
-original, but calling `createPrivateTeam` again creates another group unless both calls pass the
+original, but calling `createTeam` again creates another group unless both calls pass the
 same `{ requestKey }`: then the retry returns the first group, and the same key with a different
 input returns `Request.Reused`; see [retrying safely](thread-workflows.md#retrying-safely).
 

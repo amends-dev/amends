@@ -148,11 +148,15 @@ updating the rows first makes concurrent calls take turns on their locks and agr
 
 ## Transactions
 
-Groups are team or direct rows. Team groups fill `visibility` and `name`; direct groups fill
-`member_ids` and `direct_key`, derived from the ordered member set, and `groups_kind` rejects
-rows mixing them. `direct_groups_by_members` allows one direct group per member set, and
-`findDirect` resolves a set in any order.
-Private team creation records its group and explicit initial admissions in the shared
+Groups are team or direct rows. Team groups fill `visibility`, `Private` or `Public`, and `name`;
+direct groups fill `member_ids` and `direct_key`, derived from the ordered member set, and
+`groups_kind` rejects rows mixing them. `direct_groups_by_members` allows one direct group per
+member set, and `findDirect` resolves a set in any order. `public_groups` pages the public groups
+in binary ID order for browsing, and `summarize` sizes a page of them, with whether the reader
+belongs, in one grouped read over `active_group_membership`; the plan test checks both. Adding
+public groups replaced the development baseline; recreate disposable PostgreSQL databases when
+adopting it.
+Team creation records its group and explicit initial admissions in the shared
 workspace commit. Group admissions reference workspace memberships and have distinct IDs;
 a unique index prevents competing active admissions for the same group/member pair.
 Stores validate their own records before writes and take references to other read models as

@@ -50,7 +50,7 @@ export const groups = (harness: Harness) => {
       program.pipe(Effect.provideService(Actor.Service, actor));
     const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
       Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createPrivateTeam({ name, memberIds }),
+        service.createTeam({ name, memberIds }),
       );
     const prepare = Effect.fnUntraced(function* () {
       const bound = yield* boundTo(workspaceId);

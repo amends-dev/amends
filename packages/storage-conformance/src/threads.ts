@@ -110,7 +110,7 @@ export const threads = (harness: Harness) => {
     });
     const create = (members: ReadonlyArray<Member.Id>, name = "Engineering") =>
       Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createPrivateTeam({ name, memberIds: members }),
+        service.createTeam({ name, memberIds: members }),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const seed = (bound: Bound) =>

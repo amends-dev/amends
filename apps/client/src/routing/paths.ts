@@ -16,6 +16,8 @@ export const paths = {
   workspace: (id: string) => `/workspaces/${encodeURIComponent(id)}`,
   workspacePage: (id: string, page: WorkspacePage) =>
     `/workspaces/${encodeURIComponent(id)}${page === "home" ? "" : `/${page}`}`,
+  /** The workspace's public groups, to find and join. */
+  groups: (id: string) => `/workspaces/${encodeURIComponent(id)}/groups`,
   group: (id: string, groupId: string) =>
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}`,
   thread: (id: string, groupId: string, threadId: string) =>
@@ -37,7 +39,7 @@ export function returnPath(value: string | undefined): string {
     url.origin !== "https://amends.invalid" ||
     !(
       url.pathname === paths.workspaces ||
-      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?|groups\/[^/]+(?:\/threads\/[^/]+)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|environments|connections|settings(?:\/(?:workspace|members|invites))?|groups(?:\/[^/]+(?:\/threads\/[^/]+)?)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
         url.pathname,
       )
     )

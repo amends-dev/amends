@@ -219,7 +219,7 @@ export const journal = (harness: Harness) => {
             const group = yield* as(
               owner,
               Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createPrivateTeam({
+                groups.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, human.memberId, agent.memberId],
                 }),

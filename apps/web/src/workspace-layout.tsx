@@ -148,6 +148,7 @@ export function WorkspaceLayout(props: ParentProps) {
     () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
   );
   const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
+  const browsing = useMatch(() => "/workspaces/:workspaceId/groups");
   const [search] = useSearchParams<{ to?: string; at?: string }>();
   const pending = useInboxPending(params.workspaceId);
   const groups = useGroups(params.workspaceId);
@@ -186,6 +187,7 @@ export function WorkspaceLayout(props: ParentProps) {
     );
   const title = () => {
     if (groupId()) return "Conversation";
+    if (browsing()) return "Browse groups";
     if (drafting()) return "New message";
     if (settings())
       return settingsSection() === "members"
@@ -198,6 +200,7 @@ export function WorkspaceLayout(props: ParentProps) {
   };
   const crumbs = () => {
     if (groupId()) return direct() ? "Workspace / Direct" : "Workspace / Groups";
+    if (browsing()) return "Workspace / Groups";
     if (drafting()) return "Workspace / Direct";
     if (settings()) return "Configure / Settings";
     const configure = page() === "environments" || page() === "connections";
@@ -247,6 +250,8 @@ export function WorkspaceLayout(props: ParentProps) {
               workspaceId={params.workspaceId}
               href={(id) => href(paths.group(params.workspaceId, id))}
               current={groupId()}
+              browseHref={href(paths.groups(params.workspaceId))}
+              browsing={browsing() !== undefined}
               onCreated={(id) => navigate(paths.group(params.workspaceId, id))}
               onMessage={(target) =>
                 navigate(
@@ -360,6 +365,11 @@ export function WorkspaceLayout(props: ParentProps) {
                   <GroupFollowNote workspaceId={params.workspaceId} groupId={id} />
                 </PageHeader.Meta>
               )}
+            </Show>
+            <Show when={browsing()}>
+              <PageHeader.Meta>
+                Public groups anyone here can join. Their threads open once you do.
+              </PageHeader.Meta>
             </Show>
           </PageHeader.Root>
         </Shell.Header>

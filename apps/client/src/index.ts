@@ -46,6 +46,7 @@ export type { WorkspaceFeedState } from "./api/changes.ts";
 export {
   useGroups,
   useGroupRoster,
+  usePublicGroups,
   useMembers,
   useGroupStream,
   useThreadTimeline,
@@ -89,7 +90,12 @@ export {
   type SeenController,
   type SeenAllController,
 } from "./conversations/seen.ts";
-export { useCreateGroup, type CreateGroupController } from "./conversations/groups.ts";
+export {
+  useCreateGroup,
+  useJoinGroup,
+  type CreateGroupController,
+  type JoinGroupController,
+} from "./conversations/groups.ts";
 export { useGroupMembers, type GroupMembersController } from "./conversations/members.ts";
 export { useRenameGroup, type RenameGroupController } from "./conversations/rename.ts";
 export { useMemberName, type MemberNameController } from "./workspaces/member-name.ts";

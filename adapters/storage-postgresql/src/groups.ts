@@ -1,6 +1,6 @@
 import { Group, GroupStore } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
-import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
@@ -84,6 +84,28 @@ export const make = Effect.fn("Groups.make")(function* () {
         ).pipe(Effect.flatMap((rows) => decode(rows.map(toRecord))));
       },
       Effect.mapError(storeFailure(GroupStore, "getMany")),
+    ),
+    pagePublic: Effect.fn("Groups.pagePublic")(
+      function* (input) {
+        const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
+        const ordered = sql`${groups.id} COLLATE "C"`;
+        const found = yield* guard(
+          db
+            .select()
+            .from(groups)
+            .where(
+              and(
+                eq(groups.workspaceId, workspaceId),
+                eq(groups.visibility, "Public"),
+                options.after === undefined ? undefined : sql`${ordered} > ${options.after}`,
+              ),
+            )
+            .orderBy(ordered)
+            .limit(options.limit),
+        ).pipe(Effect.flatMap((rows) => decode(rows.map(toRecord))));
+        return found.flatMap((group) => (group.kind === "Team" ? [group] : []));
+      },
+      Effect.mapError(storeFailure(GroupStore, "pagePublic")),
     ),
     findDirect: Effect.fn("Groups.findDirect")(
       function* (input) {

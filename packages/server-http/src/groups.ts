@@ -28,13 +28,21 @@ export const layer = HttpApiBuilder.group(
             Effect.flatMap(GroupApplication.Service, (groups) => groups.listMine(query)),
           ),
         ),
+      listPublic: ({ params, query }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(GroupApplication.Service, (groups) => groups.listPublic(query)),
+          ),
+        ),
       create: ({ params, headers, payload }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
             Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.createPrivateTeam(payload, { requestKey: headers["idempotency-key"] }),
+              groups.createTeam(payload, { requestKey: headers["idempotency-key"] }),
             ),
           ),
         ),
@@ -87,6 +95,16 @@ export const layer = HttpApiBuilder.group(
             principal,
             Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
               memberships.remove({ groupId: params.groupId, membershipId: params.membershipId }),
+            ),
+          ),
+        ),
+      join: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
+              memberships.join(params.groupId),
             ),
           ),
         ),

@@ -176,7 +176,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const threads = yield* ThreadApplication.Service;
             return yield* Effect.forEach([memberIds.slice(0, 10), memberIds.slice(10)], (members) =>
               Effect.gen(function* () {
-                const group = yield* groups.createPrivateTeam({
+                const group = yield* groups.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, ...members],
                 });
@@ -222,6 +222,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
               index: "group_memberships_by_member",
               condition: "member_id =",
               query: sql`SELECT id FROM group_memberships WHERE workspace_id = ${workspaceId} AND member_id = ${memberIds[0]!} AND status = 'active' ORDER BY id COLLATE "C"`,
+            },
+            // Browsing pages public groups, and sizes a page of them with one read.
+            {
+              index: "public_groups",
+              condition: "workspace_id =",
+              query: sql`SELECT id FROM groups WHERE workspace_id = ${workspaceId} AND visibility = 'Public' AND id COLLATE "C" > ${""} ORDER BY id COLLATE "C" LIMIT 20`,
+            },
+            {
+              index: "active_group_membership",
+              condition: "group_id =",
+              query: sql`SELECT group_id, count(*), bool_or(member_id = ${memberIds[0]!}) FROM group_memberships WHERE workspace_id = ${workspaceId} AND status = 'active' AND group_id = any(${[thread.groupId]}::text[]) GROUP BY group_id`,
             },
             {
               index: "threads_by_group",

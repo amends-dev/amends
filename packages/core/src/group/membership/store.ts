@@ -3,6 +3,7 @@ import type { Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
 import type { WorkspaceId } from "../../workspace/id.ts";
 import type { MemberId } from "../../workspace/member/id.ts";
+import type { Group } from "../group.ts";
 import type { GroupId } from "../id.ts";
 import type { GroupMembership } from "./membership.ts";
 
@@ -41,6 +42,14 @@ export interface Interface {
     groupId: GroupId.Id,
     memberIds: ReadonlyArray<MemberId.Id>,
   ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+  /**
+   * How many active admissions each of several groups has, and whether this member holds one, in
+   * one read. Groups without any are omitted; order is unspecified. An empty request reads nothing.
+   */
+  readonly summarize: (
+    groupIds: ReadonlyArray<GroupId.Id>,
+    memberId: MemberId.Id,
+  ) => Effect.Effect<ReadonlyArray<Group.Summary>, Failure>;
   /**
    * Stable ID order, including historical admissions. A history read for inspection; operations
    * use the bounded reads.

@@ -10,13 +10,15 @@ and cache invalidation; apps mount it once per workspace view; features show its
    The provider opens one stream per workspace per credential scope, shared by every consumer,
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
-   each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`, `inbox`, and
-   `permissions`, and one key
+   each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`,
+   `public-groups`, `inbox`, and `permissions`, and one key
    per group stream, group roster, thread timeline, and thread participants within their
    collections.
 3. Each `Committed` message maps its events to the keys they affect
    (`apps/client/src/api/changes.ts`) and invalidates each once, so every affected read
-   refreshes once. A member's rename refreshes the members and the directory. Thread activity
+   refreshes once. A member's rename refreshes the members and the directory. Group creation,
+   renames, and membership changes also refresh the public groups, and a public group's creation
+   reaches the whole workspace. Thread activity
    names its thread and group in its payload, so it refreshes
    that thread's timeline and that group's stream, and the groups list; a group's rename refreshes
    the groups list; group membership

@@ -198,11 +198,12 @@ listed, assigned, and offered in invitations.
 | `assignment.manage`            | Administrator | Workspace | Adding, replacing, and revoking roles, within delegation limits                   |
 | `workspace.rename`             | Owner         | Workspace | Renaming workspace metadata                                                       |
 | `workspace.transfer-ownership` | Owner         | Workspace | Transferring ownership                                                            |
-| `group.create`                 | Administrator | Workspace | [Creating a private team group](group-workflows.md#creating-a-group)              |
+| `group.create`                 | Administrator | Workspace | [Creating a team group](group-workflows.md#creating-a-group), private or public   |
 | `group.read`                   | Viewer        | Group     | [Reading a group you belong to](group-workflows.md#reading-groups)                |
 | `group.follow`                 | Viewer        | Group     | [Following a group](group-workflows.md#following-a-group) for oneself             |
 | `group.rename`                 | Administrator | Group     | [Renaming a team group](group-workflows.md#renaming-a-group); bundles revision 3  |
 | `group.membership.manage`      | Administrator | Group     | Adding and removing members, and management reads                                 |
+| `group.join`                   | Viewer        | Group     | [Finding and joining public groups](group-workflows.md#public-groups); revision 4 |
 | `thread.start`                 | Viewer        | Group     | [Starting a thread](thread-workflows.md#starting-a-conversation)                  |
 | `thread.read`                  | Viewer        | Thread    | [Reading a thread](thread-workflows.md#reading-conversations) and marking it read |
 | `thread.publish`               | Viewer        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation) and typing             |

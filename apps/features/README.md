@@ -134,9 +134,10 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
 - `GroupsNavigation` renders the reader's groups as two navigation sections: Groups, teams by name
   with a `#` glyph, and Direct, direct groups by the other people in them with `@`. A group shows a
   count of what is addressed to the reader and a dot when it has new activity. The app supplies
-  `href` and the current group. Groups is hidden while the reader has no team groups, unless they
-  may create one: readers with `group.create` get a "New group" action in its heading that opens
-  `NewGroupDialog`, and the app's `onCreated` decides where the new group leads. Direct always
+  `href` and the current group. Groups shows once the groups load, with a "Browse groups" link to
+  the app's `browseHref`, marked current while `browsing`. Readers with `group.create` also get a
+  "New group" action in its heading that opens `NewGroupDialog`, and the app's `onCreated`
+  decides where the new group leads. Direct always
   shows once the groups load, with a "New message" action that opens `NewMessageDialog`; the app's
   `onMessage` receives the conversation or the people chosen.
 - `NewMessageDialog` chooses people and agents to message with the ChipPicker. When the reader
@@ -146,9 +147,13 @@ the page header's actions. See [live updates](../../docs/live-updates.md).
   composer whose first message creates the direct group, with the chosen people as mention
   suggestions. When the reader has, or gains, a conversation with exactly them, `onGroup` hands it
   over. `DirectDraftName` names the people, as the page title.
-- `NewGroupDialog` names a private team group and chooses its active people and agents with the
-  UI ChipPicker, the reader fixed as "you". Create stays disabled until the name has text, failures
-  explain themselves and keep the input, and closing clears it.
+- `NewGroupDialog` names a team group and chooses its active people and agents with the UI
+  ChipPicker, the reader fixed as "you", and asks who can find it: private for only the people
+  added, or public for anyone in the workspace to find and join. Create stays disabled until the
+  name has text, failures explain themselves and keep the input, and closing clears it.
+- `PublicGroups` lists the public groups the reader may join by name, with member counts, live
+  while mounted. One they belong to links to the app's `href`; the others offer Join, and `onJoined`
+  receives a group once the reader belongs to it. It has loading, empty, and unavailable states.
 - `GroupRenameAction` is a quiet "Rename" for beside a team group's name, shown to readers who may
   rename it. Its dialog opens on the current name, focused and selected, and saves only a
   different valid name. If someone renamed the group meanwhile, it names their name and keeps the
@@ -208,7 +213,9 @@ typing in the open thread and its row until their reply arrives. **Following** f
 and sees the member's next thread reach the owner, then follows and unfollows a thread, noted in
 its timeline. **Departures** sees the member leave the group from their own session and the open
 thread note it live.
-**CreateGroup** creates a group with the other member from the sidebar and opens it empty.
+**CreateGroup** creates a public group with the other member from the sidebar and opens it empty.
+**Browse** lists two public groups the owner is not in, joins one, which opens and joins the
+sidebar, and finds it linked on returning.
 **Members** adds a third person to the group, removes the member, and leaves.
 **Rename** renames the group and sees the new name wherever it is named. **RenameConflict** has
 the owner rename it from another session while the dialog is open, sees the save refused with the

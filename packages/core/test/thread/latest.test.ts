@@ -66,6 +66,7 @@ it.effect(
         get: () => Effect.die("Unexpected group read"),
         getMany: () => Effect.die("Unexpected group read"),
         findDirect: () => Effect.die("Unexpected group read"),
+        pagePublic: () => Effect.die("Unexpected group read"),
         getLatest: () => Effect.die("Unexpected group read"),
         insert: (record) => Effect.sync(() => void inserted.push(record)),
         rename: () => Effect.die("Unexpected group rename"),

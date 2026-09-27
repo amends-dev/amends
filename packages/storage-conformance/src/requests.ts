@@ -52,7 +52,7 @@ export const requests = (harness: Harness) => {
       const group = yield* as(
         owner,
         Effect.flatMap(GroupApplication.Service, (groups) =>
-          groups.createPrivateTeam({ name: "Team", memberIds: [owner.memberId, other.memberId] }),
+          groups.createTeam({ name: "Team", memberIds: [owner.memberId, other.memberId] }),
         ),
       );
       const start = (text: string, options: Request.Options = { requestKey: key }) =>
@@ -178,7 +178,7 @@ export const requests = (harness: Harness) => {
           );
           yield* twice(
             Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.createPrivateTeam({ name: "Second", memberIds: [] }, { requestKey }),
+              groups.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
             ),
           );
           const expiresAt = yield* future;

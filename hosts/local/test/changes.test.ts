@@ -1,6 +1,7 @@
 import { Api, Authentication } from "@amends/api-http";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { ChangeFeed } from "@amends/core/change-feed";
+import { GroupFacts } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
 import { Thread, ThreadApplication } from "@amends/core/thread";
 import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends/core/workspace";
@@ -194,6 +195,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
             events: [{ name: MemberFacts.Renamed.name, payload: { name: "Eve Moss" } }],
           });
           expect(yield* asBob.next).toEqual(renamed);
+          // A public group's creation reaches everyone who might join it, not only its members.
+          const lobby = yield* alice.groups.create({
+            params: { workspaceId: workspace.id },
+            headers: {},
+            payload: { name: "Lobby", memberIds: [], visibility: "Public" },
+          });
+          expect(yield* asBob.next).toMatchObject({
+            _tag: "Committed",
+            events: [{ name: GroupFacts.Created.name, payload: { id: lobby.id } }],
+          });
+          yield* second.next;
           yield* asBob.close;
           yield* alice.members.remove({
             params: { workspaceId: workspace.id, memberId: member.id },

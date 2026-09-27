@@ -102,7 +102,7 @@ export const signals = (harness: Harness) => {
       const group = yield* as("first")(
         owner,
         Effect.flatMap(GroupApplication.Service, (groups) =>
-          groups.createPrivateTeam({
+          groups.createTeam({
             name: "Private",
             memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
           }),

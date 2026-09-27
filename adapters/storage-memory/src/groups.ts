@@ -3,7 +3,7 @@ import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import { compareBinary, Rows } from "./rows.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
 const rows = Rows.make(Schema.fromJsonString(Group.Record));
@@ -30,6 +30,23 @@ export const make = Effect.fn("Groups.make")(function* () {
         return yield* rows.getMany((yield* read).records.groups, ids);
       },
       Effect.mapError(storeFailure(GroupStore, "getMany")),
+    ),
+    pagePublic: Effect.fn("Groups.pagePublic")(
+      function* (input) {
+        const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
+        const after = options.after;
+        return (yield* rows.all((yield* read).records.groups))
+          .flatMap((group) =>
+            group.kind === "Team" &&
+            group.visibility === "Public" &&
+            (after === undefined || compareBinary(group.id, after) > 0)
+              ? [group]
+              : [],
+          )
+          .toSorted((left, right) => compareBinary(left.id, right.id))
+          .slice(0, options.limit);
+      },
+      Effect.mapError(storeFailure(GroupStore, "pagePublic")),
     ),
     findDirect: Effect.fn("Groups.findDirect")(
       function* (input) {

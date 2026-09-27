@@ -109,6 +109,7 @@ export const gateway = (harness: Harness) => {
                     AssignmentPermissions.Read.name,
                     GroupPermissions.Read.name,
                     GroupPermissions.Follow.name,
+                    GroupMembershipPermissions.Join.name,
                     ThreadPermissions.Start.name,
                     ThreadPermissions.Read.name,
                     ThreadMessagePermissions.Publish.name,
@@ -139,6 +140,7 @@ export const gateway = (harness: Harness) => {
                       GroupPermissions.Follow.name,
                       GroupPermissions.Rename.name,
                       GroupMembershipPermissions.Manage.name,
+                      GroupMembershipPermissions.Join.name,
                       ThreadPermissions.Start.name,
                       ThreadPermissions.Read.name,
                       ThreadMessagePermissions.Publish.name,
@@ -306,7 +308,7 @@ export const gateway = (harness: Harness) => {
                   workspace.id,
                   alice,
                   Effect.flatMap(GroupApplication.Service, (groups) =>
-                    groups.createPrivateTeam({ name, memberIds: [workspace.ownerMemberId] }),
+                    groups.createTeam({ name, memberIds: [workspace.ownerMemberId] }),
                   ),
                 ),
               ).pipe(Effect.provide(host));

@@ -117,7 +117,7 @@ export const groupFollows = (harness: Harness) => {
         bound,
         owner,
         Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createPrivateTeam({
+          s.createTeam({
             name: "Team",
             memberIds: [owner.memberId, humanId, plainId, agentId],
           }),

@@ -23,7 +23,7 @@ The current domains contain these features:
 | `notification`  | Notification records, inbox/source reads, acknowledgment, activity-driven generation, and departure settlement.  |
 | `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
 | `agent`         | Permission to direct input to an agent workspace member.                                                         |
-| `group`         | Private team creation, authorized reads, audience policy, membership lifecycle, and storage.                     |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.         |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
 | `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
@@ -114,8 +114,10 @@ uses that transaction and sees its staged changes without opening another one.
 ## Groups
 
 `@amends/core/group` holds team and direct groups, their admissions, and follows.
-`GroupApplication` creates private teams and reads groups (`listMine`, `get`, `getForManagement`);
-`GroupMembershipApplication` adds, removes, and lets members leave team groups, and reads rosters;
+`GroupApplication` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
+`get`, `getForManagement`);
+`GroupMembershipApplication` adds, removes, and lets members join public groups and leave team
+groups, and reads rosters;
 `GroupFollowApplication` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
 `GroupFollowStore` are required host bindings. A direct group has a fixed set of two or more
 members in `Group.directMembers` order, identified by `Group.directKey` and found in any order
@@ -264,7 +266,7 @@ same or a later revision alone, so an older host never reverts it. The gateway r
 boots a workspace. A recorded permission the catalog does not declare, retired or added by a newer
 host, grants nothing, since no requirement can name it, and its holder's other grants stand;
 `Delegation` still loads the roles that record it. Bundle revision 3 adds `group.rename` for
-administrators and owners. `AssignmentApplication` provides listing, assignment,
+administrators and owners, and revision 4 adds `group.join` for every role. `AssignmentApplication` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
 clients can offer just the actions the member may take. `Delegation` supplies the shared
@@ -610,7 +612,7 @@ meaning rather than using it as a synonym for a constructor.
 | Thread participation      | `ThreadParticipationApplication.make()` | `ThreadParticipationApplication.Service` |
 | Human message publication | `ThreadMessageApplication.make()`       | `ThreadMessageApplication.Service`       |
 | Notification reads        | `NotificationApplication.make()`        | `NotificationApplication.Service`        |
-| Private team creation     | `GroupApplication.make()`               | `GroupApplication.Service`               |
+| Team creation and reads   | `GroupApplication.make()`               | `GroupApplication.Service`               |
 | Group membership          | `GroupMembershipApplication.make()`     | `GroupMembershipApplication.Service`     |
 | Group following           | `GroupFollowApplication.make()`         | `GroupFollowApplication.Service`         |
 | Read state                | `ReadStateApplication.make()`           | `ReadStateApplication.Service`           |

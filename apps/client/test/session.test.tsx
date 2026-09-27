@@ -52,6 +52,7 @@ it("resolves endpoint configuration and rejects credentials and non-HTTP URLs", 
 });
 it("resumes only protected internal routes", () => {
   expect(returnPath("/workspaces/a?tab=members")).toBe("/workspaces/a?tab=members");
+  expect(returnPath(paths.groups("a"))).toBe("/workspaces/a/groups");
   for (const value of [
     undefined,
     "https://other.test",

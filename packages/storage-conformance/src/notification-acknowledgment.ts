@@ -126,7 +126,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
         bound,
         owner,
         Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createPrivateTeam({
+          s.createTeam({
             name: "Team",
             memberIds: [owner.memberId, human.memberId, agent.memberId, writer.memberId],
           }),

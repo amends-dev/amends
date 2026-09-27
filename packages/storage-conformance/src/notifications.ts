@@ -848,7 +848,7 @@ export const notifications = (harness: Harness) => {
             const first = yield* join;
             const group = yield* asAlice(
               GroupApplication.Service.use((groups) =>
-                groups.createPrivateTeam({
+                groups.createTeam({
                   name: "Private",
                   memberIds: [workspace.ownerMemberId, first.id],
                 }),

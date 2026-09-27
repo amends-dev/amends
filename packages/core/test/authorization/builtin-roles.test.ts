@@ -120,6 +120,18 @@ const revisionOne = {
 /** A bundle with `group.rename` in its declaration place, after `group.follow`. */
 const withRename = (permissions: ReadonlyArray<string> = []) =>
   permissions.flatMap((name) => (name === "group.follow" ? [name, "group.rename"] : [name]));
+/**
+ * A bundle with `group.join` in its declaration place: after `group.membership.manage` where the
+ * bundle has it, else after the group permissions before it.
+ */
+const withJoin = (permissions: ReadonlyArray<string> = []) => {
+  const after = permissions.includes("group.membership.manage")
+    ? "group.membership.manage"
+    : permissions.includes("group.rename")
+      ? "group.rename"
+      : "group.follow";
+  return permissions.flatMap((name) => (name === after ? [name, "group.join"] : [name]));
+};
 const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<string>>>>> = {
   1: revisionOne,
   2: {
@@ -131,6 +143,15 @@ const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<s
     ...revisionOne,
     [BuiltinRoles.AdministratorId]: withRename(revisionOne[BuiltinRoles.AdministratorId]),
     [BuiltinRoles.OwnerId]: ["workspace.rename", ...withRename(revisionOne[BuiltinRoles.OwnerId])],
+  },
+  // Revision 4 lets everyone join public groups.
+  4: {
+    [BuiltinRoles.ViewerId]: withJoin(revisionOne[BuiltinRoles.ViewerId]),
+    [BuiltinRoles.AdministratorId]: withJoin(withRename(revisionOne[BuiltinRoles.AdministratorId])),
+    [BuiltinRoles.OwnerId]: [
+      "workspace.rename",
+      ...withJoin(withRename(revisionOne[BuiltinRoles.OwnerId])),
+    ],
   },
 };
 

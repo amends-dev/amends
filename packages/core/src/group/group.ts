@@ -9,12 +9,19 @@ export type Id = GroupId.Id;
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
 export type Name = typeof Name.Type;
 
+/**
+ * Who can find a team group: only its members see a private one, while anyone in the workspace
+ * may find and join a public one. Either way, only members read its threads.
+ */
+export const Visibility = Schema.Literals(["Private", "Public"]);
+export type Visibility = typeof Visibility.Type;
+
 /** A team group's membership is managed; its name identifies it to people. */
 export const TeamRecord = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   kind: Schema.Literal("Team"),
-  visibility: Schema.Literal("Private"),
+  visibility: Visibility,
   name: Name,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
@@ -107,11 +114,31 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name });
 export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
 
-export const CreatePrivateTeamInput = Schema.Struct({
+/** A new team group, private unless it says otherwise. */
+export const CreateTeamInput = Schema.Struct({
   name: Name,
   memberIds: Schema.UniqueArray(MemberId.Id),
+  visibility: Schema.optionalKey(Visibility),
 });
-export interface CreatePrivateTeamInput extends Schema.Schema.Type<typeof CreatePrivateTeamInput> {}
+export interface CreateTeamInput extends Schema.Schema.Type<typeof CreateTeamInput> {}
+
+/**
+ * A public group as someone browsing the workspace sees it: how many belong to it, and whether
+ * the reader is one of them.
+ */
+export const PublicItem = Schema.Struct({
+  group: TeamRecord,
+  members: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  joined: Schema.Boolean,
+});
+export interface PublicItem extends Schema.Schema.Type<typeof PublicItem> {}
+/** How many members each of several groups has, and whether one member is among them. */
+export const Summary = Schema.Struct({
+  groupId: Id,
+  members: Schema.Int.check(Schema.isGreaterThan(0)),
+  joined: Schema.Boolean,
+});
+export interface Summary extends Schema.Schema.Type<typeof Summary> {}
 
 /** The readers of one group: its current members. */
 export const audienceOf = (groupId: Id): Audience.Scope => Audience.make("group", groupId);

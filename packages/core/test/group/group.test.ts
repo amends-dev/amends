@@ -9,9 +9,11 @@ import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 
 it("creation accepts an explicit empty audience but rejects duplicate members and blank or untrimmed names", () => {
-  const decode = Schema.decodeUnknownOption(Group.CreatePrivateTeamInput);
+  const decode = Schema.decodeUnknownOption(Group.CreateTeamInput);
   expect(decode({ name: "Engineering", memberIds: [] })._tag).toBe("Some");
+  expect(decode({ name: "Lobby", memberIds: [], visibility: "Public" })._tag).toBe("Some");
   for (const input of [
+    { name: "Engineering", memberIds: [], visibility: "Secret" },
     { name: "", memberIds: [] },
     { name: " Engineering ", memberIds: [] },
     { name: "Engineering", memberIds: ["member", "member"] },
@@ -20,7 +22,7 @@ it("creation accepts an explicit empty audience but rejects duplicate members an
     expect(decode(input)._tag).toBe("None");
 });
 
-it("persisted group records reject kinds and visibility whose workflows are not implemented", () => {
+it("persisted team groups are private or public; other kinds and visibilities are rejected", () => {
   const record = {
     id: "group",
     workspaceId: "workspace",
@@ -32,9 +34,10 @@ it("persisted group records reject kinds and visibility whose workflows are not 
   };
   const decode = Schema.decodeUnknownOption(Group.Record);
   expect(decode(record)._tag).toBe("Some");
+  expect(decode({ ...record, visibility: "Public" })._tag).toBe("Some");
   for (const invalid of [
     { ...record, kind: "DM" },
-    { ...record, visibility: "Public" },
+    { ...record, visibility: "Secret" },
     { ...record, name: "" },
   ])
     expect(decode(invalid)._tag).toBe("None");

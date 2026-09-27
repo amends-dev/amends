@@ -288,6 +288,11 @@ export const CreateGroup = {
     await userEvent.type(picker, "member");
     await userEvent.click(await body.findByRole("option", { name: /member@example\.test/ }));
     await waitFor(() => expect(within(chips).getAllByRole("listitem")).toHaveLength(2));
+    // A new group is private unless the owner makes it public, for anyone here to find and join.
+    const visibility = within(dialog).getByRole("group", { name: "Who can find it" });
+    await expect(within(visibility).getByRole("radio", { name: /Private/ })).toBeChecked();
+    await userEvent.click(within(visibility).getByRole("radio", { name: /Public/ }));
+    await expect(within(visibility).getByRole("radio", { name: /Public/ })).toBeChecked();
     await userEvent.click(create);
     // The new group opens, empty, and joins the sidebar.
     await waitFor(() => expect(body.queryByRole("dialog", { name: "New group" })).toBeNull(), {
@@ -296,6 +301,46 @@ export const CreateGroup = {
     const created = await within(sidebar).findByRole("link", { name: /Receipts/ });
     await waitFor(() => expect(created).toHaveAttribute("aria-current", "page"));
     await canvas.findByText("Nothing said yet", {}, { timeout: 10000 });
+  },
+} satisfies Story;
+/** The owner finds public groups they are not in yet, joins one, and it opens. */
+export const Browse = {
+  args: { view: "browse" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const sidebar = await canvas.findByRole(
+      "navigation",
+      { name: "Workspace" },
+      { timeout: 20000 },
+    );
+    // Everyone may browse, from the Groups section, which marks it while it is open.
+    await expect(
+      await within(sidebar).findByRole("link", { name: /Browse groups/ }, { timeout: 10000 }),
+    ).toHaveAttribute("aria-current", "page");
+    const list = await canvas.findByRole("list", { name: "Public groups" }, { timeout: 10000 });
+    // Public groups by name, with how many belong to each.
+    await waitFor(() =>
+      expect(
+        within(list)
+          .getAllByRole("listitem")
+          .map((row) => row.textContent),
+      ).toEqual([
+        expect.stringMatching(/^#Announcements0 membersJoin$/),
+        expect.stringMatching(/^#Lobby1 memberJoin$/),
+      ]),
+    );
+    // Joining opens the group and adds it to the sidebar.
+    await userEvent.click(within(list).getByRole("button", { name: "Join Lobby" }));
+    await within(sidebar).findByRole("link", { name: /Lobby/ }, { timeout: 10000 });
+    await canvas.findByText("Nothing said yet", {}, { timeout: 10000 });
+    // Back among public groups, the joined one now leads to it.
+    window.location.hash = "browse";
+    const again = await canvas.findByRole("list", { name: "Public groups" }, { timeout: 10000 });
+    await waitFor(() =>
+      expect(within(again).getByRole("link", { name: /Lobby/ })).toHaveTextContent("2 members"),
+    );
+    await expect(within(again).getByRole("link", { name: /Lobby/ })).toHaveTextContent("joined");
+    await expect(within(again).getByRole("button", { name: "Join Announcements" })).toBeEnabled();
   },
 } satisfies Story;
 export const Members = {

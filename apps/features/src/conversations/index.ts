@@ -21,3 +21,4 @@ export {
   type NewMessageDialogProps,
 } from "./direct.tsx";
 export { GroupRenameAction, type GroupRenameProps } from "./rename.tsx";
+export { PublicGroups, type PublicGroupsProps } from "./public-groups.tsx";

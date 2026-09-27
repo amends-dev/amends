@@ -126,7 +126,7 @@ export const readState = (harness: Harness) => {
         bound,
         owner,
         Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createPrivateTeam({
+          s.createTeam({
             name: "Team",
             memberIds: [owner.memberId, humanId, otherId, plainId, agentId],
           }),
@@ -642,7 +642,7 @@ export const readState = (harness: Harness) => {
                 bound,
                 owner,
                 Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createPrivateTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
+                  s.createTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
                 ),
               );
               const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>

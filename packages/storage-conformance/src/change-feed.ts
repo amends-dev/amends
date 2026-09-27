@@ -191,7 +191,7 @@ export const changeFeed = (harness: Harness) => {
             const group = yield* as(
               owner,
               Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createPrivateTeam({
+                groups.createTeam({
                   name: "Private",
                   memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
                 }),
@@ -245,7 +245,7 @@ export const changeFeed = (harness: Harness) => {
             const group = yield* as(
               owner,
               Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createPrivateTeam({
+                groups.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, mentioned.memberId, bystander.memberId],
                 }),
