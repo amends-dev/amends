@@ -39,6 +39,12 @@ exactly; Anthropic, for example, requires its signature over earlier reasoning w
 continues. The tests check that a session prepared from events stored as JSON sends the same request
 the failed session would have sent, signature included.
 
+## Declaration
+
+`AmendsHarness.declaration` is what a host registers: placement `in-process` only, and
+`LanguageModel` model access, so any model connection the host installed works. It declares no
+reasoning levels, since the loop requests none.
+
 ## Limits
 
 - A response the harness cannot record stops the session with `ExecutionFailed`: a part carrying a

@@ -6,6 +6,7 @@ import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
+import { Environments } from "./environments.ts";
 import { MemoryConnection } from "./connection.ts";
 import { GroupFollows } from "./group-follows.ts";
 import { GroupMemberships } from "./group-memberships.ts";
@@ -47,6 +48,7 @@ const layerStores = Layer.mergeAll(
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,
+  Environments.layer,
 );
 
 /**

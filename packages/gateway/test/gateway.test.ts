@@ -1,4 +1,5 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
+import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
   ThreadParticipationStore,
@@ -252,6 +253,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ConnectionStore.Service,
       ConnectionStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        get: unexpected,
+        list: unexpected(),
+        insert: unexpected,
+        update: unexpected,
+      }),
+    ),
+    Context.add(
+      EnvironmentStore.Service,
+      EnvironmentStore.Service.of({
         workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),

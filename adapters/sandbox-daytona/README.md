@@ -18,6 +18,12 @@ client. Its options:
 | `timeout`            | Seconds to wait for creating, starting, stopping, or deleting; 120 by default. |
 | `snapshotTimeout`    | Seconds to wait for a snapshot to finish; 600 by default.                      |
 
+`DaytonaSandbox.declaration` is what a host registers: an isolated provider that runs under an
+account and takes a snapshot name as its template. The account is a workspace connection:
+`DaytonaConnection.declaration` declares it, with the sandbox capability for `daytona`, an API key,
+and optional API URL and target settings, and `DaytonaConnection.client(access)` turns a
+connection's settings and key into the client configuration above.
+
 How the contract maps onto Daytona:
 
 - `template` names the Daytona snapshot a new sandbox starts from; without one, Daytona's default.

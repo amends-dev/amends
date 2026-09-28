@@ -38,6 +38,9 @@ import {
   ConnectionStore,
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
+import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
+import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
+import { SandboxImplementation } from "@amends/sandbox";
 import { Gateway, SignalHub, WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
@@ -67,7 +70,66 @@ export const testImplementation = ConnectionImplementation.Declaration.make({
   ],
   authentication: [{ _tag: "ApiKey", label: "API key" }, { _tag: "None" }],
 });
-export const catalog = ConnectionCatalog.make([testImplementation]);
+/** A connection implementation for an account at the suites' hosted sandbox provider. */
+export const testSandboxAccount = ConnectionImplementation.Declaration.make({
+  id: ConnectionImplementation.Id.make("test-cloud"),
+  name: "Test cloud",
+  description: "An account at a sandbox provider for conformance tests.",
+  capabilities: { sandbox: { provider: "test-cloud" } },
+  settings: [],
+  authentication: [{ _tag: "ApiKey", label: "API key" }],
+});
+export const catalog = ConnectionCatalog.make([testImplementation, testSandboxAccount]);
+
+/**
+ * The harnesses the suites' hosts install: amends's own, in process over any model connection,
+ * and one that runs only inside a sandbox, speaking the test models' interface.
+ */
+export const testHarnesses = [
+  HarnessImplementation.Declaration.make({
+    id: HarnessContract.Name.make("amends"),
+    name: "Amends",
+    description: "An in-process harness for conformance tests.",
+    placement: ["in-process"],
+    models: { _tag: "LanguageModel" },
+  }),
+  HarnessImplementation.Declaration.make({
+    id: HarnessContract.Name.make("boxed"),
+    name: "Boxed",
+    description: "A harness that runs inside a sandbox.",
+    placement: ["in-sandbox"],
+    models: { _tag: "Interfaces", interfaces: ["test-messages"] },
+    reasoning: ["low", "high"],
+  }),
+];
+/** A local provider that takes no account, and a hosted one that runs under an account. */
+export const testSandboxes = [
+  SandboxImplementation.Declaration.make({
+    id: SandboxImplementation.Id.make("test-local"),
+    name: "Test local",
+    description: "A sandbox provider without an account.",
+    capabilities: { stdin: true, snapshots: "none", isolated: false },
+    account: false,
+  }),
+  SandboxImplementation.Declaration.make({
+    id: SandboxImplementation.Id.make("test-cloud"),
+    name: "Test cloud",
+    description: "A sandbox provider that runs under an account.",
+    capabilities: { stdin: false, snapshots: "filesystem", isolated: true },
+    account: true,
+    template: { label: "Image" },
+  }),
+];
+export const environmentCatalog = EnvironmentCatalog.make({
+  harnesses: testHarnesses,
+  sandboxes: testSandboxes,
+});
+/** What the suites' gateways install. */
+export const installed = {
+  connections: [testImplementation, testSandboxAccount],
+  harnesses: testHarnesses,
+  sandboxes: testSandboxes,
+};
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
@@ -76,6 +138,7 @@ export const bind = (
     | Signals.Service
     | BackgroundWakes.Service
     | ConnectionCatalog.Service
+    | EnvironmentCatalog.Service
   >,
 ) => ({
   context,
@@ -97,6 +160,7 @@ export const bind = (
   readStates: Context.get(context, ReadStateStore.Service),
   connections: Context.get(context, ConnectionStore.Service),
   credentials: Context.get(context, ConnectionCredentialStore.Service),
+  environments: Context.get(context, EnvironmentStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 
@@ -118,7 +182,7 @@ const withHostServices = (
       ),
       ConnectionCatalog.Service,
       catalog,
-    ),
+    ).pipe(Context.add(EnvironmentCatalog.Service, environmentCatalog)),
   );
 
 /** One workspace's stores and signals on a host. */
@@ -165,7 +229,7 @@ export const make = (harness: Harness) => {
     );
   /** A gateway over a host. */
   const gateway = (host: Context.Context<Host>) =>
-    Gateway.layer({ connections: [testImplementation] }).pipe(
+    Gateway.layer(installed).pipe(
       Layer.provideMerge(
         Layer.mergeAll(Layer.succeedContext(host), harness.crypto, WorkspaceWakes.layerUnavailable),
       ),

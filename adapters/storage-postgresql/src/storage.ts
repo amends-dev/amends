@@ -15,6 +15,7 @@ import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
+import { Environments } from "./environments.ts";
 import { CredentialKey } from "./credential-key.ts";
 import { PostgresDatabase } from "./database.ts";
 import { Invitations } from "./invitations.ts";
@@ -57,6 +58,7 @@ const layerStores = Layer.mergeAll(
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,
+  Environments.layer,
 );
 
 /**

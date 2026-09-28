@@ -11,6 +11,7 @@ import { SessionHandlers } from "./session.ts";
 import { WorkspacesHandlers } from "./workspaces.ts";
 import { ChangesHandlers } from "./changes.ts";
 import { ConnectionsHandlers } from "./connections.ts";
+import { EnvironmentsHandlers } from "./environments.ts";
 import { GroupsHandlers } from "./groups.ts";
 import { ThreadsHandlers } from "./threads.ts";
 
@@ -30,6 +31,7 @@ export const layerHandlers = Layer.mergeAll(
   ThreadsHandlers.layer,
   NotificationsHandlers.layer,
   ConnectionsHandlers.layer,
+  EnvironmentsHandlers.layer,
   ChangesHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 

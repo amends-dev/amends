@@ -1,5 +1,5 @@
 import { posix } from "node:path";
-import { Sandbox, SandboxErrors } from "@amends/sandbox";
+import { Sandbox, SandboxErrors, SandboxImplementation } from "@amends/sandbox";
 import {
   Daytona,
   DaytonaBadRequestError,
@@ -23,6 +23,21 @@ export const capabilities: Sandbox.Capabilities = {
   stdin: true,
   snapshots: "filesystem",
   isolated: true,
+};
+
+/** What a host registers: sandboxes run under the workspace's Daytona account, a connection. */
+export const declaration: SandboxImplementation.Declaration = {
+  id: SandboxImplementation.Id.make(name),
+  name: "Daytona",
+  description: "Isolated containers on Daytona, under your Daytona account.",
+  capabilities,
+  account: true,
+  template: {
+    label: "Snapshot",
+    description:
+      "The Daytona snapshot new sandboxes start from. Leave empty for Daytona's default.",
+    placeholder: "daytonaio/sandbox",
+  },
 };
 
 export interface Options {

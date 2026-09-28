@@ -1375,6 +1375,8 @@ it("adds a connection, then its key, from the Connections page, opening it besid
 it("offers adding connections only to those who may", async () => {
   const host = connectionsHost();
   mount("/workspaces/one/connections", memoryStore(session("alice")).store, host.fetch);
-  await screen.findByText("An administrator can add model providers for your workspace.");
+  await screen.findByText(
+    "An administrator can add model providers and sandbox accounts for your workspace.",
+  );
   expect(screen.queryByRole("button", { name: /Add connection/ })).not.toBeInTheDocument();
 });

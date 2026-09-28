@@ -1,5 +1,5 @@
 import { constants } from "node:os";
-import { Sandbox, SandboxErrors } from "@amends/sandbox";
+import { Sandbox, SandboxErrors, SandboxImplementation } from "@amends/sandbox";
 import { Crypto, Effect, Exit, FileSystem, Path, Queue, Schema, Scope, Stream } from "effect";
 import type { Cause, PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
@@ -49,6 +49,16 @@ const text = (stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>) =>
       (collected, chunk) => collected + chunk,
     ),
   );
+
+/** What a host registers. Sandboxes here isolate nothing, so the provider suits development. */
+export const declaration: SandboxImplementation.Declaration = {
+  id: SandboxImplementation.Id.make(name),
+  name: "Local directory",
+  description:
+    "Directories on the host's own machine. They isolate nothing, so use them in development.",
+  capabilities,
+  account: false,
+};
 
 /**
  * Sandboxes as directories under `root`. A sandbox's processes belong to the provider that

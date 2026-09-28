@@ -43,6 +43,11 @@ export const Capabilities = Schema.Struct({
    * harness must support to use the connection.
    */
   modelInference: Schema.optionalKey(Schema.Struct({ interface: Schema.NonEmptyString })),
+  /**
+   * An account at a sandbox provider, named by its sandbox implementation, such as `daytona`,
+   * under which environments using that provider acquire sandboxes.
+   */
+  sandbox: Schema.optionalKey(Schema.Struct({ provider: Schema.NonEmptyString })),
 });
 export interface Capabilities extends Schema.Schema.Type<typeof Capabilities> {}
 

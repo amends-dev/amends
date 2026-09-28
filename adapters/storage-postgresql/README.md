@@ -104,6 +104,11 @@ workspace, credential, and connection as additional data, so a sealed value open
 credential it was stored as. Grant scopes gained `target_connection_id` for connection targets.
 Adding these replaced the development baseline; recreate disposable PostgreSQL databases.
 
+`environments` holds environment records: a sandbox's columns are all set or all null, its
+variables and setup commands are JSON, and grant scopes gained `target_environment_id` for
+environment targets. Adding them replaced the development baseline; recreate disposable PostgreSQL
+databases.
+
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
 [storage envelope](../../docs/journal.md#storage-envelope).

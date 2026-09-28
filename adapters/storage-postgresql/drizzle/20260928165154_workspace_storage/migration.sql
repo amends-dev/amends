@@ -12,9 +12,10 @@ CREATE TABLE "assignments" (
 	"target_thread_id" text,
 	"target_group_id" text,
 	"target_connection_id" text,
+	"target_environment_id" text,
 	CONSTRAINT "assignments_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "assignments_source_agrees" CHECK (("source_kind" = 'Role' AND "role_id" IS NOT NULL AND "permission" IS NULL) OR ("source_kind" = 'Direct' AND "permission" IS NOT NULL AND "role_id" IS NULL)),
-	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_member_id" IS NULL AND "target_thread_id" IS NOT NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Group' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NOT NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Connection' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NOT NULL))))
+	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_environment_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_environment_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_environment_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_member_id" IS NULL AND "target_thread_id" IS NOT NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_environment_id" IS NULL) OR ("target_kind" = 'Group' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NOT NULL AND "target_connection_id" IS NULL AND "target_environment_id" IS NULL) OR ("target_kind" = 'Connection' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NOT NULL AND "target_environment_id" IS NULL) OR ("target_kind" = 'Environment' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_environment_id" IS NOT NULL))))
 );
 --> statement-breakpoint
 CREATE TABLE "builtin_role_revisions" (
@@ -64,6 +65,25 @@ CREATE TABLE "connections" (
 	"created_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "connections_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "connections_credential_needs_api_key" CHECK ("authentication" = 'ApiKey' OR "credential_id" IS NULL)
+);
+--> statement-breakpoint
+CREATE TABLE "environments" (
+	"workspace_id" text,
+	"id" text,
+	"name" text NOT NULL,
+	"harness_id" text NOT NULL,
+	"sandbox_provider_id" text,
+	"sandbox_harness" text,
+	"sandbox_connection_id" text,
+	"sandbox_template" text,
+	"sandbox_env" jsonb,
+	"sandbox_setup" jsonb,
+	"sandbox_retention" text,
+	"status" text NOT NULL,
+	"created_by" text,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "environments_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "environments_sandbox_complete" CHECK (("sandbox_provider_id" IS NULL AND "sandbox_harness" IS NULL AND "sandbox_connection_id" IS NULL AND "sandbox_template" IS NULL AND "sandbox_env" IS NULL AND "sandbox_setup" IS NULL AND "sandbox_retention" IS NULL) OR ("sandbox_provider_id" IS NOT NULL AND "sandbox_harness" IS NOT NULL AND "sandbox_env" IS NOT NULL AND "sandbox_setup" IS NOT NULL AND "sandbox_retention" IS NOT NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "group_follows" (

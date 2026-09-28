@@ -196,10 +196,12 @@ export function ConnectionList(props: ConnectionListProps) {
             lines={
               props.onAdd
                 ? [
-                    "Add a model provider for your workspace.",
+                    "Add a model provider or a sandbox account for your workspace.",
                     startWith(props.providers ?? []),
                   ].filter((line) => line !== undefined)
-                : ["An administrator can add model providers for your workspace."]
+                : [
+                    "An administrator can add model providers and sandbox accounts for your workspace.",
+                  ]
             }
           >
             <Show when={props.onAdd}>

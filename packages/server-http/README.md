@@ -98,7 +98,10 @@ and resolving to their source, replies, timeline pages from either end, particip
 read positions, leaving, and the 404s after it; and direct threads, thread-list cursors, fixed
 direct groups, outsiders, malformed queries, and the OpenAPI document. Connection host tests add a
 connection over PostgreSQL, key it, check that no read carries the key, rename it through a
-conflict, remove it, and refuse a key on a host without a credential key.
+conflict, remove it, and refuse a key on a host without a credential key. Environment host tests
+list the installed harness and providers and the in-process environment, add a Daytona environment
+under a Daytona account connection whose readiness follows its key, and rename, reconfigure, and
+remove it.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
 resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream

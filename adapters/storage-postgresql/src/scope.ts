@@ -10,61 +10,8 @@ export interface Columns {
   readonly targetThreadId: string | null;
   readonly targetGroupId: string | null;
   readonly targetConnectionId: string | null;
+  readonly targetEnvironmentId: string | null;
 }
-
-/** The scope's workspace is the row's, so only the shape and target survive. */
-export const encode = (scope: Scope.Value): Columns => {
-  return Scope.Value.match(scope, {
-    Workspace: (): Columns => ({
-      scopeKind: "Workspace",
-      targetKind: null,
-      targetMemberId: null,
-      targetThreadId: null,
-      targetGroupId: null,
-      targetConnectionId: null,
-    }),
-    Target: ({ target }): Columns => ({
-      scopeKind: "Target",
-      ...Target.Reference.match(target, {
-        Workspace: (): Omit<Columns, "scopeKind"> => ({
-          targetKind: "Workspace",
-          targetMemberId: null,
-          targetThreadId: null,
-          targetGroupId: null,
-          targetConnectionId: null,
-        }),
-        Member: ({ memberId }): Omit<Columns, "scopeKind"> => ({
-          targetKind: "Member",
-          targetMemberId: memberId,
-          targetThreadId: null,
-          targetGroupId: null,
-          targetConnectionId: null,
-        }),
-        Thread: ({ threadId }): Omit<Columns, "scopeKind"> => ({
-          targetKind: "Thread",
-          targetMemberId: null,
-          targetThreadId: threadId,
-          targetGroupId: null,
-          targetConnectionId: null,
-        }),
-        Group: ({ groupId }): Omit<Columns, "scopeKind"> => ({
-          targetKind: "Group",
-          targetMemberId: null,
-          targetThreadId: null,
-          targetGroupId: groupId,
-          targetConnectionId: null,
-        }),
-        Connection: ({ connectionId }): Omit<Columns, "scopeKind"> => ({
-          targetKind: "Connection",
-          targetMemberId: null,
-          targetThreadId: null,
-          targetGroupId: null,
-          targetConnectionId: connectionId,
-        }),
-      }),
-    }),
-  });
-};
 
 /** Each kind of target's ID column, and the field that ID fills in the target. */
 const targetIds = {
@@ -72,8 +19,45 @@ const targetIds = {
   Thread: ["targetThreadId", "threadId"],
   Group: ["targetGroupId", "groupId"],
   Connection: ["targetConnectionId", "connectionId"],
+  Environment: ["targetEnvironmentId", "environmentId"],
 } as const;
 type TargetIdColumn = (typeof targetIds)[keyof typeof targetIds][0];
+
+const none = {
+  targetMemberId: null,
+  targetThreadId: null,
+  targetGroupId: null,
+  targetConnectionId: null,
+  targetEnvironmentId: null,
+} satisfies Record<TargetIdColumn, null>;
+
+/** A target's columns: its kind, and only its own ID column set. */
+const target = (
+  targetKind: (typeof targetKinds)[number],
+  id?: readonly [TargetIdColumn, string],
+): Omit<Columns, "scopeKind"> =>
+  Object.assign({ targetKind }, none, id === undefined ? {} : { [id[0]]: id[1] });
+
+/** The scope's workspace is the row's, so only the shape and target survive. */
+export const encode = (scope: Scope.Value): Columns =>
+  Scope.Value.match(scope, {
+    Workspace: (): Columns =>
+      Object.assign({ scopeKind: "Workspace" as const, targetKind: null }, none),
+    Target: (value): Columns =>
+      Object.assign(
+        { scopeKind: "Target" as const },
+        Target.Reference.match(value.target, {
+          Workspace: () => target("Workspace"),
+          Member: ({ memberId }) => target("Member", [targetIds.Member[0], memberId]),
+          Thread: ({ threadId }) => target("Thread", [targetIds.Thread[0], threadId]),
+          Group: ({ groupId }) => target("Group", [targetIds.Group[0], groupId]),
+          Connection: ({ connectionId }) =>
+            target("Connection", [targetIds.Connection[0], connectionId]),
+          Environment: ({ environmentId }) =>
+            target("Environment", [targetIds.Environment[0], environmentId]),
+        }),
+      ),
+  });
 
 /** Whether no target ID column is set but the one kept. */
 const onlySet = (columns: Columns, kept?: TargetIdColumn) =>

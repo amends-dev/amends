@@ -21,11 +21,18 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the agent-authored messages that notify agents as informational come from no workflow yet.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) exist, but nothing runs them: no model
-  connection, stored environment definition, or turn exists, so no model provider has been called
-  outside tests. That harness stops rather than answering the model when a response calls a tool
-  it was not offered or holds a part it cannot record, and whether providers accept history with
-  calls to tools a later session no longer offers is unverified.
+  [environment runtime](../packages/environment/README.md) exist, but nothing runs them: no agent
+  or turn exists, so no model provider has been called outside tests. That harness stops rather
+  than answering the model when a response calls a tool it was not offered or holds a part it
+  cannot record, and whether providers accept history with calls to tools a later session no
+  longer offers is unverified.
+- [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
+  and an optional sandbox under an account connection, and every workspace starts with an
+  in-process one; they have an HTTP API but no screens. Nothing turns a stored environment into a
+  running one yet. Only amends's own harness is installed, and it runs in process only, so a sandbox
+  is where its tools would act, and none acts there yet. Environments hold no defaults for
+  optional settings, since no installed harness takes reasoning levels. The compatibility check
+  does not know which models a connection offers, so it accepts any model name.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
   sandboxes outside tests. No harness runs inside a sandbox yet, and an environment's retention
   can only stop or destroy its sandbox, so no harness context survives a release. Environments

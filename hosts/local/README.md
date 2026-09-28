@@ -37,7 +37,10 @@ and setting one reports `CredentialsUnavailable`. Keep it secret and stable: a c
 open credentials sealed with the old one, and nothing rotates them yet. The host installs the
 [Anthropic](../../adapters/connection-anthropic/README.md) and
 [OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connection
-implementations.
+implementations and a [Daytona](../../adapters/sandbox-daytona/README.md) account connection;
+amends's own [harness](../../packages/harness-amends/README.md); and the
+[local](../../adapters/sandbox-local/README.md) and Daytona sandbox providers, all as
+`LocalHost.installed` declares them.
 
 The pool size is the most connections the host opens. Four are the host's own: one listens for
 notifications, two run background work, and one holds the runner address. A busy workspace's

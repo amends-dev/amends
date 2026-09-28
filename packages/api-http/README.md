@@ -76,8 +76,10 @@ so a client can import the complete contract without loading server code.
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
 - `connections`: access to external systems, such as model providers; see
   [Connections](#connections).
+- `environments`: where and how agents run; see [Environments](#environments).
 
-`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`, both thread
+`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
+`POST …/environments`, both thread
 starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
 same key returns the first attempt's result, and the same key with a different body returns 422
 `Request.Reused`. Clients generating the typed client pass it in `headers`.
@@ -260,6 +262,29 @@ one does. An implementation this host lacks is 422 `UnknownImplementation`, sett
 declare or a required or malformed value are 422 `InvalidSettings`, and a way of authenticating it
 does not take, or a key for a connection that takes none, is 422 `UnsupportedAuthentication`. A
 host without a credential key answers a key with 503 `CredentialsUnavailable`.
+
+### Environments
+
+Environment paths sit under `/workspaces/:workspaceId/environments` and require active membership.
+Every member may read environments and the harnesses and sandbox providers this host installed;
+the built-in administrator tier adds, renames, configures, and removes them. The
+[core environments section](../core/README.md#environments) describes the rules.
+
+| Endpoint                                    | Operation                                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET …/environments/implementations`        | `{ harnesses, sandboxes }`: the installed declarations.                                                             |
+| `GET …/environments`                        | The environments the caller may read, by name, starting with the in-process one every workspace has.                |
+| `POST …/environments`                       | Add one from `{ name, harnessId, sandbox }`, where `sandbox` is null or its provider, placement, and settings; 201. |
+| `GET …/environments/:environmentId`         | One environment.                                                                                                    |
+| `POST …/environments/:environmentId/rename` | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `EnvironmentApplication.Changed`.   |
+| `PUT …/environments/:environmentId/sandbox` | Replace its sandbox settings from `{ sandbox }`: account connection, template, variables, setup, and retention.     |
+| `DELETE …/environments/:environmentId`      | Remove it; 204.                                                                                                     |
+
+An environment reads as `Environment.View`, with `manageable` and its readiness. One the caller may
+not read answers 404. A harness or provider this host lacks is 422 `UnknownHarness` or
+`UnknownSandboxProvider`, a harness that cannot run where asked is 422 `UnsupportedPlacement`, and
+sandbox settings that do not fit the provider, or configuring an environment without a sandbox, is
+422 `InvalidSandbox` with issue codes.
 
 ## Authentication
 

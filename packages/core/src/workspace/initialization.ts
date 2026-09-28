@@ -5,6 +5,8 @@ import { PermissionCatalog } from "../authorization/permission-catalog.ts";
 import { BuiltinRoles } from "../authorization/role/builtin.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
 import { Scope } from "../authorization/scope.ts";
+import { Environment } from "../environment/environment.ts";
+import { EnvironmentFacts } from "../environment/facts.ts";
 import { GroupFacts } from "../group/facts.ts";
 import { Group } from "../group/group.ts";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
@@ -32,7 +34,8 @@ export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()
  * Built-in roles are recorded from the permission catalog's tiers at the current revision, and
  * the creator receives one workspace-scoped Owner assignment. Existing roles are never refreshed
  * here; `BuiltinRoleUpgrade` brings an older workspace's roles to a later revision. The workspace
- * starts with its general group, public and holding the creator; see `Group.GeneralId`.
+ * starts with its general group, public and holding the creator; see `Group.GeneralId`, and its
+ * in-process environment; see `Environment.InProcessId`.
  */
 export const initialize = Effect.fn("WorkspaceInitialization.initialize")(function* (
   creator: Identity.HumanId,
@@ -108,6 +111,9 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
           admittedAt: createdAt,
           status: "active",
         })
+        .pipe(Publication.withOccurredAt(createdAt));
+      yield* journal
+        .publish(EnvironmentFacts.Created, Environment.inProcess(record.id, createdAt))
         .pipe(Publication.withOccurredAt(createdAt));
       return record;
     }).pipe(Effect.provideService(Publication.Service, provenance)),

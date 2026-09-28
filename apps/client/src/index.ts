@@ -51,6 +51,7 @@ export type { WorkspaceFailure } from "./api/failures.ts";
 export {
   useConnections,
   type ConnectionAction,
+  type ConnectionCapability,
   type ConnectionEntry,
   type ConnectionMethod,
   type ConnectionProvider,

@@ -8,6 +8,7 @@ export { builtinRoles } from "./builtin-roles.ts";
 export { changeFeed } from "./change-feed.ts";
 export { connections } from "./connections.ts";
 export { contracts } from "./contracts.ts";
+export { environments } from "./environments.ts";
 export { factMetadata } from "./fact-metadata.ts";
 export { gateway } from "./gateway.ts";
 export { groupFollows } from "./group-follows.ts";

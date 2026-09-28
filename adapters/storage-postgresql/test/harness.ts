@@ -22,6 +22,7 @@ const projections = [
   "thread_messages",
   "thread_activities",
   "connections",
+  "environments",
   "checkpoints",
   "live_projections",
 ];

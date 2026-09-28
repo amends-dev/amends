@@ -26,6 +26,7 @@ import {
 } from "@amends/core/workspace";
 import { ReadStateApplication } from "@amends/core/attention";
 import { ConnectionApplication } from "@amends/core/connection";
+import { EnvironmentApplication } from "@amends/core/environment";
 import { SignalApplication } from "@amends/core/signal";
 import { Request } from "@amends/core/request";
 import { Schema } from "effect";
@@ -139,6 +140,12 @@ export const PublicError = Schema.Union([
   ConnectionApplication.InvalidSettings,
   ConnectionApplication.UnsupportedAuthentication,
   ConnectionApplication.CredentialsUnavailable,
+  EnvironmentApplication.NotFound,
+  EnvironmentApplication.Changed,
+  EnvironmentApplication.UnknownHarness,
+  EnvironmentApplication.UnknownSandboxProvider,
+  EnvironmentApplication.UnsupportedPlacement,
+  EnvironmentApplication.InvalidSandbox,
 ]);
 export type PublicError = typeof PublicError.Type;
 

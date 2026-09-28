@@ -21,6 +21,7 @@ export {
 export {
   connectionsMessage,
   connectionsToast,
+  type ConnectionCapability,
   type ConnectionMethod,
   type ConnectionProviderOption,
   type ConnectionSettingField,

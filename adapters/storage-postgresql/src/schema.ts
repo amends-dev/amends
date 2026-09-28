@@ -41,7 +41,14 @@ export const participantKinds = ["Member", "Contact", "Triage"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection"] as const;
+export const targetKinds = [
+  "Workspace",
+  "Member",
+  "Thread",
+  "Group",
+  "Connection",
+  "Environment",
+] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** What the journal settles; a human recipient's Seen is private state in notification_seen. */
 export const notificationStates = ["Pending", "Discarded", "Informational"] as const;
@@ -54,6 +61,7 @@ const scopeColumns = {
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
   targetConnectionId: text("target_connection_id"),
+  targetEnvironmentId: text("target_environment_id"),
 };
 /** The column holding each kind of target's ID; a workspace target needs none. */
 const targetIds = {
@@ -61,6 +69,7 @@ const targetIds = {
   Thread: "targetThreadId",
   Group: "targetGroupId",
   Connection: "targetConnectionId",
+  Environment: "targetEnvironmentId",
 } as const;
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
   /** Only the named target ID column is set, or none. */
@@ -749,4 +758,35 @@ export const connectionCredentials = pgTable(
     sealed: text("sealed").notNull(),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/**
+ * Where and how agents run: a harness, and optionally a sandbox. A sandbox's columns are all set or
+ * all null; its variables and setup commands are stored as JSON, since both are lists of values.
+ */
+export const environments = pgTable(
+  "environments",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    name: text("name").notNull(),
+    harnessId: text("harness_id").notNull(),
+    sandboxProviderId: text("sandbox_provider_id"),
+    sandboxHarness: text("sandbox_harness", { enum: ["in-process", "in-sandbox"] }),
+    sandboxConnectionId: text("sandbox_connection_id"),
+    sandboxTemplate: text("sandbox_template"),
+    sandboxEnv: jsonb("sandbox_env").$type<Record<string, string>>(),
+    sandboxSetup: jsonb("sandbox_setup").$type<ReadonlyArray<string>>(),
+    sandboxRetention: text("sandbox_retention", { enum: ["stop", "destroy"] }),
+    status: text("status", { enum: memberStatuses }).notNull(),
+    createdBy: text("created_by"),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    check(
+      "environments_sandbox_complete",
+      sql`(${t.sandboxProviderId} IS NULL AND ${t.sandboxHarness} IS NULL AND ${t.sandboxConnectionId} IS NULL AND ${t.sandboxTemplate} IS NULL AND ${t.sandboxEnv} IS NULL AND ${t.sandboxSetup} IS NULL AND ${t.sandboxRetention} IS NULL) OR (${t.sandboxProviderId} IS NOT NULL AND ${t.sandboxHarness} IS NOT NULL AND ${t.sandboxEnv} IS NOT NULL AND ${t.sandboxSetup} IS NOT NULL AND ${t.sandboxRetention} IS NOT NULL)`,
+    ),
+  ],
 );

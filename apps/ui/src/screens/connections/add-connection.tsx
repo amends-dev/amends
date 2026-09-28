@@ -58,7 +58,7 @@ export function ChooseProvider(props: ChooseProviderProps) {
             }
           >
             <div class={s.stack}>
-              <p class={s.intro}>Choose a provider for model access.</p>
+              <p class={s.intro}>Choose what to connect.</p>
               <ul class={s.providers} aria-label="Providers">
                 <For each={props.providers}>
                   {(provider) => (

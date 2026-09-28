@@ -21,6 +21,7 @@ import {
 } from "@amends/core/workspace";
 import { BackgroundWakes } from "@amends/core/background";
 import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
+import { EnvironmentCatalog } from "@amends/core/environment";
 import { type WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
@@ -95,6 +96,7 @@ export const core = (bound: Bound) =>
         Layer.succeedContext(bound.context),
         BunCrypto.layer,
         ConnectionCatalog.layer([]),
+        EnvironmentCatalog.layer(),
       ),
     ),
   );

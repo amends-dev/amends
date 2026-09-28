@@ -7,6 +7,7 @@ export { NotificationsHandlers } from "./notifications.ts";
 export { Routes } from "./routes.ts";
 export { ChangesHandlers } from "./changes.ts";
 export { ConnectionsHandlers } from "./connections.ts";
+export { EnvironmentsHandlers } from "./environments.ts";
 export { Draining } from "./draining.ts";
 export { SessionHandlers } from "./session.ts";
 export { ThreadsHandlers } from "./threads.ts";

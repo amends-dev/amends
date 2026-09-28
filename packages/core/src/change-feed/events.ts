@@ -6,6 +6,9 @@ import { GroupFacts } from "../group/facts.ts";
 import type { ConnectionId } from "../connection/id.ts";
 import { ConnectionFacts } from "../connection/facts.ts";
 import { ConnectionPermissions } from "../connection/permissions.ts";
+import { EnvironmentFacts } from "../environment/facts.ts";
+import type { EnvironmentId } from "../environment/id.ts";
+import { EnvironmentPermissions } from "../environment/permissions.ts";
 import type { Group } from "../group/group.ts";
 import { GroupFollowFacts } from "../group/follow/facts.ts";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
@@ -147,6 +150,12 @@ const readAccess = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId });
 const readConnection = (connectionId: ConnectionId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(ConnectionPermissions.Read, { _tag: "Connection", workspaceId, connectionId });
+const readEnvironment = (environmentId: EnvironmentId.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(EnvironmentPermissions.Read, {
+    _tag: "Environment",
+    workspaceId,
+    environmentId,
+  });
 const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
@@ -229,6 +238,18 @@ const registry: ReadonlyArray<Registered> = [
   }),
   register(ConnectionFacts.Removed, {
     requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  }),
+  register(EnvironmentFacts.Created, {
+    requirement: ({ id }, workspaceId) => readEnvironment(id, workspaceId),
+  }),
+  register(EnvironmentFacts.Renamed, {
+    requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
+  }),
+  register(EnvironmentFacts.Configured, {
+    requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
+  }),
+  register(EnvironmentFacts.Removed, {
+    requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
   }),
   register(GroupFollowFacts.Started),
   register(GroupFollowFacts.Ended),

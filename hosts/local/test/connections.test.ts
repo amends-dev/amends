@@ -67,6 +67,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(implementations.map((implementation) => implementation.id)).toEqual([
           "anthropic",
           "openai-compatible",
+          "daytona",
         ]);
 
         const created = yield* asAlice.connections.create({

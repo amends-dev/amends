@@ -10,8 +10,8 @@ so browser and hash history work. The screens follow the Lunacy "Connections" mo
   names what is missing: required settings or the key. Unavailable is a connection whose provider
   this server no longer installs; it stays, with its saved settings and key, until someone
   removes it.
-- **Adding** starts from the providers this server installed: Anthropic and OpenAI-compatible
-  today, both for model access. The provider's declaration decides the settings asked for and
+- **Adding** starts from the providers this server installed: Anthropic and OpenAI-compatible for
+  model access, and Daytona, an account that environments run their sandboxes under. The provider's declaration decides the settings asked for and
   the ways of authenticating offered. Creating takes two steps. The first creates the connection
   without its key; the second saves the key against it. Finish later leaves the connection under
   Needs setup, and a failed key save retries only the key.

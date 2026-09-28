@@ -1,6 +1,7 @@
 export { Api } from "./api.ts";
 export { ChangesGroup } from "./changes.ts";
 export { ConnectionsGroup } from "./connections.ts";
+export { EnvironmentsGroup } from "./environments.ts";
 export { Authentication, Principal, Unauthorized } from "./authentication.ts";
 export { ApiErrors } from "./errors.ts";
 export { GroupsGroup } from "./groups.ts";
@@ -26,3 +27,6 @@ export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@ame
 export { Notification, NotificationInbox } from "@amends/core/notification";
 export { Connection } from "@amends/core/connection";
 export { ConnectionImplementation } from "@amends/connection";
+export { Environment, EnvironmentCompatibility } from "@amends/core/environment";
+export { HarnessImplementation } from "@amends/harness";
+export { SandboxImplementation } from "@amends/sandbox";

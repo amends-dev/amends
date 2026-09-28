@@ -19,13 +19,16 @@
     "./attention": "./src/attention/index.ts",
     "./request": "./src/request/index.ts",
     "./signal": "./src/signal/index.ts",
-    "./connection": "./src/connection/index.ts"
+    "./connection": "./src/connection/index.ts",
+    "./environment": "./src/environment/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@amends/connection": "workspace:*",
+    "@amends/harness": "workspace:*",
+    "@amends/sandbox": "workspace:*",
     "effect": "catalog:"
   }
 }

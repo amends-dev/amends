@@ -14,6 +14,8 @@ network; `capabilities.isolated` is `false`. Do not run untrusted work in it.
   it was acquired with;
 - `snapshots/<id>/`, each snapshot as a copy of a working directory.
 
+`LocalSandbox.declaration` is what a host registers: a provider without an account or template.
+
 Acquiring an ID whose directory exists retains it. Background processes belong to the provider
 that started them: stopping the sandbox or closing the provider's scope ends them, and a restarted
 host cannot reach processes an earlier one left running. Exposed ports are

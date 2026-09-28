@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends/connection": "workspace:*",
     "@amends/sandbox": "workspace:*",
     "@daytona/sdk": "0.218.0",
     "effect": "catalog:"

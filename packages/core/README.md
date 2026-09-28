@@ -164,6 +164,42 @@ journal and its read models, writes within commits, and reports `Unavailable` on
 none, which operations surface as `CredentialsUnavailable`. Both are required host bindings, and
 `ConnectionCatalog.Service` is supplied by the gateway from the host's registered declarations.
 
+## Environments
+
+`@amends/core/environment` holds workspace environments: where and how agents run, as a harness and
+an optional sandbox, described by the [harness](../harness/README.md#declarations) and
+[sandbox](../sandbox/README.md#declarations) declarations a host installs in its
+`EnvironmentCatalog`. A sandbox names its provider, where the harness runs (`in-process`, where the
+sandbox is only where its tools act, or `in-sandbox`), the account connection it runs under when
+its provider has one, a template, non-secret variables, setup commands run in order, and a
+retention, `stop` or `destroy`. Model access, instructions, and toolkits belong to agents, and
+credentials to connections.
+
+`EnvironmentApplication` lists the installed `implementations`, which every member may see, and
+lists, reads, creates, renames, configures, and removes environments. Creating checks the harness
+(`UnknownHarness`), that it can run where asked (`UnsupportedPlacement`), the provider
+(`UnknownSandboxProvider`), and the sandbox settings (`InvalidSandbox`, with issue codes): an
+account connection exactly when the provider runs under one, which the actor may read and use and
+which declares the sandbox capability for this provider, and a template only when the provider
+takes one. The harness, provider, and placement are fixed once created; `configure` replaces the
+rest of the sandbox settings. Reads return `Environment.View` with `manageable` and readiness,
+`Ready` or `Incomplete` with issue codes, from the catalog and the account connection's own
+readiness; nothing contacts the provider.
+
+Every workspace starts with `Environment.InProcessId`, amends's own harness in process without a
+sandbox, recorded at initialization with no creator. It is an ordinary environment afterwards.
+`environment.create` works on the workspace, and `environment.read`, `environment.manage`, and
+`environment.use` on each environment, an `Environment` target; members read and use environments,
+and administrators and the owner also create and manage them, raising the built-in roles to
+revision 3. Nothing checks `environment.use` yet.
+
+`EnvironmentCompatibility.check(environment, harness, selection)` is the one answer to whether an
+environment can run a model selection: the environment must be ready, the connection must provide
+model inference and be ready, a harness that speaks provider interfaces must speak the
+connection's, and a requested reasoning level must be one the harness takes. It does not know
+which models a connection offers. Agent setup, environment choices, turn setup, and transfers are
+meant to share it; nothing calls it yet.
+
 ## Read state
 
 `@amends/core/attention` holds private read state: `ReadStateApplication.markThreadRead` and

@@ -28,6 +28,9 @@ export type ConnectionSetup = "configured" | "needs-setup" | "unavailable";
 /** How a connection authenticates, chosen when it is created. */
 export type ConnectionMethod = "api-key" | "none";
 
+/** What a provider's connections give access to: model providers, or sandboxes for environments. */
+export type ConnectionCapability = "model-access" | "sandboxes";
+
 /** A setting a provider takes, as its implementation declares it. */
 export interface ConnectionSetting {
   readonly key: string;
@@ -44,7 +47,7 @@ export interface ConnectionProvider {
   readonly name: string;
   readonly description: string;
   /** What its connections give access to. */
-  readonly capability: "model-access" | undefined;
+  readonly capability: ConnectionCapability | undefined;
   /** The ways its connections may authenticate, in the order it prefers them. */
   readonly methods: readonly ConnectionMethod[];
   readonly settings: readonly ConnectionSetting[];
@@ -110,7 +113,12 @@ const providerOf = (declaration: ConnectionImplementation.Declaration): Connecti
   id: declaration.id,
   name: declaration.name,
   description: declaration.description,
-  capability: declaration.capabilities.modelInference === undefined ? undefined : "model-access",
+  capability:
+    declaration.capabilities.modelInference !== undefined
+      ? "model-access"
+      : declaration.capabilities.sandbox !== undefined
+        ? "sandboxes"
+        : undefined,
   methods: declaration.authentication.map(methodOf),
   settings: declaration.settings.map((setting) => ({
     key: setting.key,
@@ -157,7 +165,10 @@ export function useConnections(
           required: false,
           value,
         }));
-    const readiness = view.readiness.modelInference;
+    // Every capability needs the same settings and key today, so any incomplete one says what.
+    const readiness = [view.readiness.modelInference, view.readiness.sandbox].find(
+      (entry) => entry?._tag === "Incomplete",
+    );
     const missing =
       readiness?._tag === "Incomplete"
         ? {

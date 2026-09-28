@@ -130,7 +130,10 @@ export const View = Schema.Struct({
   /** Whether the reader may rename, configure, set or clear the credential of, and remove it. */
   manageable: Schema.Boolean,
   /** Readiness for each capability the implementation declares. */
-  readiness: Schema.Struct({ modelInference: Schema.optionalKey(Readiness) }),
+  readiness: Schema.Struct({
+    modelInference: Schema.optionalKey(Readiness),
+    sandbox: Schema.optionalKey(Readiness),
+  }),
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
@@ -203,9 +206,16 @@ export const view = (
   capabilities: declaration?.capabilities ?? {},
   manageable,
   readiness:
-    declaration?.capabilities.modelInference === undefined
+    declaration === undefined
       ? {}
-      : { modelInference: readiness(record, declaration) },
+      : {
+          ...(declaration.capabilities.modelInference === undefined
+            ? {}
+            : { modelInference: readiness(record, declaration) }),
+          ...(declaration.capabilities.sandbox === undefined
+            ? {}
+            : { sandbox: readiness(record, declaration) }),
+        },
 });
 
 export * as Connection from "./connection.ts";

@@ -1,6 +1,9 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { ClusterBackground, Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import { AmendsHarness } from "@amends/harness-amends";
+import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
+import { LocalSandbox } from "@amends/sandbox-local";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
@@ -49,11 +52,19 @@ export interface Options {
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
 }
 
-/** The connection implementations this host installs, as its catalog declares them. */
-export const connections = [
-  AnthropicConnection.declaration,
-  OpenAiCompatibleConnection.declaration,
-];
+/**
+ * What this host installs, as its catalogs declare them: model connections and a Daytona account;
+ * amends's own harness; and sandboxes as local directories, for development, and on Daytona.
+ */
+export const installed = {
+  connections: [
+    AnthropicConnection.declaration,
+    OpenAiCompatibleConnection.declaration,
+    DaytonaConnection.declaration,
+  ],
+  harnesses: [AmendsHarness.declaration],
+  sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
+};
 
 /**
  * The database, and the cluster that runs background work over the same pool: one SQL client, so
@@ -100,7 +111,7 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     ClusterBackground.layerPruning({ prune: PostgresClusterStorage.prune }),
   ).pipe(
     Layer.provideMerge(
-      Gateway.layer({ connections }).pipe(
+      Gateway.layer(installed).pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
         Layer.provide(ClusterBackground.layerWakes),
       ),

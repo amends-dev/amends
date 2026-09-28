@@ -22,8 +22,10 @@ connections against, and an app shows when someone adds a connection:
 | `authentication` | The ways a connection may authenticate: `None`, or `ApiKey`, a secret kept in protected storage. |
 
 A setting has a `key`, a `label`, a `kind` (`text` or `url`), whether it is `required`, and an
-optional `description` and `placeholder`. Model inference is the only capability so far, naming
-the provider `interface` a harness must support, such as `anthropic-messages`. Toolkit and channel
+optional `description` and `placeholder`. Model inference names the provider `interface` a harness
+must support, such as `anthropic-messages`. The sandbox capability names a sandbox provider, such as
+`daytona`, whose account the connection is; environments using that provider run under it, and
+[`sandbox-daytona`](../../adapters/sandbox-daytona/README.md) declares one. Toolkit and channel
 support, and OAuth as an authentication method with per-capability scopes, join with the first
 implementations that need them.
 

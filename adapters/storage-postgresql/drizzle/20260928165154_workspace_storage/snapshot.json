@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "72b5fe47-d0b0-4617-80ba-ecb58f79b613",
+  "id": "77ef5a6c-8e8e-4c14-ab89-0b93d95040af",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -39,6 +39,12 @@
     {
       "isRlsEnabled": false,
       "name": "connections",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "environments",
       "entityType": "tables",
       "schema": "public"
     },
@@ -321,6 +327,19 @@
       "generated": null,
       "identity": null,
       "name": "target_connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "assignments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "target_environment_id",
       "entityType": "columns",
       "schema": "public",
       "table": "assignments"
@@ -688,6 +707,188 @@
       "entityType": "columns",
       "schema": "public",
       "table": "connections"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "harness_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_provider_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_harness",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_template",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_env",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_setup",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_retention",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "environments"
     },
     {
       "type": "text",
@@ -4050,6 +4251,17 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "environments_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "environments"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "group_follows_pkey",
       "entityType": "pks",
       "schema": "public",
@@ -4275,7 +4487,7 @@
       "table": "assignments"
     },
     {
-      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL)))",
+      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Environment' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NOT NULL)))",
       "name": "assignments_scope_agrees",
       "entityType": "checks",
       "schema": "public",
@@ -4294,6 +4506,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "connections"
+    },
+    {
+      "value": "(\"sandbox_provider_id\" IS NULL AND \"sandbox_harness\" IS NULL AND \"sandbox_connection_id\" IS NULL AND \"sandbox_template\" IS NULL AND \"sandbox_env\" IS NULL AND \"sandbox_setup\" IS NULL AND \"sandbox_retention\" IS NULL) OR (\"sandbox_provider_id\" IS NOT NULL AND \"sandbox_harness\" IS NOT NULL AND \"sandbox_env\" IS NOT NULL AND \"sandbox_setup\" IS NOT NULL AND \"sandbox_retention\" IS NOT NULL)",
+      "name": "environments_sandbox_complete",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "environments"
     },
     {
       "value": "(\"status\" = 'active' AND \"ended_at\" IS NULL) OR (\"status\" = 'ended' AND \"ended_at\" IS NOT NULL)",

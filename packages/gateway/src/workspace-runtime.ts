@@ -2,6 +2,9 @@ import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
 import { BackgroundWakes } from "@amends/core/background";
 import { ConnectionCatalog } from "@amends/core/connection";
+import { EnvironmentCatalog } from "@amends/core/environment";
+import type { HarnessImplementation } from "@amends/harness";
+import type { SandboxImplementation } from "@amends/sandbox";
 import type { ConnectionImplementation } from "@amends/connection";
 import { Journal } from "@amends/core/journal";
 import { Signals } from "@amends/core/signal";
@@ -32,6 +35,12 @@ export interface Options {
    * workspace checks its connections against them. Defaults to none.
    */
   readonly connections?: ReadonlyArray<ConnectionImplementation.Declaration> | undefined;
+  /**
+   * The harnesses and sandbox providers this host installed, as they declare themselves; every
+   * workspace checks its environments against them. Each defaults to none.
+   */
+  readonly harnesses?: ReadonlyArray<HarnessImplementation.Declaration> | undefined;
+  readonly sandboxes?: ReadonlyArray<SandboxImplementation.Declaration> | undefined;
   /**
    * How long a workspace stays prepared after its last lease closes. A later request boots it
    * again from storage. Defaults to five minutes.
@@ -68,6 +77,10 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
   const cryptography = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
   const catalog = ConnectionCatalog.make(options.connections ?? []);
+  const environments = EnvironmentCatalog.make({
+    harnesses: options.harnesses,
+    sandboxes: options.sandboxes,
+  });
 
   const boot = Effect.fn("WorkspaceRuntime.boot")(function* (workspaceId: Workspace.Id) {
     const bindings = yield* storage.forWorkspace(workspaceId);
@@ -79,6 +92,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeed(Signals.Service, hub.forWorkspace(workspaceId)),
           Layer.succeed(BackgroundWakes.Service, wakes.forWorkspace(workspaceId)),
           Layer.succeed(ConnectionCatalog.Service, catalog),
+          Layer.succeed(EnvironmentCatalog.Service, environments),
         ),
       ),
       Layer.orDie,

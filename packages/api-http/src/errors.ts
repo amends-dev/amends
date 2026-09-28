@@ -17,6 +17,7 @@ import {
   GroupMembershipApplication,
 } from "@amends/core/group";
 import { ConnectionApplication } from "@amends/core/connection";
+import { EnvironmentApplication } from "@amends/core/environment";
 import { NotificationApplication } from "@amends/core/notification";
 import { ReadStateApplication } from "@amends/core/attention";
 import {
@@ -200,6 +201,23 @@ export const UnsupportedAuthentication = ConnectionApplication.UnsupportedAuthen
 export const CredentialsUnavailable = ConnectionApplication.CredentialsUnavailable.pipe(
   HttpApiSchema.status(503),
 );
+
+/** An environment the caller may not read answers as missing. */
+export const EnvironmentNotFound = EnvironmentApplication.NotFound.pipe(HttpApiSchema.status(404));
+/** An environment renamed since the caller last saw its name refuses another name with 409. */
+export const EnvironmentChanged = EnvironmentApplication.Changed.pipe(HttpApiSchema.status(409));
+/** The harness is not installed on this host. */
+export const UnknownHarness = EnvironmentApplication.UnknownHarness.pipe(HttpApiSchema.status(422));
+/** The sandbox provider is not installed on this host. */
+export const UnknownSandboxProvider = EnvironmentApplication.UnknownSandboxProvider.pipe(
+  HttpApiSchema.status(422),
+);
+/** The harness cannot run where the environment asks it to. */
+export const UnsupportedPlacement = EnvironmentApplication.UnsupportedPlacement.pipe(
+  HttpApiSchema.status(422),
+);
+/** The sandbox settings do not fit the provider, or the environment has no sandbox. */
+export const InvalidSandbox = EnvironmentApplication.InvalidSandbox.pipe(HttpApiSchema.status(422));
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [

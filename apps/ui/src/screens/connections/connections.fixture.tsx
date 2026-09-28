@@ -58,6 +58,30 @@ export const sampleProviders: readonly ConnectionProviderOption[] = [
       },
     ],
   },
+  {
+    id: "daytona",
+    name: "Daytona",
+    description: "A Daytona account that environments run their sandboxes under.",
+    capability: "sandboxes",
+    methods: ["api-key"],
+    settings: [
+      {
+        key: "apiUrl",
+        label: "API URL",
+        kind: "url",
+        required: false,
+        description: "Leave empty to use Daytona's own API.",
+        placeholder: "https://app.daytona.io/api",
+      },
+      {
+        key: "target",
+        label: "Target",
+        kind: "text",
+        required: false,
+        description: "The region sandboxes run in, such as us or eu. Leave empty for your default.",
+      },
+    ],
+  },
 ];
 
 interface Sample {

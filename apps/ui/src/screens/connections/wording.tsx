@@ -24,12 +24,15 @@ export interface ConnectionSettingField {
   readonly placeholder?: string;
 }
 
+/** What a provider's connections give access to: model providers, or sandboxes for environments. */
+export type ConnectionCapability = "model-access" | "sandboxes";
+
 /** A provider the server installed, which a new connection goes through. */
 export interface ConnectionProviderOption {
   readonly id: string;
   readonly name: string;
   readonly description: string;
-  readonly capability: "model-access" | undefined;
+  readonly capability: ConnectionCapability | undefined;
   /** The ways its connections may authenticate, preferred first. */
   readonly methods: readonly ConnectionMethod[];
   readonly settings: readonly ConnectionSettingField[];
@@ -42,7 +45,7 @@ export interface ConnectionSummary {
   readonly providerId: string;
   /** Undefined when the server no longer installs its provider. */
   readonly provider:
-    | { readonly name: string; readonly capability: "model-access" | undefined }
+    | { readonly name: string; readonly capability: ConnectionCapability | undefined }
     | undefined;
   /** Its settings with their values; for an unavailable provider, the saved keys alone. */
   readonly settings: ReadonlyArray<ConnectionSettingField & { readonly value: string }>;
@@ -84,6 +87,11 @@ export type ConnectionsError =
   | "refresh-failed"
   | "outdated";
 
+export const capabilityLabels = {
+  "model-access": "Model access",
+  sandboxes: "Sandboxes",
+} as const satisfies Record<ConnectionCapability, string>;
+
 export const setupLabels = {
   configured: "Configured",
   "needs-setup": "Needs setup",
@@ -106,7 +114,9 @@ export const providerLine = (connection: ConnectionSummary) =>
   connection.provider
     ? [
         connection.provider.name,
-        connection.provider.capability === "model-access" ? "Model access" : undefined,
+        connection.provider.capability === undefined
+          ? undefined
+          : capabilityLabels[connection.provider.capability],
       ]
         .filter(Boolean)
         .join(" · ")

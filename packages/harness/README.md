@@ -46,6 +46,15 @@ Stored events are tagged unions encoded as JSON. Adding an event kind or an opti
 old logs readable; changing what an existing field means does not. The tests round-trip every kind
 through JSON.
 
+## Declarations
+
+`HarnessImplementation.Declaration` is what a host registers in its catalog and core checks
+environments against: the harness's `id` (its `Harness.Name`), `name`, and `description`; its
+`placement`, where its loop can run (`in-process` in the amends process, or `in-sandbox` as a
+program inside a sandbox); how it reaches a model (`LanguageModel`, Effect AI access from any model
+connection the host installed, or `Interfaces`, provider interfaces it speaks itself); and the
+`reasoning` levels it can request, if any.
+
 ## Sessions
 
 `Harness.Interface<R>` names an implementation, declares its `Capabilities`, and starts sessions

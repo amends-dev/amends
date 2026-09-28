@@ -2,7 +2,13 @@ import { Cause, Effect, Option, Queue, Ref, Result, Schema, Semaphore, Stream } 
 import type { JsonSchema } from "effect";
 import { AiError, LanguageModel, Model, Tool } from "effect/unstable/ai";
 import type { Response, Toolkit } from "effect/unstable/ai";
-import { Harness, HarnessErrors, HarnessTool, Transcript } from "@amends/harness";
+import {
+  Harness,
+  HarnessErrors,
+  HarnessTool,
+  Transcript,
+  type HarnessImplementation,
+} from "@amends/harness";
 import type { HarnessEvent } from "@amends/harness";
 import { AmendsPrompt } from "./prompt.ts";
 
@@ -14,6 +20,19 @@ export const name = Harness.Name.make("amends");
  * an earlier session left pending waits for its result.
  */
 export const capabilities: Harness.Capabilities = { transcript: true, pendingToolCalls: true };
+
+/**
+ * What a host registers: the loop runs in process, over the Effect AI model a connection's
+ * implementation supplies, so any model connection the host installed works. Running it inside a
+ * sandbox, and reasoning levels, are not supported yet.
+ */
+export const declaration: HarnessImplementation.Declaration = {
+  id: name,
+  name: "Amends",
+  description: "Amends's own agent loop, over the model a connection provides.",
+  placement: ["in-process"],
+  models: { _tag: "LanguageModel" },
+};
 
 interface State {
   readonly prepared: boolean;

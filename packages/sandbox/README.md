@@ -54,6 +54,14 @@ Writing to a process's input is a capability because Vercel and Cloudflare offer
 process and exposing a port work everywhere, so anything the host must talk to inside a sandbox
 should listen on a port rather than rely on standard input.
 
+## Declarations
+
+`SandboxImplementation.Declaration` is what a host registers in its catalog and an environment
+names: the provider's `id`, `name`, `description`, and `capabilities`; whether its sandboxes run
+under an `account`, a workspace connection whose implementation declares the sandbox capability
+for this provider; and, if it takes a starting point for new sandboxes, how to describe that
+`template`.
+
 ## Errors
 
 `ProviderFailure` says the provider could not do what was asked and whether retrying unchanged can
