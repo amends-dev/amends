@@ -23,6 +23,7 @@ const projections = [
   "thread_activities",
   "connections",
   "environments",
+  "agents",
   "checkpoints",
   "live_projections",
 ];

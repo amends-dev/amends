@@ -9,7 +9,16 @@ export const declaration = ConnectionImplementation.Declaration.make({
   id: ConnectionImplementation.Id.make("anthropic"),
   name: "Anthropic",
   description: "Claude models through the Anthropic API.",
-  capabilities: { modelInference: { interface: "anthropic-messages" } },
+  capabilities: {
+    modelInference: {
+      interface: "anthropic-messages",
+      models: [
+        { id: "claude-opus-5-5", name: "Claude Opus 5.5" },
+        { id: "claude-sonnet-5", name: "Claude Sonnet 5" },
+        { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
+      ],
+    },
+  },
   settings: [
     {
       key: "baseUrl",

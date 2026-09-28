@@ -1,4 +1,6 @@
+import { AgentApplication } from "./agent/application.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
+import { AgentProjection } from "./agent/projection.ts";
 import { ConnectionApplication } from "./connection/application.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
@@ -98,6 +100,7 @@ export const projections = [
   NotificationProjection.definition,
   ConnectionProjection.definition,
   EnvironmentProjection.definition,
+  AgentProjection.definition,
 ] as const;
 
 /**
@@ -132,6 +135,9 @@ export const permissions = [
   EnvironmentPermissions.Read,
   EnvironmentPermissions.Manage,
   EnvironmentPermissions.Use,
+  AgentPermissions.Create,
+  AgentPermissions.Read,
+  AgentPermissions.Configure,
 ];
 
 /**
@@ -212,6 +218,7 @@ const operations = Layer.mergeAll(
   SignalApplication.layer,
   ConnectionApplication.layer,
   EnvironmentApplication.layer,
+  AgentApplication.layer.pipe(Layer.provide(MemberApplication.layer)),
 ).pipe(
   Layer.provide(
     Layer.mergeAll(

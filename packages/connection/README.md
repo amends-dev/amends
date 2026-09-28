@@ -23,7 +23,8 @@ connections against, and an app shows when someone adds a connection:
 
 A setting has a `key`, a `label`, a `kind` (`text` or `url`), whether it is `required`, and an
 optional `description` and `placeholder`. Model inference names the provider `interface` a harness
-must support, such as `anthropic-messages`. The sandbox capability names a sandbox provider, such as
+must support, such as `anthropic-messages`, and may suggest `models`, each an `id` and a `name`, for
+an app to offer when choosing an agent's model; an agent may still name any other. The sandbox capability names a sandbox provider, such as
 `daytona`, whose account the connection is; environments using that provider run under it, and
 [`sandbox-daytona`](../../adapters/sandbox-daytona/README.md) declares one. Toolkit and channel
 support, and OAuth as an authentication method with per-capability scopes, join with the first

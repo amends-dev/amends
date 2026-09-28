@@ -1,4 +1,6 @@
 import { Effect, Option, Schema } from "effect";
+import { AgentFacts } from "../agent/facts.ts";
+import { AgentPermissions } from "../agent/permissions.ts";
 import { AssignmentFacts } from "../authorization/assignment/facts.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
@@ -156,6 +158,8 @@ const readEnvironment = (environmentId: EnvironmentId.Id, workspaceId: Workspace
     workspaceId,
     environmentId,
   });
+const readAgent = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(AgentPermissions.Read, { _tag: "Member", workspaceId, memberId });
 const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
@@ -250,6 +254,13 @@ const registry: ReadonlyArray<Registered> = [
   }),
   register(EnvironmentFacts.Removed, {
     requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
+  }),
+  // Agents' configuration reaches those who may read it; their names come with membership facts.
+  register(AgentFacts.Created, {
+    requirement: ({ memberId }, workspaceId) => readAgent(memberId, workspaceId),
+  }),
+  register(AgentFacts.Configured, {
+    requirement: ({ memberId }, workspaceId) => readAgent(memberId, workspaceId),
   }),
   register(GroupFollowFacts.Started),
   register(GroupFollowFacts.Ended),

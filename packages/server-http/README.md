@@ -101,7 +101,9 @@ connection over PostgreSQL, key it, check that no read carries the key, rename i
 conflict, remove it, and refuse a key on a host without a credential key. Environment host tests
 list the installed harness and providers and the in-process environment, add a Daytona environment
 under a Daytona account connection whose readiness follows its key, and rename, reconfigure, and
-remove it.
+remove it. Agent host tests add an agent over an Anthropic connection, ready once its key is set,
+list it among the members, refuse a reasoning level amends does not take, and reconfigure, rename,
+and remove it.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
 resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream

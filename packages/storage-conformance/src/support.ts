@@ -38,6 +38,7 @@ import {
   ConnectionStore,
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
+import { AgentStore } from "@amends/core/agent";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
@@ -161,6 +162,7 @@ export const bind = (
   connections: Context.get(context, ConnectionStore.Service),
   credentials: Context.get(context, ConnectionCredentialStore.Service),
   environments: Context.get(context, EnvironmentStore.Service),
+  agents: Context.get(context, AgentStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 

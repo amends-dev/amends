@@ -42,7 +42,20 @@ export const Capabilities = Schema.Struct({
    * Access to a model provider through the named interface, such as `anthropic-messages`, which a
    * harness must support to use the connection.
    */
-  modelInference: Schema.optionalKey(Schema.Struct({ interface: Schema.NonEmptyString })),
+  modelInference: Schema.optionalKey(
+    Schema.Struct({
+      interface: Schema.NonEmptyString,
+      /**
+       * Models to suggest when someone chooses one, by the provider's identifier and a name to
+       * show. Suggestions only: any identifier the provider accepts can be chosen.
+       */
+      models: Schema.optionalKey(
+        Schema.NonEmptyArray(
+          Schema.Struct({ id: Schema.NonEmptyString, name: Schema.NonEmptyString }),
+        ),
+      ),
+    }),
+  ),
   /**
    * An account at a sandbox provider, named by its sandbox implementation, such as `daytona`,
    * under which environments using that provider acquire sandboxes.

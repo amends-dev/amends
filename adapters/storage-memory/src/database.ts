@@ -47,6 +47,7 @@ export const projections = [
   "threadActivities",
   "connections",
   "environments",
+  "agents",
   "checkpoints",
   "liveProjections",
 ] as const;

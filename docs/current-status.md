@@ -21,8 +21,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the agent-authored messages that notify agents as informational come from no workflow yet.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) exist, but nothing runs them: no agent
-  or turn exists, so no model provider has been called outside tests. That harness stops rather
+  [environment runtime](../packages/environment/README.md) exist, but nothing runs them: agents
+  are configured, but no turn exists, so no model provider has been called outside tests. That harness stops rather
   than answering the model when a response calls a tool it was not offered or holds a part it
   cannot record, and whether providers accept history with calls to tools a later session no
   longer offers is unverified.
@@ -32,12 +32,13 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   Nothing turns a stored environment into a
   running one yet. Only amends's own harness is installed, and it runs in process only, so a sandbox
   is where its tools would act, and none acts there yet. Environments hold no defaults for
-  optional settings, since no installed harness takes reasoning levels. The compatibility check
-  does not know which models a connection offers, so it accepts any model name.
+  optional settings, since no installed harness takes reasoning levels. Model providers suggest
+  models, but the compatibility check accepts any model name, and nothing checks one with its
+  provider.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
   sandboxes outside tests. No harness runs inside a sandbox yet, and an environment's retention
   can only stop or destroy its sandbox, so no harness context survives a release. Environments
-  do not yet supply the MCP endpoint or a turn's credentials, or check an agent's model access. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
+  do not yet supply the MCP endpoint or a turn's credentials. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
   is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes
   the suites against a real account, but a background process's output arrives only in whole lines
   there, and a snapshot can take minutes. No provider for E2B, Vercel, or Cloudflare exists;
@@ -47,9 +48,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   [OpenAI-compatible](../adapters/connection-openai-compatible/README.md) implementations, managed
   over HTTP and on the [Connections page](connections.md). There is no OAuth, toolkit or channel
   support. Readiness is computed from settings and whether a credential is set;
-  nothing checks a key with its provider. Nothing checks `connection.use` or resolves a credential
-  for use, since no agent or toolkit consumes connections yet. Credentials are sealed with one host
+  nothing checks a key with its provider. Agents check `connection.use` when configured, but
+  nothing resolves a credential for use, since no turn or toolkit consumes connections yet. Credentials are sealed with one host
   key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
+- [Agents](../packages/core/README.md#agents) are configured per workspace over HTTP, each a
+  member with instructions, model access, and a starting environment; the apps have no agent
+  screens yet. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
+  turn to override, and no profile photos. Nothing runs an agent, and a removed agent's membership
+  cannot be reactivated, as a person's cannot.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
   local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
@@ -109,8 +115,8 @@ conversation with oneself, since a direct group needs another member.
 People are shown by the name they chose in the workspace, or by the identity they sign in as
 until they choose one. The apps ask for a name when creating a workspace or accepting an
 invitation, suggesting one from an email address, and the account menu changes it later. Each
-member names only themselves: nobody renames another member, and agents, which join through no
-app flow, have no way to be named from the apps. There are no profile photos.
+member names only themselves: nobody renames another member, and agents, which the apps cannot add
+yet, are named by whoever adds or configures them over HTTP. There are no profile photos.
 
 Everyone gets "Create group" on the sidebar's Groups heading and the Groups page (every role holds
 `group.create`): a modal names a team group, picks its people and agents

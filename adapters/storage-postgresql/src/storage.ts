@@ -6,6 +6,7 @@ import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer, Option } from "effect";
 import type { Redacted } from "effect";
+import { Agents } from "./agents.ts";
 import { Assignments } from "./assignments.ts";
 import { Groups } from "./groups.ts";
 import { GroupMemberships } from "./group-memberships.ts";
@@ -59,6 +60,7 @@ const layerStores = Layer.mergeAll(
   Connections.layer,
   ConnectionCredentials.layer,
   Environments.layer,
+  Agents.layer,
 );
 
 /**

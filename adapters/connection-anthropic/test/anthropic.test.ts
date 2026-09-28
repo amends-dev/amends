@@ -51,7 +51,10 @@ it("declares model inference through Anthropic's messages API, with an API key",
   const declaration = Schema.decodeSync(ConnectionImplementation.Declaration)(
     AnthropicConnection.declaration,
   );
-  expect(declaration.capabilities).toEqual({ modelInference: { interface: "anthropic-messages" } });
+  expect(declaration.capabilities.modelInference?.interface).toBe("anthropic-messages");
+  expect(declaration.capabilities.modelInference?.models?.map((model) => model.id)).toContain(
+    "claude-opus-5-5",
+  );
   expect(declaration.authentication).toEqual([{ _tag: "ApiKey", label: "API key" }]);
 });
 

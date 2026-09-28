@@ -109,6 +109,9 @@ variables and setup commands are JSON, and grant scopes gained `target_environme
 environment targets. Adding them replaced the development baseline; recreate disposable PostgreSQL
 databases.
 
+`agents` holds agents' configuration, one row per agent with its model access as columns and a
+unique membership per workspace. Adding it replaced the development baseline too.
+
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
 [storage envelope](../../docs/journal.md#storage-envelope).

@@ -1,3 +1,4 @@
+export { AgentsGroup } from "./agents.ts";
 export { Api } from "./api.ts";
 export { ChangesGroup } from "./changes.ts";
 export { ConnectionsGroup } from "./connections.ts";
@@ -28,5 +29,6 @@ export { Notification, NotificationInbox } from "@amends/core/notification";
 export { Connection } from "@amends/core/connection";
 export { ConnectionImplementation } from "@amends/connection";
 export { Environment, EnvironmentCompatibility } from "@amends/core/environment";
+export { Agent } from "@amends/core/agent";
 export { HarnessImplementation } from "@amends/harness";
 export { SandboxImplementation } from "@amends/sandbox";

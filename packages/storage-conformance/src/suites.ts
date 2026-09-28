@@ -2,6 +2,7 @@
  * The conformance suites. Each registers its tests for one harness; an adapter's test
  * files call the suites it runs.
  */
+export { agents } from "./agents.ts";
 export { assignments } from "./assignments.ts";
 export { authorization } from "./authorization.ts";
 export { builtinRoles } from "./builtin-roles.ts";

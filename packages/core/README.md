@@ -22,7 +22,7 @@ The current domains contain these features:
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
 | `notification`  | Notification records, inbox/source reads, acknowledgment, activity-driven generation, and departure settlement.  |
 | `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
-| `agent`         | Permission to direct input to an agent workspace member.                                                         |
+| `agent`         | Agents' configuration: instructions, model access, and environment, over an agent's workspace membership.        |
 | `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.         |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
@@ -147,8 +147,8 @@ record and the host's `ConnectionCatalog`.
 
 `connection.create` works on the workspace; `connection.read`, `connection.manage`, and
 `connection.use` on each connection, a `Connection` target, so one can be shared narrowly. Members
-read and use connections; administrators and the owner also create and manage them. Nothing checks
-`connection.use` yet: consumers such as agents will. A connection someone may not read is
+read and use connections; administrators and the owner also create and manage them. Configuring an
+agent checks `connection.use` on its model connection. A connection someone may not read is
 `NotFound` to them.
 
 Creating validates the implementation (`UnknownImplementation`), its settings against the
@@ -191,14 +191,46 @@ sandbox, recorded at initialization with no creator. It is an ordinary environme
 `environment.create` works on the workspace, and `environment.read`, `environment.manage`, and
 `environment.use` on each environment, an `Environment` target; members read and use environments,
 and administrators and the owner also create and manage them, raising the built-in roles to
-revision 3. Nothing checks `environment.use` yet.
+revision 3. Configuring an agent checks `environment.use` on the environment it starts in.
 
 `EnvironmentCompatibility.check(environment, harness, selection)` is the one answer to whether an
 environment can run a model selection: the environment must be ready, the connection must provide
 model inference and be ready, a harness that speaks provider interfaces must speak the
-connection's, and a requested reasoning level must be one the harness takes. It does not know
-which models a connection offers. Agent setup, environment choices, turn setup, and transfers are
-meant to share it; nothing calls it yet.
+connection's, and a requested reasoning level must be one the harness takes. It does not check the
+model against those a connection suggests. Agent setup and environment choices call it; turn setup
+and transfers are meant to share it.
+
+## Agents
+
+`@amends/core/agent` holds agents' configuration. An agent is a workspace member whose identity is
+`Identity.MemberReference` `Agent`: its membership holds its name, status, roles, and group
+admissions, as any member's does, and `Agent.Record` holds what makes it behave, its instructions,
+its model access (a connection, a model identifier, and a reasoning level or null), and the
+environment it starts in. Credentials stay with the connection, and where and how it runs with the
+environment.
+
+`AgentApplication.create` adds the membership with its name, a workspace-scoped assignment of the
+initial role, admission to the general group, and the agent's record, in one commit. It requires
+`agent.create` on the workspace, and the role goes through `Delegation.requireGrant`, so only the
+owner gives an agent Administrator and nobody gives it Owner. The actor must be able to read and
+use the connection and the environment (`ConnectionUnavailable`, `EnvironmentUnavailable`), and
+`EnvironmentCompatibility.check` must pass except for setup still pending: an environment or
+connection that is not yet ready is saved and shows as the agent's readiness, while one without
+model inference, a harness that does not speak the connection's interface, or a reasoning level it
+does not take is refused (`Incompatible`, with the reasons). `configure` replaces the instructions,
+model access, and environment under the same checks, `rename` renames the membership with the
+name it expects (`Changed`), and `remove` removes the membership through `MemberApplication.remove`,
+with its delegation rules; the record remains for history. `environmentChoices` answers the check
+for each environment the actor may read and use, for choosing where an agent starts.
+
+Reads return `Agent.View`: the record with its membership's name, `configurable` and `usable` for
+the reader, and readiness, `Ready` or `Incomplete` with issues: the environment or connection is
+gone, or a compatibility reason. Readiness is computed whoever reads it, from the stores and the
+host's catalogs. An agent whose membership ended is `NotFound`. `agent.create` works on the
+workspace; `agent.read`, `agent.configure`, and `agent.use` on the agent's membership, a `Member`
+target. Members read and use agents, and administrators and the owner also create and configure
+them, raising the built-in roles to revision 4. Nothing checks `agent.use` outside thread
+recipients, and no turn runs an agent yet.
 
 ## Read state
 

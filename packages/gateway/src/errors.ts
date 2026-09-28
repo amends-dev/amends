@@ -26,6 +26,7 @@ import {
 } from "@amends/core/workspace";
 import { ReadStateApplication } from "@amends/core/attention";
 import { ConnectionApplication } from "@amends/core/connection";
+import { AgentApplication } from "@amends/core/agent";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { SignalApplication } from "@amends/core/signal";
 import { Request } from "@amends/core/request";
@@ -146,6 +147,11 @@ export const PublicError = Schema.Union([
   EnvironmentApplication.UnknownSandboxProvider,
   EnvironmentApplication.UnsupportedPlacement,
   EnvironmentApplication.InvalidSandbox,
+  AgentApplication.NotFound,
+  AgentApplication.Changed,
+  AgentApplication.ConnectionUnavailable,
+  AgentApplication.EnvironmentUnavailable,
+  AgentApplication.Incompatible,
 ]);
 export type PublicError = typeof PublicError.Type;
 

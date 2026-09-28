@@ -156,6 +156,21 @@ revisions[3] = {
     "environment.use",
   ],
 };
+revisions[4] = {
+  [BuiltinRoles.MemberId]: [...revisions[3]![BuiltinRoles.MemberId]!, "agent.read"],
+  [BuiltinRoles.AdministratorId]: [
+    ...revisions[3]![BuiltinRoles.AdministratorId]!,
+    "agent.create",
+    "agent.read",
+    "agent.configure",
+  ],
+  [BuiltinRoles.OwnerId]: [
+    ...revisions[3]![BuiltinRoles.OwnerId]!,
+    "agent.create",
+    "agent.read",
+    "agent.configure",
+  ],
+};
 
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);

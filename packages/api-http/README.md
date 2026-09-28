@@ -286,6 +286,33 @@ not read answers 404. A harness or provider this host lacks is 422 `UnknownHarne
 sandbox settings that do not fit the provider, or configuring an environment without a sandbox, is
 422 `InvalidSandbox` with issue codes.
 
+### Agents
+
+Agent paths sit under `/workspaces/:workspaceId/agents` and require active membership. Every member
+may read agents; the built-in administrator tier adds, configures, renames, and removes them. The
+[core agents section](../core/README.md#agents) describes the rules. The models each model
+provider suggests come with the connection implementations, as
+`capabilities.modelInference.models`; an agent may name any other.
+
+| Endpoint                              | Operation                                                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/agents`                        | The agents the caller may read, by name.                                                                                    |
+| `POST …/agents`                       | Add one from `{ name, instructions, model, environmentId, roleId }`, where `model` is `{ connectionId, model, reasoning }`. |
+| `GET …/agents/environment-choices`    | For `?connectionId=&model=&reasoning=`, each environment the caller may use, with whether it can run that model access.     |
+| `GET …/agents/:agentId`               | One agent.                                                                                                                  |
+| `PUT …/agents/:agentId/configuration` | Replace `{ instructions, model, environmentId }`.                                                                           |
+| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentApplication.Changed`.     |
+| `DELETE …/agents/:agentId`            | Remove its membership, as removing a member does; 204.                                                                      |
+
+An agent reads as `Agent.View`: its configuration, its membership's `memberId` and name,
+`configurable` and `usable` for the caller, and its readiness. One the caller may not read, or
+whose membership ended, answers 404. A connection or environment that is gone, or that the caller
+may not read and use, is 422 `ConnectionUnavailable` or `EnvironmentUnavailable`, and an
+environment that cannot run the model access is 422 `Incompatible` with its reasons; setup still
+pending, such as a connection without its key, is saved and shows in the readiness. The initial
+role follows the delegation rules: 409 `Delegation.OwnerProtected` for Owner, and 403
+`Delegation.Denied` for Administrator unless the caller owns the workspace.
+
 ## Authentication
 
 `Authentication` is bearer middleware that provides `Principal`, the

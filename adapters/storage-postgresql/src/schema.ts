@@ -790,3 +790,27 @@ export const environments = pgTable(
     ),
   ],
 );
+
+/**
+ * Agents' behavioral configuration. Each is one workspace membership, which names it and holds
+ * its roles; its model access is a connection, a model, and an optional reasoning level.
+ */
+export const agents = pgTable(
+  "agents",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    memberId: text("member_id").notNull(),
+    instructions: text("instructions").notNull(),
+    connectionId: text("connection_id").notNull(),
+    model: text("model").notNull(),
+    reasoning: text("reasoning"),
+    environmentId: text("environment_id").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    uniqueIndex("agents_by_member").on(t.workspaceId, t.memberId),
+  ],
+);

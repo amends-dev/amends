@@ -16,6 +16,7 @@ import {
   GroupFollowApplication,
   GroupMembershipApplication,
 } from "@amends/core/group";
+import { AgentApplication } from "@amends/core/agent";
 import { ConnectionApplication } from "@amends/core/connection";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { NotificationApplication } from "@amends/core/notification";
@@ -218,6 +219,21 @@ export const UnsupportedPlacement = EnvironmentApplication.UnsupportedPlacement.
 );
 /** The sandbox settings do not fit the provider, or the environment has no sandbox. */
 export const InvalidSandbox = EnvironmentApplication.InvalidSandbox.pipe(HttpApiSchema.status(422));
+
+/** An agent the caller may not read, or whose membership ended, answers as missing. */
+export const AgentNotFound = AgentApplication.NotFound.pipe(HttpApiSchema.status(404));
+/** An agent renamed since the caller last saw its name refuses another name with 409. */
+export const AgentChanged = AgentApplication.Changed.pipe(HttpApiSchema.status(409));
+/** The agent's connection is gone, or the caller may not read or use it. */
+export const AgentConnectionUnavailable = AgentApplication.ConnectionUnavailable.pipe(
+  HttpApiSchema.status(422),
+);
+/** The agent's environment is gone, or the caller may not read or use it. */
+export const AgentEnvironmentUnavailable = AgentApplication.EnvironmentUnavailable.pipe(
+  HttpApiSchema.status(422),
+);
+/** The environment cannot run the model access, for the reasons given. */
+export const AgentIncompatible = AgentApplication.Incompatible.pipe(HttpApiSchema.status(422));
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [
