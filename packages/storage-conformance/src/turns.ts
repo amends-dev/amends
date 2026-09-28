@@ -6,6 +6,7 @@ import { Environment } from "@amends/core/environment";
 import { Group } from "@amends/core/group";
 import { Identity, type Actor } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
+import { Request } from "@amends/core/request";
 import {
   ThreadApplication,
   ThreadMessageApplication,
@@ -375,6 +376,118 @@ export const turns = (harness: ConformanceHarness) => {
       60_000,
     );
 
+    it.effect(
+      "a failed turn runs again as a new turn for the same input, once, while nothing follows it",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent, selection } = yield* workspaceWithAgent;
+              const started = yield* start(workspace.id, "Scout, draft the notes.", [
+                agent.memberId,
+              ]);
+              const threadId = started.thread.id;
+              const retry = (turnId: Turn.Id, requestKey?: string) =>
+                as(
+                  workspace.id,
+                  alice,
+                  Effect.flatMap(TurnApplication.Service, (turns) =>
+                    turns.retry(
+                      turnId,
+                      requestKey === undefined ? {} : { requestKey: Request.Key.make(requestKey) },
+                    ),
+                  ),
+                );
+              const flags = (views: ReadonlyArray<Turn.View>) =>
+                views.map(({ status, stoppable, retryable }) => ({ status, stoppable, retryable }));
+              yield* accept(workspace.id);
+              const [queued] = yield* turnsOf(workspace.id, threadId);
+              expect(flags([queued!])).toEqual([
+                { status: "queued", stoppable: true, retryable: false },
+              ]);
+              expect(yield* Effect.flip(retry(queued!.id))).toMatchObject({
+                _tag: "TurnApplication.NotRetryable",
+                reason: "active",
+              });
+              // The turn takes its input in, then fails.
+              const first = batch("b1", "Scout, draft the notes.");
+              yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) =>
+                  Effect.gen(function* () {
+                    yield* execution.start(queued!.id, selection);
+                    yield* execution.submitted(queued!.id, {
+                      batchId: first.id,
+                      throughSequence: started.activity.sequence,
+                    });
+                    yield* execution.report(queued!.id, [
+                      { _tag: "InputIncorporated", batch: first },
+                    ]);
+                    yield* execution.fail(queued!.id, "The model provider is unavailable.");
+                  }),
+                ),
+              );
+              const [failed] = yield* turnsOf(workspace.id, threadId);
+              expect(flags([failed!])).toEqual([
+                { status: "failed", stoppable: false, retryable: true },
+              ]);
+
+              // Retrying handles the same input again, from the start, with nothing taken in.
+              const retried = yield* retry(failed!.id, "retry-1");
+              expect(retried).toMatchObject({
+                status: "queued",
+                agentId: agent.id,
+                participationId: failed!.participationId,
+                inputAfterSequence: failed!.inputAfterSequence,
+                acceptedThroughSequence: failed!.acceptedThroughSequence,
+                incorporatedThroughSequence: failed!.inputAfterSequence,
+                selection: null,
+                failure: null,
+                stoppable: true,
+                retryable: false,
+              });
+              expect(retried.id).not.toBe(failed!.id);
+              // The same request returns the turn it created; another finds the failure superseded.
+              expect((yield* retry(failed!.id, "retry-1")).id).toBe(retried.id);
+              expect(yield* Effect.flip(retry(failed!.id))).toMatchObject({
+                _tag: "TurnApplication.NotRetryable",
+                reason: "superseded",
+              });
+              expect(flags(yield* turnsOf(workspace.id, threadId))).toEqual([
+                { status: "queued", stoppable: true, retryable: false },
+                { status: "failed", stoppable: false, retryable: false },
+              ]);
+
+              // A turn that closed with its reply is done.
+              const again = batch("b2", "Scout, draft the notes.");
+              yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) =>
+                  Effect.gen(function* () {
+                    yield* execution.start(retried.id, selection);
+                    yield* execution.submitted(retried.id, {
+                      batchId: again.id,
+                      throughSequence: started.activity.sequence,
+                    });
+                    yield* execution.report(retried.id, [
+                      { _tag: "InputIncorporated", batch: again },
+                      ...answered("r1", "The notes."),
+                    ]);
+                    yield* execution.close(retried.id);
+                  }),
+                ),
+              );
+              expect(yield* Effect.flip(retry(retried.id))).toMatchObject({
+                _tag: "TurnApplication.NotRetryable",
+                reason: "completed",
+              });
+            }),
+          ),
+        ),
+      60_000,
+    );
+
     it.effect("an agent that stops taking part in a thread has its turn there stopped", () =>
       harness.withStorage((storage) =>
         runGateway(
@@ -404,10 +517,22 @@ export const turns = (harness: ConformanceHarness) => {
               ),
             );
             yield* accept(workspace.id);
-            expect((yield* turnsOf(workspace.id, threadId))[0]).toMatchObject({
+            const [stopped] = yield* turnsOf(workspace.id, threadId);
+            expect(stopped).toMatchObject({
               status: "cancelled",
               cancelReason: "participation-ended",
+              retryable: false,
             });
+            // It can't run again where the agent no longer takes part.
+            expect(
+              yield* Effect.flip(
+                as(
+                  workspace.id,
+                  alice,
+                  Effect.flatMap(TurnApplication.Service, (turns) => turns.retry(stopped!.id)),
+                ),
+              ),
+            ).toMatchObject({ _tag: "TurnApplication.NotRetryable", reason: "departed" });
           }),
         ),
       ),

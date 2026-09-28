@@ -77,6 +77,8 @@ so a client can import the complete contract without loading server code.
 - `connections`: access to external systems, such as model providers; see
   [Connections](#connections).
 - `environments`: where and how agents run; see [Environments](#environments).
+- `agents` and `turns`: agents, and their turns on threads; see [Agents](#agents) and
+  [Turns](#turns).
 
 `POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
 `POST …/environments`, both thread
@@ -312,6 +314,25 @@ environment that cannot run the model access is 422 `Incompatible` with its reas
 pending, such as a connection without its key, is saved and shows in the readiness. The initial
 role follows the delegation rules: 409 `Delegation.OwnerProtected` for Owner, and 403
 `Delegation.Denied` for Administrator unless the caller owns the workspace.
+
+### Turns
+
+Turn paths sit under `/workspaces/:workspaceId` and require active membership. A turn is an agent's
+attempt at the work asked of it on a thread; the
+[core turns section](../core/README.md#turns) describes the rules.
+
+| Endpoint                        | Operation                                                                                     |
+| ------------------------------- | --------------------------------------------------------------------------------------------- |
+| `GET …/threads/:threadId/turns` | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
+| `GET …/turns/:turnId`           | One turn.                                                                                     |
+| `POST …/turns/:turnId/cancel`   | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
+| `POST …/turns/:turnId/retry`    | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
+
+A turn reads as `Turn.View`: its status, input positions, the model access and environment it
+started with, its reply's `messageId`, `failure`, `cancelReason`, and times, with `stoppable` and
+`retryable` for the caller. Stopping and retrying need permission to direct the agent (403
+otherwise). A turn in a thread the caller cannot open answers 404. `retry` takes an
+`Idempotency-Key`, so repeating it returns the turn it created.
 
 ## Authentication
 

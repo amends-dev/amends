@@ -103,4 +103,25 @@ export const Acceptance = Schema.Struct({
 });
 export interface Acceptance extends Schema.Schema.Type<typeof Acceptance> {}
 
+/** Why a turn cannot be retried: it has not ended, it replied, a later one followed, or its agent left. */
+export const NotRetryableReason = Schema.Literals([
+  "active",
+  "completed",
+  "superseded",
+  "departed",
+]);
+export type NotRetryableReason = typeof NotRetryableReason.Type;
+
+/**
+ * A turn as a reader of its thread sees it, with what they may do with it now: ask it to stop,
+ * while it is active and not already stopping, or retry it, once it failed or stopped and nothing
+ * followed it. Both require directing its agent.
+ */
+export const View = Schema.Struct({
+  ...Record.fields,
+  stoppable: Schema.Boolean,
+  retryable: Schema.Boolean,
+});
+export interface View extends Schema.Schema.Type<typeof View> {}
+
 export * as Turn from "./turn.ts";

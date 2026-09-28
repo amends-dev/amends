@@ -155,6 +155,8 @@ export const PublicError = Schema.Union([
   AgentApplication.Incompatible,
   TurnApplication.NotFound,
   TurnApplication.NotActive,
+  TurnApplication.NotRetryable,
+  TurnApplication.ThreadNotFound,
 ]);
 export type PublicError = typeof PublicError.Type;
 

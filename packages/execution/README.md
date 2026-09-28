@@ -53,8 +53,8 @@ different turns run side by side, and redelivers a run cut short, so a turn cont
 restart.
 
 - `layerDispatch` provides the gateway's `WorkspaceTurns.Service`. Core asks for a run in the
-  commit that creates a turn, through a journal reaction to `TurnFacts.Created`, and the request
-  is keyed `created`, so a commit asks once. Sent inside the commit, it is stored in the commit's
+  commit that creates or retries a turn, through a journal reaction to `TurnFacts.Created` and
+  `TurnFacts.Retried`, and the request is keyed `created`, so a commit asks once. Sent inside the commit, it is stored in the commit's
   transaction when Cluster's message storage uses the workspace storage's SQL client, as with
   [background wakes](../gateway/README.md#background-work-on-effect-cluster).
 - `layerWorker` registers the entity over a `TurnRunner.Service`. A run that fails before its

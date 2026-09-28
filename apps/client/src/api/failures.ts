@@ -27,7 +27,7 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   : never;
 /**
  * Every failure the workspace, member, access, invitation, conversation, connection,
- * environment, and agent endpoints report.
+ * environment, agent, and turn endpoints report.
  */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
@@ -40,6 +40,7 @@ type Reported =
   | Failure<Client["connections"][keyof Client["connections"]]>
   | Failure<Client["environments"][keyof Client["environments"]]>
   | Failure<Client["agents"][keyof Client["agents"]]>
+  | Failure<Client["turns"][keyof Client["turns"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
@@ -95,6 +96,12 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "AgentApplication.ConnectionUnavailable": "invalid",
   "AgentApplication.EnvironmentUnavailable": "invalid",
   "AgentApplication.Incompatible": "invalid",
+  // Turns: one that finished or moved on meanwhile, or that left the reader's reach;
+  // `turnProblems` tells the refusals apart.
+  "TurnApplication.NotActive": "changed",
+  "TurnApplication.NotRetryable": "changed",
+  "TurnApplication.NotFound": "gone",
+  "TurnApplication.ThreadNotFound": "gone",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionApplication.CredentialsUnavailable": "failed",
   "GroupFollowApplication.AgentRequired": "denied",

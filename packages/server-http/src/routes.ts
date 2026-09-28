@@ -15,6 +15,7 @@ import { AgentsHandlers } from "./agents.ts";
 import { EnvironmentsHandlers } from "./environments.ts";
 import { GroupsHandlers } from "./groups.ts";
 import { ThreadsHandlers } from "./threads.ts";
+import { TurnsHandlers } from "./turns.ts";
 
 /**
  * Provide every group's handlers and authentication over the required host services.
@@ -34,6 +35,7 @@ export const layerHandlers = Layer.mergeAll(
   ConnectionsHandlers.layer,
   EnvironmentsHandlers.layer,
   AgentsHandlers.layer,
+  TurnsHandlers.layer,
   ChangesHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 

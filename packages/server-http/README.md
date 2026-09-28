@@ -103,7 +103,8 @@ list the installed harness and providers and the in-process environment, add a D
 under a Daytona account connection whose readiness follows its key, and rename, reconfigure, and
 remove it. Agent host tests add an agent over an Anthropic connection, ready once its key is set,
 list it among the members, refuse a reasoning level amends does not take, and reconfigure, rename,
-and remove it.
+and remove it. Turn host tests ask an agent in a thread and follow its turn over HTTP to its reply
+from a local model server, retry a turn whose key was refused, and stop a running one.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
 resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream

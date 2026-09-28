@@ -271,15 +271,25 @@ hundred timeline entries before the turn as history (the agent's own as response
 input not yet taken in, and the log. It reports instead that the turn finished, is stopping, or can't run, as
 when its connection has no key. `get` reads the turn, for a run to watch.
 
-The commit that creates a turn asks `TurnDispatch` to run it, through a journal reaction to
-`TurnFacts.Created`, so the request commits or rolls back with the turn. The gateway binds
+The commit that creates or retries a turn asks `TurnDispatch` to run it, through a journal
+reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
+the turn. The gateway binds
 `TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
 and environments.
 
-`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, and
-`cancel` one when they may also direct its agent (`agent.use`): a queued turn stops at once, a
-running one once execution confirms it. Turn facts reach the thread's readers through the change
-feed; the timeline shows an agent's reply as its message, and no turn activity of its own yet.
+`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns as
+`Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
+(`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. When they may also direct
+its agent (`agent.use`), `cancel` stops an active turn: a queued turn at once, a running one once
+execution confirms it. `retry` runs a failed or stopped turn again as a new queued turn, recorded
+as `TurnFacts.Retried` with the turn it retries, for the same agent, participation, and input, with
+nothing taken in, running with the agent's current configuration. Only the agent's latest turn on
+the thread can be retried, while no other is active and the agent still takes part there;
+otherwise it is `NotRetryable` with the reason (`active`, `completed`, `superseded`, or
+`departed`). A retry is created after the turn it retries, even on a clock that has not moved, and
+takes a request key, so repeating it returns the turn it created. Turn facts reach the thread's
+readers through the change feed; the timeline shows an agent's reply as its message, and no turn
+activity of its own yet.
 
 ## Read state
 

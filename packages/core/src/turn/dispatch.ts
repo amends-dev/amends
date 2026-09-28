@@ -26,16 +26,15 @@ export class Service extends Context.Service<Service, Interface>()(
 const decodeCreated = Schema.decodeUnknownSync(
   Schema.Struct({ id: TurnFacts.Created.payload.fields.id }),
 );
+const run = Effect.fnUntraced(function* (event: { readonly payload: unknown }) {
+  const { id } = decodeCreated(event.payload);
+  yield* (yield* Service).request(id);
+});
 
-/** A commit that creates a turn asks for it to run, in that same commit. */
+/** A commit that creates a turn, or retries one, asks for it to run, in that same commit. */
 export const reactions: ReadonlyArray<Reaction.Definition<Service>> = [
-  {
-    fact: TurnFacts.Created.name,
-    react: Effect.fnUntraced(function* (event) {
-      const { id } = decodeCreated(event.payload);
-      yield* (yield* Service).request(id);
-    }),
-  },
+  { fact: TurnFacts.Created.name, react: run },
+  { fact: TurnFacts.Retried.name, react: run },
 ];
 
 export * as TurnDispatch from "./dispatch.ts";

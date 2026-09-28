@@ -144,26 +144,49 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     { collection: "streams", id: text(payload, "groupId") },
   ],
   // Who belongs to a group, and which of its threads the reader may see. A fact names its group
-  // but not its threads, so every open timeline and participant list checks its access again.
+  // but not its threads, so every open timeline, participant list, and turn list checks its
+  // access again.
   "group.membership.added": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
     { collection: "timelines", id: undefined },
     { collection: "participants", id: undefined },
+    { collection: "turns", id: undefined },
   ],
   "group.membership.removed": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
     { collection: "timelines", id: undefined },
     { collection: "participants", id: undefined },
+    { collection: "turns", id: undefined },
   ],
-  // Who takes part in a thread, and so follows it.
+  // Who takes part in a thread, and so follows it; an agent that left can't retry its turns there.
   "thread.participation.added": (payload) => [
     { collection: "participants", id: text(payload, "threadId") },
   ],
   "thread.participation.ended": (payload) => [
     { collection: "participants", id: text(payload, "threadId") },
+    { collection: "turns", id: text(payload, "threadId") },
   ],
+  // Agents' turns on a thread: what each is doing there, and how it ended.
+  ...Object.fromEntries(
+    [
+      "turn.created",
+      "turn.retried",
+      "turn.input-accepted",
+      "turn.started",
+      "turn.input-incorporated",
+      "turn.cancel-requested",
+      "turn.completed",
+      "turn.failed",
+      "turn.cancelled",
+    ].map((name) => [
+      name,
+      (payload: unknown): ReadonlyArray<Target> => [
+        { collection: "turns", id: text(payload, "threadId") },
+      ],
+    ]),
+  ),
   // Rosters list active workspace members only.
   "workspace.member.added": () => [{ collection: "rosters", id: undefined }],
   "workspace.member.removed": () => [{ collection: "rosters", id: undefined }],

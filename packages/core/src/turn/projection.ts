@@ -19,7 +19,7 @@ const stored = Effect.fnUntraced(function* (payload: {
   return { store, turn: found.value };
 });
 
-export const definition = Projection.make("turns", { version: 1 })
+export const definition = Projection.make("turns", { version: 2 })
   .on(
     TurnFacts.Created,
     Effect.fn("TurnProjection.created")(function* ({ payload }) {
@@ -27,6 +27,16 @@ export const definition = Projection.make("turns", { version: 1 })
       if (store.workspaceId !== payload.workspaceId)
         return yield* conflict("Fact belongs to another workspace");
       const { notificationIds: _, ...record } = payload;
+      yield* store.insert(record);
+    }),
+  )
+  .on(
+    TurnFacts.Retried,
+    Effect.fn("TurnProjection.retried")(function* ({ payload }) {
+      const store = yield* TurnStore.Service;
+      if (store.workspaceId !== payload.workspaceId)
+        return yield* conflict("Fact belongs to another workspace");
+      const { retryOf: _, ...record } = payload;
       yield* store.insert(record);
     }),
   )

@@ -12,6 +12,7 @@ export { MembersGroup } from "./members.ts";
 export { NotificationsGroup } from "./notifications.ts";
 export { SessionGroup } from "./session.ts";
 export { ThreadsGroup } from "./threads.ts";
+export { TurnsGroup } from "./turns.ts";
 export { WorkspacesGroup } from "./workspaces.ts";
 
 // Shared wire schemas for typed clients; implementations stay in core.
@@ -30,5 +31,6 @@ export { Connection } from "@amends/core/connection";
 export { ConnectionImplementation } from "@amends/connection";
 export { Environment, EnvironmentCompatibility } from "@amends/core/environment";
 export { Agent } from "@amends/core/agent";
+export { Turn } from "@amends/core/turn";
 export { HarnessImplementation } from "@amends/harness";
 export { SandboxImplementation } from "@amends/sandbox";

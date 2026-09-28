@@ -25,6 +25,18 @@ export const Created = Fact.make("turn.created", {
   }),
 });
 
+/**
+ * Someone asked a failed or stopped turn to run again: a new turn for the same agent and input,
+ * with the agent's current configuration.
+ */
+export const Retried = Fact.make("turn.retried", {
+  version: 1,
+  audience,
+  subject: (payload) => Subject.make("turn", payload.id),
+  occurrence: (payload) => [payload.id],
+  payload: Schema.Struct({ ...Turn.Record.fields, retryOf: Turn.Id }),
+});
+
 /** An active turn accepted more input, settling the notifications that asked for it. */
 export const InputAccepted = Fact.make("turn.input-accepted", {
   version: 1,

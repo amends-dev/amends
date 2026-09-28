@@ -202,3 +202,10 @@ export { useGroupMembers, type GroupMembersController } from "./conversations/me
 export { useRenameGroup, type RenameGroupController } from "./conversations/rename.ts";
 export { useMemberName, type MemberNameController } from "./workspaces/member-name.ts";
 export { suggestedName } from "./api/workspaces.ts";
+export {
+  useThreadTurns,
+  type ThreadTurnsView,
+  type TurnEntry,
+  type TurnProblem,
+  type TurnState,
+} from "./turns/views.ts";

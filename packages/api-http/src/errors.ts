@@ -17,6 +17,7 @@ import {
   GroupMembershipApplication,
 } from "@amends/core/group";
 import { AgentApplication } from "@amends/core/agent";
+import { TurnApplication } from "@amends/core/turn";
 import { ConnectionApplication } from "@amends/core/connection";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { NotificationApplication } from "@amends/core/notification";
@@ -234,6 +235,15 @@ export const AgentEnvironmentUnavailable = AgentApplication.EnvironmentUnavailab
 );
 /** The environment cannot run the model access, for the reasons given. */
 export const AgentIncompatible = AgentApplication.Incompatible.pipe(HttpApiSchema.status(422));
+
+/** A turn the caller may not read, because its thread is closed to them, answers as missing. */
+export const TurnNotFound = TurnApplication.NotFound.pipe(HttpApiSchema.status(404));
+/** A thread the caller may not open answers as missing. */
+export const TurnThreadNotFound = TurnApplication.ThreadNotFound.pipe(HttpApiSchema.status(404));
+/** The turn has already finished, so there is nothing to stop. */
+export const TurnNotActive = TurnApplication.NotActive.pipe(HttpApiSchema.status(409));
+/** The turn can't run again, for the reason given. */
+export const TurnNotRetryable = TurnApplication.NotRetryable.pipe(HttpApiSchema.status(409));
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [

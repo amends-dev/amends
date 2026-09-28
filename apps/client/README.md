@@ -62,6 +62,8 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useAgents(workspaceId, { selected, done })` shapes the Agents page: each agent's model access,
   environment, role, and readiness, the model connections and roles to choose from, and each
   environment's fit for a model; see [Agents](#agents).
+- `useThreadTurns(workspaceId, threadId)` follows the agents' turns on a thread, with stopping and
+  retrying; see [Turns](#turns).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
@@ -253,6 +255,20 @@ a saved agent follow `selected`, the agent open. A retried creation reuses its r
 `rename` keeps the name it was made against. `failure()` reports the change, its `AgentsError`,
 and `problems`: a connection or environment no longer available, which also reloads the choices,
 reasons it cannot run, or an initial role only the owner gives, each keeping the draft.
+
+## Turns
+
+`useThreadTurns(workspaceId, threadId)` reads a thread's turns, newest first, and shapes each
+agent's latest as a `TurnEntry`: the agent by name, its `state` (`queued`, `working`, `stopping`,
+`done`, `failed`, or `stopped`), its failure as the host worded it, whether a request or the
+agent's departure stopped it, its reply's ID, the timeline position of the latest message it took
+on, its times, and whether the reader may stop or retry it now. `active()` holds the agents at work
+on the thread. The turns keep their own invalidation key per thread, which every turn fact for the
+thread, the agent's departure from it, and access changes refresh. `stop(turnId)` and
+`retry(turnId)` refresh the thread's turns before answering; `acting()` names the one running.
+A retry reuses its request key until it goes through, so asking again after a lost answer creates
+one turn. `problem()` reports a refusal, `finished` or `not-retryable` with the host's reason, or a
+workspace failure, until another command starts or it is dismissed. There are no turn screens yet.
 
 ## Views
 

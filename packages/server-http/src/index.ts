@@ -12,4 +12,5 @@ export { EnvironmentsHandlers } from "./environments.ts";
 export { Draining } from "./draining.ts";
 export { SessionHandlers } from "./session.ts";
 export { ThreadsHandlers } from "./threads.ts";
+export { TurnsHandlers } from "./turns.ts";
 export { WorkspacesHandlers } from "./workspaces.ts";

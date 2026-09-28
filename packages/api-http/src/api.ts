@@ -12,6 +12,7 @@ import { ConnectionsGroup } from "./connections.ts";
 import { EnvironmentsGroup } from "./environments.ts";
 import { GroupsGroup } from "./groups.ts";
 import { ThreadsGroup } from "./threads.ts";
+import { TurnsGroup } from "./turns.ts";
 
 /** The public HTTP contract. Servers implement its groups; clients are generated from it. */
 export class Api extends HttpApi.make("amends")
@@ -27,5 +28,6 @@ export class Api extends HttpApi.make("amends")
   .add(ConnectionsGroup)
   .add(EnvironmentsGroup)
   .add(AgentsGroup)
+  .add(TurnsGroup)
   .add(ChangesGroup)
   .annotateMerge(OpenApi.annotations({ title: "Amends API" })) {}

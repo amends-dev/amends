@@ -8,13 +8,16 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import type { Request } from "../request/request.ts";
+import { RequestReceipts } from "../request/receipts.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadId } from "../thread/id.ts";
-import { NotActive, NotFound } from "./errors.ts";
+import { ThreadParticipationStore } from "../thread/participation/store.ts";
+import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
-export { NotActive, NotFound } from "./errors.ts";
+export { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "TurnApplication.InvalidResponse",
@@ -23,47 +26,74 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 
 export type ReadError =
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
+  | Exclude<Authorization.Error, Authorization.Denied>
   | TurnStore.Failure
+  | ThreadParticipationStore.Failure
   | Schema.SchemaError
   | InvalidResponse
   | NotFound;
-export type CancelError =
+export type ListError = Exclude<ReadError, NotFound> | ThreadNotFound;
+export type ChangeError =
   | ReadError
-  | NotActive
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error;
+export type CancelError = ChangeError | NotActive;
+export type RetryError = ChangeError | NotRetryable | RequestReceipts.Error;
 
 export interface Interface {
   readonly workspaceId: Turn.Record["workspaceId"];
   /** A turn in a thread the reader may open; any other is NotFound. */
-  readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.Record, ReadError, Actor.Service>;
+  readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Service>;
   /** A thread's turns, newest first, at most `limit`, for a reader who may open the thread. */
   readonly listByThread: (
     threadId: ThreadId.Id,
     limit: number,
-  ) => Effect.Effect<ReadonlyArray<Turn.Record>, ReadError, Actor.Service>;
+  ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
   /**
    * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
    * queued turn stops at once, since nothing runs it yet; a running one stops once execution
    * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
    */
-  readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.Record, CancelError, Actor.Service>;
+  readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Service>;
+  /**
+   * Run a failed or stopped turn again, for a reader who may open its thread and direct its
+   * agent: a new turn for the same agent and input, which runs with the agent's current
+   * configuration. Only the agent's latest turn on the thread can be retried, while the agent
+   * still takes part there; otherwise it is NotRetryable. A request key makes a retry of it
+   * return the turn it created.
+   */
+  readonly retry: (
+    turnId: Turn.Id,
+    options?: Request.Options,
+  ) => Effect.Effect<Turn.View, RetryError, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/turn/application/Service",
 ) {}
 
+const RetryInput = Schema.Struct({ turnId: Turn.Id });
+const RetryResult = Schema.Struct({ turnId: Turn.Id });
+
 /** @category constructors */
 export const make = Effect.fn("TurnApplication.make")(function* () {
   const turns = yield* TurnStore.Service;
+  const participations = yield* ThreadParticipationStore.Service;
   const access = yield* ThreadAccess.Service;
   const authorization = yield* Authorization.Service;
+  const receipts = yield* RequestReceipts.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
-  if (access.workspaceId !== workspaceId || authorization.workspaceId !== workspaceId)
+  if (
+    [
+      participations.workspaceId,
+      access.workspaceId,
+      authorization.workspaceId,
+      receipts.workspaceId,
+    ].some((id) => id !== workspaceId)
+  )
     return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
 
   const decode = Schema.decodeEffect(Schema.toType(Turn.Record));
@@ -79,9 +109,56 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       .pipe(Effect.catchTag("ThreadAccess.NotFound", () => Effect.fail(new NotFound({ turnId }))));
     return turn;
   });
+  const directs = (turn: Turn.Record) =>
+    Requirement.make(AgentPermissions.Use, {
+      _tag: "Member",
+      workspaceId,
+      memberId: turn.memberId,
+    });
+
+  /** Why the turn can't be retried now, or undefined when it can. */
+  const retryBlock = Effect.fnUntraced(function* (turn: Turn.Record) {
+    if (Turn.active(turn.status)) return "active" as const;
+    if (turn.status === "completed") return "completed" as const;
+    if (Option.isSome(yield* turns.findActive(turn.memberId, turn.threadId)))
+      return "superseded" as const;
+    const latest = yield* turns.findLatest(turn.memberId, turn.threadId);
+    if (Option.isSome(latest) && latest.value.id !== turn.id) return "superseded" as const;
+    const participation = yield* participations.get(turn.participationId);
+    if (Option.isNone(participation) || participation.value.status !== "active")
+      return "departed" as const;
+    return undefined;
+  });
+
+  /**
+   * The turns as the reader sees them, with what they may do with each now. In a list of one
+   * thread's turns, newest first, only each agent's first can be its latest, so the others need
+   * no reads to tell they were superseded.
+   */
+  const present = Effect.fnUntraced(function* (
+    list: ReadonlyArray<Turn.Record>,
+    options: { readonly newestFirst?: boolean } = {},
+  ) {
+    const directed = yield* authorization.permitted(list.map(directs));
+    const seen = new Set<string>();
+    return yield* Effect.forEach(list, (turn, index) =>
+      Effect.gen(function* () {
+        const mayDirect = directed[index] === true;
+        const later = options.newestFirst === true && seen.has(turn.memberId);
+        seen.add(turn.memberId);
+        const view: Turn.View = Object.assign({}, turn, {
+          stoppable: mayDirect && Turn.active(turn.status) && turn.status !== "cancelling",
+          retryable: mayDirect && !later && (yield* retryBlock(turn)) === undefined,
+        });
+        return view;
+      }),
+    );
+  });
+  const presentOne = (turn: Turn.Record) =>
+    Effect.map(present([turn]), (views) => views[0] as Turn.View);
 
   const get = Effect.fn("TurnApplication.get")(function* (turnId: Turn.Id) {
-    return yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
+    return yield* presentOne(yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId)));
   });
 
   const listByThread = Effect.fn("TurnApplication.listByThread")(function* (
@@ -96,27 +173,22 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       .require(id)
       .pipe(
         Effect.catchTag("ThreadAccess.NotFound", () =>
-          Effect.fail(new InvalidResponse({ message: "Thread is not available" })),
+          Effect.fail(new ThreadNotFound({ threadId: id })),
         ),
       );
-    return yield* Effect.forEach(yield* turns.listByThread(thread.id, bounded), (turn) =>
+    const listed = yield* Effect.forEach(yield* turns.listByThread(thread.id, bounded), (turn) =>
       decode(turn),
     );
+    return yield* present(listed, { newestFirst: true });
   });
 
   const cancel = Effect.fn("TurnApplication.cancel")(
     function* (turnId: Turn.Id) {
       const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
-      yield* authorization.require([
-        Requirement.make(AgentPermissions.Use, {
-          _tag: "Member",
-          workspaceId,
-          memberId: turn.memberId,
-        }),
-      ]);
+      yield* authorization.require([directs(turn)]);
       if (!Turn.active(turn.status))
         return yield* new NotActive({ turnId: turn.id, status: turn.status });
-      if (turn.status === "cancelling") return turn;
+      if (turn.status === "cancelling") return yield* presentOne(turn);
       const at = yield* DateTime.now;
       const where = {
         workspaceId,
@@ -130,20 +202,79 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       );
       if (turn.status === "queued") {
         yield* journal.publish(TurnFacts.Cancelled, Object.assign({}, where, { finishedAt: at }));
-        return Turn.change(turn, {
-          status: "cancelled",
-          cancelReason: "requested",
-          finishedAt: at,
-        });
+        return yield* presentOne(
+          Turn.change(turn, { status: "cancelled", cancelReason: "requested", finishedAt: at }),
+        );
       }
-      return Turn.change(turn, { status: "cancelling", cancelReason: "requested" });
+      return yield* presentOne(
+        Turn.change(turn, { status: "cancelling", cancelReason: "requested" }),
+      );
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
 
-  return Service.of({ workspaceId, get, listByThread, cancel });
+  const retry = Effect.fn("TurnApplication.retry")(
+    function* (turnId: Turn.Id, options: Request.Options = {}) {
+      const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
+      const retried = yield* receipts.once(
+        {
+          operation: "turn.retry",
+          key: options.requestKey,
+          input: RetryInput,
+          value: { turnId: id },
+          result: RetryResult,
+          resultOf: (created: Turn.Record) => ({ turnId: created.id }),
+          restore: (result: { readonly turnId: Turn.Id }) => readable(result.turnId),
+        },
+        Effect.gen(function* () {
+          const turn = yield* readable(id);
+          yield* authorization.require([directs(turn)]);
+          const reason = yield* retryBlock(turn);
+          if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
+          // The same input, from where the failed or stopped turn began, with nothing taken in
+          // and the agent's current model access and environment. It is created after the turn it
+          // retries, even on a clock that has not moved, so it is the agent's latest there.
+          const now = yield* DateTime.now;
+          const createdAt = DateTime.isGreaterThan(now, turn.createdAt)
+            ? now
+            : DateTime.add(turn.createdAt, { milliseconds: 1 });
+          const created: Turn.Record = {
+            id: Turn.Id.make(yield* crypto.randomUUIDv4),
+            workspaceId,
+            groupId: turn.groupId,
+            threadId: turn.threadId,
+            agentId: turn.agentId,
+            memberId: turn.memberId,
+            participationId: turn.participationId,
+            status: "queued",
+            inputAfterSequence: turn.inputAfterSequence,
+            acceptedThroughSequence: turn.acceptedThroughSequence,
+            incorporatedThroughSequence: turn.inputAfterSequence,
+            selection: null,
+            messageId: null,
+            failure: null,
+            cancelReason: null,
+            createdAt,
+            startedAt: null,
+            finishedAt: null,
+          };
+          yield* journal.publish(
+            TurnFacts.Retried,
+            Object.assign({}, created, { retryOf: turn.id }),
+          );
+          return created;
+        }),
+      );
+      return yield* presentOne(retried);
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  return Service.of({ workspaceId, get, listByThread, cancel, retry });
 });
 
 /** @category layers */

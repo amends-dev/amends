@@ -198,7 +198,8 @@ over the host's database composition, that a wake asked for inside a commit is s
 reaches the worker, and is absent if the commit rolls back; that a process refuses to start at a
 runner address another process holds; and that over sockets a wake reaches the process running
 its workspace well before that process's next read. `turns.test.ts` asks an agent in a thread over
-HTTP and waits for its reply, which its turn gets from a local chat-completions server.
+HTTP and waits for its reply, which its turn gets from a local chat-completions server, then
+retries a turn whose key was refused and stops a running one over HTTP.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

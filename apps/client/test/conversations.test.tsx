@@ -157,7 +157,8 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/timelines:thread",
   ]);
   // Leaving a group also changes which notification sources the reader can still read.
-  // Every open thread checks its access again, since the fact names no threads.
+  // Every open thread, and its agents' turns, checks its access again, since the fact names no
+  // threads.
   // Public groups show who belongs, so their listing refreshes too.
   expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
     "workspace/one/groups",
@@ -167,6 +168,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/rosters:group",
     "workspace/one/streams:group",
     "workspace/one/timelines",
+    "workspace/one/turns",
   ]);
   // A payload without the expected field refreshes the whole collection rather than none.
   expect(keys([{ name: "thread.activity.recorded", payload: {} }])).toEqual([
@@ -212,6 +214,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/settings",
     "workspace/one/streams",
     "workspace/one/timelines",
+    "workspace/one/turns",
   ]);
   // Reading a thread settles notifications from it.
   expect(signalKeys("one", { _tag: "ThreadRead" })).toEqual([

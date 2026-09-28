@@ -20,8 +20,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   Turns are conversation only: agents have no tools, and environments with a sandbox fail their
   turns. A turn streams nothing to readers, and posts only its last response after its last
   input, so input taken in while it works gets one reply. A stop request is noticed by polling,
-  within a second. No environment transfer or turn timeline activity exists, and turns have no
-  HTTP or screens. Channel delivery does not run, and contacts and triage have no inbox outside
+  within a second. Turns are followed, stopped, and retried over HTTP and through the client's
+  `useThreadTurns`, but have no screens yet. No environment transfer or turn timeline activity
+  exists. Channel delivery does not run, and contacts and triage have no inbox outside
   the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
