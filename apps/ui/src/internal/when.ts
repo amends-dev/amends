@@ -55,6 +55,8 @@ const shortDateYear = new Intl.DateTimeFormat(undefined, {
 /** Such as "Sep 20", with the year when it is not this one. */
 export const dateLabel = (at: Date, now = new Date()) =>
   (at.getFullYear() === now.getFullYear() ? shortDate : shortDateYear).format(at);
+/** Such as "Sep 28, 2026", always with the year, for when something was created. */
+export const calendarDate = (at: Date) => shortDateYear.format(at);
 /** Whole days until a moment, rounded up, and at least one: a fresh week reads as 7. */
 export const daysUntil = (at: Date, now = new Date()) =>
   Math.max(1, Math.ceil((at.getTime() - now.getTime()) / 86_400_000));

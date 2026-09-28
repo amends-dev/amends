@@ -86,27 +86,33 @@ export const connections = (harness: Harness) => {
                 authentication: { _tag: "ApiKey", configured: false },
                 installed: true,
                 capabilities: { modelInference: { interface: "test-messages" } },
+                manageable: true,
                 readiness: {
                   modelInference: { _tag: "Incomplete", settings: [], credential: true },
                 },
               });
+              expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([created]);
 
-              expect(yield* as(workspace.id, bob, (service) => service.list)).toEqual([created]);
+              // A member reads the same connection, told they may not manage it.
+              const read = Object.assign({}, created, { manageable: false });
+              expect(yield* as(workspace.id, bob, (service) => service.list)).toEqual([read]);
               expect(yield* as(workspace.id, bob, (service) => service.get(created.id))).toEqual(
-                created,
+                read,
               );
               for (const denied of [
-                as(workspace.id, bob, (service) => service.create(models)),
-                as(workspace.id, bob, (service) =>
-                  service.rename({
-                    connectionId: created.id,
-                    name: "Mine",
-                    expectedName: "Models",
-                  }),
+                Effect.flip(as(workspace.id, bob, (service) => service.create(models))),
+                Effect.flip(
+                  as(workspace.id, bob, (service) =>
+                    service.rename({
+                      connectionId: created.id,
+                      name: "Mine",
+                      expectedName: "Models",
+                    }),
+                  ),
                 ),
-                as(workspace.id, bob, (service) => service.remove(created.id)),
+                Effect.flip(as(workspace.id, bob, (service) => service.remove(created.id))),
               ])
-                expect(yield* Effect.flip(denied)).toMatchObject({ _tag: "Authorization.Denied" });
+                expect(yield* denied).toMatchObject({ _tag: "Authorization.Denied" });
 
               const renamed = yield* as(workspace.id, alice, (service) =>
                 service.rename({
@@ -138,7 +144,7 @@ export const connections = (harness: Harness) => {
                 region: "eu",
               });
               expect(yield* as(workspace.id, bob, (service) => service.get(created.id))).toEqual(
-                configured,
+                Object.assign({}, configured, { manageable: false }),
               );
             }),
           ),

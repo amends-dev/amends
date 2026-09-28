@@ -49,6 +49,19 @@ export {
 } from "./settings/views.ts";
 export type { WorkspaceFailure } from "./api/failures.ts";
 export {
+  useConnections,
+  type ConnectionAction,
+  type ConnectionEntry,
+  type ConnectionMethod,
+  type ConnectionProvider,
+  type ConnectionSetting,
+  type ConnectionSetup,
+  type ConnectionsDone,
+  type ConnectionsError,
+  type ConnectionsFailure,
+  type ConnectionsView,
+} from "./connections/views.ts";
+export {
   type SettingsData,
   type SettingsSection,
   type SettingsCommand,

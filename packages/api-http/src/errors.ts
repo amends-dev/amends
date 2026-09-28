@@ -16,6 +16,7 @@ import {
   GroupFollowApplication,
   GroupMembershipApplication,
 } from "@amends/core/group";
+import { ConnectionApplication } from "@amends/core/connection";
 import { NotificationApplication } from "@amends/core/notification";
 import { ReadStateApplication } from "@amends/core/attention";
 import {
@@ -178,6 +179,27 @@ export const readState = [
   ReadStateApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
   ReadStateApplication.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
+
+/** A connection the caller may not read answers as missing. */
+export const ConnectionNotFound = ConnectionApplication.NotFound.pipe(HttpApiSchema.status(404));
+/** A connection renamed since the caller last saw its name refuses another name with 409. */
+export const ConnectionChanged = ConnectionApplication.Changed.pipe(HttpApiSchema.status(409));
+/** The implementation is not installed on this host. */
+export const UnknownImplementation = ConnectionApplication.UnknownImplementation.pipe(
+  HttpApiSchema.status(422),
+);
+/** The settings are not what the implementation declares. */
+export const InvalidSettings = ConnectionApplication.InvalidSettings.pipe(
+  HttpApiSchema.status(422),
+);
+/** The implementation, or the connection, does not authenticate that way. */
+export const UnsupportedAuthentication = ConnectionApplication.UnsupportedAuthentication.pipe(
+  HttpApiSchema.status(422),
+);
+/** This host cannot store credentials now. */
+export const CredentialsUnavailable = ConnectionApplication.CredentialsUnavailable.pipe(
+  HttpApiSchema.status(503),
+);
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [

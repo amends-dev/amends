@@ -65,15 +65,6 @@ export function EnvironmentsPage() {
     />
   );
 }
-export function ConnectionsPage() {
-  return (
-    <Placeholder
-      title="Connections"
-      heading="No connections yet"
-      line="Manage the services your workspace connects to."
-    />
-  );
-}
 export function MissingWorkspacePage() {
   const params = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();

@@ -27,9 +27,9 @@ import {
   TriagePage,
   TasksPage,
   EnvironmentsPage,
-  ConnectionsPage,
   MissingWorkspacePage,
 } from "./pages/workspace.tsx";
+import { ConnectionsPage } from "./pages/connections.tsx";
 
 function RequireSession(props: ParentProps) {
   const session = useSession();

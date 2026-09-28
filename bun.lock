@@ -209,6 +209,7 @@
       "name": "@amends/api-http",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "effect": "catalog:",

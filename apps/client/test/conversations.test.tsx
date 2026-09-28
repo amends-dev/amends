@@ -199,6 +199,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
       true,
     ).toSorted(),
   ).toEqual([
+    "workspace/one/connections",
     "workspace/one/groups",
     "workspace/one/inbox",
     "workspace/one/members",

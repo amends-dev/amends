@@ -96,7 +96,9 @@ keys into core inputs and keep each outcome's status. Conversation host tests ru
 conversation over PostgreSQL: group creation and its retry, starts, mentions reaching the inbox
 and resolving to their source, replies, timeline pages from either end, participants, following,
 read positions, leaving, and the 404s after it; and direct threads, thread-list cursors, fixed
-direct groups, outsiders, malformed queries, and the OpenAPI document.
+direct groups, outsiders, malformed queries, and the OpenAPI document. Connection host tests add a
+connection over PostgreSQL, key it, check that no read carries the key, rename it through a
+conflict, remove it, and refuse a key on a host without a credential key.
 Change-feed host tests exercise real streaming response lifetimes, two subscribers,
 cross-user delivery, workspace isolation, payload encoding, active membership,
 resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream

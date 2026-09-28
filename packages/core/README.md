@@ -137,9 +137,11 @@ admission together, without thread activity. Workspace-member removal uses it fo
 `@amends/core/connection` holds workspace connections: access to an external system through an
 implementation the host installed, described by the [connection contract](../connection/README.md).
 `ConnectionApplication` lists and reads the connections the actor may read, and creates, renames,
-configures, sets and clears the credential of, and removes them. Reads return `Connection.View`:
+configures, sets and clears the credential of, and removes them; `implementations` lists the
+declarations this host installed, which every member may see. Reads return `Connection.View`:
 the record without its credential, whether one is set, whether this host installed the
-implementation, its capabilities, and readiness for each capability. Readiness is `Ready`, or
+implementation, its capabilities, readiness for each capability, and `manageable`, whether the
+actor holds `connection.manage` on it. Readiness is `Ready`, or
 `Incomplete` with the required settings and credential it lacks; it is computed on read, from the
 record and the host's `ConnectionCatalog`.
 

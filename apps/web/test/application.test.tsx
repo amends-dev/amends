@@ -444,8 +444,9 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
-  // The directory, then the second workspace's settings and ownership; the feed stays separate.
-  expect(fetch).toHaveBeenCalledTimes(3);
+  // The directory, the first workspace's connections and their providers, then the second
+  // workspace's settings and ownership; the feed stays separate.
+  expect(fetch).toHaveBeenCalledTimes(5);
   expect(feed.streams.map((stream) => new URL(stream.request.url).pathname)).toEqual([
     "/workspaces/one/changes",
     "/workspaces/two/changes",
@@ -1252,4 +1253,128 @@ it("follows a group from its bell, confirming each change with a toast", async (
   await screen.findByText("Unfollowed #Design");
   expect(screen.getByRole("button", { name: "Follow" })).toHaveAttribute("aria-pressed", "false");
   expect(changes).toEqual(["follow", "unfollow"]);
+});
+
+/** A host with Anthropic installed, answering the Connections page's reads and writes. */
+function connectionsHost() {
+  const anthropic = {
+    id: "anthropic",
+    name: "Anthropic",
+    description: "Claude models through the Anthropic API.",
+    capabilities: { modelInference: { interface: "anthropic-messages" } },
+    settings: [{ key: "baseUrl", label: "API URL", kind: "url", required: false }],
+    authentication: [{ _tag: "ApiKey", label: "API key" }],
+  };
+  let keyed: boolean | undefined;
+  const writes: Array<{ method: string; path: string; body: unknown }> = [];
+  const view = () => ({
+    id: "c1",
+    name: "Anthropic",
+    implementationId: "anthropic",
+    settings: {},
+    authentication: { _tag: "ApiKey", configured: keyed === true },
+    createdBy: "owner-one",
+    createdAt: at,
+    installed: true,
+    capabilities: anthropic.capabilities,
+    manageable: true,
+    readiness: {
+      modelInference: keyed
+        ? { _tag: "Ready" }
+        : { _tag: "Incomplete", settings: [], credential: true },
+    },
+  });
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/connections/implementations") return response([anthropic]);
+    if (path === "/workspaces/one/connections" && request.method === "GET")
+      return response(keyed === undefined ? [] : [view()]);
+    if (path === "/workspaces/one/connections" && request.method === "POST") {
+      writes.push({ method: "POST", path, body: await request.json() });
+      keyed = false;
+      return response(view(), 201);
+    }
+    if (path === "/workspaces/one/connections/c1/credential" && request.method === "PUT") {
+      writes.push({ method: "PUT", path, body: await request.json() });
+      keyed = true;
+      return response(view());
+    }
+    return response({
+      memberships: [
+        {
+          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 1,
+        },
+      ],
+      invitations: [],
+    });
+  });
+  return { fetch, writes };
+}
+/** Adds Anthropic from the empty page, then its key, in the two steps setup takes. */
+async function addAnthropicWithKey() {
+  const page = await screen.findByRole("heading", { name: "No connections yet" });
+  fireEvent.click(within(page.parentElement!).getByRole("button", { name: "Add connection" }));
+  const chooser = await screen.findByRole("dialog", { name: "Add connection" });
+  fireEvent.click(within(chooser).getByRole("button", { name: /Anthropic/ }));
+  const configure = await screen.findByRole("dialog", { name: "Configure connection" });
+  expect(within(configure).getByRole("textbox", { name: "Connection name" })).toHaveValue(
+    "Anthropic",
+  );
+  fireEvent.click(within(configure).getByRole("button", { name: "Create & continue" }));
+  const key = await screen.findByRole("dialog", { name: "Add API key" });
+  expect(within(key).getByText("Anthropic · Step 2 of 2")).toBeInTheDocument();
+  fireEvent.input(within(key).getByLabelText("API key"), { target: { value: "sk-ant-test" } });
+  fireEvent.click(within(key).getByRole("button", { name: "Save key" }));
+  await within(screen.getByLabelText("Notifications")).findByText("API key saved");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Add API key" })).not.toBeInTheDocument(),
+  );
+  const details = await screen.findByLabelText("Connection details", { selector: "aside" });
+  expect(
+    within(details).getByText("Setup is complete. Provider access has not been tested."),
+  ).toBeInTheDocument();
+}
+
+it("adds a connection, then its key, from the Connections page, opening it beside the list", async () => {
+  const host = connectionsHost();
+  const history = mount(
+    "/workspaces/one/connections",
+    memoryStore(session("alice")).store,
+    host.fetch,
+    undefined,
+    { permissions: ["connection.create"] },
+  );
+  await addAnthropicWithKey();
+  expect(history.get()).toBe("/workspaces/one/connections?connection=c1");
+  expect(host.writes).toEqual([
+    {
+      method: "POST",
+      path: "/workspaces/one/connections",
+      body: {
+        name: "Anthropic",
+        implementationId: "anthropic",
+        settings: {},
+        authentication: "ApiKey",
+      },
+    },
+    {
+      method: "PUT",
+      path: "/workspaces/one/connections/c1/credential",
+      body: { secret: "sk-ant-test" },
+    },
+  ]);
+});
+it("offers adding connections only to those who may", async () => {
+  const host = connectionsHost();
+  mount("/workspaces/one/connections", memoryStore(session("alice")).store, host.fetch);
+  await screen.findByText("An administrator can add model providers for your workspace.");
+  expect(screen.queryByRole("button", { name: /Add connection/ })).not.toBeInTheDocument();
 });

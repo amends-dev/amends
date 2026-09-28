@@ -50,16 +50,28 @@ export type Error =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | ConnectionCredentialStore.Failure
-  | Changed
+  | ConnectionCredentialStore.Failure;
+/** Creating can also meet an implementation this host lacks, or a request key used before. */
+export type CreateError =
+  | Error
+  | RequestReceipts.Error
+  | UnknownImplementation
   | InvalidSettings
   | UnsupportedAuthentication;
-/** Creating can also meet an implementation this host lacks, or a request key used before. */
-export type CreateError = Error | RequestReceipts.Error | UnknownImplementation;
-export type CredentialError = Error | UnknownImplementation | CredentialsUnavailable;
+export type ConfigureError = Error | UnknownImplementation | InvalidSettings;
+export type CredentialError =
+  | Error
+  | UnknownImplementation
+  | UnsupportedAuthentication
+  | CredentialsUnavailable;
 
 export interface Interface {
   readonly workspaceId: Connection.Record["workspaceId"];
+  /**
+   * The implementations this host installed, as they declare themselves. They describe the host
+   * rather than the workspace, so every member may see them.
+   */
+  readonly implementations: ReadonlyArray<ConnectionImplementation.Declaration>;
   /** The workspace's connections the actor may read, by name. */
   readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Service>;
   readonly get: (
@@ -75,18 +87,18 @@ export interface Interface {
   ) => Effect.Effect<Connection.View, CreateError, Actor.Service>;
   readonly rename: (
     input: Connection.RenameInput,
-  ) => Effect.Effect<Connection.View, Error, Actor.Service>;
+  ) => Effect.Effect<Connection.View, Error | Changed, Actor.Service>;
   /** Replace its settings, which must match what the implementation declares. */
   readonly configure: (
     input: Connection.ConfigureInput,
-  ) => Effect.Effect<Connection.View, Error | UnknownImplementation, Actor.Service>;
+  ) => Effect.Effect<Connection.View, ConfigureError, Actor.Service>;
   /** Store a new credential for a connection that takes one, replacing any earlier one. */
   readonly setCredential: (
     input: Connection.SetCredentialInput,
   ) => Effect.Effect<Connection.View, CredentialError, Actor.Service>;
   readonly clearCredential: (
     connectionId: Connection.Id,
-  ) => Effect.Effect<Connection.View, Error, Actor.Service>;
+  ) => Effect.Effect<Connection.View, Error | UnsupportedAuthentication, Actor.Service>;
   /** Stop its use and delete its credential; its record remains for history. */
   readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, Error, Actor.Service>;
 }
@@ -120,8 +132,13 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const target = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
   const declarationOf = (id: ConnectionImplementation.Id) => Option.getOrUndefined(catalog.get(id));
-  const viewOf = (record: Connection.Record) =>
-    Connection.view(record, declarationOf(record.implementationId));
+  const viewOf = (record: Connection.Record, manageable: boolean) =>
+    Connection.view(record, declarationOf(record.implementationId), manageable);
+  /** The connection as the actor sees it, including whether they may manage it. */
+  const presented = (record: Connection.Record) =>
+    authorization
+      .permitted([Requirement.make(ConnectionPermissions.Manage, target(record.id))])
+      .pipe(Effect.map(([manageable = false]) => viewOf(record, manageable)));
 
   const decode = Schema.decodeEffect(Schema.toType(Connection.Record));
   /** The active connection by ID, or NotFound. */
@@ -192,24 +209,29 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     const active = records.filter(
       (record) => record.status === "active" && record.workspaceId === workspaceId,
     );
-    const readable = yield* authorization.permitted(
-      active.map((record) => Requirement.make(ConnectionPermissions.Read, target(record.id))),
+    // One grant resolution answers both permissions for every connection.
+    const permitted = yield* authorization.permitted(
+      active.flatMap((record) => [
+        Requirement.make(ConnectionPermissions.Read, target(record.id)),
+        Requirement.make(ConnectionPermissions.Manage, target(record.id)),
+      ]),
     );
     return active
-      .filter((_, index) => readable[index] === true)
+      .flatMap((record, index) =>
+        permitted[index * 2] === true ? [viewOf(record, permitted[index * 2 + 1] === true)] : [],
+      )
       .toSorted((left, right) =>
         left.name === right.name
           ? left.id < right.id
             ? -1
             : 1
           : left.name.localeCompare(right.name),
-      )
-      .map(viewOf);
+      );
   });
 
   const get = Effect.fn("ConnectionApplication.get")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
-    return viewOf(yield* authorized(id, ConnectionPermissions.Read));
+    return yield* presented(yield* authorized(id, ConnectionPermissions.Read));
   });
 
   const restore = Effect.fnUntraced(function* (reference: CreatedReference) {
@@ -260,7 +282,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
           return created;
         }),
       );
-      return viewOf(record);
+      return yield* presented(record);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -273,7 +295,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.RenameInput))(input);
     return yield* Effect.gen(function* () {
       const record = yield* authorized(request.connectionId, ConnectionPermissions.Manage);
-      if (record.name === request.name) return viewOf(record);
+      if (record.name === request.name) return viewOf(record, true);
       if (record.name !== request.expectedName)
         return yield* new Changed({ connectionId: record.id });
       yield* journal.publish(ConnectionFacts.Renamed, {
@@ -281,7 +303,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
         connectionId: record.id,
         name: request.name,
       });
-      return viewOf(Connection.change(record, { name: request.name }));
+      return viewOf(Connection.change(record, { name: request.name }), true);
     }).pipe(committed);
   });
 
@@ -297,7 +319,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
         connectionId: record.id,
         settings: request.settings,
       });
-      return viewOf(Connection.change(record, { settings: request.settings }));
+      return viewOf(Connection.change(record, { settings: request.settings }), true);
     }).pipe(committed);
   });
 
@@ -333,6 +355,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
       });
       return viewOf(
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId } }),
+        true,
       );
     }).pipe(committed);
   });
@@ -349,11 +372,12 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
           method: record.authentication._tag,
         });
       const cleared = record.authentication.credentialId;
-      if (cleared === null) return viewOf(record);
+      if (cleared === null) return viewOf(record, true);
       yield* credentials.remove(cleared);
       yield* journal.publish(ConnectionFacts.CredentialCleared, { workspaceId, connectionId: id });
       return viewOf(
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId: null } }),
+        true,
       );
     }).pipe(committed);
   });
@@ -370,6 +394,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
 
   return Service.of({
     workspaceId,
+    implementations: catalog.list,
     list,
     get,
     create,

@@ -74,9 +74,11 @@ so a client can import the complete contract without loading server code.
   generated clients pass `payload: {}`.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
+- `connections`: access to external systems, such as model providers; see
+  [Connections](#connections).
 
-`POST /workspaces`, `POST …/invitations`, `POST …/groups`, both thread starts, and
-`POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
+`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`, both thread
+starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
 same key returns the first attempt's result, and the same key with a different body returns 422
 `Request.Reused`. Clients generating the typed client pass it in `headers`.
 
@@ -231,6 +233,33 @@ sequence. A direct group's members are fixed and it has nothing to follow, so ad
 following there are 409s; unfollowing an ended participation or removing an ended admission is
 also a 409. Positions, caught-up times, and acknowledgments reach the caller's other sessions as
 signals on the change feed, and the conversation's facts reach the group's readers as commits.
+
+### Connections
+
+Connection paths sit under `/workspaces/:workspaceId/connections` and require active membership.
+Every member may read connections and the implementations this host installed; the built-in
+administrator tier adds, renames, configures, keys, and removes them. The
+[core connections section](../core/README.md#connections) describes the rules.
+
+| Endpoint                                        | Operation                                                                                                                        |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/connections/implementations`             | The installed implementations' declarations: name, description, capabilities, settings, and ways of authenticating.              |
+| `GET …/connections`                             | The connections the caller may read, by name.                                                                                    |
+| `POST …/connections`                            | Add one from `{ name, implementationId, settings, authentication }`, `ApiKey` or `None`; 201 with it. Its key is set separately. |
+| `GET …/connections/:connectionId`               | One connection.                                                                                                                  |
+| `POST …/connections/:connectionId/rename`       | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionApplication.Changed`.                 |
+| `PUT …/connections/:connectionId/settings`      | Replace its settings from `{ settings }`.                                                                                        |
+| `PUT …/connections/:connectionId/credential`    | Store `{ secret }` as its key, replacing any earlier one.                                                                        |
+| `DELETE …/connections/:connectionId/credential` | Delete its key.                                                                                                                  |
+| `DELETE …/connections/:connectionId`            | Remove it and delete its key; 204.                                                                                               |
+
+A connection reads as `Connection.View`: its settings, whether a key is set but never the key,
+whether this host installed its implementation, readiness for each capability, and `manageable`,
+whether the caller may change it. A connection the caller may not read answers 404 as a missing
+one does. An implementation this host lacks is 422 `UnknownImplementation`, settings it does not
+declare or a required or malformed value are 422 `InvalidSettings`, and a way of authenticating it
+does not take, or a key for a connection that takes none, is 422 `UnsupportedAuthentication`. A
+host without a credential key answers a key with 503 `CredentialsUnavailable`.
 
 ## Authentication
 

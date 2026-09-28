@@ -51,6 +51,7 @@ drawings, generation, and visual review in the UI workshop.
   [Workspace entry](workspace-entry.md) describes picker/creation ownership and recovery.
   [Workspace shell](workspace-shell.md) covers nested routes, account controls, and appearance.
   [Workspace settings](workspace-settings.md) covers workspace, member, and invitation management.
+  [Connections](connections.md) covers adding connections, their keys, and their setup states.
   [Live updates](live-updates.md) covers the change-feed client, invalidation, and reconnection.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.

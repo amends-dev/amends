@@ -76,7 +76,8 @@ composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
 routes, the responsive shell, groups and threads, and the account menu. Home, Triage, Tasks,
-Environments, and Connections remain placeholders. The app-owned [Settings pages](../../docs/workspace-settings.md)
+and Environments remain placeholders. `src/pages/connections.tsx` composes the
+[Connections page](../../docs/connections.md) from `useConnections` and UI's Connections screens. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode through the UI Theme.

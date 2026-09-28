@@ -8,6 +8,7 @@ import { Field } from "./field/index.ts";
 import { Input, SearchField } from "./input/index.ts";
 import { Menu } from "./menu/index.ts";
 import { MemberPicker } from "./member-picker/index.ts";
+import { Notice } from "./notice/index.ts";
 import * as s from "./components.stories.css.ts";
 
 const meta = { title: "Components/Forms" } satisfies Meta;
@@ -117,5 +118,24 @@ export const Fields = {
     await expect(canvas.getByRole("button", { name: "Remove Yumi" })).toBeVisible();
     await userEvent.type(picker, "{Backspace}");
     await expect(canvas.queryByRole("button", { name: "Remove Yumi" })).toBeNull();
+  },
+} satisfies Story;
+
+/** The caution notice from the Lunacy "Connections / 08 / Credential storage unavailable" frame. */
+export const Notices = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Notices</h2>
+        <Notice title="API key wasn’t saved" alert>
+          Credential storage is unavailable. Ask your administrator to enable it, then try again.
+        </Notice>
+        <Notice title="Provider unavailable" />
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("alert")).toHaveTextContent("API key wasn’t saved");
   },
 } satisfies Story;

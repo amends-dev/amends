@@ -42,6 +42,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "ownership",
     "members",
     "permissions",
+    "connections",
     directoryKey,
   ],
   "workspace.member.added": ["members", "ownership", directoryKey],
@@ -62,6 +63,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "groups",
     "inbox",
     "permissions",
+    "connections",
   ],
   "workspace.assignment.created": [
     "settings",
@@ -70,6 +72,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "groups",
     "inbox",
     "permissions",
+    "connections",
   ],
   "workspace.assignment.revoked": [
     "settings",
@@ -78,6 +81,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "groups",
     "inbox",
     "permissions",
+    "connections",
   ],
   // A public group's creation reaches everyone who might join it.
   "group.created": ["groups", "public-groups"],
@@ -90,6 +94,13 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "group.follow.ended": ["groups"],
   // A group's latest activity, and whether it is new to the reader.
   "thread.activity.recorded": ["groups"],
+  // Connections as the workspace's readers see them: their names, settings, and readiness.
+  "connection.created": ["connections"],
+  "connection.renamed": ["connections"],
+  "connection.configured": ["connections"],
+  "connection.credential-set": ["connections"],
+  "connection.credential-cleared": ["connections"],
+  "connection.removed": ["connections"],
 };
 /** A field of an event's JSON payload, when it is a string. */
 const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {

@@ -54,6 +54,8 @@ portable backend packages under `packages/*` remain Effect-only.
   with drafts, per-change failures, and completion; see [Settings](#settings). It is built on
   `useSettings(workspaceId, section)`, which composes keyed settings reads with commands that
   refresh them before reporting.
+- `useConnections(workspaceId, { done })` shapes the Connections page: installed providers, each
+  connection's setup, and its changes; see [Connections](#connections).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
@@ -184,6 +186,25 @@ what it was made against: `rename`, `transfer`, `role`, `invite`, `remove`, and 
 now shown. An invitation retried with the same recipient and role reuses its request key.
 `done` hears each completed change with whom it concerned and the invitation it created. See
 [workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.
+
+## Connections
+
+`useConnections(workspaceId, { done })` is what the Connections screens connect to. It reads the
+implementations this host installed as `ConnectionProvider`s (settings, ways of authenticating,
+and model access) and the connections the reader may read as `ConnectionEntry`s: provider, the
+settings with their values, the endpoint, `setup` (`configured`, `needs-setup`, or `unavailable`
+when the host no longer installs its provider), what setup still needs, whether a key is saved,
+and whether the reader may manage it. Both reads share one invalidation key that `connection.*`
+commits and access changes refresh. `canCreate()` reads `connection.create`.
+
+Creating takes two steps: `create` drafts the provider, name, settings, and way of authenticating
+and saves the connection with a request key reused while the request is the same; `key` then
+saves the key, which the client keeps only until it is saved or `dismiss()` discards it. `rename`
+keeps the name it was made against, `configure` replaces the settings as a whole, and
+`key.clear` and `remove` need no draft. `failure()` reports `ConnectionsError`: a workspace
+failure, `storage-unavailable` when the host keeps no keys, `refresh-failed`, or `outdated`; stale
+failures hold changes until `refresh()`. `done` hears each completed change, with the connection
+it created and how that one authenticates, so a page can ask for its key next.
 
 ## Views
 

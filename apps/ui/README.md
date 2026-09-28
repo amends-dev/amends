@@ -30,7 +30,8 @@ patterns, and screens as they are introduced.
 - **Color** ([tokens](src/foundations/color/tokens.ts)): semantic roles for surfaces, text,
   borders, actions, the modal scrim, and eight avatar tones. Every value is the exact light or
   dark color the mocks use. The dark error colors are proposals; the mocks have no dark error
-  state yet.
+  state yet. Caution (text, a notice surface, and its outline) comes from the Connections frames,
+  in light mode only; its dark values follow the sand avatar tone.
 - **Typography** ([tokens](src/foundations/typography/tokens.ts)): Inter at 400, 500, and 600,
   in eight roles from `meta` (11/16) to `display` (28/36). The mocks' half-pixel sizes round to
   the nearest role. Import `@amends/ui/foundations/typography/fonts` once at an app entry point.
@@ -142,7 +143,7 @@ the list, arrows and Enter pick, and Backspace removes the last chip. It is a dr
 layouts and an always-shown list on phones.
 
 `Badge` labels a property such as visibility, `EmptyState` centers a note where content will
-appear, and `Toast` shows a short confirmation with an optional action at the bottom of the
+appear, `Notice` boxes a caution for a whole form, such as a key that was not saved, and `Toast` shows a short confirmation with an optional action at the bottom of the
 viewport, dismissing itself after five seconds.
 
 `CodeInput` takes a six-digit code in one native field drawn as six cells, so typing, pasting,
@@ -225,7 +226,18 @@ panel with their role (`Select`, and Save role), access, and Remove member. `Inv
 `InvitationHistory`, `TransferOwnership`, `ConfirmRemoveMember`, and `ConfirmRevokeInvitation`
 are its modals. They take client's settings codes (`SettingsError`, by `SettingsAction`) and own
 the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
-completed change. A `Shell.Aside` rendered inside `Shell.Main`, as a page renders member details,
+completed change. `ConnectionsPane` is Connections from the Lunacy "Connections" frames, with All
+and Needs setup tabs, Add connection, quiet placeholder rows while loading, and a failed state
+with Retry. `ConnectionList` searches the connections and lists each with its provider, endpoint,
+setup (Configured, or Needs setup and Unavailable in the caution color), and how it
+authenticates, with an empty state that offers adding one. `ConnectionDetails` opens one in the
+side panel: its setup, the name and the provider's settings as separate saves, and its key, which
+is only ever replaced or removed. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
+setup, adding, and replacing), `ConfirmRemoveConnection`, and `ConfirmRemoveKey` are its modals;
+they take client's codes (`ConnectionsError`) and own the wording, and `connectionsToast` words the
+toasts. **Screens / Connections** walks adding a connection and its key, a host without key
+storage, an unavailable provider, a read-only member, search, and a stale rename. A `Shell.Aside`
+rendered inside `Shell.Main`, as a page renders member details,
 attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
 inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and
 `NewMessage` are compact modals for the account
@@ -248,7 +260,9 @@ preview's join prompt spans the main content only; the open thread beside it sim
 composer. Tab counts are plain numbers everywhere, where some mocks draw them as badges.
 The settings copy says "group" where the mocks said "channel", and the visibility help follows
 the chosen option. Task panel messages use the standard message size rather than the mock's
-smaller text. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
+smaller text. Connections' field errors keep the design system's error color and icon where the
+mocks draw them in caution, and an unavailable provider's saved settings are labeled by what the
+connection stored, since its declaration is gone. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
 the icon set covers, at every size.
 
 ## Run and verify

@@ -1,5 +1,6 @@
 export { Api } from "./api.ts";
 export { ChangesGroup } from "./changes.ts";
+export { ConnectionsGroup } from "./connections.ts";
 export { Authentication, Principal, Unauthorized } from "./authentication.ts";
 export { ApiErrors } from "./errors.ts";
 export { GroupsGroup } from "./groups.ts";
@@ -23,3 +24,5 @@ export { Assignment } from "@amends/core/authorization";
 export { Group, GroupMembership } from "@amends/core/group";
 export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends/core/thread";
 export { Notification, NotificationInbox } from "@amends/core/notification";
+export { Connection } from "@amends/core/connection";
+export { ConnectionImplementation } from "@amends/connection";

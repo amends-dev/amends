@@ -30,7 +30,28 @@ import settingsMeta, {
   Rename,
   WorkspaceGeneral,
 } from "../src/screens/group/settings.stories.tsx";
-import formsMeta, { Buttons, Fields } from "../src/components/forms.stories.tsx";
+import formsMeta, { Buttons, Fields, Notices } from "../src/components/forms.stories.tsx";
+import connectionsMeta, {
+  AddApiKey,
+  AddConnectionFlow,
+  AllConnections,
+  ChooseProvider,
+  ConfigureAnthropic,
+  ConfigureWithoutAuthentication,
+  ConfiguredConnection,
+  CredentialStorageUnavailable,
+  EmptyConnections,
+  LoadFailed,
+  Loading as ConnectionsLoading,
+  NeedsSetup,
+  NoMatchingConnections,
+  ProviderUnavailable,
+  ReadOnly as ConnectionsReadOnly,
+  RemoveApiKey,
+  RemoveConnection,
+  RenamedMeanwhile,
+  ReplaceApiKey,
+} from "../src/screens/connections/connections.stories.tsx";
 import createMeta, { CreateAndOpen, OpenForm } from "../src/screens/group/create.stories.tsx";
 import directoryMeta, {
   Discover,
@@ -188,6 +209,58 @@ describe("form components", () => {
   });
   it("associates help and errors, switches choices, and picks members", async () => {
     await stories.story(Fields).run();
+  });
+  it("announces a caution notice", async () => {
+    await stories.story(Notices).run();
+  });
+});
+
+describe("connections screen", () => {
+  const stories = definePreview(preview).meta(connectionsMeta);
+  it("renders the list, details, setup dialogs, and states", async () => {
+    viewport(1600);
+    for (const story of [
+      AllConnections,
+      ConfiguredConnection,
+      NeedsSetup,
+      ChooseProvider,
+      ConfigureAnthropic,
+      ConfigureWithoutAuthentication,
+      AddApiKey,
+      ReplaceApiKey,
+      EmptyConnections,
+      RemoveConnection,
+      RemoveApiKey,
+      ConnectionsLoading,
+      LoadFailed,
+    ]) {
+      await stories.story(story).run();
+      cleanup();
+    }
+  });
+  it("adds a connection, then its key, in two steps", async () => {
+    viewport(1600);
+    await stories.story(AddConnectionFlow).run();
+  });
+  it("reports a key the host could not store, keeping what was typed", async () => {
+    viewport(1600);
+    await stories.story(CredentialStorageUnavailable).run();
+  });
+  it("keeps an unavailable provider's connection, offering only what still works", async () => {
+    viewport(1600);
+    await stories.story(ProviderUnavailable).run();
+  });
+  it("shows members the details without any action", async () => {
+    viewport(1600);
+    await stories.story(ConnectionsReadOnly).run();
+  });
+  it("offers to clear a search that finds nothing", async () => {
+    viewport(1600);
+    await stories.story(NoMatchingConnections).run();
+  });
+  it("keeps a draft name when the connection was renamed meanwhile", async () => {
+    viewport(1600);
+    await stories.story(RenamedMeanwhile).run();
   });
 });
 

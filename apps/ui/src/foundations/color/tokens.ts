@@ -2,7 +2,8 @@
  * Color roles for the neutral design mocked in `design-system/Amends Group Exploration.free`.
  * Values are the exact light and dark fills and strokes the Lunacy screens use; components
  * consume roles, never raw values. Everything is a shade of gray except the avatar tones, the
- * agent name, and danger, which the screens use for identity and errors.
+ * agent name, danger, and caution, which the screens use for identity, errors, and things that
+ * need attention before they work, such as a connection that needs setup.
  */
 export interface AvatarTone {
   readonly background: string;
@@ -47,6 +48,8 @@ export interface ColorTokens {
     readonly subtle: string;
     /** An inline mention and the workspace mark. */
     readonly mention: string;
+    /** A notice about something that needs attention, such as a key that was not saved. */
+    readonly caution: string;
   };
   readonly text: {
     readonly primary: string;
@@ -58,6 +61,8 @@ export interface ColorTokens {
     /** An agent's name. */
     readonly agent: string;
     readonly danger: string;
+    /** A state that needs attention, such as "Needs setup", and invalid field input. */
+    readonly caution: string;
     /** Text and icons on the primary action. */
     readonly onPrimary: string;
   };
@@ -71,6 +76,8 @@ export interface ColorTokens {
     /** The outline of a chosen option. */
     readonly selected: string;
     readonly danger: string;
+    /** The outline of a caution notice. */
+    readonly caution: string;
     /** The dashed running stitch; decorative only. */
     readonly stitch: string;
   };
@@ -101,6 +108,7 @@ export const light = {
     railSelected: "#E9E9EC",
     subtle: "#F3F3F5",
     mention: "#ECEEF1",
+    caution: "#F7F4EE",
   },
   text: {
     primary: "#242528",
@@ -109,6 +117,7 @@ export const light = {
     disabled: "#9C9EA4",
     agent: "#8755DD",
     danger: "#89221C",
+    caution: "#8A7251",
     onPrimary: "#FFFFFF",
   },
   border: {
@@ -117,6 +126,7 @@ export const light = {
     strong: "#73757B",
     selected: "#9C9EA4",
     danger: "#B32F28",
+    caution: "#E8E1D5",
     stitch: "#BCB7AC",
   },
   action: { primary: "#242528", secondary: "#FFFFFF", indicator: "#242528" },
@@ -148,6 +158,8 @@ export const dark = {
     railSelected: "#30353D",
     subtle: "#262A30",
     mention: "#353A44",
+    // The mocks show caution in light mode only; the dark values follow the sand avatar tone.
+    caution: "#2B2720",
   },
   text: {
     primary: "#ECEEF2",
@@ -157,6 +169,7 @@ export const dark = {
     agent: "#C2A1FA",
     // The mocks have no dark error state yet; these are proposals.
     danger: "#F0A8A0",
+    caution: "#D5B68C",
     onPrimary: "#191B20",
   },
   border: {
@@ -165,6 +178,7 @@ export const dark = {
     strong: "#9CA5B5",
     selected: "#727D8F",
     danger: "#E58A80",
+    caution: "#4D4336",
     stitch: "#626B79",
   },
   action: { primary: "#ECEEF2", secondary: "#25292F", indicator: "#ECEEF2" },

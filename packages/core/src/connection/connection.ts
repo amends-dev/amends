@@ -127,6 +127,8 @@ export const View = Schema.Struct({
    */
   installed: Schema.Boolean,
   capabilities: ConnectionImplementation.Capabilities,
+  /** Whether the reader may rename, configure, set or clear the credential of, and remove it. */
+  manageable: Schema.Boolean,
   /** Readiness for each capability the implementation declares. */
   readiness: Schema.Struct({ modelInference: Schema.optionalKey(Readiness) }),
 });
@@ -185,6 +187,7 @@ export const readiness = (
 export const view = (
   record: Record,
   declaration: ConnectionImplementation.Declaration | undefined,
+  manageable: boolean,
 ): View => ({
   id: record.id,
   name: record.name,
@@ -198,6 +201,7 @@ export const view = (
   createdAt: record.createdAt,
   installed: declaration !== undefined,
   capabilities: declaration?.capabilities ?? {},
+  manageable,
   readiness:
     declaration?.capabilities.modelInference === undefined
       ? {}

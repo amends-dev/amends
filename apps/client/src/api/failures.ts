@@ -25,7 +25,10 @@ type Client = ApiClient["Service"];
 type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, unknown>
   ? E
   : never;
-/** Every failure the workspace, member, access, invitation, and conversation endpoints report. */
+/**
+ * Every failure the workspace, member, access, invitation, conversation, and connection
+ * endpoints report.
+ */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
   | Failure<Client["members"][keyof Client["members"]]>
@@ -34,6 +37,7 @@ type Reported =
   | Failure<Client["groups"][keyof Client["groups"]]>
   | Failure<Client["threads"][keyof Client["threads"]]>
   | Failure<Client["notifications"][keyof Client["notifications"]]>
+  | Failure<Client["connections"][keyof Client["connections"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
@@ -68,6 +72,14 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ReadStateApplication.BeyondTimeline": "changed",
   "ThreadParticipationApplication.AlreadyEnded": "changed",
   "NotificationApplication.AlreadyHandled": "changed",
+  // Connections: renamed meanwhile, or the provider it names was removed from this host.
+  "ConnectionApplication.Changed": "changed",
+  "ConnectionApplication.UnknownImplementation": "changed",
+  "ConnectionApplication.NotFound": "gone",
+  "ConnectionApplication.InvalidSettings": "invalid",
+  "ConnectionApplication.UnsupportedAuthentication": "invalid",
+  // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
+  "ConnectionApplication.CredentialsUnavailable": "failed",
   "GroupFollowApplication.AgentRequired": "denied",
   "ReadStateApplication.HumanRequired": "denied",
   "ThreadApplication.HumanAuthorRequired": "denied",
