@@ -45,9 +45,13 @@ packages/
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
   harness/            @amends/harness: the harness contract and recorded event standard
   harness-amends/     @amends/harness-amends: amends's own in-process harness over Effect AI
+  sandbox/            @amends/sandbox: the sandbox provider contract
+  sandbox-conformance/ @amends/sandbox-conformance: test suites every sandbox provider runs
 adapters/
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
   storage-memory/     @amends/storage-memory: in-memory reference storage and directory
+  sandbox-local/      @amends/sandbox-local: sandboxes as local directories, for tests and development
+  sandbox-daytona/    @amends/sandbox-daytona: sandboxes on Daytona
 hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/

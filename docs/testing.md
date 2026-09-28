@@ -147,6 +147,13 @@ terminates the child in `finally`; each child uses its own database and an ephem
 port. Tests that need a database run the fixture inside `it.live` over the Effect
 that creates it.
 
+Sandbox providers run the [sandbox conformance suites](../packages/sandbox-conformance/README.md)
+in the `backend` project with live time, since they wait on real processes. The local provider's
+tests run everywhere, each over a temporary directory and a random port, and need `python3`. The
+Daytona provider's tests create real sandboxes, take minutes, and cost money, so they run only with
+`AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, for example from the repository's Git-ignored `.env`;
+otherwise, as in CI, they are reported as skipped.
+
 ## Storage conformance
 
 The [conformance suites](../packages/storage-conformance/README.md) specify storage

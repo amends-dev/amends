@@ -1,0 +1,17 @@
+{
+  "name": "@amends/sandbox-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/sandbox": "workspace:*",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  }
+}

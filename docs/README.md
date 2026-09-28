@@ -24,6 +24,10 @@ remaining gaps with links to their owning code.
 | [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
 | [Harness](../packages/harness/README.md)                             | The harness contract: sessions, and the events and transcript every harness records.                                |
 | [Amends harness](../packages/harness-amends/README.md)               | Amends's own harness: an in-process agent loop over Effect AI.                                                      |
+| [Sandbox](../packages/sandbox/README.md)                             | The sandbox provider contract: acquisition, commands, processes, ports, files, and snapshots.                       |
+| [Sandbox conformance](../packages/sandbox-conformance/README.md)     | Test suites every sandbox provider runs, and the harness a provider supplies.                                       |
+| [Local sandbox](../adapters/sandbox-local/README.md)                 | Sandboxes as directories on this machine, the reference provider.                                                   |
+| [Daytona sandbox](../adapters/sandbox-daytona/README.md)             | Sandboxes on Daytona, and running its suites with an API key.                                                       |
 | [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                    |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                              |

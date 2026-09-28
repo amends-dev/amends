@@ -29,8 +29,9 @@ implemented through `NotificationApplication.acknowledge`, as private `Seen` sta
 journal. Other participation management, the task and channel workflows that admit contacts and
 triage, public groups, group/thread HTTP/UI, turns, execution,
 agent/contact/triage acknowledgment, and channel
-delivery below remain design intent. The harness contract and amends's own in-process harness
-exist as packages, but no environment or turn runs them yet. “Agreed” records a design decision,
+delivery below remain design intent. The harness contract, amends's own in-process harness, and
+the sandbox contract with local and Daytona providers exist as packages, but no environment or
+turn runs them yet. “Agreed” records a design decision,
 not its implementation status.
 
 ## Architecture summary
@@ -1189,6 +1190,28 @@ harness is then initialized against the prepared filesystem before conversation 
 new execution. If a retained runtime already provides the required state, full reconstruction
 is unnecessary. Acquisition-result schemas and proof of matching retained context remain
 contract work.
+
+## Agreed: sandbox providers share one contract, separate from harnesses
+
+A sandbox provider supplies execution: a local directory, or a hosted service such as Daytona,
+E2B, Vercel, or Cloudflare. What runs inside a sandbox is a separate choice. It may be an ACP
+agent such as opencode, amends's own harness, or anything else a harness implementation starts.
+A sandbox knows nothing about harnesses; the environment composes the two, and a harness that runs
+inside a sandbox reaches its process through the sandbox contract.
+
+Every provider acquires sandboxes and reports whether their files were retained, restored from a
+snapshot, or fresh. It runs commands, starts background processes and streams their output,
+exposes a port as a URL with the headers needed to reach it, reads and writes files, and stops or
+destroys a sandbox. What providers differ on is declared as a capability rather than assumed:
+writing to a running process's input, which Vercel and Cloudflare do not offer; filesystem or
+memory snapshots; and isolation, which a local directory does not provide. Anything the host talks
+to inside a sandbox therefore listens on a port rather than relying on standard input. A snapshot
+is a reference that only the provider which took it can restore or delete.
+
+The contract and its conformance suites are [`@amends/sandbox`](../packages/sandbox/README.md) and
+[`@amends/sandbox-conformance`](../packages/sandbox-conformance/README.md), with local and Daytona
+providers in `adapters/`. Environment composition, retention policy, and harnesses running inside
+sandboxes remain open.
 
 ## Agreed: environments store references to provider-managed filesystem snapshots
 

@@ -21,10 +21,17 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the agent-authored messages that notify agents as informational come from no workflow yet.
 - The [harness contract](../packages/harness/README.md) and amends's own
   [in-process harness](../packages/harness-amends/README.md) exist, but nothing runs them: no
-  environment, sandbox, model connection, or turn log exists, so no provider has been called
+  environment, model connection, or turn log exists, so no model provider has been called
   outside tests. That harness stops rather than answering the model when a response calls a tool
   it was not offered or holds a part it cannot record, and whether providers accept history with
   calls to tools a later session no longer offers is unverified.
+- The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
+  sandboxes outside their tests: no environment composes a sandbox with a harness, and no harness
+  runs inside one. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
+  is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes
+  the suites against a real account, but a background process's output arrives only in whole lines
+  there, and a snapshot can take minutes. No provider for E2B, Vercel, or Cloudflare exists;
+  Cloudflare's SDK runs only inside a Worker, so reaching it from a host needs its Bridge Worker.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
   local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for

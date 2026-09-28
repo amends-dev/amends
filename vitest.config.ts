@@ -14,7 +14,12 @@ export default defineConfig({
           environment: "node",
           // Integration tests share CI's two CPUs with PostgreSQL; the 5 s default is too tight.
           testTimeout: 20_000,
-          include: ["packages/*/test/**/*.test.ts", "adapters/storage-memory/test/**/*.test.ts"],
+          include: [
+            "packages/*/test/**/*.test.ts",
+            "adapters/storage-memory/test/**/*.test.ts",
+            "adapters/sandbox-local/test/**/*.test.ts",
+            "adapters/sandbox-daytona/test/**/*.test.ts",
+          ],
         },
       },
       {

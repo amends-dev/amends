@@ -138,6 +138,11 @@ gateway, adapting the same credential resolution to their own authentication.
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs
 them against itself.
 
+`@amends/sandbox` is the [sandbox contract](./sandbox/README.md) every sandbox provider implements,
+from a local directory to a hosted service, with capabilities for what providers differ on. It
+knows nothing of harnesses. `@amends/sandbox-conformance` holds the test suites every provider
+adapter runs against itself; the providers live in `adapters/`.
+
 `@amends/harness` is the [harness contract](./harness/README.md): sessions, their capabilities, and
 the events and transcript every harness records, so a turn's log reads the same whichever harness
 ran it. It depends on Effect alone and knows nothing of core. `@amends/harness-amends` is

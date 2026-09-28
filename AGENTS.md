@@ -47,8 +47,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   events and transcript a turn's log stores whichever harness ran, so work continues across
   environments. `harness-amends` is amends's own harness, an agent loop over Effect AI's
   `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`.
+  `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
+  suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
 - `adapters/*`: implementations of gateway contracts over one external system, with
-  that system's dependencies. `storage-postgresql` implements workspace storage and
+  that system's dependencies. `sandbox-local` and `sandbox-daytona` implement the sandbox
+  contract over this machine's directories and over Daytona. `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
   per record field, except a thread activity's kind-specific `details`, stored as JSON;
   `storage-memory` implements them in process memory as the reference

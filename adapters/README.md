@@ -5,6 +5,10 @@ contracts over one external system, such as a database. Adapters consume shared
 packages and may install the dependencies their system needs, which is why they
 live outside `packages/`. Hosts compose them; shared packages never depend on them.
 
+`sandbox-local/` and `sandbox-daytona/` implement the [sandbox contract](../packages/sandbox/README.md):
+the first with directories on this machine, the reference provider for tests, and the second over
+Daytona's hosted sandboxes. Both run the [sandbox conformance suites](../packages/sandbox-conformance/README.md).
+
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
 and one column per record field, except a thread activity's kind-specific details, which
