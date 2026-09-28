@@ -1,5 +1,5 @@
 import { For, Match, Show, Switch, createMemo } from "solid-js";
-import { IconAlertTriangle, IconCheck, IconMarkMail, IconMessage } from "@amends/icons";
+import { IconMarkMail, IconMessage } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
@@ -133,7 +133,7 @@ export function InboxPane(props: InboxPaneProps) {
           </Match>
           <Match when={props.status === "failed"}>
             <EmptyState
-              icon={IconAlertTriangle}
+              art="came-apart"
               title="Can’t load your inbox"
               lines={["Try again once the host is reachable."]}
             >
@@ -144,7 +144,7 @@ export function InboxPane(props: InboxPaneProps) {
           </Match>
           <Match when={props.items.length === 0 && props.tab === "unread"}>
             <EmptyState
-              icon={IconCheck}
+              art="rest"
               title="You’re all caught up"
               lines={["You’ve seen everything that came to you."]}
             >
@@ -153,7 +153,7 @@ export function InboxPane(props: InboxPaneProps) {
           </Match>
           <Match when={props.items.length === 0}>
             <EmptyState
-              icon={IconMarkMail}
+              art="caret"
               title="No activity yet"
               lines={["Mentions, replies, and new threads in groups you follow appear here."]}
             />

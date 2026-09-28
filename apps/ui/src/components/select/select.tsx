@@ -1,6 +1,6 @@
 import * as Primitive from "@kobalte/core/select";
 import { Show, createMemo, createSignal } from "solid-js";
-import { IconCheck, IconChevronDown } from "@amends/icons";
+import { IconAlertTriangle, IconCheck, IconChevronDown } from "@amends/icons";
 import { useField } from "../field/index.ts";
 import { classes } from "../../internal/props.ts";
 import { overlayMount } from "../../internal/overlay.ts";
@@ -11,6 +11,12 @@ export interface SelectOption {
   readonly label: string;
   /** A second line in the list, such as whether an account needs setup. */
   readonly description?: string;
+  /** A third line, such as why it needs setup. */
+  readonly detail?: string;
+  /** A state at its end: `ready` with a check, or `caution` with a warning. */
+  readonly status?: { readonly label: string; readonly tone: "ready" | "caution" };
+  /** Shown, with its reasons, but not chosen. */
+  readonly disabled?: boolean;
 }
 
 export type SelectProps = {
@@ -25,6 +31,8 @@ export type SelectProps = {
   class?: string;
   /** An action after the options, such as creating a missing one; choosing it closes the list. */
   action?: { readonly label: string; readonly onSelect: () => void };
+  /** Names the options above them, such as "Model connections". */
+  heading?: string;
 };
 
 /**
@@ -44,7 +52,11 @@ export function Select(props: SelectProps) {
         (option, index) =>
           option.value === next[index]?.value &&
           option.label === next[index]?.label &&
-          option.description === next[index]?.description,
+          option.description === next[index]?.description &&
+          option.detail === next[index]?.detail &&
+          option.status?.label === next[index]?.status?.label &&
+          option.status?.tone === next[index]?.status?.tone &&
+          option.disabled === next[index]?.disabled,
       ),
   });
   const chosen = () => options().find((option) => option.value === props.value) ?? null;
@@ -53,6 +65,7 @@ export function Select(props: SelectProps) {
       options={[...options()]}
       optionValue="value"
       optionTextValue="label"
+      optionDisabled="disabled"
       value={chosen()}
       onChange={(option) => {
         if (option) props.onChange(option.value);
@@ -81,7 +94,23 @@ export function Select(props: SelectProps) {
                 </Primitive.ItemLabel>
                 <Primitive.ItemDescription class={s.itemDescription}>
                   {description()}
+                  <Show when={item.item.rawValue.detail}>
+                    {(detail) => <span class={s.itemDetail}>{detail()}</span>}
+                  </Show>
                 </Primitive.ItemDescription>
+              </span>
+            )}
+          </Show>
+          <Show when={item.item.rawValue.status}>
+            {(status) => (
+              <span class={s.status} data-tone={status().tone}>
+                <Show
+                  when={status().tone === "ready"}
+                  fallback={<IconAlertTriangle class={s.statusIcon} />}
+                >
+                  <IconCheck class={s.statusIcon} />
+                </Show>
+                {status().label}
               </span>
             )}
           </Show>
@@ -109,7 +138,14 @@ export function Select(props: SelectProps) {
       </Primitive.Trigger>
       <Primitive.Portal mount={overlayMount(trigger())}>
         <Primitive.Content class={s.content}>
-          <Primitive.Listbox class={s.listbox} />
+          <Show when={props.heading}>
+            {(heading) => (
+              <p class={s.heading} aria-hidden="true">
+                {heading()}
+              </p>
+            )}
+          </Show>
+          <Primitive.Listbox class={s.listbox} aria-label={props.heading} />
           <Show when={props.action}>
             {(action) => (
               <button

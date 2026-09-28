@@ -48,7 +48,11 @@ patterns, and screens as they are introduced.
 ## Components
 
 Small pieces the patterns share: `Logo` (the finalized mark; its patch lifts when the link or
-button holding it is hovered), `IconButton` (32px or 24px compact), `Avatar` and `AvatarStack`
+button holding it is hovered, and `motion` loops the Amends Logo board's turn-6 motions: `sew-on`
+for a launch, `thread` to idle, `tug` for something done, and `working` as a loader),
+`StateArt` (the board's turn-7 empty and error states, drawn from the mark's parts: `sew-in`,
+`reach`, `fill`, `caret`, `rest`, `came-apart`, `lost-thread`, `nothing-here`, and `held-back`,
+each still for readers who prefer reduced motion), `IconButton` (32px or 24px compact), `Avatar` and `AvatarStack`
 (square initials in eight tones), `Count` (badge or plain), and `Tabs` (links or buttons, one
 scrolling row, underlined current tab). Below 64rem icon buttons, tabs, and navigation rows grow
 to 44px touch targets.
@@ -137,7 +141,11 @@ options, such as Public and Private, over native radio inputs; its `card` varian
 full-width options with a radio and a description, such as where something runs. `Select` is one choice from a
 short list shaped like an Input, such as a role: Kobalte's listbox opens as wide as the field
 with a check by the current option, and inside a Field it takes the label and help. Options can
-carry a second line, and the list can end with an action, such as creating a missing account. `Menu` wraps
+carry a second line, a third for a reason, and a status at their end (`ready` with a check, or
+`caution`), may be shown but disabled, can sit under a `heading`, and the list can end with an
+action, such as creating a missing account. `Combobox` takes free text with suggestions, shaped
+like a Select: typing narrows them, choosing one enters its value, and text matching none can be
+kept as entered, such as a model ID. `TextArea` is the Input's look for several lines. `Menu` wraps
 Kobalte's dropdown menu for filters, sorting, and pickers; it attaches inside the nearest dialog
 or Theme so it keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
 `MemberPicker` chooses several people by name: chosen people become removable chips and leave
@@ -145,7 +153,7 @@ the list, arrows and Enter pick, and Backspace removes the last chip. It is a dr
 layouts and an always-shown list on phones.
 
 `Badge` labels a property such as visibility, `EmptyState` centers a note where content will
-appear, `Notice` boxes a caution for a whole form, such as a key that was not saved, and `Toast` shows a short confirmation with an optional action at the bottom of the
+appear, over the `StateArt` its `art` names, or the working mark while something is awaited, `Notice` boxes a caution for a whole form, such as a key that was not saved, and `Toast` shows a short confirmation with an optional action at the bottom of the
 viewport, dismissing itself after five seconds.
 
 `CodeInput` takes a six-digit code in one native field drawn as six cells, so typing, pasting,
@@ -250,7 +258,18 @@ or whose `SandboxSummary` shows them to members. `AddEnvironment` takes the basi
 sandbox settings, and `ConfirmRemoveEnvironment` confirms removal; the wording, including the
 mocks' exact error and readiness copy, lives beside them. **Screens / Environments** walks adding
 with the account detour, editing variables and commands, a refused account, readiness, and
-members' view. Side panes on phones place their tabs under the title. A `Shell.Aside`
+members' view. `AgentsPane` and `AgentList` are Agents from the Lunacy "Agents" frames: All and
+Needs setup, and each agent's model (connection and model) and environment, as columns with room
+and under the name otherwise, with lilac one-letter avatars. `AgentDetails` has an Overview, with
+readiness and its recovery, the name as its own save, the saved configuration, and who created
+it, and a Configuration tab whose `InstructionsField` and `ModelFields` (the model connection,
+the suggested or entered model, and each environment with whether it works, needs setup, or
+can't run the model) save together, or whose `ConfigurationSummary` shows them to members.
+`AddAgent` takes the name and initial role beside the same fields, and `ConfirmRemoveAgent`
+confirms removal. `ChooseProvider`, `ConfigureConnection`, and `ConnectionKey` take `returnTo`
+with `returnKind="agent"` for the model-connection detour. **Screens / Agents** walks the detour,
+roles, suggestions, fitting environments, a refused connection, stale reasoning, and members'
+view. Side panes on phones place their tabs under the title. A `Shell.Aside`
 rendered inside `Shell.Main`, as a page renders member details,
 attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
 inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and

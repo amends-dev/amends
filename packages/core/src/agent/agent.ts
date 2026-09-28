@@ -112,14 +112,24 @@ export const View = Schema.Struct({
   id: Id,
   memberId: MemberId.Id,
   /** Its membership's name. */
-  name: Schema.NullOr(Member.Name),
+  name: Member.Name,
   instructions: Instructions,
   model: ModelSelection,
   environmentId: EnvironmentId.Id,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
+  /**
+   * The role its membership holds across the workspace, when the reader may read its access; null
+   * when they may not, or when it holds none.
+   */
+  role: Schema.NullOr(Schema.Struct({ id: Role.Id, name: Schema.NonEmptyString })),
   /** Whether the reader may change its name and configuration. */
   configurable: Schema.Boolean,
+  /**
+   * Whether the reader may remove it: configuring it and removing members, within the delegation
+   * rules, which leave an agent holding more than Member to the owner.
+   */
+  removable: Schema.Boolean,
   /** Whether the reader may ask it for work. */
   usable: Schema.Boolean,
   readiness: Readiness,

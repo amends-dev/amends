@@ -24,8 +24,121 @@
     @keyframes amNudge{0%,100%{transform:translate(0,0)}50%{transform:translate(2.5px,2.5px)}}
     @keyframes amBlink{0%,100%{opacity:.2}20%{opacity:1}45%{opacity:.2}}
     @keyframes amWord{0%,40%{opacity:0;transform:translateY(10px)}52%,86%{opacity:1;transform:translateY(0)}95%,100%{opacity:0;transform:translateY(0)}}
+    @keyframes amSewIn{0%,6%{opacity:0;transform:translateY(-12px) rotate(8deg)}22%{opacity:1;transform:none}27%{transform:translateY(1.5px)}32%,78%{transform:none;opacity:1}92%,100%{opacity:0;transform:translateY(-12px) rotate(8deg)}}
+    @keyframes amReach{0%,100%{stroke-dashoffset:46}45%,55%{stroke-dashoffset:22}}
+    @keyframes amGhost{0%,100%{opacity:0;transform:scale(.9)}45%,55%{opacity:.55;transform:scale(1)}}
+    @keyframes amSwing{0%,100%{transform:rotate(-15deg)}50%{transform:rotate(-4deg)}}
+    @keyframes amFray{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(7deg)}}
+    @keyframes amRecoilL{0%,60%,100%{transform:translateX(0)}12%{transform:translateX(-3.5px)}30%{transform:translateX(1px)}}
+    @keyframes amRecoilR{0%,60%,100%{transform:translateX(0)}12%{transform:translateX(3.5px)}30%{transform:translateX(-1px)}}
+    @keyframes amScan{0%{transform:translateX(-10px);opacity:0}18%,82%{opacity:1}50%{transform:translateX(10px)}100%{transform:translateX(-10px);opacity:0}}
+    @keyframes amStrain{0%,55%,100%{transform:translate(0,0)}22%{transform:translate(4.5px,4.5px)}34%{transform:translate(3px,3px)}}
+    @keyframes amTaut{0%,55%,100%{transform:scaleX(1)}22%{transform:scaleX(1.55)}}
+    @keyframes amBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
   </style>
 </helmet>
+
+<section style="font-family:'IBM Plex Sans',system-ui,sans-serif;padding:44px 40px 20px;display:flex;flex-direction:column;gap:34px;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:760px;">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:oklch(0.56 0.13 42);">Turn 7 · empty and error states</span>
+    <h1 style="margin:0;font-family:'Instrument Serif',serif;font-weight:400;font-size:46px;line-height:1.03;">States, told in cloth and thread</h1>
+    <p style="margin:0;font-size:15px;line-height:1.62;color:oklch(0.41 0.014 84);text-wrap:pretty;">Nine states drawn from the same two shapes as <a href="#5a">5a</a>. The rule: <b style="font-weight:600;">empty</b> states are outlines waiting to be filled, <b style="font-weight:600;">errors</b> are stitches that came undone. Headlines are placeholders, edit freely. Theme and speed are in Tweaks.</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;max-width:1040px;">
+
+    <div id="7a" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7a</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">no workspaces</span></div>
+      <div data-screen-label="7a No workspaces" style="display:flex;flex-direction:column;gap:14px;">{{ noWorkspaces }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">No workspaces yet</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">Make one and you can start handing work to agents.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7b" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7b</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">no connections</span></div>
+      <div data-screen-label="7b No connections" style="display:flex;flex-direction:column;gap:14px;">{{ noConnections }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">Nothing connected</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">Connect an app and agents can act inside it.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7c" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7c</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">no environments</span></div>
+      <div data-screen-label="7c No environments" style="display:flex;flex-direction:column;gap:14px;">{{ noEnvironments }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">No environments</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">Agents need somewhere to work. Add the first one.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7d" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7d</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">empty thread</span></div>
+      <div data-screen-label="7d Empty thread" style="display:flex;flex-direction:column;gap:14px;">{{ emptyThread }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">No messages yet</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">Say what you need done and Patch takes it from here.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7e" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7e</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">all clear</span></div>
+      <div data-screen-label="7e All clear" style="display:flex;flex-direction:column;gap:14px;">{{ allClear }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">Nothing to triage</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">Everything has been picked up. Mended and resting.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7f" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7f</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">error · came apart</span></div>
+      <div data-screen-label="7f Something broke" style="display:flex;flex-direction:column;gap:14px;">{{ broke }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">Something came apart</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">That run failed partway. Retry it, or open the log.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7g" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7g</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">error · offline</span></div>
+      <div data-screen-label="7g Connection lost" style="display:flex;flex-direction:column;gap:14px;">{{ connectionLost }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">Lost the thread</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">We can't reach that app right now. Reconnecting.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7h" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7h</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">error · not found</span></div>
+      <div data-screen-label="7h Not found" style="display:flex;flex-direction:column;gap:14px;">{{ notFound }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">Nothing here</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">This task or page no longer exists.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="7i" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;gap:10px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px;background:oklch(0.24 0.014 84);color:oklch(0.97 0.01 90);">7i</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:oklch(0.47 0.014 84);">error · no access</span></div>
+      <div data-screen-label="7i No access" style="display:flex;flex-direction:column;gap:14px;">{{ denied }}
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <span style="font-family:'Instrument Serif',serif;font-size:26px;line-height:1.1;">Held back</span>
+          <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">You don't have access to this workspace yet.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
 
 <section style="font-family:'IBM Plex Sans',system-ui,sans-serif;padding:44px 40px 20px;display:flex;flex-direction:column;gap:34px;background:oklch(0.955 0.012 88);color:oklch(0.24 0.014 84);">
   <div style="display:flex;flex-direction:column;gap:12px;max-width:760px;">
@@ -124,6 +237,7 @@
         <span style="font-size:14px;line-height:1.55;color:oklch(0.44 0.014 84);text-wrap:pretty;">Knockout holds the silhouette and works at every size. Swap is closer to the colour version but the white patch needs an outline on white, so it gets heavier.</span>
       </div>
     </div>
+
   </div>
 </section>
 </x-dc>
@@ -162,7 +276,79 @@ class Component extends DCLogic {
         h('span', { key: 'm' }, mark({ size: 96, patch: drop, stitch: pop })),
         h('span', { key: 'w', style: { display: 'flex', fontFamily: "'Instrument Serif',serif", fontSize: 92, lineHeight: 1, color: fg } },
           ...'amends'.split('').map((c, i) => h('span', { key: i, style: { display: 'inline-block', ...anim('amWord', 3.2, i * 0.05, 'cubic-bezier(.2,.9,.3,1)') } }, c)))
-      ], { gap: 22 })
+      ], { gap: 22 }),
+      ...this.emptyStates()
+    };
+  }
+
+  emptyStates() {
+    const h = React.createElement;
+    const dark = this.props.theme === 'dark';
+    const fg = dark ? '#ffffff' : '#111111', bg = dark ? '#111111' : '#ffffff';
+    const sp = this.props.speed ?? 1, t = s => (s / sp) + 's';
+    const A = (n, d, dl = 0, e = 'ease-in-out') => ({ animation: `${n} ${t(d)} ${e} ${t(dl)} infinite both` });
+    const box = { transformBox: 'fill-box', transformOrigin: 'center' };
+    const tile = (vw, vh, kids) => h('div', { style: { height: 190, borderRadius: 16, background: bg, boxShadow: dark ? 'none' : 'inset 0 0 0 1px oklch(0.88 0.01 88)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+      h('svg', { viewBox: `0 0 ${vw} ${vh}`, width: Math.round(vw * (108 / vh)), height: 108, fill: 'none', style: { overflow: 'visible', flex: 'none' } }, kids));
+    const base = () => h('rect', { key: 'b', x: 3, y: 3, width: 42, height: 42, fill: fg });
+    const patch = st => h('g', { key: 'p', style: st }, h('rect', { x: 22, y: 22, width: 39, height: 39, fill: fg, stroke: bg, strokeWidth: 2.6 }));
+    const stitch = (d, i, st) => h('path', { key: 's' + i, d, stroke: bg, strokeWidth: 2.4, strokeLinecap: 'square', style: { ...box, ...st } });
+    const allStitches = st => ['M18.5 37 H25.5', 'M18.5 30 H25.5', 'M30 18.5 V25.5', 'M37 18.5 V25.5'].map((d, i) => stitch(d, i, typeof st === 'function' ? st(i) : st));
+    const ghostSq = (x, y, s) => h('rect', { key: 'g' + x, x, y, width: s, height: s, stroke: fg, strokeWidth: 2.4, strokeDasharray: '6 5', strokeLinecap: 'round', opacity: 0.38 });
+
+    return {
+      noWorkspaces: tile(120, 64, [
+        ghostSq(8, 17, 30), ghostSq(45, 17, 30),
+        h('g', { key: 'n', style: { transformBox: 'fill-box', transformOrigin: 'center', ...A('amSewIn', 3.2, 0, 'cubic-bezier(.3,1.4,.5,1)') } },
+          h('rect', { x: 82, y: 17, width: 30, height: 30, fill: fg }),
+          h('path', { d: 'M90 22 V29 M100 22 V29', stroke: bg, strokeWidth: 2.4, strokeLinecap: 'square' }))
+      ]),
+
+      noConnections: tile(120, 64, [
+        h('rect', { key: 'l', x: 8, y: 17, width: 30, height: 30, fill: fg }),
+        ghostSq(82, 17, 30),
+        h('path', { key: 'guide', d: 'M40 32 H80', stroke: fg, strokeWidth: 2.4, strokeDasharray: '5 5', opacity: 0.16 }),
+        h('path', { key: 'reach', d: 'M40 32 H80', stroke: fg, strokeWidth: 2.4, strokeLinecap: 'square', strokeDasharray: 46, style: A('amReach', 2.8) })
+      ]),
+
+      noEnvironments: tile(64, 64, [
+        ghostSq(4, 4, 56),
+        h('rect', { key: 'in', x: 22, y: 22, width: 20, height: 20, fill: fg, style: { ...box, ...A('amGhost', 2.8) } })
+      ]),
+
+      emptyThread: tile(64, 64, [
+        h('path', { key: 'line', d: 'M14 8 V56', stroke: fg, strokeWidth: 2.4, strokeDasharray: '6 6', opacity: 0.28 }),
+        h('path', { key: 'caret', d: 'M14 32 H46', stroke: fg, strokeWidth: 2.6, strokeLinecap: 'square', style: A('amBlink', 1.5, 0, 'linear') })
+      ]),
+
+      allClear: tile(64, 64, [base(), patch({ ...box, ...A('amBreathe', 3.6) }), ...allStitches({})]),
+
+      broke: tile(64, 64, [
+        base(),
+        patch({ transformBox: 'fill-box', transformOrigin: '0 0', ...A('amSwing', 2.6) }),
+        stitch('M30 18.5 V25.5', 2, {}), stitch('M37 18.5 V25.5', 3, {}),
+        h('path', { key: 'f1', d: 'M18.5 30 H22', stroke: bg, strokeWidth: 2.4, strokeLinecap: 'square', style: { transformBox: 'fill-box', transformOrigin: '0 50%', ...A('amFray', 2.6) } }),
+        h('path', { key: 'f2', d: 'M18.5 37 H21.5', stroke: bg, strokeWidth: 2.4, strokeLinecap: 'square', style: { transformBox: 'fill-box', transformOrigin: '0 50%', ...A('amFray', 2.6, 0.15) } })
+      ]),
+
+      connectionLost: tile(120, 64, [
+        h('rect', { key: 'l', x: 8, y: 17, width: 30, height: 30, fill: fg }),
+        h('rect', { key: 'r', x: 82, y: 17, width: 30, height: 30, fill: fg }),
+        h('path', { key: 'a', d: 'M40 32 H55', stroke: fg, strokeWidth: 2.4, strokeLinecap: 'square', style: { ...box, ...A('amRecoilL', 2.2) } }),
+        h('path', { key: 'b2', d: 'M65 32 H80', stroke: fg, strokeWidth: 2.4, strokeLinecap: 'square', style: { ...box, ...A('amRecoilR', 2.2) } })
+      ]),
+
+      notFound: tile(64, 64, [
+        h('rect', { key: 'b', x: 4, y: 4, width: 56, height: 56, fill: fg }),
+        h('rect', { key: 'h', x: 21, y: 21, width: 22, height: 22, fill: bg }),
+        h('path', { key: 'sc', d: 'M25 32 H39', stroke: fg, strokeWidth: 2.4, strokeLinecap: 'square', style: { ...box, ...A('amScan', 2.6, 0, 'linear') } })
+      ]),
+
+      denied: tile(64, 64, [
+        base(),
+        patch({ ...box, ...A('amStrain', 2.4, 0, 'cubic-bezier(.3,1.5,.5,1)') }),
+        ...allStitches(i => A('amTaut', 2.4, 0, 'cubic-bezier(.3,1.5,.5,1)'))
+      ])
     };
   }
 }

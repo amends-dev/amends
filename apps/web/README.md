@@ -79,7 +79,9 @@ routes, the responsive shell, groups and threads, and the account menu. Home, Tr
 remain placeholders. `src/pages/connections.tsx` composes the
 [Connections page](../../docs/connections.md) from `useConnections` and UI's Connections screens,
 and `src/pages/environments.tsx` the [Environments page](../../docs/environments.md) from
-`useEnvironments`, detouring through the Connections dialogs to create a sandbox account. The app-owned [Settings pages](../../docs/workspace-settings.md)
+`useEnvironments`, detouring through the Connections dialogs to create a sandbox account, and
+`src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from `useAgents`, detouring
+through them to create a model connection. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode through the UI Theme.

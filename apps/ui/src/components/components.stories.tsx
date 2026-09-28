@@ -12,7 +12,8 @@ import { avatarTones } from "../foundations/color/tokens.ts";
 import { Avatar, AvatarStack } from "./avatar/index.ts";
 import { Count } from "./count/index.ts";
 import { IconButton } from "./icon-button/index.ts";
-import { Logo } from "./logo/index.ts";
+import { Logo, type LogoMotion } from "./logo/index.ts";
+import { StateArt, type StateArtKind } from "./state-art/index.ts";
 import { Tabs } from "./tabs/index.ts";
 import * as s from "./components.stories.css.ts";
 
@@ -37,6 +38,79 @@ export const LogoMark = {
                 <Logo size={size} />
                 {size}
               </a>
+            )}
+          </For>
+        </div>
+      </section>
+    </div>
+  ),
+} satisfies Story;
+
+const motions: ReadonlyArray<{ readonly motion: LogoMotion; readonly use: string }> = [
+  { motion: "sew-on", use: "Launch" },
+  { motion: "thread", use: "Idle" },
+  { motion: "tug", use: "Done" },
+  { motion: "working", use: "Loading" },
+];
+
+/** The Amends Logo "5a in motion" board: the mark's own parts, looping. */
+export const LogoMotions = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Logo in motion</h2>
+        <p class={s.note}>
+          The patch lands, gets tugged, or breathes, and the stitches do the rest. Each motion rests
+          still for readers who prefer reduced motion.
+        </p>
+        <div class={s.canvasPanel}>
+          <For each={motions}>
+            {(entry) => (
+              <span class={s.labelled}>
+                <Logo size="4rem" motion={entry.motion} />
+                {`${entry.motion} · ${entry.use}`}
+              </span>
+            )}
+          </For>
+        </div>
+      </section>
+    </div>
+  ),
+} satisfies Story;
+
+const states: ReadonlyArray<{ readonly kind: StateArtKind; readonly use: string }> = [
+  { kind: "sew-in", use: "No workspaces or agents yet" },
+  { kind: "reach", use: "Nothing connected" },
+  { kind: "fill", use: "No environments" },
+  { kind: "caret", use: "No messages yet" },
+  { kind: "rest", use: "All caught up" },
+  { kind: "came-apart", use: "Couldn’t load" },
+  { kind: "lost-thread", use: "Can’t reach the host" },
+  { kind: "nothing-here", use: "Not found" },
+  { kind: "held-back", use: "No access" },
+];
+
+/**
+ * The Amends Logo "States" board: empty states are outlines waiting to be filled, errors are
+ * stitches that came undone. EmptyState shows them above its title.
+ */
+export const StateArtStates = {
+  name: "State art",
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>State art</h2>
+        <p class={s.note}>
+          Drawn from the same square, patch, and stitches as the mark, in the text color over the
+          surface behind.
+        </p>
+        <div class={s.canvasPanel}>
+          <For each={states}>
+            {(state) => (
+              <span class={s.labelled}>
+                <StateArt kind={state.kind} />
+                {`${state.kind} · ${state.use}`}
+              </span>
             )}
           </For>
         </div>

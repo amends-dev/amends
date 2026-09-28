@@ -105,7 +105,9 @@ export const agents = (harness: ConformanceHarness) => {
                 instructions: "Review each change for correctness.",
                 model: { connectionId: models.id, model: "model-x", reasoning: null },
                 environmentId: Environment.InProcessId,
+                role: { id: BuiltinRoles.MemberId, name: "Member" },
                 configurable: true,
+                removable: true,
                 usable: true,
                 readiness: { _tag: "Ready" },
               });
@@ -127,7 +129,7 @@ export const agents = (harness: ConformanceHarness) => {
                 status: "active",
               });
               expect(yield* as(workspace.id, bob, (service) => service.list)).toEqual([
-                Object.assign({}, created, { configurable: false }),
+                Object.assign({}, created, { configurable: false, removable: false }),
               ]);
 
               for (const denied of [
@@ -193,14 +195,25 @@ export const agents = (harness: ConformanceHarness) => {
             ).toMatchObject({ _tag: "Delegation.Denied", reason: "administrator-role" });
             expect(
               yield* as(workspace.id, charlie, (service) => service.create(newAgent(models.id))),
-            ).toMatchObject({ name: "Reviewer", configurable: true });
-            expect(
-              yield* as(workspace.id, alice, (service) =>
-                service.create(
-                  newAgent(models.id, { name: "Lead", roleId: BuiltinRoles.AdministratorId }),
-                ),
+            ).toMatchObject({ name: "Reviewer", configurable: true, removable: true });
+            const lead = yield* as(workspace.id, alice, (service) =>
+              service.create(
+                newAgent(models.id, { name: "Lead", roleId: BuiltinRoles.AdministratorId }),
               ),
-            ).toMatchObject({ name: "Lead" });
+            );
+            expect(lead).toMatchObject({
+              name: "Lead",
+              role: { id: BuiltinRoles.AdministratorId, name: "Administrator" },
+              removable: true,
+            });
+            // An administrator configures an agent holding Administrator, but only the owner
+            // removes it.
+            expect(
+              yield* as(workspace.id, charlie, (service) => service.get(lead.id)),
+            ).toMatchObject({ configurable: true, removable: false });
+            expect(
+              yield* Effect.flip(as(workspace.id, charlie, (service) => service.remove(lead.id))),
+            ).toMatchObject({ _tag: "Delegation.Denied", reason: "protected-member" });
           }),
         ),
       ),

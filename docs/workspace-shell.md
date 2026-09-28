@@ -5,7 +5,7 @@ Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace lay
 `design-system/Amends Group Exploration.free`: a rail, a sidebar, the main content, and a side
 panel.
 
-- **Rail**: the brand, the Home, Environments, and Connections destinations, then Settings and
+- **Rail**: the brand, the Home, Agents, Environments, and Connections destinations, then Settings and
   the reader's avatar, which opens the account menu. A destination is a section, marked
   `aria-current="true"`; Home covers Inbox, Triage, Tasks, groups, and direct messages.
 - **Sidebar**: the workspace (which switches workspace), Inbox with the count of what is pending
@@ -77,10 +77,13 @@ Try again under a note when a page fails. A notification whose thread the reader
 
 Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
 side panel, such as Settings' member details, attaches beside the main content like the thread
-panel. [Connections](connections.md) and [Environments](environments.md) follow their own Lunacy
-frames. Home, Triage, and Tasks are placeholders drawn with UI's EmptyState.
-The mocks' Agents destination, search, the Tasks and Files tabs, reactions, and task references
-have no backend and are not shown.
+panel. [Agents](agents.md), [Connections](connections.md), and [Environments](environments.md)
+follow their own Lunacy frames. Home, Triage, and Tasks are placeholders drawn with UI's
+EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
+above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
+empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts
+on hover, and checking a restored session shows the mark at work. The mocks' search, the Tasks
+and Files tabs, reactions, and task references have no backend and are not shown.
 
 ## Account and appearance
 

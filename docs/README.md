@@ -54,6 +54,8 @@ drawings, generation, and visual review in the UI workshop.
   [Connections](connections.md) covers adding connections, their keys, and their setup states.
   [Environments](environments.md) covers adding environments, their sandbox settings, and the
   account detour.
+  [Agents](agents.md) covers adding and configuring agents, fitting environments, and the
+  model-connection detour.
   [Live updates](live-updates.md) covers the change-feed client, invalidation, and reconnection.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.

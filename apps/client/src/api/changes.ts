@@ -44,17 +44,19 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "permissions",
     "connections",
     "environments",
+    "agents",
     directoryKey,
   ],
-  "workspace.member.added": ["members", "ownership", directoryKey],
-  "workspace.member.removed": ["members", "ownership", directoryKey],
+  // An agent is a member: its name, and whether it is still in the workspace, show with it.
+  "workspace.member.added": ["members", "ownership", "agents", directoryKey],
+  "workspace.member.removed": ["members", "ownership", "agents", directoryKey],
   // A member's name shows wherever members are named, and in the directory's memberships.
-  "workspace.member.renamed": ["members", directoryKey],
+  "workspace.member.renamed": ["members", "agents", directoryKey],
   "workspace.invitation.issued": ["invitations"],
   "workspace.invitation.revoked": ["invitations"],
   "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],
   "workspace.role.created": ["settings", "members"],
-  "workspace.role.renamed": ["settings", "members"],
+  "workspace.role.renamed": ["settings", "members", "agents"],
   // Grants decide what the reader may do and see, including another member's access, and which
   // notification sources they can still read.
   "workspace.role.permissions-changed": [
@@ -66,6 +68,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "permissions",
     "connections",
     "environments",
+    "agents",
   ],
   "workspace.assignment.created": [
     "settings",
@@ -76,6 +79,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "permissions",
     "connections",
     "environments",
+    "agents",
   ],
   "workspace.assignment.revoked": [
     "settings",
@@ -86,6 +90,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "permissions",
     "connections",
     "environments",
+    "agents",
   ],
   // A public group's creation reaches everyone who might join it.
   "group.created": ["groups", "public-groups"],
@@ -100,17 +105,21 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "thread.activity.recorded": ["groups"],
   // Connections as the workspace's readers see them: their names, settings, and readiness, which
   // also decides whether an environment running under one as its account is ready.
-  "connection.created": ["connections", "environments"],
-  "connection.renamed": ["connections", "environments"],
-  "connection.configured": ["connections", "environments"],
-  "connection.credential-set": ["connections", "environments"],
-  "connection.credential-cleared": ["connections", "environments"],
-  "connection.removed": ["connections", "environments"],
-  // Environments: their names, harness, sandbox settings, and readiness.
-  "environment.created": ["environments"],
-  "environment.renamed": ["environments"],
-  "environment.configured": ["environments"],
-  "environment.removed": ["environments"],
+  // An agent's readiness follows its model connection too.
+  "connection.created": ["connections", "environments", "agents"],
+  "connection.renamed": ["connections", "environments", "agents"],
+  "connection.configured": ["connections", "environments", "agents"],
+  "connection.credential-set": ["connections", "environments", "agents"],
+  "connection.credential-cleared": ["connections", "environments", "agents"],
+  "connection.removed": ["connections", "environments", "agents"],
+  // Environments: their names, harness, sandbox settings, and readiness, which agents follow.
+  "environment.created": ["environments", "agents"],
+  "environment.renamed": ["environments", "agents"],
+  "environment.configured": ["environments", "agents"],
+  "environment.removed": ["environments", "agents"],
+  // Agents: their configuration and readiness.
+  "agent.created": ["agents"],
+  "agent.configured": ["agents"],
 };
 /** A field of an event's JSON payload, when it is a string. */
 const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {

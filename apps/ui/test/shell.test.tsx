@@ -15,6 +15,8 @@ import componentsMeta, {
   Counts,
   IconButtons,
   LogoMark,
+  LogoMotions,
+  StateArtStates,
   TabRow,
 } from "../src/components/components.stories.tsx";
 import shellMeta, {
@@ -151,6 +153,8 @@ describe("stories", () => {
   const shell = project.meta(shellMeta);
   it("renders the basic components", async () => {
     await components.story(LogoMark).run();
+    await components.story(LogoMotions).run();
+    await components.story(StateArtStates).run();
     await components.story(Avatars).run();
     await components.story(Counts).run();
   });

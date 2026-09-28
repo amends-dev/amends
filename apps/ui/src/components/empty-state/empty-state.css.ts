@@ -16,17 +16,8 @@ export const empty = style({
   textAlign: "center",
 });
 
-export const mark = style({
-  display: "grid",
-  placeItems: "center",
-  width: "2.75rem",
-  height: "2.75rem",
-  marginBlockEnd: "0.75rem",
-  backgroundColor: vars.color.surface.subtle,
-  color: vars.color.text.secondary,
-});
-
-export const icon = style({ width: "1.5rem", height: "1.5rem" });
+// The art sits a little apart from the words it illustrates.
+export const art = style({ marginBlockEnd: "1rem", color: vars.color.text.primary });
 
 export const title = style({
   ...typeScale.heading,

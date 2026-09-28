@@ -1,10 +1,15 @@
 import { For, Show, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import type { IconComponent } from "../../internal/props.ts";
+import { Logo } from "../logo/index.ts";
+import { StateArt, type StateArtKind } from "../state-art/index.ts";
 import * as s from "./empty-state.css.ts";
 
 export interface EmptyStateProps {
-  readonly icon?: IconComponent;
+  /**
+   * The animated state above the title: what is empty or how it went wrong, or `working`, the
+   * mark at work while something is waited on.
+   */
+  readonly art?: StateArtKind | "working";
   readonly title: string;
   /** Short sentences under the title. */
   readonly lines?: readonly string[];
@@ -18,11 +23,14 @@ export interface EmptyStateProps {
 export function EmptyState(props: EmptyStateProps) {
   return (
     <div class={s.empty}>
-      <Show when={props.icon}>
-        {(icon) => (
-          <span class={s.mark} aria-hidden="true">
-            <Dynamic component={icon()} class={s.icon} />
-          </span>
+      <Show when={props.art}>
+        {(art) => (
+          <Show
+            when={art() !== "working" && (art() as StateArtKind)}
+            fallback={<Logo motion="working" size="3.5rem" class={s.art} />}
+          >
+            {(kind) => <StateArt kind={kind()} class={s.art} />}
+          </Show>
         )}
       </Show>
       <Dynamic component={`h${props.level ?? 2}`} class={s.title}>

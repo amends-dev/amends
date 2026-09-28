@@ -1,0 +1,331 @@
+import { For, Match, Show, Switch, type JSX } from "solid-js";
+import { IconMarkAgents } from "@amends/icons";
+import { Avatar } from "../../components/avatar/index.ts";
+import { Button } from "../../components/button/index.ts";
+import { Divider } from "../../components/divider/index.ts";
+import { EmptyState } from "../../components/empty-state/index.ts";
+import { SearchField } from "../../components/input/index.ts";
+import { Tabs } from "../../components/tabs/index.ts";
+import { Keyed } from "../../internal/keyed.tsx";
+import { Pane } from "../../patterns/pane/index.ts";
+import { Shell } from "../../patterns/shell/index.ts";
+import {
+  AgentsAlert,
+  SetupStatus,
+  modelLine,
+  type AgentSummary,
+  type AgentsAction,
+  type AgentsError,
+} from "./wording.tsx";
+import * as s from "./agents.css.ts";
+
+export type AgentsTab = "all" | "needs-setup";
+
+export interface AgentsPaneProps {
+  /** Under the title on phones. */
+  readonly workspaceName: string;
+  readonly tab: AgentsTab;
+  readonly tabHref: (tab: AgentsTab) => string;
+  /** Switches tabs in place of following their links. */
+  readonly onTabChange?: (tab: AgentsTab) => void;
+  /** Agents in each tab, once they have loaded. */
+  readonly counts?: { readonly all: number; readonly needsSetup: number };
+  /** Shows Add agent, for a reader who may add one. */
+  readonly onAdd?: () => void;
+  /** In place of the list, while agents load or when they cannot. */
+  readonly status?: "loading" | "failed" | "unavailable";
+  readonly onRetry?: () => void;
+  /** The list: AgentList. */
+  readonly children: JSX.Element;
+}
+
+const tabs = [
+  { id: "all", label: "All" },
+  { id: "needs-setup", label: "Needs setup" },
+] as const;
+
+/** The workspace's agents in the main content, All first, then those that need setup. */
+export function AgentsPane(props: AgentsPaneProps) {
+  return (
+    <Pane.Root class={s.pane}>
+      <Pane.Header>
+        <Shell.NavigationToggle />
+        <Pane.Title icon={IconMarkAgents} context={props.workspaceName}>
+          Agents
+        </Pane.Title>
+        <Pane.Actions>
+          <Show when={props.status !== "unavailable" && props.onAdd}>
+            {(add) => (
+              <Button onClick={() => add()()}>
+                <span class={s.wideOnly}>Add agent</span>
+                <span class={s.phoneOnly}>Add</span>
+              </Button>
+            )}
+          </Show>
+        </Pane.Actions>
+        <Pane.Tabs>
+          <Tabs.List aria-label="Agents">
+            <For each={tabs}>
+              {(tab) => (
+                <Tabs.Tab
+                  href={props.tabHref(tab.id)}
+                  current={props.tab === tab.id}
+                  count={
+                    props.counts === undefined
+                      ? undefined
+                      : tab.id === "all"
+                        ? props.counts.all
+                        : props.counts.needsSetup
+                  }
+                  onClick={(event: MouseEvent) => {
+                    if (!props.onTabChange) return;
+                    event.preventDefault();
+                    props.onTabChange(tab.id);
+                  }}
+                >
+                  {tab.label}
+                </Tabs.Tab>
+              )}
+            </For>
+          </Tabs.List>
+        </Pane.Tabs>
+      </Pane.Header>
+      <Switch fallback={props.children}>
+        <Match when={props.status === "loading"}>
+          <Pane.Body inset="list">
+            <p class={s.visuallyHidden} role="status">
+              Loading agents…
+            </p>
+            <ul class={s.list} aria-hidden="true">
+              <For each={[0, 1, 2]}>
+                {() => (
+                  <li class={s.placeholder}>
+                    <span class={s.placeholderTile} />
+                    <span class={s.placeholderLine} />
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Pane.Body>
+        </Match>
+        <Match when={props.status === "unavailable"}>
+          <Pane.Body>
+            <EmptyState
+              art="held-back"
+              title="Agents aren’t available"
+              lines={["You may no longer be a member of this workspace."]}
+            />
+          </Pane.Body>
+        </Match>
+        <Match when={props.status === "failed"}>
+          <Pane.Body>
+            <EmptyState
+              art="came-apart"
+              title="Couldn’t load agents"
+              lines={["Try again once the host is reachable."]}
+            >
+              <Show when={props.onRetry}>
+                {(retry) => <Button onClick={() => retry()()}>Retry</Button>}
+              </Show>
+            </EmptyState>
+          </Pane.Body>
+        </Match>
+      </Switch>
+    </Pane.Root>
+  );
+}
+
+export interface AgentListProps {
+  readonly tab: AgentsTab;
+  readonly query: string;
+  readonly onQueryChange: (query: string) => void;
+  /** The tab's agents after the search. */
+  readonly agents: readonly AgentSummary[];
+  /** Agents in the workspace, whatever the tab and search. */
+  readonly total: number;
+  /** No model connection exists yet, so agents need one before the first is added. */
+  readonly noModelConnection?: boolean;
+  /** The agent open in the side panel. */
+  readonly selectedId?: string;
+  readonly agentHref: (id: string) => string;
+  /** Opens an agent in place of following its link. */
+  readonly onOpen?: (id: string) => void;
+  /** Starts adding an agent, for a reader who may. */
+  readonly onAdd?: () => void;
+  /** Starts creating a model connection, for a reader who may add agents. */
+  readonly onCreateConnection?: () => void;
+  /** A read or change that failed, outside any dialog. */
+  readonly failure?: {
+    readonly action: AgentsAction | "refresh";
+    readonly error: AgentsError;
+  };
+  readonly onRefresh?: () => void;
+  readonly refreshing?: boolean;
+}
+
+/** One letter on a lilac tile, as agents appear across the workspace. */
+export function AgentAvatar(props: {
+  readonly name: string;
+  readonly size: 32 | 40;
+  readonly class?: string;
+}) {
+  return (
+    <Avatar
+      name={props.name}
+      initials={props.name.trim().charAt(0).toUpperCase()}
+      tone="lilac"
+      size={props.size}
+      class={props.class}
+      decorative
+    />
+  );
+}
+
+/**
+ * The agent list: search, then each agent with its model, environment, and setup. With room it
+ * shows the model and environment as columns; beside an open agent or on phones, under the name.
+ * Place it in AgentsPane.
+ */
+export function AgentList(props: AgentListProps) {
+  const search = () => props.query.trim();
+  const alert = () => (
+    <Show when={props.failure}>
+      {(failure) => (
+        <AgentsAlert
+          action={failure().action}
+          error={failure().error}
+          onRefresh={props.onRefresh}
+          refreshing={props.refreshing}
+        />
+      )}
+    </Show>
+  );
+  return (
+    <Show
+      when={props.total > 0}
+      fallback={
+        <Pane.Body>
+          {alert()}
+          <Show
+            when={props.noModelConnection && props.onCreateConnection}
+            fallback={
+              <EmptyState
+                art="sew-in"
+                title="No agents yet"
+                lines={
+                  props.onAdd
+                    ? [
+                        "Create an agent with instructions, a model,",
+                        "and an environment to start in.",
+                      ]
+                    : ["An administrator can add agents to your workspace."]
+                }
+              >
+                <Show when={props.onAdd}>
+                  {(add) => (
+                    <Button variant="primary" onClick={() => add()()}>
+                      Add agent
+                    </Button>
+                  )}
+                </Show>
+              </EmptyState>
+            }
+          >
+            {(create) => (
+              <EmptyState
+                art="reach"
+                title="Connect a model first"
+                lines={[
+                  "Agents need a model connection.",
+                  "Connect a model provider, then create your first agent.",
+                ]}
+              >
+                <Button variant="primary" onClick={() => create()()}>
+                  Create model connection
+                </Button>
+              </EmptyState>
+            )}
+          </Show>
+        </Pane.Body>
+      }
+    >
+      <Pane.Toolbar>
+        <SearchField
+          placeholder="Search agents…"
+          class={s.search}
+          value={props.query}
+          onInput={(event) => props.onQueryChange(event.currentTarget.value)}
+        />
+      </Pane.Toolbar>
+      <div class={s.headings} aria-hidden="true">
+        <span class={s.headingAgent}>Agent</span>
+        <span class={s.wideColumn}>Model</span>
+        <span class={s.wideColumn}>Environment</span>
+        <span>Setup</span>
+        <Divider class={s.headingsStitch} />
+      </div>
+      <Pane.Body inset="list">
+        <div class={s.listing}>
+          {alert()}
+          <Show
+            when={props.agents.length > 0}
+            fallback={
+              <div class={s.empty}>
+                <p class={s.emptyText}>
+                  {search() ? `No agents match “${search()}”.` : "All agents are ready."}
+                </p>
+                <Show when={search()}>
+                  <Button variant="quiet" onClick={() => props.onQueryChange("")}>
+                    Clear search
+                  </Button>
+                </Show>
+              </div>
+            }
+          >
+            <ul
+              class={s.list}
+              aria-label={props.tab === "needs-setup" ? "Agents that need setup" : "Agents"}
+            >
+              <Keyed each={props.agents} by={(agent) => agent.id}>
+                {(agent) => (
+                  <li>
+                    <a
+                      href={props.agentHref(agent().id)}
+                      class={s.row}
+                      aria-current={props.selectedId === agent().id ? "true" : undefined}
+                      onClick={(event) => {
+                        if (!props.onOpen) return;
+                        event.preventDefault();
+                        props.onOpen(agent().id);
+                      }}
+                    >
+                      <AgentAvatar name={agent().name} size={32} class={s.avatar} />
+                      <span class={s.rowText}>
+                        <span class={s.rowName}>{agent().name}</span>
+                        <span class={s.rowLine}>{modelLine(agent())}</span>
+                        <span class={s.rowLine}>
+                          {agent().environment.name ?? "Unavailable environment"}
+                        </span>
+                      </span>
+                      <span class={s.rowColumn}>{modelLine(agent())}</span>
+                      <span class={s.rowColumn}>
+                        {agent().environment.name ?? "Unavailable environment"}
+                      </span>
+                      <span class={s.rowSetup}>
+                        <SetupStatus issues={agent().issues} />
+                      </span>
+                    </a>
+                  </li>
+                )}
+              </Keyed>
+            </ul>
+          </Show>
+          <p class={s.footnote}>
+            Ready reflects the saved configuration. Model access has not been tested with the
+            provider.
+          </p>
+        </div>
+      </Pane.Body>
+    </Show>
+  );
+}

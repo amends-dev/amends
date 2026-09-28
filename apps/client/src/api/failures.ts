@@ -26,8 +26,8 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * Every failure the workspace, member, access, invitation, conversation, connection, and
- * environment endpoints report.
+ * Every failure the workspace, member, access, invitation, conversation, connection,
+ * environment, and agent endpoints report.
  */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
@@ -39,6 +39,7 @@ type Reported =
   | Failure<Client["notifications"][keyof Client["notifications"]]>
   | Failure<Client["connections"][keyof Client["connections"]]>
   | Failure<Client["environments"][keyof Client["environments"]]>
+  | Failure<Client["agents"][keyof Client["agents"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
@@ -87,6 +88,13 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "EnvironmentApplication.NotFound": "gone",
   "EnvironmentApplication.UnsupportedPlacement": "invalid",
   "EnvironmentApplication.InvalidSandbox": "invalid",
+  // Agents: renamed meanwhile, or gone; a connection or environment no longer usable, or one
+  // that cannot run the model, is refused with the draft kept, and `agentProblems` names it.
+  "AgentApplication.Changed": "changed",
+  "AgentApplication.NotFound": "gone",
+  "AgentApplication.ConnectionUnavailable": "invalid",
+  "AgentApplication.EnvironmentUnavailable": "invalid",
+  "AgentApplication.Incompatible": "invalid",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionApplication.CredentialsUnavailable": "failed",
   "GroupFollowApplication.AgentRequired": "denied",

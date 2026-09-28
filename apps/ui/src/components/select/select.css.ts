@@ -1,7 +1,7 @@
 import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
-import { typeScale } from "../../foundations/typography/tokens.ts";
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
 
 // Shaped like the Input: 42px, bordered, reading-size text; 44px on touch, 16px text on phones.
 export const trigger = style({
@@ -96,7 +96,41 @@ export const itemText = style({
   paddingBlock: "0.5rem",
 });
 
-export const itemDescription = style({ ...typeScale.hint, color: vars.color.text.secondary });
+export const itemDescription = style({
+  ...typeScale.hint,
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.25rem",
+  color: vars.color.text.secondary,
+});
+
+export const itemDetail = style({ display: "block" });
+
+// A state at the option's end, such as Works or Needs setup.
+export const status = style({
+  ...typeScale.hint,
+  display: "inline-flex",
+  alignItems: "center",
+  alignSelf: "flex-start",
+  flex: "none",
+  gap: "0.375rem",
+  marginBlockStart: "0.5rem",
+  color: vars.color.text.secondary,
+  fontWeight: fontWeight.medium,
+  selectors: { "&[data-tone=caution]": { color: vars.color.text.caution } },
+});
+
+export const statusIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+
+// A label naming the options, above them.
+export const heading = style({
+  ...typeScale.meta,
+  margin: 0,
+  padding: "0.5rem 0.5rem 0.375rem",
+  color: vars.color.text.secondary,
+  fontWeight: fontWeight.medium,
+  textTransform: "uppercase",
+});
 
 // The action after the options, set off by a divider.
 export const action = style({

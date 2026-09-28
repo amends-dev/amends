@@ -51,9 +51,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   nothing checks a key with its provider. Agents check `connection.use` when configured, but
   nothing resolves a credential for use, since no turn or toolkit consumes connections yet. Credentials are sealed with one host
   key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
-- [Agents](../packages/core/README.md#agents) are configured per workspace over HTTP, each a
-  member with instructions, model access, and a starting environment; the apps have no agent
-  screens yet. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
+- [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
+  instructions, model access, and a starting environment, over HTTP and on the
+  [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
   turn to override, and no profile photos. Nothing runs an agent, and a removed agent's membership
   cannot be reactivated, as a person's cannot.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
@@ -115,8 +115,8 @@ conversation with oneself, since a direct group needs another member.
 People are shown by the name they chose in the workspace, or by the identity they sign in as
 until they choose one. The apps ask for a name when creating a workspace or accepting an
 invitation, suggesting one from an email address, and the account menu changes it later. Each
-member names only themselves: nobody renames another member, and agents, which the apps cannot add
-yet, are named by whoever adds or configures them over HTTP. There are no profile photos.
+member names only themselves: nobody renames another member, and agents are named by whoever adds
+or configures them on the Agents page. There are no profile photos.
 
 Everyone gets "Create group" on the sidebar's Groups heading and the Groups page (every role holds
 `group.create`): a modal names a team group, picks its people and agents

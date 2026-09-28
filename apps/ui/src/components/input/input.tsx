@@ -22,6 +22,26 @@ export function Input(props: InputProps) {
   );
 }
 
+export type TextAreaProps = JSX.TextareaHTMLAttributes<HTMLTextAreaElement>;
+
+/**
+ * A bordered field for several lines, such as an agent's instructions, sized by `rows`. Inside a
+ * Field it takes the label, help, and error associations.
+ */
+export function TextArea(props: TextAreaProps) {
+  const field = useField();
+  const [local, native] = splitProps(props, ["class"]);
+  return (
+    <textarea
+      id={field?.id}
+      aria-describedby={field?.describedBy()}
+      aria-invalid={field?.invalid() ? true : undefined}
+      {...native}
+      class={classes(s.input, s.textarea, local.class)}
+    />
+  );
+}
+
 export type SearchFieldProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "type"> & {
   /** Also the accessible name, such as "Search tasks…". */
   placeholder: string;

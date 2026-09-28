@@ -59,6 +59,9 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useEnvironments(workspaceId, { done })` shapes the Environments page: installed harnesses and
   providers, the accounts each provider runs under, and each environment's setup and changes; see
   [Environments](#environments).
+- `useAgents(workspaceId, { selected, done })` shapes the Agents page: each agent's model access,
+  environment, role, and readiness, the model connections and roles to choose from, and each
+  environment's fit for a model; see [Agents](#agents).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
@@ -227,6 +230,29 @@ variable rows with their issues, command rows that move, and retention, saved as
 `SandboxSettings` with blank rows left out. `rename` keeps the name it was made against. A retried
 creation reuses its request key. `failure()` reports the change, its `EnvironmentsError`, and the
 `problems` the host named, such as `connection-unavailable`, keeping the draft.
+
+## Agents
+
+`useAgents(workspaceId, { selected, done })` is what the Agents screens connect to. It reads the
+agents the reader may read as `AgentEntry`s (name, role, instructions, model connection and model,
+reasoning, environment with its runtime, readiness issues as codes, whether the reader may
+configure and remove it, and who created it), the connections with model access as
+`ModelConnection`s with the models their provider suggests, the environments and their runtime,
+and the roles the reader may give from the workspace settings. Agents keep their own invalidation
+key, which `agent.*` commits, membership renames and removals, connection and environment
+changes, and access changes refresh.
+
+`create` drafts a name, a role (Member unless the reader chooses another they may give), and a
+configuration, lasting until saved or cancelled so a page can detour to create a model connection
+and return. The configuration is edited through a `ConfigurationEditor`, the same for a new agent
+and `configure.configuration(id)`: instructions, the connection (whose first suggested model fills
+an empty model), the model, reasoning, and the environment. `environments()` checks each
+environment against the draft's model access through the host's environment choices, once typing
+pauses, as `works`, `needs-setup` (still savable), or `cant-run` with its reasons; the choices for
+a saved agent follow `selected`, the agent open. A retried creation reuses its request key, and
+`rename` keeps the name it was made against. `failure()` reports the change, its `AgentsError`,
+and `problems`: a connection or environment no longer available, which also reloads the choices,
+reasons it cannot run, or an initial role only the owner gives, each keeping the draft.
 
 ## Views
 

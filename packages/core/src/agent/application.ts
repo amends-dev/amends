@@ -3,10 +3,13 @@ import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect
 import type { PlatformError } from "effect";
 import { Assignment } from "../authorization/assignment/assignment.ts";
 import { AssignmentFacts } from "../authorization/assignment/facts.ts";
+import { AssignmentPermissions } from "../authorization/assignment/permissions.ts";
+import { AssignmentStore } from "../authorization/assignment/store.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Delegation } from "../authorization/delegation.ts";
 import type { Permission } from "../authorization/permission.ts";
 import { Requirement } from "../authorization/requirement.ts";
+import { RoleStore } from "../authorization/role/store.ts";
 import { Target } from "../authorization/target.ts";
 import { ConnectionCatalog } from "../connection/catalog.ts";
 import { Connection } from "../connection/connection.ts";
@@ -32,7 +35,10 @@ import { RequestReceipts } from "../request/receipts.ts";
 import { MemberApplication } from "../workspace/member/application.ts";
 import { MemberFacts } from "../workspace/member/facts.ts";
 import { Member } from "../workspace/member/member.ts";
+import { MemberPermissions } from "../workspace/member/permissions.ts";
 import { MemberStore } from "../workspace/member/store.ts";
+import { WorkspaceStore } from "../workspace/store.ts";
+import { Workspace } from "../workspace/workspace.ts";
 import { Agent } from "./agent.ts";
 import {
   Changed,
@@ -61,6 +67,9 @@ export type ReadError =
   | Authorization.Error
   | AgentStore.Failure
   | MemberStore.Failure
+  | AssignmentStore.Failure
+  | RoleStore.Failure
+  | WorkspaceStore.Failure
   | EnvironmentStore.Failure
   | ConnectionStore.Failure
   | Schema.SchemaError
@@ -124,6 +133,14 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/agent/application/Service",
 ) {}
 
+/** What the reader may do with an agent, and the role it holds when they may read its access. */
+interface Access {
+  readonly role: Agent.View["role"];
+  readonly configurable: boolean;
+  readonly removable: boolean;
+  readonly usable: boolean;
+}
+
 const CreatedReference = Schema.Struct({ agentId: Agent.Id });
 type CreatedReference = typeof CreatedReference.Type;
 
@@ -141,6 +158,9 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const agents = yield* AgentStore.Service;
   const members = yield* MemberStore.Service;
   const memberships = yield* MemberApplication.Service;
+  const assignments = yield* AssignmentStore.Service;
+  const roles = yield* RoleStore.Service;
+  const workspace = yield* WorkspaceStore.Service;
   const groups = yield* GroupStore.Service;
   const environments = yield* EnvironmentStore.Service;
   const connections = yield* ConnectionStore.Service;
@@ -156,6 +176,9 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
       agents.workspaceId,
       members.workspaceId,
       memberships.workspaceId,
+      assignments.workspaceId,
+      roles.workspaceId,
+      workspace.workspaceId,
       groups.workspaceId,
       environments.workspaceId,
       connections.workspaceId,
@@ -303,7 +326,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const viewOf = Effect.fnUntraced(function* (
     record: Agent.Record,
     name: Member.Name,
-    access: { readonly configurable: boolean; readonly usable: boolean },
+    access: Access,
   ) {
     return {
       id: record.id,
@@ -314,19 +337,89 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
       environmentId: record.environmentId,
       createdBy: record.createdBy,
       createdAt: record.createdAt,
+      role: access.role,
       configurable: access.configurable,
+      removable: access.removable,
       usable: access.usable,
       readiness: yield* readinessOf(record),
     } satisfies Agent.View;
   });
+  const ownerOf = Effect.gen(function* () {
+    const found = yield* workspace.get;
+    if (Option.isNone(found)) return yield* invalid("Workspace metadata is missing");
+    return (yield* Schema.decodeEffect(Workspace.Record)(found.value)).ownerMemberId;
+  });
+  /** The role a membership holds across the workspace, if any, by its current name. */
+  const roleOf = Effect.fnUntraced(function* (assigned: ReadonlyArray<Assignment.Record>) {
+    const source = assigned.find(
+      (assignment) =>
+        assignment.source._tag === "Role" && assignment.source.scope._tag === "Workspace",
+    )?.source;
+    if (source?._tag !== "Role") return null;
+    const found = yield* roles.get(source.roleId);
+    return Option.isSome(found) ? { id: found.value.id, name: found.value.name } : null;
+  });
+  /**
+   * What the actor may do with each agent, by one grant resolution: whether they may read it, and
+   * its access for the view. Removal follows member removal and its delegation rules.
+   */
+  const accessOf = Effect.fnUntraced(function* (records: ReadonlyArray<Agent.Record>) {
+    const permissions = [
+      AgentPermissions.Read,
+      AgentPermissions.Configure,
+      AgentPermissions.Use,
+      AssignmentPermissions.Read,
+      MemberPermissions.Remove,
+    ] as const;
+    const permitted = yield* authorization.permitted(
+      records.flatMap((record) =>
+        permissions.map((permission) =>
+          Requirement.make(permission, memberTarget(record.memberId)),
+        ),
+      ),
+    );
+    const ownerId = yield* ownerOf;
+    const actorId = (yield* Actor.Service).memberId;
+    return yield* Effect.forEach(records, (record, index) =>
+      Effect.gen(function* () {
+        const [readable, configurable, usable, accessReadable, memberRemovable] = permissions.map(
+          (_, offset) => permitted[index * permissions.length + offset] === true,
+        );
+        const removal: Delegation.Recipient = {
+          workspaceId,
+          memberId: record.memberId,
+          ownerId,
+          actorId,
+          selfRemoval: true,
+        };
+        const mayRemove = configurable === true && memberRemovable === true;
+        const assigned =
+          accessReadable || (mayRemove && Delegation.recipientNeedsAssignments(removal))
+            ? yield* Schema.decodeEffect(Schema.Array(Schema.toType(Assignment.Record)))(
+                yield* assignments.listActiveByMember(record.memberId),
+              )
+            : [];
+        const access: Access = {
+          role: accessReadable ? yield* roleOf(assigned) : null,
+          configurable: configurable === true,
+          removable:
+            mayRemove &&
+            record.memberId !== ownerId &&
+            Delegation.recipientDenial(removal, assigned) === undefined,
+          usable: usable === true,
+        };
+        return { readable: readable === true, access };
+      }),
+    );
+  });
   /** The agent as the actor sees it, including what they may do with it. */
   const presented = Effect.fnUntraced(function* (record: Agent.Record, name: Member.Name) {
-    const target = memberTarget(record.memberId);
-    const [configurable = false, usable = false] = yield* authorization.permitted([
-      Requirement.make(AgentPermissions.Configure, target),
-      Requirement.make(AgentPermissions.Use, target),
-    ]);
-    return yield* viewOf(record, name, { configurable, usable });
+    const [found] = yield* accessOf([record]);
+    return yield* viewOf(
+      record,
+      name,
+      found?.access ?? { role: null, configurable: false, removable: false, usable: false },
+    );
   });
 
   /**
@@ -380,28 +473,12 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
       const { member, name } = yield* membershipOf(record);
       if (member.status === "active") loaded.push({ record, name });
     }
-    // One grant resolution answers every permission for every agent.
-    const permitted = yield* authorization.permitted(
-      loaded.flatMap(({ record }) => [
-        Requirement.make(AgentPermissions.Read, memberTarget(record.memberId)),
-        Requirement.make(AgentPermissions.Configure, memberTarget(record.memberId)),
-        Requirement.make(AgentPermissions.Use, memberTarget(record.memberId)),
-      ]),
-    );
+    const access = yield* accessOf(loaded.map(({ record }) => record));
     const views = yield* Effect.forEach(
-      loaded.flatMap((entry, index) =>
-        permitted[index * 3] === true
-          ? [
-              {
-                ...entry,
-                access: {
-                  configurable: permitted[index * 3 + 1] === true,
-                  usable: permitted[index * 3 + 2] === true,
-                },
-              },
-            ]
-          : [],
-      ),
+      loaded.flatMap((entry, index) => {
+        const found = access[index];
+        return found?.readable ? [{ ...entry, access: found.access }] : [];
+      }),
       ({ record, name, access }) => viewOf(record, name, access),
     );
     return views.toSorted((left, right) =>

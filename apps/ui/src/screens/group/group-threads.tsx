@@ -1,5 +1,5 @@
 import { Match, Show, Switch, createEffect, createSignal, on } from "solid-js";
-import { IconAlertTriangle, IconMarkAttach, IconMessage } from "@amends/icons";
+import { IconMarkAttach } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
@@ -120,7 +120,7 @@ export function ConversationState(props: {
       </Match>
       <Match when={props.status === "unavailable"}>
         <EmptyState
-          icon={IconAlertTriangle}
+          art="held-back"
           title={
             props.subject === "group" ? "This group isn’t available" : "This thread isn’t available"
           }
@@ -133,7 +133,7 @@ export function ConversationState(props: {
       </Match>
       <Match when={props.status === "failed"}>
         <EmptyState
-          icon={IconAlertTriangle}
+          art="came-apart"
           title={
             props.subject === "group" ? "Can’t load this conversation" : "Can’t load this thread"
           }
@@ -231,7 +231,7 @@ export function GroupThreads(props: GroupThreadsProps) {
           <Match when={props.entries.length === 0 && props.welcome}>
             {(welcome) => (
               <EmptyState
-                icon={IconMessage}
+                art="caret"
                 title={
                   welcome().direct
                     ? `Your conversation with ${welcome().groupName}`

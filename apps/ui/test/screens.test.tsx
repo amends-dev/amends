@@ -35,7 +35,31 @@ import formsMeta, {
   CardsAndDetailedSelect,
   Fields,
   Notices,
+  SuggestionsAndStatuses,
 } from "../src/components/forms.stories.tsx";
+import agentsMeta, {
+  AddAgentDialog,
+  AdministratorRole,
+  AllAgents,
+  CompatibleEnvironments,
+  Configuration as AgentConfiguration,
+  ConfigureAndSave,
+  ConnectionDetour,
+  ConnectionNoLongerAvailable,
+  CreateWhileSetupIsPending,
+  LoadFailed as AgentsLoadFailed,
+  Loading as AgentsLoading,
+  MemberReadOnly as AgentMemberReadOnly,
+  ModelConnectionOptions,
+  ModelSuggestions,
+  NeedsSetup as AgentNeedsSetup,
+  NoAgentsYet,
+  NoModelConnection,
+  Overview as AgentOverview,
+  OwnerRoleOptions,
+  RemoveAgent,
+  UnsupportedReasoning,
+} from "../src/screens/agents/agents.stories.tsx";
 import environmentsMeta, {
   AccountNeedsKey,
   AccountNoLongerAvailable,
@@ -243,6 +267,9 @@ describe("form components", () => {
   it("chooses among cards, and offers an action after a select's detailed options", async () => {
     await stories.story(CardsAndDetailedSelect).run();
   });
+  it("suggests models, keeps any entered one, and shows each option's status", async () => {
+    await stories.story(SuggestionsAndStatuses).run();
+  });
 });
 
 describe("environments screen", () => {
@@ -292,6 +319,60 @@ describe("environments screen", () => {
     await stories.story(NoSandboxDetails).run();
     cleanup();
     await stories.story(MemberReadOnly).run();
+  });
+});
+
+describe("agents screen", () => {
+  const stories = definePreview(preview).meta(agentsMeta);
+  it("renders the list, details, dialogs, and states", async () => {
+    viewport(1600);
+    for (const story of [
+      AllAgents,
+      AgentOverview,
+      AgentConfiguration,
+      NoAgentsYet,
+      AddAgentDialog,
+      RemoveAgent,
+      AgentsLoading,
+      AgentsLoadFailed,
+    ]) {
+      await stories.story(story).run();
+      cleanup();
+    }
+  });
+  it("shows readiness and its recovery, and members' read-only view", async () => {
+    viewport(1600);
+    await stories.story(AgentNeedsSetup).run();
+    cleanup();
+    await stories.story(AgentMemberReadOnly).run();
+  });
+  it("offers roles, model connections, suggested models, and fitting environments", async () => {
+    viewport(1600);
+    for (const story of [
+      OwnerRoleOptions,
+      AdministratorRole,
+      ModelConnectionOptions,
+      ModelSuggestions,
+      CompatibleEnvironments,
+      CreateWhileSetupIsPending,
+    ]) {
+      await stories.story(story).run();
+      cleanup();
+    }
+  });
+  it("creates a model connection on the way and returns to the draft", async () => {
+    viewport(1600);
+    await stories.story(NoModelConnection).run();
+    cleanup();
+    await stories.story(ConnectionDetour).run();
+  });
+  it("saves a configuration, keeps the draft when refused, and repairs stale reasoning", async () => {
+    viewport(1600);
+    await stories.story(ConfigureAndSave).run();
+    cleanup();
+    await stories.story(ConnectionNoLongerAvailable).run();
+    cleanup();
+    await stories.story(UnsupportedReasoning).run();
   });
 });
 

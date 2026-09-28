@@ -4,6 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { IconMarkNew } from "@amends/icons";
 import { Button } from "./button/index.ts";
 import { Choice } from "./choice/index.ts";
+import { Combobox } from "./combobox/index.ts";
 import { Field } from "./field/index.ts";
 import { Input, SearchField } from "./input/index.ts";
 import { Menu } from "./menu/index.ts";
@@ -202,5 +203,107 @@ export const CardsAndDetailedSelect = {
     );
     await userEvent.click(body.getByRole("button", { name: "Create Daytona connection" }));
     await expect(canvas.getByText("Created 1 from the list")).toBeVisible();
+  },
+} satisfies Story;
+
+function ModelFieldsExample() {
+  const [model, setModel] = createSignal("claude-sonnet-5");
+  const [environment, setEnvironment] = createSignal("remote");
+  return (
+    <div class={s.stack}>
+      <Field.Root hint="Choose a suggestion or enter a model ID.">
+        <Field.Label>Model</Field.Label>
+        <Combobox
+          value={model()}
+          onChange={setModel}
+          heading="Suggested models"
+          footer="Or enter another model ID."
+          custom={{
+            label: (text) => `Use “${text}”`,
+            description: "Use this model ID as entered.",
+          }}
+          suggestions={[
+            { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
+            { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
+            { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+          ]}
+        />
+      </Field.Root>
+      <p class={s.note}>Model: {model()}</p>
+      <Field.Root>
+        <Field.Label>Environment</Field.Label>
+        <Select
+          heading="For this model"
+          options={[
+            {
+              value: "in-process",
+              label: "In-process",
+              description: "Amends · No sandbox",
+              status: { label: "Works", tone: "ready" },
+            },
+            {
+              value: "remote",
+              label: "Remote development",
+              description: "Amends · Daytona",
+              status: { label: "Works", tone: "ready" },
+            },
+            {
+              value: "review",
+              label: "Review sandbox",
+              description: "Amends · Daytona",
+              detail: "Daytona account needs its API key.",
+              status: { label: "Needs setup", tone: "caution" },
+            },
+            {
+              value: "boxed",
+              label: "Boxed",
+              description: "The harness doesn’t support this connection’s model provider.",
+              status: { label: "Can’t run this model", tone: "caution" },
+              disabled: true,
+            },
+          ]}
+          value={environment()}
+          onChange={setEnvironment}
+        />
+      </Field.Root>
+    </div>
+  );
+}
+
+/**
+ * A combobox of suggestions that also keeps any text, from the Lunacy "Agents / 12" and "13"
+ * frames, and a select whose options carry a status, a reason, and may be unavailable, from
+ * "Agents / 14" and the selection states.
+ */
+export const SuggestionsAndStatuses = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Suggestions and option statuses</h2>
+        <ModelFieldsExample />
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const model = canvas.getByRole("combobox", { name: "Model" });
+    await userEvent.click(canvas.getByRole("button", { name: "Show suggestions" }));
+    await expect(await body.findByRole("option", { name: /Claude Opus 5.5/ })).toBeVisible();
+    await userEvent.click(body.getByRole("option", { name: /Claude Opus 5.5/ }));
+    await expect(model).toHaveValue("claude-opus-5-5");
+    await userEvent.clear(model);
+    await userEvent.type(model, "my-model-alias");
+    await expect(await body.findByRole("option", { name: /Use “my-model-alias”/ })).toBeVisible();
+    await userEvent.keyboard("{Enter}");
+    await expect(canvas.getByText("Model: my-model-alias")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: /Environment/ }));
+    await expect(await body.findByRole("option", { name: /Review sandbox/ })).toHaveTextContent(
+      "Needs setup",
+    );
+    await expect(body.getByRole("option", { name: /Boxed/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   },
 } satisfies Story;

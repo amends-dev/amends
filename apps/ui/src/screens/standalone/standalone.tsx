@@ -1,5 +1,4 @@
 import { Match, Show, Switch, type JSX } from "solid-js";
-import { IconAlertTriangle, IconMarkRetry, IconUsers } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
@@ -55,6 +54,7 @@ export function CheckingSessionScreen(props: StatusProps) {
       <div class={s.status} role="status">
         <EmptyState
           level={1}
+          art="working"
           title="Checking your session"
           lines={["Connecting to your workspace host…"]}
         />
@@ -70,7 +70,7 @@ export function HostUnavailableScreen(props: StatusProps & { readonly onRetry: (
       <div class={s.status}>
         <EmptyState
           level={1}
-          icon={IconMarkRetry}
+          art="lost-thread"
           title="Can’t reach your workspace host"
           lines={["You’re still signed in. Try again once the host is running."]}
         >
@@ -92,6 +92,7 @@ export function NotFoundScreen(
       <div class={s.status}>
         <EmptyState
           level={1}
+          art="nothing-here"
           title="Nothing at this address"
           lines={["This page doesn’t exist. Check the link, or start again from your workspaces."]}
         >
@@ -111,7 +112,7 @@ export function CrashedScreen(props: { readonly homeHref: string; readonly onRel
       <div class={s.status}>
         <EmptyState
           level={1}
-          icon={IconAlertTriangle}
+          art="came-apart"
           title="Something went wrong"
           lines={["amends stopped on an unexpected error. Reloading usually fixes it."]}
         >
@@ -146,7 +147,7 @@ export function WorkspaceUnavailableScreen(
             {(access) => (
               <EmptyState
                 level={1}
-                icon={IconUsers}
+                art="held-back"
                 title="You haven’t joined this workspace yet"
                 lines={[
                   `You’ve been invited to ${access().workspaceName ?? "this workspace"}. Accept the invitation from your workspaces to open it.`,
@@ -162,6 +163,7 @@ export function WorkspaceUnavailableScreen(
             {(access) => (
               <EmptyState
                 level={1}
+                art="held-back"
                 title="That workspace is closed to you"
                 lines={[
                   `Your membership of ${access().workspaceName} has ended. The work you did stays on that workspace’s record.`,
@@ -175,6 +177,7 @@ export function WorkspaceUnavailableScreen(
           <Match when={props.access.reason === "unknown"}>
             <EmptyState
               level={1}
+              art="held-back"
               title="That workspace is closed to you"
               lines={[
                 `This workspace doesn’t exist, or it hasn’t been shared with ${props.identity}.`,

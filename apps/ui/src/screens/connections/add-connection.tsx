@@ -26,24 +26,27 @@ export interface ChooseProviderProps {
   /** The providers this server installed. */
   readonly providers: readonly ConnectionProviderOption[];
   readonly onChoose: (providerId: string) => void;
+  /**
+   * The agent a model connection is being created for, which the flow returns to: the dialog asks
+   * for a model provider, and leads back to the agent.
+   */
+  readonly returnTo?: string;
 }
 
 /** The first step of adding a connection: which installed provider it goes through. */
 export function ChooseProvider(props: ChooseProviderProps) {
+  const title = () => (props.returnTo === undefined ? "Add connection" : "Create model connection");
   return (
-    <Modal.Root
-      open={props.open}
-      onClose={props.onClose}
-      aria-label="Add connection"
-      size="compact"
-    >
+    <Modal.Root open={props.open} onClose={props.onClose} aria-label={title()} size="compact">
       <Pane.Root variant="modal">
         <Pane.Header>
-          <Pane.Title>Add connection</Pane.Title>
+          <Pane.Title>{title()}</Pane.Title>
           <Pane.Actions>
             <Pane.Close label="Close" onClick={() => props.onClose()} />
           </Pane.Actions>
-          <Pane.Subtitle>{props.workspaceName}</Pane.Subtitle>
+          <Pane.Subtitle>
+            {props.returnTo === undefined ? props.workspaceName : `For ${props.returnTo}`}
+          </Pane.Subtitle>
         </Pane.Header>
         <Pane.Body>
           <Show
@@ -58,7 +61,11 @@ export function ChooseProvider(props: ChooseProviderProps) {
             }
           >
             <div class={s.stack}>
-              <p class={s.intro}>Choose what to connect.</p>
+              <p class={s.intro}>
+                {props.returnTo === undefined
+                  ? "Choose what to connect."
+                  : "Choose a model provider."}
+              </p>
               <ul class={s.providers} aria-label="Providers">
                 <For each={props.providers}>
                   {(provider) => (
@@ -86,7 +93,9 @@ export function ChooseProvider(props: ChooseProviderProps) {
           </Show>
         </Pane.Body>
         <Modal.Actions>
-          <Button onClick={() => props.onClose()}>Cancel</Button>
+          <Button onClick={() => props.onClose()}>
+            {props.returnTo === undefined ? "Cancel" : "Back to agent"}
+          </Button>
         </Modal.Actions>
       </Pane.Root>
     </Modal.Root>
@@ -116,10 +125,12 @@ export interface ConfigureConnectionProps {
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
   /**
-   * The environment this connection is being created for, which the flow returns to: the dialog
-   * is titled for creating the provider's connection and leads back to it.
+   * The environment or agent this connection is being created for, which the flow returns to: the
+   * dialog is titled for creating the connection and leads back to it.
    */
   readonly returnTo?: string;
+  /** What `returnTo` names: an environment's sandbox account, or an agent's model access. */
+  readonly returnKind?: "environment" | "agent";
 }
 
 /**
@@ -133,30 +144,24 @@ export function ConfigureConnection(props: ConfigureConnectionProps) {
     if (!busy()) props.onClose();
   };
   const keyed = () => props.method === "api-key";
+  const forAgent = () => props.returnTo !== undefined && props.returnKind === "agent";
+  const title = () =>
+    props.returnTo === undefined
+      ? "Configure connection"
+      : forAgent()
+        ? "Configure model connection"
+        : `Create ${props.provider.name} connection`;
   return (
-    <Modal.Root
-      open={props.open}
-      onClose={close}
-      aria-label={
-        props.returnTo === undefined
-          ? "Configure connection"
-          : `Create ${props.provider.name} connection`
-      }
-      size="compact"
-    >
+    <Modal.Root open={props.open} onClose={close} aria-label={title()} size="compact">
       <Pane.Root variant="modal">
         <Pane.Header>
-          <Pane.Title>
-            {props.returnTo === undefined
-              ? "Configure connection"
-              : `Create ${props.provider.name} connection`}
-          </Pane.Title>
+          <Pane.Title>{title()}</Pane.Title>
           <Pane.Actions>
             <Pane.Close label="Close" onClick={close} />
           </Pane.Actions>
           <Pane.Subtitle>
             {props.returnTo !== undefined
-              ? `For ${props.returnTo}${keyed() ? " · 1 of 2" : ""}`
+              ? `${forAgent() ? `${props.provider.name} · ` : ""}For ${props.returnTo}${keyed() ? " · 1 of 2" : ""}`
               : keyed()
                 ? `${props.provider.name} · Step 1 of 2`
                 : props.provider.name}
@@ -206,12 +211,19 @@ export function ConfigureConnection(props: ConfigureConnectionProps) {
               )}
             </For>
             <Show
-              when={props.returnTo !== undefined && props.provider.methods.length === 1 && keyed()}
+              when={
+                props.returnTo !== undefined &&
+                !forAgent() &&
+                props.provider.methods.length === 1 &&
+                keyed()
+              }
               fallback={
                 <Field.Root
                   hint={
                     keyed()
-                      ? "You’ll add the API key in the next step."
+                      ? forAgent()
+                        ? "Add the key next, then return to your agent."
+                        : "You’ll add the API key in the next step."
                       : "Use this only when the endpoint accepts requests without credentials."
                   }
                 >
@@ -286,8 +298,10 @@ export interface ConnectionKeyProps {
   readonly error?: ConnectionsError;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
-  /** The environment the flow returns to once the key is saved, with this connection chosen. */
+  /** The environment or agent the flow returns to once the key is saved, with this connection chosen. */
   readonly returnTo?: string;
+  /** What `returnTo` names: an environment's sandbox account, or an agent's model access. */
+  readonly returnKind?: "environment" | "agent";
 }
 
 /**
@@ -301,6 +315,7 @@ export function ConnectionKey(props: ConnectionKeyProps) {
     if (!busy()) props.onClose();
   };
   const replacing = () => props.mode === "replace";
+  const forAgent = () => props.returnTo !== undefined && props.returnKind === "agent";
   const unsaved = () =>
     props.error === "storage-unavailable" || props.error === "failed" ? props.error : undefined;
   return (
@@ -318,7 +333,13 @@ export function ConnectionKey(props: ConnectionKeyProps) {
           </Pane.Actions>
           <Pane.Subtitle>
             {props.mode === "setup"
-              ? `${props.name} · ${props.returnTo === undefined ? "Step 2 of 2" : "2 of 2"}`
+              ? `${props.name} · ${
+                  props.returnTo === undefined
+                    ? "Step 2 of 2"
+                    : forAgent()
+                      ? `For ${props.returnTo} · 2 of 2`
+                      : "2 of 2"
+                }`
               : props.name}
           </Pane.Subtitle>
         </Pane.Header>
@@ -332,13 +353,15 @@ export function ConnectionKey(props: ConnectionKeyProps) {
             }}
           >
             <p class={s.intro}>
-              {props.mode === "setup" && props.returnTo !== undefined
-                ? "The connection is created. Save its key to finish setup."
-                : props.mode === "setup"
-                  ? "Your connection is created. Add its API key to finish setup."
-                  : replacing()
-                    ? "The current key stays in place until the new key is saved."
-                    : "Add its API key to finish setup."}
+              {props.mode === "setup" && forAgent()
+                ? "The connection is created. Add its key to finish setup."
+                : props.mode === "setup" && props.returnTo !== undefined
+                  ? "The connection is created. Save its key to finish setup."
+                  : props.mode === "setup"
+                    ? "Your connection is created. Add its API key to finish setup."
+                    : replacing()
+                      ? "The current key stays in place until the new key is saved."
+                      : "Add its API key to finish setup."}
             </p>
             <Field.Root
               hint="Stored securely. Once saved, it cannot be viewed or copied."
@@ -365,7 +388,9 @@ export function ConnectionKey(props: ConnectionKeyProps) {
                   <p class={s.note}>
                     {props.returnTo === undefined
                       ? "Saving a key does not test it with the provider."
-                      : `You’ll return to ${props.returnTo} with this connection selected.`}
+                      : forAgent()
+                        ? `Return to ${props.returnTo} with this connection selected.`
+                        : `You’ll return to ${props.returnTo} with this connection selected.`}
                   </p>
                   <Show when={props.error && props.error !== "invalid" && props.error}>
                     {(error) => (

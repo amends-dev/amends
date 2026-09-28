@@ -23,6 +23,7 @@ import { InboxPage } from "./pages/inbox.tsx";
 import { GroupsPage } from "./pages/groups.tsx";
 import { DirectPage } from "./pages/direct.tsx";
 import { HomePage, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
+import { AgentsPage } from "./pages/agents.tsx";
 import { ConnectionsPage } from "./pages/connections.tsx";
 import { EnvironmentsPage } from "./pages/environments.tsx";
 
@@ -115,6 +116,7 @@ export function ApplicationRoutes() {
           <Route path="/direct" component={DirectPage} />
           <Route path="/triage" component={TriagePage} />
           <Route path="/tasks" component={TasksPage} />
+          <Route path="/agents" component={AgentsPage} />
           <Route path="/environments" component={EnvironmentsPage} />
           <Route path="/connections" component={ConnectionsPage} />
           <Route path="/settings">

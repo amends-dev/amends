@@ -79,13 +79,15 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     return current === path(page) || current.startsWith(`${path(page)}/`);
   };
   const destination = (): Destination | undefined =>
-    at("environments")
-      ? "environments"
-      : at("connections")
-        ? "connections"
-        : at("settings")
-          ? undefined
-          : "home";
+    at("agents")
+      ? "agents"
+      : at("environments")
+        ? "environments"
+        : at("connections")
+          ? "connections"
+          : at("settings")
+            ? undefined
+            : "home";
   const groupId = () => conversation()?.params.groupId;
   // A thread opens beside its group's stream, or beside the inbox it was opened from.
   const panel = createMemo(
@@ -144,11 +146,9 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             },
           }}
           homeHref={href(path("home"))}
-          destinations={["home", "environments", "connections"]}
+          destinations={["home", "agents", "environments", "connections"]}
           destination={destination()}
-          destinationHref={(target) =>
-            href(target === "home" || target === "agents" ? path("home") : path(target))
-          }
+          destinationHref={(target) => href(path(target))}
           settings={{ href: href(path("settings")), current: at("settings") }}
           inbox={{ href: href(path("inbox")), current: at("inbox"), unread: pending() }}
           triage={{ href: href(path("triage")), current: at("triage") }}

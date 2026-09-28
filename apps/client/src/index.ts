@@ -81,6 +81,24 @@ export {
 export type { CommandRow, Retention, SandboxDraft, VariableRow } from "./environments/draft.ts";
 export type { EnvironmentProblem, SandboxIssue } from "./api/environments.ts";
 export {
+  useAgents,
+  type AgentAction,
+  type AgentBlocker,
+  type AgentDraft,
+  type AgentEntry,
+  type AgentIssue,
+  type AgentRole,
+  type AgentsDone,
+  type AgentsError,
+  type AgentsFailure,
+  type AgentsView,
+  type ConfigurationEditor,
+  type EnvironmentFit,
+  type EnvironmentOption,
+  type ModelConnection,
+} from "./agents/views.ts";
+export type { AgentProblem, AgentReason } from "./api/agents.ts";
+export {
   type SettingsData,
   type SettingsSection,
   type SettingsCommand,

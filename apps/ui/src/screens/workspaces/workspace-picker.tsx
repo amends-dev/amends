@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
-import { IconMarkNew, IconMarkOpen, IconUsers } from "@amends/icons";
+import { IconMarkNew, IconMarkOpen } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Count } from "../../components/count/index.ts";
@@ -169,7 +169,7 @@ export function WorkspacePicker(props: WorkspacePickerProps) {
       <Show when={empty()}>
         <div class={s.empty}>
           <EmptyState
-            icon={IconUsers}
+            art="sew-in"
             title="No workspaces yet"
             lines={["Create a workspace for your team. Invitations will appear here."]}
           >

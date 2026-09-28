@@ -1,5 +1,5 @@
 import { For, Match, Show, Switch, type JSX } from "solid-js";
-import { IconAlertTriangle, IconMarkEnvironments } from "@amends/icons";
+import { IconMarkEnvironments } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
@@ -111,7 +111,7 @@ export function EnvironmentsPane(props: EnvironmentsPaneProps) {
         <Match when={props.status === "unavailable"}>
           <Pane.Body>
             <EmptyState
-              icon={IconMarkEnvironments}
+              art="held-back"
               title="Environments aren’t available"
               lines={["You may no longer be a member of this workspace."]}
             />
@@ -120,7 +120,7 @@ export function EnvironmentsPane(props: EnvironmentsPaneProps) {
         <Match when={props.status === "failed"}>
           <Pane.Body>
             <EmptyState
-              icon={IconAlertTriangle}
+              art="came-apart"
               title="Couldn’t load environments"
               lines={["Try again once the host is reachable."]}
             >
@@ -185,7 +185,7 @@ export function EnvironmentList(props: EnvironmentListProps) {
         <Pane.Body>
           {alert()}
           <EmptyState
-            icon={IconMarkEnvironments}
+            art="fill"
             title="No environments yet"
             lines={
               props.onAdd

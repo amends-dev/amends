@@ -1,5 +1,5 @@
 import { For, Match, Show, Switch, type JSX } from "solid-js";
-import { IconAlertTriangle, IconMarkConnections } from "@amends/icons";
+import { IconMarkConnections } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
@@ -113,7 +113,7 @@ export function ConnectionsPane(props: ConnectionsPaneProps) {
         <Match when={props.status === "unavailable"}>
           <Pane.Body>
             <EmptyState
-              icon={IconMarkConnections}
+              art="held-back"
               title="Connections aren’t available"
               lines={["You may no longer be a member of this workspace."]}
             />
@@ -122,7 +122,7 @@ export function ConnectionsPane(props: ConnectionsPaneProps) {
         <Match when={props.status === "failed"}>
           <Pane.Body>
             <EmptyState
-              icon={IconAlertTriangle}
+              art="came-apart"
               title="Couldn’t load connections"
               lines={["Try again once the host is reachable."]}
             >
@@ -191,7 +191,7 @@ export function ConnectionList(props: ConnectionListProps) {
             )}
           </Show>
           <EmptyState
-            icon={IconMarkConnections}
+            art="reach"
             title="No connections yet"
             lines={
               props.onAdd

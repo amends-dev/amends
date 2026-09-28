@@ -304,8 +304,8 @@ provider suggests come with the connection implementations, as
 | `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentApplication.Changed`.     |
 | `DELETE …/agents/:agentId`            | Remove its membership, as removing a member does; 204.                                                                      |
 
-An agent reads as `Agent.View`: its configuration, its membership's `memberId` and name,
-`configurable` and `usable` for the caller, and its readiness. One the caller may not read, or
+An agent reads as `Agent.View`: its configuration, its membership's `memberId`, name, and role,
+`configurable`, `removable`, and `usable` for the caller, and its readiness. One the caller may not read, or
 whose membership ended, answers 404. A connection or environment that is gone, or that the caller
 may not read and use, is 422 `ConnectionUnavailable` or `EnvironmentUnavailable`, and an
 environment that cannot run the model access is 422 `Incompatible` with its reasons; setup still

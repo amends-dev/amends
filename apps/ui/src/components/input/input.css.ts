@@ -31,6 +31,13 @@ export const input = style({
   },
 });
 
+// Several lines: the Input's look with room above and below, resized by its rows only.
+export const textarea = style({
+  paddingBlock: "0.625rem",
+  lineHeight: 1.5,
+  resize: "none",
+});
+
 // The quiet search: a filled field without an outline.
 export const search = style({
   position: "relative",

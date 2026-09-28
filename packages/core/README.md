@@ -223,8 +223,9 @@ name it expects (`Changed`), and `remove` removes the membership through `Member
 with its delegation rules; the record remains for history. `environmentChoices` answers the check
 for each environment the actor may read and use, for choosing where an agent starts.
 
-Reads return `Agent.View`: the record with its membership's name, `configurable` and `usable` for
-the reader, and readiness, `Ready` or `Incomplete` with issues: the environment or connection is
+Reads return `Agent.View`: the record with its membership's name, the workspace role it holds when
+the reader may read its access, `configurable`, `removable` (configuring it and removing members,
+within the delegation rules), and `usable` for the reader, and readiness, `Ready` or `Incomplete` with issues: the environment or connection is
 gone, or a compatibility reason. Readiness is computed whoever reads it, from the stores and the
 host's catalogs. An agent whose membership ended is `NotFound`. `agent.create` works on the
 workspace; `agent.read`, `agent.configure`, and `agent.use` on the agent's membership, a `Member`

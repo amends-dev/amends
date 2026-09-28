@@ -1,5 +1,5 @@
 import { Match, Show, Switch, type JSX } from "solid-js";
-import { IconAlertTriangle, IconMarkSettings } from "@amends/icons";
+import { IconMarkSettings } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
@@ -73,7 +73,7 @@ export function SettingsPane(props: SettingsPaneProps) {
         <Match when={props.status === "unavailable"}>
           <Pane.Body>
             <EmptyState
-              icon={IconMarkSettings}
+              art="held-back"
               title="These settings aren’t available"
               lines={["You may no longer be a member of this workspace."]}
             />
@@ -82,7 +82,7 @@ export function SettingsPane(props: SettingsPaneProps) {
         <Match when={props.status === "failed"}>
           <Pane.Body>
             <EmptyState
-              icon={IconAlertTriangle}
+              art="came-apart"
               title="Can’t load settings"
               lines={["Try again once the host is reachable."]}
             >
