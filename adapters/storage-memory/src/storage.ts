@@ -22,6 +22,7 @@ import { ThreadActivities } from "./thread-activities.ts";
 import { ThreadMessages } from "./thread-messages.ts";
 import { ThreadParticipations } from "./thread-participations.ts";
 import { Threads } from "./threads.ts";
+import { TurnRecords } from "./turn-records.ts";
 import { Workspaces } from "./workspaces.ts";
 
 /**
@@ -51,6 +52,7 @@ const layerStores = Layer.mergeAll(
   ConnectionCredentials.layer,
   Environments.layer,
   Agents.layer,
+  TurnRecords.layer,
 );
 
 /**

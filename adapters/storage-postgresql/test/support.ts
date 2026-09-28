@@ -22,13 +22,22 @@ import {
 import { BackgroundWakes } from "@amends/core/background";
 import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
-import { type WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
+import type { WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { PostgresDatabase, PostgresSignals, PostgresStorage } from "../src/index.ts";
 import { Signals } from "@amends/core/signal";
 import { temporary } from "./postgres.ts";
+
+/**
+ * Wakes the suites deliver themselves: each request is accepted and nothing runs, so a suite runs
+ * the background process it expects, as a host's runner would.
+ */
+const manualWakes: WorkspaceWakes.Interface = {
+  forWorkspace: (workspaceId) =>
+    BackgroundWakes.Service.of({ workspaceId, request: () => Effect.void }),
+};
 
 export const setup = () => {
   const url = inject("amendsPostgresUrl");
@@ -81,7 +90,7 @@ export const views = (options: PostgresStorage.Options = {}) =>
             Context.add(
               Context.add(context, Signals.Service, hub.forWorkspace(workspaceId)),
               BackgroundWakes.Service,
-              WorkspaceWakes.unavailable.forWorkspace(workspaceId),
+              manualWakes.forWorkspace(workspaceId),
             ),
           ),
         ),

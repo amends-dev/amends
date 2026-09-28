@@ -22,6 +22,7 @@ const cluster = (url: string) => {
     inWorkspace: unexpected,
     asMember: unexpected,
     asMemberScoped: unexpected,
+    executeTurns: unexpected,
     runBackground: () => Effect.succeed(BackgroundProcess.idle),
   });
   return ClusterBackground.layer.pipe(
@@ -146,6 +147,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             inWorkspace: unexpected,
             asMember: unexpected,
             asMemberScoped: unexpected,
+            executeTurns: unexpected,
             runBackground: (id) =>
               id === "missing"
                 ? Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId: id }))

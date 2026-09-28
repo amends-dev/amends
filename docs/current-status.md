@@ -15,10 +15,11 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Only member workflows exist. Task and channel workflows, which will start threads with contacts
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
-- Notifications that ask agents for work stay pending: no turns, execution, silent completion,
-  or channel delivery run, and contacts and triage have no inbox outside the store. Turn and task
-  activity kinds remain design intent. Only people author messages through the application, so
-  the agent-authored messages that notify agents as informational come from no workflow yet.
+- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and a
+  closing turn publishes the agent's reply, but nothing executes turns yet: they stay queued. No
+  retry, retry limits, environment transfer, or turn timeline activity exists, and turns have no
+  HTTP or screens. Channel delivery does not run, and contacts and triage have no inbox outside
+  the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
   [environment runtime](../packages/environment/README.md) exist, but nothing runs them: agents
@@ -57,7 +58,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   turn to override, and no profile photos. Nothing runs an agent, and a removed agent's membership
   cannot be reactivated, as a person's cannot.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
+  local host runs them on an Effect Cluster runner; `turn.accept` is the one registered. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
   the takeover time, 35 seconds by default. Cluster's socket transport, which delivers wakes
   between processes at once, is not authenticated and belongs on a private network. Wakes are not

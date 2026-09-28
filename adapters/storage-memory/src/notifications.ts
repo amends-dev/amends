@@ -2,6 +2,7 @@ import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
+import { Turn } from "@amends/core/turn";
 import { Member } from "@amends/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -270,6 +271,50 @@ export const make = Effect.fn("Notifications.make")(function* () {
             : error,
         ),
       );
+    }),
+    accept: Effect.fn("Notifications.accept")(function* (inputs, turnInput, acceptedInput) {
+      yield* Store.Transaction;
+      if (inputs.length === 0) return;
+      const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(inputs).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "accept")),
+      );
+      const turnId = yield* Schema.decodeEffect(Turn.Id)(turnInput).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "accept")),
+      );
+      const space = yield* write.pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
+      const accepted: Array<Notification.Record> = [];
+      for (const id of new Set(ids)) {
+        const found = yield* rows
+          .get(space.records.notifications, id)
+          .pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
+        const record = Option.getOrUndefined(found);
+        const first = accepted[0]?.recipient;
+        if (
+          record === undefined ||
+          record.recipient._tag !== "Agent" ||
+          record.state._tag !== "Pending" ||
+          (first?._tag === "Agent" && first.memberId !== record.recipient.memberId)
+        )
+          return yield* new NotificationStore.Conflict({
+            operation: "accept",
+            message: "Expected pending notifications of one agent",
+          });
+        accepted.push(record);
+      }
+      const acknowledgedAt = DateTime.toUtc(acceptedInput);
+      for (const record of accepted) {
+        const row = yield* rows
+          .encode(
+            Object.assign({}, record, {
+              state: Notification.State.cases.Acknowledged.make({
+                outcome: { _tag: "Accepted", turnId },
+                acknowledgedAt,
+              }),
+            }),
+          )
+          .pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
+        space.records.notifications.set(record.id, row);
+      }
     }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (input) {

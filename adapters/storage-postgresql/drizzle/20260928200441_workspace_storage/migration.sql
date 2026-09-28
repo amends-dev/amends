@@ -245,6 +245,8 @@ CREATE TABLE "notifications" (
 	"source_entry_id" text NOT NULL,
 	"participation_id" text,
 	"discard_reason" text,
+	"accepted_turn_id" text,
+	"accepted_at" timestamp with time zone,
 	"recipient_kind" text NOT NULL,
 	"recipient_id" text,
 	"recipient_member_id" text,
@@ -255,7 +257,7 @@ CREATE TABLE "notifications" (
 	"thread_group_id" text,
 	"thread_sequence" integer,
 	CONSTRAINT "notifications_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "notification_state" CHECK (("state" IN ('Pending', 'Informational') AND "discard_reason" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" IN ('participation-ended', 'access-lost'))),
+	CONSTRAINT "notification_state" CHECK (("state" IN ('Pending', 'Informational') AND "discard_reason" IS NULL AND "accepted_turn_id" IS NULL AND "accepted_at" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" IN ('participation-ended', 'access-lost') AND "accepted_turn_id" IS NULL AND "accepted_at" IS NULL) OR ("state" = 'Accepted' AND "recipient_kind" = 'Agent' AND "discard_reason" IS NULL AND "accepted_turn_id" IS NOT NULL AND "accepted_at" IS NOT NULL)),
 	CONSTRAINT "notification_seen_state" CHECK ("seen_at" IS NULL OR ("recipient_kind" = 'Human' AND "state" = 'Pending')),
 	CONSTRAINT "notification_recipient" CHECK (CASE "recipient_kind" WHEN 'Triage' THEN "recipient_id" IS NULL AND "recipient_member_id" IS NULL WHEN 'Contact' THEN "recipient_id" IS NOT NULL AND "recipient_member_id" IS NULL ELSE "recipient_id" IS NOT NULL AND "recipient_member_id" IS NOT NULL END),
 	CONSTRAINT "notification_thread" CHECK (("thread_id" IS NULL AND "thread_group_id" IS NULL AND "thread_sequence" IS NULL) OR ("thread_id" IS NOT NULL AND "thread_group_id" IS NOT NULL AND "thread_sequence" > 0)),
@@ -342,6 +344,33 @@ CREATE TABLE "threads" (
 	CONSTRAINT "thread_latest" CHECK (("latest_sequence" IS NULL AND "latest_activity_at" IS NULL) OR ("latest_sequence" > 0 AND "latest_activity_at" IS NOT NULL))
 );
 --> statement-breakpoint
+CREATE TABLE "turns" (
+	"workspace_id" text,
+	"id" text,
+	"group_id" text NOT NULL,
+	"thread_id" text NOT NULL,
+	"agent_id" text NOT NULL,
+	"member_id" text NOT NULL,
+	"participation_id" text NOT NULL,
+	"status" text NOT NULL,
+	"input_after_sequence" integer NOT NULL,
+	"accepted_through_sequence" integer NOT NULL,
+	"incorporated_through_sequence" integer NOT NULL,
+	"connection_id" text,
+	"model" text,
+	"reasoning" text,
+	"environment_id" text,
+	"message_id" text,
+	"failure" text,
+	"cancel_reason" text,
+	"created_at" timestamp with time zone NOT NULL,
+	"started_at" timestamp with time zone,
+	"finished_at" timestamp with time zone,
+	CONSTRAINT "turns_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "turn_input_order" CHECK ("input_after_sequence" <= "incorporated_through_sequence" AND "incorporated_through_sequence" <= "accepted_through_sequence" AND "input_after_sequence" < "accepted_through_sequence"),
+	CONSTRAINT "turn_selection_complete" CHECK (("connection_id" IS NULL AND "model" IS NULL AND "reasoning" IS NULL AND "environment_id" IS NULL) OR ("connection_id" IS NOT NULL AND "model" IS NOT NULL AND "environment_id" IS NOT NULL))
+);
+--> statement-breakpoint
 CREATE TABLE "workspaces" (
 	"name" text NOT NULL,
 	"workspace_id" text PRIMARY KEY,
@@ -384,6 +413,9 @@ CREATE INDEX "participations_by_admission" ON "thread_participations" ("workspac
 CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_start" ON "threads" ("workspace_id","group_id","created_at","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_latest" ON "threads" ("workspace_id","group_id","latest_activity_at","id" COLLATE "C");--> statement-breakpoint
+CREATE UNIQUE INDEX "active_turn_by_agent_thread" ON "turns" ("workspace_id","member_id","thread_id") WHERE "status" IN ('queued', 'running', 'cancelling');--> statement-breakpoint
+CREATE INDEX "turns_by_thread" ON "turns" ("workspace_id","thread_id","created_at");--> statement-breakpoint
+CREATE INDEX "active_turns" ON "turns" ("workspace_id","created_at") WHERE "status" IN ('queued', 'running', 'cancelling');--> statement-breakpoint
 ALTER TABLE "log_append_keys" ADD CONSTRAINT "log_append_keys_batch" FOREIGN KEY ("workspace_id","log_id","commit_id") REFERENCES "log_batches"("workspace_id","log_id","commit_id");--> statement-breakpoint
 ALTER TABLE "log_batches" ADD CONSTRAINT "log_batches_commit" FOREIGN KEY ("workspace_id","commit_id") REFERENCES "commits"("workspace_id","id");--> statement-breakpoint
 ALTER TABLE "log_entries" ADD CONSTRAINT "log_entries_batch" FOREIGN KEY ("workspace_id","log_id","position") REFERENCES "log_batches"("workspace_id","log_id","position");

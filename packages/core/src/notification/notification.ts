@@ -7,6 +7,7 @@ import { GroupId } from "../group/id.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationId } from "../thread/participation/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
+import { TurnId } from "../turn/id.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
 export type Id = typeof Id.Type;
@@ -49,8 +50,14 @@ export const ofMember = <const I extends Identity.MemberReference>(
   identity: I,
 ) => Object.assign({}, identity, { memberId });
 
-/** Extend with durable handoff outcomes when the owning turn/delivery workflows exist. */
-export const AcknowledgmentOutcome = Schema.TaggedUnion({ Seen: {} });
+/**
+ * How a recipient handled a notification: a person saw it, or an agent accepted it into a turn,
+ * which owns the work from then on. Extend with delivery handoff when channels exist.
+ */
+export const AcknowledgmentOutcome = Schema.TaggedUnion({
+  Seen: {},
+  Accepted: { turnId: TurnId.Id },
+});
 export type AcknowledgmentOutcome = typeof AcknowledgmentOutcome.Type;
 
 export const Acknowledgment = Schema.Struct({
@@ -61,7 +68,10 @@ export interface Acknowledgment extends Schema.Schema.Type<typeof Acknowledgment
 
 /** The outcome determines which recipient contract can record an acknowledgment. */
 export const acceptsAcknowledgment = (recipient: Recipient, outcome: AcknowledgmentOutcome) =>
-  AcknowledgmentOutcome.match(outcome, { Seen: () => recipient._tag === "Human" });
+  AcknowledgmentOutcome.match(outcome, {
+    Seen: () => recipient._tag === "Human",
+    Accepted: () => recipient._tag === "Agent",
+  });
 
 export const State = Schema.TaggedUnion({
   Pending: {},

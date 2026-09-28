@@ -98,6 +98,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     discardPendingForParticipation: unexpected,
     discardPendingForGroup: unexpected,
     markSeen: unexpected,
+    accept: unexpected,
     ...overrides,
   });
   const host = Layer.mergeAll(

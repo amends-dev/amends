@@ -110,7 +110,10 @@ environment targets. Adding them replaced the development baseline; recreate dis
 databases.
 
 `agents` holds agents' configuration, one row per agent with its model access as columns and a
-unique membership per workspace. Adding it replaced the development baseline too.
+unique membership per workspace. `turns` holds agents' attempts, with a partial unique index that
+allows one active turn per agent and thread, and the selection a turn ran with as columns set all
+together or not at all. A notification an agent accepted into a turn is `Accepted`, with its
+turn and time. Adding them replaced the development baseline too.
 
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the

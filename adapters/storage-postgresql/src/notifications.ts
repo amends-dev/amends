@@ -3,6 +3,7 @@ import { Member } from "@amends/core/workspace";
 import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
+import { Turn } from "@amends/core/turn";
 import { and, asc, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -64,17 +65,23 @@ const toEncodedRecord = (row: NotificationRow) => ({
         },
       }),
   state:
-    row.state === "Discarded"
-      ? { _tag: "Discarded", reason: row.discardReason }
-      : row.state === "Informational"
-        ? row.discardReason === null && row.seenAt === null
-          ? { _tag: "Informational" }
-          : undefined
-        : row.discardReason !== null
-          ? undefined
-          : row.seenAt === null
-            ? { _tag: "Pending" }
-            : { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: row.seenAt },
+    row.state === "Accepted"
+      ? {
+          _tag: "Acknowledged",
+          outcome: { _tag: "Accepted", turnId: row.acceptedTurnId },
+          acknowledgedAt: row.acceptedAt,
+        }
+      : row.state === "Discarded"
+        ? { _tag: "Discarded", reason: row.discardReason }
+        : row.state === "Informational"
+          ? row.discardReason === null && row.seenAt === null
+            ? { _tag: "Informational" }
+            : undefined
+          : row.discardReason !== null
+            ? undefined
+            : row.seenAt === null
+              ? { _tag: "Pending" }
+              : { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: row.seenAt },
 });
 
 /** A membership for people and agents, a contact, or triage. */
@@ -351,6 +358,53 @@ export const make = Effect.fn("Notifications.make")(function* () {
           SELECT ${workspaceId}::text, id, seen_at FROM seen
           ON CONFLICT DO NOTHING`),
       ).pipe(Effect.mapError(storeError(NotificationStore, "markSeen")));
+    }),
+    accept: Effect.fn("Notifications.accept")(function* (input, turnInput, at) {
+      yield* Store.Transaction;
+      const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(input).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "accept")),
+      );
+      const turnId = yield* Schema.decodeEffect(Turn.Id)(turnInput).pipe(
+        Effect.mapError(storeConflict(NotificationStore, "accept")),
+      );
+      const acceptedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
+        at,
+      ).pipe(Effect.mapError(storeConflict(NotificationStore, "accept")));
+      const unique = [...new Set(ids)];
+      if (unique.length === 0) return;
+      // Check every notification is a pending one of the same agent, then settle them together.
+      const eligible = yield* guard(
+        db
+          .select({ id: notifications.id, memberId: notifications.recipientMemberId })
+          .from(notifications)
+          .where(
+            and(
+              inWorkspace,
+              inIds(notifications.id, unique),
+              eq(notifications.recipientKind, "Agent"),
+              eq(notifications.state, "Pending"),
+            ),
+          ),
+      ).pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
+      if (
+        eligible.length !== unique.length ||
+        new Set(eligible.map((row) => row.memberId)).size !== 1
+      )
+        return yield* new NotificationStore.Conflict({
+          operation: "accept",
+          message: "Expected pending notifications of one agent",
+        });
+      yield* guard(
+        db
+          .update(notifications)
+          .set({
+            state: "Accepted",
+            acceptedTurnId: turnId,
+            acceptedAt: DateTime.toDate(acceptedAt),
+          })
+          .where(and(inWorkspace, inIds(notifications.id, unique))),
+        true,
+      ).pipe(Effect.mapError(storeError(NotificationStore, "accept")));
     }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (input) {

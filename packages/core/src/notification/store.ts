@@ -7,6 +7,7 @@ import type { GroupId } from "../group/id.ts";
 import type { MemberId } from "../workspace/member/id.ts";
 import type { ThreadId } from "../thread/id.ts";
 import type { ThreadParticipationId } from "../thread/participation/id.ts";
+import type { TurnId } from "../turn/id.ts";
 
 /** Exclusive keyset boundary for listing; not a journal position or live delivery cursor. */
 export const Cursor = Schema.Struct({
@@ -51,7 +52,8 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * internal reads do not authorize callers; application operations must do so.
  * Every storage adapter implements this contract.
  *
- * The journal settles notifications as Pending or Discarded. A human recipient's Seen is private
+ * The journal settles notifications as Pending or Discarded, and an agent's as Acknowledged with
+ * outcome Accepted when a turn takes them. A human recipient's Seen is private
  * state beside them, written by markSeen and kept when projections are rebuilt: reads show a
  * seen pending notification as Acknowledged with outcome Seen and its time, and pending reads and
  * counts leave it out.
@@ -147,6 +149,16 @@ export interface Interface {
     ids: ReadonlyArray<Notification.Id>,
     seenAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict>;
+  /**
+   * Record that an agent accepted these pending notifications into a turn, in the turn's commit.
+   * Each must be a pending notification of an agent in this workspace, all of the same agent;
+   * otherwise the call conflicts and writes nothing. An empty request writes nothing.
+   */
+  readonly accept: (
+    ids: ReadonlyArray<Notification.Id>,
+    turnId: TurnId.Id,
+    acceptedAt: DateTime.Utc,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** Settle pending agent input for this ended participation, preserving source and recipient history. */
   readonly discardPendingForParticipation: (
     id: ThreadParticipationId.Id,

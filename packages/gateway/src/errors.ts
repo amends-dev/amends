@@ -27,6 +27,7 @@ import {
 import { ReadStateApplication } from "@amends/core/attention";
 import { ConnectionApplication } from "@amends/core/connection";
 import { AgentApplication } from "@amends/core/agent";
+import { TurnApplication } from "@amends/core/turn";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { SignalApplication } from "@amends/core/signal";
 import { Request } from "@amends/core/request";
@@ -152,6 +153,8 @@ export const PublicError = Schema.Union([
   AgentApplication.ConnectionUnavailable,
   AgentApplication.EnvironmentUnavailable,
   AgentApplication.Incompatible,
+  TurnApplication.NotFound,
+  TurnApplication.NotActive,
 ]);
 export type PublicError = typeof PublicError.Type;
 

@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from "effect";
 import { AgentFacts } from "../agent/facts.ts";
+import { TurnFacts } from "../turn/facts.ts";
 import { AgentPermissions } from "../agent/permissions.ts";
 import { AssignmentFacts } from "../authorization/assignment/facts.ts";
 import { Requirement } from "../authorization/requirement.ts";
@@ -261,6 +262,31 @@ const registry: ReadonlyArray<Registered> = [
   }),
   register(AgentFacts.Configured, {
     requirement: ({ memberId }, workspaceId) => readAgent(memberId, workspaceId),
+  }),
+  // Turns reach those who may read their thread: what the agent is doing there, and how it ended.
+  register(TurnFacts.Created, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.InputAccepted, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.Started, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.InputIncorporated, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.CancelRequested, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.Completed, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.Failed, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  }),
+  register(TurnFacts.Cancelled, {
+    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
   }),
   register(GroupFollowFacts.Started),
   register(GroupFollowFacts.Ended),

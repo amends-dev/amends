@@ -4,16 +4,34 @@ import { Projection } from "../journal/projection.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import { ThreadActivityKind } from "../thread/activity/kind.ts";
 import { ThreadParticipationActivity } from "../thread/participation/activity.ts";
+import { TurnFacts } from "../turn/facts.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
+/** A turn's acceptance settles the notifications it took, in the same commit. */
+const accepted = Effect.fnUntraced(function* (payload: {
+  readonly workspaceId: string;
+  readonly turnId: Parameters<NotificationStore.Interface["accept"]>[1];
+  readonly notificationIds: ReadonlyArray<Notification.Id>;
+  readonly acceptedAt: Parameters<NotificationStore.Interface["accept"]>[2];
+}) {
+  const notifications = yield* NotificationStore.Service;
+  if (notifications.workspaceId !== payload.workspaceId)
+    return yield* new NotificationStore.Conflict({
+      operation: "project",
+      message: "Acceptance belongs to another workspace",
+    });
+  yield* notifications.accept(payload.notificationIds, payload.turnId, payload.acceptedAt);
+});
+
 /**
  * Activity generates notifications, and an unfollow's ending settles an agent's pending input
  * from that participation; leaving a group settles what a member had pending from it; human Seen
  * is private state, outside the journal. Everything comes from the
  * recorded facts and this read model's own notifications, so it rebuilds without reading other
- * read models: recipients were selected when the activity was recorded.
+ * read models: recipients were selected when the activity was recorded. A turn accepting an
+ * agent's notifications settles them as accepted into it.
  */
-export const definition = Projection.make("notifications", { version: 2 })
+export const definition = Projection.make("notifications", { version: 3 })
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("NotificationProjection.activity")(function* (event) {
@@ -56,6 +74,23 @@ export const definition = Projection.make("notifications", { version: 2 })
           message: "Departure belongs to another workspace",
         });
       yield* notifications.discardPendingForGroup(memberId, groupId);
+    }),
+  )
+  .on(
+    TurnFacts.Created,
+    Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
+      yield* accepted({
+        workspaceId: payload.workspaceId,
+        turnId: payload.id,
+        notificationIds: payload.notificationIds,
+        acceptedAt: payload.createdAt,
+      });
+    }),
+  )
+  .on(
+    TurnFacts.InputAccepted,
+    Effect.fn("NotificationProjection.inputAccepted")(function* ({ payload }) {
+      yield* accepted(payload);
     }),
   );
 export * as NotificationProjection from "./projection.ts";

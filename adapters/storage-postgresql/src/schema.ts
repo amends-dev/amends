@@ -51,7 +51,7 @@ export const targetKinds = [
 ] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** What the journal settles; a human recipient's Seen is private state in notification_seen. */
-export const notificationStates = ["Pending", "Discarded", "Informational"] as const;
+export const notificationStates = ["Pending", "Discarded", "Informational", "Accepted"] as const;
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -301,6 +301,9 @@ export const notifications = pgTable(
     sourceEntryId: text("source_entry_id").notNull(),
     participationId: text("participation_id"),
     discardReason: text("discard_reason", { enum: ["participation-ended", "access-lost"] }),
+    // The turn an agent accepted the notification into, and when.
+    acceptedTurnId: text("accepted_turn_id"),
+    acceptedAt: instant("accepted_at"),
     recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
     recipientId: text("recipient_id"),
     // The membership a human or agent is notified as; its inbox is the membership's.
@@ -319,7 +322,7 @@ export const notifications = pgTable(
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "notification_state",
-      sql`(${table.state} IN ('Pending', 'Informational') AND ${table.discardReason} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} IN ('participation-ended', 'access-lost'))`,
+      sql`(${table.state} IN ('Pending', 'Informational') AND ${table.discardReason} IS NULL AND ${table.acceptedTurnId} IS NULL AND ${table.acceptedAt} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} IN ('participation-ended', 'access-lost') AND ${table.acceptedTurnId} IS NULL AND ${table.acceptedAt} IS NULL) OR (${table.state} = 'Accepted' AND ${table.recipientKind} = 'Agent' AND ${table.discardReason} IS NULL AND ${table.acceptedTurnId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL)`,
     ),
     check(
       "notification_seen_state",
@@ -812,5 +815,64 @@ export const agents = pgTable(
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     uniqueIndex("agents_by_member").on(t.workspaceId, t.memberId),
+  ],
+);
+
+export const turnStatuses = [
+  "queued",
+  "running",
+  "cancelling",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+/**
+ * Agents' attempts on threads, with how far each has accepted and taken in its thread's input.
+ * An agent has at most one active turn on a thread; the model access and environment are recorded
+ * when execution starts, all together or not at all.
+ */
+export const turns = pgTable(
+  "turns",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    groupId: text("group_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    agentId: text("agent_id").notNull(),
+    memberId: text("member_id").notNull(),
+    participationId: text("participation_id").notNull(),
+    status: text("status", { enum: turnStatuses }).notNull(),
+    inputAfterSequence: integer("input_after_sequence").notNull(),
+    acceptedThroughSequence: integer("accepted_through_sequence").notNull(),
+    incorporatedThroughSequence: integer("incorporated_through_sequence").notNull(),
+    connectionId: text("connection_id"),
+    model: text("model"),
+    reasoning: text("reasoning"),
+    environmentId: text("environment_id"),
+    messageId: text("message_id"),
+    failure: text("failure"),
+    cancelReason: text("cancel_reason", { enum: ["requested", "participation-ended"] }),
+    createdAt: instant("created_at").notNull(),
+    startedAt: instant("started_at"),
+    finishedAt: instant("finished_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    uniqueIndex("active_turn_by_agent_thread")
+      .on(t.workspaceId, t.memberId, t.threadId)
+      .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
+    index("turns_by_thread").on(t.workspaceId, t.threadId, t.createdAt),
+    index("active_turns")
+      .on(t.workspaceId, t.createdAt)
+      .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
+    check(
+      "turn_input_order",
+      sql`${t.inputAfterSequence} <= ${t.incorporatedThroughSequence} AND ${t.incorporatedThroughSequence} <= ${t.acceptedThroughSequence} AND ${t.inputAfterSequence} < ${t.acceptedThroughSequence}`,
+    ),
+    check(
+      "turn_selection_complete",
+      sql`(${t.connectionId} IS NULL AND ${t.model} IS NULL AND ${t.reasoning} IS NULL AND ${t.environmentId} IS NULL) OR (${t.connectionId} IS NOT NULL AND ${t.model} IS NOT NULL AND ${t.environmentId} IS NOT NULL)`,
+    ),
   ],
 );

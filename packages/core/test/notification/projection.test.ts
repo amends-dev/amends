@@ -59,6 +59,7 @@ const refusing: NotificationStore.Interface = {
   discardPendingForParticipation: () => Effect.die("Unexpected notification write"),
   discardPendingForGroup: () => Effect.die("Unexpected notification write"),
   markSeen: () => Effect.die("Unexpected notification write"),
+  accept: () => Effect.die("Unexpected notification write"),
 };
 /** Only the notification store is provided, so the projection can read no other read model. */
 const run = <A, E>(

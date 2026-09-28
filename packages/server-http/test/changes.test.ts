@@ -40,6 +40,7 @@ const gateway = Layer.succeed(
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
     runBackground: () => Effect.die("unused"),
+    executeTurns: () => Effect.die("unused"),
     asMemberScoped: <A, E>(
       _id: Workspace.Id,
       _identity: Identity.MemberReference,

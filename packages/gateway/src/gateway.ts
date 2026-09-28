@@ -11,6 +11,7 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
+import type { TurnExecution } from "@amends/core/turn";
 import { Context, Crypto, Effect, Encoding, Layer, Option, Result, Schema } from "effect";
 import type { Cause } from "effect";
 import type { Scope } from "effect";
@@ -73,6 +74,15 @@ export interface Interface {
     BackgroundProcess.Outcome,
     BackgroundRuns.Unknown | BackgroundRuns.Failure | GatewayErrors.WorkspaceNotFound
   >;
+  /**
+   * Run turn execution in a workspace, for the host process that runs the work agents accepted.
+   * It is trusted and has no actor: each step acts as its turn's agent. Its failures are core's
+   * own. A workspace that was never created returns WorkspaceNotFound without being prepared.
+   */
+  readonly executeTurns: <A, E>(
+    workspaceId: Workspace.Id,
+    program: Effect.Effect<A, E, TurnExecution.Service>,
+  ) => Effect.Effect<A, E | GatewayErrors.WorkspaceNotFound>;
 }
 
 /** Workspace bootstrap and entry; core's application services are the operations. */
@@ -364,7 +374,23 @@ export const make = Effect.fn("Gateway.make")(function* (
     );
   });
 
-  return Service.of({ createWorkspace, inWorkspace, asMember, asMemberScoped, runBackground });
+  const executeTurns: Interface["executeTurns"] = Effect.fn("Gateway.executeTurns")(function* <
+    A,
+    E,
+  >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, TurnExecution.Service>) {
+    if (!(yield* runtimes.prepared(workspaceId)) && !(yield* created(workspaceId)))
+      return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+    return yield* Effect.scoped(bind(workspaceId, heal(workspaceId, program)));
+  });
+
+  return Service.of({
+    createWorkspace,
+    inWorkspace,
+    asMember,
+    asMemberScoped,
+    runBackground,
+    executeTurns,
+  });
 });
 
 /**

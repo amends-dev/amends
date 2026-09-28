@@ -29,6 +29,7 @@ describe.skipIf(!available)("background work on the local host", () => {
             inWorkspace: unexpected,
             asMember: unexpected,
             asMemberScoped: unexpected,
+            executeTurns: unexpected,
             runBackground: (_, name) =>
               Effect.sync(() => {
                 runs.push(name);
@@ -109,6 +110,7 @@ describe.skipIf(!available)("background work on the local host", () => {
                       inWorkspace: unexpected,
                       asMember: unexpected,
                       asMemberScoped: unexpected,
+                      executeTurns: unexpected,
                       runBackground: (id) =>
                         Effect.sync(() => {
                           runs.push({ runner: name, key: id });

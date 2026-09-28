@@ -1,5 +1,6 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
+import { TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
@@ -148,6 +149,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         discardPendingForParticipation: unexpected,
         discardPendingForGroup: unexpected,
         markSeen: unexpected,
+        accept: unexpected,
         workspaceId: boundWorkspaceId,
         get: unexpected,
         listByRecipient: unexpected,
@@ -277,6 +279,19 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
+        insert: unexpected,
+        update: unexpected,
+      }),
+    ),
+    Context.add(
+      TurnStore.Service,
+      TurnStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        get: unexpected,
+        findActive: unexpected,
+        findLatest: unexpected,
+        listActive: unexpected,
+        listByThread: unexpected,
         insert: unexpected,
         update: unexpected,
       }),

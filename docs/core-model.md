@@ -26,10 +26,11 @@ metadata, timeline pages, and current-participant summaries are also implemented
 agent-input settlement. `NotificationApplication.resolveSource` resolves owned notifications under
 current thread access, without acknowledgment or participation changes. Human acknowledgment is
 implemented through `NotificationApplication.acknowledge`, as private `Seen` state outside the
-journal. Other participation management, the task and channel workflows that admit contacts and
-triage, public groups, group/thread HTTP/UI, turns, execution,
-agent/contact/triage acknowledgment, and channel
-delivery below remain design intent. The harness contract, amends's own in-process harness, the
+journal. Agents accept their work notifications into turns, one active turn per agent per
+thread, and a turn closes by publishing the agent's reply from its log; see
+[core's turns](../packages/core/README.md#turns). Other participation management, the task and
+channel workflows that admit contacts and triage, public groups, group/thread HTTP/UI, turn
+execution, contact/triage acknowledgment, and channel delivery below remain design intent. The harness contract, amends's own in-process harness, the
 sandbox contract with local and Daytona providers, and the environment runtime that composes them
 exist as packages, but no turn runs them yet. Connections exist in core, for model inference
 through API keys, with credentials kept outside the journal; nothing uses them yet. “Agreed” records a design decision,

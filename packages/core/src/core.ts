@@ -1,13 +1,16 @@
 import { AgentApplication } from "./agent/application.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentProjection } from "./agent/projection.ts";
+import { TurnAcceptance } from "./turn/acceptance.ts";
+import { TurnApplication } from "./turn/application.ts";
+import { TurnExecution } from "./turn/execution.ts";
+import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionApplication } from "./connection/application.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
 import { EnvironmentApplication } from "./environment/application.ts";
 import { EnvironmentPermissions } from "./environment/permissions.ts";
 import { EnvironmentProjection } from "./environment/projection.ts";
-import type { BackgroundProcess } from "./background/process.ts";
 import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
 import { ThreadApplication } from "./thread/application.ts";
@@ -101,6 +104,7 @@ export const projections = [
   ConnectionProjection.definition,
   EnvironmentProjection.definition,
   AgentProjection.definition,
+  TurnProjection.definition,
 ] as const;
 
 /**
@@ -160,7 +164,7 @@ export const journalLog = Log.Id.make("journal");
  * a commit that publishes a fact it wakes on asks for it to run in that same commit. A domain that
  * adds background work registers its process here.
  */
-export const processes: ReadonlyArray<BackgroundProcess.Definition> = [];
+export const processes = [TurnAcceptance.process] as const;
 
 /** The domain journal and its log, over host storage; its commits ask for background work. */
 const journal = Journal.layer({
@@ -219,6 +223,7 @@ const operations = Layer.mergeAll(
   ConnectionApplication.layer,
   EnvironmentApplication.layer,
   AgentApplication.layer.pipe(Layer.provide(MemberApplication.layer)),
+  TurnApplication.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
@@ -241,12 +246,21 @@ const operations = Layer.mergeAll(
 );
 
 /**
- * Complete core for one workspace: application operations and background runs over the
+ * What runs outside requests: the domains' background processes, and turn execution, which a
+ * host's runner drives for the turns agents accepted. Neither is an operation an actor calls.
+ */
+const background = Layer.mergeAll(
+  BackgroundRuns.layer(processes).pipe(Layer.provide(TurnAcceptance.layer)),
+  TurnExecution.layer.pipe(Layer.provide(messagePublication)),
+).pipe(Layer.provide(Layer.mergeAll(threadAccess, admissions)));
+
+/**
+ * Complete core for one workspace: application operations, background runs, and turn execution over the
  * journal, authorization, and the permission catalog.
  *
  * @category layers
  */
-export const layer = Layer.mergeAll(operations, BackgroundRuns.layer(processes)).pipe(
+export const layer = Layer.mergeAll(operations, background).pipe(
   Layer.provideMerge(Layer.mergeAll(journal, authorization)),
   Layer.provideMerge(PermissionCatalog.layer(permissions)),
 );

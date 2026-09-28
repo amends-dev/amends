@@ -3,10 +3,9 @@
 The journal uses the same append-only log mechanism as execution history.
 `Journal.publish` appends a fact event to its configured log and applies matching
 projections inside the same commit. A turn's log stores its own schema-defined
-execution entries through `Log`, without running domain projections. The generic
-log mechanism is implemented; turn execution and its domain-specific log schema
-remain planned. Turn and agent examples below illustrate consumers rather than
-available application operations.
+execution entries through `Log`, without running domain projections, as
+[`TurnLog`](../packages/core/README.md#turns) does. Turn execution remains planned; the turn and
+agent examples below illustrate consumers rather than available application operations.
 
 ## Ownership
 

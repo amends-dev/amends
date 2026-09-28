@@ -43,6 +43,7 @@ const background = (
     inWorkspace: unexpected,
     asMember: unexpected,
     asMemberScoped: unexpected,
+    executeTurns: unexpected,
     runBackground: (id, name) =>
       Effect.gen(function* () {
         expect([id, name]).toEqual([workspaceId, process]);

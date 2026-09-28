@@ -77,6 +77,10 @@ is sufficient to type-check a supplied implementation.
   what it left outstanding. It is for the host process that runs background work, when a wake
   arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
   workspace that was never created returns `WorkspaceNotFound` without being prepared.
+- `executeTurns(workspaceId, program)` runs [turn execution](../core/README.md#turns) for the
+  host process that runs agents' accepted work. It is trusted and has no actor: each step acts as
+  its turn's agent, and failures are core's own. A workspace that was never created returns
+  `WorkspaceNotFound`.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
