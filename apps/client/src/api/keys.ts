@@ -11,7 +11,8 @@ export type WorkspaceResource =
   | "public-groups"
   | "inbox"
   | "permissions"
-  | "connections";
+  | "connections"
+  | "environments";
 export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "settings",
   "ownership",
@@ -22,6 +23,7 @@ export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "inbox",
   "permissions",
   "connections",
+  "environments",
 ];
 /** Everything the signed-in identity can reach, across workspaces. */
 export const directoryKey = "directory";

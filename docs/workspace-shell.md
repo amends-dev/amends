@@ -77,8 +77,8 @@ Try again under a note when a page fails. A notification whose thread the reader
 
 Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
 side panel, such as Settings' member details, attaches beside the main content like the thread
-panel. [Connections](connections.md) follows its own Lunacy frames. Home, Triage, Tasks, and
-Environments are placeholders drawn with UI's EmptyState.
+panel. [Connections](connections.md) and [Environments](environments.md) follow their own Lunacy
+frames. Home, Triage, and Tasks are placeholders drawn with UI's EmptyState.
 The mocks' Agents destination, search, the Tasks and Files tabs, reactions, and task references
 have no backend and are not shown.
 

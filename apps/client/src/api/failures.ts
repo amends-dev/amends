@@ -26,8 +26,8 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * Every failure the workspace, member, access, invitation, conversation, and connection
- * endpoints report.
+ * Every failure the workspace, member, access, invitation, conversation, connection, and
+ * environment endpoints report.
  */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
@@ -38,6 +38,7 @@ type Reported =
   | Failure<Client["threads"][keyof Client["threads"]]>
   | Failure<Client["notifications"][keyof Client["notifications"]]>
   | Failure<Client["connections"][keyof Client["connections"]]>
+  | Failure<Client["environments"][keyof Client["environments"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
@@ -78,6 +79,14 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ConnectionApplication.NotFound": "gone",
   "ConnectionApplication.InvalidSettings": "invalid",
   "ConnectionApplication.UnsupportedAuthentication": "invalid",
+  // Environments: renamed meanwhile, or naming a harness or provider this host no longer has;
+  // `environmentProblems` tells the refusals apart.
+  "EnvironmentApplication.Changed": "changed",
+  "EnvironmentApplication.UnknownHarness": "changed",
+  "EnvironmentApplication.UnknownSandboxProvider": "changed",
+  "EnvironmentApplication.NotFound": "gone",
+  "EnvironmentApplication.UnsupportedPlacement": "invalid",
+  "EnvironmentApplication.InvalidSandbox": "invalid",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionApplication.CredentialsUnavailable": "failed",
   "GroupFollowApplication.AgentRequired": "denied",

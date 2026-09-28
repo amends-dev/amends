@@ -7,8 +7,12 @@ export type RootProps = {
   /** Called on Escape, a click outside, or a close button; the caller closes it. */
   onClose: () => void;
   "aria-label": string;
-  /** "compact" is 560px wide and as tall as its content, for short forms. Default "regular". */
-  size?: "regular" | "compact";
+  /**
+   * "compact" is 560px wide and as tall as its content, for short forms; "form" is 640px wide and
+   * as tall as its content, for a form of a few sections; "wide" is 720 × 864, for long forms with
+   * side-by-side fields. Default "regular".
+   */
+  size?: "regular" | "compact" | "form" | "wide";
   /** A Pane with variant="modal". */
   children: JSX.Element;
 };

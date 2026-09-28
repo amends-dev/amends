@@ -30,7 +30,34 @@ import settingsMeta, {
   Rename,
   WorkspaceGeneral,
 } from "../src/screens/group/settings.stories.tsx";
-import formsMeta, { Buttons, Fields, Notices } from "../src/components/forms.stories.tsx";
+import formsMeta, {
+  Buttons,
+  CardsAndDetailedSelect,
+  Fields,
+  Notices,
+} from "../src/components/forms.stories.tsx";
+import environmentsMeta, {
+  AccountNeedsKey,
+  AccountNoLongerAvailable,
+  AddDaytonaKey,
+  AddDaytonaSettings,
+  AddWithAccountDetour,
+  AddWithDaytona,
+  AddWithoutSandbox,
+  AllEnvironments,
+  CreateDaytonaAccount,
+  DaytonaAccountOptions,
+  EditSandboxSettings,
+  EnvironmentOverview,
+  LoadFailed as EnvironmentsLoadFailed,
+  Loading as EnvironmentsLoading,
+  LocalDirectorySettings,
+  MemberReadOnly,
+  NoDaytonaAccounts,
+  NoSandboxDetails,
+  RemoveEnvironment,
+  SandboxSettings,
+} from "../src/screens/environments/environments.stories.tsx";
 import connectionsMeta, {
   AddApiKey,
   AddConnectionFlow,
@@ -212,6 +239,59 @@ describe("form components", () => {
   });
   it("announces a caution notice", async () => {
     await stories.story(Notices).run();
+  });
+  it("chooses among cards, and offers an action after a select's detailed options", async () => {
+    await stories.story(CardsAndDetailedSelect).run();
+  });
+});
+
+describe("environments screen", () => {
+  const stories = definePreview(preview).meta(environmentsMeta);
+  it("renders the list, details, add steps, account detour, and states", async () => {
+    viewport(1600);
+    for (const story of [
+      AllEnvironments,
+      EnvironmentOverview,
+      SandboxSettings,
+      AddWithoutSandbox,
+      AddWithDaytona,
+      AddDaytonaSettings,
+      LocalDirectorySettings,
+      CreateDaytonaAccount,
+      AddDaytonaKey,
+      RemoveEnvironment,
+      EnvironmentsLoading,
+      EnvironmentsLoadFailed,
+    ]) {
+      await stories.story(story).run();
+      cleanup();
+    }
+  });
+  it("lists each Daytona account with its state, and offers creating one", async () => {
+    viewport(1600);
+    await stories.story(DaytonaAccountOptions).run();
+    cleanup();
+    await stories.story(NoDaytonaAccounts).run();
+  });
+  it("adds a Daytona environment, detouring to create its account and returning to the draft", async () => {
+    viewport(1600);
+    await stories.story(AddWithAccountDetour).run();
+  });
+  it("checks variables and reorders commands before saving the sandbox settings", async () => {
+    viewport(1600);
+    await stories.story(EditSandboxSettings).run();
+  });
+  it("keeps the draft and names the field when the account is no longer available", async () => {
+    viewport(1600);
+    await stories.story(AccountNoLongerAvailable).run();
+  });
+  it("shows readiness and its recovery, the workspace's own environment, and members' view", async () => {
+    viewport(1600);
+    await stories.story(AccountNeedsKey).run();
+    cleanup();
+    await stories.story(NoSandboxDetails).run();
+    cleanup();
+    await stories.story(MemberReadOnly).run();
   });
 });
 

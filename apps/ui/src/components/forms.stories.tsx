@@ -9,6 +9,7 @@ import { Input, SearchField } from "./input/index.ts";
 import { Menu } from "./menu/index.ts";
 import { MemberPicker } from "./member-picker/index.ts";
 import { Notice } from "./notice/index.ts";
+import { Select } from "./select/index.ts";
 import * as s from "./components.stories.css.ts";
 
 const meta = { title: "Components/Forms" } satisfies Meta;
@@ -137,5 +138,69 @@ export const Notices = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("alert")).toHaveTextContent("API key wasn’t saved");
+  },
+} satisfies Story;
+
+function CardChoiceExample() {
+  const [where, setWhere] = createSignal("none");
+  const [account, setAccount] = createSignal<string | undefined>("team");
+  const [created, setCreated] = createSignal(0);
+  return (
+    <div class={s.stack}>
+      <Choice.Group label="Sandbox" value={where()} onChange={setWhere} variant="card">
+        <Choice.Option value="none" description="Run without a sandbox.">
+          No sandbox
+        </Choice.Option>
+        <Choice.Option value="local" description="Runs on this host without isolation.">
+          Local directory
+        </Choice.Option>
+        <Choice.Option value="daytona" description="Isolated containers in your Daytona account.">
+          Daytona
+        </Choice.Option>
+      </Choice.Group>
+      <Field.Root hint={`Created ${created()} from the list`}>
+        <Field.Label>Daytona account</Field.Label>
+        <Select
+          options={[
+            { value: "team", label: "Daytona · Team", description: "Configured" },
+            {
+              value: "backup",
+              label: "Daytona · Backup",
+              description: "Needs API key · Can finish setup later",
+            },
+          ]}
+          value={account()}
+          onChange={setAccount}
+          action={{ label: "Create Daytona connection", onSelect: () => setCreated(created() + 1) }}
+        />
+      </Field.Root>
+    </div>
+  );
+}
+
+/**
+ * Card choices from the Lunacy "Environments / 05" frame, and a select whose options carry a
+ * second line and whose list ends with an action, from "Environments / 10".
+ */
+export const CardsAndDetailedSelect = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Card choices and a select with details</h2>
+        <CardChoiceExample />
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("radio", { name: /Daytona/ }));
+    await expect(canvas.getByRole("radio", { name: /Daytona/ })).toBeChecked();
+    await userEvent.click(canvas.getByRole("button", { name: /Daytona account/ }));
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByRole("option", { name: /Daytona · Backup/ })).toHaveTextContent(
+      "Needs API key",
+    );
+    await userEvent.click(body.getByRole("button", { name: "Create Daytona connection" }));
+    await expect(canvas.getByText("Created 1 from the list")).toBeVisible();
   },
 } satisfies Story;

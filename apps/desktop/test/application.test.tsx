@@ -782,3 +782,175 @@ it("adds a connection, then its key, at its hash route", async () => {
     ["PUT", "/workspaces/one/connections/c1/credential"],
   ]);
 });
+
+/** A host with Amends and Daytona installed, answering the Environments page and its detour. */
+function environmentsHost() {
+  const daytonaConnection = {
+    id: "daytona",
+    name: "Daytona",
+    description: "A Daytona account that environments run their sandboxes under.",
+    capabilities: { sandbox: { provider: "daytona" } },
+    settings: [
+      { key: "apiUrl", label: "API URL", kind: "url", required: false },
+      { key: "target", label: "Target", kind: "text", required: false },
+    ],
+    authentication: [{ _tag: "ApiKey", label: "API key" }],
+  };
+  const implementations = {
+    harnesses: [
+      {
+        id: "amends",
+        name: "Amends",
+        description: "Amends's own agent loop.",
+        placement: ["in-process"],
+        models: { _tag: "LanguageModel" },
+      },
+    ],
+    sandboxes: [
+      {
+        id: "daytona",
+        name: "Daytona",
+        description: "Isolated containers in your Daytona account.",
+        capabilities: { stdin: true, snapshots: "filesystem", isolated: true },
+        account: true,
+        template: { label: "Snapshot" },
+      },
+    ],
+  };
+  const environments: Array<Record<string, unknown>> = [
+    {
+      id: "in-process",
+      name: "In-process",
+      harnessId: "amends",
+      sandbox: null,
+      createdBy: null,
+      createdAt: at,
+      manageable: true,
+      readiness: { _tag: "Ready" },
+    },
+  ];
+  let account: { keyed: boolean } | undefined;
+  const accountView = () => ({
+    id: "a1",
+    name: "Daytona · Builds",
+    implementationId: "daytona",
+    settings: {},
+    authentication: { _tag: "ApiKey", configured: account?.keyed === true },
+    createdBy: "owner-one",
+    createdAt: at,
+    installed: true,
+    capabilities: daytonaConnection.capabilities,
+    manageable: true,
+    readiness: {
+      sandbox: account?.keyed
+        ? { _tag: "Ready" }
+        : { _tag: "Incomplete", settings: [], credential: true },
+    },
+  });
+  const writes: Array<{ method: string; path: string; body: unknown }> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/environments/implementations") return response(implementations);
+    if (path === "/workspaces/one/environments" && request.method === "GET")
+      return response(environments);
+    if (path === "/workspaces/one/connections/implementations")
+      return response([daytonaConnection]);
+    if (path === "/workspaces/one/connections" && request.method === "GET")
+      return response(account ? [accountView()] : []);
+    if (request.method !== "GET") {
+      const body = await request.json();
+      writes.push({ method: request.method, path, body });
+      if (path === "/workspaces/one/connections") {
+        account = { keyed: false };
+        return response(accountView(), 201);
+      }
+      if (path === "/workspaces/one/connections/a1/credential") {
+        account = { keyed: true };
+        return response(accountView());
+      }
+      if (path === "/workspaces/one/environments") {
+        const input = body as { name: string; sandbox: unknown };
+        const created = {
+          id: "e1",
+          name: input.name,
+          harnessId: "amends",
+          sandbox: input.sandbox,
+          createdBy: "owner-one",
+          createdAt: at,
+          manageable: true,
+          readiness: { _tag: "Ready" },
+        };
+        environments.push(created);
+        return response(created, 201);
+      }
+    }
+    return response({
+      memberships: [
+        {
+          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 1,
+        },
+      ],
+      invitations: [],
+    });
+  });
+  return { fetch, writes };
+}
+/** Adds Release sandbox on Daytona, creating its account and key on the way, then the environment. */
+async function addDaytonaEnvironment() {
+  fireEvent.click(await screen.findByRole("button", { name: /Add environment/ }));
+  let dialog = await screen.findByRole("dialog", { name: "Add environment" });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Environment name" }), {
+    target: { value: "Release sandbox" },
+  });
+  fireEvent.click(within(dialog).getByRole("radio", { name: /Daytona/ }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+  await within(dialog).findByText("No Daytona connections yet");
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Snapshot · Optional" }), {
+    target: { value: "amends-dev-base" },
+  });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create Daytona connection" }));
+  const create = await screen.findByRole("dialog", { name: "Create Daytona connection" });
+  expect(within(create).getByText("For Release sandbox · 1 of 2")).toBeInTheDocument();
+  fireEvent.input(within(create).getByRole("textbox", { name: "Connection name" }), {
+    target: { value: "Daytona · Builds" },
+  });
+  fireEvent.click(within(create).getByRole("button", { name: "Create & continue" }));
+  const key = await screen.findByRole("dialog", { name: "Add API key" });
+  fireEvent.input(within(key).getByLabelText("API key"), { target: { value: "dtn-key" } });
+  fireEvent.click(within(key).getByRole("button", { name: "Save key & return" }));
+  dialog = await screen.findByRole("dialog", { name: "Add environment" });
+  await waitFor(() =>
+    expect(within(dialog).getByRole("button", { name: /Daytona account/ })).toHaveTextContent(
+      "Daytona · Builds",
+    ),
+  );
+  expect(within(dialog).getByRole("textbox", { name: "Snapshot · Optional" })).toHaveValue(
+    "amends-dev-base",
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create environment" }));
+  await within(screen.getByLabelText("Notifications")).findByText("Release sandbox created");
+}
+
+it("adds a Daytona environment at its hash route, creating its account on the way", async () => {
+  const host = environmentsHost();
+  mount("/workspaces/one/environments", "alice", host.fetch, {
+    permissions: ["environment.create", "connection.create"],
+  });
+  await addDaytonaEnvironment();
+  await waitFor(() =>
+    expect(window.location.hash).toBe("#/workspaces/one/environments?environment=e1"),
+  );
+  expect(host.writes.map((write) => [write.method, write.path])).toEqual([
+    ["POST", "/workspaces/one/connections"],
+    ["PUT", "/workspaces/one/connections/a1/credential"],
+    ["POST", "/workspaces/one/environments"],
+  ]);
+});

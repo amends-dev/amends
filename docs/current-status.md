@@ -28,7 +28,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   longer offers is unverified.
 - [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
   and an optional sandbox under an account connection, and every workspace starts with an
-  in-process one; they have an HTTP API but no screens. Nothing turns a stored environment into a
+  in-process one; they are managed over HTTP and on the [Environments page](environments.md).
+  Nothing turns a stored environment into a
   running one yet. Only amends's own harness is installed, and it runs in process only, so a sandbox
   is where its tools would act, and none acts there yet. Environments hold no defaults for
   optional settings, since no installed harness takes reasoning levels. The compatibility check

@@ -86,4 +86,40 @@ export const item = style({
 
 export const itemLabel = style({ flex: 1, minWidth: 0 });
 
+// An option with a second line: the label over its description.
+export const itemText = style({
+  display: "flex",
+  flex: 1,
+  flexDirection: "column",
+  gap: "0.25rem",
+  minWidth: 0,
+  paddingBlock: "0.5rem",
+});
+
+export const itemDescription = style({ ...typeScale.hint, color: vars.color.text.secondary });
+
+// The action after the options, set off by a divider.
+export const action = style({
+  ...typeScale.control,
+  display: "flex",
+  alignItems: "center",
+  boxSizing: "border-box",
+  width: "100%",
+  minHeight: "2.5rem",
+  marginBlockStart: "0.25rem",
+  paddingInline: "1rem",
+  border: "none",
+  borderBlockStart: `1px solid ${vars.color.border.divider}`,
+  background: "none",
+  color: vars.color.text.secondary,
+  fontFamily: "inherit",
+  textAlign: "start",
+  cursor: "pointer",
+  selectors: {
+    "&:hover": { backgroundColor: vars.color.surface.subtle, color: vars.color.text.primary },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
+  },
+  "@media": { [media.touch]: { minHeight: "2.75rem" } },
+});
+
 export const indicator = style({ flex: "none", width: "0.875rem", height: "0.875rem" });

@@ -56,6 +56,9 @@ portable backend packages under `packages/*` remain Effect-only.
   refresh them before reporting.
 - `useConnections(workspaceId, { done })` shapes the Connections page: installed providers, each
   connection's setup, and its changes; see [Connections](#connections).
+- `useEnvironments(workspaceId, { done })` shapes the Environments page: installed harnesses and
+  providers, the accounts each provider runs under, and each environment's setup and changes; see
+  [Environments](#environments).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
@@ -205,6 +208,25 @@ keeps the name it was made against, `configure` replaces the settings as a whole
 failure, `storage-unavailable` when the host keeps no keys, `refresh-failed`, or `outdated`; stale
 failures hold changes until `refresh()`. `done` hears each completed change, with the connection
 it created and how that one authenticates, so a page can ask for its key next.
+
+## Environments
+
+`useEnvironments(workspaceId, { done })` is what the Environments screens connect to. It reads the
+harnesses and sandbox providers this host installed, the environments the reader may read as
+`EnvironmentEntry`s (harness, sandbox with its provider, placement, account, template, variables,
+commands, and retention, readiness issues, whether the reader may manage it, and who created it),
+and the connections, from which `accounts(providerId)` lists the accounts a provider runs under,
+ready ones first. Environments and their implementations share one invalidation key that
+`environment.*` commits, connection changes, and access changes refresh.
+
+`create` drafts the basics, then the sandbox settings when there is a sandbox; the draft lasts
+until it is saved or cancelled, so a page can detour to create an account and return. `placements`
+offers where the harness can run with the chosen sandbox. Sandbox settings are edited through a
+`SandboxEditor`, the same for a new environment and `configure.sandbox(id)`: account, template,
+variable rows with their issues, command rows that move, and retention, saved as the host's
+`SandboxSettings` with blank rows left out. `rename` keeps the name it was made against. A retried
+creation reuses its request key. `failure()` reports the change, its `EnvironmentsError`, and the
+`problems` the host named, such as `connection-unavailable`, keeping the draft.
 
 ## Views
 

@@ -133,9 +133,11 @@ and key rows by id through `internal/keyed.tsx`, so callers may pass freshly bui
 `Button` is primary, secondary, or quiet, with an optional icon or menu chevron. `Field` gives
 one control a label, help, and error text, and `Input` and the member picker pick those
 associations up. `SearchField` is the quiet filled search. `Choice` is one choice among boxed
-options, such as Public and Private, over native radio inputs. `Select` is one choice from a
+options, such as Public and Private, over native radio inputs; its `card` variant stacks
+full-width options with a radio and a description, such as where something runs. `Select` is one choice from a
 short list shaped like an Input, such as a role: Kobalte's listbox opens as wide as the field
-with a check by the current option, and inside a Field it takes the label and help. `Menu` wraps
+with a check by the current option, and inside a Field it takes the label and help. Options can
+carry a second line, and the list can end with an action, such as creating a missing account. `Menu` wraps
 Kobalte's dropdown menu for filters, sorting, and pickers; it attaches inside the nearest dialog
 or Theme so it keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
 `MemberPicker` chooses several people by name: chosen people become removable chips and leave
@@ -152,8 +154,9 @@ have a large size for centered screens, and field errors carry a warning icon.
 
 `Modal` is the fifth pattern: a Pane with `variant="modal"` in a native dialog, so the page
 behind is inert, Escape and a click outside close it, and focus returns. It is 640 × 600 capped
-to the viewport, or 560px wide and as tall as its content with `size="compact"`, and fills the
-screen on phones. `Modal.Actions` holds its buttons at the end
+to the viewport, 560px wide and as tall as its content with `size="compact"`, 640px wide and as
+tall as its content with `size="form"`, or 720 × 864 with `size="wide"`, and fills the screen on
+phones. `Modal.Actions` holds its buttons at the end
 of a 64px band, sharing the width on phones.
 
 `Centered` is the sixth pattern, for screens outside a workspace: the canvas frames one white
@@ -235,8 +238,19 @@ side panel: its setup, the name and the provider's settings as separate saves, a
 is only ever replaced or removed. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
 setup, adding, and replacing), `ConfirmRemoveConnection`, and `ConfirmRemoveKey` are its modals;
 they take client's codes (`ConnectionsError`) and own the wording, and `connectionsToast` words the
-toasts. **Screens / Connections** walks adding a connection and its key, a host without key
-storage, an unavailable provider, a read-only member, search, and a stale rename. A `Shell.Aside`
+toasts. `ConfigureConnection` and `ConnectionKey` take `returnTo` for creating a connection on
+the way to another form, such as a sandbox account while adding an environment. **Screens / Connections** walks adding a connection and its key, a host without key
+storage, an unavailable provider, a read-only member, search, and a stale rename.
+`EnvironmentsPane` and `EnvironmentList` are Environments from the Lunacy "Environments" frames:
+All and Needs setup, and each environment's harness, sandbox, and readiness, as columns when the
+pane has room and under the name beside the details or on phones. `EnvironmentDetails` has an
+Overview, with readiness and its recovery, the name, the fixed runtime, and who created it, and a
+Sandbox tab, whose `SandboxFields` edit the account, template, variables, commands, and retention,
+or whose `SandboxSummary` shows them to members. `AddEnvironment` takes the basics, then the
+sandbox settings, and `ConfirmRemoveEnvironment` confirms removal; the wording, including the
+mocks' exact error and readiness copy, lives beside them. **Screens / Environments** walks adding
+with the account detour, editing variables and commands, a refused account, readiness, and
+members' view. Side panes on phones place their tabs under the title. A `Shell.Aside`
 rendered inside `Shell.Main`, as a page renders member details,
 attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
 inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and
@@ -262,7 +276,9 @@ The settings copy says "group" where the mocks said "channel", and the visibilit
 the chosen option. Task panel messages use the standard message size rather than the mock's
 smaller text. Connections' field errors keep the design system's error color and icon where the
 mocks draw them in caution, and an unavailable provider's saved settings are labeled by what the
-connection stored, since its declaration is gone. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
+connection stored, since its declaration is gone. Environments' command fields grow to two lines as
+drawn; an account's refusal shows under its field rather than in it, and the mocks' Daytona
+connection details keep the generic connection layout. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
 the icon set covers, at every size.
 
 ## Run and verify

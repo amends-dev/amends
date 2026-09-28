@@ -48,6 +48,8 @@ export interface ConnectionProvider {
   readonly description: string;
   /** What its connections give access to. */
   readonly capability: ConnectionCapability | undefined;
+  /** The sandbox provider whose account its connections are, if they are one. */
+  readonly sandboxProvider: string | undefined;
   /** The ways its connections may authenticate, in the order it prefers them. */
   readonly methods: readonly ConnectionMethod[];
   readonly settings: readonly ConnectionSetting[];
@@ -119,6 +121,7 @@ const providerOf = (declaration: ConnectionImplementation.Declaration): Connecti
       : declaration.capabilities.sandbox !== undefined
         ? "sandboxes"
         : undefined,
+  sandboxProvider: declaration.capabilities.sandbox?.provider,
   methods: declaration.authentication.map(methodOf),
   settings: declaration.settings.map((setting) => ({
     key: setting.key,

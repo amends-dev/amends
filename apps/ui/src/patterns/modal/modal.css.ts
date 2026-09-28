@@ -24,12 +24,21 @@ export const dialog = style({
       height: "fit-content",
       maxHeight: "calc(100dvh - 4rem)",
     },
+    "&[data-size=form]": { height: "fit-content", maxHeight: "calc(100dvh - 4rem)" },
+    "&[data-size=wide]": {
+      width: "min(45rem, calc(100vw - 2rem))",
+      height: "min(54rem, calc(100dvh - 4rem))",
+    },
     "&::backdrop": { backgroundColor: vars.color.scrim },
   },
   "@media": {
     [media.mobile]: {
       selectors: {
-        "&[data-size=compact]": { width: "100vw", height: "100dvh", maxHeight: "none" },
+        "&[data-size=compact], &[data-size=form], &[data-size=wide]": {
+          width: "100vw",
+          height: "100dvh",
+          maxHeight: "none",
+        },
       },
       width: "100vw",
       height: "100dvh",

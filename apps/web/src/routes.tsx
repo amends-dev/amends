@@ -22,14 +22,9 @@ import { GroupPage } from "./pages/group.tsx";
 import { InboxPage } from "./pages/inbox.tsx";
 import { GroupsPage } from "./pages/groups.tsx";
 import { DirectPage } from "./pages/direct.tsx";
-import {
-  HomePage,
-  TriagePage,
-  TasksPage,
-  EnvironmentsPage,
-  MissingWorkspacePage,
-} from "./pages/workspace.tsx";
+import { HomePage, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
 import { ConnectionsPage } from "./pages/connections.tsx";
+import { EnvironmentsPage } from "./pages/environments.tsx";
 
 function RequireSession(props: ParentProps) {
   const session = useSession();

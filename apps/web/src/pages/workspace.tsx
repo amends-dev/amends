@@ -56,15 +56,6 @@ export function TasksPage() {
     />
   );
 }
-export function EnvironmentsPage() {
-  return (
-    <Placeholder
-      title="Environments"
-      heading="No environments yet"
-      line="Configure where your agents work."
-    />
-  );
-}
 export function MissingWorkspacePage() {
   const params = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();

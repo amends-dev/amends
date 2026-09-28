@@ -54,8 +54,7 @@ const text = (stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>) =>
 export const declaration: SandboxImplementation.Declaration = {
   id: SandboxImplementation.Id.make(name),
   name: "Local directory",
-  description:
-    "Directories on the host's own machine. They isolate nothing, so use them in development.",
+  description: "Runs on this host without isolation.",
   capabilities,
   account: false,
 };

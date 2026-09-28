@@ -52,8 +52,9 @@ export const header = style({
       paddingInline: "1rem",
       selectors: {
         [`${side} &`]: {
-          gridTemplateRows: "3.5rem auto auto",
-          gridTemplateAreas: '"leading . actions" "title title title" "subtitle subtitle subtitle"',
+          gridTemplateRows: "3.5rem auto auto auto",
+          gridTemplateAreas:
+            '"leading . actions" "title title title" "tabs tabs tabs" "subtitle subtitle subtitle"',
           minHeight: "7rem",
         },
       },

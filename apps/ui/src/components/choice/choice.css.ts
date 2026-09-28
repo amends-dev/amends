@@ -1,4 +1,4 @@
-import { style } from "@vanilla-extract/css";
+import { globalStyle, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
@@ -16,7 +16,14 @@ export const group = style({
 export const options = style({
   display: "flex",
   gap: "0.5rem",
-  "@media": { [media.mobile]: { display: "grid", gridTemplateColumns: "1fr 1fr" } },
+  selectors: { "&[data-variant=card]": { flexDirection: "column", gap: "0.625rem" } },
+  "@media": {
+    [media.mobile]: {
+      selectors: {
+        "&:not([data-variant=card])": { display: "grid", gridTemplateColumns: "1fr 1fr" },
+      },
+    },
+  },
 });
 
 // A boxed option: the chosen one is filled, outlined, and checked.
@@ -49,6 +56,57 @@ export const option = style({
     "&:has(input:disabled)": { color: vars.color.text.disabled, cursor: "default" },
   },
   "@media": { [media.touch]: { minHeight: "2.75rem" }, [media.mobile]: { width: "auto" } },
+});
+
+// A card: a radio, then the label over its description, 84px tall across the whole width.
+globalStyle(`${option}[data-variant=card]`, {
+  display: "grid",
+  gridTemplateColumns: "1rem minmax(0, 1fr)",
+  alignItems: "start",
+  columnGap: "0.875rem",
+  width: "100%",
+  minHeight: "5.25rem",
+  padding: "0.875rem 1rem",
+  fontWeight: fontWeight.regular,
+});
+
+globalStyle(`${option}[data-variant=card]:has(input:checked)`, {
+  backgroundColor: vars.color.surface.active,
+});
+
+export const radio = style({
+  position: "relative",
+  boxSizing: "border-box",
+  width: "1rem",
+  height: "1rem",
+  marginBlockStart: "0.3125rem",
+  border: `1px solid ${vars.color.border.selected}`,
+  borderRadius: "50%",
+  backgroundColor: vars.color.surface.field,
+  selectors: {
+    [`${option}:has(input:checked) &`]: { borderColor: vars.color.text.primary },
+    [`${option}:has(input:checked) &::after`]: {
+      content: '""',
+      position: "absolute",
+      inset: "3px",
+      borderRadius: "50%",
+      backgroundColor: vars.color.text.primary,
+    },
+  },
+});
+
+export const cardText = style({ display: "flex", flexDirection: "column", gap: "0.4375rem" });
+
+export const cardLabel = style({
+  ...typeScale.item,
+  color: vars.color.text.primary,
+  fontWeight: fontWeight.medium,
+});
+
+export const description = style({
+  ...typeScale.control,
+  color: vars.color.text.secondary,
+  fontWeight: fontWeight.regular,
 });
 
 // The native radio stays in place for forms and keyboards but is not drawn.

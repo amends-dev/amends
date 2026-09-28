@@ -115,6 +115,11 @@ export interface ConfigureConnectionProps {
   readonly error?: ConnectionsError;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
+  /**
+   * The environment this connection is being created for, which the flow returns to: the dialog
+   * is titled for creating the provider's connection and leads back to it.
+   */
+  readonly returnTo?: string;
 }
 
 /**
@@ -129,15 +134,32 @@ export function ConfigureConnection(props: ConfigureConnectionProps) {
   };
   const keyed = () => props.method === "api-key";
   return (
-    <Modal.Root open={props.open} onClose={close} aria-label="Configure connection" size="compact">
+    <Modal.Root
+      open={props.open}
+      onClose={close}
+      aria-label={
+        props.returnTo === undefined
+          ? "Configure connection"
+          : `Create ${props.provider.name} connection`
+      }
+      size="compact"
+    >
       <Pane.Root variant="modal">
         <Pane.Header>
-          <Pane.Title>Configure connection</Pane.Title>
+          <Pane.Title>
+            {props.returnTo === undefined
+              ? "Configure connection"
+              : `Create ${props.provider.name} connection`}
+          </Pane.Title>
           <Pane.Actions>
             <Pane.Close label="Close" onClick={close} />
           </Pane.Actions>
           <Pane.Subtitle>
-            {keyed() ? `${props.provider.name} · Step 1 of 2` : props.provider.name}
+            {props.returnTo !== undefined
+              ? `For ${props.returnTo}${keyed() ? " · 1 of 2" : ""}`
+              : keyed()
+                ? `${props.provider.name} · Step 1 of 2`
+                : props.provider.name}
           </Pane.Subtitle>
         </Pane.Header>
         <Pane.Body>
@@ -183,29 +205,38 @@ export function ConfigureConnection(props: ConfigureConnectionProps) {
                 </Field.Root>
               )}
             </For>
-            <Field.Root
-              hint={
-                keyed()
-                  ? "You’ll add the API key in the next step."
-                  : "Use this only when the endpoint accepts requests without credentials."
+            <Show
+              when={props.returnTo !== undefined && props.provider.methods.length === 1 && keyed()}
+              fallback={
+                <Field.Root
+                  hint={
+                    keyed()
+                      ? "You’ll add the API key in the next step."
+                      : "Use this only when the endpoint accepts requests without credentials."
+                  }
+                >
+                  <Field.Label>Authentication</Field.Label>
+                  <Show
+                    when={props.provider.methods.length > 1}
+                    fallback={<Input value={methodLabels[props.method]} readOnly />}
+                  >
+                    <Select
+                      options={props.provider.methods.map((method) => ({
+                        value: method,
+                        label: methodLabels[method],
+                      }))}
+                      value={props.method}
+                      onChange={(value) => props.onMethodChange(value as ConnectionMethod)}
+                      disabled={busy()}
+                    />
+                  </Show>
+                </Field.Root>
               }
             >
-              <Field.Label>Authentication</Field.Label>
-              <Show
-                when={props.provider.methods.length > 1}
-                fallback={<Input value={methodLabels[props.method]} readOnly />}
-              >
-                <Select
-                  options={props.provider.methods.map((method) => ({
-                    value: method,
-                    label: methodLabels[method],
-                  }))}
-                  value={props.method}
-                  onChange={(value) => props.onMethodChange(value as ConnectionMethod)}
-                  disabled={busy()}
-                />
-              </Show>
-            </Field.Root>
+              <p class={s.note}>
+                API key authentication. Add the key next, then return to your environment.
+              </p>
+            </Show>
             <Show when={props.error}>
               {(error) => (
                 <ConnectionsAlert
@@ -255,6 +286,8 @@ export interface ConnectionKeyProps {
   readonly error?: ConnectionsError;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
+  /** The environment the flow returns to once the key is saved, with this connection chosen. */
+  readonly returnTo?: string;
 }
 
 /**
@@ -284,7 +317,9 @@ export function ConnectionKey(props: ConnectionKeyProps) {
             <Pane.Close label="Close" onClick={close} />
           </Pane.Actions>
           <Pane.Subtitle>
-            {props.mode === "setup" ? `${props.name} · Step 2 of 2` : props.name}
+            {props.mode === "setup"
+              ? `${props.name} · ${props.returnTo === undefined ? "Step 2 of 2" : "2 of 2"}`
+              : props.name}
           </Pane.Subtitle>
         </Pane.Header>
         <Pane.Body>
@@ -297,11 +332,13 @@ export function ConnectionKey(props: ConnectionKeyProps) {
             }}
           >
             <p class={s.intro}>
-              {props.mode === "setup"
-                ? "Your connection is created. Add its API key to finish setup."
-                : replacing()
-                  ? "The current key stays in place until the new key is saved."
-                  : "Add its API key to finish setup."}
+              {props.mode === "setup" && props.returnTo !== undefined
+                ? "The connection is created. Save its key to finish setup."
+                : props.mode === "setup"
+                  ? "Your connection is created. Add its API key to finish setup."
+                  : replacing()
+                    ? "The current key stays in place until the new key is saved."
+                    : "Add its API key to finish setup."}
             </p>
             <Field.Root
               hint="Stored securely. Once saved, it cannot be viewed or copied."
@@ -325,7 +362,11 @@ export function ConnectionKey(props: ConnectionKeyProps) {
               when={unsaved()}
               fallback={
                 <>
-                  <p class={s.note}>Saving a key does not test it with the provider.</p>
+                  <p class={s.note}>
+                    {props.returnTo === undefined
+                      ? "Saving a key does not test it with the provider."
+                      : `You’ll return to ${props.returnTo} with this connection selected.`}
+                  </p>
                   <Show when={props.error && props.error !== "invalid" && props.error}>
                     {(error) => (
                       <ConnectionsAlert
@@ -358,7 +399,13 @@ export function ConnectionKey(props: ConnectionKeyProps) {
             class={s.primary}
             disabled={!props.secret.trim() || busy()}
           >
-            {unsaved() ? "Try again" : replacing() ? "Replace key" : "Save key"}
+            {unsaved()
+              ? "Try again"
+              : replacing()
+                ? "Replace key"
+                : props.returnTo === undefined
+                  ? "Save key"
+                  : "Save key & return"}
           </Button>
         </Modal.Actions>
       </Pane.Root>

@@ -43,6 +43,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "members",
     "permissions",
     "connections",
+    "environments",
     directoryKey,
   ],
   "workspace.member.added": ["members", "ownership", directoryKey],
@@ -64,6 +65,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
     "connections",
+    "environments",
   ],
   "workspace.assignment.created": [
     "settings",
@@ -73,6 +75,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
     "connections",
+    "environments",
   ],
   "workspace.assignment.revoked": [
     "settings",
@@ -82,6 +85,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
     "connections",
+    "environments",
   ],
   // A public group's creation reaches everyone who might join it.
   "group.created": ["groups", "public-groups"],
@@ -94,13 +98,19 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "group.follow.ended": ["groups"],
   // A group's latest activity, and whether it is new to the reader.
   "thread.activity.recorded": ["groups"],
-  // Connections as the workspace's readers see them: their names, settings, and readiness.
-  "connection.created": ["connections"],
-  "connection.renamed": ["connections"],
-  "connection.configured": ["connections"],
-  "connection.credential-set": ["connections"],
-  "connection.credential-cleared": ["connections"],
-  "connection.removed": ["connections"],
+  // Connections as the workspace's readers see them: their names, settings, and readiness, which
+  // also decides whether an environment running under one as its account is ready.
+  "connection.created": ["connections", "environments"],
+  "connection.renamed": ["connections", "environments"],
+  "connection.configured": ["connections", "environments"],
+  "connection.credential-set": ["connections", "environments"],
+  "connection.credential-cleared": ["connections", "environments"],
+  "connection.removed": ["connections", "environments"],
+  // Environments: their names, harness, sandbox settings, and readiness.
+  "environment.created": ["environments"],
+  "environment.renamed": ["environments"],
+  "environment.configured": ["environments"],
+  "environment.removed": ["environments"],
 };
 /** A field of an event's JSON payload, when it is a string. */
 const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {

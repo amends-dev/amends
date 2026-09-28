@@ -29,7 +29,7 @@ export const capabilities: Sandbox.Capabilities = {
 export const declaration: SandboxImplementation.Declaration = {
   id: SandboxImplementation.Id.make(name),
   name: "Daytona",
-  description: "Isolated containers on Daytona, under your Daytona account.",
+  description: "Isolated containers in your Daytona account.",
   capabilities,
   account: true,
   template: {

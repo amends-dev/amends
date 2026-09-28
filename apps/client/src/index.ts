@@ -63,6 +63,24 @@ export {
   type ConnectionsView,
 } from "./connections/views.ts";
 export {
+  useEnvironments,
+  type CreateStep,
+  type EnvironmentAction,
+  type EnvironmentEntry,
+  type EnvironmentIssue,
+  type EnvironmentsDone,
+  type EnvironmentsError,
+  type EnvironmentsFailure,
+  type EnvironmentsView,
+  type HarnessChoice,
+  type Placement,
+  type SandboxAccount,
+  type SandboxEditor,
+  type SandboxProviderChoice,
+} from "./environments/views.ts";
+export type { CommandRow, Retention, SandboxDraft, VariableRow } from "./environments/draft.ts";
+export type { EnvironmentProblem, SandboxIssue } from "./api/environments.ts";
+export {
   type SettingsData,
   type SettingsSection,
   type SettingsCommand,
