@@ -84,7 +84,7 @@ const conversation = [
   "thread.follow",
   "agent.use",
 ];
-const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<string>>>>> = {
+const revisions: Record<number, Readonly<Record<string, ReadonlyArray<string>>>> = {
   // Members take part in and start conversations, and create groups; administrators manage
   // people and moderate public groups; the owner also renames and transfers the workspace.
   1: {
@@ -112,6 +112,28 @@ const revisions: Readonly<Record<number, Readonly<Record<string, ReadonlyArray<s
       ),
     ],
   },
+};
+// Connections: members see and use them; administrators and the owner also add and manage them.
+revisions[2] = {
+  [BuiltinRoles.MemberId]: [
+    ...revisions[1]![BuiltinRoles.MemberId]!,
+    "connection.read",
+    "connection.use",
+  ],
+  [BuiltinRoles.AdministratorId]: [
+    ...revisions[1]![BuiltinRoles.AdministratorId]!,
+    "connection.create",
+    "connection.read",
+    "connection.manage",
+    "connection.use",
+  ],
+  [BuiltinRoles.OwnerId]: [
+    ...revisions[1]![BuiltinRoles.OwnerId]!,
+    "connection.create",
+    "connection.read",
+    "connection.manage",
+    "connection.use",
+  ],
 };
 
 it("the registered declarations make the current revision's bundles", () => {

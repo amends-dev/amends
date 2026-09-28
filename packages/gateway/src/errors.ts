@@ -25,6 +25,7 @@ import {
   WorkspaceSettingsApplication,
 } from "@amends/core/workspace";
 import { ReadStateApplication } from "@amends/core/attention";
+import { ConnectionApplication } from "@amends/core/connection";
 import { SignalApplication } from "@amends/core/signal";
 import { Request } from "@amends/core/request";
 import { Schema } from "effect";
@@ -132,6 +133,12 @@ export const PublicError = Schema.Union([
   InvitationApplication.AlreadyMember,
   InvitationApplication.Unavailable,
   InvitationApplication.InvalidExpiry,
+  ConnectionApplication.NotFound,
+  ConnectionApplication.Changed,
+  ConnectionApplication.UnknownImplementation,
+  ConnectionApplication.InvalidSettings,
+  ConnectionApplication.UnsupportedAuthentication,
+  ConnectionApplication.CredentialsUnavailable,
 ]);
 export type PublicError = typeof PublicError.Type;
 

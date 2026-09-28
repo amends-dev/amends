@@ -1,0 +1,17 @@
+{
+  "name": "@amends/connection-openai-compatible",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/connection": "workspace:*",
+    "@effect/ai-openai-compat": "catalog:",
+    "effect": "catalog:"
+  }
+}

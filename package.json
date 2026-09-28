@@ -14,7 +14,9 @@
       "effect": "4.0.0-rc.115",
       "@effect/atom-solid": "4.0.0-rc.115",
       "@solidjs/router": "0.15.4",
-      "@effect/vitest": "4.0.0-rc.115"
+      "@effect/vitest": "4.0.0-rc.115",
+      "@effect/ai-anthropic": "4.0.0-rc.115",
+      "@effect/ai-openai-compat": "4.0.0-rc.115"
     }
   },
   "type": "module",

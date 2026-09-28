@@ -50,9 +50,12 @@ currently run through TypeScript. Check compatibility before changing this setup
   `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
   `environment` composes a harness with an optional sandbox into a running environment.
+  `connection` is the contract connection implementations fulfil: the declaration a host
+  registers in its catalog, and each capability's code, such as model inference.
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `sandbox-local` and `sandbox-daytona` implement the sandbox
-  contract over this machine's directories and over Daytona. `storage-postgresql` implements workspace storage and
+  contract over this machine's directories and over Daytona. `connection-anthropic` and
+  `connection-openai-compatible` implement model-provider connections; hosts register them. `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
   per record field, except a thread activity's kind-specific `details`, stored as JSON;
   `storage-memory` implements them in process memory as the reference

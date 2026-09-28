@@ -1,6 +1,6 @@
 import type { Harness } from "@amends/storage-conformance";
 import { BunCrypto } from "@effect/platform-bun";
-import { Effect, Layer } from "effect";
+import { Effect, Encoding, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { layer } from "../src/index.ts";
 import { database, inDatabase, setup } from "./support.ts";
@@ -21,11 +21,15 @@ const projections = [
   "thread_participations",
   "thread_messages",
   "thread_activities",
+  "connections",
   "checkpoints",
   "live_projections",
 ];
 
 const { available, withDatabase } = setup();
+
+/** A fixed credential key for tests, 32 bytes as base64. */
+const credentialKey = Redacted.make(Encoding.encodeBase64(new Uint8Array(32).fill(7)));
 
 /** A database for each test on the run's server; each connection is another host's pool. */
 export const harness: Harness = {
@@ -40,9 +44,10 @@ export const harness: Harness = {
         connect: (options) =>
           Layer.build(
             // Waiting readers rely on notifications: the fallback poll is the default five seconds.
-            layer(options?.failFast === true ? { lockTimeout: "100 millis" } : {}).pipe(
-              Layer.provideMerge(database(url)),
-            ),
+            layer({
+              credentialKey,
+              ...(options?.failFast === true && { lockTimeout: "100 millis" }),
+            }).pipe(Layer.provideMerge(database(url))),
           ).pipe(Effect.orDie),
         discardProjections: maintain(
           Effect.flatMap(SqlClient.SqlClient, (sql) =>

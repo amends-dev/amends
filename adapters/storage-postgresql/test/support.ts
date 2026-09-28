@@ -20,6 +20,7 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { BackgroundWakes } from "@amends/core/background";
+import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
 import { type WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
@@ -64,6 +65,7 @@ export const bind = (
   groupMemberships: Context.get(context, GroupMembershipStore.Service),
   groupFollows: Context.get(context, GroupFollowStore.Service),
   readStates: Context.get(context, ReadStateStore.Service),
+  credentials: Context.get(context, ConnectionCredentialStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 /** Workspace views over the database in context, each with its signals. */
@@ -88,7 +90,13 @@ export const database = (url: string) =>
   PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 });
 export const core = (bound: Bound) =>
   Core.layer.pipe(
-    Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), BunCrypto.layer)),
+    Layer.provideMerge(
+      Layer.mergeAll(
+        Layer.succeedContext(bound.context),
+        BunCrypto.layer,
+        ConnectionCatalog.layer([]),
+      ),
+    ),
   );
 export const inDatabase = <A, E>(
   url: string,

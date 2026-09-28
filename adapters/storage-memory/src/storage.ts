@@ -4,6 +4,8 @@ import { Effect, Layer } from "effect";
 import { Assignments } from "./assignments.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
+import { ConnectionCredentials } from "./connection-credentials.ts";
+import { Connections } from "./connections.ts";
 import { MemoryConnection } from "./connection.ts";
 import { GroupFollows } from "./group-follows.ts";
 import { GroupMemberships } from "./group-memberships.ts";
@@ -43,6 +45,8 @@ const layerStores = Layer.mergeAll(
   ThreadMessages.layer,
   ThreadActivities.layer,
   ReadStates.layer,
+  Connections.layer,
+  ConnectionCredentials.layer,
 );
 
 /**

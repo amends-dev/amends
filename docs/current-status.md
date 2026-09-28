@@ -34,6 +34,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the suites against a real account, but a background process's output arrives only in whole lines
   there, and a snapshot can take minutes. No provider for E2B, Vercel, or Cloudflare exists;
   Cloudflare's SDK runs only inside a Worker, so reaching it from a host needs its Bridge Worker.
+- [Connections](../packages/core/README.md#connections) support model inference through API keys
+  only, with the [Anthropic](../adapters/connection-anthropic/README.md) and
+  [OpenAI-compatible](../adapters/connection-openai-compatible/README.md) implementations. There is
+  no OAuth, toolkit or channel support, and no HTTP endpoint or settings screen, so connections are
+  reachable only through core. Readiness is computed from settings and whether a credential is set;
+  nothing checks a key with its provider. Nothing checks `connection.use` or resolves a credential
+  for use, since no agent or toolkit consumes connections yet. Credentials are sealed with one host
+  key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
   local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for

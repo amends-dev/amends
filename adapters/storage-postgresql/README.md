@@ -94,6 +94,16 @@ log ID. It decodes the stored envelope through the same path as journal pages, h
 transaction, and opens none. This supports notification-source reads without scanning the log
 or changing the schema.
 
+`connections` holds connection records, with an implementation's settings as JSON since each
+implementation declares its own, and a check that only an API-key connection references a
+credential. `connection_credentials` holds each secret sealed with the host's credential key,
+outside the read models, so rebuilding projections keeps it. `PostgresStorage.make({ credentialKey })`
+takes that key as 32 bytes of base64 and refuses a malformed one when the host starts; without one
+the store reports `Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row's
+workspace, credential, and connection as additional data, so a sealed value opens only as the
+credential it was stored as. Grant scopes gained `target_connection_id` for connection targets.
+Adding these replaced the development baseline; recreate disposable PostgreSQL databases.
+
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
 [storage envelope](../../docs/journal.md#storage-envelope).

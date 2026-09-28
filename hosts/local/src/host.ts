@@ -1,3 +1,5 @@
+import { AnthropicConnection } from "@amends/connection-anthropic";
+import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { ClusterBackground, Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import {
   PostgresClusterStorage,
@@ -40,7 +42,18 @@ export interface Options {
   readonly runnerTakeover?: Duration.Input | undefined;
   /** How often a runner reads for due wakes, every two seconds by default. */
   readonly pollInterval?: Duration.Input | undefined;
+  /**
+   * The key that seals connections' credentials at rest, 32 bytes as base64. Without one, the
+   * host stores no credentials.
+   */
+  readonly credentialKey?: Redacted.Redacted<string> | undefined;
 }
+
+/** The connection implementations this host installs, as its catalog declares them. */
+export const connections = [
+  AnthropicConnection.declaration,
+  OpenAiCompatibleConnection.declaration,
+];
 
 /**
  * The database, and the cluster that runs background work over the same pool: one SQL client, so
@@ -87,8 +100,8 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     ClusterBackground.layerPruning({ prune: PostgresClusterStorage.prune }),
   ).pipe(
     Layer.provideMerge(
-      Gateway.layer().pipe(
-        Layer.provideMerge(postgres()),
+      Gateway.layer({ connections }).pipe(
+        Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
         Layer.provide(ClusterBackground.layerWakes),
       ),
     ),

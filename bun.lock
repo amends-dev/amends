@@ -17,6 +17,24 @@
         "vitest": "^5.0.1",
       },
     },
+    "adapters/connection-anthropic": {
+      "name": "@amends/connection-anthropic",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection": "workspace:*",
+        "@effect/ai-anthropic": "catalog:",
+        "effect": "catalog:",
+      },
+    },
+    "adapters/connection-openai-compatible": {
+      "name": "@amends/connection-openai-compatible",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection": "workspace:*",
+        "@effect/ai-openai-compat": "catalog:",
+        "effect": "catalog:",
+      },
+    },
     "adapters/sandbox-daytona": {
       "name": "@amends/sandbox-daytona",
       "version": "0.0.0",
@@ -173,6 +191,8 @@
       "name": "@amends/host-local",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-anthropic": "workspace:*",
+        "@amends/connection-openai-compatible": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/server-http": "workspace:*",
@@ -194,10 +214,18 @@
         "effect": "catalog:",
       },
     },
+    "packages/connection": {
+      "name": "@amends/connection",
+      "version": "0.0.0",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/core": {
       "name": "@amends/core",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -217,6 +245,7 @@
       "name": "@amends/gateway",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "effect": "catalog:",
       },
@@ -266,6 +295,7 @@
       "name": "@amends/storage-conformance",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@effect/vitest": "catalog:",
@@ -277,6 +307,8 @@
     "vite-node": "5.0.0",
   },
   "catalog": {
+    "@effect/ai-anthropic": "4.0.0-rc.115",
+    "@effect/ai-openai-compat": "4.0.0-rc.115",
     "@effect/atom-solid": "4.0.0-rc.115",
     "@effect/platform-bun": "4.0.0-rc.115",
     "@effect/sql-pg": "4.0.0-rc.115",
@@ -290,6 +322,12 @@
     "@amends/api-http": ["@amends/api-http@workspace:packages/api-http"],
 
     "@amends/client": ["@amends/client@workspace:apps/client"],
+
+    "@amends/connection": ["@amends/connection@workspace:packages/connection"],
+
+    "@amends/connection-anthropic": ["@amends/connection-anthropic@workspace:adapters/connection-anthropic"],
+
+    "@amends/connection-openai-compatible": ["@amends/connection-openai-compatible@workspace:adapters/connection-openai-compatible"],
 
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
@@ -416,6 +454,10 @@
     "@daytona/toolbox-api-client": ["@daytona/toolbox-api-client@0.218.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-8ZI4Mc9xEan1hAkEJVvSxvJbnGkIhc4JhA5o6woBOs5MVHwOnXepqozeBl73CkxgEUl3ZLS9c8TOf95UYZ9aeA=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.12.1", "", {}, "sha512-yHwomvolVafvUXhy5TdiJVkuNCxXn+bKOs2aWiWEQh/5YaV97Oa/abJz3dmx7lxgIUsUlS1Jl4mEfvJPo3YsVw=="],
+
+    "@effect/ai-anthropic": ["@effect/ai-anthropic@4.0.0-rc.115", "", { "peerDependencies": { "effect": "^4.0.0-rc.115" } }, "sha512-tAE9tU12lFi2jcmASbqkRDgOIhYVH8chnEpVjynePMw8ZQLL5if5k/8sJuPpXwAxGrGwXDPv9Fo4Ouwtofr3lw=="],
+
+    "@effect/ai-openai-compat": ["@effect/ai-openai-compat@4.0.0-rc.115", "", { "peerDependencies": { "effect": "^4.0.0-rc.115" } }, "sha512-P2BdD2CbajJR3cmnnHMlhG8p9sAM+1zzB9rl4PH/3BjyJw7wkUDjSTgDOvpuYX788aLZkhzgcW2f0NBsyVs4OQ=="],
 
     "@effect/atom-solid": ["@effect/atom-solid@4.0.0-rc.115", "", { "peerDependencies": { "effect": "^4.0.0-rc.115", "solid-js": ">=1.9.14 <2.0.0" } }, "sha512-ULA4diJu+rWrYa6ij+CEjEJyTIxOPsZXm6el177jNgV+Smiq1ERIYmUHYSrpPnqFlnSBpwkzIBAI+AOlUkFUiQ=="],
 

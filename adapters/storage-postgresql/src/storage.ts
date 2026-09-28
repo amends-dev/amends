@@ -4,7 +4,8 @@ import { ThreadMessages } from "./thread-messages.ts";
 import { ThreadActivities } from "./thread-activities.ts";
 import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
+import type { Redacted } from "effect";
 import { Assignments } from "./assignments.ts";
 import { Groups } from "./groups.ts";
 import { GroupMemberships } from "./group-memberships.ts";
@@ -12,6 +13,9 @@ import { GroupFollows } from "./group-follows.ts";
 import { ReadStates } from "./read-states.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
+import { ConnectionCredentials } from "./connection-credentials.ts";
+import { Connections } from "./connections.ts";
+import { CredentialKey } from "./credential-key.ts";
 import { PostgresDatabase } from "./database.ts";
 import { Invitations } from "./invitations.ts";
 import { Journal } from "./journal.ts";
@@ -20,7 +24,13 @@ import { Notifications } from "./notifications.ts";
 import { Roles } from "./roles.ts";
 import { Workspaces } from "./workspaces.ts";
 
-export type Options = Binding.Options;
+export interface Options extends Binding.Options {
+  /**
+   * The key that seals connections' credentials at rest: 32 bytes, encoded as base64. Without
+   * one, the host stores no credentials, and setting one reports that it cannot.
+   */
+  readonly credentialKey?: Redacted.Redacted<string> | undefined;
+}
 
 /**
  * Provide every store core requires over the same workspace binding.
@@ -45,6 +55,8 @@ const layerStores = Layer.mergeAll(
   ThreadMessages.layer,
   ThreadActivities.layer,
   ReadStates.layer,
+  Connections.layer,
+  ConnectionCredentials.layer,
 );
 
 /**
@@ -52,8 +64,16 @@ const layerStores = Layer.mergeAll(
  *
  * @category layers
  */
-export const layerWorkspace = (workspaceId: Workspace.Id, options: Options = {}) =>
-  layerStores.pipe(Layer.provide(Binding.layer(workspaceId, options)));
+export const layerWorkspace = (
+  workspaceId: Workspace.Id,
+  options: Options = {},
+  credentialKey: Option.Option<CredentialKey.Interface> = Option.none(),
+) =>
+  layerStores.pipe(
+    Layer.provide(
+      Layer.mergeAll(Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)),
+    ),
+  );
 
 /**
  * One pool, with inexpensive workspace-bound views over it. The stores hold no
@@ -64,12 +84,16 @@ export const layerWorkspace = (workspaceId: Workspace.Id, options: Options = {})
 export const make = Effect.fn("PostgresStorage.make")(function* (options: Options = {}) {
   // Invalid options stop the host starting, rather than its first workspace.
   yield* Binding.settings(options);
+  const credentialKey =
+    options.credentialKey === undefined
+      ? Option.none()
+      : Option.some(yield* Effect.orDie(CredentialKey.make(options.credentialKey)));
   const database = yield* PostgresDatabase.Service;
   const forWorkspace: WorkspaceStorage.Interface["forWorkspace"] = Effect.fn(
     "PostgresStorage.forWorkspace",
   )(
     function* (workspaceId: Workspace.Id) {
-      return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options)));
+      return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)));
     },
     Effect.provideService(PostgresDatabase.Service, database),
   );

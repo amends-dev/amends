@@ -1,4 +1,4 @@
-import { Config, Duration, Effect, Schema } from "effect";
+import { Config, Duration, Effect, Encoding, Option, Result, Schema } from "effect";
 import type { Redacted } from "effect";
 
 export interface Options {
@@ -16,6 +16,8 @@ export interface Options {
   readonly runnerTransport: "storage" | "socket";
   /** How long a process that stops answering keeps its workspaces before another takes them. */
   readonly runnerTakeover: Duration.Duration;
+  /** The key that seals connections' credentials at rest; without one, none can be stored. */
+  readonly credentialKey: Redacted.Redacted<string> | undefined;
 }
 
 const port = Config.schema(
@@ -76,6 +78,21 @@ const poolSize = Config.schema(
   "AMENDS_DATABASE_POOL_SIZE",
 ).pipe(Config.withDefault(20));
 
+const credentialKey = Config.schema(
+  Schema.Redacted(
+    Schema.String.check(
+      Schema.makeFilter(
+        (value) =>
+          Result.match(Encoding.decodeBase64(value), {
+            onFailure: () => false,
+            onSuccess: (bytes) => bytes.length === 32,
+          }) || "Expected 32 bytes encoded as base64, such as from `openssl rand -base64 32`",
+      ),
+    ),
+  ),
+  "AMENDS_CREDENTIAL_KEY",
+).pipe(Config.option);
+
 /** Read and validate startup options without opening a database or server. */
 export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<
   Options,
@@ -88,6 +105,7 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
     runnerAddress: yield* runnerAddress,
     runnerTransport: yield* runnerTransport,
     runnerTakeover: yield* runnerTakeover,
+    credentialKey: Option.getOrUndefined(yield* credentialKey),
   };
 });
 

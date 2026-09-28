@@ -3,6 +3,9 @@ import { AssignmentFacts } from "../authorization/assignment/facts.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
 import { GroupFacts } from "../group/facts.ts";
+import type { ConnectionId } from "../connection/id.ts";
+import { ConnectionFacts } from "../connection/facts.ts";
+import { ConnectionPermissions } from "../connection/permissions.ts";
 import type { Group } from "../group/group.ts";
 import { GroupFollowFacts } from "../group/follow/facts.ts";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
@@ -142,6 +145,8 @@ const readMember = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(MemberPermissions.Read, { _tag: "Member", workspaceId, memberId });
 const readAccess = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId });
+const readConnection = (connectionId: ConnectionId.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(ConnectionPermissions.Read, { _tag: "Connection", workspaceId, connectionId });
 const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
@@ -205,6 +210,25 @@ const registry: ReadonlyArray<Registered> = [
   register(GroupMembershipFacts.Removed, {
     requirement: ({ groupId }, workspaceId) => readGroup(groupId, workspaceId),
     access: ({ memberId }) => ({ _tag: "Groups", memberId }),
+  }),
+  // Connections reach those who may read them; no fact carries a secret.
+  register(ConnectionFacts.Created, {
+    requirement: ({ id }, workspaceId) => readConnection(id, workspaceId),
+  }),
+  register(ConnectionFacts.Renamed, {
+    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  }),
+  register(ConnectionFacts.Configured, {
+    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  }),
+  register(ConnectionFacts.CredentialSet, {
+    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  }),
+  register(ConnectionFacts.CredentialCleared, {
+    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  }),
+  register(ConnectionFacts.Removed, {
+    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
   }),
   register(GroupFollowFacts.Started),
   register(GroupFollowFacts.Ended),

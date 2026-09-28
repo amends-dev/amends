@@ -1,0 +1,17 @@
+{
+  "name": "@amends/connection-anthropic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/connection": "workspace:*",
+    "@effect/ai-anthropic": "catalog:",
+    "effect": "catalog:"
+  }
+}

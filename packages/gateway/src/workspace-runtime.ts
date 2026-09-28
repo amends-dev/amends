@@ -1,6 +1,8 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
 import { BackgroundWakes } from "@amends/core/background";
+import { ConnectionCatalog } from "@amends/core/connection";
+import type { ConnectionImplementation } from "@amends/connection";
 import { Journal } from "@amends/core/journal";
 import { Signals } from "@amends/core/signal";
 import { Workspace } from "@amends/core/workspace";
@@ -25,6 +27,11 @@ import { WorkspaceWakes } from "./wakes.ts";
 export type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
 
 export interface Options {
+  /**
+   * The connection implementations this host installed, as they declare themselves; every
+   * workspace checks its connections against them. Defaults to none.
+   */
+  readonly connections?: ReadonlyArray<ConnectionImplementation.Declaration> | undefined;
   /**
    * How long a workspace stays prepared after its last lease closes. A later request boots it
    * again from storage. Defaults to five minutes.
@@ -60,6 +67,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
   const wakes = yield* WorkspaceWakes.Service;
   const cryptography = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
+  const catalog = ConnectionCatalog.make(options.connections ?? []);
 
   const boot = Effect.fn("WorkspaceRuntime.boot")(function* (workspaceId: Workspace.Id) {
     const bindings = yield* storage.forWorkspace(workspaceId);
@@ -70,6 +78,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeed(Crypto.Crypto, cryptography),
           Layer.succeed(Signals.Service, hub.forWorkspace(workspaceId)),
           Layer.succeed(BackgroundWakes.Service, wakes.forWorkspace(workspaceId)),
+          Layer.succeed(ConnectionCatalog.Service, catalog),
         ),
       ),
       Layer.orDie,

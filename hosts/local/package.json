@@ -10,6 +10,8 @@
     "status": "bun run src/status.ts"
   },
   "dependencies": {
+    "@amends/connection-anthropic": "workspace:*",
+    "@amends/connection-openai-compatible": "workspace:*",
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/server-http": "workspace:*",

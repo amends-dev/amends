@@ -32,6 +32,12 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { BackgroundWakes } from "@amends/core/background";
+import {
+  ConnectionCatalog,
+  ConnectionCredentialStore,
+  ConnectionStore,
+} from "@amends/core/connection";
+import { ConnectionImplementation } from "@amends/connection";
 import { Gateway, SignalHub, WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
@@ -46,9 +52,31 @@ export const workspaceId = Workspace.Id.make("workspace-one");
 export const otherWorkspaceId = Workspace.Id.make("workspace-two");
 export const journalLog = Log.Id.make("journal");
 
+/**
+ * The connection implementation the suites' hosts install: model inference behind a required
+ * endpoint, authenticated by an API key or not at all.
+ */
+export const testImplementation = ConnectionImplementation.Declaration.make({
+  id: ConnectionImplementation.Id.make("test-models"),
+  name: "Test models",
+  description: "A model provider for conformance tests.",
+  capabilities: { modelInference: { interface: "test-messages" } },
+  settings: [
+    { key: "endpoint", label: "Endpoint", kind: "url", required: true },
+    { key: "region", label: "Region", kind: "text", required: false },
+  ],
+  authentication: [{ _tag: "ApiKey", label: "API key" }, { _tag: "None" }],
+});
+export const catalog = ConnectionCatalog.make([testImplementation]);
+
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
-  context: Context.Context<WorkspaceStorage.Bindings | Signals.Service | BackgroundWakes.Service>,
+  context: Context.Context<
+    | WorkspaceStorage.Bindings
+    | Signals.Service
+    | BackgroundWakes.Service
+    | ConnectionCatalog.Service
+  >,
 ) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
@@ -67,6 +95,8 @@ export const bind = (
   groupMemberships: Context.get(context, GroupMembershipStore.Service),
   groupFollows: Context.get(context, GroupFollowStore.Service),
   readStates: Context.get(context, ReadStateStore.Service),
+  connections: Context.get(context, ConnectionStore.Service),
+  credentials: Context.get(context, ConnectionCredentialStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 
@@ -81,9 +111,13 @@ const withHostServices = (
 ) =>
   bind(
     Context.add(
-      Context.add(context, Signals.Service, hub.forWorkspace(id)),
-      BackgroundWakes.Service,
-      WorkspaceWakes.unavailable.forWorkspace(id),
+      Context.add(
+        Context.add(context, Signals.Service, hub.forWorkspace(id)),
+        BackgroundWakes.Service,
+        WorkspaceWakes.unavailable.forWorkspace(id),
+      ),
+      ConnectionCatalog.Service,
+      catalog,
     ),
   );
 
@@ -131,7 +165,7 @@ export const make = (harness: Harness) => {
     );
   /** A gateway over a host. */
   const gateway = (host: Context.Context<Host>) =>
-    Gateway.layer().pipe(
+    Gateway.layer({ connections: [testImplementation] }).pipe(
       Layer.provideMerge(
         Layer.mergeAll(Layer.succeedContext(host), harness.crypto, WorkspaceWakes.layerUnavailable),
       ),

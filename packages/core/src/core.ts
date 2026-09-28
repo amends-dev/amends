@@ -1,4 +1,7 @@
 import { AgentPermissions } from "./agent/permissions.ts";
+import { ConnectionApplication } from "./connection/application.ts";
+import { ConnectionPermissions } from "./connection/permissions.ts";
+import { ConnectionProjection } from "./connection/projection.ts";
 import type { BackgroundProcess } from "./background/process.ts";
 import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
@@ -90,6 +93,7 @@ export const projections = [
   ThreadMessageProjection.definition,
   ThreadActivityProjection.definition,
   NotificationProjection.definition,
+  ConnectionProjection.definition,
 ] as const;
 
 /**
@@ -116,6 +120,10 @@ export const permissions = [
   ThreadMessagePermissions.Publish,
   ThreadParticipationPermissions.Follow,
   AgentPermissions.Use,
+  ConnectionPermissions.Create,
+  ConnectionPermissions.Read,
+  ConnectionPermissions.Manage,
+  ConnectionPermissions.Use,
 ];
 
 /**
@@ -194,6 +202,7 @@ const operations = Layer.mergeAll(
   ThreadMessageApplication.layer,
   ThreadParticipationApplication.layer,
   SignalApplication.layer,
+  ConnectionApplication.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(

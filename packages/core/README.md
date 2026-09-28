@@ -132,6 +132,36 @@ projections end the member's follow of the group and every thread participation 
 admission together, without thread activity. Workspace-member removal uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
 
+## Connections
+
+`@amends/core/connection` holds workspace connections: access to an external system through an
+implementation the host installed, described by the [connection contract](../connection/README.md).
+`ConnectionApplication` lists and reads the connections the actor may read, and creates, renames,
+configures, sets and clears the credential of, and removes them. Reads return `Connection.View`:
+the record without its credential, whether one is set, whether this host installed the
+implementation, its capabilities, and readiness for each capability. Readiness is `Ready`, or
+`Incomplete` with the required settings and credential it lacks; it is computed on read, from the
+record and the host's `ConnectionCatalog`.
+
+`connection.create` works on the workspace; `connection.read`, `connection.manage`, and
+`connection.use` on each connection, a `Connection` target, so one can be shared narrowly. Members
+read and use connections; administrators and the owner also create and manage them. Nothing checks
+`connection.use` yet: consumers such as agents will. A connection someone may not read is
+`NotFound` to them.
+
+Creating validates the implementation (`UnknownImplementation`), its settings against the
+declaration (`InvalidSettings`), and the authentication method (`UnsupportedAuthentication`), and
+takes no secret, since a request receipt records its input in the journal. `setCredential` takes
+the secret, as `Connection.Secret`, redacted: it stores the secret in `ConnectionCredentialStore`
+and records only its reference, deleting a replaced one, in the same commit. Removal deletes the
+credential and keeps the record for history. No fact, change-feed event, or read carries a secret,
+and replay restores references, not secrets.
+
+`ConnectionStore` is a projection store; `ConnectionCredentialStore` holds secrets outside the
+journal and its read models, writes within commits, and reports `Unavailable` on a host that keeps
+none, which operations surface as `CredentialsUnavailable`. Both are required host bindings, and
+`ConnectionCatalog.Service` is supplied by the gateway from the host's registered declarations.
+
 ## Read state
 
 `@amends/core/attention` holds private read state: `ReadStateApplication.markThreadRead` and

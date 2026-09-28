@@ -31,7 +31,8 @@ triage, public groups, group/thread HTTP/UI, turns, execution,
 agent/contact/triage acknowledgment, and channel
 delivery below remain design intent. The harness contract, amends's own in-process harness, the
 sandbox contract with local and Daytona providers, and the environment runtime that composes them
-exist as packages, but no turn runs them yet. “Agreed” records a design decision,
+exist as packages, but no turn runs them yet. Connections exist in core, for model inference
+through API keys, with credentials kept outside the journal; nothing uses them yet. “Agreed” records a design decision,
 not its implementation status.
 
 ## Architecture summary
@@ -1771,6 +1772,32 @@ flowchart LR
 One connection can serve multiple consumers when its implementation and authorization
 support their operations. One capability does not imply another. Establishing a connection
 alone neither creates a toolkit or channel nor selects a model for an agent.
+
+## Agreed: hosts register implementations, and credentials stay outside the journal
+
+A connection implementation has two parts: a declaration, which is data, and the code that reaches
+the external system, which lives in an adapter with that system's dependencies. A host registers
+the declarations of the implementations it installs as its catalog. Core checks connections
+against that catalog and never imports an adapter, and an app lists the catalog as the choices for
+adding a connection, rendering each implementation's declared settings and authentication. What a
+host has not configured, such as an OAuth client, is shown as unavailable with the reason.
+Generic implementations, such as one for any MCP server or any OpenAI-compatible API, cover whole
+families; presets that fill their settings are data, not new implementations.
+
+Authentication is a method a connection uses, not a kind of connection: none, a secret the person
+connecting supplies, or OAuth. An implementation declares the methods it accepts and, for OAuth,
+the scopes each capability needs, so readiness can differ per capability as scopes are granted.
+The connection records its method, non-secret authorization state such as the external identity,
+granted scopes, and expiry, and references to its credentials. The credentials themselves, API
+keys and OAuth tokens, live in protected storage outside the journal: no fact, change-feed event,
+or read model carries one, and replay restores references, not secrets. A credential is stored in
+the commit that records its reference, so both exist or neither does. An OAuth client registered
+with a provider belongs to the host's configuration, not a workspace. Refreshing an expired token
+is part of resolving the credential for use; failing to refresh records that the connection needs
+authorization again.
+
+Model-provider connections with API keys are implemented. OAuth, toolkit and channel support,
+refreshing, and resolving credentials for use arrive with the implementations that need them.
 
 ## Agreed: agents select model access and environments validate compatibility
 

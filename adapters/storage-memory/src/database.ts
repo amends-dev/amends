@@ -45,6 +45,7 @@ export const projections = [
   "threadParticipations",
   "threadMessages",
   "threadActivities",
+  "connections",
   "checkpoints",
   "liveProjections",
 ] as const;
@@ -69,6 +70,8 @@ export interface Space {
   readonly groupTimes: Map<string, number>;
   /** Private Seen by notification ID: when its human recipient first saw it. Kept through rebuilds. */
   readonly notificationsSeen: Map<string, number>;
+  /** Connections' credentials, outside the journal and its read models, which rebuilds keep. */
+  readonly credentials: Map<string, string>;
 }
 
 export interface Interface {
@@ -105,6 +108,7 @@ export const empty = (): Space => ({
   threadPositions: new Map(),
   groupTimes: new Map(),
   notificationsSeen: new Map(),
+  credentials: new Map(),
 });
 
 /** An isolated snapshot: every map is copied, and the values they hold never change. */
@@ -118,6 +122,7 @@ export const copy = (space: Space): Space => ({
   threadPositions: new Map(space.threadPositions),
   groupTimes: new Map(space.groupTimes),
   notificationsSeen: new Map(space.notificationsSeen),
+  credentials: new Map(space.credentials),
 });
 
 /** Committed state of one workspace, without creating any. */

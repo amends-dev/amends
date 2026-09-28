@@ -43,6 +43,7 @@ packages/
   api-http/           @amends/api-http: shared HTTP contract
   server-http/        @amends/server-http: HTTP handlers and authentication
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
+  connection/         @amends/connection: the connection implementation contract
   environment/        @amends/environment: spawns a harness with a sandbox and manages its lifecycle
   harness/            @amends/harness: the harness contract and recorded event standard
   harness-amends/     @amends/harness-amends: amends's own in-process harness over Effect AI
@@ -53,6 +54,8 @@ adapters/
   storage-memory/     @amends/storage-memory: in-memory reference storage and directory
   sandbox-local/      @amends/sandbox-local: sandboxes as local directories, for tests and development
   sandbox-daytona/    @amends/sandbox-daytona: sandboxes on Daytona
+  connection-anthropic/ @amends/connection-anthropic: Anthropic model connections
+  connection-openai-compatible/ @amends/connection-openai-compatible: chat-completions model connections
 hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/

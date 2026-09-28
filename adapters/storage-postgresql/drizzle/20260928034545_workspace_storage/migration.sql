@@ -11,9 +11,10 @@ CREATE TABLE "assignments" (
 	"target_member_id" text,
 	"target_thread_id" text,
 	"target_group_id" text,
+	"target_connection_id" text,
 	CONSTRAINT "assignments_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "assignments_source_agrees" CHECK (("source_kind" = 'Role' AND "role_id" IS NOT NULL AND "permission" IS NULL) OR ("source_kind" = 'Direct' AND "permission" IS NOT NULL AND "role_id" IS NULL)),
-	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_thread_id" IS NOT NULL AND "target_member_id" IS NULL AND "target_group_id" IS NULL) OR ("target_kind" = 'Group' AND "target_group_id" IS NOT NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL))))
+	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_member_id" IS NULL AND "target_thread_id" IS NOT NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Group' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NOT NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Connection' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NOT NULL))))
 );
 --> statement-breakpoint
 CREATE TABLE "builtin_role_revisions" (
@@ -40,6 +41,29 @@ CREATE TABLE "commits" (
 	"recorded_at" timestamp with time zone NOT NULL,
 	"entry_count" integer NOT NULL,
 	CONSTRAINT "commits_pkey" PRIMARY KEY("workspace_id","id")
+);
+--> statement-breakpoint
+CREATE TABLE "connection_credentials" (
+	"workspace_id" text,
+	"id" text,
+	"connection_id" text NOT NULL,
+	"sealed" text NOT NULL,
+	CONSTRAINT "connection_credentials_pkey" PRIMARY KEY("workspace_id","id")
+);
+--> statement-breakpoint
+CREATE TABLE "connections" (
+	"workspace_id" text,
+	"id" text,
+	"name" text NOT NULL,
+	"implementation_id" text NOT NULL,
+	"settings" jsonb NOT NULL,
+	"authentication" text NOT NULL,
+	"credential_id" text,
+	"status" text NOT NULL,
+	"created_by" text NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "connections_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "connections_credential_needs_api_key" CHECK ("authentication" = 'ApiKey' OR "credential_id" IS NULL)
 );
 --> statement-breakpoint
 CREATE TABLE "group_follows" (

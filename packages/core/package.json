@@ -18,12 +18,14 @@
     "./agent": "./src/agent/index.ts",
     "./attention": "./src/attention/index.ts",
     "./request": "./src/request/index.ts",
-    "./signal": "./src/signal/index.ts"
+    "./signal": "./src/signal/index.ts",
+    "./connection": "./src/connection/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends/connection": "workspace:*",
     "effect": "catalog:"
   }
 }

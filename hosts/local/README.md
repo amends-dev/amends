@@ -22,14 +22,22 @@ The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `bun run dev` restarts the host when its source changes.
 
-| Setting                     | Default           | Accepted value                                             |
-| --------------------------- | ----------------- | ---------------------------------------------------------- |
-| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port. |
-| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                    |
-| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                           |
-| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.         |
-| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                     |
-| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.              |
+| Setting                     | Default           | Accepted value                                              |
+| --------------------------- | ----------------- | ----------------------------------------------------------- |
+| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port.  |
+| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                     |
+| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                            |
+| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.          |
+| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                      |
+| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.               |
+| `AMENDS_CREDENTIAL_KEY`     | Unset             | 32 bytes as base64, such as from `openssl rand -base64 32`. |
+
+`AMENDS_CREDENTIAL_KEY` seals connections' credentials at rest; without it the host stores none,
+and setting one reports `CredentialsUnavailable`. Keep it secret and stable: a changed key cannot
+open credentials sealed with the old one, and nothing rotates them yet. The host installs the
+[Anthropic](../../adapters/connection-anthropic/README.md) and
+[OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connection
+implementations.
 
 The pool size is the most connections the host opens. Four are the host's own: one listens for
 notifications, two run background work, and one holds the runner address. A busy workspace's

@@ -1,3 +1,4 @@
+import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import {
   ThreadStore,
   ThreadParticipationStore,
@@ -246,6 +247,25 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listActiveByGroup: unexpected,
         insert: unexpected,
         end: unexpected,
+      }),
+    ),
+    Context.add(
+      ConnectionStore.Service,
+      ConnectionStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        get: unexpected,
+        list: unexpected(),
+        insert: unexpected,
+        update: unexpected,
+      }),
+    ),
+    Context.add(
+      ConnectionCredentialStore.Service,
+      ConnectionCredentialStore.Service.of({
+        workspaceId: boundWorkspaceId,
+        put: unexpected,
+        get: unexpected,
+        remove: unexpected,
       }),
     ),
     Context.add(

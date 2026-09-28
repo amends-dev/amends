@@ -41,7 +41,7 @@ export const participantKinds = ["Member", "Contact", "Triage"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = ["Workspace", "Member", "Thread", "Group"] as const;
+export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** What the journal settles; a human recipient's Seen is private state in notification_seen. */
 export const notificationStates = ["Pending", "Discarded", "Informational"] as const;
@@ -53,12 +53,35 @@ const scopeColumns = {
   targetMemberId: text("target_member_id"),
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
+  targetConnectionId: text("target_connection_id"),
 };
-const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) =>
-  check(
+/** The column holding each kind of target's ID; a workspace target needs none. */
+const targetIds = {
+  Member: "targetMemberId",
+  Thread: "targetThreadId",
+  Group: "targetGroupId",
+  Connection: "targetConnectionId",
+} as const;
+const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
+  /** Only the named target ID column is set, or none. */
+  const only = (kept?: (typeof targetIds)[keyof typeof targetIds]) =>
+    sql.join(
+      Object.values(targetIds).map((column) =>
+        column === kept ? sql`${columns[column]} IS NOT NULL` : sql`${columns[column]} IS NULL`,
+      ),
+      sql` AND `,
+    );
+  return check(
     name,
-    sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.scopeKind} = 'Target' AND ${columns.targetKind} IS NOT NULL AND ((${columns.targetKind} = 'Workspace' AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.targetKind} = 'Member' AND ${columns.targetMemberId} IS NOT NULL AND ${columns.targetThreadId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.targetKind} = 'Thread' AND ${columns.targetThreadId} IS NOT NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetGroupId} IS NULL) OR (${columns.targetKind} = 'Group' AND ${columns.targetGroupId} IS NOT NULL AND ${columns.targetMemberId} IS NULL AND ${columns.targetThreadId} IS NULL)))`,
+    sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${only()}) OR (${columns.scopeKind} = 'Target' AND ${columns.targetKind} IS NOT NULL AND ((${columns.targetKind} = 'Workspace' AND ${only()}) OR ${sql.join(
+      Object.entries(targetIds).map(
+        ([kind, column]) =>
+          sql`(${columns.targetKind} = ${sql.raw(`'${kind}'`)} AND ${only(column)})`,
+      ),
+      sql` OR `,
+    )}))`,
   );
+};
 
 export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
@@ -683,4 +706,47 @@ export const threadActivities = pgTable(
     uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
   ],
+);
+
+/**
+ * Connections to external systems. An implementation declares its own settings, so they are
+ * stored as JSON, like a thread activity's kind-specific details; a credential is referenced here
+ * and kept in connection_credentials.
+ */
+export const connections = pgTable(
+  "connections",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    name: text("name").notNull(),
+    implementationId: text("implementation_id").notNull(),
+    settings: jsonb("settings").$type<Record<string, string>>().notNull(),
+    authentication: text("authentication", { enum: ["None", "ApiKey"] }).notNull(),
+    credentialId: text("credential_id"),
+    status: text("status", { enum: memberStatuses }).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    check(
+      "connections_credential_needs_api_key",
+      sql`${t.authentication} = 'ApiKey' OR ${t.credentialId} IS NULL`,
+    ),
+  ],
+);
+
+/**
+ * Connections' credentials, outside the journal and its read models: rebuilding projections
+ * keeps them. Each secret is sealed with the host's credential key, bound to its row.
+ */
+export const connectionCredentials = pgTable(
+  "connection_credentials",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    connectionId: text("connection_id").notNull(),
+    sealed: text("sealed").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
 );

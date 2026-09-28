@@ -138,6 +138,11 @@ gateway, adapting the same credential resolution to their own authentication.
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs
 them against itself.
 
+`@amends/connection` is the [connection contract](./connection/README.md): what a connection
+implementation declares for a host's catalog, and the code each capability supplies, such as model
+inference. Core's connection domain checks connections against the declarations; implementations
+live in adapters.
+
 `@amends/sandbox` is the [sandbox contract](./sandbox/README.md) every sandbox provider implements,
 from a local directory to a hosted service, with capabilities for what providers differ on. It
 knows nothing of harnesses. `@amends/sandbox-conformance` holds the test suites every provider

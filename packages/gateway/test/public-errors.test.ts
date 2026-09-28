@@ -1,6 +1,7 @@
 import type { AssignmentApplication } from "@amends/core/authorization";
 import type { ReadStateApplication } from "@amends/core/attention";
 import type { ChangeFeedApplication } from "@amends/core/change-feed";
+import type { ConnectionApplication } from "@amends/core/connection";
 import type {
   GroupApplication,
   GroupFollowApplication,
@@ -66,6 +67,7 @@ it("every error a core operation can fail with is public or internal, so none be
   expectTypeOf<Unclassified<AssignmentApplication.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ReadStateApplication.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ChangeFeedApplication.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ConnectionApplication.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<GroupApplication.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<GroupFollowApplication.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<GroupMembershipApplication.Interface>>().toEqualTypeOf<never>();

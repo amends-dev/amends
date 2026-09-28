@@ -9,6 +9,10 @@ live outside `packages/`. Hosts compose them; shared packages never depend on th
 the first with directories on this machine, the reference provider for tests, and the second over
 Daytona's hosted sandboxes. Both run the [sandbox conformance suites](../packages/sandbox-conformance/README.md).
 
+`connection-anthropic/` and `connection-openai-compatible/` implement the
+[connection contract](../packages/connection/README.md) for model providers over Effect AI: each
+declares itself for a host's catalog and turns a connection into model access.
+
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
 and one column per record field, except a thread activity's kind-specific details, which
