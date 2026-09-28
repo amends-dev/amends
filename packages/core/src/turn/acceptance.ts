@@ -146,7 +146,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     // The agent must still be able to open the thread; otherwise its work waits, as a person's
     // notification waits in their inbox, until its access or participation is settled.
     const thread = yield* access.require(threadId).pipe(
-      Effect.map(Option.some),
+      Effect.asSome,
       Effect.catchTags({
         "ThreadAccess.NotFound": () => Effect.succeedNone,
         "Authorization.Denied": () => Effect.succeedNone,

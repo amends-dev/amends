@@ -95,6 +95,16 @@ process that runs a workspace about its wake at once, and checks that the others
 Cluster's socket messages are not authenticated: use `socket` only where runner addresses are
 reachable on a private network.
 
+## Turns
+
+The host runs agents' [turns](../../packages/execution/README.md) on the same Cluster runner as
+its background work: each turn is its own entity, so turns run side by side, and the request to
+run one is stored in the commit that created it. A turn runs amends's own harness in process,
+with the agent's Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply
+in its thread. Environments with a sandbox cannot run turns yet. Several processes over one
+database share turns as they share wakes, and a turn cut short by a restart continues from its
+log. Handled requests to run turns are pruned with handled wakes.
+
 ## Browser and desktop access
 
 The web development server proxies `/api` to this host. Desktop connects directly to
@@ -111,16 +121,16 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                      |
-| `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                                                                                                              |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                   |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                     |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                      |
-| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                      |
+| Module                             | Responsibility                                                                                                                                                                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                |
+| `authentication/credentials.ts`    | `DevelopmentCredentials.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                        |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                             |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                               |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work and turns, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `execution` is what runs turns. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                          |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                |
+| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                                                                |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
@@ -187,7 +197,8 @@ bounds, the required database URL, empty values, and redacted errors. `backgroun
 over the host's database composition, that a wake asked for inside a commit is stored with it,
 reaches the worker, and is absent if the commit rolls back; that a process refuses to start at a
 runner address another process holds; and that over sockets a wake reaches the process running
-its workspace well before that process's next read.
+its workspace well before that process's next read. `turns.test.ts` asks an agent in a thread over
+HTTP and waits for its reply, which its turn gets from a local chat-completions server.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

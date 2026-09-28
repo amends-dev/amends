@@ -28,6 +28,7 @@ remaining gaps with links to their owning code.
 | [Anthropic connection](../adapters/connection-anthropic/README.md)                 | Anthropic model connections over Effect AI.                                                                         |
 | [OpenAI-compatible connection](../adapters/connection-openai-compatible/README.md) | Chat-completions model connections, such as OpenAI, OpenRouter, or a local server.                                  |
 | [Environment](../packages/environment/README.md)                                   | Spawning a harness with a sandbox, acquisition outcomes, snapshots, and release.                                    |
+| [Execution](../packages/execution/README.md)                                       | Running agents' turns: sessions, input, closing with the reply, stops, retries, and Cluster entities.               |
 | [Sandbox](../packages/sandbox/README.md)                                           | The sandbox provider contract: acquisition, commands, processes, ports, files, and snapshots.                       |
 | [Sandbox conformance](../packages/sandbox-conformance/README.md)                   | Test suites every sandbox provider runs, and the harness a provider supplies.                                       |
 | [Local sandbox](../adapters/sandbox-local/README.md)                               | Sandboxes as directories on this machine, the reference provider.                                                   |

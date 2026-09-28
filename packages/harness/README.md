@@ -4,7 +4,8 @@
 [core model](../../docs/core-model.md#agreed-every-harness-records-the-same-events): how a turn
 drives a harness session, and the events every harness reports. Implementations translate their
 native interaction into it; [`@amends/harness-amends`](../harness-amends/README.md) is amends's own.
-Nothing here knows about environments, threads, or turns, and nothing runs a harness yet.
+Nothing here knows about environments, threads, or turns; [turn execution](../execution/README.md)
+runs harnesses.
 
 ## One recorded standard
 

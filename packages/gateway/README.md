@@ -85,8 +85,10 @@ is sufficient to type-check a supplied implementation.
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
 `SignalHub.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
-`WorkspaceWakes.Service`, whose `forWorkspace` returns its `BackgroundWakes.Service`, and
-`Crypto.Crypto`.
+`WorkspaceWakes.Service`, whose `forWorkspace` returns its `BackgroundWakes.Service`,
+`WorkspaceTurns.Service`, whose `forWorkspace` returns its `TurnDispatch.Service`, delivering
+requests to run new turns to whatever runs them, and `Crypto.Crypto`. A host that runs no turns
+provides `WorkspaceTurns.layerIdle`: agents still accept their work, which waits queued.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
@@ -184,9 +186,10 @@ resumes after a restart.
   undelivered, so Cluster runs it again.
 - `layer` provides both. Every runner over the same storage runs the worker, as Cluster
   requires of every entity type.
-- `layerPruning({ prune, keep? })` removes handled wakes once they are older than `keep`
-  (seven days by default), with the job's own past runs, every hour on one runner, through
-  `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
+- `layerPruning({ prune, keep?, entityTypes? })` removes handled wakes once they are older than
+  `keep` (seven days by default), with the job's own past runs and the handled messages of any
+  other `entityTypes`, such as [turns'](../execution/README.md#turns-on-effect-cluster), every
+  hour on one runner, through `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
   supplies `prune`. By then a wake's key no longer needs to stop a repeat: commits are not
   retried days later, and wakes not yet handled are kept however old.
 

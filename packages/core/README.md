@@ -264,8 +264,17 @@ in and no work still waiting for the agent on the thread, both checked in the cl
 otherwise it reports `InputPending`. It then publishes the last completed response after the last
 input, verbatim, as the agent's own message to the thread's current participants, checking the
 agent may still open and post in the thread, and records completion. A turn can complete without a
-reply. `fail` and `stopped` end a turn. Execution itself, running harnesses and environments, is
-the host's; nothing runs turns yet.
+reply. `fail` and `stopped` end a turn. `prepare` assembles what a run needs from the stores: the
+agent's instructions, the model access and environment the turn started with or, before it
+starts, the agent's current ones, the connection's settings and key, the messages among the
+hundred timeline entries before the turn as history (the agent's own as responses), the accepted
+input not yet taken in, and the log. It reports instead that the turn finished, is stopping, or can't run, as
+when its connection has no key. `get` reads the turn, for a run to watch.
+
+The commit that creates a turn asks `TurnDispatch` to run it, through a journal reaction to
+`TurnFacts.Created`, so the request commits or rolls back with the turn. The gateway binds
+`TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
+and environments.
 
 `TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, and
 `cancel` one when they may also direct its agent (`agent.use`): a queued turn stops at once, a

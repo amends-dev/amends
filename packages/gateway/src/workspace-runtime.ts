@@ -1,6 +1,7 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
 import { BackgroundWakes } from "@amends/core/background";
+import { TurnDispatch } from "@amends/core/turn";
 import { ConnectionCatalog } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
 import type { HarnessImplementation } from "@amends/harness";
@@ -25,6 +26,7 @@ import {
 import { SignalHub } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceWakes } from "./wakes.ts";
+import { WorkspaceTurns } from "./turns.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
@@ -74,6 +76,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
   const storage = yield* WorkspaceStorage.Service;
   const hub = yield* SignalHub.Service;
   const wakes = yield* WorkspaceWakes.Service;
+  const turns = yield* WorkspaceTurns.Service;
   const cryptography = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
   const catalog = ConnectionCatalog.make(options.connections ?? []);
@@ -91,6 +94,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeed(Crypto.Crypto, cryptography),
           Layer.succeed(Signals.Service, hub.forWorkspace(workspaceId)),
           Layer.succeed(BackgroundWakes.Service, wakes.forWorkspace(workspaceId)),
+          Layer.succeed(TurnDispatch.Service, turns.forWorkspace(workspaceId)),
           Layer.succeed(ConnectionCatalog.Service, catalog),
           Layer.succeed(EnvironmentCatalog.Service, environments),
         ),

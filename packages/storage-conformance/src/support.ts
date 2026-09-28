@@ -39,11 +39,17 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnStore } from "@amends/core/turn";
+import { TurnDispatch, TurnStore } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
-import { Gateway, SignalHub, WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
+import {
+  Gateway,
+  SignalHub,
+  WorkspaceStorage,
+  WorkspaceTurns,
+  WorkspaceWakes,
+} from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
@@ -149,6 +155,7 @@ export const bind = (
     | WorkspaceStorage.Bindings
     | Signals.Service
     | BackgroundWakes.Service
+    | TurnDispatch.Service
     | ConnectionCatalog.Service
     | EnvironmentCatalog.Service
   >,
@@ -179,9 +186,9 @@ export const bind = (
 export type Bound = ReturnType<typeof bind>;
 
 /**
- * A workspace's stores with its signals from the host, and wakes the suites deliver themselves:
- * a commit's request is accepted and nothing runs, so a suite runs the process it expects, as a
- * host's runner would.
+ * A workspace's stores with its signals from the host, and wakes and turn dispatch the suites
+ * deliver themselves: a commit's request is accepted and nothing runs, so a suite runs the process
+ * or the turn it expects, as a host's runner would.
  */
 const withHostServices = (
   context: Context.Context<WorkspaceStorage.Bindings>,
@@ -189,15 +196,13 @@ const withHostServices = (
   id: Workspace.Id,
 ) =>
   bind(
-    Context.add(
-      Context.add(
-        Context.add(context, Signals.Service, hub.forWorkspace(id)),
-        BackgroundWakes.Service,
-        manualWakes.forWorkspace(id),
-      ),
-      ConnectionCatalog.Service,
-      catalog,
-    ).pipe(Context.add(EnvironmentCatalog.Service, environmentCatalog)),
+    context.pipe(
+      Context.add(Signals.Service, hub.forWorkspace(id)),
+      Context.add(BackgroundWakes.Service, manualWakes.forWorkspace(id)),
+      Context.add(TurnDispatch.Service, WorkspaceTurns.idle.forWorkspace(id)),
+      Context.add(ConnectionCatalog.Service, catalog),
+      Context.add(EnvironmentCatalog.Service, environmentCatalog),
+    ),
   );
 
 /** One workspace's stores and signals on a host. */
@@ -246,7 +251,12 @@ export const make = (harness: Harness) => {
   const gateway = (host: Context.Context<Host>) =>
     Gateway.layer(installed).pipe(
       Layer.provideMerge(
-        Layer.mergeAll(Layer.succeedContext(host), harness.crypto, layerManualWakes),
+        Layer.mergeAll(
+          Layer.succeedContext(host),
+          harness.crypto,
+          layerManualWakes,
+          WorkspaceTurns.layerIdle,
+        ),
       ),
     );
   return {

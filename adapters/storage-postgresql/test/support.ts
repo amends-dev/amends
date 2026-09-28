@@ -22,6 +22,8 @@ import {
 import { BackgroundWakes } from "@amends/core/background";
 import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
+import { TurnDispatch } from "@amends/core/turn";
+import { WorkspaceTurns } from "@amends/gateway";
 import type { WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
@@ -56,7 +58,9 @@ export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
-  context: Context.Context<WorkspaceStorage.Bindings | Signals.Service | BackgroundWakes.Service>,
+  context: Context.Context<
+    WorkspaceStorage.Bindings | Signals.Service | BackgroundWakes.Service | TurnDispatch.Service
+  >,
 ) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
@@ -87,10 +91,10 @@ export const views = (options: PostgresStorage.Options = {}) =>
       forWorkspace: (workspaceId: Workspace.Id) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>
           bind(
-            Context.add(
-              Context.add(context, Signals.Service, hub.forWorkspace(workspaceId)),
-              BackgroundWakes.Service,
-              manualWakes.forWorkspace(workspaceId),
+            context.pipe(
+              Context.add(Signals.Service, hub.forWorkspace(workspaceId)),
+              Context.add(BackgroundWakes.Service, manualWakes.forWorkspace(workspaceId)),
+              Context.add(TurnDispatch.Service, WorkspaceTurns.idle.forWorkspace(workspaceId)),
             ),
           ),
         ),

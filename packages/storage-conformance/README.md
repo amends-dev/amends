@@ -76,5 +76,6 @@ registration.
 `Support` holds the fixtures the suites share: identities, bound stores by name, a fixed
 clock, and cores, hosts, and gateways over a harness's storage. Their background wakes are
 `manualWakes`: a commit's request is accepted and nothing runs, so a suite runs the process it
-expects through the gateway, as a host's runner would. `Operations` runs single application
+expects through the gateway, as a host's runner would. Their turn dispatch is
+`WorkspaceTurns.idle`, so a suite drives turn execution itself. `Operations` runs single application
 operations through a gateway, the way a protocol handler does.

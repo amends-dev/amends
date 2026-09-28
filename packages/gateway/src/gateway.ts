@@ -18,6 +18,7 @@ import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import type { SignalHub } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
+import type { WorkspaceTurns } from "./turns.ts";
 import type { WorkspaceWakes } from "./wakes.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
@@ -169,6 +170,7 @@ export const make = Effect.fn("Gateway.make")(function* (
   | WorkspaceStorage.Service
   | SignalHub.Service
   | WorkspaceWakes.Service
+  | WorkspaceTurns.Service
   | Crypto.Crypto
   | Scope.Scope
 > {

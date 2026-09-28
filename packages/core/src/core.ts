@@ -3,6 +3,7 @@ import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentProjection } from "./agent/projection.ts";
 import { TurnAcceptance } from "./turn/acceptance.ts";
 import { TurnApplication } from "./turn/application.ts";
+import { TurnDispatch } from "./turn/dispatch.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionApplication } from "./connection/application.ts";
@@ -68,6 +69,7 @@ import { GrantResolver } from "./authorization/grant-resolver.ts";
 import { PermissionCatalog } from "./authorization/permission-catalog.ts";
 import { RoleProjection } from "./authorization/role/projection.ts";
 import { Journal } from "./journal/journal.ts";
+import type { Reaction } from "./journal/reaction.ts";
 import { Log } from "./journal/log.ts";
 import { NotificationApplication } from "./notification/application.ts";
 import { NotificationProjection } from "./notification/projection.ts";
@@ -170,7 +172,9 @@ export const processes = [TurnAcceptance.process] as const;
 const journal = Journal.layer({
   logId: journalLog,
   projections,
-  reactions: BackgroundWakes.reactions(processes),
+  reactions: [...BackgroundWakes.reactions(processes), ...TurnDispatch.reactions] as ReadonlyArray<
+    Reaction.Definition<BackgroundWakes.Service | TurnDispatch.Service>
+  >,
 }).pipe(Layer.provideMerge(Log.layer));
 
 /** Authorization for the acting member, with its grant resolution. */

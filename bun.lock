@@ -195,6 +195,7 @@
         "@amends/connection-anthropic": "workspace:*",
         "@amends/connection-openai-compatible": "workspace:*",
         "@amends/core": "workspace:*",
+        "@amends/execution": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness-amends": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
@@ -244,6 +245,21 @@
       "dependencies": {
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@amends/harness-amends": "workspace:*",
+      },
+    },
+    "packages/execution": {
+      "name": "@amends/execution",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection": "workspace:*",
+        "@amends/core": "workspace:*",
+        "@amends/environment": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "@amends/harness": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -347,6 +363,8 @@
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
 
     "@amends/environment": ["@amends/environment@workspace:packages/environment"],
+
+    "@amends/execution": ["@amends/execution@workspace:packages/execution"],
 
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 

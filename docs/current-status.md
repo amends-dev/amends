@@ -15,23 +15,26 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Only member workflows exist. Task and channel workflows, which will start threads with contacts
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
-- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and a
-  closing turn publishes the agent's reply, but nothing executes turns yet: they stay queued. No
-  retry, retry limits, environment transfer, or turn timeline activity exists, and turns have no
+- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
+  local host [runs them](../packages/execution/README.md), each closing with the agent's reply.
+  Turns are conversation only: agents have no tools, and environments with a sandbox fail their
+  turns. A turn streams nothing to readers, and posts only its last response after its last
+  input, so input taken in while it works gets one reply. A stop request is noticed by polling,
+  within a second. No environment transfer or turn timeline activity exists, and turns have no
   HTTP or screens. Channel delivery does not run, and contacts and triage have no inbox outside
   the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) exist, but nothing runs them: agents
-  are configured, but no turn exists, so no model provider has been called outside tests. That harness stops rather
+  [environment runtime](../packages/environment/README.md) run agents' turns in process. No test
+  calls a real model provider: the host's end-to-end test uses a local chat-completions stand-in. That harness stops rather
   than answering the model when a response calls a tool it was not offered or holds a part it
   cannot record, and whether providers accept history with calls to tools a later session no
   longer offers is unverified.
 - [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
   and an optional sandbox under an account connection, and every workspace starts with an
   in-process one; they are managed over HTTP and on the [Environments page](environments.md).
-  Nothing turns a stored environment into a
-  running one yet. Only amends's own harness is installed, and it runs in process only, so a sandbox
+  Turns spawn in-process environments only; one with a sandbox cannot run a turn yet. Only
+  amends's own harness is installed, and it runs in process only, so a sandbox
   is where its tools would act, and none acts there yet. Environments hold no defaults for
   optional settings, since no installed harness takes reasoning levels. Model providers suggest
   models, but the compatibility check accepts any model name, and nothing checks one with its
@@ -50,15 +53,16 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   over HTTP and on the [Connections page](connections.md). There is no OAuth, toolkit or channel
   support. Readiness is computed from settings and whether a credential is set;
   nothing checks a key with its provider. Agents check `connection.use` when configured, but
-  nothing resolves a credential for use, since no turn or toolkit consumes connections yet. Credentials are sealed with one host
+  only turns resolve a credential for use, as they run; no toolkit consumes connections yet. Credentials are sealed with one host
   key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
   instructions, model access, and a starting environment, over HTTP and on the
   [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
-  turn to override, and no profile photos. Nothing runs an agent, and a removed agent's membership
+  turn to override, and no profile photos. Agents run only when their work arrives in a thread, and a removed agent's membership
   cannot be reactivated, as a person's cannot.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them on an Effect Cluster runner; `turn.accept` is the one registered. Several host
+  local host runs them on an Effect Cluster runner; `turn.accept` is the one registered. Turns run
+  on the same runner, each as its own entity. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
   the takeover time, 35 seconds by default. Cluster's socket transport, which delivers wakes
   between processes at once, is not authenticated and belongs on a private network. Wakes are not
@@ -349,8 +353,8 @@ level. The locks serialize cooperating writers, but the connection's isolation d
 determines snapshot behavior.
 
 Every journal commit still takes the workspace's lock, so one workspace's conversation writes
-run one at a time, at roughly the rate one commit's statements allow. Execution output appended
-outside a commit does not count against that; turn execution itself is not implemented yet. The adapter's tests do not
+run one at a time, at roughly the rate one commit's statements allow. Turn execution records each
+step in its own commit, so a running turn's steps take their turn with the conversation's writes. The adapter's tests do not
 establish correctness for arbitrary session/database isolation settings.
 An explicit isolation choice and coverage for changed defaults remain outstanding.
 

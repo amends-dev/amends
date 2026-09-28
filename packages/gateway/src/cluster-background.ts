@@ -203,23 +203,23 @@ export type Prune<E, R> = (
  * Prune handled wakes, and the job's own past runs, once they are older than `keep` (seven days
  * by default), every hour on one runner of the cluster. Cluster removes neither. A wake's key
  * then no longer stops a repeat, which no longer arises: commits are not retried days later.
+ * `entityTypes` names other entities whose handled messages go the same way, such as turns'.
  *
  * @category layers
  */
 export const layerPruning = <E, R>(options: {
   readonly prune: Prune<E, R>;
   readonly keep?: Duration.Input | undefined;
+  readonly entityTypes?: ReadonlyArray<string> | undefined;
 }) => {
   const keep = Duration.fromInputUnsafe(options.keep ?? "7 days");
+  const entityTypes = [WorkspaceProcess.type, ...(options.entityTypes ?? [])];
   return ClusterCron.make({
     name: pruning,
     cron: Cron.parseUnsafe("0 * * * *"),
     execute: Effect.gen(function* () {
       const before = DateTime.subtractDuration(yield* DateTime.now, keep);
-      const removed = yield* options.prune(
-        [WorkspaceProcess.type, `ClusterCron/${pruning}`],
-        before,
-      );
+      const removed = yield* options.prune([...entityTypes, `ClusterCron/${pruning}`], before);
       if (removed > 0) yield* Effect.logInfo("Pruned handled background wakes", { removed });
     }),
   });

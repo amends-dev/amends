@@ -6,7 +6,7 @@ so browser and hash history work. The screens follow the Lunacy "Connections" mo
 
 - **The list:** each connection with its provider, its API URL or "Default API endpoint", its
   setup, and how it authenticates, with search. Configured means setup is complete; it never
-  means the provider accepted the key, since nothing sends the provider a request. Needs setup
+  means the provider accepted the key, since nothing checks it until an agent's turn uses it. Needs setup
   names what is missing: required settings or the key. Unavailable is a connection whose provider
   this server no longer installs; it stays, with its saved settings and key, until someone
   removes it.

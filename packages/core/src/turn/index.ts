@@ -1,6 +1,7 @@
 export { Turn } from "./turn.ts";
 export { TurnAcceptance } from "./acceptance.ts";
 export { TurnApplication } from "./application.ts";
+export { TurnDispatch } from "./dispatch.ts";
 export { TurnErrors } from "./errors.ts";
 export { TurnExecution } from "./execution.ts";
 export { TurnFacts } from "./facts.ts";

@@ -1,6 +1,7 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { ClusterBackground, Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import { ClusterTurns, TurnRunner } from "@amends/execution";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
 import { LocalSandbox } from "@amends/sandbox-local";
@@ -66,6 +67,12 @@ export const installed = {
   sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
 };
 
+/** The code that runs agents' turns: amends's harness in process, with either model connection. */
+export const execution: TurnRunner.Options = {
+  harnesses: [AmendsHarness.make()],
+  models: [AnthropicConnection.modelInference, OpenAiCompatibleConnection.modelInference],
+};
+
 /**
  * The database, and the cluster that runs background work over the same pool: one SQL client, so
  * a wake a commit asks for is stored in that commit's transaction. The process first claims its
@@ -99,21 +106,26 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 
 /**
  * The gateway and the workspace directory over one PostgreSQL database, through the
- * storage adapter, with the workspaces' background work running in this process and handled
- * wakes pruned after seven days. The HTTP server resolves bearer tokens before entering the
- * gateway.
+ * storage adapter, with the workspaces' background work and agents' turns running in this
+ * process, and handled wakes and turn requests pruned after seven days. The HTTP server resolves
+ * bearer tokens before entering the gateway.
  *
  * @category layers
  */
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer =>
-  Layer.merge(
+  Layer.mergeAll(
     ClusterBackground.layerWorker,
-    ClusterBackground.layerPruning({ prune: PostgresClusterStorage.prune }),
+    ClusterBackground.layerPruning({
+      prune: PostgresClusterStorage.prune,
+      entityTypes: [ClusterTurns.TurnEntity.type],
+    }),
+    ClusterTurns.layerWorker.pipe(Layer.provide(TurnRunner.layer(execution))),
   ).pipe(
     Layer.provideMerge(
       Gateway.layer(installed).pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
         Layer.provide(ClusterBackground.layerWakes),
+        Layer.provide(ClusterTurns.layerDispatch),
       ),
     ),
     Layer.provide(BunCrypto.layer),
