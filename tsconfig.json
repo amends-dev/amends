@@ -7,6 +7,7 @@
     "scripts/**/*.ts",
     "packages/core/test/**/*.ts",
     "packages/gateway/test/**/*.ts",
+    "packages/environment/test/**/*.ts",
     "packages/harness/test/**/*.ts",
     "packages/harness-amends/test/**/*.ts",
     "packages/server-http/test/**/*.ts",

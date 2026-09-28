@@ -24,6 +24,7 @@ remaining gaps with links to their owning code.
 | [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
 | [Harness](../packages/harness/README.md)                             | The harness contract: sessions, and the events and transcript every harness records.                                |
 | [Amends harness](../packages/harness-amends/README.md)               | Amends's own harness: an in-process agent loop over Effect AI.                                                      |
+| [Environment](../packages/environment/README.md)                     | Spawning a harness with a sandbox, acquisition outcomes, snapshots, and release.                                    |
 | [Sandbox](../packages/sandbox/README.md)                             | The sandbox provider contract: acquisition, commands, processes, ports, files, and snapshots.                       |
 | [Sandbox conformance](../packages/sandbox-conformance/README.md)     | Test suites every sandbox provider runs, and the harness a provider supplies.                                       |
 | [Local sandbox](../adapters/sandbox-local/README.md)                 | Sandboxes as directories on this machine, the reference provider.                                                   |

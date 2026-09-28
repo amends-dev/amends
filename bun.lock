@@ -201,6 +201,18 @@
         "effect": "catalog:",
       },
     },
+    "packages/environment": {
+      "name": "@amends/environment",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/harness": "workspace:*",
+        "@amends/sandbox": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@amends/harness-amends": "workspace:*",
+      },
+    },
     "packages/gateway": {
       "name": "@amends/gateway",
       "version": "0.0.0",
@@ -282,6 +294,8 @@
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
+
+    "@amends/environment": ["@amends/environment@workspace:packages/environment"],
 
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 

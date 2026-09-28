@@ -43,6 +43,7 @@ packages/
   api-http/           @amends/api-http: shared HTTP contract
   server-http/        @amends/server-http: HTTP handlers and authentication
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
+  environment/        @amends/environment: spawns a harness with a sandbox and manages its lifecycle
   harness/            @amends/harness: the harness contract and recorded event standard
   harness-amends/     @amends/harness-amends: amends's own in-process harness over Effect AI
   sandbox/            @amends/sandbox: the sandbox provider contract

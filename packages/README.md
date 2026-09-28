@@ -143,6 +143,10 @@ from a local directory to a hosted service, with capabilities for what providers
 knows nothing of harnesses. `@amends/sandbox-conformance` holds the test suites every provider
 adapter runs against itself; the providers live in `adapters/`.
 
+`@amends/environment` is the [environment runtime](./environment/README.md): it composes a harness
+with an optional sandbox, spawns them without history, passes history and input through, and
+applies retention on release. It depends on the harness and sandbox contracts only.
+
 `@amends/harness` is the [harness contract](./harness/README.md): sessions, their capabilities, and
 the events and transcript every harness records, so a turn's log reads the same whichever harness
 ran it. It depends on Effect alone and knows nothing of core. `@amends/harness-amends` is

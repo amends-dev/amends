@@ -29,9 +29,9 @@ implemented through `NotificationApplication.acknowledge`, as private `Seen` sta
 journal. Other participation management, the task and channel workflows that admit contacts and
 triage, public groups, group/thread HTTP/UI, turns, execution,
 agent/contact/triage acknowledgment, and channel
-delivery below remain design intent. The harness contract, amends's own in-process harness, and
-the sandbox contract with local and Daytona providers exist as packages, but no environment or
-turn runs them yet. “Agreed” records a design decision,
+delivery below remain design intent. The harness contract, amends's own in-process harness, the
+sandbox contract with local and Daytona providers, and the environment runtime that composes them
+exist as packages, but no turn runs them yet. “Agreed” records a design decision,
 not its implementation status.
 
 ## Architecture summary
@@ -1210,8 +1210,9 @@ is a reference that only the provider which took it can restore or delete.
 
 The contract and its conformance suites are [`@amends/sandbox`](../packages/sandbox/README.md) and
 [`@amends/sandbox-conformance`](../packages/sandbox-conformance/README.md), with local and Daytona
-providers in `adapters/`. Environment composition, retention policy, and harnesses running inside
-sandboxes remain open.
+providers in `adapters/`. [`@amends/environment`](../packages/environment/README.md) composes a
+harness with a sandbox; retention settings beyond stopping or destroying the sandbox, and harnesses
+running inside sandboxes, remain open.
 
 ## Agreed: environments store references to provider-managed filesystem snapshots
 

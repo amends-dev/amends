@@ -19,15 +19,17 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   or channel delivery run, and contacts and triage have no inbox outside the store. Turn and task
   activity kinds remain design intent. Only people author messages through the application, so
   the agent-authored messages that notify agents as informational come from no workflow yet.
-- The [harness contract](../packages/harness/README.md) and amends's own
-  [in-process harness](../packages/harness-amends/README.md) exist, but nothing runs them: no
-  environment, model connection, or turn log exists, so no model provider has been called
+- The [harness contract](../packages/harness/README.md), amends's own
+  [in-process harness](../packages/harness-amends/README.md), and the
+  [environment runtime](../packages/environment/README.md) exist, but nothing runs them: no model
+  connection, stored environment definition, or turn exists, so no model provider has been called
   outside tests. That harness stops rather than answering the model when a response calls a tool
   it was not offered or holds a part it cannot record, and whether providers accept history with
   calls to tools a later session no longer offers is unverified.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
-  sandboxes outside their tests: no environment composes a sandbox with a harness, and no harness
-  runs inside one. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
+  sandboxes outside tests. No harness runs inside a sandbox yet, and an environment's retention
+  can only stop or destroy its sandbox, so no harness context survives a release. Environments
+  do not yet supply the MCP endpoint or a turn's credentials, or check an agent's model access. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
   is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes
   the suites against a real account, but a background process's output arrives only in whole lines
   there, and a snapshot can take minutes. No provider for E2B, Vercel, or Cloudflare exists;
