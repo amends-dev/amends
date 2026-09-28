@@ -137,3 +137,9 @@ gateway, adapting the same credential resolution to their own authentication.
 `@amends/storage-conformance` holds the [test suites](./storage-conformance/README.md)
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs
 them against itself.
+
+`@amends/harness` is the [harness contract](./harness/README.md): sessions, their capabilities, and
+the events and transcript every harness records, so a turn's log reads the same whichever harness
+ran it. It depends on Effect alone and knows nothing of core. `@amends/harness-amends` is
+amends's [own harness](./harness-amends/README.md), an agent loop over Effect AI's `LanguageModel`,
+which ships with `effect`; provider packages and other harnesses' dependencies belong in adapters.

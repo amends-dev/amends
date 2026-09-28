@@ -43,6 +43,8 @@ packages/
   api-http/           @amends/api-http: shared HTTP contract
   server-http/        @amends/server-http: HTTP handlers and authentication
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
+  harness/            @amends/harness: the harness contract and recorded event standard
+  harness-amends/     @amends/harness-amends: amends's own in-process harness over Effect AI
 adapters/
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
   storage-memory/     @amends/storage-memory: in-memory reference storage and directory

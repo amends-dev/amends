@@ -184,6 +184,21 @@
         "effect": "catalog:",
       },
     },
+    "packages/harness": {
+      "name": "@amends/harness",
+      "version": "0.0.0",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+    },
+    "packages/harness-amends": {
+      "name": "@amends/harness-amends",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/harness": "workspace:*",
+        "effect": "catalog:",
+      },
+    },
     "packages/server-http": {
       "name": "@amends/server-http",
       "version": "0.0.0",
@@ -228,6 +243,10 @@
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
 
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
+
+    "@amends/harness": ["@amends/harness@workspace:packages/harness"],
+
+    "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
 

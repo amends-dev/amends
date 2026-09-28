@@ -19,6 +19,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   or channel delivery run, and contacts and triage have no inbox outside the store. Turn and task
   activity kinds remain design intent. Only people author messages through the application, so
   the agent-authored messages that notify agents as informational come from no workflow yet.
+- The [harness contract](../packages/harness/README.md) and amends's own
+  [in-process harness](../packages/harness-amends/README.md) exist, but nothing runs them: no
+  environment, sandbox, model connection, or turn log exists, so no provider has been called
+  outside tests. That harness stops rather than answering the model when a response calls a tool
+  it was not offered or holds a part it cannot record, and whether providers accept history with
+  calls to tools a later session no longer offers is unverified.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
   local host runs them on an Effect Cluster runner, but no process is registered yet. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for

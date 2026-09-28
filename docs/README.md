@@ -22,6 +22,8 @@ remaining gaps with links to their owning code.
 | [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                    |
 | [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                          |
 | [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
+| [Harness](../packages/harness/README.md)                             | The harness contract: sessions, and the events and transcript every harness records.                                |
+| [Amends harness](../packages/harness-amends/README.md)               | Amends's own harness: an in-process agent loop over Effect AI.                                                      |
 | [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                    |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                              |

@@ -43,7 +43,10 @@ currently run through TypeScript. Check compatibility before changing this setup
   over the same gateway rather than new gateway methods. `storage-conformance` holds
   the test suites every storage adapter runs against itself through a harness; behavior
   core relies on belongs there, and adapter tests keep only what one adapter stores or
-  fails differently.
+  fails differently. `harness` is the contract every harness implements: sessions, and the
+  events and transcript a turn's log stores whichever harness ran, so work continues across
+  environments. `harness-amends` is amends's own harness, an agent loop over Effect AI's
+  `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`.
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column

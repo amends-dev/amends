@@ -1,0 +1,98 @@
+import { Schema } from "effect";
+import { Prompt } from "effect/unstable/ai";
+import type { Transcript } from "@amends/harness";
+
+/** The key under which this harness records its native data: Effect AI's provider metadata. */
+export const nativeKey = "amends";
+
+const isProviderOptions = Schema.is(Prompt.ProviderOptions);
+
+/**
+ * The provider metadata this harness recorded on a part. Effect AI providers read their own
+ * entries back as options, such as a signature the provider requires over its earlier reasoning.
+ */
+const optionsOf = (native: Transcript.Native | undefined): Prompt.ProviderOptions => {
+  const recorded = native?.[nativeKey];
+  return isProviderOptions(recorded) ? recorded : {};
+};
+
+/** Provider metadata as native data, or nothing when the provider attached none. */
+export const nativeOf = (metadata: Prompt.ProviderOptions): Transcript.Native | undefined =>
+  Object.keys(metadata).length === 0 ? undefined : { [nativeKey]: metadata };
+
+const text = (content: ReadonlyArray<Transcript.Content>): ReadonlyArray<string> =>
+  content.map((part) => part.text);
+
+/** A tool result as Effect AI passes it to a provider: its JSON value, or else its text. */
+const resultOf = (item: Transcript.ToolResult): unknown =>
+  item.structured ?? text(item.content).join("\n");
+
+/**
+ * The prompt for the next model request: the agent's instructions, then the transcript in order.
+ * Each input names its author, since a thread has many people and agents in it.
+ */
+export const make = (
+  instructions: string | undefined,
+  transcript: ReadonlyArray<Transcript.Item>,
+): Prompt.Prompt => {
+  const messages: Array<Prompt.Message> = [];
+  if (instructions !== undefined && instructions.length > 0)
+    messages.push(Prompt.systemMessage({ content: instructions }));
+  let results: Array<Prompt.ToolResultPart> = [];
+  const flushResults = () => {
+    if (results.length > 0) messages.push(Prompt.toolMessage({ content: results }));
+    results = [];
+  };
+  for (const item of transcript) {
+    if (item._tag === "ToolResult") {
+      results.push(
+        Prompt.toolResultPart({
+          id: item.callId,
+          name: item.name,
+          isFailure: item.isError,
+          result: resultOf(item),
+          providerExecuted: false,
+        }),
+      );
+      continue;
+    }
+    flushResults();
+    if (item._tag === "Input") {
+      const [first = "", ...rest] = text(item.content);
+      messages.push(
+        Prompt.userMessage({
+          content: [`${item.author.name}: ${first}`, ...rest].map((part) =>
+            Prompt.textPart({ text: part }),
+          ),
+        }),
+      );
+      continue;
+    }
+    if (item.parts.length === 0) continue;
+    messages.push(
+      Prompt.assistantMessage({
+        content: item.parts.map((part) => {
+          const options = optionsOf(part.native);
+          switch (part._tag) {
+            case "Text":
+              return Prompt.textPart({ text: part.text, options });
+            case "Reasoning":
+              return Prompt.reasoningPart({ text: part.text, options });
+            case "ToolCall":
+              return Prompt.toolCallPart({
+                id: part.id,
+                name: part.name,
+                params: part.params,
+                providerExecuted: false,
+                options,
+              });
+          }
+        }),
+      }),
+    );
+  }
+  flushResults();
+  return Prompt.fromMessages(messages);
+};
+
+export * as AmendsPrompt from "./prompt.ts";

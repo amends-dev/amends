@@ -29,8 +29,9 @@ implemented through `NotificationApplication.acknowledge`, as private `Seen` sta
 journal. Other participation management, the task and channel workflows that admit contacts and
 triage, public groups, group/thread HTTP/UI, turns, execution,
 agent/contact/triage acknowledgment, and channel
-delivery below remain design intent. “Agreed” records a design decision, not its
-implementation status.
+delivery below remain design intent. The harness contract and amends's own in-process harness
+exist as packages, but no environment or turn runs them yet. “Agreed” records a design decision,
+not its implementation status.
 
 ## Architecture summary
 
@@ -1008,6 +1009,36 @@ restores an existing agent-side session by ID; it does not accept an arbitrary u
 transcript. ACP support alone therefore does not establish the ability to reconstruct native
 state from any amends turn log. Each harness implementation must satisfy the continuation
 contract within its declared capabilities.
+
+## Agreed: every harness records the same events
+
+A turn's log stores harness events in one harness-neutral form, whichever harness produced them
+and wherever it ran. Execution that starts in process and moves to a sandbox, or recovers in
+another host, leaves one log that reads the same throughout, and any harness able to continue a
+transcript can take it up.
+
+The transcript a harness continues from is the history the turn chose followed by the completed
+entries its events recorded: input the harness took in, completed responses, and tool results.
+Streaming deltas and idleness add nothing to it. A response that never completed therefore leaves
+no entry and is requested again. A tool call that was running when its execution stopped has no
+result, so it stays pending rather than running again, consistent with
+[uncertain outcomes](#operation-deadlines-and-uncertain-outcomes). Incorporated input appears once,
+so continuation never submits it twice. Recovering after a failure, completing an environment
+switch, and retrying all prepare fresh execution from the same transcript; there is no separate
+restore path.
+
+An entry can carry native data that only the harness that recorded it can use, keyed by that
+harness: a provider's signature over its reasoning, for example, which the same provider requires
+to continue a tool loop. Other harnesses ignore it, and the meaning of a transcript never depends
+on it. A harness declares whether it prepares its context from any valid transcript and whether it
+accepts the result of a call an earlier execution left pending. One that restores only its own
+native sessions declares neither, so it cannot be offered as the destination of a transfer whose
+transcript it cannot continue.
+
+The shared schema, the transcript rules, and amends's own in-process harness are implemented in
+[`@amends/harness`](../packages/harness/README.md) and
+[`@amends/harness-amends`](../packages/harness-amends/README.md). The turn log's storage, the
+turn's history selection, and the environment's event envelope remain open.
 
 ## Agreed: agents start in an environment and execution can move
 
