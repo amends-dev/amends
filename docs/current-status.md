@@ -250,11 +250,13 @@ commits from every host over the same storage and resumes from a cursor. Its rem
   server through its WAL flush. A process that stops between its commit and the notice leaves
   followers to find the commit at their next poll, within five seconds. Behind a
   transaction-pooling proxy, `LISTEN` is unavailable and followers re-check every five seconds.
-- Writes are limited by the host's own work rather than by PostgreSQL: on a laptop with durable
-  writes, a thread start takes about 250 ms of which its 45 statements spend little on the
-  database, and a member list about 45 ms for 7 statements. A profile shows the time in the Effect
-  runtime, Drizzle's query building, tracing, and output. Thread starts across 16 workspaces
-  reached about 17 a second, up from 14 before notices moved after the commit.
+- One host process is limited by its own CPU before PostgreSQL: on a laptop with durable writes,
+  a thread start takes about 18 ms (40 ms at the 99th percentile) and a member list about 1 ms,
+  and thread starts across 16 workspaces reach about 110 a second, about 9 ms of host CPU each,
+  spent in the Effect runtime, Drizzle's query building, schema decoding, and the driver. Commit
+  notices sent after the commit matter once several processes write to one database; one process
+  saturates first. PostgreSQL alone, with 32 clients of tiny commits, reached about 36,600 a
+  second with the notice after the commit against 22,100 with it inside.
 - New notifications reach their recipients over the feed, and a human's `Seen` and read positions
   reach their other sessions as signals. An agent's pending notifications discarded when its
   participation ends show only through the inbox, beside an unfollow's participation-ended
