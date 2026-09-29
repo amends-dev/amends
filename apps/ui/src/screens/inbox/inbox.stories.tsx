@@ -10,7 +10,7 @@ export default meta;
 type Story = StoryObj;
 
 /** The Lunacy "Inbox / 01 / All activity" frame. */
-export const AllActivity = { render: () => <InboxWorkspace /> } satisfies Story;
+export const AllActivity = { render: () => <InboxWorkspace tab="all" /> } satisfies Story;
 
 /** The Lunacy "Inbox / 02 / Unread and open thread" frame. */
 export const UnreadWithThread = {
@@ -25,7 +25,9 @@ export const CaughtUp = {
 } satisfies Story;
 
 /** The Lunacy "Inbox / 07 / First use" frame. */
-export const FirstUse = { render: () => <InboxWorkspace items={[]} /> } satisfies Story;
+export const FirstUse = {
+  render: () => <InboxWorkspace tab="all" items={[]} />,
+} satisfies Story;
 
 export const Loading = { render: () => <InboxWorkspace status="loading" /> } satisfies Story;
 
@@ -64,7 +66,7 @@ export const SelectionFlow = {
   },
 } satisfies Story;
 
-/** Mark all seen clears every unread dot, then hides itself. */
+/** Unread opens first; Mark all seen clears every unread dot, then hides itself. */
 export const MarkAllSeen = {
   render: () => <InboxWorkspace />,
   play: async ({ canvasElement }) => {

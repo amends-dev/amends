@@ -99,7 +99,8 @@ preview before joining, and Join opens the group.
 
 ## Inbox
 
-The Inbox lists what came to the reader, All or Unread, newest first under day seams: who
+A workspace's own address lands on its Inbox. The Inbox lists what came to the reader, Unread
+first and All beside it, newest first under day seams: who
 mentioned them, replied, or started a thread, where, what was said, and how long ago, with a dot
 while unread. Opening one marks it seen at once and opens its thread in the side panel at the
 message that notified the reader, set apart, under "Mention · #general" or the like; on phones
@@ -117,8 +118,8 @@ Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.m
 side panel, such as Settings' member details, attaches beside the main content like the thread
 panel. [Agents](agents.md) follows its v02 navigation frames; [Connections](connections.md) and
 [Environments](environments.md) follow the same pattern, with their v01 frames for lists, forms,
-and modals. Home, Triage, and Tasks are placeholders drawn with UI's
-EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
+and modals. The workspace's own address redirects to the Inbox; Triage and Tasks are placeholders
+drawn with UI's EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
 above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
 empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts
 on hover, and checking a restored session shows the mark at work. Search jumps to a page, group,

@@ -184,9 +184,9 @@ it("keeps an unknown workspace page inside the workspace, with a way back home",
   );
   await screen.findByRole("heading", { name: "Nothing on this page" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Workspace home" }));
-  await screen.findByRole("heading", { name: "Home" });
-  expect(history.get()).toBe("/workspaces/one");
+  fireEvent.click(screen.getByRole("button", { name: "Go to Inbox" }));
+  await screen.findByRole("heading", { name: "Inbox" });
+  expect(history.get()).toBe("/workspaces/one/inbox");
 });
 it("replaces a crashed view with a reload, without account controls", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -224,7 +224,7 @@ it("resolves active workspace scope from the directory and updates it during nav
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, () =>
     Promise.resolve(response(listing)),
   );
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "First workspace",
   );
@@ -245,14 +245,17 @@ it("revalidates and replaces cached directory data when credentials change", asy
       response({ memberships: [membership("one", "Alice workspace")], invitations: [] }),
     )
     .mockImplementationOnce(() => pending.promise);
-  // The layout also reads the workspace's agents, whose status its sidebar and cards show.
+  // The workspace's own reads, such as its agents and inbox, wait; only the directory answers.
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
-    new URL(new Request(input, init).url).pathname.endsWith("/agents")
-      ? new Promise<Response>(() => {})
-      : directoryReads(input, init),
+    new URL(new Request(input, init).url).pathname === "/me/workspaces"
+      ? directoryReads(input, init)
+      : new Promise<Response>(() => {}),
   );
   mount("/workspaces/one", fixture.store, fetch);
-  await screen.findByText("Alice workspace");
+  // The sidebar's workspace switcher names it; the Inbox's header repeats it for phones.
+  await within(await screen.findByRole("navigation", { name: "Workspace" })).findByText(
+    "Alice workspace",
+  );
   fixture.change(session("bob"));
   expect(screen.queryByText("Alice workspace")).not.toBeInTheDocument();
   await waitFor(() => expect(directoryReads).toHaveBeenCalledTimes(2));
@@ -271,11 +274,11 @@ it("resumes a safe return path only after a stored session validates", async () 
         response({ memberships: [membership("one", "First workspace")], invitations: [] }),
       ),
   );
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "First workspace",
   );
-  expect(history.get()).toBe("/workspaces/one");
+  expect(history.get()).toBe("/workspaces/one/inbox");
 });
 
 async function submitEmail() {
@@ -293,7 +296,7 @@ it("signs in through the composed page and validates before resuming the intende
     .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
     .mockImplementation(() => checked.promise);
   const fixture = memoryStore();
-  const history = mount("/workspaces/one?tab=members", fixture.store, fetch);
+  const history = mount("/workspaces/one/tasks?filter=mine", fixture.store, fetch);
   const code = await submitEmail();
   expect(screen.getAllByRole("main")).toHaveLength(1);
   expect(code).toHaveFocus();
@@ -312,11 +315,11 @@ it("signs in through the composed page and validates before resuming the intende
   checked.resolve(
     response({ memberships: [membership("one", "First workspace")], invitations: [] }),
   );
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Tasks" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "First workspace",
   );
-  expect(history.get()).toBe("/workspaces/one?tab=members");
+  expect(history.get()).toBe("/workspaces/one/tasks?filter=mine");
 });
 it("ignores an external return destination after signing in", async () => {
   const fetch = vi
@@ -393,9 +396,9 @@ it("retains a created workspace through directory failure and navigates after re
   await within(dialog).findByText(/Your workspace was created, but/);
   expect(history.get()).toBe("/workspaces/new");
   fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Studio");
-  expect(history.get()).toBe("/workspaces/one");
+  expect(history.get()).toBe("/workspaces/one/inbox");
   expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
 
@@ -431,7 +434,7 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
     );
   });
   const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   const sidebar = screen.getByRole("navigation", { name: "Workspace" });
   const trigger = screen.getByRole("button", { name: "Account: alice" });
   fireEvent.click(screen.getByRole("link", { name: "Tasks" }));
@@ -454,10 +457,10 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
   // The directory; each workspace's agents, whose status the layout shows; the first
-  // workspace's environments with their harnesses and providers, and its connections, whose
-  // providers the Connections page adds; then the second workspace's settings and ownership.
-  // The feed stays separate.
-  expect(fetch).toHaveBeenCalledTimes(9);
+  // workspace's Inbox, where it lands, read as unread and as all; its environments with their
+  // harnesses and providers, and its connections, whose providers the Connections page adds; then
+  // the second workspace's settings and ownership. The feed stays separate.
+  expect(fetch).toHaveBeenCalledTimes(11);
   expect(feed.streams.map((stream) => new URL(stream.request.url).pathname)).toEqual([
     "/workspaces/one/changes",
     "/workspaces/two/changes",
@@ -733,7 +736,7 @@ it("leaves a workspace once a commit removes the member, without signing out", a
         ? response({ _tag: "Gateway.NotMember", workspaceId: "one" }, 403)
         : undefined,
   );
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   status = "removed";
   feed.streams[0]?.send(
     committed("one", "2", [
@@ -748,12 +751,12 @@ it("leaves a workspace once a commit removes the member, without signing out", a
 it("tells the reader when changes stop arriving, and clears once they resume", async () => {
   let down = false;
   mount(
-    "/workspaces/one",
+    "/workspaces/one/tasks",
     memoryStore(session("alice")).store,
     liveWorkspace({ name: () => "Studio" }),
     () => (down ? response({ _tag: "ChangeFeed.Unavailable" }, 503) : undefined),
   );
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Tasks" });
   const announcer = screen.getByRole("status");
   expect(announcer).toBeEmptyDOMElement();
   down = true;
@@ -895,7 +898,14 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path.endsWith("/notifications/inbox")) return Promise.resolve(response(inbox));
+    if (path.endsWith("/notifications/inbox"))
+      return Promise.resolve(
+        response(
+          new URL(request.url).searchParams.get("pendingOnly") === "true"
+            ? inbox.filter((entry) => entry.notification.state._tag === "Pending")
+            : inbox,
+        ),
+      );
     if (request.method === "POST" && path.endsWith("/notifications/n1/acknowledge")) {
       acknowledged.push(path);
       inbox[0]!.notification.state = {
@@ -921,7 +931,10 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
   });
   const history = mount("/workspaces/one/inbox", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("navigation", { name: "Workspace" });
-  const list = await within(screen.getByRole("main")).findByRole("list", { name: "Notifications" });
+  // Unread opens first.
+  const list = await within(screen.getByRole("main")).findByRole("list", {
+    name: "Unread notifications",
+  });
   await within(list).findByText("On it.");
   expect(within(list).getByText(/mentioned you/)).toBeInTheDocument();
   expect(within(list).getByRole("img", { name: "unread" })).toBeInTheDocument();
@@ -957,7 +970,8 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/inbox"));
   await waitFor(() => expect(screen.queryByLabelText("Thread", { selector: "aside" })).toBeNull());
   // The inbox stays mounted while threads open and close beside it.
-  expect(within(screen.getByRole("main")).getByRole("list", { name: "Notifications" })).toBe(list);
+  // Nothing unread remains once its thread closes.
+  await within(screen.getByRole("main")).findByText("You’re all caught up");
 });
 
 it("offers a new group only to those who may create one, and opens the group it creates", async () => {
@@ -1052,7 +1066,7 @@ it("shows no new group action to a reader who may not create one", async () => {
   );
   mount("/workspaces/one", memoryStore(session("alice")).store, fetch);
   await screen.findByRole("navigation", { name: "Workspace" });
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   expect(screen.queryByRole("button", { name: "Create group" })).toBeNull();
 });
 
@@ -1126,7 +1140,7 @@ it("manages a group's members from its header, and leaving returns to the worksp
   fireEvent.click(within(dialog).getByRole("button", { name: "General" }));
   fireEvent.click(await within(dialog).findByRole("button", { name: "Leave group" }));
   await waitFor(() => expect(changes).toEqual(["remove a2", "leave a1"]));
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one"));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/inbox"));
   expect(changes).toEqual(["remove a2", "leave a1"]);
 });
 

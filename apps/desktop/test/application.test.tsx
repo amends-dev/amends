@@ -115,17 +115,17 @@ it("signs in from the desktop page and resumes the workspace query through hash 
         invitations: [],
       }),
     );
-  const store = mount("/workspaces/one?tab=members", undefined, fetch);
+  const store = mount("/workspaces/one/tasks?filter=mine", undefined, fetch);
   const code = await submitEmail();
   expect(screen.getAllByRole("main")).toHaveLength(1);
   expect(code).toHaveFocus();
   fireEvent.input(code, { target: { value: "001234" } });
   fireEvent.submit(screen.getByRole("form"));
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Tasks" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent(
     "Desktop workspace",
   );
-  expect(window.location.hash).toBe("#/workspaces/one?tab=members");
+  expect(window.location.hash).toBe("#/workspaces/one/tasks?filter=mine");
   expect(store.read()?.token).toBe("jo@mercier.co");
   expect(new Headers(fetch.mock.calls[2]?.[1]?.headers).get("authorization")).toBe(
     "Bearer jo@mercier.co",
@@ -179,9 +179,9 @@ it("opens creation from the picker and enters the created workspace through hash
     target: { value: "Studio" },
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "Create workspace" }));
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Studio");
-  expect(window.location.hash).toBe("#/workspaces/one");
+  expect(window.location.hash).toBe("#/workspaces/one/inbox");
   fireEvent.keyDown(screen.getByRole("button", { name: "Account: alice" }), { key: "Enter" });
   fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Switch workspace" }), {
     key: "Enter",
@@ -209,7 +209,7 @@ it("navigates workspace sections with persistent chrome and retains appearance a
     invitations: [],
   };
   mount("/workspaces/one", "alice", () => Promise.resolve(response(listing)));
-  await screen.findByRole("heading", { name: "Home" });
+  await screen.findByRole("heading", { name: "Inbox" });
   const sidebar = screen.getByRole("navigation", { name: "Workspace" });
   fireEvent.click(screen.getByRole("link", { name: "Triage" }));
   await screen.findByRole("heading", { name: "Triage" });
@@ -455,7 +455,14 @@ it("lists the inbox at its hash route, and opening one marks it seen and shows i
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path.endsWith("/notifications/inbox")) return Promise.resolve(response(inbox));
+    if (path.endsWith("/notifications/inbox"))
+      return Promise.resolve(
+        response(
+          new URL(request.url).searchParams.get("pendingOnly") === "true"
+            ? inbox.filter((entry) => entry.notification.state._tag === "Pending")
+            : inbox,
+        ),
+      );
     if (request.method === "POST" && path.endsWith("/notifications/n1/acknowledge")) {
       inbox[0]!.notification.state = {
         _tag: "Acknowledged",
@@ -492,7 +499,10 @@ it("lists the inbox at its hash route, and opening one marks it seen and shows i
   });
   mount("/workspaces/one/inbox", "alice", fetch);
   await screen.findByRole("navigation", { name: "Workspace" });
-  const list = await within(screen.getByRole("main")).findByRole("list", { name: "Notifications" });
+  // Unread opens first.
+  const list = await within(screen.getByRole("main")).findByRole("list", {
+    name: "Unread notifications",
+  });
   await within(list).findByText("On it.");
   const open = within(list).getByRole("link", { name: /mentioned you$/ });
   expect(open).toHaveAttribute("href", "#/workspaces/one/inbox/groups/g1/threads/t1?at=2");
@@ -506,7 +516,8 @@ it("lists the inbox at its hash route, and opening one marks it seen and shows i
   await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
   fireEvent.click(within(thread).getByRole("button", { name: "Close thread" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/inbox"));
-  expect(within(screen.getByRole("main")).getByRole("list", { name: "Notifications" })).toBe(list);
+  // Nothing unread remains once its thread closes.
+  await within(screen.getByRole("main")).findByText("You’re all caught up");
 });
 
 it("creates a group from the sidebar and opens it at its hash route", async () => {

@@ -101,8 +101,8 @@ The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creatio
 composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
-routes, the responsive shell, groups and threads, and the account menu. Home, Triage, and Tasks
-remain placeholders. `src/pages/connections.tsx` composes the
+routes, the responsive shell, groups and threads, and the account menu. The workspace's own
+address redirects to its Inbox, which opens on Unread; Triage and Tasks remain placeholders. `src/pages/connections.tsx` composes the
 [Connections page](../../docs/connections.md) from `useConnections` and UI's Connections screens,
 and `src/pages/environments.tsx` the [Environments page](../../docs/environments.md) from
 `useEnvironments`, detouring through the Connections dialogs to create a sandbox account, and

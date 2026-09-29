@@ -72,5 +72,4 @@ is an EmptyState with one action:
 | Crashed view         | `CrashedScreen`         | Something went wrong            | Reload                          |
 
 The crashed view sits outside ClientProvider, so it shows no account. An unknown page inside a
-workspace keeps the workspace layout, still in the previous UI, with a way back to the
-workspace home. Unavailable workspaces are described above.
+workspace keeps the workspace layout, still in the previous UI, with Go to Inbox as the way back. Unavailable workspaces are described above.

@@ -87,7 +87,7 @@ export function InboxWorkspace(props: InboxWorkspaceProps) {
       item.id === props.selected ? { ...item, unread: false } : item,
     ),
   );
-  const [tab, setTab] = createSignal<InboxTab>(props.tab ?? "all");
+  const [tab, setTab] = createSignal<InboxTab>(props.tab ?? "unread");
   const [selected, setSelected] = createSignal(props.selected);
   const unread = () => items().filter((item) => item.unread).length;
   const shown = createMemo(() =>

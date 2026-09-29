@@ -86,7 +86,7 @@ function byDay(items: readonly InboxItem[]) {
 }
 
 /**
- * The Inbox: what came to the reader, newest first under day seams, All or Unread. Opening a
+ * The Inbox: what came to the reader, newest first under day seams, Unread or All. Opening a
  * notification opens its thread beside the list and marks it seen.
  */
 export function InboxPane(props: InboxPaneProps) {
@@ -121,8 +121,8 @@ export function InboxPane(props: InboxPaneProps) {
         </Pane.Actions>
         <Pane.Tabs>
           <Tabs.List aria-label="Inbox">
-            {tab("all", "All")}
             {tab("unread", "Unread", props.unreadCount ?? 0)}
+            {tab("all", "All")}
           </Tabs.List>
         </Pane.Tabs>
       </Pane.Header>

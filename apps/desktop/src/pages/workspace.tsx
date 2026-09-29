@@ -3,7 +3,7 @@ import { Button } from "@amends/ui/components/button";
 import { EmptyState } from "@amends/ui/components/empty-state";
 import { Pane } from "@amends/ui/patterns/pane";
 import { Shell } from "@amends/ui/patterns/shell";
-import { useNavigate, useParams } from "@solidjs/router";
+import { Navigate, useNavigate, useParams } from "@solidjs/router";
 import type { JSX } from "solid-js";
 
 /** A workspace page that is still a placeholder: its title and what it will hold. */
@@ -29,14 +29,10 @@ function Placeholder(props: {
   );
 }
 
-export function HomePage() {
-  return (
-    <Placeholder
-      title="Home"
-      heading="Your workspace is ready"
-      line="Work and activity will appear here."
-    />
-  );
+/** A workspace's own address lands on its Inbox, what came to the reader. */
+export function WorkspaceIndex() {
+  const params = useParams<{ workspaceId: string }>();
+  return <Navigate href={paths.workspacePage(params.workspaceId, "inbox")} />;
 }
 export function TriagePage() {
   return (
@@ -65,7 +61,9 @@ export function MissingWorkspacePage() {
       heading="Nothing on this page"
       line="This page doesn’t exist in the workspace."
     >
-      <Button onClick={() => navigate(paths.workspace(params.workspaceId))}>Workspace home</Button>
+      <Button onClick={() => navigate(paths.workspacePage(params.workspaceId, "inbox"))}>
+        Go to Inbox
+      </Button>
     </Placeholder>
   );
 }

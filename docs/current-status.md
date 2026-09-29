@@ -161,7 +161,7 @@ A group's header shows its member stack, which opens Group settings on Members: 
 picker (`manageable` on each item of their groups list); in a private group any member also
 removes others, while in a public one only administrators and the owner do
 (`membersRemovable`). Anyone may leave a team group from its General tab, which returns them to
-the workspace home. Removing and leaving act on the first click, as the mocks show, where the
+the workspace's Inbox. Removing and leaving act on the first click, as the mocks show, where the
 previous UI asked for a second confirming click. Direct groups list their members without changes. Nobody manages a group they are
 not in: administrators moderate a public group by joining it. Leaving settles the reader's pending
 notifications from the group: they leave the Inbox count and its Unread filter at once and stay in

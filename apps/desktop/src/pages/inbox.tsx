@@ -10,7 +10,8 @@ export function InboxPage() {
   const params = useParams<{ workspaceId: string; threadId?: string }>();
   const [search] = useSearchParams<{ at?: string }>();
   const workspace = useWorkspace(() => params.workspaceId);
-  const [tab, setTab] = createSignal<InboxTab>("all");
+  // Unread first: what the reader has not looked at is why they come here.
+  const [tab, setTab] = createSignal<InboxTab>("unread");
   // The notification whose thread is open beside the inbox, kept in Unread while it is.
   const [selected, setSelected] = createSignal<string>();
   const actions = useWorkspaceActions();

@@ -22,7 +22,7 @@ import { GroupPage } from "./pages/group.tsx";
 import { InboxPage } from "./pages/inbox.tsx";
 import { GroupsPage } from "./pages/groups.tsx";
 import { DirectPage } from "./pages/direct.tsx";
-import { HomePage, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
+import { WorkspaceIndex, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
 import { AgentsPage } from "./pages/agents.tsx";
 import { ConnectionsPage } from "./pages/connections.tsx";
 import { EnvironmentsPage } from "./pages/environments.tsx";
@@ -103,7 +103,7 @@ export function ApplicationRoutes() {
       <Route component={RequireSession}>
         <Route path={[paths.workspaces, paths.createWorkspace]} component={WorkspacePickerPage} />
         <Route path="/workspaces/:workspaceId" component={WorkspaceRoute}>
-          <Route path="/" component={HomePage} />
+          <Route path="/" component={WorkspaceIndex} />
           <Route path="/groups" component={GroupsPage} />
           <Route
             path={["/groups/:groupId", "/groups/:groupId/threads/:threadId"]}
