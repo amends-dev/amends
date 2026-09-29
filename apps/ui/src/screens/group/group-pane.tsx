@@ -38,7 +38,7 @@ export interface GroupPaneProps {
   /** A few members for the header stack, such as the most recent to post. */
   readonly members: readonly AvatarStackPerson[];
   readonly memberCount: number;
-  /** The tabs to offer; with one, the tab row is left out. Default all three. */
+  /** The tabs to offer, in a row even when there is one, such as Threads alone. Default all three. */
   readonly tabs?: readonly GroupTab[];
   readonly tab: GroupTab;
   readonly tabHref: (tab: GroupTab) => string;
@@ -144,7 +144,7 @@ export function GroupPane(props: GroupPaneProps) {
             </Show>
           </Show>
         </Pane.Actions>
-        <Show when={shownTabs().length > 1}>
+        <Show when={shownTabs().length > 0}>
           <Pane.Tabs>
             <Tabs.List aria-label={props.name}>
               <For each={shownTabs()}>

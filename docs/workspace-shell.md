@@ -109,8 +109,11 @@ and modals. Home, Triage, and Tasks are placeholders drawn with UI's
 EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
 above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
 empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts
-on hover, and checking a restored session shows the mark at work. The mocks' search, the Tasks
-and Files tabs, reactions, and task references have no backend and are not shown.
+on hover, and checking a restored session shows the mark at work. Search jumps to a page, group,
+conversation, person, agent, environment, or connection by name, from ⌘K or Ctrl+K, the
+sidebar's "Find anything", or the rail's Search; messages cannot be searched yet. A group shows its
+Threads tab alone: the mocks' Tasks and Files tabs, reactions, and task references have no backend
+and are not shown.
 
 ## Account and appearance
 

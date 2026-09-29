@@ -1198,6 +1198,38 @@ it("lists teammates under Direct messages and says when there are no groups", as
   );
 });
 
+it("jumps to a group by name from ⌘K or the sidebar's search", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    if (path === "/workspaces/one/groups/g1/members") return Promise.resolve(response([]));
+    const answer = conversation(path);
+    return Promise.resolve(
+      response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] }),
+    );
+  });
+  const history = mount("/workspaces/one", memoryStore(session("alice")).store, fetch, undefined, {
+    groups: [managed],
+  });
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  await within(sidebar).findByRole("link", { name: "Design" });
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  const dialog = await screen.findByRole("dialog", { name: "Jump to" });
+  const field = within(dialog).getByRole("combobox", { name: "Jump to" });
+  const user = userEvent.setup();
+  await user.type(field, "des");
+  expect(
+    within(dialog)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["Design"]);
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g1"));
+  expect(screen.queryByRole("dialog", { name: "Jump to" })).toBeNull();
+  // The sidebar's search opens it too.
+  fireEvent.click(within(sidebar).getByRole("button", { name: /Find anything/u }));
+  expect(await screen.findByRole("dialog", { name: "Jump to" })).toBeInTheDocument();
+});
+
 it("renames a group from its settings", async () => {
   let name = "Design",
     expectedName: string | undefined;

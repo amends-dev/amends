@@ -10,9 +10,10 @@ export type RootProps = {
   /**
    * "compact" is 560px wide and as tall as its content, for short forms; "form" is 640px wide and
    * as tall as its content, for a form of a few sections; "wide" is 720 × 864, for long forms with
-   * side-by-side fields. Default "regular".
+   * side-by-side fields; "palette" is 640 × 480 near the top, for a search that keeps its place as
+   * results narrow. Default "regular".
    */
-  size?: "regular" | "compact" | "form" | "wide";
+  size?: "regular" | "compact" | "form" | "wide" | "palette";
   /** A Pane with variant="modal". */
   children: JSX.Element;
 };

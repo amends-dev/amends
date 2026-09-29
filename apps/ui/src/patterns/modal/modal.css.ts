@@ -29,16 +29,23 @@ export const dialog = style({
       width: "min(45rem, calc(100vw - 2rem))",
       height: "min(54rem, calc(100dvh - 4rem))",
     },
+    // A search over the workspace: near the top, and a fixed height so it keeps its place as
+    // results narrow.
+    "&[data-size=palette]": {
+      height: "min(30rem, calc(100dvh - 4rem))",
+      marginBlockStart: "12vh",
+    },
     "&::backdrop": { backgroundColor: vars.color.scrim },
   },
   "@media": {
     [media.mobile]: {
       selectors: {
-        "&[data-size=compact], &[data-size=form], &[data-size=wide]": {
+        "&[data-size=compact], &[data-size=form], &[data-size=wide], &[data-size=palette]": {
           width: "100vw",
           height: "100dvh",
           maxHeight: "none",
         },
+        "&[data-size=palette]": { marginBlockStart: 0 },
       },
       width: "100vw",
       height: "100dvh",

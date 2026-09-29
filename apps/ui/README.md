@@ -205,8 +205,9 @@ have a large size for centered screens, and field errors carry a warning icon.
 `Modal` is the fifth pattern: a Pane with `variant="modal"` in a native dialog, so the page
 behind is inert, Escape and a click outside close it, and focus returns. It is 640 × 600 capped
 to the viewport, 560px wide and as tall as its content with `size="compact"`, 640px wide and as
-tall as its content with `size="form"`, or 720 × 864 with `size="wide"`, and fills the screen on
-phones. `Modal.Actions` holds its buttons at the end
+tall as its content with `size="form"`, 720 × 864 with `size="wide"`, or 640 × 480 near the top
+with `size="palette"`, for a search that keeps its place as results narrow, and fills the screen
+on phones. `Modal.Actions` holds its buttons at the end
 of a 64px band, sharing the width on phones.
 
 `Centered` is the sixth pattern, for screens outside a workspace: the canvas frames one white
@@ -261,8 +262,8 @@ and starts its own, since its elbow hangs from the avatar, and messages without 
 `at` never stack.
 `GroupThreads` and `ThreadPane` take a `status` (loading, unavailable, failed with Try again),
 `earlier` to load older entries, a `sendError` code, and a `follow` bell, filled
-(`IconBellFilled`) while following; `GroupPane` takes the tabs to show (with one, the tab row is
-left out) and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
+(`IconBellFilled`) while following; `GroupPane` takes the tabs to show, in a row even when there is
+one, and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
 message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
 report change errors, and `focusName` opens it with the name selected for a rename; for a direct conversation it shows only members, and for the workspace's
 `general` group it says everyone belongs and offers no Leave; the apps hide adding there too. `GroupDirectory` takes
@@ -339,7 +340,12 @@ rendered inside `Shell.Main`, as a page renders member details,
 attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
 inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and
 `NewMessage` are compact modals for the account
-menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
+menu's Change your name and the sidebar's New message. `JumpTo` jumps anywhere by name: a palette
+of places grouped in sections (a label, an icon or a person's avatar, and a quiet detail), narrowed
+as the reader types by a name's start, a word's start, or anywhere in it, five a section before
+typing and eight after; arrows move, Enter goes, and Escape closes. The apps open it from ⌘K or
+Ctrl+K, the sidebar's "Find anything", and the rail's Search. **Screens / Workspace dialogs** shows
+it. `WorkspaceNavigation` takes the rail
 destinations to show, an optional search, and an account menu (identity, appearance, switch
 workspace, settings, change name, sign out); once groups load (`groupsLoading`), an empty Groups
 section in `HomeSidebar` says "No groups yet". **Screens / Workspace navigation** shows Home with

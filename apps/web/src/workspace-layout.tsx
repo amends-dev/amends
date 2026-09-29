@@ -31,6 +31,7 @@ import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
+import { JumpTo, type JumpToItem } from "@amends/ui/screens/jump-to";
 import {
   DestinationSidebar,
   HomeSidebar,
@@ -39,13 +40,27 @@ import {
   type NavigationSection,
 } from "@amends/ui/screens/workspace-navigation";
 import {
+  IconMarkAgents,
+  IconMarkChannel,
   IconMarkConnections,
   IconMarkEnvironments,
+  IconMarkMail,
   IconMarkSettings,
+  IconMessage,
   IconUsers,
 } from "@amends/icons";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { createMemo, createSignal, For, Match, Show, Switch, type ParentProps } from "solid-js";
+import {
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  type ParentProps,
+} from "solid-js";
 import { TurnLog } from "./turn-log.tsx";
 import { WorkspaceActionsContext, useWorkspaceActions } from "./workspace-actions.ts";
 
@@ -88,7 +103,18 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const browsing = useMatch(() => "/workspaces/:workspaceId/groups");
   const [search, setSearch] = useSearchParams<{ at?: string; to?: string; log?: string }>();
   const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
-  const [dialog, setDialog] = createSignal<"create-group" | "new-message" | "name">();
+  const [dialog, setDialog] = createSignal<"create-group" | "new-message" | "name" | "jump">();
+  // ⌘K, or Ctrl+K, jumps anywhere in the workspace, from wherever the reader is.
+  onMount(() => {
+    const jump = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k" || event.altKey || event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      setDialog("jump");
+    };
+    document.addEventListener("keydown", jump);
+    onCleanup(() => document.removeEventListener("keydown", jump));
+  });
   const [toasts, setToasts] = createSignal<ReadonlyArray<{ id: number; text: string }>>([]);
   let toastId = 0;
   const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }]);
@@ -170,6 +196,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
           destination={destination()}
           destinationHref={(target) => href(path(target))}
           settings={{ href: href(path("settings")), current: at("settings") }}
+          onSearch={() => setDialog("jump")}
           onSwitchWorkspace={() => navigate(paths.workspaces)}
         >
           <Switch
@@ -318,6 +345,9 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
           error={name.error()}
           onSave={name.save}
         />
+        <Show when={dialog() === "jump"}>
+          <JumpToDialog workspaceId={workspaceId} onClose={() => setDialog(undefined)} />
+        </Show>
         <LiveStatus status={live()} />
         <Toast.Region>
           <For each={toasts()}>
@@ -332,6 +362,151 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         </Toast.Region>
       </Shell.Root>
     </WorkspaceActionsContext.Provider>
+  );
+}
+
+/** A place Jump to offers, and the path it leads to. */
+type Place = JumpToItem & { readonly path: string };
+
+/**
+ * Jump to: pages, groups, conversations, people, and the workspace's agents, environments, and
+ * connections, by name. The lists it offers load while it is open.
+ */
+function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: () => void }) {
+  const workspaceId = props.workspaceId;
+  const navigate = useNavigate();
+  const groups = useWorkspaceGroups(workspaceId);
+  const people = useWorkspacePeople(workspaceId);
+  const agents = useAgentList(workspaceId);
+  const environments = useEnvironmentList(workspaceId);
+  const connections = useConnectionList(workspaceId);
+  const page = (target: WorkspacePage) => paths.workspacePage(workspaceId, target);
+  const places = createMemo((): readonly Place[] => {
+    const humans = new Set(people().flatMap((person) => (person.agent ? [] : [person.id])));
+    return [
+      {
+        id: "page:inbox",
+        label: "Inbox",
+        section: "Go to",
+        icon: IconMarkMail,
+        path: page("inbox"),
+      },
+      {
+        id: "page:groups",
+        label: "Groups",
+        section: "Go to",
+        detail: "Browse",
+        icon: IconMarkChannel,
+        path: paths.groups(workspaceId),
+      },
+      {
+        id: "page:agents",
+        label: "Agents",
+        section: "Go to",
+        icon: IconMarkAgents,
+        path: page("agents"),
+      },
+      {
+        id: "page:environments",
+        label: "Environments",
+        section: "Go to",
+        icon: IconMarkEnvironments,
+        path: page("environments"),
+      },
+      {
+        id: "page:connections",
+        label: "Connections",
+        section: "Go to",
+        icon: IconMarkConnections,
+        path: page("connections"),
+      },
+      {
+        id: "page:settings",
+        label: "Settings",
+        section: "Go to",
+        icon: IconMarkSettings,
+        path: paths.settingsSection(workspaceId, "workspace"),
+      },
+      {
+        id: "page:members",
+        label: "Members",
+        section: "Go to",
+        detail: "Settings",
+        icon: IconUsers,
+        path: paths.settingsSection(workspaceId, "members"),
+      },
+      ...groups.teams().map((group) => ({
+        id: `group:${group.id}`,
+        label: group.name,
+        section: "Groups",
+        icon: IconMarkChannel,
+        path: paths.group(workspaceId, group.id),
+      })),
+      // A conversation with one person is under People; with several, or with an agent, here.
+      ...groups
+        .directs()
+        .filter((group) => !(group.memberIds.length === 1 && humans.has(group.memberIds[0]!)))
+        .map((group) => ({
+          id: `group:${group.id}`,
+          label: group.name,
+          section: "Direct messages",
+          icon: IconMessage,
+          path: paths.group(workspaceId, group.id),
+        })),
+      ...people()
+        .filter((person) => !person.agent)
+        .map((person) => {
+          const existing = groups.directWith([person.id]);
+          return {
+            id: `person:${person.id}`,
+            label: person.name,
+            section: "People",
+            detail: "Direct message",
+            person: { name: person.name },
+            path: existing
+              ? paths.group(workspaceId, existing.id)
+              : paths.directDraft(workspaceId, [person.id]),
+          };
+        }),
+      ...agents.agents().map((agent) => ({
+        id: `agent:${agent.id}`,
+        label: agent.name,
+        section: "Agents",
+        person: {
+          name: agent.name,
+          initials: agent.name.trim().charAt(0).toUpperCase(),
+          tone: "lilac" as const,
+        },
+        path: paths.agent(workspaceId, agent.id),
+      })),
+      ...environments.environments().map((environment) => ({
+        id: `environment:${environment.id}`,
+        label: environment.name,
+        section: "Environments",
+        icon: IconMarkEnvironments,
+        path: paths.environment(workspaceId, environment.id),
+      })),
+      ...connections.connections().map((connection) => ({
+        id: `connection:${connection.id}`,
+        label: connection.name,
+        section: "Connections",
+        icon: IconMarkConnections,
+        path: paths.connection(workspaceId, connection.id),
+      })),
+    ];
+  });
+  return (
+    <JumpTo
+      open
+      onClose={props.onClose}
+      items={places()}
+      loading={groups.all() === undefined || agents.loading() || environments.loading()}
+      onOpen={(id) => {
+        const place = places().find((entry) => entry.id === id);
+        props.onClose();
+        if (place) navigate(place.path);
+      }}
+    />
   );
 }
 

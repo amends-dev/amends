@@ -125,6 +125,7 @@ import signInMeta, {
 import dialogsMeta, {
   ChangeNameFailed,
   ChangeYourName,
+  JumpToAnywhere,
   NewMessageDialog,
 } from "../src/screens/account/dialogs.stories.tsx";
 import conversationMeta2, {
@@ -585,6 +586,9 @@ describe("workspace dialogs", () => {
     await stories.story(ChangeYourName).run();
     await stories.story(ChangeNameFailed).run();
     await stories.story(NewMessageDialog).run();
+  });
+  it("jumps anywhere by name from the keyboard", async () => {
+    await stories.story(JumpToAnywhere).run();
   });
 });
 

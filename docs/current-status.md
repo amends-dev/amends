@@ -192,8 +192,10 @@ placeholder until tasks exist.
 
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
-the workspace or one item; which item is not shown. The mocks' search, group
-Tasks and Files tabs, reactions, and task references have no backend and are not shown.
+the workspace or one item; which item is not shown. Search is Jump to, over what the app already
+reads: pages, groups, conversations, people, agents, environments, and connections, by name.
+Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
+tabs, reactions, and task references have no backend and are not shown.
 
 ## Storage cost
 

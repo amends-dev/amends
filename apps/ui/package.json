@@ -56,6 +56,7 @@
     "./screens/group": "./src/screens/group/index.ts",
     "./screens/groups": "./src/screens/groups/index.ts",
     "./screens/inbox": "./src/screens/inbox/index.ts",
+    "./screens/jump-to": "./src/screens/jump-to/index.ts",
     "./screens/settings": "./src/screens/settings/index.ts",
     "./screens/sign-in": "./src/screens/sign-in/index.ts",
     "./screens/standalone": "./src/screens/standalone/index.ts",
