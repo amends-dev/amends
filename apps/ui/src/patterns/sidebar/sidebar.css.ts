@@ -212,6 +212,8 @@ export const section = style({
   flexDirection: "column",
   gap: "0.375rem",
   marginBlockStart: "1.375rem",
+  // A destination's first section starts where Home's first items do.
+  selectors: { "&:first-child": { marginBlockStart: 0 } },
   "@media": { [media.touch]: { gap: "0.25rem", marginBlockStart: "0.5rem" } },
 });
 
@@ -313,3 +315,11 @@ export const subItemIcon = style({
 
 // Where agents are at work, quiet beside the label and apart from unread counts.
 export const itemActivity = style({ flex: "none" });
+
+// Needs attention, such as setup: a small warning in the caution color.
+export const itemAttention = style({
+  flex: "none",
+  width: "0.875rem",
+  height: "0.875rem",
+  color: vars.color.text.caution,
+});

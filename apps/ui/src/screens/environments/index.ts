@@ -5,10 +5,10 @@ export {
   type ConfirmRemoveEnvironmentProps,
 } from "./add-environment.tsx";
 export {
-  EnvironmentDetails,
-  type EnvironmentDetailsProps,
-  type EnvironmentDetailsTab,
-} from "./environment-details.tsx";
+  EnvironmentPane,
+  type EnvironmentPaneProps,
+  type EnvironmentTab,
+} from "./environment-pane.tsx";
 export {
   EnvironmentList,
   EnvironmentsPane,

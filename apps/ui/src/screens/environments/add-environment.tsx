@@ -6,7 +6,7 @@ import { Input } from "../../components/input/index.ts";
 import { Select } from "../../components/select/index.ts";
 import { Modal } from "../../patterns/modal/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
-import { sandboxProblem } from "./environment-details.tsx";
+import { sandboxProblem } from "./environment-pane.tsx";
 import { SandboxFields, type SandboxFieldsProps } from "./sandbox-fields.tsx";
 import {
   EnvironmentsAlert,

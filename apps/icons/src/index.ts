@@ -12,6 +12,7 @@ export { IconCircleFrame } from "./generated/circle-frame.tsx";
 export { IconClock } from "./generated/clock.tsx";
 export { IconFolder } from "./generated/folder.tsx";
 export { IconHome } from "./generated/home.tsx";
+export { IconList } from "./generated/list.tsx";
 export { IconMarkAgents } from "./generated/mark-agents.tsx";
 export { IconMarkAttach } from "./generated/mark-attach.tsx";
 export { IconMarkBack } from "./generated/mark-back.tsx";

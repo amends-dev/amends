@@ -148,11 +148,8 @@ export interface AgentListProps {
   readonly total: number;
   /** No model connection exists yet, so agents need one before the first is added. */
   readonly noModelConnection?: boolean;
-  /** The agent open in the side panel. */
-  readonly selectedId?: string;
+  /** Each agent's page. */
   readonly agentHref: (id: string) => string;
-  /** Opens an agent in place of following its link. */
-  readonly onOpen?: (id: string) => void;
   /** Starts adding an agent, for a reader who may. */
   readonly onAdd?: () => void;
   /** Starts creating a model connection, for a reader who may add agents. */
@@ -185,9 +182,9 @@ export function AgentAvatar(props: {
 }
 
 /**
- * The agent list: search, then each agent with its model, environment, and setup. With room it
- * shows the model and environment as columns; beside an open agent or on phones, under the name.
- * Place it in AgentsPane.
+ * The agent list: search, then each agent with its model, environment, and setup, each row
+ * opening the agent's page. With room it shows the model and environment as columns; in a narrow
+ * pane or on phones, under the name. Place it in AgentsPane.
  */
 export function AgentList(props: AgentListProps) {
   const search = () => props.query.trim();
@@ -293,16 +290,7 @@ export function AgentList(props: AgentListProps) {
               <Keyed each={props.agents} by={(agent) => agent.id}>
                 {(agent) => (
                   <li>
-                    <a
-                      href={props.agentHref(agent().id)}
-                      class={s.row}
-                      aria-current={props.selectedId === agent().id ? "true" : undefined}
-                      onClick={(event) => {
-                        if (!props.onOpen) return;
-                        event.preventDefault();
-                        props.onOpen(agent().id);
-                      }}
-                    >
+                    <a href={props.agentHref(agent().id)} class={s.row}>
                       <AgentAvatar name={agent().name} size={32} class={s.avatar} />
                       <span class={s.rowText}>
                         <span class={s.rowName}>{agent().name}</span>

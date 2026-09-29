@@ -106,11 +106,19 @@ viewport width ([layout tokens](src/foundations/layout/tokens.ts)):
 | below 48rem     | The menu button opens rail and sidebar together   | Full screen with Back; main keeps its state |
 
 The drawer and a floating side panel behave as modal dialogs: they take focus, make the rest of
-the shell inert, and close on Escape or a click on the scrim, returning focus. Following a link
-in the drawer closes it. On phones the pane runs edge to edge and respects safe-area insets. The
+the shell inert, and close on Escape or a click on the scrim, returning focus. Following a sidebar
+link in the drawer closes it; a rail link switches the sidebar and leaves the drawer open. On phones the pane runs edge to edge and respects safe-area insets. The
 desktop app's title bar is not modelled yet. A rail destination is a section, so the current one
 is marked `aria-current="true"`; the sidebar marks the page within it. Sidebar items take a count
-or, for unseen activity, a dot, and `Sidebar.Empty` is a quiet line in a section with no items. `LiveStatus` is a live region at the bottom of the screen that
+or, for unseen activity, a dot; `activity` marks agents at work there and `attention` a caution
+mark, such as "Needs setup", named for assistive technology. `Sidebar.Empty` is a quiet line in a
+section with no items, and a destination's first section starts where Home's first items do.
+
+Every destination uses the patterns the same way: the rail picks it, its sidebar lists its items
+under section headers with Browse and Create, the main content shows the list or one item with
+tabs, and the side panel holds only something inside what the main content shows. A page about
+one item puts its sections in `Pane.Column`, one column 680px at most; nothing sits beside it.
+`Pane.Title` takes a `person` for an avatar in place of the icon, as an agent's page does. `LiveStatus` is a live region at the bottom of the screen that
 says "Connecting…" or "Reconnecting…" while workspace changes have stopped arriving, and stays
 empty otherwise.
 
@@ -177,7 +185,10 @@ middle or an 800px directory from near the top.
 ## Screens
 
 Screens take plain data and callbacks; web and desktop fill them from client hooks and own
-routing. `WorkspaceNavigation` is the rail and the Home sidebar. `GroupPane` is a group's header
+routing. `WorkspaceNavigation` is the rail and the sidebar's workspace header around the current
+destination's sidebar, its children: `HomeSidebar` (Inbox, Triage, Tasks, groups, and direct
+messages) or `DestinationSidebar`, which lists a destination's `NavigationSection`s of items, each
+with Browse and Create beside its title. `GroupPane` is a group's header
 and tabs around the current tab, `GroupThreads` is its Threads tab (timeline and composer), and
 `ThreadPane` is an open thread in the side panel. `GroupTasks` is the Tasks tab: search, status
 and assignee filters, and sorting that stay above the task list, with the status and key
@@ -228,11 +239,11 @@ said, how long ago, and an unread dot; the open one is set apart. Opening one ca
 Unread's empty state is "You're all caught up" with View all activity; All's is "No activity yet".
 `ThreadPane` takes a notification `reason` for its subtitle ("Mention · #general") and a
 `backLabel` for phones. **Screens / Inbox** walks the mocks' selection flow.
-`SettingsPane` is Settings from the Lunacy "Workspace settings" frames, with Workspace and
-Members tabs, the member count, Invite people on Members, and loading and failed states.
-`WorkspaceSettings` is the Workspace tab: the name with Save changes, the owner with Transfer
-ownership, and details (the workspace ID with Copy ID, and its creator); touch layouts stack
-the details under the rest. `MemberSettings` is the Members tab: search and an Active/Removed
+`SettingsPane` is one section of Settings from the Lunacy "Workspace settings" frames, Workspace
+or Members as the Settings sidebar chooses, with Invite people on Members, and loading and failed
+states. `WorkspaceSettings` is the Workspace section in one column: the name with Save changes,
+details (the workspace ID with Copy ID, and its creator), then the owner with Transfer ownership.
+`MemberSettings` is the Members section: search and an Active/Removed
 filter above the roster's member, role, and status columns, then pending invitations with
 Revoke and View history; on phones the roster lists each role under the name, and the
 invitations become one card that opens the history. `MemberDetails` opens a member in the side
@@ -244,9 +255,9 @@ completed change. `ConnectionsPane` is Connections from the Lunacy "Connections"
 and Needs setup tabs, Add connection, quiet placeholder rows while loading, and a failed state
 with Retry. `ConnectionList` searches the connections and lists each with its provider, endpoint,
 setup (Configured, or Needs setup and Unavailable in the caution color), and how it
-authenticates, with an empty state that offers adding one. `ConnectionDetails` opens one in the
-side panel: its setup, the name and the provider's settings as separate saves, and its key, which
-is only ever replaced or removed. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
+authenticates, with an empty state that offers adding one; each row opens the connection's page.
+`ConnectionPane` is that page in one column: its setup, the name and the provider's settings as
+separate saves, its key, which is only ever replaced or removed, its details, and removal. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
 setup, adding, and replacing), `ConfirmRemoveConnection`, and `ConfirmRemoveKey` are its modals;
 they take client's codes (`ConnectionsError`) and own the wording, and `connectionsToast` words the
 toasts. `ConfigureConnection` and `ConnectionKey` take `returnTo` for creating a connection on
@@ -254,18 +265,20 @@ the way to another form, such as a sandbox account while adding an environment. 
 storage, an unavailable provider, a read-only member, search, and a stale rename.
 `EnvironmentsPane` and `EnvironmentList` are Environments from the Lunacy "Environments" frames:
 All and Needs setup, and each environment's harness, sandbox, and readiness, as columns when the
-pane has room and under the name beside the details or on phones. `EnvironmentDetails` has an
-Overview, with readiness and its recovery, the name, the fixed runtime, and who created it, and a
-Sandbox tab, whose `SandboxFields` edit the account, template, variables, commands, and retention,
+pane has room and under the name when narrow or on phones; each row opens its page. `EnvironmentPane`
+is that page: an Overview in one column, with readiness and its recovery, the name, the fixed
+runtime, its details, and removal, and a Sandbox tab, whose `SandboxFields` edit the account, template, variables, commands, and retention,
 or whose `SandboxSummary` shows them to members. `AddEnvironment` takes the basics, then the
 sandbox settings, and `ConfirmRemoveEnvironment` confirms removal; the wording, including the
 mocks' exact error and readiness copy, lives beside them. **Screens / Environments** walks adding
 with the account detour, editing variables and commands, a refused account, readiness, and
 members' view. `AgentsPane` and `AgentList` are Agents from the Lunacy "Agents" frames: All and
 Needs setup, and each agent's model (connection and model) and environment, as columns with room
-and under the name otherwise, with lilac one-letter avatars. `AgentDetails` has an Overview, with
-readiness and its recovery, the name as its own save, the saved configuration, and who created
-it, and a Configuration tab whose `InstructionsField` and `ModelFields` (the model connection,
+and under the name otherwise, with lilac one-letter avatars; each row opens its page. `AgentPane`
+is that page, from the v02 navigation frames: an Overview in one column, with readiness and its
+recovery, the name as its own save, the saved configuration with Edit configuration, details (its
+role, its turns in progress, each opening its log beside the page, and who created it), and
+Membership with Remove agent, and a Configuration tab whose `InstructionsField` and `ModelFields` (the model connection,
 the suggested or entered model, and each environment with whether it works, needs setup, or
 can't run the model) save together, or whose `ConfigurationSummary` shows them to members.
 `AddAgent` takes the name and initial role beside the same fields, and `ConfirmRemoveAgent`
@@ -293,7 +306,8 @@ inviting, changing a role, removing, revoking, transferring, and a stale rename.
 menu's Change your name and the sidebar's New message, and `WorkspaceNavigation` takes the rail
 destinations to show, an optional search, and an account menu (identity, appearance, switch
 workspace, settings, change name, sign out); once groups load (`groupsLoading`), an empty Groups
-section says "No groups yet". **Screens / Workspace navigation** shows it with and without groups. **Screens / Live conversation** and **Screens /
+section in `HomeSidebar` says "No groups yet". **Screens / Workspace navigation** shows Home with
+and without groups, and the Agents sidebar with an agent open and with none. **Screens / Live conversation** and **Screens /
 Workspace dialogs** exercise these over dated data. **Screens / Group threads** composes them
 with the Lunacy sample data, and **Screens / Group tasks**, **Group settings**, **Create group**,
 and **Browse groups** add the rest of the group flows to the same working workspace: switching

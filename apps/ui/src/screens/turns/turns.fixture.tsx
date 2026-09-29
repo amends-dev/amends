@@ -8,7 +8,7 @@ import { GroupThreads } from "../group/group-threads.tsx";
 import { ThreadPane } from "../group/thread-pane.tsx";
 import { navigation, people } from "../sample.ts";
 import type { TimelineEntry } from "../timeline/index.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import type { TurnLogActivity, TurnLogTurn } from "./turn-log.tsx";
 import { TurnLogPane } from "./turn-log.tsx";
 import type { ThreadTurn } from "./turn-row.tsx";
@@ -176,11 +176,15 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
       <WorkspaceNavigation
         {...base}
         destinations={["home", "agents", "environments", "connections"]}
-        groups={[
-          { id: "general", name: "general", href: "#general", current: true, activity: active() },
-          { id: "design", name: "design", href: "#design" },
-        ]}
-      />
+      >
+        <HomeSidebar
+          {...base}
+          groups={[
+            { id: "general", name: "general", href: "#general", current: true, activity: active() },
+            { id: "design", name: "design", href: "#design" },
+          ]}
+        />
+      </WorkspaceNavigation>
       <Shell.Main>
         <GroupPane
           name="general"

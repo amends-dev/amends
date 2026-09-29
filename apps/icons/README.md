@@ -21,7 +21,8 @@ The 26 `mark-*` drawings reinterpret the named glyphs in the
 portable SVGs. They are the visual reference for frontend navigation and actions when
 the reference names the control. The earlier 23 outline utility icons remain for
 controls without a corresponding mark, including the mobile hamburger, sidebar toggles,
-notifications, and delete. `IconBellFilled` is the bell's filled state, for following. `IconMarkMenu` is the reference's downward menu caret;
+notifications, and delete. `IconBellFilled` is the bell's filled state, for following. `IconList`
+opens a destination's full list from its sidebar section. `IconMarkMenu` is the reference's downward menu caret;
 `IconMenu` remains the mobile hamburger. Named exports and individual subpaths both
 point to generated Solid source.
 Consumers must compile dependency TSX with their Solid plugin, as our Vite apps do.

@@ -9,8 +9,7 @@ states of a turn at work.
 - **In the thread:** each agent's latest turn is a compact row under the messages: the agent, its
   state (Queued, Working, Stopping…, Stopped, Failed, or Completed without a reply), View log, and
   Stop while it is active or Retry once it failed or stopped, for a reader who may direct the
-  agent. A failure names its reason and links to the agent's settings (`?agent=` on the Agents
-  page); a turn stopped because its agent left the thread says so and offers no retry. A retry
+  agent. A failure names its reason and links to the agent's page (`/agents/:agentId`); a turn stopped because its agent left the thread says so and offers no retry. A retry
   keeps the failed or stopped turn and notes it above the new attempt ("Previous turn failed ·
   View log"). A turn that replied shows no row: its reply notes "Completed · View turn log".
   Stop shows Stopping… at once and stays disabled until the turn stops; if it already finished,

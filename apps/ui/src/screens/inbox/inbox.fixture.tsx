@@ -4,7 +4,7 @@ import { Show, createMemo, createSignal } from "solid-js";
 import { Shell } from "../../patterns/shell/index.ts";
 import { ThreadPane } from "../group/index.ts";
 import { navigation, people, threadEntries } from "../sample.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import { InboxPane, type InboxItem, type InboxTab } from "./index.ts";
 
 const now = new Date();
@@ -99,7 +99,9 @@ export function InboxWorkspace(props: InboxWorkspaceProps) {
   const nav = navigation({ groups: [{ id: "general", name: "general" }] });
   return (
     <Shell.Root>
-      <WorkspaceNavigation {...nav} inbox={{ href: "#inbox", current: true, unread: unread() }} />
+      <WorkspaceNavigation {...nav}>
+        <HomeSidebar {...nav} inbox={{ href: "#inbox", current: true, unread: unread() }} />
+      </WorkspaceNavigation>
       <Shell.Main>
         <InboxPane
           workspaceName="Mercier & Co"

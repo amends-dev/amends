@@ -7,7 +7,7 @@ import { Notice } from "../../components/notice/index.ts";
 import { Select } from "../../components/select/index.ts";
 import { Modal } from "../../patterns/modal/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
-import { settingLabel } from "./connection-details.tsx";
+import { settingLabel } from "./connection-pane.tsx";
 import {
   ConnectionsAlert,
   connectionsMessage,

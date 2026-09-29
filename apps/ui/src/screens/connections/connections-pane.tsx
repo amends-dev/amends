@@ -147,11 +147,8 @@ export interface ConnectionListProps {
   readonly total: number;
   /** Provider names for the empty state, such as Anthropic. */
   readonly providers?: readonly string[];
-  /** The connection open in the side panel. */
-  readonly selectedId?: string;
+  /** Each connection's page. */
   readonly connectionHref: (id: string) => string;
-  /** Opens a connection in place of following its link. */
-  readonly onOpen?: (id: string) => void;
   /** Starts adding a connection, for a reader who may. */
   readonly onAdd?: () => void;
   /** A read or change that failed, outside any dialog. */
@@ -266,16 +263,7 @@ export function ConnectionList(props: ConnectionListProps) {
               <Keyed each={props.connections} by={(connection) => connection.id}>
                 {(connection) => (
                   <li>
-                    <a
-                      href={props.connectionHref(connection().id)}
-                      class={s.row}
-                      aria-current={props.selectedId === connection().id ? "true" : undefined}
-                      onClick={(event) => {
-                        if (!props.onOpen) return;
-                        event.preventDefault();
-                        props.onOpen(connection().id);
-                      }}
-                    >
+                    <a href={props.connectionHref(connection().id)} class={s.row}>
                       <span class={s.tile} aria-hidden="true">
                         <IconMarkConnections class={s.tileIcon} />
                       </span>

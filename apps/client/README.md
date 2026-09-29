@@ -62,6 +62,9 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useAgents(workspaceId, { selected, done })` shapes the Agents page: each agent's model access,
   environment, role, and readiness, the model connections and roles to choose from, and each
   environment's fit for a model; see [Agents](#agents).
+- `useAgentList`, `useEnvironmentList`, and `useConnectionList` give each destination's sidebar
+  its items by name, whether each needs setup (and, for connections, what it gives), and whether
+  the reader may add one. Each shares its page's read, so both show the same items.
 - `useThreadTurns(workspaceId, threadId)` follows the agents' turns on a thread, with stopping and
   retrying; see [Turns](#turns).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
@@ -74,8 +77,10 @@ portable backend packages under `packages/*` remain Effect-only.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
   `paths.group` and `paths.thread` name a group's page and a thread open beside it,
-  `paths.inboxThread` a thread open beside the inbox, and `paths.directDraft` a first message to
-  people with no conversation yet; all resume after sign-in.
+  `paths.inboxThread` a thread open beside the inbox, `paths.agent`, `paths.environment`, and
+  `paths.connection` an item's page (and its Configuration or Sandbox tab), and
+  `paths.directDraft` a first message to people with no conversation yet; all resume after
+  sign-in.
 
 Only `src/api` imports the HTTP contract and gateway session/directory schemas.
 Client cannot import UI, icons, styling, Storybook, router libraries, platform entry

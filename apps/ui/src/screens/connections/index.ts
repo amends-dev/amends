@@ -10,7 +10,7 @@ export {
   type ConfirmRemoveKeyProps,
   type ConnectionKeyProps,
 } from "./add-connection.tsx";
-export { ConnectionDetails, type ConnectionDetailsProps } from "./connection-details.tsx";
+export { ConnectionPane, type ConnectionPaneProps } from "./connection-pane.tsx";
 export {
   ConnectionList,
   ConnectionsPane,

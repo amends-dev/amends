@@ -21,7 +21,7 @@ import {
   you,
 } from "../sample.ts";
 import type { TimelineEntry, TimelineMessage } from "../timeline/index.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
   CreateGroup,
   GroupPane,
@@ -204,18 +204,20 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
     onCleanup(() => window.removeEventListener("hashchange", follow));
   });
 
+  const nav = () =>
+    navigation({
+      groups: joined(),
+      currentGroup: current()?.id,
+      directory: view().kind === "directory",
+      threadOpen: thread(),
+      onOpenDirectory: (next) => setView({ kind: "directory", tab: next }),
+      onCreateGroup: () => setCreating(true),
+    });
   return (
     <Shell.Root>
-      <WorkspaceNavigation
-        {...navigation({
-          groups: joined(),
-          currentGroup: current()?.id,
-          directory: view().kind === "directory",
-          threadOpen: thread(),
-          onOpenDirectory: (next) => setView({ kind: "directory", tab: next }),
-          onCreateGroup: () => setCreating(true),
-        })}
-      />
+      <WorkspaceNavigation {...nav()}>
+        <HomeSidebar {...nav()} />
+      </WorkspaceNavigation>
       <Shell.Main>
         <Switch>
           <Match when={view().kind === "directory" && view()}>

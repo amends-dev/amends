@@ -5,7 +5,11 @@ import type { MentionCandidate } from "../../components/composer/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { people } from "../sample.ts";
 import type { TimelineEntry } from "../timeline/index.ts";
-import { WorkspaceNavigation, type Appearance } from "../workspace-navigation/index.ts";
+import {
+  HomeSidebar,
+  WorkspaceNavigation,
+  type Appearance,
+} from "../workspace-navigation/index.ts";
 import { navigation } from "../sample.ts";
 import { GroupPane } from "./group-pane.tsx";
 import { GroupThreads, type ConversationStatus } from "./group-threads.tsx";
@@ -118,12 +122,16 @@ export function Conversation(props: ConversationProps) {
               }
             : undefined,
         }}
-        groups={[
-          { id: "general", name: "general", href: "#general", current: true },
-          { id: "design", name: "design", href: "#design", pending: 2 },
-          { id: "product", name: "product", href: "#product", unread: true },
-        ]}
-      />
+      >
+        <HomeSidebar
+          {...base}
+          groups={[
+            { id: "general", name: "general", href: "#general", current: true },
+            { id: "design", name: "design", href: "#design", pending: 2 },
+            { id: "product", name: "product", href: "#product", unread: true },
+          ]}
+        />
+      </WorkspaceNavigation>
       <Shell.Main>
         <GroupPane
           name="general"

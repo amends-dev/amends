@@ -105,6 +105,11 @@ and `apps/desktop`; UI owns reusable visual pieces, and client owns connected st
 actions as hooks. Neither shared package owns application pages.
 UI screens are presentational: they take data and callbacks and render a pane or
 the navigation, while the apps own routes, data, and which screen shows.
+Every rail destination follows one navigation pattern
+([workspace shell](docs/workspace-shell.md)): its sidebar lists its items with Browse and
+Create, the main content shows the list or one item with tabs as links, and the side panel holds
+only something inside what the main content shows. A page about one item puts its sections in
+`Pane.Column`, one column; never lay details or forms side by side in the main content.
 
 Web and desktop compose UI; they do not define styles, inline style objects, or
 local stylesheets. Shared UI stylesheet/font imports and component options are

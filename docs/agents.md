@@ -1,13 +1,16 @@
 # Agents
 
-Both apps own `/workspaces/:id/agents`, reached from the rail's Agents destination.
-`?tab=needs-setup` shows the agents with a readiness issue, and `?agent=:agentId` opens one beside
-the list. Tabs and rows are links, so browser and hash history work. The screens follow the Lunacy
-"Agents" mocks.
+Both apps own `/workspaces/:id/agents`, reached from the rail's Agents destination, whose sidebar
+lists the agents; see the [workspace shell](workspace-shell.md). `/agents` is the list, with
+`?tab=needs-setup` for the agents with a readiness issue; `/agents/:agentId` is an agent's page, and
+`/agents/:agentId/configuration` its Configuration tab. `?add=agent`, from the sidebar's + or the
+list's Add agent, opens Add agent over either. Tabs, rows, and sidebar items are links, so browser
+and hash history work. The screens follow the Lunacy "Agents" mocks: v02 for the navigation and
+the agent's page, v01 for the list, adding, and the connection detour.
 
 - **The list:** each agent with a one-letter avatar, its model (the connection and the model ID),
   its environment, and its setup: Ready, Needs setup, or Can't run when the environment cannot
-  run the model at all. With room, model and environment are columns; beside an open agent and on
+  run the model at all. With room, model and environment are columns; in a narrow pane and on
   phones they sit under the name. Ready reflects the saved configuration; nothing calls the
   provider to decide it.
 - **Readiness:** each issue is listed with what brings the first one back: the model connection
@@ -25,17 +28,20 @@ the list. Tabs and rows are links, so browser and hash history work. The screens
   when no model connection exists, asks for a model provider, then the connection's name and
   settings, then its key. Saving the key, or finishing later, returns to the draft with the new
   connection chosen.
-- **Details:** Overview shows the readiness, the name as its own save, the saved configuration,
-  and who created the agent. Configuration holds the instructions, model connection, model, and
-  environment, saved together. Reasoning shows only for a harness that takes levels; a saved level
+- **The agent's page:** Overview reads in one column: the readiness, the name as its own save, the
+  saved configuration with Edit configuration, then Details (its role, its turns in progress, and
+  who created it) and Membership with Remove agent. Each turn in progress, such as "Working ·
+  #general", opens its log in the side panel (`?log=:turnId`), where Back leads to its thread.
+  Configuration holds the instructions, model connection, model, and environment, saved together
+  from the bar under them. Reasoning shows only for a harness that takes levels; a saved level
   its harness no longer takes offers Use default reasoning. Remove agent shows to a reader who may
   remove it: configuring does not include removing, and only the owner removes an agent holding
   more than Member.
 
 Adding and configuring show only to a reader who may do them, from `agent.create` and each agent's
 `configurable`: administrators and the owner by default. Members see the same values without
-inputs, and Close in place of the save actions. Removing asks for confirmation, and each completed
-change confirms itself with a toast. On phones, details and adding fill the screen.
+inputs, and no save actions. Removing asks for confirmation, and each completed
+change confirms itself with a toast. On phones, adding fills the screen.
 
 ## Boundaries and recovery
 
@@ -44,9 +50,9 @@ Core keeps agents; see [core's agents](../packages/core/README.md#agents). The
 the connection implementations' suggested models. Client's `useAgents` shapes them for the
 screens, keeps each draft with what it was made against, checks environment choices as the draft
 changes, and reports failures as codes by the change that failed, with what the host refused;
-UI's [Agents screens](../apps/ui/README.md) word them with the mocks' exact copy. The pages in web
-and desktop own the routes, the open agent and its tab, which modal shows, and the detour through
-the Connections dialogs.
+UI's [Agents screens](../apps/ui/README.md) word them with the mocks' exact copy. `useAgentList` gives the
+sidebar the agents by name, sharing the page's read. The pages in web and desktop own the routes,
+the open agent and its tab, which modal shows, and the detour through the Connections dialogs.
 
 A draft survives the detour and errors. A rename carries the name it started from, and a rename
 made elsewhere meanwhile conflicts until the reader refreshes. A creation retried after a lost

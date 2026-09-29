@@ -143,11 +143,8 @@ export interface EnvironmentListProps {
   readonly environments: readonly EnvironmentSummary[];
   /** Environments in the workspace, whatever the tab and search. */
   readonly total: number;
-  /** The environment open in the side panel. */
-  readonly selectedId?: string;
+  /** Each environment's page. */
   readonly environmentHref: (id: string) => string;
-  /** Opens an environment in place of following its link. */
-  readonly onOpen?: (id: string) => void;
   /** Starts adding an environment, for a reader who may. */
   readonly onAdd?: () => void;
   /** A read or change that failed, outside any dialog. */
@@ -160,9 +157,9 @@ export interface EnvironmentListProps {
 }
 
 /**
- * The environment list: search, then each environment with its harness, sandbox, and readiness.
- * With room it shows the harness and sandbox as columns; beside an open environment or on phones,
- * under the name. Place it in EnvironmentsPane.
+ * The environment list: search, then each environment with its harness, sandbox, and readiness,
+ * each row opening the environment's page. With room it shows the harness and sandbox as columns;
+ * in a narrow pane or on phones, under the name. Place it in EnvironmentsPane.
  */
 export function EnvironmentList(props: EnvironmentListProps) {
   const search = () => props.query.trim();
@@ -248,16 +245,7 @@ export function EnvironmentList(props: EnvironmentListProps) {
               <Keyed each={props.environments} by={(environment) => environment.id}>
                 {(environment) => (
                   <li>
-                    <a
-                      href={props.environmentHref(environment().id)}
-                      class={s.row}
-                      aria-current={props.selectedId === environment().id ? "true" : undefined}
-                      onClick={(event) => {
-                        if (!props.onOpen) return;
-                        event.preventDefault();
-                        props.onOpen(environment().id);
-                      }}
-                    >
+                    <a href={props.environmentHref(environment().id)} class={s.row}>
                       <span class={s.tile} aria-hidden="true">
                         <IconMarkEnvironments class={s.tileIcon} />
                       </span>

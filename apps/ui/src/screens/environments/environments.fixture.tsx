@@ -1,20 +1,21 @@
 // Workshop harness: Environments with the Lunacy sample environments, harness, providers, and
 // Daytona accounts, following the mocks' behavior notes over local state. Not exported.
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { IconMarkEnvironments } from "@amends/icons";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { ConfigureConnection, ConnectionKey } from "../connections/index.ts";
 import { navigation } from "../sample.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
   AddEnvironment,
   ConfirmRemoveEnvironment,
-  EnvironmentDetails,
+  EnvironmentPane,
   EnvironmentList,
   EnvironmentsPane,
   environmentsToast,
   type CommandRowView,
-  type EnvironmentDetailsTab,
+  type EnvironmentTab,
   type EnvironmentIssue,
   type EnvironmentProblem,
   type EnvironmentSummary,
@@ -148,8 +149,9 @@ type Dialog = "add" | "remove" | "create-account" | "account-key";
 
 export interface EnvironmentsWorkspaceProps {
   readonly tab?: EnvironmentsTab;
+  /** The environment whose page shows, in place of the list. */
   readonly selected?: string;
-  readonly detailsTab?: EnvironmentDetailsTab;
+  readonly environmentTab?: EnvironmentTab;
   readonly dialog?: Dialog;
   /** For the add dialog: its step, the provider chosen, and a name typed. */
   readonly add?: {
@@ -173,8 +175,8 @@ export function EnvironmentsWorkspace(props: EnvironmentsWorkspaceProps) {
   const [tab, setTab] = createSignal<EnvironmentsTab>(props.tab ?? "all");
   const [query, setQuery] = createSignal("");
   const [selected, setSelected] = createSignal(props.selected);
-  const [detailsTab, setDetailsTab] = createSignal<EnvironmentDetailsTab>(
-    props.detailsTab ?? "overview",
+  const [environmentTab, setEnvironmentTab] = createSignal<EnvironmentTab>(
+    props.environmentTab ?? "overview",
   );
   const [dialog, setDialog] = createSignal<Dialog | undefined>(props.dialog);
   const [names, setNames] = createSignal<Readonly<Record<string, string>>>({});
@@ -316,47 +318,93 @@ export function EnvironmentsWorkspace(props: EnvironmentsWorkspaceProps) {
   };
   const addingProvider = () => providerOf(adding().providerId);
   const nav = navigation({ groups: [{ id: "general", name: "general" }] });
+  const open = (id: string | undefined) => {
+    setProblems([]);
+    setEnvironmentTab("overview");
+    setSelected(id);
+  };
+  const add = props.readOnly ? undefined : () => setDialog("add");
+  // The sidebar's and list's links are plain hashes here: follow the list and each page.
+  onMount(() => {
+    const follow = () => {
+      const target = window.location.hash.slice(1);
+      if (target === "environments") return open(undefined);
+      if (!target.startsWith("environment-")) return;
+      const rest = target.slice("environment-".length);
+      const tab = rest.endsWith("-sandbox") ? "sandbox" : "overview";
+      const id = rest.replace(/-(sandbox|overview)$/, "");
+      if (!records().some((entry) => entry.id === id)) return;
+      if (id !== selected()) open(id);
+      setEnvironmentTab(tab);
+    };
+    window.addEventListener("hashchange", follow);
+    onCleanup(() => window.removeEventListener("hashchange", follow));
+  });
   return (
     <Shell.Root>
-      <WorkspaceNavigation {...nav} destination="environments" />
+      <WorkspaceNavigation {...nav} destination="environments">
+        <DestinationSidebar
+          sections={[
+            {
+              id: "environments",
+              title: "Environments",
+              href: "#environments",
+              current: !props.status && selected() === undefined,
+              browse: { label: "Browse environments", onBrowse: () => open(undefined) },
+              create: add && { label: "Add environment", onCreate: add },
+              entries: props.status
+                ? []
+                : all().map((environment) => ({
+                    id: environment.id,
+                    name: environment.name,
+                    href: `#environment-${environment.id}`,
+                    current: selected() === environment.id,
+                    icon: IconMarkEnvironments,
+                    attention: environment.issues.length > 0 ? "Needs setup" : undefined,
+                  })),
+              loading: props.status === "loading",
+              empty: "No environments yet",
+            },
+          ]}
+        />
+      </WorkspaceNavigation>
       <Shell.Main>
-        <EnvironmentsPane
-          workspaceName="Mercier & Co"
-          tab={tab()}
-          tabHref={(next) => `#${next}`}
-          onTabChange={(next) => {
-            setQuery("");
-            setTab(next);
-          }}
-          counts={
-            props.status
-              ? undefined
-              : {
-                  all: all().length,
-                  needsSetup: all().filter((environment) => environment.issues.length > 0).length,
-                }
+        <Show
+          when={!props.status && current()}
+          fallback={
+            <EnvironmentsPane
+              workspaceName="Mercier & Co"
+              tab={tab()}
+              tabHref={(next) => `#${next}`}
+              onTabChange={(next) => {
+                setQuery("");
+                setTab(next);
+              }}
+              counts={
+                props.status
+                  ? undefined
+                  : {
+                      all: all().length,
+                      needsSetup: all().filter((environment) => environment.issues.length > 0)
+                        .length,
+                    }
+              }
+              onAdd={add}
+              status={props.status}
+              onRetry={() => {}}
+            >
+              <EnvironmentList
+                tab={tab()}
+                query={query()}
+                onQueryChange={setQuery}
+                environments={shown()}
+                total={all().length}
+                environmentHref={(id) => `#environment-${id}`}
+                onAdd={add}
+              />
+            </EnvironmentsPane>
           }
-          onAdd={props.readOnly ? undefined : () => setDialog("add")}
-          status={props.status}
-          onRetry={() => {}}
         >
-          <EnvironmentList
-            tab={tab()}
-            query={query()}
-            onQueryChange={setQuery}
-            environments={shown()}
-            total={all().length}
-            selectedId={selected()}
-            environmentHref={(id) => `#environment-${id}`}
-            onOpen={(id) => {
-              setProblems([]);
-              setDetailsTab("overview");
-              setSelected(id);
-            }}
-            onAdd={props.readOnly ? undefined : () => setDialog("add")}
-          />
-        </EnvironmentsPane>
-        <Show when={!props.status && current()}>
           {(environment) => {
             const id = () => environment().id;
             const changed = () =>
@@ -364,11 +412,13 @@ export function EnvironmentsWorkspace(props: EnvironmentsWorkspaceProps) {
               settled(configOf(id())) !== settled(record(id())?.sandbox ?? empty()) &&
               configOf(id()).variables.every((row) => !variableIssue(configOf(id()), row.id));
             return (
-              <EnvironmentDetails
+              <EnvironmentPane
+                workspaceName="Mercier & Co"
                 environment={environment()}
-                onClose={() => setSelected(undefined)}
-                tab={detailsTab()}
-                onTabChange={setDetailsTab}
+                onBrowse={() => open(undefined)}
+                tab={environmentTab()}
+                tabHref={(next) => `#environment-${id()}-${next}`}
+                onTabChange={setEnvironmentTab}
                 name={names()[id()] ?? environment().name}
                 onNameChange={(name) => setNames({ ...names(), [id()]: name })}
                 nameChanged={
@@ -414,7 +464,7 @@ export function EnvironmentsWorkspace(props: EnvironmentsWorkspaceProps) {
                   const { [id()]: _saved, ...rest } = configs();
                   setConfigs(rest);
                   setProblems([]);
-                  setDetailsTab("overview");
+                  setEnvironmentTab("overview");
                 }}
                 onOpenAccount={() => toast("Opens the connection")}
                 onRemove={() => setDialog("remove")}
@@ -476,7 +526,7 @@ export function EnvironmentsWorkspace(props: EnvironmentsWorkspaceProps) {
           };
           setRecords([...records(), created]);
           setSelected(created.id);
-          setDetailsTab("overview");
+          setEnvironmentTab("overview");
           setDialog(undefined);
           toast(environmentsToast("create", created.name));
         }}

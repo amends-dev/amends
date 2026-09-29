@@ -1,11 +1,17 @@
 export {
+  DestinationSidebar,
+  HomeSidebar,
   WorkspaceNavigation,
   type AccountMenu,
   type Appearance,
   type Destination,
+  type DestinationSidebarProps,
+  type HomeSidebarProps,
   type NavigationDirect,
+  type NavigationEntry,
   type NavigationGroup,
   type NavigationLink,
+  type NavigationSection,
   type NavigationThread,
   type WorkspaceNavigationProps,
 } from "./workspace-navigation.tsx";

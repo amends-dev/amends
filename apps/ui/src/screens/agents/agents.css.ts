@@ -10,7 +10,7 @@ const ellipsis = {
   whiteSpace: "nowrap",
 } as const;
 
-/** The list lays itself out by the pane's width: columns with room, compact beside the details. */
+/** The list lays itself out by the pane's width: columns with room, compact when narrow. */
 const wide = "(min-width: 60rem)";
 
 export const pane = style({ containerType: "inline-size" });
@@ -104,17 +104,6 @@ export const row = style({
   selectors: {
     "&:hover": { backgroundColor: vars.color.surface.hover },
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
-    "&[aria-current]": { backgroundColor: vars.color.surface.selected },
-    "&[aria-current]::before": {
-      content: '""',
-      position: "absolute",
-      insetInlineStart: 0,
-      top: "50%",
-      width: "2px",
-      height: "1.25rem",
-      transform: "translateY(-50%)",
-      backgroundColor: vars.color.action.indicator,
-    },
   },
   "@container": { [wide]: { gridTemplateColumns: wideColumns, alignItems: "center" } },
   "@media": {
@@ -255,35 +244,6 @@ globalStyle(`${alert} > p`, { flex: 1 });
 
 export const alertAction = style({ flex: "none", marginBlockStart: "-0.375rem" });
 
-// Details: readiness, then the name, the configuration, and who created it.
-export const details = style({ display: "flex", flexDirection: "column", gap: "2rem" });
-
-export const identity = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });
-
-export const identityRow = style({
-  display: "grid",
-  gridTemplateColumns: "2.5rem minmax(0, 1fr)",
-  alignItems: "start",
-  columnGap: "1rem",
-});
-
-export const identityText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
-
-export const identityName = style({
-  ...typeScale.titleTouch,
-  ...ellipsis,
-  margin: 0,
-  color: vars.color.text.primary,
-  fontWeight: fontWeight.medium,
-});
-
-export const identityDetail = style({
-  ...typeScale.control,
-  ...ellipsis,
-  marginBlockStart: "0.375rem",
-  color: vars.color.text.secondary,
-});
-
 export const status = style({
   display: "flex",
   flexDirection: "column",
@@ -300,10 +260,53 @@ export const fields = style({ display: "flex", flexDirection: "column", gap: "1.
 
 export const start = style({ alignSelf: "flex-start" });
 
-// Save buttons sit at the end, just under the field they save.
-export const end = style({ alignSelf: "flex-end", marginBlockStart: "-0.5rem" });
-
 export const section = style({ display: "flex", flexDirection: "column", gap: "0.75rem" });
+
+// Details: a label over each value.
+export const detailList = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: "1rem",
+  margin: 0,
+});
+
+export const detail = style({ display: "flex", flexDirection: "column", gap: "0.25rem" });
+
+export const detailName = style({ ...typeScale.hint, color: vars.color.text.secondary });
+
+export const detailValue = style({ ...typeScale.item, margin: 0, color: vars.color.text.primary });
+
+// Its turns in progress, each opening its log beside the page.
+export const turns = style({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "0.25rem",
+  margin: 0,
+  padding: 0,
+  listStyle: "none",
+});
+
+export const turn = style({
+  ...typeScale.item,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.625rem",
+  marginInline: "-0.375rem",
+  padding: "0.125rem 0.375rem",
+  border: "none",
+  background: "none",
+  color: vars.color.text.primary,
+  fontFamily: "inherit",
+  textAlign: "start",
+  cursor: "pointer",
+  selectors: {
+    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
+  },
+});
+
+export const turnWhere = style({ fontWeight: fontWeight.medium });
 
 // The saved configuration: the connection, the model standing out, then the environment.
 export const summary = style({ display: "flex", flexDirection: "column", gap: "0.5rem" });
@@ -321,20 +324,6 @@ export const nameValue = style({
   margin: 0,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
-});
-
-// Removing the agent stays at the bottom of the panel, apart from its settings.
-export const danger = style({
-  flex: "none",
-  display: "flex",
-  padding: "1.375rem 1.5rem",
-  boxShadow: `inset 0 1px 0 ${vars.color.border.divider}`,
-  "@media": {
-    [media.mobile]: {
-      padding: "0.75rem 1rem",
-      paddingBlockEnd: "max(0.75rem, env(safe-area-inset-bottom))",
-    },
-  },
 });
 
 // A field's state under it: Works, Needs setup, or Can’t run, then what it means.

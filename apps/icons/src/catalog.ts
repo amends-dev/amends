@@ -73,6 +73,13 @@ export const iconCatalog = [
     exportName: "IconHome",
   },
   {
+    name: "list",
+    title: "List",
+    keywords: ["list", "browse", "all", "items", "rows"],
+    categories: ["navigation", "content"],
+    exportName: "IconList",
+  },
+  {
     name: "mark-agents",
     title: "Agents mark",
     keywords: ["mark", "agents", "principal", "concentric"],

@@ -10,7 +10,7 @@ const ellipsis = {
   whiteSpace: "nowrap",
 } as const;
 
-/** The list lays itself out by the pane's width: columns with room, compact beside the details. */
+/** The list lays itself out by the pane's width: columns with room, compact when narrow. */
 const wide = "(min-width: 60rem)";
 
 export const pane = style({ containerType: "inline-size" });
@@ -103,17 +103,6 @@ export const row = style({
   selectors: {
     "&:hover": { backgroundColor: vars.color.surface.hover },
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
-    "&[aria-current]": { backgroundColor: vars.color.surface.selected },
-    "&[aria-current]::before": {
-      content: '""',
-      position: "absolute",
-      insetInlineStart: 0,
-      top: "50%",
-      width: "2px",
-      height: "1.25rem",
-      transform: "translateY(-50%)",
-      backgroundColor: vars.color.action.indicator,
-    },
   },
   "@container": { [wide]: { gridTemplateColumns: wideColumns, alignItems: "center" } },
   "@media": {
@@ -247,42 +236,6 @@ export const alertMessages = style({
 
 export const alertAction = style({ flex: "none", marginBlockStart: "-0.375rem" });
 
-// Details: readiness, then the name, the runtime, and who created it.
-export const details = style({ display: "flex", flexDirection: "column", gap: "2rem" });
-
-export const identity = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });
-
-export const identityRow = style({
-  display: "grid",
-  gridTemplateColumns: "2.5rem minmax(0, 1fr)",
-  alignItems: "start",
-  columnGap: "1rem",
-});
-
-export const identityTile = style([
-  tile,
-  { width: "2.5rem", height: "2.5rem", marginBlockStart: 0 },
-]);
-
-export const identityIcon = style({ width: "1.5rem", height: "1.5rem" });
-
-export const identityText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
-
-export const identityName = style({
-  ...typeScale.titleTouch,
-  ...ellipsis,
-  margin: 0,
-  color: vars.color.text.primary,
-  fontWeight: fontWeight.medium,
-});
-
-export const identityDetail = style({
-  ...typeScale.control,
-  ...ellipsis,
-  marginBlockStart: "0.375rem",
-  color: vars.color.text.secondary,
-});
-
 export const status = style({
   display: "flex",
   flexDirection: "column",
@@ -295,9 +248,6 @@ export const note = style({ ...typeScale.control, margin: 0, color: vars.color.t
 export const form = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });
 
 export const start = style({ alignSelf: "flex-start" });
-
-// Save buttons sit at the end, just under the field they save.
-export const end = style({ alignSelf: "flex-end", marginBlockStart: "-0.5rem" });
 
 export const section = style({ display: "flex", flexDirection: "column", gap: "0.75rem" });
 
@@ -317,6 +267,20 @@ export const headingText = style({
 });
 
 export const headingStitch = style({ flex: 1, minWidth: "1.5rem" });
+
+// Details: a label over each value.
+export const detailList = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: "1rem",
+  margin: 0,
+});
+
+export const detail = style({ display: "flex", flexDirection: "column", gap: "0.25rem" });
+
+export const detailName = style({ ...typeScale.hint, color: vars.color.text.secondary });
+
+export const detailValue = style({ ...typeScale.item, margin: 0, color: vars.color.text.primary });
 
 export const runtime = style({
   display: "flex",
@@ -339,20 +303,6 @@ export const runtimeValue = style({
   margin: 0,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
-});
-
-// Removing the environment stays at the bottom of the panel, apart from its settings.
-export const danger = style({
-  flex: "none",
-  display: "flex",
-  padding: "1.375rem 1.5rem",
-  boxShadow: `inset 0 1px 0 ${vars.color.border.divider}`,
-  "@media": {
-    [media.mobile]: {
-      padding: "0.75rem 1rem",
-      paddingBlockEnd: "max(0.75rem, env(safe-area-inset-bottom))",
-    },
-  },
 });
 
 // Sandbox settings: the account and template, then variables, commands, and retention.

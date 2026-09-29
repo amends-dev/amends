@@ -174,9 +174,9 @@ unread. There is no way to mark one seen without opening it. The inbox reads eac
 notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
 
-Settings follows the Lunacy mocks: Workspace and Members tabs, with invitations as modals from
-Members. A member's access lists each assignment by its role or permission and whether it covers
-the workspace or one item; which item is not shown. The mocks' Agents destination, search, group
+Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
+its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
+the workspace or one item; which item is not shown. The mocks' search, group
 Tasks and Files tabs, reactions, and task references have no backend and are not shown.
 
 ## Storage cost
@@ -198,12 +198,16 @@ assignments, one read per member; a batched assignment read across members would
 The [UI package](../apps/ui/README.md) is built from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: light and dark color roles taken from the mocks,
 Inter in eight type roles, a 4px spacing grid, shadows for modals, popovers, and toasts, and the
-[icons package](../apps/icons/README.md)'s 51 generated drawings, including the mocks' marks.
+[icons package](../apps/icons/README.md)'s 52 generated drawings, including the mocks' marks.
 Its components, the six layout patterns, and the screens cover every page the apps show; each has
 Storybook stories in both modes, run as portable tests in Happy DOM. The dark error colors are
 proposals, since the mocks have no dark error state. Contrast, gamut, font loading, and layout
 have no automated checks: stories are compared with their Lunacy frames in a browser at phone,
-touch, and desktop widths. Right-to-left layouts and forced colors are not reviewed.
+touch, and desktop widths. Right-to-left layouts and forced colors are not reviewed. The
+navigation pattern (a sidebar per rail destination, items as pages in the main content) has Lunacy
+frames only for Agents ("Agents / Light mode / v02 · Navigation"); Environments, Connections, and
+Settings follow it without frames of their own, and their v01 frames still draw the Home sidebar
+and details in the side panel, as the Settings frames still draw Workspace in two columns.
 
 ## Shared client foundation
 

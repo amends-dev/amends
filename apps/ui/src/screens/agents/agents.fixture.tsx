@@ -1,6 +1,6 @@
 // Workshop harness: Agents with the Lunacy sample agents, model connections, and environments,
 // following the mocks' behavior notes over local state. Not exported.
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
@@ -11,15 +11,15 @@ import {
   type ConnectionProviderOption,
 } from "../connections/index.ts";
 import { navigation } from "../sample.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
   AddAgent,
-  AgentDetails,
   AgentList,
+  AgentPane,
   AgentsPane,
   ConfirmRemoveAgent,
   agentsToast,
-  type AgentDetailsTab,
+  type AgentTab,
   type AgentEnvironmentOption,
   type AgentIssue,
   type AgentProblem,
@@ -144,13 +144,22 @@ const activities: Readonly<Record<string, AgentSummary["activity"]>> = {
   atlas: { state: "queued", places: ["#design"] },
   yumi: { state: "working", places: ["#general", "#product"] },
 };
+const turnsOf = (id: string) => {
+  const activity = activities[id];
+  return (activity?.places ?? []).map((where, index) => ({
+    id: `${id}-turn-${index}`,
+    state: activity!.state,
+    where,
+  }));
+};
 
 type Dialog = "add" | "remove" | "choose-provider" | "configure-connection" | "connection-key";
 
 export interface AgentsWorkspaceProps {
   readonly tab?: AgentsTab;
+  /** The agent whose page shows, in place of the list. */
   readonly selected?: string;
-  readonly detailsTab?: AgentDetailsTab;
+  readonly agentTab?: AgentTab;
   readonly dialog?: Dialog;
   /** For the add dialog: a name typed, and the connection chosen. */
   readonly add?: { readonly name?: string; readonly connectionId?: string };
@@ -183,7 +192,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
   const [tab, setTab] = createSignal<AgentsTab>(props.tab ?? "all");
   const [query, setQuery] = createSignal("");
   const [selected, setSelected] = createSignal(props.selected);
-  const [detailsTab, setDetailsTab] = createSignal<AgentDetailsTab>(props.detailsTab ?? "overview");
+  const [agentTab, setAgentTab] = createSignal<AgentTab>(props.agentTab ?? "overview");
   const [dialog, setDialog] = createSignal<Dialog | undefined>(props.dialog);
   const [names, setNames] = createSignal<Readonly<Record<string, string>>>({});
   const [configs, setConfigs] = createSignal<Readonly<Record<string, Draft>>>({});
@@ -340,49 +349,95 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
           { id: "member", name: "Member" },
           { id: "administrator", name: "Administrator" },
         ];
+  const open = (id: string | undefined) => {
+    setProblems([]);
+    setAgentTab("overview");
+    setSelected(id);
+  };
+  const add = props.readOnly ? undefined : () => setDialog("add");
+  // The sidebar's and list's links are plain hashes here: follow the list and each agent's page.
+  onMount(() => {
+    const follow = () => {
+      const target = window.location.hash.slice(1);
+      if (target === "agents") return open(undefined);
+      if (!target.startsWith("agent-")) return;
+      const rest = target.slice("agent-".length);
+      const tab = rest.endsWith("-configuration") ? "configuration" : "overview";
+      const id = rest.replace(/-(configuration|overview)$/, "");
+      if (!records().some((entry) => entry.id === id)) return;
+      if (id !== selected()) open(id);
+      setAgentTab(tab);
+    };
+    window.addEventListener("hashchange", follow);
+    onCleanup(() => window.removeEventListener("hashchange", follow));
+  });
   return (
     <Shell.Root>
-      <WorkspaceNavigation {...nav} destination="agents" />
+      <WorkspaceNavigation {...nav} destination="agents">
+        <DestinationSidebar
+          sections={[
+            {
+              id: "agents",
+              title: "Agents",
+              href: "#agents",
+              current: !props.status && selected() === undefined,
+              browse: { label: "Browse agents", onBrowse: () => open(undefined) },
+              create: add && { label: "Add agent", onCreate: add },
+              entries: props.status
+                ? []
+                : all().map((agent) => ({
+                    id: agent.id,
+                    name: agent.name,
+                    href: `#agent-${agent.id}`,
+                    current: selected() === agent.id,
+                    person: { name: agent.name, initials: agent.name.charAt(0), tone: "lilac" },
+                    activity: agent.activity?.state,
+                    attention: agent.issues.length > 0 ? "Needs setup" : undefined,
+                  })),
+              loading: props.status === "loading",
+              empty: "No agents yet",
+            },
+          ]}
+        />
+      </WorkspaceNavigation>
       <Shell.Main>
-        <AgentsPane
-          workspaceName="Mercier & Co"
-          tab={tab()}
-          tabHref={(next) => `#${next}`}
-          onTabChange={(next) => {
-            setQuery("");
-            setTab(next);
-          }}
-          counts={
-            props.status
-              ? undefined
-              : {
-                  all: all().length,
-                  needsSetup: all().filter((agent) => agent.issues.length > 0).length,
-                }
+        <Show
+          when={!props.status && current()}
+          fallback={
+            <AgentsPane
+              workspaceName="Mercier & Co"
+              tab={tab()}
+              tabHref={(next) => `#${next}`}
+              onTabChange={(next) => {
+                setQuery("");
+                setTab(next);
+              }}
+              counts={
+                props.status
+                  ? undefined
+                  : {
+                      all: all().length,
+                      needsSetup: all().filter((agent) => agent.issues.length > 0).length,
+                    }
+              }
+              onAdd={add}
+              status={props.status}
+              onRetry={() => {}}
+            >
+              <AgentList
+                tab={tab()}
+                query={query()}
+                onQueryChange={setQuery}
+                agents={shown()}
+                total={all().length}
+                noModelConnection={connections().length === 0}
+                agentHref={(id) => `#agent-${id}`}
+                onAdd={add}
+                onCreateConnection={props.readOnly ? undefined : () => startDetour("add")}
+              />
+            </AgentsPane>
           }
-          onAdd={props.readOnly ? undefined : () => setDialog("add")}
-          status={props.status}
-          onRetry={() => {}}
         >
-          <AgentList
-            tab={tab()}
-            query={query()}
-            onQueryChange={setQuery}
-            agents={shown()}
-            total={all().length}
-            noModelConnection={connections().length === 0}
-            selectedId={selected()}
-            agentHref={(id) => `#agent-${id}`}
-            onOpen={(id) => {
-              setProblems([]);
-              setDetailsTab("overview");
-              setSelected(id);
-            }}
-            onAdd={props.readOnly ? undefined : () => setDialog("add")}
-            onCreateConnection={props.readOnly ? undefined : () => startDetour("add")}
-          />
-        </AgentsPane>
-        <Show when={!props.status && current()}>
           {(agent) => {
             const id = () => agent().id;
             const changed = () =>
@@ -390,11 +445,13 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
               saved(configOf(id())) !== saved(record(id())!) &&
               complete(configOf(id()));
             return (
-              <AgentDetails
+              <AgentPane
+                workspaceName="Mercier & Co"
                 agent={agent()}
-                onClose={() => setSelected(undefined)}
-                tab={detailsTab()}
-                onTabChange={setDetailsTab}
+                onBrowse={() => open(undefined)}
+                tab={agentTab()}
+                tabHref={(next) => `#agent-${id()}-${next}`}
+                onTabChange={setAgentTab}
                 name={names()[id()] ?? agent().name}
                 onNameChange={(name) => setNames({ ...names(), [id()]: name })}
                 nameChanged={
@@ -439,10 +496,12 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
                   const { [id()]: _saved, ...rest } = configs();
                   setConfigs(rest);
                   setProblems([]);
-                  setDetailsTab("overview");
+                  setAgentTab("overview");
                 }}
                 onOpenConnection={() => toast("Opens the connection")}
                 onOpenEnvironment={() => toast("Opens the environment")}
+                turns={turnsOf(id())}
+                onOpenTurn={() => toast("Opens the turn log beside the page")}
                 onRemove={() => setDialog("remove")}
                 failure={
                   problems().length > 0
@@ -478,7 +537,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
           };
           setRecords([...records(), created]);
           setSelected(created.id);
-          setDetailsTab("overview");
+          setAgentTab("overview");
           setDialog(undefined);
           toast(agentsToast("create", created.name));
         }}

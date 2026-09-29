@@ -1,6 +1,6 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { IconChevronDown, IconMarkSearch } from "@amends/icons";
+import { IconAlertTriangle, IconChevronDown, IconMarkSearch } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Count } from "../../components/count/index.ts";
 import { TurnActivity, turnStateLabels } from "../../components/turn-status/index.ts";
@@ -116,6 +116,8 @@ export type ItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "child
   current?: boolean;
   /** Agents at work there: the most pressing turn state, as a quiet mark before any count. */
   activity?: "queued" | "working" | "stopping";
+  /** Something needs attention, such as setup, named for assistive technology: a caution mark. */
+  attention?: string;
 };
 
 /** A destination in a List. */
@@ -129,6 +131,7 @@ export function Item(props: ItemProps) {
     "unread",
     "current",
     "activity",
+    "attention",
     "class",
   ]);
   return (
@@ -159,6 +162,9 @@ export function Item(props: ItemProps) {
               {turnStateLabels[activity()]}
             </TurnActivity>
           )}
+        </Show>
+        <Show when={local.attention}>
+          {(attention) => <IconAlertTriangle label={attention()} class={s.itemAttention} />}
         </Show>
         <Show
           when={local.count}

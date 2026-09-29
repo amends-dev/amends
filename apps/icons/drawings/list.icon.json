@@ -1,0 +1,14 @@
+{
+  "name": "list",
+  "title": "List",
+  "categories": ["navigation", "content"],
+  "keywords": ["list", "browse", "all", "items", "rows"],
+  "shapes": [
+    { "dot": [5, 7] },
+    { "dot": [5, 12] },
+    { "dot": [5, 17] },
+    { "line": [9, 7, 19, 7] },
+    { "line": [9, 12, 19, 12] },
+    { "line": [9, 17, 19, 17] }
+  ]
+}

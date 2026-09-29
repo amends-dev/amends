@@ -116,9 +116,24 @@ export function ApplicationRoutes() {
           <Route path="/direct" component={DirectPage} />
           <Route path="/triage" component={TriagePage} />
           <Route path="/tasks" component={TasksPage} />
-          <Route path="/agents" component={AgentsPage} />
-          <Route path="/environments" component={EnvironmentsPage} />
-          <Route path="/connections" component={ConnectionsPage} />
+          <Route
+            path={["/agents", "/agents/:agentId", "/agents/:agentId/:tab"]}
+            matchFilters={{ tab: ["configuration"] }}
+            component={AgentsPage}
+          />
+          <Route
+            path={[
+              "/environments",
+              "/environments/:environmentId",
+              "/environments/:environmentId/:tab",
+            ]}
+            matchFilters={{ tab: ["sandbox"] }}
+            component={EnvironmentsPage}
+          />
+          <Route
+            path={["/connections", "/connections/:connectionId"]}
+            component={ConnectionsPage}
+          />
           <Route path="/settings">
             <Route path="/" component={SettingsIndex} />
             <Route path="/workspace" component={WorkspaceSettingsPage} />

@@ -3,6 +3,7 @@ import {
   useConnections,
   useWorkspace,
   type ConnectionAction,
+  type ConnectionCapability,
   type ConnectionEntry,
 } from "@amends/client";
 import {
@@ -10,15 +11,15 @@ import {
   ConfigureConnection,
   ConfirmRemoveConnection,
   ConfirmRemoveKey,
-  ConnectionDetails,
   ConnectionKey,
   ConnectionList,
+  ConnectionPane,
   ConnectionsPane,
   connectionsToast,
   type ConnectionsTab,
 } from "@amends/ui/screens/connections";
-import { useParams, useSearchParams } from "@solidjs/router";
-import { Show, createMemo, createSignal } from "solid-js";
+import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";
 
 const href = (path: string) => `#${path}`;
@@ -34,30 +35,39 @@ export function ConnectionsPage() {
 
 type Dialog = "choose" | "configure" | "key" | "remove" | "remove-key";
 
+/** What `?add=` and `?kind=` name: any connection, or those that give one capability. */
+const capabilityOf = (value: string | undefined): ConnectionCapability | undefined =>
+  value === "model-access" || value === "sandboxes" ? value : undefined;
+
 /**
- * A workspace's connections: All or Needs setup by `?tab=`, with the connection open beside them
- * by `?connection=`. Adding one takes two steps, the connection and then its key.
+ * A workspace's connections: the list, All or Needs setup by `?tab=` and one capability by
+ * `?kind=`, or one connection's page by its path. `?add=` opens Add connection over either, for
+ * any provider or, as the sidebar sections' + do, for `model-access` or `sandboxes`. Adding takes
+ * two steps, the connection and then its key.
  */
 function Connections(props: { readonly workspaceId: string }) {
   const { workspaceId } = props;
-  const [search, setSearch] = useSearchParams<{ tab?: string; connection?: string }>();
+  const params = useParams<{ connectionId?: string }>();
+  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string; kind?: string }>();
+  const navigate = useNavigate();
   const workspace = useWorkspace(() => workspaceId);
   const actions = useWorkspaceActions();
   const [dialog, setDialog] = createSignal<Dialog>();
   // The key dialog: right after creating the connection, or adding or replacing one later.
   const [keyMode, setKeyMode] = createSignal<"setup" | "add" | "replace">("add");
   const [query, setQuery] = createSignal("");
+  const base = paths.workspacePage(workspaceId, "connections");
   const view = useConnections(workspaceId, {
     done: (done) => {
       if (done.action === "create" && done.created) {
-        setSearch({ connection: done.created });
+        navigate(paths.connection(workspaceId, done.created));
         if (done.method === "api-key") {
           setKeyMode("setup");
           setDialog("key");
           return;
         }
       }
-      if (done.action === "remove") setSearch({ connection: undefined });
+      if (done.action === "remove") navigate(base);
       actions.toast(connectionsToast(done.action, done.subject));
       setDialog(undefined);
     },
@@ -66,11 +76,26 @@ function Connections(props: { readonly workspaceId: string }) {
     view.dismiss();
     setDialog(next);
   };
+  const adding = () => dialog() === "choose" || dialog() === "configure";
   const close = () => {
     view.dismiss();
-    if (dialog() === "configure") view.create.cancel();
+    if (adding()) return setSearch({ add: undefined });
     setDialog(undefined);
   };
+  // `?add=` opens Add connection over the page; leaving it, such as with Back, sets the draft aside.
+  createEffect(
+    on(
+      () => search.add !== undefined && view.canCreate(),
+      (add) => {
+        if (add) open("choose");
+        else if (adding()) {
+          view.create.cancel();
+          setDialog(undefined);
+        }
+      },
+    ),
+  );
+  const add = () => setSearch({ add: search.kind ?? "connection" });
   const failureOf = (action: ConnectionAction) => {
     const failure = view.failure();
     return failure?.action === action ? failure.error : undefined;
@@ -79,91 +104,100 @@ function Connections(props: { readonly workspaceId: string }) {
   const refreshing = () => view.pending() === "refresh";
   const name = () => workspace()?.workspace.name ?? "";
   const tab = (): ConnectionsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
-  const base = paths.workspacePage(workspaceId, "connections");
+  const kind = () => capabilityOf(search.kind);
+  const ofKind = createMemo(() =>
+    view
+      .connections()
+      .filter((connection) => kind() === undefined || connection.provider?.capability === kind()),
+  );
   const shown = createMemo(() => {
     const words = query().trim().toLocaleLowerCase();
-    return view
-      .connections()
-      .filter(
-        (connection) =>
-          (tab() === "all" || connection.setup === "needs-setup") &&
-          (words === "" ||
-            connection.name.toLocaleLowerCase().includes(words) ||
-            (connection.provider?.name ?? connection.providerId)
-              .toLocaleLowerCase()
-              .includes(words)),
-      );
+    return ofKind().filter(
+      (connection) =>
+        (tab() === "all" || connection.setup === "needs-setup") &&
+        (words === "" ||
+          connection.name.toLocaleLowerCase().includes(words) ||
+          (connection.provider?.name ?? connection.providerId).toLocaleLowerCase().includes(words)),
+    );
   });
+  /** The providers Add connection offers: all, or those giving the capability asked for. */
+  const providers = () => {
+    const wanted = capabilityOf(search.add);
+    return view
+      .providers()
+      .filter((provider) => wanted === undefined || provider.capability === wanted);
+  };
   const selected = (): ConnectionEntry | undefined =>
-    search.connection === undefined ? undefined : view.connection(search.connection);
-  const add = () => open("choose");
+    params.connectionId === undefined ? undefined : view.connection(params.connectionId);
+  const listHref = (next: ConnectionsTab) => {
+    const query = new URLSearchParams({
+      ...(next === "needs-setup" ? { tab: next } : {}),
+      ...(kind() ? { kind: kind()! } : {}),
+    }).toString();
+    return href(query ? `${base}?${query}` : base);
+  };
   return (
     <>
-      <ConnectionsPane
-        workspaceName={name()}
-        tab={tab()}
-        tabHref={(next) => href(next === "needs-setup" ? `${base}?tab=needs-setup` : base)}
-        onTabChange={(next) =>
-          setSearch({ tab: next === "needs-setup" ? "needs-setup" : undefined })
-        }
-        counts={
-          view.status()
-            ? undefined
-            : {
-                all: view.connections().length,
-                needsSetup: view
-                  .connections()
-                  .filter((connection) => connection.setup === "needs-setup").length,
-              }
-        }
-        onAdd={view.canCreate() ? add : undefined}
-        status={view.status()}
-        onRetry={view.refresh}
-      >
-        <ConnectionList
-          tab={tab()}
-          query={query()}
-          onQueryChange={setQuery}
-          connections={shown()}
-          total={view.connections().length}
-          providers={view.providers().map((provider) => provider.name)}
-          selectedId={selected()?.id}
-          connectionHref={(id) =>
-            href(
-              `${base}?${new URLSearchParams({ ...(tab() === "needs-setup" ? { tab: tab() } : {}), connection: id })}`,
-            )
-          }
-          onOpen={(id) => {
-            view.dismiss();
-            setSearch({ connection: id });
-          }}
-          onAdd={view.canCreate() ? add : undefined}
-          failure={view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined}
-          onRefresh={view.refresh}
-          refreshing={refreshing()}
-        />
-      </ConnectionsPane>
-      <Show when={selected()}>
-        {(connection) => (
-          <ConnectionDetails
+      <Show
+        when={params.connectionId}
+        keyed
+        fallback={
+          <ConnectionsPane
             workspaceName={name()}
-            connection={connection()}
-            onClose={() => {
-              view.configure.reset(connection().id);
-              view.dismiss();
-              setSearch({ connection: undefined });
-            }}
-            name={view.rename.name(connection().id)}
-            onNameChange={(value) => view.rename.setName(connection().id, value)}
-            nameChanged={view.rename.changed(connection().id)}
-            onSaveName={() => view.rename.save(connection().id)}
-            value={(key) => view.configure.value(connection().id, key)}
-            onValueChange={(key, value) => view.configure.setValue(connection().id, key, value)}
-            issue={(key) => view.configure.issue(connection().id, key)}
-            settingsChanged={view.configure.changed(connection().id)}
-            onSaveSettings={() => view.configure.save(connection().id)}
+            tab={tab()}
+            tabHref={listHref}
+            onTabChange={(next) =>
+              setSearch({ tab: next === "needs-setup" ? "needs-setup" : undefined })
+            }
+            counts={
+              view.status()
+                ? undefined
+                : {
+                    all: ofKind().length,
+                    needsSetup: ofKind().filter((connection) => connection.setup === "needs-setup")
+                      .length,
+                  }
+            }
+            onAdd={view.canCreate() ? add : undefined}
+            status={view.status()}
+            onRetry={view.refresh}
+          >
+            <ConnectionList
+              tab={tab()}
+              query={query()}
+              onQueryChange={setQuery}
+              connections={shown()}
+              total={ofKind().length}
+              providers={view.providers().map((provider) => provider.name)}
+              connectionHref={(id) => href(paths.connection(workspaceId, id))}
+              onAdd={view.canCreate() ? add : undefined}
+              failure={
+                view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined
+              }
+              onRefresh={view.refresh}
+              refreshing={refreshing()}
+            />
+          </ConnectionsPane>
+        }
+      >
+        {(connectionId) => (
+          <ConnectionPane
+            workspaceName={name()}
+            connection={selected()}
+            status={view.status()}
+            onRetry={view.refresh}
+            onBrowse={() => navigate(base)}
+            name={view.rename.name(connectionId)}
+            onNameChange={(value) => view.rename.setName(connectionId, value)}
+            nameChanged={view.rename.changed(connectionId)}
+            onSaveName={() => view.rename.save(connectionId)}
+            value={(key) => view.configure.value(connectionId, key)}
+            onValueChange={(key, value) => view.configure.setValue(connectionId, key, value)}
+            issue={(key) => view.configure.issue(connectionId, key)}
+            settingsChanged={view.configure.changed(connectionId)}
+            onSaveSettings={() => view.configure.save(connectionId)}
             onSetKey={() => {
-              setKeyMode(connection().keySaved ? "replace" : "add");
+              setKeyMode(selected()?.keySaved ? "replace" : "add");
               open("key");
             }}
             onRemoveKey={() => open("remove-key")}
@@ -178,7 +212,7 @@ function Connections(props: { readonly workspaceId: string }) {
         open={dialog() === "choose"}
         onClose={close}
         workspaceName={name()}
-        providers={view.providers()}
+        providers={providers()}
         onChoose={(providerId) => {
           view.create.begin(providerId);
           setDialog("configure");

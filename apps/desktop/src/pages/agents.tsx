@@ -10,17 +10,18 @@ import {
 } from "@amends/client";
 import {
   AddAgent,
-  AgentDetails,
   AgentList,
+  AgentPane,
   AgentsPane,
   ConfirmRemoveAgent,
   agentsToast,
-  type AgentDetailsTab,
+  type AgentTab,
   type AgentsTab,
 } from "@amends/ui/screens/agents";
 import { ChooseProvider, ConfigureConnection, ConnectionKey } from "@amends/ui/screens/connections";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { Show, createMemo, createSignal } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
+import { TurnLog } from "../turn-log.tsx";
 import { useWorkspaceActions } from "../workspace-actions.ts";
 
 const href = (path: string) => `#${path}`;
@@ -37,29 +38,31 @@ export function AgentsPage() {
 type Dialog = "add" | "remove" | "choose-provider" | "create-connection" | "connection-key";
 
 /**
- * A workspace's agents: All or Needs setup by `?tab=`, with the agent open beside them by
- * `?agent=`. Adding one takes its name, role, model access, environment, and instructions; a model
- * connection it needs can be created on the way, returning to the draft with it chosen.
+ * A workspace's agents: the list, All or Needs setup by `?tab=`, or one agent's page by its path,
+ * Overview or Configuration. `?add=agent` opens Add agent over either, as the sidebar's + does, and
+ * `?log=` opens one of the agent's turns beside its page. Adding takes its name, role, model
+ * access, environment, and instructions; a model connection it needs can be created on the way,
+ * returning to the draft with it chosen.
  */
 function Agents(props: { readonly workspaceId: string }) {
   const { workspaceId } = props;
-  const [search, setSearch] = useSearchParams<{ tab?: string; agent?: string }>();
+  const params = useParams<{ agentId?: string; tab?: string }>();
+  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string; log?: string }>();
   const navigate = useNavigate();
   const workspace = useWorkspace(() => workspaceId);
   const actions = useWorkspaceActions();
   const [dialog, setDialog] = createSignal<Dialog>();
-  const [detailsTab, setDetailsTab] = createSignal<AgentDetailsTab>("overview");
   const [query, setQuery] = createSignal("");
   // Where the connection detour returns: the draft being added, or an agent's configuration.
   const [detour, setDetour] = createSignal<{ readonly agentId?: string }>();
+  const base = paths.workspacePage(workspaceId, "agents");
+  const agentPath = (agentId: string, tab: AgentTab = "overview") =>
+    paths.agent(workspaceId, agentId, tab === "configuration" ? "configuration" : undefined);
   const view = useAgents(workspaceId, {
-    selected: () => search.agent,
+    selected: () => params.agentId,
     done: (done) => {
-      if (done.action === "create" && done.created) {
-        setDetailsTab("overview");
-        setSearch({ agent: done.created });
-      }
-      if (done.action === "remove") setSearch({ agent: undefined });
+      if (done.action === "create" && done.created) navigate(agentPath(done.created));
+      if (done.action === "remove") navigate(base);
       actions.toast(agentsToast(done.action, done.subject));
       setDialog(undefined);
     },
@@ -70,8 +73,8 @@ function Agents(props: { readonly workspaceId: string }) {
     setDetour(undefined);
     if (from?.agentId !== undefined) {
       if (connectionId) view.configure.configuration(from.agentId).setConnection(connectionId);
-      setDetailsTab("configuration");
       setDialog(undefined);
+      navigate(agentPath(from.agentId, "configuration"));
     } else {
       if (connectionId) view.create.configuration.setConnection(connectionId);
       setDialog(view.create.active() ? "add" : undefined);
@@ -108,11 +111,31 @@ function Agents(props: { readonly workspaceId: string }) {
     view.dismiss();
     setDialog(next);
   };
+  /** Leaves `?add=agent` for the page under it; the effect below sets the draft aside. */
+  const closeAdd = () => setSearch({ add: undefined });
   const close = () => {
     view.dismiss();
-    if (dialog() === "add") view.create.cancel();
+    if (dialog() === "add") return closeAdd();
     setDialog(undefined);
   };
+  // `?add=agent` opens Add agent over the page; leaving it, such as with Back, sets the draft aside.
+  createEffect(
+    on(
+      () => search.add === "agent" && view.canCreate(),
+      (adding) => {
+        if (adding) {
+          view.dismiss();
+          if (!view.create.active()) view.create.begin();
+          setDialog("add");
+        } else if (view.create.active() && detour()?.agentId === undefined) {
+          view.create.cancel();
+          setDetour(undefined);
+          setDialog(undefined);
+        }
+      },
+    ),
+  );
+  const add = () => setSearch({ add: "agent" });
   const failureOf = (action: AgentAction) => {
     const failure = view.failure();
     return failure?.action === action ? failure : undefined;
@@ -120,7 +143,6 @@ function Agents(props: { readonly workspaceId: string }) {
   const refreshing = () => view.pending() === "refresh";
   const name = () => workspace()?.workspace.name ?? "";
   const tab = (): AgentsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
-  const base = paths.workspacePage(workspaceId, "agents");
   const activity = useTurnActivity(workspaceId);
   const shown = createMemo(() => {
     const words = query().trim().toLocaleLowerCase();
@@ -134,10 +156,30 @@ function Agents(props: { readonly workspaceId: string }) {
       .map((agent) => ({ ...agent, activity: activity.agentActivity(agent.memberId) }));
   });
   const selected = (): AgentEntry | undefined =>
-    search.agent === undefined ? undefined : view.agent(search.agent);
-  const add = () => {
-    view.create.begin();
-    open("add");
+    params.agentId === undefined ? undefined : view.agent(params.agentId);
+  /** The open agent's turns in progress, by where each runs. */
+  const turns = () => {
+    const agent = selected();
+    if (agent === undefined) return [];
+    return activity.ofAgent(agent.memberId).flatMap((turn) =>
+      turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
+        ? [
+            {
+              id: turn.id,
+              state: turn.state,
+              where:
+                turn.groupKind === "direct"
+                  ? (turn.groupName ?? "A conversation")
+                  : `#${turn.groupName ?? "group"}`,
+            },
+          ]
+        : [],
+    );
+  };
+  const openThread = (turnId: string) => {
+    const turn = activity.all().find((candidate) => candidate.id === turnId);
+    if (turn) navigate(paths.thread(workspaceId, turn.groupId, turn.threadId));
+    else setSearch({ log: undefined });
   };
   /** The draft's name, or the agent's, for the detour to name where it returns. */
   const returnTo = () => {
@@ -166,106 +208,104 @@ function Agents(props: { readonly workspaceId: string }) {
   };
   return (
     <>
-      <AgentsPane
-        workspaceName={name()}
-        tab={tab()}
-        tabHref={(next) => href(next === "needs-setup" ? `${base}?tab=needs-setup` : base)}
-        onTabChange={(next) =>
-          setSearch({ tab: next === "needs-setup" ? "needs-setup" : undefined })
-        }
-        counts={
-          view.status()
-            ? undefined
-            : {
-                all: view.agents().length,
-                needsSetup: view.agents().filter((agent) => agent.issues.length > 0).length,
+      <Show
+        when={params.agentId}
+        keyed
+        fallback={
+          <AgentsPane
+            workspaceName={name()}
+            tab={tab()}
+            tabHref={(next) => href(next === "needs-setup" ? `${base}?tab=needs-setup` : base)}
+            onTabChange={(next) =>
+              setSearch({ tab: next === "needs-setup" ? "needs-setup" : undefined })
+            }
+            counts={
+              view.status()
+                ? undefined
+                : {
+                    all: view.agents().length,
+                    needsSetup: view.agents().filter((agent) => agent.issues.length > 0).length,
+                  }
+            }
+            onAdd={view.canCreate() ? add : undefined}
+            status={view.status()}
+            onRetry={view.refresh}
+          >
+            <AgentList
+              tab={tab()}
+              query={query()}
+              onQueryChange={setQuery}
+              agents={shown()}
+              total={view.agents().length}
+              noModelConnection={view.connectionsLoaded() && view.connections().length === 0}
+              agentHref={(id) => href(agentPath(id))}
+              onAdd={view.canCreate() ? add : undefined}
+              onCreateConnection={view.canCreate() ? () => startDetour() : undefined}
+              failure={
+                view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined
               }
-        }
-        onAdd={view.canCreate() ? add : undefined}
-        status={view.status()}
-        onRetry={view.refresh}
-      >
-        <AgentList
-          tab={tab()}
-          query={query()}
-          onQueryChange={setQuery}
-          agents={shown()}
-          total={view.agents().length}
-          noModelConnection={view.connectionsLoaded() && view.connections().length === 0}
-          selectedId={selected()?.id}
-          agentHref={(id) =>
-            href(
-              `${base}?${new URLSearchParams({
-                ...(tab() === "needs-setup" ? { tab: tab() } : {}),
-                agent: id,
-              })}`,
-            )
-          }
-          onOpen={(id) => {
-            view.dismiss();
-            setDetailsTab("overview");
-            setSearch({ agent: id });
-          }}
-          onAdd={view.canCreate() ? add : undefined}
-          onCreateConnection={view.canCreate() ? () => startDetour() : undefined}
-          failure={view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined}
-          onRefresh={view.refresh}
-          refreshing={refreshing()}
-        />
-      </AgentsPane>
-      <Show when={selected()}>
-        {(agent) => {
-          const id = () => agent().id;
-          return (
-            <AgentDetails
-              agent={agent()}
-              onClose={() => {
-                view.configure.reset(id());
-                view.dismiss();
-                setSearch({ agent: undefined });
-              }}
-              tab={detailsTab()}
-              onTabChange={setDetailsTab}
-              name={view.rename.name(id())}
-              onNameChange={(value) => view.rename.setName(id(), value)}
-              nameChanged={view.rename.changed(id())}
-              onSaveName={() => view.rename.save(id())}
-              connectionReady={
-                view.connections().find((connection) => connection.id === agent().connection.id)
-                  ?.ready
-              }
-              configuration={{
-                ...editorProps(view.configure.configuration(id())),
-                onCreateConnection: () => startDetour(id()),
-              }}
-              configurationChanged={view.configure.changed(id())}
-              onSaveConfiguration={() => view.configure.save(id())}
-              onDiscardConfiguration={() => {
-                view.configure.reset(id());
-                view.dismiss();
-                setDetailsTab("overview");
-              }}
-              onOpenConnection={() =>
-                navigate(
-                  href(
-                    `${paths.workspacePage(workspaceId, "connections")}?connection=${encodeURIComponent(agent().connection.id)}`,
-                  ),
-                )
-              }
-              onOpenEnvironment={() =>
-                navigate(
-                  href(
-                    `${paths.workspacePage(workspaceId, "environments")}?environment=${encodeURIComponent(agent().environment.id)}`,
-                  ),
-                )
-              }
-              onRemove={() => open("remove")}
-              pending={view.pending()}
-              failure={dialog() ? undefined : view.failure()}
               onRefresh={view.refresh}
+              refreshing={refreshing()}
             />
-          );
-        }}
+          </AgentsPane>
+        }
+      >
+        {(agentId) => (
+          <AgentPane
+            workspaceName={name()}
+            agent={selected()}
+            status={view.status()}
+            onRetry={view.refresh}
+            onBrowse={() => navigate(base)}
+            tab={params.tab === "configuration" ? "configuration" : "overview"}
+            tabHref={(next) => href(agentPath(agentId, next))}
+            onTabChange={(next) => navigate(agentPath(agentId, next))}
+            name={view.rename.name(agentId)}
+            onNameChange={(value) => view.rename.setName(agentId, value)}
+            nameChanged={view.rename.changed(agentId)}
+            onSaveName={() => view.rename.save(agentId)}
+            connectionReady={
+              view.connections().find((connection) => connection.id === selected()?.connection.id)
+                ?.ready
+            }
+            configuration={{
+              ...editorProps(view.configure.configuration(agentId)),
+              onCreateConnection: () => startDetour(agentId),
+            }}
+            configurationChanged={view.configure.changed(agentId)}
+            onSaveConfiguration={() => view.configure.save(agentId)}
+            onDiscardConfiguration={() => {
+              view.configure.reset(agentId);
+              view.dismiss();
+              navigate(agentPath(agentId));
+            }}
+            onOpenConnection={() => {
+              const agent = selected();
+              if (agent) navigate(paths.connection(workspaceId, agent.connection.id));
+            }}
+            onOpenEnvironment={() => {
+              const agent = selected();
+              if (agent) navigate(paths.environment(workspaceId, agent.environment.id));
+            }}
+            turns={turns()}
+            onOpenTurn={(turnId) => setSearch({ log: turnId })}
+            onRemove={() => open("remove")}
+            pending={view.pending()}
+            failure={dialog() ? undefined : view.failure()}
+            onRefresh={view.refresh}
+          />
+        )}
+      </Show>
+      <Show when={params.agentId && search.log} keyed>
+        {(turnId) => (
+          <TurnLog
+            workspaceId={workspaceId}
+            turnId={turnId}
+            onBack={() => openThread(turnId)}
+            onClose={() => setSearch({ log: undefined })}
+            onRetried={(next) => setSearch({ log: next })}
+          />
+        )}
       </Show>
       <AddAgent
         open={dialog() === "add"}

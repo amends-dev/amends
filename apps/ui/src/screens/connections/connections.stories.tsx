@@ -12,11 +12,21 @@ type Story = StoryObj;
 const body = (element: HTMLElement) => within(element.ownerDocument.body);
 const list = (element: HTMLElement) =>
   within(within(element).getByRole("list", { name: "Connections" }));
-const details = (element: HTMLElement) =>
-  within(element).findByLabelText("Connection details", { selector: "aside" });
+const details = async (element: HTMLElement) => within(element).getByRole("main");
+const sidebar = (element: HTMLElement) =>
+  within(within(element).getByRole("navigation", { name: "Workspace" }));
 
 /** The Lunacy "Connections / 01 / All connections" frame. */
-export const AllConnections = { render: () => <ConnectionsWorkspace /> } satisfies Story;
+export const AllConnections = {
+  render: () => <ConnectionsWorkspace />,
+  play: async ({ canvasElement }) => {
+    const nav = sidebar(canvasElement);
+    await expect(nav.getByText("Model providers")).toBeVisible();
+    await expect(nav.getByText("Sandbox accounts")).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Add model provider" })).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Add sandbox account" })).toBeVisible();
+  },
+} satisfies Story;
 
 /** The Lunacy "02 / Configured connection" frame. */
 export const ConfiguredConnection = {
@@ -25,7 +35,7 @@ export const ConfiguredConnection = {
 
 /** The Lunacy "03 / Needs setup" frame. */
 export const NeedsSetup = {
-  render: () => <ConnectionsWorkspace tab="needs-setup" selected="local" />,
+  render: () => <ConnectionsWorkspace selected="local" />,
 } satisfies Story;
 
 /** The Lunacy "04 / Choose provider" frame. */
@@ -138,7 +148,7 @@ export const ReadOnly = {
   render: () => <ConnectionsWorkspace selected="anthropic-team" readOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryByRole("button", { name: /Add/ })).toBeNull();
+    await expect(sidebar(canvasElement).queryByRole("button", { name: /Add/ })).toBeNull();
     const panel = within(await details(canvasElement));
     for (const name of ["Save name", "Save settings", "Replace key", "Remove key"])
       await expect(panel.queryByRole("button", { name })).toBeNull();
@@ -183,9 +193,11 @@ export const AddConnectionFlow = {
         canvas.getAllByRole("status").some((toast) => toast.textContent?.includes("API key saved")),
       ).toBe(true),
     );
-    const row = list(canvasElement).getByRole("link", { name: /Anthropic · Research/ });
-    await expect(row).toHaveTextContent("Configured");
-    await expect(row).toHaveAttribute("aria-current", "true");
+    await expect(canvas.getByRole("heading", { name: "Anthropic · Research" })).toBeVisible();
+    await expect(within(canvas.getByRole("main")).getByText("Configured")).toBeVisible();
+    await expect(
+      sidebar(canvasElement).getByRole("link", { name: /Anthropic · Research/ }),
+    ).toHaveAttribute("aria-current", "page");
   },
 } satisfies Story;
 

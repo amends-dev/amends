@@ -16,23 +16,6 @@ export const loading = style({
   color: vars.color.text.secondary,
 });
 
-// Workspace: the name and ownership on the left, details in a 444px column 88px to the right;
-// touch layouts stack the details underneath.
-export const workspace = style({
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 42.5rem) minmax(15rem, 27.75rem)",
-  justifyContent: "space-between",
-  alignItems: "start",
-  columnGap: "3rem",
-  rowGap: "3.5rem",
-  paddingBlockStart: "0.25rem",
-  "@media": {
-    [media.touch]: { gridTemplateColumns: "minmax(0, 42.5rem)", justifyContent: "start" },
-  },
-});
-
-export const column = style({ display: "flex", flexDirection: "column", gap: "3.5rem" });
-
 export const section = style({ display: "flex", flexDirection: "column", gap: "1.125rem" });
 
 export const form = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });

@@ -1,16 +1,21 @@
 // Workshop harness: Connections with the Lunacy sample providers and connections, following the
 // mocks' behavior notes over local state. Not exported.
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { IconMarkConnections } from "@amends/icons";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { navigation } from "../sample.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import {
+  DestinationSidebar,
+  WorkspaceNavigation,
+  type NavigationSection,
+} from "../workspace-navigation/index.ts";
 import {
   ChooseProvider,
   ConfigureConnection,
   ConfirmRemoveConnection,
   ConfirmRemoveKey,
-  ConnectionDetails,
+  ConnectionPane,
   ConnectionKey,
   ConnectionList,
   ConnectionsPane,
@@ -281,53 +286,102 @@ export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
   const valueOf = (id: string, key: string) =>
     values()[id]?.[key] ?? records().find((record) => record.id === id)?.settings[key] ?? "";
 
+  const open = (id: string | undefined) => {
+    setFailure(undefined);
+    setSelected(id);
+  };
+  const add = props.readOnly ? undefined : () => setDialog("choose");
+  /** A sidebar section: the connections that give one capability. */
+  const section = (
+    capability: "model-access" | "sandboxes",
+    title: string,
+    create: string,
+  ): NavigationSection => ({
+    id: capability,
+    title,
+    href: "#connections",
+    browse: { label: `Browse ${title.toLowerCase()}`, onBrowse: () => open(undefined) },
+    create: add && { label: create, onCreate: add },
+    entries: props.status
+      ? []
+      : all()
+          .filter((connection) => connection.provider?.capability === capability)
+          .map((connection) => ({
+            id: connection.id,
+            name: connection.name,
+            href: `#connection-${connection.id}`,
+            current: selected() === connection.id,
+            icon: IconMarkConnections,
+            attention: connection.setup === "configured" ? undefined : "Needs setup",
+          })),
+    loading: props.status === "loading",
+    empty: "None yet",
+  });
+  // The sidebar's and list's links are plain hashes here: follow the list and each page.
+  onMount(() => {
+    const follow = () => {
+      const target = window.location.hash.slice(1);
+      if (target === "connections") return open(undefined);
+      if (!target.startsWith("connection-")) return;
+      const id = target.slice("connection-".length);
+      if (records().some((entry) => entry.id === id) && id !== selected()) open(id);
+    };
+    window.addEventListener("hashchange", follow);
+    onCleanup(() => window.removeEventListener("hashchange", follow));
+  });
   const nav = navigation({ groups: [{ id: "general", name: "general" }] });
   return (
     <Shell.Root>
-      <WorkspaceNavigation {...nav} destination="connections" />
+      <WorkspaceNavigation {...nav} destination="connections">
+        <DestinationSidebar
+          sections={[
+            section("model-access", "Model providers", "Add model provider"),
+            section("sandboxes", "Sandbox accounts", "Add sandbox account"),
+          ]}
+        />
+      </WorkspaceNavigation>
       <Shell.Main>
-        <ConnectionsPane
-          workspaceName="Mercier & Co"
-          tab={tab()}
-          tabHref={(next) => `#${next}`}
-          onTabChange={(next) => {
-            setQuery("");
-            setTab(next);
-          }}
-          counts={
-            props.status
-              ? undefined
-              : {
-                  all: all().length,
-                  needsSetup: all().filter((entry) => entry.setup === "needs-setup").length,
-                }
+        <Show
+          when={!props.status && current()}
+          fallback={
+            <ConnectionsPane
+              workspaceName="Mercier & Co"
+              tab={tab()}
+              tabHref={(next) => `#${next}`}
+              onTabChange={(next) => {
+                setQuery("");
+                setTab(next);
+              }}
+              counts={
+                props.status
+                  ? undefined
+                  : {
+                      all: all().length,
+                      needsSetup: all().filter((entry) => entry.setup === "needs-setup").length,
+                    }
+              }
+              onAdd={add}
+              status={props.status}
+              onRetry={() => {}}
+            >
+              <ConnectionList
+                tab={tab()}
+                query={query()}
+                onQueryChange={setQuery}
+                connections={shown()}
+                total={all().length}
+                providers={providers().map((provider) => provider.name)}
+                connectionHref={(id) => `#connection-${id}`}
+                onAdd={add}
+              />
+            </ConnectionsPane>
           }
-          onAdd={props.readOnly ? undefined : () => setDialog("choose")}
-          status={props.status}
-          onRetry={() => {}}
         >
-          <ConnectionList
-            tab={tab()}
-            query={query()}
-            onQueryChange={setQuery}
-            connections={shown()}
-            total={all().length}
-            providers={providers().map((provider) => provider.name)}
-            selectedId={selected()}
-            connectionHref={(id) => `#connection-${id}`}
-            onOpen={(id) => {
-              setFailure(undefined);
-              setSelected(id);
-            }}
-            onAdd={props.readOnly ? undefined : () => setDialog("choose")}
-          />
-        </ConnectionsPane>
-        <Show when={!props.status && current()}>
           {(connection) => (
-            <ConnectionDetails
+            <ConnectionPane
               workspaceName="Mercier & Co"
               connection={connection()}
-              onClose={() => setSelected(undefined)}
+              onBrowse={() => open(undefined)}
               name={nameOf(connection().id)}
               onNameChange={(name) => setNames({ ...names(), [connection().id]: name })}
               nameChanged={

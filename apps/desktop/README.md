@@ -108,7 +108,7 @@ and `src/pages/environments.tsx` the [Environments page](../../docs/environments
 `useEnvironments`, detouring through the Connections dialogs to create a sandbox account, and
 `src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from `useAgents`, detouring
 through them to create a model connection. The app-owned [Settings pages](../../docs/workspace-settings.md)
-compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
+compose the Workspace and Members sections, which the Settings sidebar lists, and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode through the UI Theme.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages

@@ -3,34 +3,59 @@
 Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace layout, built on the
 [UI](../apps/ui/README.md) Shell pattern from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: a rail, a sidebar, the main content, and a side
-panel.
+panel. Every destination uses them the same way, as the Lunacy "Agents / Light mode / v02 ·
+Navigation" frames lay out:
 
-- **Rail**: the brand, the Home, Agents, Environments, and Connections destinations, then Settings and
-  the reader's avatar, which opens the account menu. A destination is a section, marked
-  `aria-current="true"`; Home covers Inbox, Triage, Tasks, groups, and direct messages.
-- **Sidebar**: the workspace (which switches workspace), Inbox with the count of what is pending
-  for the reader, Triage, Tasks, then Groups and Direct messages. Groups' title links to the
-  directory at `/groups`, with Browse groups (the Discover tab) and, for readers who may create
-  groups, Create group. The general group comes first, then the rest by name; each shows the
-  reader's pending count, or a dot for activity they have not seen. With no groups, once they
-  load, the section says "No groups yet". Direct messages lists the reader's direct groups by their
-  other people, the most recently active first, then up to six teammates, people and agents, they
-  have no one-to-one conversation with yet, by name, with New message. A teammate's row opens a
-  first message to them; the conversation starts when it is sent. The reader is not listed:
-  a direct group needs at least one other member.
-- **Main**: one pane per page. `/groups/:groupId` shows the group's pane: its name, member stack,
-  follow bell, settings, and its threads with the composer. `/groups` is the directory: Your
-  groups and Discover, with Join.
-- **Side panel**: `…/groups/:groupId/threads/:threadId` opens a thread beside its group, and
-  `/inbox/groups/:groupId/threads/:threadId` beside the inbox, at the message that notified the
-  reader. Closing returns to the group or the inbox. The panel sits beside the content from 80rem,
-  floats over it below that, and fills the screen on phones.
+- **Rail** picks a destination: Home, Agents, Environments, and Connections, then Settings and the
+  reader's avatar, which opens the account menu. The current destination is marked
+  `aria-current="true"`, whichever of its pages shows.
+- **Sidebar** lists the destination's items. Its header, the workspace switcher, stays the same
+  everywhere; below it, each section's title and Browse open the full list in the main content, and
+  its + opens the create modal over the current page. Items open in the main content.
+- **Main** shows one pane: a list, or one item with its tabs, which are links. A list's rows open
+  the item in the main content, as the sidebar's items do. Pages about one item read in one column
+  (UI's `Pane.Column`, 680px at most); nothing sits beside it.
+- **Side panel** holds only something inside what the main content shows: a group's thread, an
+  agent's turn log, or a member in Settings. An item of a destination never opens there.
+- **Modals** create and confirm.
+
+The destinations' sidebars:
+
+- **Home**: Inbox with the count of what is pending for the reader, Triage, Tasks, then Groups and
+  Direct messages. Groups' title links to the directory at `/groups`, with Browse groups (the
+  Discover tab) and, for readers who may create groups, Create group. The general group comes
+  first, then the rest by name; each shows the reader's pending count, or a dot for activity they
+  have not seen. With no groups, once they load, the section says "No groups yet". Direct messages
+  lists the reader's direct groups by their other people, the most recently active first, then up
+  to six teammates, people and agents, they have no one-to-one conversation with yet, by name,
+  with New message. A teammate's row opens a first message to them; the conversation starts when
+  it is sent. The reader is not listed: a direct group needs at least one other member.
+- **Agents**: each agent by name with its avatar, marked while one of its turns is queued or
+  running, and with a caution mark when it needs setup; + is Add agent (`?add=agent`). See
+  [agents](agents.md).
+- **Environments**: each environment, marked when it needs setup; + is Add environment
+  (`?add=environment`). One section: every environment serves the same use, and the sandbox is a
+  field of one creation flow. See [environments](environments.md).
+- **Connections**: Model providers, then Sandbox accounts, each with its own Browse (the list of
+  that kind, `?kind=`) and + (`?add=model-access` or `?add=sandboxes`), which offers only that
+  kind's providers. Connections whose provider this host no longer installs follow under
+  Unavailable. See [connections](connections.md).
+- **Settings**: Workspace and Members, each its own page. See
+  [workspace settings](workspace-settings.md).
+
+Home's main content: `/groups/:groupId` shows the group's pane: its name, member stack, follow
+bell, settings, and its threads with the composer. `/groups` is the directory: Your groups and
+Discover, with Join. `…/groups/:groupId/threads/:threadId` opens a thread in the side panel beside
+its group, and `/inbox/groups/:groupId/threads/:threadId` beside the inbox, at the message that
+notified the reader. Closing returns to the group or the inbox. The panel sits beside the content
+from 80rem, floats over it below that, and fills the screen on phones.
 
 Below 64rem the sidebar moves into a drawer beside the rail, opened from each pane's menu button;
-below 48rem rail and sidebar open together. Following a link, Escape, or the scrim closes it. The
-shell is keyed by workspace: switching workspaces builds a new one for its groups and names.
+below 48rem rail and sidebar open together. A rail link switches the sidebar and keeps the drawer
+open to choose from; a sidebar link, Escape, or the scrim closes it. The shell is keyed by
+workspace: switching workspaces builds a new one for its groups and names.
 A missing or removed membership shows the [unavailable page](workspace-entry.md) outside the
-workspace layout. Sign-in preserves supported nested destinations.
+workspace layout. Sign-in preserves supported nested destinations, including an item's page.
 
 ## Groups and threads
 
@@ -77,8 +102,9 @@ Try again under a note when a page fails. A notification whose thread the reader
 
 Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
 side panel, such as Settings' member details, attaches beside the main content like the thread
-panel. [Agents](agents.md), [Connections](connections.md), and [Environments](environments.md)
-follow their own Lunacy frames. Home, Triage, and Tasks are placeholders drawn with UI's
+panel. [Agents](agents.md) follows its v02 navigation frames; [Connections](connections.md) and
+[Environments](environments.md) follow the same pattern, with their v01 frames for lists, forms,
+and modals. Home, Triage, and Tasks are placeholders drawn with UI's
 EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
 above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
 empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts

@@ -131,6 +131,12 @@ export const titleIcon = style({
   },
 });
 
+// A person's avatar in place of the icon, dropped on touch layouts like it.
+export const titleAvatar = style({
+  flex: "none",
+  "@media": { [media.touch]: { display: "none" } },
+});
+
 export const titleText = style({
   display: "flex",
   flexDirection: "column",
@@ -244,6 +250,16 @@ export const body = style({
     [media.touch]: { padding: "1rem 1.5rem" },
     [media.mobile]: { padding: "1rem", selectors: { [`${modal} &`]: { padding: "1rem" } } },
   },
+});
+
+// One column of sections for a page about one item; nothing sits beside it.
+export const column = style({
+  display: "flex",
+  flexDirection: "column",
+  gap: "2.5rem",
+  maxWidth: "42.5rem",
+  paddingBlockStart: "0.25rem",
+  "@media": { [media.mobile]: { gap: "2rem" } },
 });
 
 export const footer = style({

@@ -90,96 +90,53 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
   };
   return (
     <Pane.Body>
-      <div class={s.workspace}>
-        <div class={s.column}>
-          <form
-            id={formId}
-            class={s.form}
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (props.changed && !props.saving) props.onSave();
-            }}
+      <Pane.Column>
+        <form
+          id={formId}
+          class={s.form}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (props.changed && !props.saving) props.onSave();
+          }}
+        >
+          <Field.Root
+            hint={
+              props.renamable
+                ? "This name is shown throughout your workspace."
+                : "Only the workspace owner can rename it."
+            }
           >
-            <Field.Root
-              hint={
-                props.renamable
-                  ? "This name is shown throughout your workspace."
-                  : "Only the workspace owner can rename it."
-              }
-            >
-              <Field.Label>Workspace name</Field.Label>
-              <Input
-                value={props.name}
-                onInput={(event) => props.onNameChange(event.currentTarget.value)}
-                autocomplete="organization"
-                maxLength={80}
-                disabled={!props.renamable || props.saving}
-                required
+            <Field.Label>Workspace name</Field.Label>
+            <Input
+              value={props.name}
+              onInput={(event) => props.onNameChange(event.currentTarget.value)}
+              autocomplete="organization"
+              maxLength={80}
+              disabled={!props.renamable || props.saving}
+              required
+            />
+          </Field.Root>
+          <Show when={props.failure}>
+            {(failure) => (
+              <SettingsAlert
+                action={failure().action}
+                error={failure().error}
+                onRefresh={props.onRefresh}
+                refreshing={props.refreshing}
               />
-            </Field.Root>
-            <Show when={props.failure}>
-              {(failure) => (
-                <SettingsAlert
-                  action={failure().action}
-                  error={failure().error}
-                  onRefresh={props.onRefresh}
-                  refreshing={props.refreshing}
-                />
-              )}
-            </Show>
-            <Show when={props.renamable}>
-              <Button
-                type="submit"
-                variant="primary"
-                class={s.start}
-                disabled={!props.changed || props.saving}
-              >
-                Save changes
-              </Button>
-            </Show>
-          </form>
-          <Show when={props.owner}>
-            {(owner) => (
-              <section class={s.section} aria-label="Ownership">
-                <SectionHeading>Ownership</SectionHeading>
-                <div class={s.person}>
-                  <Avatar
-                    name={owner().name}
-                    initials={owner().initials}
-                    tone={owner().tone}
-                    size={40}
-                    decorative
-                  />
-                  <div class={s.personText}>
-                    <span class={s.personName}>{displayName(owner())}</span>
-                    <span class={s.personDetail}>Workspace owner</span>
-                  </div>
-                </div>
-                <p class={s.note}>
-                  {props.onTransfer && owner().you
-                    ? "A workspace has one owner. Transferring ownership makes you an administrator."
-                    : "A workspace has one owner."}
-                </p>
-                <Show when={props.onTransfer}>
-                  {(transfer) => (
-                    <>
-                      <Show when={props.noCandidates}>
-                        <p class={s.note}>Invite another person before transferring ownership.</p>
-                      </Show>
-                      <Button
-                        class={s.phoneWide}
-                        disabled={props.noCandidates}
-                        onClick={() => transfer()()}
-                      >
-                        Transfer ownership
-                      </Button>
-                    </>
-                  )}
-                </Show>
-              </section>
             )}
           </Show>
-        </div>
+          <Show when={props.renamable}>
+            <Button
+              type="submit"
+              variant="primary"
+              class={s.start}
+              disabled={!props.changed || props.saving}
+            >
+              Save changes
+            </Button>
+          </Show>
+        </form>
         <section class={s.section} aria-label="Details">
           <SectionHeading>Details</SectionHeading>
           <div class={s.details}>
@@ -213,7 +170,48 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
             </Show>
           </div>
         </section>
-      </div>
+        <Show when={props.owner}>
+          {(owner) => (
+            <section class={s.section} aria-label="Ownership">
+              <SectionHeading>Ownership</SectionHeading>
+              <div class={s.person}>
+                <Avatar
+                  name={owner().name}
+                  initials={owner().initials}
+                  tone={owner().tone}
+                  size={40}
+                  decorative
+                />
+                <div class={s.personText}>
+                  <span class={s.personName}>{displayName(owner())}</span>
+                  <span class={s.personDetail}>Workspace owner</span>
+                </div>
+              </div>
+              <p class={s.note}>
+                {props.onTransfer && owner().you
+                  ? "A workspace has one owner. Transferring ownership makes you an administrator."
+                  : "A workspace has one owner."}
+              </p>
+              <Show when={props.onTransfer}>
+                {(transfer) => (
+                  <>
+                    <Show when={props.noCandidates}>
+                      <p class={s.note}>Invite another person before transferring ownership.</p>
+                    </Show>
+                    <Button
+                      class={s.phoneWide}
+                      disabled={props.noCandidates}
+                      onClick={() => transfer()()}
+                    >
+                      Transfer ownership
+                    </Button>
+                  </>
+                )}
+              </Show>
+            </section>
+          )}
+        </Show>
+      </Pane.Column>
     </Pane.Body>
   );
 }

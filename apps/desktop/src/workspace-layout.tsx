@@ -10,14 +10,17 @@ import {
   useSession,
   useThreadConversation,
   useThreadFollow,
+  useAgentList,
+  useConnectionList,
+  useEnvironmentList,
   useThreadTurns,
   useTurnActivity,
-  useTurnLog,
   useWorkspace,
   useDirectMessages,
   useWorkspaceGroups,
   useWorkspacePeople,
   useWorkspacePermission,
+  type ConnectionCapability,
   type MentionCandidate,
   type WorkspacePage,
 } from "@amends/client";
@@ -28,10 +31,22 @@ import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
-import { TurnLogPane } from "@amends/ui/screens/turns";
-import { WorkspaceNavigation, type Destination } from "@amends/ui/screens/workspace-navigation";
+import {
+  DestinationSidebar,
+  HomeSidebar,
+  WorkspaceNavigation,
+  type Destination,
+  type NavigationSection,
+} from "@amends/ui/screens/workspace-navigation";
+import {
+  IconMarkConnections,
+  IconMarkEnvironments,
+  IconMarkSettings,
+  IconUsers,
+} from "@amends/icons";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { createMemo, createSignal, For, Show, type ParentProps } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch, type ParentProps } from "solid-js";
+import { TurnLog } from "./turn-log.tsx";
 import { WorkspaceActionsContext, useWorkspaceActions } from "./workspace-actions.ts";
 
 const href = (path: string) => `#${path}`;
@@ -155,49 +170,92 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
           destination={destination()}
           destinationHref={(target) => href(path(target))}
           settings={{ href: href(path("settings")), current: at("settings") }}
-          inbox={{ href: href(path("inbox")), current: at("inbox"), unread: pending() }}
-          triage={{ href: href(path("triage")), current: at("triage") }}
-          tasks={{ href: href(path("tasks")), current: at("tasks") }}
-          groupsDirectory={{
-            href: href(paths.groups(workspaceId)),
-            current: browsing() !== undefined,
-          }}
-          groups={groups.teams().map((group) => ({
-            id: group.id,
-            name: group.name,
-            href: href(paths.group(workspaceId, group.id)),
-            current: groupId() === group.id,
-            pending: group.pending,
-            unread: group.unread,
-            activity: activity.inGroup(group.id),
-          }))}
-          groupsLoading={groups.all() === undefined}
-          directMessages={directs().map((entry) =>
-            entry.kind === "conversation"
-              ? {
-                  id: entry.id,
-                  name: entry.name,
-                  href: href(paths.group(workspaceId, entry.id)),
-                  current: groupId() === entry.id,
-                  pending: entry.pending,
-                  unread: entry.unread,
-                }
-              : {
-                  id: entry.id,
-                  name: entry.name,
-                  // A first message; the conversation starts when it is sent.
-                  href: href(paths.directDraft(workspaceId, entry.memberIds)),
-                  current: drafting() !== undefined && search.to === entry.id,
-                },
-          )}
           onSwitchWorkspace={() => navigate(paths.workspaces)}
-          onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
-          onCreateGroup={creator() ? openCreate : undefined}
-          onNewMessage={() => {
-            setRecipients([]);
-            setDialog("new-message");
-          }}
-        />
+        >
+          <Switch
+            fallback={
+              <HomeSidebar
+                inbox={{ href: href(path("inbox")), current: at("inbox"), unread: pending() }}
+                triage={{ href: href(path("triage")), current: at("triage") }}
+                tasks={{ href: href(path("tasks")), current: at("tasks") }}
+                groupsDirectory={{
+                  href: href(paths.groups(workspaceId)),
+                  current: browsing() !== undefined,
+                }}
+                groups={groups.teams().map((group) => ({
+                  id: group.id,
+                  name: group.name,
+                  href: href(paths.group(workspaceId, group.id)),
+                  current: groupId() === group.id,
+                  pending: group.pending,
+                  unread: group.unread,
+                  activity: activity.inGroup(group.id),
+                }))}
+                groupsLoading={groups.all() === undefined}
+                directMessages={directs().map((entry) =>
+                  entry.kind === "conversation"
+                    ? {
+                        id: entry.id,
+                        name: entry.name,
+                        href: href(paths.group(workspaceId, entry.id)),
+                        current: groupId() === entry.id,
+                        pending: entry.pending,
+                        unread: entry.unread,
+                      }
+                    : {
+                        id: entry.id,
+                        name: entry.name,
+                        // A first message; the conversation starts when it is sent.
+                        href: href(paths.directDraft(workspaceId, entry.memberIds)),
+                        current: drafting() !== undefined && search.to === entry.id,
+                      },
+                )}
+                onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
+                onCreateGroup={creator() ? openCreate : undefined}
+                onNewMessage={() => {
+                  setRecipients([]);
+                  setDialog("new-message");
+                }}
+              />
+            }
+          >
+            <Match when={at("settings")}>
+              <DestinationSidebar
+                sections={[
+                  {
+                    id: "settings",
+                    title: "Settings",
+                    entries: [
+                      {
+                        id: "workspace",
+                        name: "Workspace",
+                        href: href(paths.settingsSection(workspaceId, "workspace")),
+                        current: at("settings") && !location.pathname.endsWith("/members"),
+                        icon: IconMarkSettings,
+                      },
+                      {
+                        id: "members",
+                        name: "Members",
+                        href: href(paths.settingsSection(workspaceId, "members")),
+                        current: location.pathname.endsWith("/settings/members"),
+                        icon: IconUsers,
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </Match>
+            <Match when={destination() === "agents"}>
+              <AgentsSidebar workspaceId={workspaceId} />
+            </Match>
+            <Match when={destination() === "environments"}>
+              <EnvironmentsSidebar workspaceId={workspaceId} />
+            </Match>
+            <Match when={destination() === "connections"}>
+              <ConnectionsSidebar workspaceId={workspaceId} />
+            </Match>
+          </Switch>
+        </WorkspaceNavigation>
         <Shell.Main>{props.children}</Shell.Main>
         <Show when={panel()} keyed>
           {(thread) => (
@@ -274,6 +332,145 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         </Toast.Region>
       </Shell.Root>
     </WorkspaceActionsContext.Provider>
+  );
+}
+
+/**
+ * The Agents sidebar: each agent, marked while at work or when it needs setup. The title and Browse
+ * open the list; + opens Add agent over the current page, by `?add=agent`.
+ */
+function AgentsSidebar(props: { readonly workspaceId: string }) {
+  const navigate = useNavigate();
+  const [, setSearch] = useSearchParams<{ add?: string }>();
+  const list = useAgentList(props.workspaceId);
+  const activity = useTurnActivity(props.workspaceId);
+  const open = useMatch(() => "/workspaces/:workspaceId/agents/:agentId/*rest");
+  const base = paths.workspacePage(props.workspaceId, "agents");
+  return (
+    <DestinationSidebar
+      sections={[
+        {
+          id: "agents",
+          title: "Agents",
+          href: href(base),
+          current: open() === undefined,
+          browse: { label: "Browse agents", onBrowse: () => navigate(base) },
+          create: list.canCreate()
+            ? { label: "Add agent", onCreate: () => setSearch({ add: "agent" }) }
+            : undefined,
+          entries: list.agents().map((agent) => ({
+            id: agent.id,
+            name: agent.name,
+            href: href(paths.agent(props.workspaceId, agent.id)),
+            current: open()?.params.agentId === agent.id,
+            person: {
+              name: agent.name,
+              initials: agent.name.trim().charAt(0).toUpperCase(),
+              tone: "lilac" as const,
+            },
+            activity: activity.agentActivity(agent.memberId)?.state,
+            attention: agent.needsSetup ? "Needs setup" : undefined,
+          })),
+          loading: list.loading(),
+          empty: "No agents yet",
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * The Environments sidebar: each environment, marked when it needs setup. The title and Browse open
+ * the list; + opens Add environment over the current page, by `?add=environment`.
+ */
+function EnvironmentsSidebar(props: { readonly workspaceId: string }) {
+  const navigate = useNavigate();
+  const [, setSearch] = useSearchParams<{ add?: string }>();
+  const list = useEnvironmentList(props.workspaceId);
+  const open = useMatch(() => "/workspaces/:workspaceId/environments/:environmentId/*rest");
+  const base = paths.workspacePage(props.workspaceId, "environments");
+  return (
+    <DestinationSidebar
+      sections={[
+        {
+          id: "environments",
+          title: "Environments",
+          href: href(base),
+          current: open() === undefined,
+          browse: { label: "Browse environments", onBrowse: () => navigate(base) },
+          create: list.canCreate()
+            ? { label: "Add environment", onCreate: () => setSearch({ add: "environment" }) }
+            : undefined,
+          entries: list.environments().map((environment) => ({
+            id: environment.id,
+            name: environment.name,
+            href: href(paths.environment(props.workspaceId, environment.id)),
+            current: open()?.params.environmentId === environment.id,
+            icon: IconMarkEnvironments,
+            attention: environment.needsSetup ? "Needs setup" : undefined,
+          })),
+          loading: list.loading(),
+          empty: "No environments yet",
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * The Connections sidebar: model providers, then the accounts sandboxes run under, each marked when
+ * it needs setup. A section's title and Browse open the list of that kind; its + opens Add
+ * connection over the current page for that kind, by `?add=`.
+ */
+function ConnectionsSidebar(props: { readonly workspaceId: string }) {
+  const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams<{ add?: string; kind?: string }>();
+  const list = useConnectionList(props.workspaceId);
+  const open = useMatch(() => "/workspaces/:workspaceId/connections/:connectionId");
+  const browsing = useMatch(() => "/workspaces/:workspaceId/connections");
+  const base = paths.workspacePage(props.workspaceId, "connections");
+  const section = (
+    kind: ConnectionCapability | undefined,
+    title: string,
+    create?: string,
+  ): NavigationSection => ({
+    id: kind ?? "other",
+    title,
+    href: kind && href(`${base}?kind=${kind}`),
+    current: kind !== undefined && browsing() !== undefined && search.kind === kind,
+    browse: kind && {
+      label: `Browse ${title.toLowerCase()}`,
+      onBrowse: () => navigate(`${base}?kind=${kind}`),
+    },
+    create:
+      kind && create && list.canCreate()
+        ? { label: create, onCreate: () => setSearch({ add: kind }) }
+        : undefined,
+    entries: list
+      .connections()
+      .filter((connection) => connection.capability === kind)
+      .map((connection) => ({
+        id: connection.id,
+        name: connection.name,
+        href: href(paths.connection(props.workspaceId, connection.id)),
+        current: open()?.params.connectionId === connection.id,
+        icon: IconMarkConnections,
+        attention: connection.needsSetup ? "Needs setup" : undefined,
+      })),
+    loading: list.loading(),
+    empty: kind && "None yet",
+  });
+  return (
+    <DestinationSidebar
+      sections={[
+        section("model-access", "Model providers", "Add model provider"),
+        section("sandboxes", "Sandbox accounts", "Add sandbox account"),
+        // Connections whose provider this host no longer installs give nothing it knows.
+        ...(list.connections().some((connection) => connection.capability === undefined)
+          ? [section(undefined, "Unavailable")]
+          : []),
+      ]}
+    />
   );
 }
 
@@ -391,63 +588,5 @@ function ThreadPanel(props: {
         />
       )}
     </Show>
-  );
-}
-
-/** A turn's log in place of its thread: what it did, what it is writing, Stop and Retry. */
-function TurnLog(props: {
-  readonly workspaceId: string;
-  readonly turnId: string;
-  readonly onBack: () => void;
-  readonly onClose: () => void;
-  /** A retry queued this new turn, whose log shows next. */
-  readonly onRetried: (turnId: string) => void;
-}) {
-  const log = useTurnLog(props.workspaceId, props.turnId, { retried: props.onRetried });
-  const groups = useWorkspaceGroups(props.workspaceId);
-  const turn = () => {
-    const current = log.turn();
-    if (current === undefined) return undefined;
-    const group = groups.group(current.groupId);
-    return {
-      ...current,
-      where:
-        group?.kind === "direct"
-          ? `Thread with ${group.name}`
-          : `Thread in #${current.groupName ?? group?.name ?? ""}`,
-      model:
-        current.model && [current.model.provider, current.model.model].filter(Boolean).join(" · "),
-      agentHref: href(paths.agent(props.workspaceId, current.agent.id)),
-    };
-  };
-  const status = () => {
-    if (log.loading()) return "loading" as const;
-    const failure = turn() === undefined ? log.failure() : undefined;
-    if (failure === undefined) return undefined;
-    return failure === "gone" || failure === "denied"
-      ? ("unavailable" as const)
-      : ("failed" as const);
-  };
-  const acting = () => {
-    const current = log.acting();
-    return current?.turnId === props.turnId ? current.kind : undefined;
-  };
-  return (
-    <TurnLogPane
-      turn={turn()}
-      activity={log.activity()}
-      draft={log.draft()}
-      status={status()}
-      onRetryLoad={log.refresh}
-      reconnecting={log.reconnecting()}
-      updatedAt={log.updatedAt()}
-      acting={acting()}
-      problem={log.problem()?.problem}
-      onStop={() => log.stop(props.turnId)}
-      onRetry={() => log.retry(props.turnId)}
-      onBack={props.onBack}
-      onClose={props.onClose}
-      onOpenReply={props.onBack}
-    />
   );
 }

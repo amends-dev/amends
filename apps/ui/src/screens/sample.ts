@@ -3,7 +3,7 @@ import type { MessageAuthor } from "../components/message/index.ts";
 import type { PickerPerson } from "../components/member-picker/index.ts";
 import type { SettingsMember, TaskPerson, TaskRow } from "./group/index.ts";
 import type { TimelineEntry } from "./timeline/index.ts";
-import type { WorkspaceNavigationProps } from "./workspace-navigation/index.ts";
+import type { HomeSidebarProps, WorkspaceNavigationProps } from "./workspace-navigation/index.ts";
 
 export const people = {
   alex: { name: "Alex", initials: "AM", tone: "sand" },
@@ -112,7 +112,10 @@ export interface NavigationState {
   readonly onCreateGroup?: () => void;
 }
 
-export function navigation(state: NavigationState): WorkspaceNavigationProps {
+/** The rail and Home sidebar's sample props; pass them to both WorkspaceNavigation and HomeSidebar. */
+export type NavigationSample = Omit<WorkspaceNavigationProps, "children"> & HomeSidebarProps;
+
+export function navigation(state: NavigationState): NavigationSample {
   return {
     workspace: { name: "Mercier & Co" },
     account: people.jordan,

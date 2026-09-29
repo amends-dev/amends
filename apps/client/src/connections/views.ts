@@ -136,6 +136,51 @@ const providerOf = (declaration: ConnectionImplementation.Declaration): Connecti
 const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | undefined =>
   AsyncResult.isFailure(read) && !read.waiting ? read.cause : undefined;
 
+/** A connection as the Connections sidebar lists it. */
+export interface ConnectionListEntry {
+  readonly id: string;
+  readonly name: string;
+  /** What it gives: model access for agents, or an account sandboxes run under. */
+  readonly capability: ConnectionCapability | undefined;
+  /** It needs settings or its key, or its provider is no longer installed. */
+  readonly needsSetup: boolean;
+}
+
+/**
+ * A workspace's connections by name, for navigation, live while mounted. It shares the
+ * Connections page's read. `canCreate` says whether the reader may add one.
+ */
+export function useConnectionList(workspaceId: string) {
+  const reads = connectionsReads(useApiClient(), workspaceId);
+  const read = reads ? useAtomValue(() => reads.connections) : undefined;
+  const canCreate = useWorkspacePermission(workspaceId, "connection.create");
+  const connections = createMemo((): readonly ConnectionListEntry[] | undefined =>
+    read === undefined
+      ? undefined
+      : Option.getOrUndefined(AsyncResult.value(read()))?.map((view) => ({
+          id: view.id,
+          name: view.name,
+          capability:
+            view.capabilities.modelInference !== undefined
+              ? "model-access"
+              : view.capabilities.sandbox !== undefined
+                ? "sandboxes"
+                : undefined,
+          needsSetup:
+            !view.installed ||
+            [view.readiness.modelInference, view.readiness.sandbox].some(
+              (entry) => entry?._tag === "Incomplete",
+            ),
+        })),
+  );
+  return {
+    connections: () => connections() ?? [],
+    /** Nothing has loaded yet, so an empty list says nothing. */
+    loading: () => connections() === undefined,
+    canCreate,
+  };
+}
+
 /**
  * A workspace's connections, live while mounted: the providers this host installed, each
  * connection's setup, and the changes the reader may make. Creating takes two steps, the

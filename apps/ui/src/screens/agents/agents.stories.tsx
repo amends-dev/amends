@@ -10,46 +10,98 @@ export default meta;
 type Story = StoryObj;
 
 const body = (element: HTMLElement) => within(element.ownerDocument.body);
-const details = (element: HTMLElement) =>
-  within(element).findByLabelText("Agent details", { selector: "aside" });
+const mainPane = (element: HTMLElement) => within(within(element).getByRole("main"));
+const sidebar = (element: HTMLElement) =>
+  within(within(element).getByRole("navigation", { name: "Workspace" }));
 
-/** The Lunacy "Agents / 01 / All agents" frame. */
-export const AllAgents = { render: () => <AgentsWorkspace /> } satisfies Story;
-
-/** The Lunacy "02 / Needs setup" frame: the agent whose connection needs its key. */
-export const NeedsSetup = {
-  render: () => <AgentsWorkspace tab="needs-setup" selected="review-helper" />,
+/**
+ * The Lunacy "Agents v02 / 01 / Browse agents" frame: the list in the main content, and the
+ * agents in the sidebar, where Browse is current.
+ */
+export const AllAgents = {
+  render: () => <AgentsWorkspace />,
   play: async ({ canvasElement }) => {
-    const panel = within(await details(canvasElement));
-    await expect(
-      panel.getByText("Anthropic · Backup needs an API key before this agent is ready."),
-    ).toBeVisible();
-    await expect(panel.getByRole("button", { name: "Open connection" })).toBeVisible();
+    const nav = sidebar(canvasElement);
+    await expect(nav.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("img", { name: "Needs setup" })).toBeVisible();
+    await userEvent.click(nav.getByRole("link", { name: /Atlas/ }));
+    await expect(mainPane(canvasElement).getByRole("heading", { name: "Atlas" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /Atlas/ })).toHaveAttribute("aria-current", "page");
   },
 } satisfies Story;
 
-/** The Lunacy "03 / Overview" frame. */
-export const Overview = { render: () => <AgentsWorkspace selected="atlas" /> } satisfies Story;
-
-/** The Lunacy "04 / Configuration" frame. */
-export const Configuration = {
-  render: () => <AgentsWorkspace selected="atlas" detailsTab="configuration" />,
+/** The v01 "02 / Needs setup" list: only the agents that need setup. */
+export const NeedsSetup = {
+  render: () => <AgentsWorkspace tab="needs-setup" />,
+  play: async ({ canvasElement }) => {
+    const list = within(
+      mainPane(canvasElement).getByRole("list", { name: "Agents that need setup" }),
+    );
+    await expect(list.getAllByRole("link")).toHaveLength(1);
+  },
 } satisfies Story;
 
-/** The Lunacy "05 / Member overview" and "06 / Member configuration" frames. */
+/** The Lunacy "Agents v02 / 04 / Agent needs setup" frame: its connection needs its key. */
+export const AgentNeedsSetup = {
+  render: () => <AgentsWorkspace selected="review-helper" />,
+  play: async ({ canvasElement }) => {
+    const main = mainPane(canvasElement);
+    await expect(
+      main.getByText("Anthropic · Backup needs an API key before this agent is ready."),
+    ).toBeVisible();
+    await expect(main.getByRole("button", { name: "Open connection" })).toBeVisible();
+  },
+} satisfies Story;
+
+/**
+ * The Lunacy "Agents v02 / 02 / Agent overview" frame: one column, its turns in progress opening
+ * their logs beside the page.
+ */
+export const Overview = {
+  render: () => <AgentsWorkspace selected="atlas" />,
+  play: async ({ canvasElement }) => {
+    const main = mainPane(canvasElement);
+    await expect(main.getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(
+      main.getByRole("button", { name: "Queued in #design: open its log" }),
+    ).toBeVisible();
+    await userEvent.click(main.getByRole("link", { name: "Edit configuration" }));
+    await expect(await main.findByRole("textbox", { name: "Instructions" })).toBeVisible();
+  },
+} satisfies Story;
+
+/** The Lunacy "Agents v02 / 03 / Agent configuration" frame. */
+export const Configuration = {
+  render: () => <AgentsWorkspace selected="atlas" agentTab="configuration" />,
+} satisfies Story;
+
+/** A member who may only look: the same values without inputs, and no Add or Remove. */
 export const MemberReadOnly = {
   render: () => <AgentsWorkspace selected="atlas" readOnly />,
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.queryByRole("button", { name: /Add/ })).toBeNull();
-    const panel = within(await details(canvasElement));
+    await expect(sidebar(canvasElement).queryByRole("button", { name: "Add agent" })).toBeNull();
+    const main = mainPane(canvasElement);
     await expect(
-      panel.getByText("You can view this agent. Ask an administrator to make changes."),
+      main.getByText("You can view this agent. Ask an administrator to make changes."),
     ).toBeVisible();
-    await expect(panel.queryByRole("button", { name: "Remove agent" })).toBeNull();
-    await userEvent.click(panel.getByRole("button", { name: "Configuration" }));
-    await expect(await panel.findByText("You can view this configuration.")).toBeVisible();
-    await expect(panel.queryByRole("textbox")).toBeNull();
+    await expect(main.queryByRole("button", { name: "Remove agent" })).toBeNull();
+    await userEvent.click(main.getByRole("link", { name: "Configuration" }));
+    await expect(await main.findByText("You can view this configuration.")).toBeVisible();
+    await expect(main.queryByRole("textbox")).toBeNull();
+  },
+} satisfies Story;
+
+/** The Lunacy "Agents v02 / 05" frame: + in the sidebar opens Add agent from any page. */
+export const AddFromSidebar = {
+  render: () => <AgentsWorkspace selected="atlas" />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(sidebar(canvasElement).getByRole("button", { name: "Add agent" }));
+    await expect(
+      await body(canvasElement).findByRole("dialog", { name: "Add agent" }),
+    ).toBeVisible();
   },
 } satisfies Story;
 
@@ -182,10 +234,12 @@ export const ConnectionDetour = {
     await userEvent.click(dialog.getByRole("button", { name: "Create agent" }));
     await waitFor(() => expect(page.queryByRole("dialog", { name: "Add agent" })).toBeNull());
     await expect(
-      within(within(canvasElement).getByRole("list", { name: "Agents" })).getByRole("link", {
-        name: /Scout/,
-      }),
-    ).toHaveAttribute("aria-current", "true");
+      within(within(canvasElement).getByRole("main")).getByRole("heading", { name: "Scout" }),
+    ).toBeVisible();
+    await expect(sidebar(canvasElement).getByRole("link", { name: /Scout/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   },
 } satisfies Story;
 
@@ -196,9 +250,9 @@ export const RemoveAgent = {
 
 /** The Lunacy "20" to "25" phone frames show these at 390px. */
 export const ConfigureAndSave = {
-  render: () => <AgentsWorkspace selected="nora" detailsTab="configuration" />,
+  render: () => <AgentsWorkspace selected="nora" agentTab="configuration" />,
   play: async ({ canvasElement }) => {
-    const panel = within(await details(canvasElement));
+    const panel = mainPane(canvasElement);
     const save = panel.getByRole("button", { name: "Save configuration" });
     await expect(save).toBeDisabled();
     await userEvent.type(panel.getByRole("textbox", { name: "Instructions" }), " Be brief.");
@@ -210,9 +264,9 @@ export const ConfigureAndSave = {
 
 /** The connection went away meanwhile: the save is refused at the field, the draft kept. */
 export const ConnectionNoLongerAvailable = {
-  render: () => <AgentsWorkspace selected="atlas" detailsTab="configuration" connectionGone />,
+  render: () => <AgentsWorkspace selected="atlas" agentTab="configuration" connectionGone />,
   play: async ({ canvasElement }) => {
-    const panel = within(await details(canvasElement));
+    const panel = mainPane(canvasElement);
     await userEvent.type(panel.getByRole("textbox", { name: "Instructions" }), " Be brief.");
     await userEvent.click(panel.getByRole("button", { name: "Save configuration" }));
     await expect(
@@ -228,9 +282,9 @@ export const ConnectionNoLongerAvailable = {
 
 /** A saved reasoning level the harness no longer takes, with the way back to its default. */
 export const UnsupportedReasoning = {
-  render: () => <AgentsWorkspace selected="atlas" detailsTab="configuration" staleReasoning />,
+  render: () => <AgentsWorkspace selected="atlas" agentTab="configuration" staleReasoning />,
   play: async ({ canvasElement }) => {
-    const panel = within(await details(canvasElement));
+    const panel = mainPane(canvasElement);
     await expect(panel.getByText("Saved reasoning: high")).toBeVisible();
     await userEvent.click(panel.getByRole("button", { name: "Use default reasoning" }));
     await waitFor(() =>

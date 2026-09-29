@@ -49,10 +49,12 @@ export {
 } from "./settings/views.ts";
 export type { WorkspaceFailure } from "./api/failures.ts";
 export {
+  useConnectionList,
   useConnections,
   type ConnectionAction,
   type ConnectionCapability,
   type ConnectionEntry,
+  type ConnectionListEntry,
   type ConnectionMethod,
   type ConnectionProvider,
   type ConnectionSetting,
@@ -63,11 +65,13 @@ export {
   type ConnectionsView,
 } from "./connections/views.ts";
 export {
+  useEnvironmentList,
   useEnvironments,
   type CreateStep,
   type EnvironmentAction,
   type EnvironmentEntry,
   type EnvironmentIssue,
+  type EnvironmentListEntry,
   type EnvironmentsDone,
   type EnvironmentsError,
   type EnvironmentsFailure,
@@ -81,12 +85,14 @@ export {
 export type { CommandRow, Retention, SandboxDraft, VariableRow } from "./environments/draft.ts";
 export type { EnvironmentProblem, SandboxIssue } from "./api/environments.ts";
 export {
+  useAgentList,
   useAgents,
   type AgentAction,
   type AgentBlocker,
   type AgentDraft,
   type AgentEntry,
   type AgentIssue,
+  type AgentListEntry,
   type AgentRole,
   type AgentsDone,
   type AgentsError,

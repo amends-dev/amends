@@ -265,7 +265,8 @@ it("redirects the Settings entry to its workspace section and keeps the rail's s
   await screen.findByRole("textbox", { name: "Workspace name" });
   expect(window.location.hash).toBe("#/workspaces/one/settings/workspace");
   expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "true");
-  const tabs = () => within(screen.getByRole("navigation", { name: "Settings" }));
+  // Settings lists its sections in the sidebar.
+  const tabs = () => within(screen.getByRole("navigation", { name: "Workspace" }));
   expect(tabs().getByRole("link", { name: "Workspace" })).toHaveAttribute("aria-current", "page");
   // Tabs link within the hash router.
   const members = tabs().getByRole("link", { name: /Members/ });
@@ -766,9 +767,12 @@ async function addAnthropicWithKey() {
   await waitFor(() =>
     expect(screen.queryByRole("dialog", { name: "Add API key" })).not.toBeInTheDocument(),
   );
-  const details = await screen.findByLabelText("Connection details", { selector: "aside" });
+  // The new connection opens as its page.
+  await screen.findByRole("heading", { name: "Anthropic" });
   expect(
-    within(details).getByText("Setup is complete. Provider access has not been tested."),
+    within(screen.getByRole("main")).getByText(
+      "Setup is complete. Provider access has not been tested.",
+    ),
   ).toBeInTheDocument();
 }
 
@@ -776,11 +780,92 @@ it("adds a connection, then its key, at its hash route", async () => {
   const host = connectionsHost();
   mount("/workspaces/one/connections", "alice", host.fetch, { permissions: ["connection.create"] });
   await addAnthropicWithKey();
-  expect(window.location.hash).toBe("#/workspaces/one/connections?connection=c1");
+  expect(window.location.hash).toBe("#/workspaces/one/connections/c1");
   expect(host.writes.map((write) => [write.method, write.path])).toEqual([
     ["POST", "/workspaces/one/connections"],
     ["PUT", "/workspaces/one/connections/c1/credential"],
   ]);
+});
+
+/** A host listing two agents, one of whose model connection is gone, for the Agents pages. */
+function agentsHost() {
+  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" };
+  const agent = (id: string, name: string, ready: boolean) => ({
+    id,
+    memberId: `member-${id}`,
+    name,
+    instructions: "Help the team.",
+    model: { connectionId: "c1", model: "claude-sonnet-5", reasoning: null },
+    environmentId: "e1",
+    createdBy: "owner-one",
+    createdAt: "2026-09-25T12:00:00.000Z",
+    role: { id: "builtin:member", name: "Member" },
+    configurable: true,
+    removable: true,
+    usable: true,
+    readiness: ready
+      ? { _tag: "Ready" }
+      : { _tag: "Incomplete", issues: [{ _tag: "ConnectionUnavailable" }] },
+  });
+  return vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/agents")
+      return response([agent("a1", "Atlas", true), agent("a2", "Review helper", false)]);
+    if (
+      path === "/workspaces/one/connections" ||
+      path === "/workspaces/one/connections/implementations" ||
+      path === "/workspaces/one/environments"
+    )
+      return response([]);
+    if (path === "/workspaces/one/environments/implementations")
+      return response({ harnesses: [], sandboxes: [] });
+    if (path === "/workspaces/one/settings")
+      return response({
+        workspace,
+        canRename: true,
+        canReadInvitations: true,
+        canInvite: true,
+        roles: [],
+      });
+    return response({
+      memberships: [
+        {
+          workspace,
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 1,
+        },
+      ],
+      invitations: [],
+    });
+  });
+}
+
+it("lists agents in the sidebar, opens each as its page with tabs, and adds from the sidebar", async () => {
+  mount("/workspaces/one/agents", "alice", agentsHost(), { permissions: ["agent.create"] });
+  const sidebar = within(await screen.findByRole("navigation", { name: "Workspace" }));
+  await sidebar.findByRole("link", { name: /Atlas/ });
+  // The list shows, so the section is current; an agent that needs setup is marked.
+  expect(sidebar.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
+  expect(sidebar.getByRole("img", { name: "Needs setup" })).toBeInTheDocument();
+  expect(sidebar.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
+  fireEvent.click(sidebar.getByRole("link", { name: /Atlas/ }));
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/agents/a1"));
+  const main = within(screen.getByRole("main"));
+  await main.findByRole("heading", { name: "Atlas" });
+  expect(sidebar.getByRole("link", { name: /Atlas/ })).toHaveAttribute("aria-current", "page");
+  fireEvent.click(main.getByRole("link", { name: "Configuration" }));
+  await waitFor(() =>
+    expect(window.location.hash).toBe("#/workspaces/one/agents/a1/configuration"),
+  );
+  fireEvent.click(sidebar.getByRole("button", { name: "Add agent" }));
+  await screen.findByRole("dialog", { name: "Add agent" });
+  expect(window.location.hash).toBe("#/workspaces/one/agents/a1/configuration?add=agent");
 });
 
 /** A host with Amends and Daytona installed, answering the Environments page and its detour. */
@@ -905,7 +990,9 @@ function environmentsHost() {
 }
 /** Adds Release sandbox on Daytona, creating its account and key on the way, then the environment. */
 async function addDaytonaEnvironment() {
-  fireEvent.click(await screen.findByRole("button", { name: /Add environment/ }));
+  // The sidebar's + opens Add environment over the page.
+  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
+  fireEvent.click(await within(sidebar).findByRole("button", { name: "Add environment" }));
   let dialog = await screen.findByRole("dialog", { name: "Add environment" });
   fireEvent.input(within(dialog).getByRole("textbox", { name: "Environment name" }), {
     target: { value: "Release sandbox" },
@@ -945,9 +1032,7 @@ it("adds a Daytona environment at its hash route, creating its account on the wa
     permissions: ["environment.create", "connection.create"],
   });
   await addDaytonaEnvironment();
-  await waitFor(() =>
-    expect(window.location.hash).toBe("#/workspaces/one/environments?environment=e1"),
-  );
+  await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/environments/e1"));
   expect(host.writes.map((write) => [write.method, write.path])).toEqual([
     ["POST", "/workspaces/one/connections"],
     ["PUT", "/workspaces/one/connections/a1/credential"],

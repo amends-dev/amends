@@ -162,6 +162,39 @@ const editor = (
     change((current) => SandboxDrafts.edit.retention(current, retention)),
 });
 
+/** An environment as the Environments sidebar lists it. */
+export interface EnvironmentListEntry {
+  readonly id: string;
+  readonly name: string;
+  /** Something keeps it from running now. */
+  readonly needsSetup: boolean;
+}
+
+/**
+ * A workspace's environments by name, for navigation, live while mounted. It shares the
+ * Environments page's read. `canCreate` says whether the reader may add one.
+ */
+export function useEnvironmentList(workspaceId: string) {
+  const reads = environmentsReads(useApiClient(), workspaceId);
+  const read = reads ? useAtomValue(() => reads.environments) : undefined;
+  const canCreate = useWorkspacePermission(workspaceId, "environment.create");
+  const environments = createMemo((): readonly EnvironmentListEntry[] | undefined =>
+    read === undefined
+      ? undefined
+      : Option.getOrUndefined(AsyncResult.value(read()))?.map((view) => ({
+          id: view.id,
+          name: view.name,
+          needsSetup: view.readiness._tag === "Incomplete",
+        })),
+  );
+  return {
+    environments: () => environments() ?? [],
+    /** Nothing has loaded yet, so an empty list says nothing. */
+    loading: () => environments() === undefined,
+    canCreate,
+  };
+}
+
 /**
  * A workspace's environments, live while mounted: the harnesses and sandbox providers this host
  * installed, the accounts sandboxes can run under, each environment's setup, and the changes the

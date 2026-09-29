@@ -183,6 +183,41 @@ const sameConfiguration = (left: AgentConfiguration, right: AgentConfiguration) 
   left.model.reasoning === right.model.reasoning &&
   left.environmentId === right.environmentId;
 
+/** An agent as the Agents sidebar lists it. */
+export interface AgentListEntry {
+  readonly id: string;
+  readonly memberId: string;
+  readonly name: string;
+  /** Something keeps it from running now. */
+  readonly needsSetup: boolean;
+}
+
+/**
+ * A workspace's agents by name, for navigation, live while mounted. It shares the Agents page's
+ * read, so both show the same agents. `canCreate` says whether the reader may add one.
+ */
+export function useAgentList(workspaceId: string) {
+  const reads = agentsReads(useApiClient(), workspaceId);
+  const read = reads ? useAtomValue(() => reads.agents) : undefined;
+  const canCreate = useWorkspacePermission(workspaceId, "agent.create");
+  const agents = createMemo((): readonly AgentListEntry[] | undefined =>
+    read === undefined
+      ? undefined
+      : Option.getOrUndefined(AsyncResult.value(read()))?.map((view) => ({
+          id: view.id,
+          memberId: view.memberId,
+          name: view.name,
+          needsSetup: view.readiness._tag === "Incomplete",
+        })),
+  );
+  return {
+    agents: () => agents() ?? [],
+    /** Nothing has loaded yet, so an empty list says nothing. */
+    loading: () => agents() === undefined,
+    canCreate,
+  };
+}
+
 /**
  * A workspace's agents, live while mounted: each agent's configuration and readiness, the model
  * connections and environments it can use, and the changes the reader may make. Drafts keep what

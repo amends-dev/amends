@@ -46,7 +46,7 @@ export function MembersSettingsPage() {
 
 type Dialog = "invite" | "history" | "transfer" | "remove" | "revoke";
 
-/** A workspace's settings: one tab, with the member open beside Members by `?member=`. */
+/** A workspace's settings: one section, with the member open beside Members by `?member=`. */
 function Settings(props: { readonly workspaceId: string; readonly tab: SettingsSection }) {
   const { workspaceId } = props;
   const [search, setSearch] = useSearchParams<{ member?: string }>();
@@ -106,8 +106,6 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsS
       <SettingsPane
         workspaceName={name()}
         tab={props.tab}
-        tabHref={(tab) => href(paths.settingsSection(workspaceId, tab))}
-        memberCount={view.memberCount()}
         onInvite={view.permissions().invite ? invite : undefined}
         status={view.status()}
         onRetry={view.refresh}

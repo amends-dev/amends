@@ -1,10 +1,11 @@
 // Workshop harness: Workspace settings with the Lunacy sample members and invitations, following
 // the mocks' behavior notes over local state. Not exported.
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { IconMarkSettings, IconUsers } from "@amends/icons";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { navigation } from "../sample.ts";
-import { WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
   ConfirmRemoveMember,
   ConfirmRevokeInvitation,
@@ -162,23 +163,53 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     setFailure(undefined);
     setDialog(undefined);
   };
+  // The sidebar's links are plain hashes here: follow them to each section.
+  onMount(() => {
+    const follow = () => {
+      const target = window.location.hash.slice(1);
+      if (target !== "workspace" && target !== "members") return;
+      setSelected(undefined);
+      setTab(target);
+    };
+    window.addEventListener("hashchange", follow);
+    onCleanup(() => window.removeEventListener("hashchange", follow));
+  });
   // Settings is not a rail destination; the rail marks its own entry instead.
   const { destination: _home, ...nav } = navigation({
     groups: [{ id: "general", name: "general" }],
   });
   return (
     <Shell.Root>
-      <WorkspaceNavigation {...nav} settings={{ href: "#settings", current: true }} />
+      <WorkspaceNavigation {...nav} settings={{ href: "#settings", current: true }}>
+        <DestinationSidebar
+          sections={[
+            {
+              id: "settings",
+              title: "Settings",
+              entries: [
+                {
+                  id: "workspace",
+                  name: "Workspace",
+                  href: "#workspace",
+                  icon: IconMarkSettings,
+                  current: tab() === "workspace",
+                },
+                {
+                  id: "members",
+                  name: "Members",
+                  href: "#members",
+                  icon: IconUsers,
+                  current: tab() === "members",
+                },
+              ],
+            },
+          ]}
+        />
+      </WorkspaceNavigation>
       <Shell.Main>
         <SettingsPane
           workspaceName={name()}
           tab={tab()}
-          tabHref={(next) => `#${next}`}
-          onTabChange={(next) => {
-            setSelected(undefined);
-            setTab(next);
-          }}
-          memberCount={members().filter((person) => person.status === "active").length}
           onInvite={
             can
               ? () => {

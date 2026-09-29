@@ -10,11 +10,26 @@ export default meta;
 type Story = StoryObj;
 
 const body = (element: HTMLElement) => within(element.ownerDocument.body);
-const details = (element: HTMLElement) =>
-  within(element).findByLabelText("Environment details", { selector: "aside" });
+const details = async (element: HTMLElement) => within(element).getByRole("main");
+const sidebar = (element: HTMLElement) =>
+  within(within(element).getByRole("navigation", { name: "Workspace" }));
 
 /** The Lunacy "Environments / 01 / All environments" frame. */
-export const AllEnvironments = { render: () => <EnvironmentsWorkspace /> } satisfies Story;
+export const AllEnvironments = {
+  render: () => <EnvironmentsWorkspace />,
+  play: async ({ canvasElement }) => {
+    const nav = sidebar(canvasElement);
+    await expect(nav.getByRole("link", { name: "Environments" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(nav.getByRole("button", { name: "Add environment" })).toBeVisible();
+    await userEvent.click(nav.getByRole("link", { name: /Remote development/ }));
+    await expect(
+      within(canvasElement).getByRole("heading", { name: "Remote development" }),
+    ).toBeVisible();
+  },
+} satisfies Story;
 
 /** The Lunacy "02 / Environment overview" frame. */
 export const EnvironmentOverview = {
@@ -23,7 +38,7 @@ export const EnvironmentOverview = {
 
 /** The Lunacy "03 / Sandbox settings upper" and "04 / lower" frames. */
 export const SandboxSettings = {
-  render: () => <EnvironmentsWorkspace selected="remote" detailsTab="sandbox" />,
+  render: () => <EnvironmentsWorkspace selected="remote" environmentTab="sandbox" />,
 } satisfies Story;
 
 /** The Lunacy "05 / Add without sandbox" frame. */
@@ -109,17 +124,16 @@ export const NoSandboxDetails = {
   render: () => <EnvironmentsWorkspace selected="in-process" />,
   play: async ({ canvasElement }) => {
     const panel = within(await details(canvasElement));
-    await expect(panel.queryByRole("tab", { name: "Sandbox" })).toBeNull();
+    await expect(panel.queryByRole("link", { name: "Sandbox" })).toBeNull();
     await expect(panel.getByText("Created with this workspace")).toBeVisible();
   },
 } satisfies Story;
 
 /** The Lunacy "16 / Member read-only settings" frame. */
 export const MemberReadOnly = {
-  render: () => <EnvironmentsWorkspace selected="remote" detailsTab="sandbox" readOnly />,
+  render: () => <EnvironmentsWorkspace selected="remote" environmentTab="sandbox" readOnly />,
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.queryByRole("button", { name: /Add/ })).toBeNull();
+    await expect(sidebar(canvasElement).queryByRole("button", { name: /Add/ })).toBeNull();
     const panel = within(await details(canvasElement));
     await expect(
       panel.getByText("You can view these settings. Ask an administrator to change them."),
@@ -131,7 +145,7 @@ export const MemberReadOnly = {
 
 /** The Lunacy "17 / Account needs key" frame. */
 export const AccountNeedsKey = {
-  render: () => <EnvironmentsWorkspace tab="needs-setup" selected="review" />,
+  render: () => <EnvironmentsWorkspace selected="review" />,
   play: async ({ canvasElement }) => {
     const panel = within(await details(canvasElement));
     await expect(
@@ -162,7 +176,7 @@ export const AddWithAccountDetour = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const page = body(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: /Add environment/ }));
+    await userEvent.click(sidebar(canvasElement).getByRole("button", { name: "Add environment" }));
     let dialog = await page.findByRole("dialog", { name: "Add environment" });
     await userEvent.type(
       within(dialog).getByRole("textbox", { name: "Environment name" }),
@@ -194,17 +208,16 @@ export const AddWithAccountDetour = {
     await expect(within(dialog).getByText("Sandbox account · Configured")).toBeVisible();
     await userEvent.click(within(dialog).getByRole("button", { name: "Create environment" }));
     await waitFor(() => expect(page.queryByRole("dialog", { name: "Add environment" })).toBeNull());
+    await expect(canvas.getByRole("heading", { name: "Release sandbox" })).toBeVisible();
     await expect(
-      within(canvas.getByRole("list", { name: "Environments" })).getByRole("link", {
-        name: /Release sandbox/,
-      }),
-    ).toHaveAttribute("aria-current", "true");
+      sidebar(canvasElement).getByRole("link", { name: /Release sandbox/ }),
+    ).toHaveAttribute("aria-current", "page");
   },
 } satisfies Story;
 
 /** Variables refuse invalid and repeated names; commands move and are removed from their menu. */
 export const EditSandboxSettings = {
-  render: () => <EnvironmentsWorkspace selected="local" detailsTab="sandbox" />,
+  render: () => <EnvironmentsWorkspace selected="local" environmentTab="sandbox" />,
   play: async ({ canvasElement }) => {
     const panel = within(await details(canvasElement));
     const save = panel.getByRole("button", { name: "Save sandbox settings" });
@@ -232,7 +245,7 @@ export const EditSandboxSettings = {
 
 /** The account went away meanwhile: the save is refused beside the account field, draft kept. */
 export const AccountNoLongerAvailable = {
-  render: () => <EnvironmentsWorkspace selected="remote" detailsTab="sandbox" accountGone />,
+  render: () => <EnvironmentsWorkspace selected="remote" environmentTab="sandbox" accountGone />,
   play: async ({ canvasElement }) => {
     const panel = within(await details(canvasElement));
     await userEvent.click(panel.getByRole("radio", { name: /Destroy sandbox/ }));

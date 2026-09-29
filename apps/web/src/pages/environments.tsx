@@ -10,15 +10,15 @@ import { ConfigureConnection, ConnectionKey } from "@amends/ui/screens/connectio
 import {
   AddEnvironment,
   ConfirmRemoveEnvironment,
-  EnvironmentDetails,
+  EnvironmentPane,
   EnvironmentList,
   EnvironmentsPane,
   environmentsToast,
-  type EnvironmentDetailsTab,
+  type EnvironmentTab,
   type EnvironmentsTab,
 } from "@amends/ui/screens/environments";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
-import { Show, createMemo, createSignal } from "solid-js";
+import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";
 
 const href = (path: string) => path;
@@ -35,29 +35,29 @@ export function EnvironmentsPage() {
 type Dialog = "add" | "remove" | "create-account" | "account-key";
 
 /**
- * A workspace's environments: All or Needs setup by `?tab=`, with the environment open beside them
- * by `?environment=`. Adding one takes its basics, then its sandbox settings; an account it needs
- * can be created on the way, returning to the draft with that account chosen.
+ * A workspace's environments: the list, All or Needs setup by `?tab=`, or one environment's page by
+ * its path, Overview or Sandbox. `?add=environment` opens Add environment over either, as the
+ * sidebar's + does. Adding takes its basics, then its sandbox settings; an account it needs can be
+ * created on the way, returning to the draft with that account chosen.
  */
 function Environments(props: { readonly workspaceId: string }) {
   const { workspaceId } = props;
-  const [search, setSearch] = useSearchParams<{ tab?: string; environment?: string }>();
+  const params = useParams<{ environmentId?: string; tab?: string }>();
+  const [search, setSearch] = useSearchParams<{ tab?: string; add?: string }>();
   const navigate = useNavigate();
   const workspace = useWorkspace(() => workspaceId);
   const actions = useWorkspaceActions();
   const [dialog, setDialog] = createSignal<Dialog>();
-  const [detailsTab, setDetailsTab] = createSignal<EnvironmentDetailsTab>("overview");
   const [query, setQuery] = createSignal("");
   // Where the account detour returns: the draft being added, or an environment's settings.
   const [detour, setDetour] = createSignal<{ readonly environmentId?: string }>();
+  const base = paths.workspacePage(workspaceId, "environments");
+  const environmentPath = (environmentId: string, tab: EnvironmentTab = "overview") =>
+    paths.environment(workspaceId, environmentId, tab === "sandbox" ? "sandbox" : undefined);
   const view = useEnvironments(workspaceId, {
     done: (done) => {
-      if (done.action === "create" && done.created) {
-        setDetailsTab("overview");
-        setSearch({ environment: done.created });
-      }
-      if (done.action === "remove") setSearch({ environment: undefined });
-      if (done.action === "configure") setDetailsTab("sandbox");
+      if (done.action === "create" && done.created) navigate(environmentPath(done.created));
+      if (done.action === "remove") navigate(base);
       actions.toast(environmentsToast(done.action, done.subject));
       setDialog(undefined);
     },
@@ -68,8 +68,8 @@ function Environments(props: { readonly workspaceId: string }) {
     setDetour(undefined);
     if (from?.environmentId !== undefined) {
       if (accountId) view.configure.sandbox(from.environmentId).setAccount(accountId);
-      setDetailsTab("sandbox");
       setDialog(undefined);
+      navigate(environmentPath(from.environmentId, "sandbox"));
     } else {
       if (accountId) view.create.sandbox.setAccount(accountId);
       setDialog(view.create.active() ? "add" : undefined);
@@ -110,11 +110,30 @@ function Environments(props: { readonly workspaceId: string }) {
     view.dismiss();
     setDialog(next);
   };
+  /** Leaves `?add=environment` for the page under it; the effect below sets the draft aside. */
+  const closeAdd = () => setSearch({ add: undefined });
   const close = () => {
     view.dismiss();
-    if (dialog() === "add") view.create.cancel();
+    if (dialog() === "add") return closeAdd();
     setDialog(undefined);
   };
+  // `?add=environment` opens Add environment over the page; leaving it sets the draft aside.
+  createEffect(
+    on(
+      () => search.add === "environment" && view.canCreate(),
+      (adding) => {
+        if (adding) {
+          view.dismiss();
+          if (!view.create.active()) view.create.begin();
+          setDialog("add");
+        } else if (view.create.active() && detour()?.environmentId === undefined) {
+          view.create.cancel();
+          setDetour(undefined);
+          setDialog(undefined);
+        }
+      },
+    ),
+  );
   const failureOf = (action: EnvironmentAction) => {
     const failure = view.failure();
     return failure?.action === action ? failure : undefined;
@@ -123,7 +142,6 @@ function Environments(props: { readonly workspaceId: string }) {
   const refreshing = () => view.pending() === "refresh";
   const name = () => workspace()?.workspace.name ?? "";
   const tab = (): EnvironmentsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
-  const base = paths.workspacePage(workspaceId, "environments");
   const shown = createMemo(() => {
     const words = query().trim().toLocaleLowerCase();
     return view
@@ -135,11 +153,8 @@ function Environments(props: { readonly workspaceId: string }) {
       );
   });
   const selected = (): EnvironmentEntry | undefined =>
-    search.environment === undefined ? undefined : view.environment(search.environment);
-  const add = () => {
-    view.create.begin();
-    open("add");
-  };
+    params.environmentId === undefined ? undefined : view.environment(params.environmentId);
+  const add = () => setSearch({ add: "environment" });
   /** The draft's name, or the environment's, for the account detour to name where it returns. */
   const returnTo = () => {
     const from = detour();
@@ -168,92 +183,81 @@ function Environments(props: { readonly workspaceId: string }) {
   });
   return (
     <>
-      <EnvironmentsPane
-        workspaceName={name()}
-        tab={tab()}
-        tabHref={(next) => href(next === "needs-setup" ? `${base}?tab=needs-setup` : base)}
-        onTabChange={(next) =>
-          setSearch({ tab: next === "needs-setup" ? "needs-setup" : undefined })
-        }
-        counts={
-          view.status()
-            ? undefined
-            : {
-                all: view.environments().length,
-                needsSetup: view.environments().filter((entry) => entry.issues.length > 0).length,
+      <Show
+        when={params.environmentId}
+        keyed
+        fallback={
+          <EnvironmentsPane
+            workspaceName={name()}
+            tab={tab()}
+            tabHref={(next) => href(next === "needs-setup" ? `${base}?tab=needs-setup` : base)}
+            onTabChange={(next) =>
+              setSearch({ tab: next === "needs-setup" ? "needs-setup" : undefined })
+            }
+            counts={
+              view.status()
+                ? undefined
+                : {
+                    all: view.environments().length,
+                    needsSetup: view.environments().filter((entry) => entry.issues.length > 0)
+                      .length,
+                  }
+            }
+            onAdd={view.canCreate() ? add : undefined}
+            status={view.status()}
+            onRetry={view.refresh}
+          >
+            <EnvironmentList
+              tab={tab()}
+              query={query()}
+              onQueryChange={setQuery}
+              environments={shown()}
+              total={view.environments().length}
+              environmentHref={(id) => href(environmentPath(id))}
+              onAdd={view.canCreate() ? add : undefined}
+              failure={
+                view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined
               }
+              onRefresh={view.refresh}
+              refreshing={refreshing()}
+            />
+          </EnvironmentsPane>
         }
-        onAdd={view.canCreate() ? add : undefined}
-        status={view.status()}
-        onRetry={view.refresh}
       >
-        <EnvironmentList
-          tab={tab()}
-          query={query()}
-          onQueryChange={setQuery}
-          environments={shown()}
-          total={view.environments().length}
-          selectedId={selected()?.id}
-          environmentHref={(id) =>
-            href(
-              `${base}?${new URLSearchParams({
-                ...(tab() === "needs-setup" ? { tab: tab() } : {}),
-                environment: id,
-              })}`,
-            )
-          }
-          onOpen={(id) => {
-            view.dismiss();
-            setDetailsTab("overview");
-            setSearch({ environment: id });
-          }}
-          onAdd={view.canCreate() ? add : undefined}
-          failure={view.failure()?.action === "refresh" && !dialog() ? view.failure() : undefined}
-          onRefresh={view.refresh}
-          refreshing={refreshing()}
-        />
-      </EnvironmentsPane>
-      <Show when={selected()}>
-        {(environment) => {
-          const id = () => environment().id;
-          const editor = () => view.configure.sandbox(id());
+        {(environmentId) => {
+          const editor = () => view.configure.sandbox(environmentId);
           return (
-            <EnvironmentDetails
-              environment={environment()}
-              onClose={() => {
-                view.configure.reset(id());
-                view.dismiss();
-                setSearch({ environment: undefined });
-              }}
-              tab={detailsTab()}
-              onTabChange={setDetailsTab}
-              name={view.rename.name(id())}
-              onNameChange={(value) => view.rename.setName(id(), value)}
-              nameChanged={view.rename.changed(id())}
-              onSaveName={() => view.rename.save(id())}
+            <EnvironmentPane
+              workspaceName={name()}
+              environment={selected()}
+              status={view.status()}
+              onRetry={view.refresh}
+              onBrowse={() => navigate(base)}
+              tab={params.tab === "sandbox" ? "sandbox" : "overview"}
+              tabHref={(next) => href(environmentPath(environmentId, next))}
+              onTabChange={(next) => navigate(environmentPath(environmentId, next))}
+              name={view.rename.name(environmentId)}
+              onNameChange={(value) => view.rename.setName(environmentId, value)}
+              nameChanged={view.rename.changed(environmentId)}
+              onSaveName={() => view.rename.save(environmentId)}
               sandbox={
-                environment().sandbox
+                selected()?.sandbox
                   ? {
-                      ...editorProps(editor(), environment().sandbox!.providerId),
-                      onCreateAccount: () => startDetour(id()),
+                      ...editorProps(editor(), selected()!.sandbox!.providerId),
+                      onCreateAccount: () => startDetour(environmentId),
                     }
                   : undefined
               }
-              sandboxChanged={view.configure.changed(id())}
-              onSaveSandbox={() => view.configure.save(id())}
+              sandboxChanged={view.configure.changed(environmentId)}
+              onSaveSandbox={() => view.configure.save(environmentId)}
               onDiscardSandbox={() => {
-                view.configure.reset(id());
+                view.configure.reset(environmentId);
                 view.dismiss();
-                setDetailsTab("overview");
+                navigate(environmentPath(environmentId));
               }}
               onOpenAccount={() => {
-                const account = environment().sandbox?.account?.id;
-                if (account)
-                  navigate(
-                    href(
-                      `${paths.workspacePage(workspaceId, "connections")}?connection=${encodeURIComponent(account)}`,
-                    ),
-                  );
+                const account = selected()?.sandbox?.account?.id;
+                if (account) navigate(paths.connection(workspaceId, account));
               }}
               onRemove={() => open("remove")}
               pending={view.pending()}

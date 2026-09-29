@@ -157,8 +157,9 @@ export function Navigation(props: NavigationProps) {
           }
         }}
         onClick={(event) => {
-          // Following a link in the drawer closes it.
-          if (modal() && (event.target as Element).closest("a[href]"))
+          // Following a sidebar link closes the drawer; a rail link switches the sidebar, which
+          // stays open to choose from.
+          if (modal() && (event.target as Element).closest('[data-shell-part="sidebar"] a[href]'))
             state.setNavigationOpen(false);
         }}
       >

@@ -1,8 +1,10 @@
 import { Show, createContext, splitProps, useContext, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { IconMarkBack, IconMarkClose } from "@amends/icons";
+import { Avatar } from "../../components/avatar/index.ts";
 import { Badge } from "../../components/badge/index.ts";
 import { IconButton, type IconButtonProps } from "../../components/icon-button/index.ts";
+import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./pane.css.ts";
 
@@ -45,6 +47,8 @@ export type TitleProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & 
   children: string;
   /** Shown before the title on desktop. */
   icon?: IconComponent;
+  /** An avatar before the title on desktop, in place of an icon, for a page about someone. */
+  person?: { readonly name: string; readonly initials?: string; readonly tone?: AvatarToneName };
   /** A second line on phones, such as the workspace name. */
   context?: string;
   /** A short label after the title, such as "Public". */
@@ -57,6 +61,7 @@ export function Title(props: TitleProps) {
   const [local, native] = splitProps(props, [
     "children",
     "icon",
+    "person",
     "context",
     "badge",
     "level",
@@ -67,6 +72,18 @@ export function Title(props: TitleProps) {
   return (
     <div {...native} class={classes(s.title, local.class)}>
       <Show when={local.icon}>{(icon) => <Dynamic component={icon()} class={s.titleIcon} />}</Show>
+      <Show when={local.person}>
+        {(person) => (
+          <Avatar
+            name={person().name}
+            initials={person().initials}
+            tone={person().tone}
+            size={28}
+            class={s.titleAvatar}
+            decorative
+          />
+        )}
+      </Show>
       <div class={s.titleText}>
         <Dynamic component={`h${level()}`} class={s.heading}>
           {local.children}
@@ -178,6 +195,17 @@ export function Body(props: BodyProps) {
       class={classes(s.body, local.class)}
     />
   );
+}
+
+export type ColumnProps = JSX.HTMLAttributes<HTMLDivElement>;
+
+/**
+ * A page about one item, such as an agent or the workspace, in the Body: its sections in one
+ * readable column, 680px at most, whatever the width. Pages never set details beside it.
+ */
+export function Column(props: ColumnProps) {
+  const [local, native] = splitProps(props, ["class"]);
+  return <div {...native} class={classes(s.column, local.class)} />;
 }
 
 export type FooterProps = JSX.HTMLAttributes<HTMLDivElement> & {

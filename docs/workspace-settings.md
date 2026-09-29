@@ -1,15 +1,17 @@
 # Workspace settings
 
-Both apps own `/workspaces/:id/settings/{workspace,members}`. The Settings entry redirects to
-Workspace; `?member=:memberId` opens a member beside Members. Tabs and member rows are links, so
-browser and hash history work. The screens follow the Lunacy "Workspace settings" mocks.
+Both apps own `/workspaces/:id/settings/{workspace,members}`, the two sections the rail's Settings
+lists in its sidebar, each its own page; see the [workspace shell](workspace-shell.md). The
+Settings entry redirects to Workspace; `?member=:memberId` opens a member beside Members. Sidebar
+items and member rows are links, so browser and hash history work. The screens follow the Lunacy
+"Workspace settings" mocks, with each section's page in one column.
 
-- **Workspace:** rename, the current owner, ownership transfer, and details: the workspace ID with
-  Copy ID, and who created it. The three roles are Member, Administrator, and Owner. Transfer
+- **Workspace:** rename, then details: the workspace ID with Copy ID, and who created it; then the
+  current owner and ownership transfer. The three roles are Member, Administrator, and Owner. Transfer
   makes the former owner an Administrator; ordinary role editing never offers Owner.
 - **Members:** the roster with search and an Active/Removed filter, each member's workspace role
-  and status, then pending invitations. The tab's count is active memberships; pending
-  invitations have their own count and become members only once accepted. A member opens in the
+  and status, then pending invitations. Pending invitations have their own count and
+  become members only once accepted. A member opens in the
   side panel with their role, their access, and removal. Changing the workspace role keeps any
   separate assignments. Removed members rejoin through a new invitation and a new membership.
 - **Invitations** are modals reached from Members: Invite people issues one for a sign-in email

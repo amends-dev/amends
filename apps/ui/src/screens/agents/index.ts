@@ -4,7 +4,12 @@ export {
   type AddAgentProps,
   type ConfirmRemoveAgentProps,
 } from "./add-agent.tsx";
-export { AgentDetails, type AgentDetailsProps, type AgentDetailsTab } from "./agent-details.tsx";
+export {
+  AgentPane,
+  type AgentPaneProps,
+  type AgentTab,
+  type AgentTurnSummary,
+} from "./agent-pane.tsx";
 export {
   AgentAvatar,
   AgentList,

@@ -62,12 +62,16 @@ safe return path. Client and the UI packages never import each other. Route inte
 live in this app. Vite deduplicates Solid and compiles the shared vanilla-extract styles.
 
 Page compositions contain no inline styles or local stylesheets. `src/workspace-layout.tsx` builds
-the workspace on the UI Shell: `WorkspaceNavigation` with the account menu, one pane per page in
-`Shell.Main`, the thread panel as `ThreadPane`, and the Create group, New message, and Change your
-name modals, over client view hooks. Group, directory, direct-draft, and placeholder pages compose
+the workspace on the UI Shell: `WorkspaceNavigation` with the account menu around the current
+destination's sidebar (`HomeSidebar`, or `DestinationSidebar` for Agents, Environments,
+Connections, and Settings from the client list hooks), one pane per page in `Shell.Main`, the
+thread panel as `ThreadPane`, and the Create group, New message, and Change your name modals, over
+client view hooks. A sidebar's + asks its page to open the create modal through `?add=`. Group, directory, direct-draft, and placeholder pages compose
 UI screens, as do the Inbox with `useInboxView` and `InboxPane` and Settings with
 `useWorkspaceSettings` and the settings screens. A page may render a `Shell.Aside`, such as
-Settings' member details, and it attaches beside the main content. `src/workspace-actions.ts`
+Settings' member details or an agent's turn log (`src/turn-log.tsx`, shared with the thread
+panel), and it attaches beside the main content. Agents, Environments, and Connections each route
+their list and each item's page to one page component, which owns its dialogs. `src/workspace-actions.ts`
 lets pages offer the layout's Create group and show toasts. Visual gaps are evaluated and verified in the UI workshop before app
 consumption; `check:packages` rejects app-local styles.
 
@@ -82,7 +86,7 @@ and `src/pages/environments.tsx` the [Environments page](../../docs/environments
 `useEnvironments`, detouring through the Connections dialogs to create a sandbox account, and
 `src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from `useAgents`, detouring
 through them to create a model connection. The app-owned [Settings pages](../../docs/workspace-settings.md)
-compose the Workspace and Members tabs and their modals. `src/appearance.ts` supplies
+compose the Workspace and Members sections, which the Settings sidebar lists, and their modals. `src/appearance.ts` supplies
 local preference persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode through the UI Theme.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
