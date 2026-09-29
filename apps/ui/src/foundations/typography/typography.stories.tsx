@@ -31,7 +31,7 @@ export const Scale = {
       <section class={s.section}>
         <h2 class={s.heading}>Type scale</h2>
         <p class={s.note}>
-          Inter at 400, 500, and 600. Each role has one size and line height; the weight shown is
+          Figtree at 400, 500, and 600. Each role has one size and line height; the weight shown is
           its usual one.
         </p>
         <div class={s.panel}>

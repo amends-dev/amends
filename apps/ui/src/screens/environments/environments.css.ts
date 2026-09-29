@@ -371,7 +371,11 @@ export const variable = style({
 
 export const variableKey = style({ gap: "0.25rem" });
 
+// Variables are typed exactly, so their names and values are set in the monospace.
+export const variableName = style({ fontFamily: monoFamily });
+
 export const variableValue = style({
+  fontFamily: monoFamily,
   "@media": { [media.mobile]: { gridColumn: 1, gridRow: 2 } },
 });
 
@@ -489,6 +493,7 @@ export const readKey = style({
   ...typeScale.control,
   ...ellipsis,
   color: vars.color.text.primary,
+  fontFamily: monoFamily,
   fontWeight: fontWeight.medium,
 });
 
@@ -497,6 +502,7 @@ export const readValue = style({
   ...ellipsis,
   margin: 0,
   color: vars.color.text.secondary,
+  fontFamily: monoFamily,
 });
 
 export const readCommand = style({

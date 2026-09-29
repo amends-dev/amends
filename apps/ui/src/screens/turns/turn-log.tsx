@@ -215,7 +215,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                     >
                       {(model) => (
                         <>
-                          <span>{model()}</span>
+                          <span class={s.model}>{model()}</span>
                           <Show when={turn().environment}>
                             {(environment) => <span>Environment · {environment()}</span>}
                           </Show>

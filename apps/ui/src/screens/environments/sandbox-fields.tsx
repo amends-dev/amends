@@ -226,6 +226,7 @@ export function SandboxFields(props: SandboxFieldsProps) {
                       }
                     >
                       <Input
+                        class={s.variableName}
                         aria-label={`Variable ${index() + 1} name`}
                         value={row().key}
                         onInput={(event) =>

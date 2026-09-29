@@ -8,7 +8,7 @@ export type ThemeProps = JSX.HTMLAttributes<HTMLDivElement> & {
   mode: ColorMode;
 };
 
-/** Applies a color mode, Inter, and body text to everything inside it. */
+/** Applies a color mode, the typeface, and body text to everything inside it. */
 export function Theme(props: ThemeProps) {
   const [local, native] = splitProps(props, ["mode", "class"]);
   return (

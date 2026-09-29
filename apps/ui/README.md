@@ -32,15 +32,18 @@ patterns, and screens as they are introduced.
   dark color the mocks use. The dark error colors are proposals; the mocks have no dark error
   state yet. Caution (text, a notice surface, and its outline) comes from the Connections frames,
   in light mode only; its dark values follow the sand avatar tone.
-- **Typography** ([tokens](src/foundations/typography/tokens.ts)): Inter at 400, 500, and 600,
+- **Typography** ([tokens](src/foundations/typography/tokens.ts)): Figtree at 400, 500, and 600
+  (the mocks draw Inter; Figtree was chosen for the app),
   in eight roles from `meta` (11/16) to `display` (28/36). The mocks' half-pixel sizes round to
-  the nearest role. Import `@amends/ui/foundations/typography/fonts` once at an app entry point.
+  the nearest role. Geist Mono (`monoFamily`) sets code and values people copy exactly: code in
+  messages and the composer, commands, environment variables, and model IDs, where `Combobox`
+  takes `monospace`. Import `@amends/ui/foundations/typography/fonts` once at an app entry point.
 - **Space** ([tokens](src/foundations/space/tokens.ts)): a 4px grid with 2, 6, and 10px half
   steps. Corners are square throughout; there is no radius scale.
 - **Elevation** ([tokens](src/foundations/elevation/tokens.ts)): shadows for modals, popovers,
   and toasts only. Panels are flat and separated by dividers.
 - **Theme** ([Theme](src/foundations/theme/theme.tsx)): `<Theme mode="light">` applies a mode's
-  variables, Inter, and body text. A nested Theme starts its own scope. Styles read values from
+  variables, the typeface, and body text. A nested Theme starts its own scope. Styles read values from
   `vars` in `@amends/ui/foundations/theme`. CSS variable names start with `amends-`.
 - **Icons** (**Foundations / Icons**): every drawing from [`@amends/icons`](../icons/README.md),
   searchable, with sizes, weights, and accessible names. Review new drawings here.

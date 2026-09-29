@@ -34,6 +34,8 @@ export interface ComboboxProps {
   readonly disabled?: boolean;
   /** The accessible name outside a Field. */
   readonly "aria-label"?: string;
+  /** Values are typed exactly, such as model IDs: the field and each suggestion's value are set in the monospace. */
+  readonly monospace?: boolean;
 }
 
 type Entry =
@@ -149,6 +151,7 @@ export function Combobox(props: ComboboxProps): JSX.Element {
           ref={setInput}
           id={field?.id}
           class={s.input}
+          data-mono={props.monospace ? "" : undefined}
           role="combobox"
           aria-label={props["aria-label"]}
           aria-labelledby={field?.labelId}
@@ -242,7 +245,10 @@ export function Combobox(props: ComboboxProps): JSX.Element {
                             entry.text,
                           )}
                     </span>
-                    <span class={s.optionDescription}>
+                    <span
+                      class={s.optionDescription}
+                      data-mono={props.monospace && entry.kind === "suggestion" ? "" : undefined}
+                    >
                       {entry.kind === "suggestion"
                         ? entry.suggestion.value
                         : (props.custom?.description ?? "Use this value as entered.")}

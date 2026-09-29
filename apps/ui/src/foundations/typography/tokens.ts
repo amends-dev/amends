@@ -1,14 +1,17 @@
 /**
- * Inter at three weights and eight sizes. The mocks' half-pixel variants (10.5, 11.5, 12.5,
+ * Figtree at three weights and eight sizes. The mocks' half-pixel variants (10.5, 11.5, 12.5,
  * 13.5, 14.5) are rounded to the nearest step here, so the same role reads the same everywhere.
  * Sizes are rem at a 16px root so they follow the reader's text-size preference.
  */
 export const fontFamily =
-  '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  '"Figtree", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-/** The system's monospace, for code and values people copy exactly. */
+/**
+ * Geist Mono, for code and values people copy exactly: code in messages, commands, environment
+ * variables, and model IDs.
+ */
 export const monoFamily =
-  'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+  '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
 
 export const fontWeight = { regular: 400, medium: 500, semibold: 600 } as const;
 export type FontWeight = keyof typeof fontWeight;

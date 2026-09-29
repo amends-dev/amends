@@ -1,7 +1,7 @@
 import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
 // Agents' turns under a thread's messages, each a compact row.
 export const turns = style({
@@ -109,6 +109,9 @@ export const summary = style({
   backgroundColor: vars.color.surface.subtle,
   color: vars.color.text.secondary,
 });
+
+// The model the turn ran on, as its ID.
+export const model = style({ fontFamily: monoFamily });
 
 export const activity = style({
   display: "flex",

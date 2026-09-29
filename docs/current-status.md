@@ -213,7 +213,7 @@ assignments, one read per member; a batched assignment read across members would
 
 The [UI package](../apps/ui/README.md) is built from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: light and dark color roles taken from the mocks,
-Inter in eight type roles, a 4px spacing grid, shadows for modals, popovers, and toasts, and the
+Figtree in eight type roles with Geist Mono for code and exact values (the mocks draw Inter), a 4px spacing grid, shadows for modals, popovers, and toasts, and the
 [icons package](../apps/icons/README.md)'s 61 generated drawings, including the mocks' marks.
 Its components, the six layout patterns, and the screens cover every page the apps show; each has
 Storybook stories in both modes, run as portable tests in Happy DOM. The dark error colors are

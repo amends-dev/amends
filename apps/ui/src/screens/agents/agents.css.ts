@@ -1,7 +1,7 @@
 import { globalStyle, keyframes, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
 const ellipsis = {
   minWidth: 0,
@@ -253,6 +253,9 @@ export const status = style({
 
 export const note = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary });
 
+// A model ID, typed exactly, in the monospace.
+export const modelNote = style([note, { fontFamily: monoFamily }]);
+
 export const form = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });
 
 // The configuration's fields sit further apart than a form's.
@@ -316,6 +319,7 @@ export const summaryModel = style({
   ...ellipsis,
   margin: 0,
   color: vars.color.text.primary,
+  fontFamily: monoFamily,
   fontWeight: fontWeight.medium,
 });
 

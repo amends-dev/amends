@@ -154,6 +154,7 @@ export function ModelFields(props: ModelFieldsProps) {
             description: "Use this model ID as entered.",
           }}
           placeholder="Model ID"
+          monospace
           disabled={props.disabled}
         />
       </Field.Root>
@@ -315,7 +316,7 @@ export function ConfigurationSummary(props: ConfigurationSummaryProps) {
       </div>
       <div class={s.field}>
         <span class={s.factLabel}>Model</span>
-        <p class={s.note}>{props.model}</p>
+        <p class={s.modelNote}>{props.model}</p>
       </div>
       <div class={s.field}>
         <span class={s.factLabel}>Environment</span>

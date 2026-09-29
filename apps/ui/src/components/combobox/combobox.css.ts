@@ -1,7 +1,7 @@
 import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
 export const combobox = style({ position: "relative" });
 
@@ -37,6 +37,7 @@ export const input = style({
   color: vars.color.text.primary,
   fontFamily: "inherit",
   selectors: {
+    "&[data-mono]": { fontFamily: monoFamily },
     "&::placeholder": { color: vars.color.text.muted, opacity: 1 },
     "&:disabled": { color: vars.color.text.disabled },
   },
@@ -125,6 +126,7 @@ export const optionDescription = style({
   color: vars.color.text.secondary,
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  selectors: { "&[data-mono]": { fontFamily: monoFamily } },
 });
 
 export const indicator = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
