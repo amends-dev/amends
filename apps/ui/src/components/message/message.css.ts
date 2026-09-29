@@ -23,9 +23,19 @@ export const message = style({
       backgroundColor: vars.color.surface.active,
     },
     // A message stacked under its author's one before sits 6px beneath it, inside the
-    // timeline's 24px gap (22px on phones); marked out, its band reaches up 8px more.
+    // timeline's 24px gap (22px on phones). Between stacked messages a band reaches only 3px, half
+    // the gap, so it never touches its neighbor.
     "&[data-continued]": { marginBlockStart: "-1.125rem" },
-    "&[data-continued][data-active]": { marginBlockStart: "-1.625rem" },
+    "&[data-continued][data-active]": {
+      marginBlockStart: "-1.3125rem",
+      paddingBlockStart: "0.1875rem",
+    },
+    "&[data-active]:has(+ [data-continued])": {
+      marginBlockEnd: "-0.1875rem",
+      paddingBlockEnd: "0.1875rem",
+    },
+    // With no byline, the bar centers on the first line of text.
+    "&[data-continued][data-active]::before": { top: "0.28125rem" },
     "&[data-active]::before": {
       content: '""',
       position: "absolute",
@@ -40,7 +50,7 @@ export const message = style({
     [media.mobile]: {
       selectors: {
         "&[data-continued]": { marginBlockStart: "-1rem" },
-        "&[data-continued][data-active]": { marginBlockStart: "-1.5rem" },
+        "&[data-continued][data-active]": { marginBlockStart: "-1.1875rem" },
       },
     },
     // Under the pointer, a quiet band reaching as the open thread's does, behind the text.
@@ -54,6 +64,8 @@ export const message = style({
           backgroundColor: vars.color.surface.hover,
           pointerEvents: "none",
         },
+        "&[data-continued]:hover:not([data-active])::after": { top: "-0.1875rem" },
+        "&:has(+ [data-continued]):hover:not([data-active])::after": { bottom: "-0.1875rem" },
       },
     },
   },
