@@ -1,7 +1,8 @@
-import { Show, createEffect, createSignal, splitProps, type JSX } from "solid-js";
+import { For, Show, createEffect, createSignal, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { Avatar, AvatarStack, type AvatarStackPerson } from "../avatar/index.ts";
 import { TaskStatus, type TaskState } from "../task-status/index.ts";
+import { TurnActivity, type TurnState } from "../turn-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import { clockTime, fullTime } from "../../internal/when.ts";
@@ -173,6 +174,22 @@ export function TaskReference(props: TaskReferenceProps) {
   );
 }
 
+/** An agent at work in a thread, shown as "Yumi working" and marked with its turn's state. */
+export interface ThreadActivity {
+  /** The agent, by name. */
+  readonly agent: string;
+  readonly state: TurnState;
+}
+
+const activityWords: Readonly<Record<TurnState, string>> = {
+  queued: "queued",
+  working: "working",
+  stopping: "stopping",
+  done: "done",
+  failed: "failed",
+  stopped: "stopped",
+};
+
 export type RepliesProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   count: number;
   /** The people who replied, most recent last. */
@@ -181,11 +198,20 @@ export type RepliesProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "ch
   unread?: boolean;
   /** A quiet line after the count, such as who is typing. */
   note?: string;
+  /** Agents at work in the thread. */
+  activity?: readonly ThreadActivity[];
 };
 
 /** Opens the message's thread. */
 export function Replies(props: RepliesProps) {
-  const [local, native] = splitProps(props, ["count", "people", "unread", "note", "class"]);
+  const [local, native] = splitProps(props, [
+    "count",
+    "people",
+    "unread",
+    "note",
+    "activity",
+    "class",
+  ]);
   const label = () => `${local.count} ${local.count === 1 ? "reply" : "replies"}`;
   return (
     <button {...native} type="button" class={classes(s.replies, local.class)}>
@@ -207,6 +233,13 @@ export function Replies(props: RepliesProps) {
         </Show>
         {label()}
       </span>
+      <For each={local.activity ?? []}>
+        {(activity) => (
+          <TurnActivity state={activity.state}>
+            {`${activity.agent} ${activityWords[activity.state]}`}
+          </TurnActivity>
+        )}
+      </For>
       <Show when={local.note}>
         <span class={s.repliesNote}>{local.note}</span>
       </Show>
@@ -217,6 +250,8 @@ export function Replies(props: RepliesProps) {
 export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   /** A quiet line after the action, such as who is typing; it keeps the action in view. */
   note?: string;
+  /** Agents at work in the thread; they keep the action in view too. */
+  activity?: readonly ThreadActivity[];
 };
 
 /**
@@ -224,15 +259,22 @@ export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "chil
  * focused, and always on touch screens.
  */
 export function Reply(props: ReplyProps) {
-  const [local, native] = splitProps(props, ["note", "class"]);
+  const [local, native] = splitProps(props, ["note", "activity", "class"]);
   return (
     <button
       {...native}
       type="button"
       class={classes(s.reply, local.class)}
-      data-noted={local.note ? "" : undefined}
+      data-noted={local.note || local.activity?.length ? "" : undefined}
     >
       <span class={s.replyLabel}>Reply in thread</span>
+      <For each={local.activity ?? []}>
+        {(activity) => (
+          <TurnActivity state={activity.state}>
+            {`${activity.agent} ${activityWords[activity.state]}`}
+          </TurnActivity>
+        )}
+      </For>
       <Show when={local.note}>
         <span class={s.repliesNote}>{local.note}</span>
       </Show>

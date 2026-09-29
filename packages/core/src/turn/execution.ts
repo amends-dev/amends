@@ -14,6 +14,7 @@ import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadMessageActivity } from "../thread/message/activity.ts";
 import { ThreadMessageStore } from "../thread/message/store.ts";
 import { MemberStore } from "../workspace/member/store.ts";
+import { Signals } from "../signal/signals.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Identity } from "../identity/identity.ts";
 import { Actor } from "../identity/actor.ts";
@@ -148,6 +149,19 @@ export interface Interface {
     turnId: Turn.Id,
     events: ReadonlyArray<HarnessEvent.Event>,
   ) => Effect.Effect<Turn.Record, Error>;
+  /**
+   * Show the turn's readers more of a response before it completes, as a signal: nothing is
+   * recorded, and a turn no longer running shows nothing.
+   */
+  readonly draft: (
+    turnId: Turn.Id,
+    piece: {
+      readonly responseId: string;
+      readonly part: number;
+      readonly offset: number;
+      readonly text: string;
+    },
+  ) => Effect.Effect<void, Error>;
   /** Record that execution stopped before the turn finished, and why. */
   readonly interrupted: (
     turnId: Turn.Id,
@@ -189,6 +203,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const activities = yield* ThreadActivityStore.Service;
   const messages = yield* ThreadMessageStore.Service;
   const members = yield* MemberStore.Service;
+  const signals = yield* Signals.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -205,6 +220,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       admissions.workspaceId,
       publication.workspaceId,
       authorization.workspaceId,
+      signals.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
@@ -251,6 +267,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       ? Effect.void
       : Effect.fail(new NotActive({ turnId: turn.id, status: turn.status }));
   const submittedKey = (batchId: string) => Log.IdempotencyKey.make(`submitted:${batchId}`);
+  /** Tell the turn's readers its log grew, once the commit that grew it is done. */
+  const logged = (turn: Turn.Record) =>
+    signals.publish({
+      _tag: "TurnLogged",
+      workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      turnId: turn.id,
+    });
 
   /** Thread messages in a sequence range, oldest first, at most `limit` of the newest. */
   const messagesIn = Effect.fnUntraced(function* (
@@ -432,7 +457,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     turnId: Turn.Id,
     events: ReadonlyArray<HarnessEvent.Event>,
   ) {
-    return yield* asAgent(turnId)((turn) =>
+    const reported = yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running", "cancelling"]);
         const handle = TurnLog.open(log, turnId);
@@ -457,13 +482,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         return Turn.change(turn, { incorporatedThroughSequence: through });
       }),
     );
+    if (events.length > 0) yield* logged(reported);
+    return reported;
   });
 
   const interrupted = Effect.fn("TurnExecution.interrupted")(function* (
     turnId: Turn.Id,
     stop: { readonly reason: string; readonly retryable: boolean },
   ) {
-    yield* asAgent(turnId)((turn) =>
+    const turn = yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running", "cancelling"]);
         const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(stop.reason);
@@ -472,8 +499,34 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           reason,
           retryable: stop.retryable,
         });
+        return turn;
       }),
     );
+    yield* logged(turn);
+  });
+
+  const draft = Effect.fn("TurnExecution.draft")(function* (
+    turnId: Turn.Id,
+    piece: {
+      readonly responseId: string;
+      readonly part: number;
+      readonly offset: number;
+      readonly text: string;
+    },
+  ) {
+    const turn = yield* load(turnId);
+    if (turn.status !== "running" || piece.text === "" || piece.responseId === "") return;
+    yield* signals.publish({
+      _tag: "TurnDraft",
+      workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      turnId: turn.id,
+      responseId: piece.responseId,
+      part: piece.part,
+      offset: piece.offset,
+      text: piece.text,
+    });
   });
 
   const entries = Effect.fn("TurnExecution.entries")(function* (turnId: Turn.Id) {
@@ -616,6 +669,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     start,
     submitted,
     report,
+    draft,
     interrupted,
     entries,
     close,

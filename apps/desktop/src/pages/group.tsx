@@ -7,6 +7,7 @@ import {
   useMentionCandidates,
   useNewThread,
   useRenameGroup,
+  useTurnActivity,
   useWorkspace,
   useWorkspaceGroups,
 } from "@amends/client";
@@ -49,6 +50,21 @@ function Group(props: {
   const groups = useWorkspaceGroups(workspaceId);
   const group = () => groups.group(groupId);
   const conversation = useGroupConversation(workspaceId, groupId);
+  const activity = useTurnActivity(workspaceId);
+  // Each thread notes the agents at work in it.
+  const entries = () =>
+    conversation.entries().map((entry) => {
+      const working = activity.inThread(entry.id);
+      return working.length === 0
+        ? entry
+        : {
+            ...entry,
+            thread: {
+              ...entry.thread,
+              activity: working.map((turn) => ({ agent: turn.agent.name, state: turn.state })),
+            },
+          };
+    });
   const composer = useNewThread(workspaceId, groupId);
   const candidates = useMentionCandidates(workspaceId, groupId);
   const actions = useWorkspaceActions();
@@ -101,7 +117,7 @@ function Group(props: {
         onOpenSettings={direct() ? undefined : () => open("general")}
       >
         <GroupThreads
-          entries={conversation.entries()}
+          entries={entries()}
           days
           status={conversation.status()}
           onRetry={conversation.retry}

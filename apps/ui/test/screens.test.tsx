@@ -184,6 +184,23 @@ import workspacesMeta, {
   RefreshFailed,
   WorkspacesAndInvitations,
 } from "../src/screens/workspaces/workspaces.stories.tsx";
+import turnsMeta, {
+  CompletedWithoutReply,
+  FailedWithRetry,
+  FollowOnly,
+  LogCompleted,
+  LogFailed,
+  LogQueued,
+  LogReconnecting,
+  LogStreaming,
+  Queued as TurnQueued,
+  Replied,
+  StopFailed,
+  Stopped as TurnStopped,
+  StoppedWhenAgentLeft,
+  Stopping as TurnStopping,
+  Working as TurnWorking,
+} from "../src/screens/turns/turns.stories.tsx";
 import { viewport } from "./viewport.ts";
 
 afterEach(() => {
@@ -216,6 +233,31 @@ describe("group threads screen", () => {
   it("sends to the group and toggles a reaction", async () => {
     viewport(1600);
     await stories.story(Send).run();
+  });
+});
+
+describe("turns screens", () => {
+  const stories = definePreview(preview).meta(turnsMeta);
+  it("shows an agent's turn under its thread, in every state, with Stop and Retry", async () => {
+    viewport(1600);
+    await stories.story(TurnQueued).run();
+    await stories.story(TurnWorking).run();
+    await stories.story(TurnStopping).run();
+    await stories.story(TurnStopped).run();
+    await stories.story(FailedWithRetry).run();
+    await stories.story(StoppedWhenAgentLeft).run();
+    await stories.story(CompletedWithoutReply).run();
+    await stories.story(FollowOnly).run();
+    await stories.story(StopFailed).run();
+  });
+  it("opens a reply's turn log, and shows the log's states", async () => {
+    viewport(1600);
+    await stories.story(Replied).run();
+    await stories.story(LogQueued).run();
+    await stories.story(LogStreaming).run();
+    await stories.story(LogReconnecting).run();
+    await stories.story(LogFailed).run();
+    await stories.story(LogCompleted).run();
   });
 });
 

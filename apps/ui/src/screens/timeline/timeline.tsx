@@ -1,9 +1,13 @@
 import { For, Match, Show, Switch, createMemo } from "solid-js";
 import { Keyed } from "../../internal/keyed.tsx";
-import { IconMarkNew, IconMarkResources } from "@amends/icons";
+import { IconCheck, IconMarkNew, IconMarkResources } from "@amends/icons";
 import type { AvatarStackPerson } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
-import { Message, type MessageAuthor } from "../../components/message/index.ts";
+import {
+  Message,
+  type MessageAuthor,
+  type MessageThreadActivity,
+} from "../../components/message/index.ts";
 import type { TaskState } from "../../components/task-status/index.ts";
 import { clockTime, dayLabel, dayOf, fullTime, typingText } from "../../internal/when.ts";
 import * as s from "./timeline.css.ts";
@@ -36,7 +40,11 @@ export interface TimelineMessage {
     readonly unread?: boolean;
     /** The people typing a reply now. */
     readonly typing?: readonly string[];
+    /** Agents at work in the thread, such as "Yumi working". */
+    readonly activity?: readonly MessageThreadActivity[];
   };
+  /** The agent's turn that posted it, whose log the note under it opens. */
+  readonly turn?: { readonly id: string };
 }
 
 export interface TimelineDivider {
@@ -126,6 +134,8 @@ export interface TimelineProps {
   readonly days?: boolean;
   /** The message the reader came to see: set apart and scrolled to. */
   readonly focusId?: string;
+  /** Opens the log of the turn that posted a message. */
+  readonly onOpenTurnLog?: (turnId: string) => void;
 }
 
 /** Messages, dividers, and events, oldest first. */
@@ -211,6 +221,21 @@ export function Timeline(props: TimelineProps) {
                       </Message.TaskReference>
                     )}
                   </Show>
+                  <Show when={props.onOpenTurnLog && message().turn}>
+                    {(turn) => (
+                      <p class={s.turnNote}>
+                        <IconCheck class={s.eventIcon} aria-hidden="true" />
+                        Completed ·{" "}
+                        <button
+                          type="button"
+                          class={s.turnLink}
+                          onClick={() => props.onOpenTurnLog?.(turn().id)}
+                        >
+                          View turn log
+                        </button>
+                      </p>
+                    )}
+                  </Show>
                   <Show when={message().thread}>
                     {(thread) => (
                       <Show
@@ -219,6 +244,7 @@ export function Timeline(props: TimelineProps) {
                           <Show when={props.onOpenThread}>
                             <Message.Reply
                               note={typingText(thread().typing ?? [])}
+                              activity={thread().activity}
                               aria-expanded={props.activeId === message().id}
                               onClick={() => props.onOpenThread?.(message().id)}
                             />
@@ -230,6 +256,7 @@ export function Timeline(props: TimelineProps) {
                           people={thread().people}
                           unread={thread().unread}
                           note={typingText(thread().typing ?? [])}
+                          activity={thread().activity}
                           aria-expanded={props.activeId === message().id}
                           onClick={() => props.onOpenThread?.(message().id)}
                         />

@@ -139,6 +139,12 @@ const samples: readonly Sample[] = [
   },
 ];
 
+/** Where agents are at work: Atlas waits in one thread, Yumi works in two. */
+const activities: Readonly<Record<string, AgentSummary["activity"]>> = {
+  atlas: { state: "queued", places: ["#design"] },
+  yumi: { state: "working", places: ["#general", "#product"] },
+};
+
 type Dialog = "add" | "remove" | "choose-provider" | "configure-connection" | "connection-key";
 
 export interface AgentsWorkspaceProps {
@@ -258,6 +264,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
       removable: !props.readOnly,
       createdBy: "Jamie Morgan",
       createdAt: new Date(2026, 8, 28),
+      activity: activities[record.id],
     };
   };
   const all = createMemo(() => records().map(summaryOf));

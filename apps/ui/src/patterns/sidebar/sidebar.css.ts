@@ -310,3 +310,6 @@ export const subItemIcon = style({
   height: "0.875rem",
   color: vars.color.text.secondary,
 });
+
+// Where agents are at work, quiet beside the label and apart from unread counts.
+export const itemActivity = style({ flex: "none" });

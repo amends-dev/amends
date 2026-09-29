@@ -3,6 +3,7 @@ import { Dynamic } from "solid-js/web";
 import { IconChevronDown, IconMarkSearch } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Count } from "../../components/count/index.ts";
+import { TurnActivity, turnStateLabels } from "../../components/turn-status/index.ts";
 import { TaskStatus, type TaskState } from "../../components/task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
@@ -113,6 +114,8 @@ export type ItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "child
   /** A dot for activity the reader has not seen, when there is no count. */
   unread?: boolean;
   current?: boolean;
+  /** Agents at work there: the most pressing turn state, as a quiet mark before any count. */
+  activity?: "queued" | "working" | "stopping";
 };
 
 /** A destination in a List. */
@@ -125,6 +128,7 @@ export function Item(props: ItemProps) {
     "countLabel",
     "unread",
     "current",
+    "activity",
     "class",
   ]);
   return (
@@ -149,6 +153,13 @@ export function Item(props: ItemProps) {
           )}
         </Show>
         <span class={s.itemLabel}>{local.children}</span>
+        <Show when={local.activity}>
+          {(activity) => (
+            <TurnActivity state={activity()} class={s.itemActivity}>
+              {turnStateLabels[activity()]}
+            </TurnActivity>
+          )}
+        </Show>
         <Show
           when={local.count}
           fallback={

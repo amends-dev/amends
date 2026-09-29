@@ -5,7 +5,7 @@ import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import type { Actor } from "../identity/actor.ts";
 import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
+import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import type { Request } from "../request/request.ts";
@@ -15,6 +15,7 @@ import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnFacts } from "./facts.ts";
+import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 export { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
@@ -33,6 +34,8 @@ export type ReadError =
   | InvalidResponse
   | NotFound;
 export type ListError = Exclude<ReadError, NotFound> | ThreadNotFound;
+export type ActiveError = Exclude<ReadError, NotFound>;
+export type LogError = ReadError | Log.ReadError;
 export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
@@ -50,6 +53,15 @@ export interface Interface {
     threadId: ThreadId.Id,
     limit: number,
   ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
+  /**
+   * The workspace's active turns in threads the reader may open, oldest first, among at most
+   * `limit` active turns in the workspace.
+   */
+  readonly listActive: (
+    limit: number,
+  ) => Effect.Effect<ReadonlyArray<Turn.View>, ActiveError, Actor.Service>;
+  /** A turn with its log, for a reader who may open its thread. */
+  readonly log: (turnId: Turn.Id) => Effect.Effect<Turn.LogView, LogError, Actor.Service>;
   /**
    * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
    * queued turn stops at once, since nothing runs it yet; a running one stops once execution
@@ -84,6 +96,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const receipts = yield* RequestReceipts.Service;
   const journal = yield* Journal.Service;
+  const log = yield* Log.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -166,9 +179,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     limit: number,
   ) {
     const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
-    const bounded = yield* Schema.decodeEffect(
-      Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
-    )(limit);
+    const count = yield* bounded(limit);
     const thread = yield* access
       .require(id)
       .pipe(
@@ -176,10 +187,74 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
           Effect.fail(new ThreadNotFound({ threadId: id })),
         ),
       );
-    const listed = yield* Effect.forEach(yield* turns.listByThread(thread.id, bounded), (turn) =>
+    const listed = yield* Effect.forEach(yield* turns.listByThread(thread.id, count), (turn) =>
       decode(turn),
     );
     return yield* present(listed, { newestFirst: true });
+  });
+
+  const bounded = Schema.decodeEffect(
+    Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
+  );
+
+  const listActive = Effect.fn("TurnApplication.listActive")(function* (limit: number) {
+    const active = yield* Effect.forEach(yield* turns.listActive(yield* bounded(limit)), (turn) =>
+      decode(turn),
+    );
+    // Each thread's access is checked once, whatever number of its turns are active.
+    const readable = new Map<string, boolean>();
+    for (const turn of active) {
+      if (readable.has(turn.threadId)) continue;
+      const may = yield* access.require(turn.threadId).pipe(
+        Effect.as(true),
+        Effect.catchTags({
+          "ThreadAccess.NotFound": () => Effect.succeed(false),
+          "Authorization.Denied": () => Effect.succeed(false),
+        }),
+      );
+      readable.set(turn.threadId, may);
+    }
+    return yield* present(active.filter((turn) => readable.get(turn.threadId) === true));
+  });
+
+  const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
+    const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
+    const handle = TurnLog.open(log, turn.id);
+    const items: Array<Turn.LogItem> = [];
+    let after: Log.Position | undefined;
+    for (;;) {
+      const batches = yield* handle.read(
+        after === undefined ? { limit: 100 } : { after, limit: 100 },
+      );
+      if (batches.length === 0) break;
+      for (const batch of batches) {
+        for (const entry of batch.entries) {
+          const at = entry.recordedAt;
+          const payload = entry.payload;
+          if (payload._tag === "Interrupted")
+            items.push({
+              _tag: "Interrupted",
+              at,
+              reason: payload.reason,
+              retryable: payload.retryable,
+            });
+          else if (payload._tag === "Harness") {
+            const event = payload.event;
+            if (event._tag === "InputIncorporated")
+              items.push({ _tag: "InputTaken", at, messages: event.batch.items.length });
+            else if (event._tag === "ResponseCompleted") {
+              const text = event.response.parts
+                .flatMap((part) => (part._tag === "Text" ? [part.text] : []))
+                .join("");
+              if (/\S/u.test(text))
+                items.push({ _tag: "Responded", at, responseId: event.response.id, text });
+            }
+          }
+        }
+        after = batch.position;
+      }
+    }
+    return { turn: yield* presentOne(turn), items } satisfies Turn.LogView;
   });
 
   const cancel = Effect.fn("TurnApplication.cancel")(
@@ -274,7 +349,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     journal.commit,
   );
 
-  return Service.of({ workspaceId, get, listByThread, cancel, retry });
+  return Service.of({ workspaceId, get, listByThread, listActive, log: readLog, cancel, retry });
 });
 
 /** @category layers */

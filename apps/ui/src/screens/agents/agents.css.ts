@@ -33,7 +33,8 @@ export const phoneOnly = style({
 
 // Columns: a 32px avatar, the agent, and setup; with room, the model and environment between.
 const compactColumns = "2rem minmax(0, 1fr) 8.75rem";
-const wideColumns = "2rem minmax(0, 0.8fr) minmax(0, 1.6fr) minmax(0, 1.05fr) 7.5rem";
+const wideColumns =
+  "2rem minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.95fr) 7.5rem minmax(0, 1fr)";
 
 export const search = style({
   width: "20rem",
@@ -149,6 +150,28 @@ export const rowColumn = style([
   wideColumn,
   { ...typeScale.control, ...ellipsis, color: vars.color.text.secondary },
 ]);
+
+// Current activity, apart from setup: the turn state, then where it works.
+export const rowActivity = style([
+  wideColumn,
+  { ...typeScale.control, minWidth: 0, color: vars.color.text.secondary },
+]);
+
+export const idle = style({
+  ...typeScale.hint,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.3125rem",
+  color: vars.color.text.muted,
+});
+
+export const activityWhere = style({
+  ...typeScale.hint,
+  ...ellipsis,
+  display: "block",
+  marginBlockStart: "0.25rem",
+  color: vars.color.text.secondary,
+});
 
 export const rowSetup = style({
   display: "flex",

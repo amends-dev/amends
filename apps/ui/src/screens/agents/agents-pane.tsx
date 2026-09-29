@@ -5,6 +5,8 @@ import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { SearchField } from "../../components/input/index.ts";
+import { Logo } from "../../components/logo/index.ts";
+import { TurnActivity } from "../../components/turn-status/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { Pane } from "../../patterns/pane/index.ts";
@@ -13,6 +15,7 @@ import {
   AgentsAlert,
   SetupStatus,
   modelLine,
+  activityWords,
   type AgentSummary,
   type AgentsAction,
   type AgentsError,
@@ -262,6 +265,7 @@ export function AgentList(props: AgentListProps) {
         <span class={s.wideColumn}>Model</span>
         <span class={s.wideColumn}>Environment</span>
         <span>Setup</span>
+        <span class={s.wideColumn}>Current activity</span>
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
@@ -306,6 +310,15 @@ export function AgentList(props: AgentListProps) {
                         <span class={s.rowLine}>
                           {agent().environment.name ?? "Unavailable environment"}
                         </span>
+                        <Show when={agent().activity}>
+                          {(activity) => (
+                            <span class={s.rowLine}>
+                              <TurnActivity state={activity().state}>
+                                {`${activityWords(activity()).status} · ${activityWords(activity()).where}`}
+                              </TurnActivity>
+                            </span>
+                          )}
+                        </Show>
                       </span>
                       <span class={s.rowColumn}>{modelLine(agent())}</span>
                       <span class={s.rowColumn}>
@@ -314,6 +327,26 @@ export function AgentList(props: AgentListProps) {
                       <span class={s.rowSetup}>
                         <SetupStatus issues={agent().issues} />
                       </span>
+                      <span class={s.rowActivity}>
+                        <Show
+                          when={agent().activity}
+                          fallback={
+                            <span class={s.idle}>
+                              <Logo size="0.875rem" />
+                              Idle
+                            </span>
+                          }
+                        >
+                          {(activity) => (
+                            <>
+                              <TurnActivity state={activity().state}>
+                                {activityWords(activity()).status}
+                              </TurnActivity>
+                              <span class={s.activityWhere}>{activityWords(activity()).where}</span>
+                            </>
+                          )}
+                        </Show>
+                      </span>
                     </a>
                   </li>
                 )}
@@ -321,8 +354,7 @@ export function AgentList(props: AgentListProps) {
             </ul>
           </Show>
           <p class={s.footnote}>
-            Ready reflects the saved configuration. Model access has not been tested with the
-            provider.
+            Setup and current activity are separate: an agent can work on more than one thread.
           </p>
         </div>
       </Pane.Body>

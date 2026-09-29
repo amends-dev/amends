@@ -2,6 +2,7 @@ import {
   paths,
   useAgents,
   useConnections,
+  useTurnActivity,
   useWorkspace,
   type AgentAction,
   type AgentEntry,
@@ -120,6 +121,7 @@ function Agents(props: { readonly workspaceId: string }) {
   const name = () => workspace()?.workspace.name ?? "";
   const tab = (): AgentsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
   const base = paths.workspacePage(workspaceId, "agents");
+  const activity = useTurnActivity(workspaceId);
   const shown = createMemo(() => {
     const words = query().trim().toLocaleLowerCase();
     return view
@@ -128,7 +130,8 @@ function Agents(props: { readonly workspaceId: string }) {
         (agent) =>
           (tab() === "all" || agent.issues.length > 0) &&
           (words === "" || agent.name.toLocaleLowerCase().includes(words)),
-      );
+      )
+      .map((agent) => ({ ...agent, activity: activity.agentActivity(agent.memberId) }));
   });
   const selected = (): AgentEntry | undefined =>
     search.agent === undefined ? undefined : view.agent(search.agent);

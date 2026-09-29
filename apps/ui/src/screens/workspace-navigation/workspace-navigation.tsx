@@ -48,6 +48,8 @@ export interface NavigationGroup extends NavigationLink {
   readonly name: string;
   /** Open threads and tasks shown under the group. */
   readonly threads?: readonly NavigationThread[];
+  /** Agents at work in the group: the most pressing turn state. */
+  readonly activity?: "queued" | "working" | "stopping";
   /** Notifications addressed to the reader from the group. */
   readonly pending?: number;
   /** Activity the reader has not seen. */
@@ -272,6 +274,7 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                       count={group().pending || undefined}
                       countLabel={`${group().pending ?? 0} for you`}
                       unread={group().unread}
+                      activity={group().activity}
                     >
                       {group().name}
                     </Sidebar.Item>

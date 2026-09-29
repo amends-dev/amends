@@ -10,6 +10,9 @@ import {
   useSession,
   useThreadConversation,
   useThreadFollow,
+  useThreadTurns,
+  useTurnActivity,
+  useTurnLog,
   useWorkspace,
   useDirectMessages,
   useWorkspaceGroups,
@@ -25,6 +28,7 @@ import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
+import { TurnLogPane } from "@amends/ui/screens/turns";
 import { WorkspaceNavigation, type Destination } from "@amends/ui/screens/workspace-navigation";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createMemo, createSignal, For, Show, type ParentProps } from "solid-js";
@@ -58,6 +62,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const groups = useWorkspaceGroups(workspaceId);
   const directs = useDirectMessages(workspaceId);
   const pending = useInboxPending(workspaceId);
+  const activity = useTurnActivity(workspaceId);
   const creator = useWorkspacePermission(workspaceId, "group.create");
   const live = useLiveStatus();
   const conversation = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/*rest");
@@ -66,7 +71,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     () => "/workspaces/:workspaceId/inbox/groups/:groupId/threads/:threadId",
   );
   const browsing = useMatch(() => "/workspaces/:workspaceId/groups");
-  const [search] = useSearchParams<{ at?: string; to?: string }>();
+  const [search, setSearch] = useSearchParams<{ at?: string; to?: string; log?: string }>();
   const drafting = useMatch(() => "/workspaces/:workspaceId/direct");
   const [dialog, setDialog] = createSignal<"create-group" | "new-message" | "name">();
   const [toasts, setToasts] = createSignal<ReadonlyArray<{ id: number; text: string }>>([]);
@@ -164,6 +169,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             current: groupId() === group.id,
             pending: group.pending,
             unread: group.unread,
+            activity: activity.inGroup(group.id),
           }))}
           groupsLoading={groups.all() === undefined}
           directMessages={directs().map((entry) =>
@@ -203,6 +209,9 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
               focus={fromInbox() && search.at ? Number(search.at) || undefined : undefined}
               fromInbox={fromInbox() !== undefined}
               onClose={closePanel}
+              log={search.log}
+              onOpenLog={(turnId) => setSearch({ log: turnId })}
+              onCloseLog={() => setSearch({ log: undefined })}
             />
           )}
         </Show>
@@ -268,7 +277,10 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   );
 }
 
-/** One thread beside the page: its timeline, following, and a composer for replying. */
+/**
+ * One thread beside the page: its timeline, its agents' turns, following, and a composer for
+ * replying; or one of its turns' logs in its place, keeping the reply being written.
+ */
 function ThreadPanel(props: {
   readonly workspaceId: string;
   readonly groupId: string;
@@ -277,6 +289,10 @@ function ThreadPanel(props: {
   /** Opened from the inbox: it says why the notification came, and Back leads to the inbox. */
   readonly fromInbox?: boolean;
   readonly onClose: () => void;
+  /** The turn whose log shows in place of the thread. */
+  readonly log?: string;
+  readonly onOpenLog: (turnId: string) => void;
+  readonly onCloseLog: () => void;
 }) {
   const groups = useWorkspaceGroups(props.workspaceId);
   const group = () => groups.group(props.groupId);
@@ -292,47 +308,146 @@ function ThreadPanel(props: {
           : "Couldn’t unfollow the thread. Try again.",
       ),
   });
+  const turns = useThreadTurns(props.workspaceId, props.threadId);
+  const agentHref = (agentId: string) => href(paths.agent(props.workspaceId, agentId));
+  // The agent's reply notes the turn that posted it, whose log it opens.
+  const entries = () => {
+    const replies = turns.replies();
+    return thread.entries().map((entry) => {
+      const turn = entry.kind === "message" ? replies.get(entry.id) : undefined;
+      return turn ? { ...entry, turn: { id: turn.id } } : entry;
+    });
+  };
+  // Each agent's latest turn shows under the messages, unless its reply already stands for it.
+  const inline = () =>
+    turns
+      .latest()
+      .filter((turn) => turn.state !== "done" || turn.replyId === undefined)
+      .map((turn) => ({ ...turn, agentHref: agentHref(turn.agent.id) }));
   return (
-    <ThreadPane
-      title="Thread"
-      groupName={group()?.name ?? ""}
-      groupKind={group()?.kind}
-      reason={props.fromInbox ? thread.focusReason() : undefined}
-      backLabel={props.fromInbox ? "Inbox" : undefined}
-      entries={thread.entries()}
-      days
-      repliesDivider
-      status={thread.status()}
-      onRetry={thread.retry}
-      earlier={
-        thread.earlier()
-          ? {
-              loading: thread.loadingEarlier(),
-              failed: thread.earlierFailed(),
-              onLoad: thread.loadEarlier,
-            }
-          : undefined
+    <Show
+      when={props.log}
+      keyed
+      fallback={
+        <ThreadPane
+          title="Thread"
+          groupName={group()?.name ?? ""}
+          groupKind={group()?.kind}
+          reason={props.fromInbox ? thread.focusReason() : undefined}
+          backLabel={props.fromInbox ? "Inbox" : undefined}
+          entries={entries()}
+          onOpenTurnLog={props.onOpenLog}
+          turns={{
+            list: inline(),
+            onStop: turns.stop,
+            onRetry: turns.retry,
+            onOpenLog: props.onOpenLog,
+            acting: turns.acting(),
+            problem: turns.problem(),
+          }}
+          days
+          repliesDivider
+          status={thread.status()}
+          onRetry={thread.retry}
+          earlier={
+            thread.earlier()
+              ? {
+                  loading: thread.loadingEarlier(),
+                  failed: thread.earlierFailed(),
+                  onLoad: thread.loadEarlier,
+                }
+              : undefined
+          }
+          focusId={thread.focusId()}
+          typing={thread.typing()}
+          follow={
+            !follow.followable() || follow.following() === undefined
+              ? undefined
+              : {
+                  following: follow.following() ?? false,
+                  pending: follow.pending(),
+                  onToggle: follow.toggle,
+                }
+          }
+          onClose={props.onClose}
+          placeholder="Reply in thread"
+          draft={reply.draft()}
+          onDraftChange={reply.setDraft}
+          onSend={() => reply.send()}
+          sending={reply.pending()}
+          sendError={reply.error()}
+          mentionCandidates={candidates()}
+          onMention={(candidate) => reply.mention(candidate.id, candidate.name)}
+        />
       }
-      focusId={thread.focusId()}
-      typing={thread.typing()}
-      follow={
-        !follow.followable() || follow.following() === undefined
-          ? undefined
-          : {
-              following: follow.following() ?? false,
-              pending: follow.pending(),
-              onToggle: follow.toggle,
-            }
-      }
+    >
+      {(turnId) => (
+        <TurnLog
+          workspaceId={props.workspaceId}
+          turnId={turnId}
+          onBack={props.onCloseLog}
+          onClose={props.onClose}
+          onRetried={props.onOpenLog}
+        />
+      )}
+    </Show>
+  );
+}
+
+/** A turn's log in place of its thread: what it did, what it is writing, Stop and Retry. */
+function TurnLog(props: {
+  readonly workspaceId: string;
+  readonly turnId: string;
+  readonly onBack: () => void;
+  readonly onClose: () => void;
+  /** A retry queued this new turn, whose log shows next. */
+  readonly onRetried: (turnId: string) => void;
+}) {
+  const log = useTurnLog(props.workspaceId, props.turnId, { retried: props.onRetried });
+  const groups = useWorkspaceGroups(props.workspaceId);
+  const turn = () => {
+    const current = log.turn();
+    if (current === undefined) return undefined;
+    const group = groups.group(current.groupId);
+    return {
+      ...current,
+      where:
+        group?.kind === "direct"
+          ? `Thread with ${group.name}`
+          : `Thread in #${current.groupName ?? group?.name ?? ""}`,
+      model:
+        current.model && [current.model.provider, current.model.model].filter(Boolean).join(" · "),
+      agentHref: href(paths.agent(props.workspaceId, current.agent.id)),
+    };
+  };
+  const status = () => {
+    if (log.loading()) return "loading" as const;
+    const failure = turn() === undefined ? log.failure() : undefined;
+    if (failure === undefined) return undefined;
+    return failure === "gone" || failure === "denied"
+      ? ("unavailable" as const)
+      : ("failed" as const);
+  };
+  const acting = () => {
+    const current = log.acting();
+    return current?.turnId === props.turnId ? current.kind : undefined;
+  };
+  return (
+    <TurnLogPane
+      turn={turn()}
+      activity={log.activity()}
+      draft={log.draft()}
+      status={status()}
+      onRetryLoad={log.refresh}
+      reconnecting={log.reconnecting()}
+      updatedAt={log.updatedAt()}
+      acting={acting()}
+      problem={log.problem()?.problem}
+      onStop={() => log.stop(props.turnId)}
+      onRetry={() => log.retry(props.turnId)}
+      onBack={props.onBack}
       onClose={props.onClose}
-      placeholder="Reply in thread"
-      draft={reply.draft()}
-      onDraftChange={reply.setDraft}
-      onSend={() => reply.send()}
-      sending={reply.pending()}
-      sendError={reply.error()}
-      mentionCandidates={candidates()}
-      onMention={(candidate) => reply.mention(candidate.id, candidate.name)}
+      onOpenReply={props.onBack}
     />
   );
 }

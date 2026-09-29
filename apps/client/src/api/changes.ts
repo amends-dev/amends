@@ -4,6 +4,7 @@ import { Sse } from "effect/unstable/encoding";
 import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
 import { watchWake } from "../live/wake.ts";
 import { isUnauthorized, type ApiClient } from "./client.ts";
+import { drafted, draftsAtom, settled } from "./drafts.ts";
 import { consume, echoesAtom, echoOf } from "./echoes.ts";
 import { posted, typing, typistsAtom } from "./typing.ts";
 import {
@@ -69,6 +70,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections",
     "environments",
     "agents",
+    "active-turns",
   ],
   "workspace.assignment.created": [
     "settings",
@@ -80,6 +82,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections",
     "environments",
     "agents",
+    "active-turns",
   ],
   "workspace.assignment.revoked": [
     "settings",
@@ -91,14 +94,15 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections",
     "environments",
     "agents",
+    "active-turns",
   ],
   // A public group's creation reaches everyone who might join it.
   "group.created": ["groups", "public-groups"],
   // A team group's name shows in the sidebar, on its page, and among public groups.
   "group.renamed": ["groups", "public-groups"],
   // Group access decides the same for the group's threads; public groups show who belongs.
-  "group.membership.added": ["groups", "public-groups", "inbox"],
-  "group.membership.removed": ["groups", "public-groups", "inbox"],
+  "group.membership.added": ["groups", "public-groups", "inbox", "active-turns"],
+  "group.membership.removed": ["groups", "public-groups", "inbox", "active-turns"],
   "group.follow.started": ["groups"],
   "group.follow.ended": ["groups"],
   // A group's latest activity, and whether it is new to the reader.
@@ -120,6 +124,18 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   // Agents: their configuration and readiness.
   "agent.created": ["agents"],
   "agent.configured": ["agents"],
+  // Where agents are at work: a turn starting, changing state, or ending.
+  ...Object.fromEntries(
+    [
+      "turn.created",
+      "turn.retried",
+      "turn.started",
+      "turn.cancel-requested",
+      "turn.completed",
+      "turn.failed",
+      "turn.cancelled",
+    ].map((name): [string, ReadonlyArray<Affected>] => [name, ["active-turns"]]),
+  ),
 };
 /** A field of an event's JSON payload, when it is a string. */
 const text = (value: unknown, ...path: ReadonlyArray<string>): string | undefined => {
@@ -184,6 +200,8 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
       name,
       (payload: unknown): ReadonlyArray<Target> => [
         { collection: "turns", id: text(payload, "threadId") },
+        // A new turn's fact names it by its own ID; the others by `turnId`.
+        { collection: "turn-logs", id: text(payload, "turnId") ?? text(payload, "id") },
       ],
     ]),
   ),
@@ -243,6 +261,10 @@ export const signalKeys = (workspaceId: string, signal: { readonly _tag: string 
       return [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")];
     case "GroupCaughtUp":
       return [workspaceKey(workspaceId, "groups")];
+    case "TurnLogged":
+      return "turnId" in signal && typeof signal.turnId === "string"
+        ? [itemKey(workspaceId, "turn-logs", signal.turnId)]
+        : [collectionKey(workspaceId, "turn-logs")];
     default:
       return [];
   }
@@ -326,6 +348,17 @@ const run = Effect.fnUntraced(function* (
                 posted(current, threadId, memberId, Date.now()),
               );
           }
+        // A turn that ended has nothing more to draft; its log holds what it wrote.
+        for (const event of message.events)
+          if (
+            event.name === "turn.completed" ||
+            event.name === "turn.failed" ||
+            event.name === "turn.cancelled"
+          ) {
+            const turnId = text(event.payload, "turnId");
+            if (turnId)
+              registry.update(draftsAtom(workspaceId), (current) => settled(current, turnId));
+          }
         // A notification for the reader changes their inbox and pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
@@ -334,6 +367,10 @@ const run = Effect.fnUntraced(function* (
         const signal = message.signal;
         if (signal._tag === "Typing")
           registry.update(typists, (current) => typing(current, signal, Date.now()));
+        if (signal._tag === "TurnDraft") {
+          registry.update(draftsAtom(workspaceId), (current) => drafted(current, signal));
+          return Effect.void;
+        }
         // The reader's own request already refreshed what its signal changes.
         const echo = echoOf(signal);
         if (echo !== undefined) {

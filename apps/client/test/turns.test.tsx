@@ -2,7 +2,8 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
-import { affectedKeys } from "../src/api/changes.ts";
+import { affectedKeys, signalKeys } from "../src/api/changes.ts";
+import { drafted, settled, writing, type Drafts } from "../src/api/drafts.ts";
 import {
   ClientProvider,
   DirectoryProvider,
@@ -193,7 +194,9 @@ it("stops a turn, and retries one with a key it keeps until the retry goes throu
   // A retry lost in transit asks again with the same key.
   f.server.answers.push(new Response("unavailable", { status: 502 }));
   expect(f.view.retry("atlas-1")).toBe(true);
-  await waitFor(() => expect(f.view.problem()).toEqual({ kind: "failed" }));
+  await waitFor(() =>
+    expect(f.view.problem()).toEqual({ turnId: "atlas-1", problem: "retry-failed" }),
+  );
   expect(f.view.retry("atlas-1")).toBe(true);
   await waitFor(() => expect(f.view.acting()).toBeUndefined());
   const retries = f.writes.filter((write) => write.path.endsWith("/retry"));
@@ -217,13 +220,13 @@ it("names why a stop or retry was refused", async () => {
   );
   f.view.retry("atlas-1");
   await waitFor(() =>
-    expect(f.view.problem()).toEqual({ kind: "not-retryable", reason: "superseded" }),
+    expect(f.view.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
   );
   f.server.answers.push(
     json({ _tag: "TurnApplication.NotActive", turnId: "scout-2", status: "completed" }, 409),
   );
   f.view.stop("scout-2");
-  await waitFor(() => expect(f.view.problem()).toEqual({ kind: "finished" }));
+  await waitFor(() => expect(f.view.problem()).toEqual({ turnId: "scout-2", problem: "finished" }));
   f.view.dismiss();
   expect(f.view.problem()).toBeUndefined();
 });
@@ -237,11 +240,53 @@ it("refreshes a thread's turns as its turn facts arrive", () => {
     "turn.failed",
     "turn.cancelled",
   ])
-    expect(affectedKeys("one", [{ name, payload: { threadId: "thread" } }])).toEqual([
+    expect(
+      affectedKeys("one", [{ name, payload: { threadId: "thread", turnId: "turn-1" } }]).toSorted(),
+    ).toEqual([
+      "workspace/one/active-turns",
+      "workspace/one/turn-logs:turn-1",
       "workspace/one/turns:thread",
     ]);
   // An agent that stops taking part can no longer retry its turns there.
   expect(
     affectedKeys("one", [{ name: "thread.participation.ended", payload: { threadId: "thread" } }]),
   ).toContain("workspace/one/turns:thread");
+});
+
+it("a turn's log refreshes as it grows", () => {
+  expect(signalKeys("one", { _tag: "TurnLogged", turnId: "turn-1" } as never)).toEqual([
+    "workspace/one/turn-logs:turn-1",
+  ]);
+});
+
+it("drafts continue their part in order, marking a gap rather than showing text out of place", () => {
+  const draft = (offset: number, text: string, part = 0) => ({
+    turnId: "turn-1",
+    responseId: "r1",
+    part,
+    offset,
+    text,
+  });
+  let drafts: Drafts = new Map();
+  drafts = drafted(drafts, draft(0, "Deploy "));
+  drafts = drafted(drafts, draft(7, "the API"));
+  // A repeat of text already held adds nothing; one overlapping adds only what is new.
+  drafts = drafted(drafts, draft(0, "Deploy "));
+  drafts = drafted(drafts, draft(11, "API first"));
+  expect(writing(drafts, "turn-1", new Set())).toEqual({
+    text: "Deploy the API first",
+    broken: false,
+  });
+  // Text past a gap is not shown; the completed response replaces the draft.
+  drafts = drafted(drafts, draft(40, "later"));
+  expect(writing(drafts, "turn-1", new Set())).toEqual({
+    text: "Deploy the API first",
+    broken: true,
+  });
+  // A response the log holds is no longer drafted; nor is anything of a turn that ended.
+  expect(writing(drafts, "turn-1", new Set(["r1"]))).toBeUndefined();
+  expect(writing(settled(drafts, "turn-1"), "turn-1", new Set())).toBeUndefined();
+  // Parts of the response being written join in order.
+  const two = drafted(drafted(new Map(), draft(0, "b", 1)), draft(0, "a", 0));
+  expect(writing(two, "turn-1", new Set())?.text).toBe("ab");
 });

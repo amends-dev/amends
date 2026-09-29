@@ -33,6 +33,7 @@
     "./components/tabs": "./src/components/tabs/index.ts",
     "./components/task-status": "./src/components/task-status/index.ts",
     "./components/toast": "./src/components/toast/index.ts",
+    "./components/turn-status": "./src/components/turn-status/index.ts",
     "./foundations/color": "./src/foundations/color/tokens.ts",
     "./foundations/elevation": "./src/foundations/elevation/tokens.ts",
     "./foundations/layout": "./src/foundations/layout/tokens.ts",
@@ -58,6 +59,7 @@
     "./screens/sign-in": "./src/screens/sign-in/index.ts",
     "./screens/standalone": "./src/screens/standalone/index.ts",
     "./screens/timeline": "./src/screens/timeline/index.ts",
+    "./screens/turns": "./src/screens/turns/index.ts",
     "./screens/workspace-navigation": "./src/screens/workspace-navigation/index.ts",
     "./screens/workspaces": "./src/screens/workspaces/index.ts",
     "./styles": "./src/styles.css.ts"

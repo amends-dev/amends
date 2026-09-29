@@ -148,7 +148,10 @@ then the stream ends; reconnecting returns 403.
 Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
 `Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
 readers, and `ThreadRead`, `GroupCaughtUp`, and `NotificationsSeen` reach only the caller's own
-sessions after one of them records read state or acknowledges a notification. Signals have no
+sessions after one of them records read state or acknowledges a notification. `TurnDraft`
+(`groupId`, `threadId`, `turnId`, `responseId`, `part`, `offset`, `text`) carries more of a
+response an agent's turn is writing, continuing its part at `offset` characters, and `TurnLogged`
+says a turn's log grew; both reach the thread's readers. Signals have no
 cursor, are never replayed, and may be missed; after reconnecting, refresh read state with the rest
 of the view. Show a typing indicator until `until` unless another `Typing` extends it, and hide the
 caller's own. Send `POST …/threads/:threadId/typing` while the user types; repeats within two
@@ -324,7 +327,9 @@ attempt at the work asked of it on a thread; the
 | Endpoint                        | Operation                                                                                     |
 | ------------------------------- | --------------------------------------------------------------------------------------------- |
 | `GET …/threads/:threadId/turns` | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
+| `GET …/active-turns`            | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
 | `GET …/turns/:turnId`           | One turn.                                                                                     |
+| `GET …/turns/:turnId/log`       | The turn with its log: input taken in, responses' text, and interruptions, oldest first.      |
 | `POST …/turns/:turnId/cancel`   | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
 | `POST …/turns/:turnId/retry`    | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
 

@@ -48,7 +48,26 @@ export interface AgentSummary {
   /** Who added it, by name. */
   readonly createdBy: string | undefined;
   readonly createdAt: Date;
+  /**
+   * Where it is at work now, apart from its setup: its most pressing turn state, and each thread
+   * it works on, such as "#general". Unset while it is idle.
+   */
+  readonly activity?: {
+    readonly state: "queued" | "working" | "stopping";
+    readonly places: readonly string[];
+  };
 }
+
+/** An agent's current activity in a few words: "Working · 2" and "#general + 1 more". */
+export const activityWords = (activity: NonNullable<AgentSummary["activity"]>) => {
+  const count = activity.places.length;
+  const state = { queued: "Queued", working: "Working", stopping: "Stopping" }[activity.state];
+  const [first] = activity.places;
+  return {
+    status: count > 1 ? `${state} · ${count}` : state,
+    where: first === undefined ? "" : count > 1 ? `${first} + ${count - 1} more` : first,
+  };
+};
 
 /** A connection that provides model access, as the connection field offers it. */
 export interface ModelConnectionOption {

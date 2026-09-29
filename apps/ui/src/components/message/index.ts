@@ -10,4 +10,5 @@ export type {
   RootProps as MessageRootProps,
   TaskReferenceProps as MessageTaskReferenceProps,
   TextProps as MessageTextProps,
+  ThreadActivity as MessageThreadActivity,
 } from "./message.tsx";

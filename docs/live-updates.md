@@ -12,8 +12,8 @@ and cache invalidation; apps mount it once per workspace view; features show its
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
    each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`,
    `public-groups`, `inbox`, `permissions`, `connections`, `environments`, and `agents`, and one key
-   per group stream, group roster, thread timeline, thread participants, and a thread's agents'
-   turns within their collections.
+   per group stream, group roster, thread timeline, thread participants, a thread's agents'
+   turns, and a turn's log within their collections, and `active-turns` for the workspace.
 3. Each `Committed` message maps its events to the keys they affect
    (`apps/client/src/api/changes.ts`) and invalidates each once, so every affected read
    refreshes once. A member's rename refreshes the members and the directory. Group creation,
@@ -34,8 +34,9 @@ and cache invalidation; apps mount it once per workspace view; features show its
    harnesses and providers, which share theirs. The agents follow every `agent.*` fact, and the
    connection, environment, membership, and grant facts their readiness, names, and access
    follow; an agent's environment choices refresh with them. Every `turn.*` fact names its
-   thread, so it refreshes that thread's turns, as does an agent leaving the thread, since it can
-   no longer retry them there; group membership and grant changes refresh every thread's turns. A commit that
+   thread and turn, so it refreshes that thread's turns, the turn's log, and the active turns, as
+   an agent leaving the thread refreshes its turns there, since it can no longer retry them; group
+   membership and grant changes refresh every thread's turns and the active turns. A commit that
    carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
    value, so the stream and thread panel replace what they show with an unavailable state once a

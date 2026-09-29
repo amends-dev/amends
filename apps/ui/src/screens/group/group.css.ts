@@ -66,6 +66,16 @@ export const earlier = style({
   paddingBlockEnd: "1rem",
 });
 
+// A thread's messages and its agents' turns, resting together against the bottom.
+export const threadStack = style({
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-end",
+  gap: "1.5rem",
+  minHeight: "100%",
+  "@media": { [media.mobile]: { gap: "1.375rem" } },
+});
+
 // Who is typing, under the thread's timeline; empty and out of the way otherwise.
 export const typing = style({
   ...typeScale.meta,

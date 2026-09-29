@@ -57,20 +57,28 @@ export interface ConversationProps {
   readonly focusId?: string;
 }
 
-/** Keeps a timeline at its newest entry when it opens and while the reader is at the bottom. */
-export function useStickToBottom(entries: () => readonly TimelineEntry[]) {
+/**
+ * Keep a scrolling body at its bottom while the reader is there, as `size` grows; scrolling up
+ * leaves them where they are. `atBottom` says whether they are there, and `toBottom` returns them.
+ */
+export function useStickToBottom(size: () => number) {
   const [body, setBody] = createSignal<HTMLDivElement>();
-  let atBottom = true;
+  const [atBottom, setAtBottom] = createSignal(true);
   const onScroll = () => {
     const element = body();
-    if (element) atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+    if (element) setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 80);
+  };
+  const toBottom = () => {
+    const element = body();
+    if (element) element.scrollTop = element.scrollHeight;
+    setAtBottom(true);
   };
   createEffect(
-    on([body, () => entries().length], ([element]) => {
-      if (element && atBottom) element.scrollTop = element.scrollHeight;
+    on([body, size], ([element]) => {
+      if (element && atBottom()) element.scrollTop = element.scrollHeight;
     }),
   );
-  return { ref: setBody, onScroll };
+  return { ref: setBody, onScroll, atBottom, toBottom };
 }
 
 /** The composer under a timeline, with attach and mention actions and Send. */
@@ -193,7 +201,7 @@ const list = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 /** A group's Threads tab: the timeline and the composer. Place it inside GroupPane. */
 export function GroupThreads(props: GroupThreadsProps) {
-  const scroll = useStickToBottom(() => props.entries);
+  const scroll = useStickToBottom(() => props.entries.length);
   return (
     <>
       <Pane.Body ref={scroll.ref} onScroll={scroll.onScroll}>

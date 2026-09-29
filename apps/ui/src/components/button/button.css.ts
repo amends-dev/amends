@@ -88,3 +88,6 @@ export const chevron = style({
   height: "0.75rem",
   color: vars.color.text.secondary,
 });
+
+// A link drawn as a button keeps the button's look, not a link's underline.
+export const link = style({ textDecoration: "none", boxSizing: "border-box" });

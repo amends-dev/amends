@@ -262,13 +262,32 @@ reasons it cannot run, or an initial role only the owner gives, each keeping the
 agent's latest as a `TurnEntry`: the agent by name, its `state` (`queued`, `working`, `stopping`,
 `done`, `failed`, or `stopped`), its failure as the host worded it, whether a request or the
 agent's departure stopped it, its reply's ID, the timeline position of the latest message it took
-on, its times, and whether the reader may stop or retry it now. `active()` holds the agents at work
-on the thread. The turns keep their own invalidation key per thread, which every turn fact for the
-thread, the agent's departure from it, and access changes refresh. `stop(turnId)` and
-`retry(turnId)` refresh the thread's turns before answering; `acting()` names the one running.
-A retry reuses its request key until it goes through, so asking again after a lost answer creates
-one turn. `problem()` reports a refusal, `finished` or `not-retryable` with the host's reason, or a
-workspace failure, until another command starts or it is dismissed. There are no turn screens yet.
+on, its times, whether the reader may stop or retry it now, and the failed or stopped turn it
+follows. `active()` holds the agents at work on the thread, and `replies()` the turn behind each
+reply. The turns keep their own invalidation key per thread, which every turn fact for the thread,
+the agent's departure from it, and access changes refresh. `stop(turnId)` and `retry(turnId)`
+refresh the thread's turns before answering; `acting()` names the one running. A retry reuses its
+request key until it goes through, so asking again after a lost answer creates one turn.
+`problem()` reports why one did not go through as a `TurnCommandProblem` code the screens word
+(`stop-failed`, `retry-failed`, `finished`, `still-running`, `replied`, `superseded`, `departed`,
+`denied`, or `gone`), until another command starts or it is dismissed.
+
+`useTurnLog(workspaceId, turnId, { retried })` reads one turn's log and shapes its activity, oldest
+first: accepted, started, each batch of input taken in (the first holding the request), each
+response with its text and whether it became the reply, interruptions, and how it ended. `turn()`
+adds where it ran and the model access and environment it started with, by provider, model, and
+environment name. `draft()` is the response the agent is writing now, from `TurnDraft` signals:
+their text continues each response part at its offset, a repeat adds nothing, and text past a gap
+marks the draft broken until the completed response in the log replaces it; a turn that ends drops
+its drafts. `reconnecting()` and `updatedAt()` say when live updates are down, and the log's own
+key refreshes on the turn's facts and each `TurnLogged` signal. Its `stop` and `retry` refresh the
+log too, and `retried` receives the turn a retry queued.
+
+`useTurnActivity(workspaceId)` reads the workspace's active turns in threads the reader may open,
+for marks where agents are at work: `inThread`, `inGroup` (working, then stopping, then queued),
+`ofAgent`, and `agentActivity`, an agent's most pressing state and the places it works, each thread
+by its group. It keeps the workspace's `active-turns` key, which turn facts and access changes
+refresh.
 
 ## Views
 

@@ -161,6 +161,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
   // threads.
   // Public groups show who belongs, so their listing refreshes too.
   expect(keys([{ name: "group.membership.removed", payload: { groupId: "group" } }])).toEqual([
+    "workspace/one/active-turns",
     "workspace/one/groups",
     "workspace/one/inbox",
     "workspace/one/participants",
@@ -201,6 +202,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
       true,
     ).toSorted(),
   ).toEqual([
+    "workspace/one/active-turns",
     "workspace/one/agents",
     "workspace/one/connections",
     "workspace/one/environments",
@@ -214,6 +216,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/settings",
     "workspace/one/streams",
     "workspace/one/timelines",
+    "workspace/one/turn-logs",
     "workspace/one/turns",
   ]);
   // Reading a thread settles notifications from it.

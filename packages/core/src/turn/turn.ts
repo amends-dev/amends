@@ -124,4 +124,28 @@ export const View = Schema.Struct({
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
+/**
+ * One entry of a turn's log as its thread's readers see it: the facts of its work, never private
+ * reasoning or a harness's own data. The harness took in a batch of the thread's input; a response
+ * completed with text, verbatim; or execution stopped short and continues the same turn.
+ */
+export const LogItem = Schema.TaggedUnion({
+  InputTaken: { at: Schema.DateTimeUtcFromString, messages: Schema.Int },
+  Responded: {
+    at: Schema.DateTimeUtcFromString,
+    responseId: Schema.NonEmptyString,
+    text: Schema.String,
+  },
+  Interrupted: {
+    at: Schema.DateTimeUtcFromString,
+    reason: Schema.String,
+    retryable: Schema.Boolean,
+  },
+});
+export type LogItem = typeof LogItem.Type;
+
+/** A turn with its log, oldest entry first. */
+export const LogView = Schema.Struct({ turn: View, items: Schema.Array(LogItem) });
+export interface LogView extends Schema.Schema.Type<typeof LogView> {}
+
 export * as Turn from "./turn.ts";

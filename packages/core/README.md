@@ -269,7 +269,9 @@ agent's instructions, the model access and environment the turn started with or,
 starts, the agent's current ones, the connection's settings and key, the messages among the
 hundred timeline entries before the turn as history (the agent's own as responses), the accepted
 input not yet taken in, and the log. It reports instead that the turn finished, is stopping, or can't run, as
-when its connection has no key. `get` reads the turn, for a run to watch.
+when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
+readers more of a response before it completes, as a `TurnDraft` signal, and `report` and
+`interrupted` publish `TurnLogged` after their commits, so readers read the log again.
 
 The commit that creates or retries a turn asks `TurnDispatch` to run it, through a journal
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
@@ -279,7 +281,11 @@ and environments.
 
 `TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
-(`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. When they may also direct
+(`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. `listActive` gives the
+workspace's active turns in threads the reader may open, among at most `limit` active turns, and
+`log` a turn with its log as its readers see it (`Turn.LogView`): each batch of input taken in,
+each completed response's text, and interruptions, with when each was recorded, never reasoning
+or a harness's own data. When they may also direct
 its agent (`agent.use`), `cancel` stops an active turn: a queued turn at once, a running one once
 execution confirms it. `retry` runs a failed or stopped turn again as a new queued turn, recorded
 as `TurnFacts.Retried` with the turn it retries, for the same agent, participation, and input, with
@@ -555,8 +561,9 @@ message schemas. Frontend query dependencies belong in the client.
 ## Signals
 
 `@amends/core/signal` holds what is happening now and is never stored: `Signal.Value` is `Typing`,
-`ThreadRead`, `GroupCaughtUp`, or `NotificationsSeen`. `Signal.reachOf` gives each its audience,
-as a fact declares one: typing reaches the thread's group with `thread.read` for the thread, and
+`ThreadRead`, `GroupCaughtUp`, `NotificationsSeen`, `TurnDraft`, or `TurnLogged`.
+`Signal.reachOf` gives each its audience, as a fact declares one: typing and turns' progress reach
+the thread's group with `thread.read` for the thread, and
 the three read-state signals reach only the member whose private state changed, so their other
 sessions stay current without the journal.
 

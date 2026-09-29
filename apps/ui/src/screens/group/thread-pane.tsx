@@ -5,6 +5,7 @@ import { typingText } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Timeline, type TimelineEntry } from "../timeline/index.ts";
+import { ThreadTurns, type ThreadTurn, type ThreadTurnControls } from "../turns/turn-row.tsx";
 import type { GroupFollow } from "./group-pane.tsx";
 import {
   ConversationComposer,
@@ -34,6 +35,13 @@ export interface ThreadPaneProps extends ConversationProps {
   readonly reason?: "mention" | "reply" | "thread";
   /** What Back returns to on phones. Default the group's name. */
   readonly backLabel?: string;
+  /**
+   * The agents' turns on the thread, under its messages: each agent's latest, with stopping,
+   * retrying, and opening its log.
+   */
+  readonly turns?: ThreadTurnControls & { readonly list: readonly ThreadTurn[] };
+  /** Opens the log of the turn that posted a reply, from the note under the reply. */
+  readonly onOpenTurnLog?: (turnId: string) => void;
 }
 
 const reasons = { mention: "Mention", reply: "Reply", thread: "New thread" } as const;
@@ -60,7 +68,7 @@ function withReplies(entries: readonly TimelineEntry[]): readonly TimelineEntry[
  * composer. Render it while the thread is open.
  */
 export function ThreadPane(props: ThreadPaneProps) {
-  const scroll = useStickToBottom(() => props.entries);
+  const scroll = useStickToBottom(() => props.entries.length + (props.turns?.list.length ?? 0));
   return (
     <Shell.Aside aria-label={props.title} onClose={() => props.onClose()}>
       <Pane.Root variant="side">
@@ -107,13 +115,20 @@ export function ThreadPane(props: ThreadPaneProps) {
                     />
                   )}
                 </Show>
-                <Timeline
-                  entries={props.repliesDivider ? withReplies(props.entries) : props.entries}
-                  onReact={props.onReact}
-                  taskHref={props.taskHref}
-                  days={props.days}
-                  focusId={props.focusId}
-                />
+                <div class={s.threadStack}>
+                  <Timeline
+                    entries={props.repliesDivider ? withReplies(props.entries) : props.entries}
+                    anchor="top"
+                    onReact={props.onReact}
+                    taskHref={props.taskHref}
+                    days={props.days}
+                    focusId={props.focusId}
+                    onOpenTurnLog={props.onOpenTurnLog}
+                  />
+                  <Show when={props.turns}>
+                    {(turns) => <ThreadTurns {...turns()} turns={turns().list} />}
+                  </Show>
+                </div>
               </>
             }
           >

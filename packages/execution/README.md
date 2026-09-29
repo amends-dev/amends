@@ -33,7 +33,10 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    again after a restart records it once. Without new input, `resume` a conversation that awaits
    a response.
 5. `report` each completed harness event until the harness is idle; text and reasoning deltas are
-   not recorded. Then `close` the turn, which publishes the agent's reply. When closing finds
+   not recorded. Text deltas are shown to the thread's readers instead, as drafts: at most every
+   150 milliseconds, each response part's new text in pieces of up to 1,500 characters, at the
+   offset it continues. A response that completes first replaces its draft, and a draft that
+   fails is not retried. Then `close` the turn, which publishes the agent's reply. When closing finds
    more input, the run submits what the agent accepted and continues in the same session, or
    waits while the agent is still accepting it, checking every second (`checkInterval`) for up to
    a minute (`inputWait`) before failing the turn.
@@ -69,8 +72,8 @@ Handled runs are pruned with background wakes when the host passes `TurnEntity.t
 ## Limits
 
 Turns are conversation only. Agents have no tools, so a turn left waiting on a tool call fails,
-and environments with a sandbox fail their turns. A turn records completed responses and streams
-nothing to readers. It posts one reply, the last response after the last input, so a turn that
+and environments with a sandbox fail their turns. A turn records completed responses and shows
+its text to readers only as best-effort drafts. It posts one reply, the last response after the last input, so a turn that
 takes in more input while it works answers all of it at once. Stop requests are noticed by
 polling, within `checkInterval`.
 
@@ -82,7 +85,7 @@ bun run test
 ```
 
 `test/runner.test.ts` runs the runner over turn execution in memory, amends's own harness, and a
-scripted model: a queued turn from start to reply, input accepted while it works and while it
+scripted model: drafts as a response streams, a queued turn from start to reply, input accepted while it works and while it
 waits, stopping, retrying from the log, failing without retry, a sandbox environment, and turns
 already finished or stopping. The [local host's](../../hosts/local/README.md#verify) `turns.test.ts`
 runs a turn end to end over PostgreSQL and Cluster against a local chat-completions server.

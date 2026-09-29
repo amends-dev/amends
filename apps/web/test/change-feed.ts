@@ -40,7 +40,8 @@ export const committed = (
  * The workspace sidebar's reads: the reader's groups, the members naming them, what the reader
  * may do there, and how many notifications are pending for them.
  */
-const sidebarRead = /^\/workspaces\/[^/]+\/(groups|members|permissions|notifications\/count)$/;
+const sidebarRead =
+  /^\/workspaces\/[^/]+\/(groups|members|permissions|notifications\/count|active-turns)$/;
 /**
  * What the sidebar's reads answer: nothing, unless a test grants permissions, lists groups, or
  * has notifications pending.

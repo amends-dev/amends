@@ -52,3 +52,33 @@ export function Button(props: ButtonProps) {
     </button>
   );
 }
+
+export type ButtonLinkProps = JSX.AnchorHTMLAttributes<HTMLAnchorElement> & {
+  href: string;
+  /** Default secondary. */
+  variant?: ButtonVariant;
+  /** Shown before the label. */
+  icon?: IconComponent;
+  /** Fill the container's width. */
+  wide?: boolean;
+};
+
+/** A link that looks like a Button, for an action that leads somewhere, such as Agent settings. */
+export function ButtonLink(props: ButtonLinkProps) {
+  const [local, native] = splitProps(props, ["variant", "icon", "wide", "class", "children"]);
+  return (
+    <a
+      {...native}
+      class={classes(
+        s.button,
+        s.variant[local.variant ?? "secondary"],
+        s.link,
+        local.wide && s.wide,
+        local.class,
+      )}
+    >
+      <Show when={local.icon}>{(icon) => <Dynamic component={icon()} class={s.icon} />}</Show>
+      {local.children}
+    </a>
+  );
+}

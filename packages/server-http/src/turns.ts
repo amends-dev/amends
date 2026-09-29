@@ -31,7 +31,10 @@ export const layer = HttpApiBuilder.group(
     return handlers.handleAll({
       listByThread: ({ params, query }) =>
         asMember(params.workspaceId, (turns) => turns.listByThread(params.threadId, query.limit)),
+      listActive: ({ params, query }) =>
+        asMember(params.workspaceId, (turns) => turns.listActive(query.limit)),
       get: ({ params }) => asMember(params.workspaceId, (turns) => turns.get(params.turnId)),
+      log: ({ params }) => asMember(params.workspaceId, (turns) => turns.log(params.turnId)),
       cancel: ({ params }) => asMember(params.workspaceId, (turns) => turns.cancel(params.turnId)),
       retry: ({ params, headers }) =>
         asMember(params.workspaceId, (turns) =>

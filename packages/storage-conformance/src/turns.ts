@@ -194,6 +194,13 @@ export const turns = (harness: ConformanceHarness) => {
               yield* accept(workspace.id);
               const [queued] = yield* turnsOf(workspace.id, threadId);
               const turnId = queued!.id;
+              const readTurns = <A, E>(
+                read: (turns: TurnApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+              ) => as(workspace.id, alice, Effect.flatMap(TurnApplication.Service, read));
+              // The workspace's active turns include it until it ends.
+              expect(
+                (yield* readTurns((turns) => turns.listActive(10))).map(({ id }) => id),
+              ).toEqual([turnId]);
               const running = yield* execute(
                 workspace.id,
                 Effect.flatMap(TurnExecution.Service, (execution) =>
@@ -275,6 +282,24 @@ export const turns = (harness: ConformanceHarness) => {
                   text: "The plan, with its risks.",
                 },
               });
+              // Readers see the log's facts: each batch taken in and each response's text.
+              const shown = yield* readTurns((turns) => turns.log(turnId));
+              expect(shown.turn).toMatchObject({ id: turnId, status: "completed" });
+              expect(
+                shown.items.map((item) =>
+                  item._tag === "Responded"
+                    ? `${item._tag}: ${item.text}`
+                    : item._tag === "InputTaken"
+                      ? `${item._tag}: ${item.messages}`
+                      : item._tag,
+                ),
+              ).toEqual([
+                "InputTaken: 1",
+                "Responded: An early answer.",
+                "InputTaken: 1",
+                "Responded: The plan, with its risks.",
+              ]);
+              expect(yield* readTurns((turns) => turns.listActive(10))).toEqual([]);
               // The log keeps both responses; the thread shows only the last.
               const entries = yield* execute(
                 workspace.id,

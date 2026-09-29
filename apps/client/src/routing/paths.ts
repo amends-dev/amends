@@ -23,6 +23,9 @@ export const paths = {
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}`,
   thread: (id: string, groupId: string, threadId: string) =>
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
+  /** One agent open on the Agents page, where its setup is fixed. */
+  agent: (id: string, agentId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/agents?agent=${encodeURIComponent(agentId)}`,
   /** A first message to some people who have no direct group together yet. */
   directDraft: (id: string, memberIds: ReadonlyArray<string>) =>
     `/workspaces/${encodeURIComponent(id)}/direct?to=${memberIds.map(encodeURIComponent).join(",")}`,

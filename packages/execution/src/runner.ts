@@ -79,6 +79,11 @@ const unexpected = {
   "Environment.Released": Effect.die,
 } as const;
 
+/** How often a running turn shows its readers more of a response it is writing. */
+const draftInterval = 150;
+/** The most text one draft carries, so a signal stays small wherever it is relayed. */
+const draftPiece = 1500;
+
 /** How long a turn waits before running again after its `attempt`th failure: 2, 4, then 8 seconds. */
 const backoff = (attempt: number) => Duration.seconds(2 ** Math.min(attempt, 6));
 
@@ -146,6 +151,32 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         return unrunnable(`The conversation could not be continued: ${prepared.failure._tag}.`);
 
       const pull = yield* Stream.toPull(running.events);
+      /** Text of each response part not yet shown to readers, and how much of it they have. */
+      const drafts = new Map<
+        string,
+        { readonly responseId: string; readonly part: number; offset: number; pending: string }
+      >();
+      let shownAt = Number.NEGATIVE_INFINITY;
+      /** Show readers what the harness wrote since the last draft, best effort. */
+      const showDrafts = Effect.gen(function* () {
+        if (![...drafts.values()].some((draft) => draft.pending !== "")) return;
+        shownAt = yield* Clock.currentTimeMillis;
+        for (const draft of drafts.values()) {
+          while (draft.pending !== "") {
+            const text = draft.pending.slice(0, draftPiece);
+            yield* step((execution) =>
+              execution.draft(turnId, {
+                responseId: draft.responseId,
+                part: draft.part,
+                offset: draft.offset,
+                text,
+              }),
+            ).pipe(Effect.catchCause((cause) => Effect.logDebug("Draft not shown", cause)));
+            draft.offset += text.length;
+            draft.pending = draft.pending.slice(text.length);
+          }
+        }
+      });
       /** Record what the harness reports until it is idle. */
       const untilIdle = Effect.gen(function* () {
         for (;;) {
@@ -159,6 +190,25 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
               ),
             ),
           );
+          for (const item of chunk) {
+            if (item._tag !== "Harness") continue;
+            const event = item.event;
+            if (event._tag === "TextDelta") {
+              const key = `${event.responseId}\u0000${event.part}`;
+              const draft = drafts.get(key) ?? {
+                responseId: event.responseId,
+                part: event.part,
+                offset: 0,
+                pending: "",
+              };
+              draft.pending += event.delta;
+              drafts.set(key, draft);
+            } else if (event._tag === "ResponseCompleted")
+              // The completed response replaces its draft in the log.
+              for (const [key, draft] of drafts)
+                if (draft.responseId === event.response.id) drafts.delete(key);
+          }
+          if ((yield* Clock.currentTimeMillis) - shownAt >= draftInterval) yield* showDrafts;
           const events = chunk.flatMap(recorded);
           if (events.length > 0) yield* step((execution) => execution.report(turnId, events));
           if (events.at(-1)?._tag === "Idle") return;

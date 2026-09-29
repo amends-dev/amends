@@ -84,6 +84,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     messages: [{ sequence: 1, text: "What is the tide at noon?" }],
     unaccepted: false,
     steps: [] as Array<string>,
+    drafts: [] as Array<{ responseId: string; part: number; offset: number; text: string }>,
     reply: undefined as string | undefined,
   };
   const change = (changes: Partial<Turn.Record>) => {
@@ -150,6 +151,10 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
           ),
         });
         return state.turn;
+      }),
+    draft: (_, piece) =>
+      Effect.sync(() => {
+        state.drafts.push({ ...piece });
       }),
     interrupted: (_, stop) =>
       Effect.sync(() => {
@@ -312,6 +317,57 @@ describe("TurnRunner", () => {
       // Deltas show a response while it streams; the log keeps completed entries.
       expect(harnessEvents(state.log)).toEqual(["InputIncorporated", "ResponseCompleted", "Idle"]);
       expect(texts(prompts[0])).toEqual(["Be brief.", "Alice: What is the tide at noon?"]);
+    }),
+  );
+
+  it.effect("shows readers a response's text as it streams, then records it once complete", () =>
+    Effect.gen(function* () {
+      const { state, execution } = fakeExecution();
+      const first = yield* Deferred.make<void>();
+      const rest = yield* Deferred.make<void>();
+      const part = (value: Response.StreamPartEncoded) => Stream.make(value);
+      const { implementation } = yield* scripted([
+        Stream.concat(
+          Stream.fromIterable<Response.StreamPartEncoded>([
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "Noon " },
+          ]),
+          Stream.fromEffect(Deferred.await(first)).pipe(
+            Stream.flatMap(() => part({ type: "text-delta", id: "t1", delta: "is high tide." })),
+            Stream.concat(
+              Stream.fromEffect(Deferred.await(rest)).pipe(
+                Stream.flatMap(() =>
+                  Stream.fromIterable<Response.StreamPartEncoded>([
+                    { type: "text-end", id: "t1" },
+                    {
+                      type: "finish",
+                      reason: "stop",
+                      usage: { inputTokens: { total: 20 }, outputTokens: { total: 4 } },
+                    },
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]);
+      const runner = yield* runnerOver(execution, implementation);
+
+      const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
+      while (state.drafts.length === 0) yield* Effect.yieldNow;
+      expect(state.drafts).toEqual([
+        { responseId: expect.any(String), part: 0, offset: 0, text: "Noon " },
+      ]);
+      // More text within the draft interval waits; after it, the next draft continues the part.
+      yield* TestClock.adjust("200 millis");
+      yield* Deferred.succeed(first, undefined);
+      while (state.drafts.length === 1) yield* Effect.yieldNow;
+      expect(state.drafts[1]).toMatchObject({ part: 0, offset: 5, text: "is high tide." });
+      yield* Deferred.succeed(rest, undefined);
+      yield* Fiber.join(fiber);
+
+      expect(state.reply).toBe("Noon is high tide.");
+      expect(harnessEvents(state.log)).not.toContain("TextDelta");
     }),
   );
 

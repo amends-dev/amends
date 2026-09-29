@@ -18,11 +18,13 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
   local host [runs them](../packages/execution/README.md), each closing with the agent's reply.
   Turns are conversation only: agents have no tools, and environments with a sandbox fail their
-  turns. A turn streams nothing to readers, and posts only its last response after its last
-  input, so input taken in while it works gets one reply. A stop request is noticed by polling,
-  within a second. Turns are followed, stopped, and retried over HTTP and through the client's
-  `useThreadTurns`, but have no screens yet. No environment transfer or turn timeline activity
-  exists. Channel delivery does not run, and contacts and triage have no inbox outside
+  turns. A turn posts only its last response after its last input, so input taken in while it
+  works gets one reply. Its text streams to readers as signals, best effort: a draft missed while
+  reconnecting shows once the response completes. A stop request is noticed by polling, within a
+  second. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each
+  turn's log; threads have no titles, so the log names a thread by its group. No environment
+  transfer or turn timeline activity exists, and the active turns read covers at most a hundred
+  active turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox outside
   the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the

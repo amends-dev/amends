@@ -203,9 +203,18 @@ export { useRenameGroup, type RenameGroupController } from "./conversations/rena
 export { useMemberName, type MemberNameController } from "./workspaces/member-name.ts";
 export { suggestedName } from "./api/workspaces.ts";
 export {
+  activeState,
   useThreadTurns,
+  useTurnActivity,
+  useTurnLog,
+  type ActiveTurn,
   type ThreadTurnsView,
+  type TurnActivity,
+  type TurnActivityView,
+  type TurnCommandProblem,
+  type TurnControls,
+  type TurnDetail,
   type TurnEntry,
-  type TurnProblem,
+  type TurnLogView,
   type TurnState,
 } from "./turns/views.ts";

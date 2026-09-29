@@ -50,6 +50,9 @@ patterns, and screens as they are introduced.
 Small pieces the patterns share: `Logo` (the finalized mark; its patch lifts when the link or
 button holding it is hovered, and `motion` loops the Amends Logo board's turn-6 motions: `sew-on`
 for a launch, `thread` to idle, `tug` for something done, and `working` as a loader),
+`TurnStatus` (an agent's turn as a chip, and `TurnActivity`, the same mark with a quiet phrase:
+queued, working, and stopping move as the logo's `thread`, `working`, and `tug` motions, still under
+reduced motion; done, failed, and stopped are still, a failure outlined in the caution color),
 `StateArt` (the board's turn-7 empty and error states, drawn from the mark's parts: `sew-in`,
 `reach`, `fill`, `caret`, `rest`, `came-apart`, `lost-thread`, `nothing-here`, and `held-back`,
 each still for readers who prefer reduced motion), `IconButton` (32px or 24px compact), `Avatar` and `AvatarStack`
@@ -269,7 +272,20 @@ can't run the model) save together, or whose `ConfigurationSummary` shows them t
 confirms removal. `ChooseProvider`, `ConfigureConnection`, and `ConnectionKey` take `returnTo`
 with `returnKind="agent"` for the model-connection detour. **Screens / Agents** walks the detour,
 roles, suggestions, fitting environments, a refused connection, stale reasoning, and members'
-view. Side panes on phones place their tabs under the title. A `Shell.Aside`
+view. Agents also shows each agent's current activity apart from its setup: Idle, or its most
+pressing turn state with the threads it works in. `ThreadTurns` puts the agents' turns under a
+thread's messages as compact rows, from the Lunacy "Turn activity" frames: the agent, its state,
+View log, and Stop or Retry for a reader who may direct it, with a failure's reason and Agent
+settings, the failed or stopped turn a retry follows, and a refused command worded from its
+`TurnProblem` code; rows key by turn so Stop keeps its focus, and move their actions under the
+name when too narrow. `ThreadPane` takes them as `turns`, and its timeline notes "Completed · View
+turn log" under an agent's reply; a thread's replies and a sidebar group mark where agents work.
+`TurnLogPane` shows a turn's log in place of its thread: where and with what it runs, its
+activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
+failure, and a footer that follows live, offers "New activity · Jump to latest" once the reader
+scrolls up, or offers Retry turn or View reply. **Screens / Turns** walks each state, the log's
+states, and a stop and retry. `ButtonLink` is a link drawn as a button, for actions such as Agent
+settings that lead elsewhere. Side panes on phones place their tabs under the title. A `Shell.Aside`
 rendered inside `Shell.Main`, as a page renders member details,
 attaches beside Main, so Main can turn inert while the panel floats. **Screens / Settings** walks
 inviting, changing a role, removing, revoking, transferring, and a stale rename. `ChangeName` and
