@@ -41,7 +41,6 @@ import {
   type ThreadTimeline,
 } from "../src/index.ts";
 import { affectedKeys, signalKeys } from "../src/api/changes.ts";
-import { mentionsIn, withMentionLinks } from "../src/conversations/compose.ts";
 
 afterEach(cleanup);
 const json = (body: unknown) =>
@@ -1118,31 +1117,7 @@ it("a send cut off by closing the thread is sent again with its key after reopen
   expect(posts[1]!.key).toBe(posts[0]!.key);
 });
 
-it("a draft mentions the members whose @name its text still holds", () => {
-  const mentioned = [
-    { memberId: "ada", name: "ada@mercier.co" },
-    { memberId: "jo", name: "Jo Mercer" },
-    { memberId: "rae", name: "Rae" },
-  ];
-  expect(mentionsIn("@ada@mercier.co and @Jo Mercer, please", mentioned)).toEqual(["ada", "jo"]);
-  // Removed from the text, or only part of a longer word, a name mentions no one.
-  expect(mentionsIn("Ask @Raelynn", mentioned)).toEqual([]);
-  expect(mentionsIn("email@Rae", mentioned)).toEqual([]);
-  expect(mentionsIn("@Rae? @Rae.", mentioned)).toEqual(["rae"]);
-});
-
-it("a sent draft links each member it mentions by @name", () => {
-  const mentioned = [
-    { memberId: "jo", name: "Jo" },
-    { memberId: "jm", name: "Jo Mercer" },
-    { memberId: "odd", name: "[Odd]" },
-  ];
-  expect(withMentionLinks("@Jo Mercer, @Jo and @[Odd]: see email@Jo or @Joanna", mentioned)).toBe(
-    "[@Jo Mercer](member:jm), [@Jo](member:jo) and [@\\[Odd\\]](member:odd): see email@Jo or @Joanna",
-  );
-});
-
-it("a reply sends the mentions its text still holds", async () => {
+it("a reply sends the members its text links to as its mentions", async () => {
   const bodies: Array<unknown> = [];
   let typed = 0;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -1177,20 +1152,16 @@ it("a reply sends the mentions its text still holds", async () => {
       <Consumer />
     </ClientProvider>
   ));
-  composer.mention("ada", "Ada");
-  composer.mention("jo", "Jo");
-  composer.setDraft("@Ada and @Jo, look");
+  composer.setDraft("[@Ada](member:ada) and [@Jo](member:jo), look");
   expect(composer.mentions()).toEqual(["ada", "jo"]);
-  composer.setDraft("@Ada, look");
+  // A name without its link addresses no one.
+  composer.setDraft("[@Ada](member:ada), look, @Jo");
   expect(composer.mentions()).toEqual(["ada"]);
   composer.send();
   await waitFor(() =>
-    expect(bodies).toEqual([{ text: "[@Ada](member:ada), look", mentions: ["ada"] }]),
+    expect(bodies).toEqual([{ text: "[@Ada](member:ada), look, @Jo", mentions: ["ada"] }]),
   );
-  // A posted draft forgets its mentions.
   await waitFor(() => expect(composer.draft()).toBe(""));
-  composer.setDraft("@Ada again");
-  expect(composer.mentions()).toEqual([]);
   // Writing told the thread's readers once; the edits since were too soon to repeat it.
   expect(typed).toBe(1);
 });

@@ -15,14 +15,9 @@ import { typingRequest } from "../api/typing.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
 
-/** Someone a draft mentioned, and the name its text shows them by after `@`. */
-export interface Mentioned {
-  readonly memberId: string;
-  readonly name: string;
-}
 interface Draft {
+  /** Markdown, whose mentions link to members. */
   readonly text: string;
-  readonly mentioned: ReadonlyArray<Mentioned>;
   /**
    * The last message sent from this draft and its request key, until it is posted. It lives with
    * the draft rather than the composer, so sending the same message again after the composer
@@ -31,47 +26,17 @@ interface Draft {
    */
   readonly attempt?: { readonly body: string; readonly key: ReturnType<typeof newPostKey> };
 }
-const empty: Draft = { text: "", mentioned: [] };
+const empty: Draft = { text: "" };
 /** How often a reply being written tells the thread's readers again; its signal lasts longer. */
 const typingInterval = 2500;
 /** One draft per composer target, kept in the credential scope's registry while it lasts. */
 const draftOf = Atom.family((_key: string) => Atom.make(empty).pipe(Atom.keepAlive));
-/** Where a draft still mentions a member by `@name`: after a space or the start, before a pause. */
-const mentionPattern = (entry: Mentioned, flags: string) =>
-  new RegExp(`(^|\\s)@${escape(entry.name)}(?=$|[\\s.,;:!?)])`, flags);
-/** The members whose `@name` a text still contains, each once, in the order first mentioned. */
-export const mentionsIn = (text: string, mentioned: ReadonlyArray<Mentioned>) => [
-  ...new Set(
-    mentioned
-      .filter((entry) => mentionPattern(entry, "u").test(text))
-      .map((entry) => entry.memberId),
-  ),
-];
-/**
- * The draft as a message: each `@name` it still mentions becomes a mention linking to the member,
- * longer names first so one name is not taken for the start of another.
- */
-export const withMentionLinks = (text: string, mentioned: ReadonlyArray<Mentioned>) =>
-  mentioned
-    .toSorted((left, right) => right.name.length - left.name.length)
-    .reduce(
-      (written, entry) =>
-        written.replace(
-          mentionPattern(entry, "gu"),
-          (_, before: string) => before + ThreadMessage.mentionText(entry.memberId, entry.name),
-        ),
-      text,
-    );
-const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-
 export interface ComposerController {
-  /** The text being written, kept when the composer unmounts and remounts. */
+  /** The markdown being written, kept when the composer unmounts and remounts. */
   readonly draft: Accessor<string>;
   /** Replace the draft's text; a failure shown for the previous one clears. */
   readonly setDraft: (text: string) => void;
-  /** Record that the text now mentions a member by `@name`. */
-  readonly mention: (memberId: string, name: string) => void;
-  /** The members the draft mentions: those whose `@name` is still in its text. */
+  /** The members the draft mentions: those its text still links to. */
   readonly mentions: Accessor<ReadonlyArray<string>>;
   /** The draft has text and nothing is sending. */
   readonly ready: Accessor<boolean>;
@@ -101,7 +66,7 @@ function compose(
   const draft = useAtomValue(() => draftAtom),
     write = useAtomSet(() => draftAtom);
   const [error, setError] = createSignal<WorkspaceFailure>();
-  const mentions = () => mentionsIn(draft().text, draft().mentioned);
+  const mentions = () => ThreadMessage.mentionedIn(draft().text);
   const request = useRequest(
     postRequest(useApiClient(), workspaceId),
     (exit, post) => {
@@ -109,8 +74,8 @@ function compose(
         setError(workspaceFailure(exit.cause));
         return;
       }
-      if (withMentionLinks(draft().text, draft().mentioned) === post.text) write(empty);
-      else write({ text: draft().text, mentioned: draft().mentioned });
+      if (draft().text === post.text) write(empty);
+      else write({ text: draft().text });
       if (exit.value.groupId !== undefined) posted?.(exit.value.groupId);
     },
     { when: () => session.session !== undefined },
@@ -139,21 +104,13 @@ function compose(
       setError(undefined);
       typed(previous, text);
     },
-    mention: (memberId, name) =>
-      write({
-        ...draft(),
-        mentioned: [
-          ...draft().mentioned.filter((entry) => entry.memberId !== memberId),
-          { memberId, name },
-        ],
-      }),
     mentions,
     ready,
     pending: request.pending,
     error,
     send: () => {
       if (!ready()) return;
-      const text = withMentionLinks(draft().text, draft().mentioned),
+      const text = draft().text,
         addressed = mentions();
       const body = JSON.stringify([text, addressed]);
       // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.

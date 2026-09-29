@@ -1,0 +1,13 @@
+{
+  "name": "strikethrough",
+  "title": "Strikethrough",
+  "categories": ["content", "controls"],
+  "keywords": ["strikethrough", "strike", "delete", "format"],
+  "shapes": [
+    { "line": [10, 4, 17, 4] },
+    { "arc": [10, 8, 4, 180, 270] },
+    { "line": [4, 12, 20, 12] },
+    { "arc": [14, 16, 4, 270, 90] },
+    { "line": [14, 20, 6, 20] }
+  ]
+}

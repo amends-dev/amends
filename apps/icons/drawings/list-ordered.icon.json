@@ -1,0 +1,28 @@
+{
+  "name": "list-ordered",
+  "title": "Numbered list",
+  "categories": ["content", "controls"],
+  "keywords": ["numbered", "ordered", "list", "steps", "format"],
+  "shapes": [
+    {
+      "polyline": [
+        [3.5, 5.5],
+        [5.5, 4],
+        [5.5, 10]
+      ],
+      "corner": 0
+    },
+    { "arc": [5, 15.5, 1.5, 180, 0] },
+    {
+      "polyline": [
+        [6.5, 15.5],
+        [3.5, 20],
+        [6.5, 20]
+      ],
+      "corner": 0
+    },
+    { "line": [10, 7, 20, 7] },
+    { "line": [10, 12, 20, 12] },
+    { "line": [10, 17, 20, 17] }
+  ]
+}

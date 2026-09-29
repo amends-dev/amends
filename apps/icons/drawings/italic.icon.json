@@ -1,0 +1,7 @@
+{
+  "name": "italic",
+  "title": "Italic",
+  "categories": ["content", "controls"],
+  "keywords": ["italic", "emphasis", "slant", "format"],
+  "shapes": [{ "line": [10, 4, 19, 4] }, { "line": [5, 20, 14, 20] }, { "line": [15, 4, 9, 20] }]
+}

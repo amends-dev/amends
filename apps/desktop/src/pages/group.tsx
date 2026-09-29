@@ -148,7 +148,6 @@ function Group(props: {
           sending={composer.pending()}
           sendError={composer.error()}
           mentionCandidates={candidates()}
-          onMention={(candidate) => composer.mention(candidate.id, candidate.name)}
         />
       </GroupPane>
       <GroupSettings

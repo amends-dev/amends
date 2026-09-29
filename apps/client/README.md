@@ -375,11 +375,9 @@ message shows even while the change feed is away.
 same way, with a draft kept per set of people; posting it starts a thread in their direct group,
 creating the group when they have none, and `started` receives the group.
 
-`mention(memberId, name)` records that the text mentions a member by `@name`. `mentions` and
-`send` count only the members whose `@name` the text still holds as a word of its own, so deleting
-a name drops its mention, and a retry reuses its key only when both text and mentions match.
-Sending writes each such `@name` as a mention link to the member (`withMentionLinks`), the form
-message text keeps mentions in; the composer's text is otherwise sent as the markdown typed.
+The draft is markdown, as the composer writes it. `mentions` and `send` address the members its
+text links to as mentions (`ThreadMessage.mentionedIn`), so deleting a mention drops it, and a retry
+reuses its key only when both text and mentions match.
 `useGroupRoster(workspaceId, groupId)` reads a group's current members, whom its messages can
 mention, live over membership and grant changes.
 

@@ -24,6 +24,7 @@
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.9",
     "@tauri-apps/cli": "2.11.5",
+    "@testing-library/user-event": "^14.6.1",
     "@vanilla-extract/vite-plugin": "^5.2.6",
     "effect": "catalog:",
     "happy-dom": "^20.10.6",

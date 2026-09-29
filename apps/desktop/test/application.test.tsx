@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
+import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { HashRouter } from "@solidjs/router";
 import { Session, type SessionStore } from "@amends/client";
@@ -649,7 +650,7 @@ it("drafts a first direct message at its hash route and opens the conversation",
   mount("/workspaces/one/direct?to=ada-one", "alice", fetch);
   await screen.findByText("Send the first message to start the conversation.");
   const composer = await screen.findByRole("combobox", { name: /^Message / });
-  fireEvent.input(composer, { target: { value: "Are you free?" } });
+  await userEvent.setup().type(composer, "Are you free?");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/groups/g9"));
 });

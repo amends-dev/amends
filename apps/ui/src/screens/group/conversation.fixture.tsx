@@ -160,7 +160,6 @@ export function Conversation(props: ConversationProps) {
             draft={draft()}
             onDraftChange={setDraft}
             mentionCandidates={candidates}
-            onMention={() => {}}
             onSend={(text) => {
               setEntries([
                 ...entries(),
@@ -169,7 +168,8 @@ export function Conversation(props: ConversationProps) {
                   id: `sent-${entries().length}`,
                   author: people.jordan,
                   at: new Date(),
-                  text: text,
+                  text,
+                  mentions: candidates.filter((person) => text.includes(`(member:${person.id})`)),
                   thread: { replies: 0 },
                 },
               ]);

@@ -1,6 +1,6 @@
 import { For, createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { IconMarkAttach, IconMarkMention, IconMarkResources } from "@amends/icons";
 import { Composer } from "./composer/index.ts";
 import { Divider } from "./divider/index.ts";
@@ -170,8 +170,10 @@ function ComposerExample() {
           setDraft("");
         }}
       >
+        <Composer.Formatting />
         <Composer.Input placeholder="Message #general" />
         <Composer.Toolbar>
+          <Composer.FormattingToggle />
           <IconButton icon={IconMarkAttach} label="Attach" />
           <IconButton icon={IconMarkMention} label="Mention" />
           <Composer.Send />
@@ -188,8 +190,10 @@ export const Composing = {
       <section class={s.section}>
         <h2 class={s.heading}>Composer</h2>
         <p class={s.note}>
-          Enter sends and Shift+Enter starts a new line. The field grows with its text, and Send
-          waits for something to send.
+          The draft is formatted as it is written, from the toolbar, shortcuts, or markdown typed
+          such as **bold** or "- " at the start of a line, and sent as markdown. Enter sends and
+          Shift+Enter starts a new line. The field grows with its text, and Send waits for something
+          to send.
         </p>
         <ComposerExample />
       </section>
@@ -197,14 +201,15 @@ export const Composing = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByRole("textbox", { name: "Message #general" });
+    const input = await canvas.findByRole("textbox", { name: "Message #general" });
     const send = canvas.getByRole("button", { name: "Send" });
     await expect(send).toBeDisabled();
     await userEvent.type(input, "   ");
     await expect(send).toBeDisabled();
-    await userEvent.clear(input);
-    await userEvent.type(input, "first{Shift>}{Enter}{/Shift}second{Enter}");
-    await expect(canvas.getByRole("status", { name: "Sent" })).toHaveTextContent("first second");
-    await expect(input).toHaveValue("");
+    await userEvent.type(input, "first **bold**{Shift>}{Enter}{/Shift}second{Enter}");
+    await expect(canvas.getByRole("status", { name: "Sent" })).toHaveTextContent(
+      "first **bold** second",
+    );
+    await waitFor(() => expect(input).toHaveTextContent(""));
   },
 } satisfies Story;

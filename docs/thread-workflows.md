@@ -38,6 +38,8 @@ readers show their current name. The text shows who was mentioned; `mentions` is
 addresses, and the operation does not compare the two. The apps render emphasis, strikethrough,
 code, lists, task lists, quotes, tables, and links; raw HTML shows as written, images show as
 links to them without loading, and only web and email addresses link. A newline breaks the line.
+The apps' composer writes this markdown as it formats a draft, and mentions a member by writing
+their mention link.
 
 Authorization and validation run in the same commit as the start:
 

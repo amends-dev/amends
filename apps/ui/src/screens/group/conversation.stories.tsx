@@ -58,20 +58,21 @@ export const ReplyInThread = {
   },
 } satisfies Story;
 
-/** Typing "@" suggests people; choosing one puts their name in the draft. */
+/** Typing "@" suggests people; choosing one puts them in the draft as one piece. */
 export const Mentions = {
   render: () => <Conversation />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByRole("combobox", { name: "Message #general" });
+    const input = await canvas.findByRole("combobox", { name: "Message #general" });
     await userEvent.type(input, "Thanks @sa");
     const options = within(await canvas.findByRole("listbox", { name: "People to mention" }));
     await expect(options.getAllByRole("option")).toHaveLength(1);
     await userEvent.keyboard("{Enter}");
-    await expect(input).toHaveValue("Thanks @Sara Lind ");
+    await expect(input.querySelector("[data-member=sara]")).toHaveTextContent("@Sara Lind");
     await userEvent.keyboard("{Enter}");
-    await waitFor(() => expect(input).toHaveValue(""));
-    await expect(canvas.getByText("Thanks @Sara Lind")).toBeVisible();
+    await waitFor(() => expect(input).toHaveTextContent(""));
+    const sent = canvas.getByText("Thanks");
+    await expect(within(sent).getByText("@Sara Lind")).toBeVisible();
   },
 } satisfies Story;
 

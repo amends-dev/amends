@@ -128,13 +128,23 @@ empty otherwise.
 `Reactions`, an agent's `Activity`, a `TaskReference`, and a `Replies` summary joined to the
 avatar by a stitched elbow; `active` highlights the message whose thread is open. `Divider` is
 the running stitch, optionally labelled ("Today", or "4 replies" leading). `TaskStatus` draws
-triage, open, in-progress, and done. `Composer` is a form around an auto-growing field: Enter
-sends, Shift+Enter starts a new line, and Send waits for non-blank text. The caller owns the
-draft so it survives navigation. Given `mentionCandidates`, typing `@` opens suggestions above the
-field: arrows move, Enter or Tab choose (inserting `@name` and calling `onMention`), and Escape
-closes; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a send
-failed. Phones use 16px message and field text so the page does not zoom, and give reactions and
-the reply summary 44px targets.
+triage, open, in-progress, and done. `Composer` is a form around a Tiptap (ProseMirror) editor
+that formats the draft as it is written, with RichText's element styles, so the draft reads as the
+message will. The caller owns the draft, as markdown, so it survives navigation; the editor reads
+it in and writes it back with Tiptap's markdown extension over the same `marked` as RichText.
+Enter sends and Shift+Enter starts a new line, list item, or code line; Send waits for non-blank
+text. `Composer.Formatting` is a toolbar of bold, italic, strikethrough, link, numbered and
+bulleted lists, quote, code, and code block, each pressed while it applies and unavailable where it
+cannot, with Slack's shortcuts (⌘B, ⌘I, ⌘⇧X, ⌘⇧U, ⌘⇧7, ⌘⇧8, ⌘⇧9, ⌘⇧C, ⌘⌥⇧C) beside Tiptap's own.
+`Composer.FormattingToggle` shows or hides it; phones start with it hidden. Markdown typed as it is
+written becomes its formatting, at the start of a block or of a line after a line break, and plain
+text pasted outside code reads as markdown. A link's address, from the toolbar or ⌘⇧U, is written in
+a form above the composer; web and email addresses link, and a bare domain is a web address. Given
+`mentionCandidates`, typing `@` opens suggestions above the composer: arrows move, Enter or Tab
+choose, inserting the member as one piece that deletes whole and is written as their mention link,
+and Escape closes; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a
+send failed. Phones use 16px message and field text so the page does not zoom, and give reactions
+and the reply summary 44px targets.
 
 `RichText` renders markdown in the surrounding type, as `Message.Text` holds it: paragraphs with
 line breaks where the text has them, emphasis, strikethrough, inline code and code blocks, lists
@@ -338,7 +348,8 @@ mocks draw them in caution, and an unavailable provider's saved settings are lab
 connection stored, since its declaration is gone. Environments' command fields grow to two lines as
 drawn; an account's refusal shows under its field rather than in it, and the mocks' Daytona
 connection details keep the generic connection layout. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
-the icon set covers, at every size.
+the icon set covers, at every size, and add Formatting and its toggle, which the mocks do not draw;
+pressed formats share the selected row's fill.
 
 ## Run and verify
 

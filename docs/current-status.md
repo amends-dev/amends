@@ -101,12 +101,14 @@ thread" while hovered or focused. The page composer starts a thread and the thre
 and thread within the session, and both mention group members picked after `@`. A name typed
 without picking it addresses no one. Messages render as markdown, with mentions naming members
 as they are called now, in the timeline, the inbox's one-line previews, and a turn log's reply and
-streaming draft. The composer is still a plain text field: formatting is typed as markdown, with
-no toolbar, shortcuts, or preview while writing, and `/` commands do not exist yet. Links open in
-a new browser tab on the web; the desktop shell has no handler that opens them in the system
-browser. Code blocks have no
-syntax highlighting. Messages written before mention links, which held a plain `@name`, no
-longer highlight their mentions. An open thread is read through the newest activity it
+streaming draft. The composer formats the draft as it is written, from its toolbar, Slack's
+shortcuts, or markdown typed or pasted as text, and sends it as markdown; a mention is chosen after
+`@` and deletes whole. It edits paragraphs, emphasis, strikethrough, code and code blocks, lists,
+quotes, headings, rules, and links: tables and task lists render in messages but pasted markdown
+loses them, and `/` commands do not exist yet. Its formatting toolbar starts hidden on phones.
+Links open in a new browser tab on the web; the desktop shell has no handler that opens them in
+the system browser. Code blocks have no syntax highlighting. Messages written before mention
+links, which held a plain `@name`, no longer highlight their mentions. An open thread is read through the newest activity it
 shows, and a visible group's stream catches the reader up with the group, clearing the stream's
 unread dots, the sidebar's new-activity dot, and the pending counts of what was read, but only
 while the page is visible. A thread counts as read when it opens, however far back the reader has
@@ -205,7 +207,7 @@ assignments, one read per member; a batched assignment read across members would
 The [UI package](../apps/ui/README.md) is built from the Lunacy mocks in
 `design-system/Amends Group Exploration.free`: light and dark color roles taken from the mocks,
 Inter in eight type roles, a 4px spacing grid, shadows for modals, popovers, and toasts, and the
-[icons package](../apps/icons/README.md)'s 52 generated drawings, including the mocks' marks.
+[icons package](../apps/icons/README.md)'s 61 generated drawings, including the mocks' marks.
 Its components, the six layout patterns, and the screens cover every page the apps show; each has
 Storybook stories in both modes, run as portable tests in Happy DOM. The dark error colors are
 proposals, since the mocks have no dark error state. Contrast, gamut, font loading, and layout

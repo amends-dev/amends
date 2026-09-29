@@ -32,6 +32,7 @@ export interface ConversationProps {
   readonly onReact?: (messageId: string, emoji: string) => void;
   /** The composer's placeholder and name, such as "Message #general". */
   readonly placeholder: string;
+  /** The draft, as markdown whose mentions link to members. */
   readonly draft: string;
   readonly onDraftChange: (draft: string) => void;
   readonly onSend: (text: string) => void;
@@ -40,7 +41,6 @@ export interface ConversationProps {
   readonly onAttach?: () => void;
   /** People the draft can mention after "@", which also shows the Mention action. */
   readonly mentionCandidates?: readonly MentionCandidate[];
-  readonly onMention?: (candidate: MentionCandidate) => void;
   /** In place of the timeline, while it loads or when it cannot. */
   readonly status?: ConversationStatus;
   readonly onRetry?: () => void;
@@ -81,7 +81,7 @@ export function useStickToBottom(size: () => number) {
   return { ref: setBody, onScroll, atBottom, toBottom };
 }
 
-/** The composer under a timeline, with attach and mention actions and Send. */
+/** The composer under a timeline, with formatting, attach and mention actions, and Send. */
 export function ConversationComposer(props: ConversationProps) {
   return (
     <Pane.Footer>
@@ -91,10 +91,11 @@ export function ConversationComposer(props: ConversationProps) {
         onSend={props.onSend}
         disabled={props.sending}
         mentionCandidates={props.mentionCandidates}
-        onMention={props.onMention}
       >
+        <Composer.Formatting />
         <Composer.Input placeholder={props.placeholder} />
         <Composer.Toolbar>
+          <Composer.FormattingToggle />
           <Show when={props.onAttach}>
             {(attach) => (
               <IconButton icon={IconMarkAttach} label="Attach" onClick={() => attach()()} />

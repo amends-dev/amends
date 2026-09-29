@@ -574,7 +574,6 @@ function ThreadPanel(props: {
           sending={reply.pending()}
           sendError={reply.error()}
           mentionCandidates={candidates()}
-          onMention={(candidate) => reply.mention(candidate.id, candidate.name)}
         />
       }
     >

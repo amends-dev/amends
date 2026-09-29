@@ -65,7 +65,6 @@ function Draft(props: { readonly memberIds: ReadonlyArray<string> }) {
           name: people.name(id),
           agent: people.member(id)?.identity._tag === "Agent",
         }))}
-        onMention={(candidate) => composer.mention(candidate.id, candidate.name)}
       />
     </GroupPane>
   );

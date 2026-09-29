@@ -1,0 +1,20 @@
+{
+  "name": "bold",
+  "title": "Bold",
+  "categories": ["content", "controls"],
+  "keywords": ["bold", "strong", "weight", "format"],
+  "shapes": [
+    {
+      "polyline": [
+        [14, 4],
+        [6, 4],
+        [6, 20],
+        [15, 20]
+      ],
+      "corner": 1
+    },
+    { "line": [6, 12, 15, 12] },
+    { "arc": [14, 8, 4, 270, 90] },
+    { "arc": [15, 16, 4, 270, 90] }
+  ]
+}

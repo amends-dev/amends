@@ -1,0 +1,12 @@
+{
+  "name": "quote",
+  "title": "Quote",
+  "categories": ["content", "controls"],
+  "keywords": ["quote", "blockquote", "cite", "format"],
+  "shapes": [
+    { "line": [4, 5, 4, 19] },
+    { "line": [9, 7, 20, 7] },
+    { "line": [9, 12, 20, 12] },
+    { "line": [9, 17, 16, 17] }
+  ]
+}

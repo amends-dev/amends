@@ -180,9 +180,7 @@ export {
   useNewThread,
   useDirectMessage,
   useReply,
-  mentionsIn,
   type ComposerController,
-  type Mentioned,
 } from "./conversations/compose.ts";
 export { usePageVisible, useMarkThreadRead, useMarkGroupRead } from "./conversations/read.ts";
 export { useTyping } from "./conversations/typing.ts";

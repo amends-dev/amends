@@ -74,3 +74,10 @@ it("keeps finished blocks while streamed text grows, closing what is left open",
   expect(view.getByText("First paragraph.")).toBe(first);
   expect(view.getByText("bold").tagName).toBe("STRONG");
 });
+
+it("reads entity references as the characters they name, except in code", () => {
+  const view = mount("Tom &amp; Jerry &lt;3 &copy; &#169; &#x1F600; &bogus; &#0; `&amp;`");
+  expect(view.container.querySelector("p")?.textContent).toBe(
+    "Tom & Jerry <3 © © 😀 &bogus; � &amp;",
+  );
+});

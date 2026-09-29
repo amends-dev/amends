@@ -54,6 +54,58 @@ function memberOf(href: string) {
   }
 }
 
+// Entity references people and editors write for characters markdown or HTML would otherwise
+// read as syntax; numeric references name any character.
+const namedEntities: Readonly<Record<string, string>> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: "\u00A0",
+  copy: "©",
+  reg: "®",
+  trade: "™",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  lsquo: "‘",
+  rsquo: "’",
+  ldquo: "“",
+  rdquo: "”",
+  laquo: "«",
+  raquo: "»",
+  bull: "•",
+  middot: "·",
+  times: "×",
+  divide: "÷",
+  deg: "°",
+  plusmn: "±",
+  larr: "←",
+  rarr: "→",
+  uarr: "↑",
+  darr: "↓",
+  harr: "↔",
+  euro: "€",
+  pound: "£",
+  yen: "¥",
+  cent: "¢",
+  sect: "§",
+  para: "¶",
+};
+const entities = /&(?:#(\d{1,7})|#[xX]([\da-fA-F]{1,6})|([a-zA-Z][a-zA-Z\d]{1,31}));/gu;
+
+/** Text with its entity references as the characters they name, as markdown reads them. */
+function decode(text: string) {
+  if (!text.includes("&")) return text;
+  return text.replace(entities, (whole, decimal?: string, hex?: string, name?: string) => {
+    if (name !== undefined) return namedEntities[name] ?? whole;
+    const code = decimal === undefined ? Number.parseInt(hex!, 16) : Number.parseInt(decimal, 10);
+    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    return valid ? String.fromCodePoint(code) : "\uFFFD";
+  });
+}
+
 interface Context {
   readonly member: (id: string) => RichTextMention | undefined;
 }
@@ -72,8 +124,9 @@ function inlineRuns(tokens: readonly Token[]): Run[] {
         return [" "];
       case "codespan":
       case "escape":
-      case "image":
         return [current.text];
+      case "image":
+        return [decode(current.text)];
       case "link": {
         const member = memberOf(current.href);
         return member === undefined
@@ -84,7 +137,7 @@ function inlineRuns(tokens: readonly Token[]): Run[] {
       case "strong":
       case "em":
       case "del":
-        return current.tokens?.length ? inlineRuns(current.tokens) : [current.text];
+        return current.tokens?.length ? inlineRuns(current.tokens) : [decode(current.text)];
       default:
         return [current.raw];
     }
@@ -114,7 +167,10 @@ function blockRuns(tokens: readonly Token[]): Run[] {
       case "paragraph":
       case "heading":
       case "text":
-        return [" ", ...(current.tokens?.length ? inlineRuns(current.tokens) : [current.text])];
+        return [
+          " ",
+          ...(current.tokens?.length ? inlineRuns(current.tokens) : [decode(current.text)]),
+        ];
       default:
         return [" ", current.raw];
     }
@@ -169,7 +225,7 @@ function inline(token: Token, context: Context): JSX.Element {
   const current = tokensOf(token);
   switch (current.type) {
     case "text":
-      return current.tokens?.length ? inlines(current.tokens, context) : current.text;
+      return current.tokens?.length ? inlines(current.tokens, context) : decode(current.text);
     case "escape":
       return current.text;
     case "strong":
@@ -192,7 +248,7 @@ function inline(token: Token, context: Context): JSX.Element {
         <a
           class={s.link}
           href={href}
-          title={current.title ?? undefined}
+          title={current.title ? decode(current.title) : undefined}
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -203,7 +259,7 @@ function inline(token: Token, context: Context): JSX.Element {
     case "image": {
       // Images are not loaded, which would tell their host who read the message.
       const href = safeHref(current.href);
-      const label = current.text || current.href;
+      const label = decode(current.text) || current.href;
       if (!href) return label;
       return (
         <a class={s.link} href={href} target="_blank" rel="noopener noreferrer">
@@ -228,7 +284,7 @@ function block(token: Token, context: Context): JSX.Element {
     case "text":
       return (
         <p class={s.paragraph}>
-          {current.tokens?.length ? inlines(current.tokens, context) : current.text}
+          {current.tokens?.length ? inlines(current.tokens, context) : decode(current.text)}
         </p>
       );
     case "heading":

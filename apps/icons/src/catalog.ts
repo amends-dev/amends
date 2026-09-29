@@ -24,6 +24,13 @@ export const iconCatalog = [
     exportName: "IconBellFilled",
   },
   {
+    name: "bold",
+    title: "Bold",
+    keywords: ["bold", "strong", "weight", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconBold",
+  },
+  {
     name: "check",
     title: "Check",
     keywords: ["tick", "done", "confirm", "selected"],
@@ -59,6 +66,20 @@ export const iconCatalog = [
     exportName: "IconClock",
   },
   {
+    name: "code",
+    title: "Code",
+    keywords: ["code", "inline", "monospace", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconCode",
+  },
+  {
+    name: "code-block",
+    title: "Code block",
+    keywords: ["code", "block", "snippet", "monospace", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconCodeBlock",
+  },
+  {
     name: "folder",
     title: "Folder",
     keywords: ["directory", "collection", "empty", "files"],
@@ -73,11 +94,32 @@ export const iconCatalog = [
     exportName: "IconHome",
   },
   {
+    name: "italic",
+    title: "Italic",
+    keywords: ["italic", "emphasis", "slant", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconItalic",
+  },
+  {
+    name: "link",
+    title: "Link",
+    keywords: ["link", "url", "address", "chain"],
+    categories: ["content", "controls"],
+    exportName: "IconLink",
+  },
+  {
     name: "list",
     title: "List",
     keywords: ["list", "browse", "all", "items", "rows"],
     categories: ["navigation", "content"],
     exportName: "IconList",
+  },
+  {
+    name: "list-ordered",
+    title: "Numbered list",
+    keywords: ["numbered", "ordered", "list", "steps", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconListOrdered",
   },
   {
     name: "mark-agents",
@@ -304,6 +346,13 @@ export const iconCatalog = [
     exportName: "IconPlus",
   },
   {
+    name: "quote",
+    title: "Quote",
+    keywords: ["quote", "blockquote", "cite", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconQuote",
+  },
+  {
     name: "search",
     title: "Search",
     keywords: ["find", "magnifier", "lookup"],
@@ -339,11 +388,25 @@ export const iconCatalog = [
     exportName: "IconSidebarLeftOpen",
   },
   {
+    name: "strikethrough",
+    title: "Strikethrough",
+    keywords: ["strikethrough", "strike", "delete", "format"],
+    categories: ["content", "controls"],
+    exportName: "IconStrikethrough",
+  },
+  {
     name: "trash",
     title: "Delete",
     keywords: ["remove", "bin", "discard", "destroy"],
     categories: ["actions"],
     exportName: "IconTrash",
+  },
+  {
+    name: "type",
+    title: "Formatting",
+    keywords: ["type", "text", "formatting", "style", "toolbar"],
+    categories: ["content", "controls"],
+    exportName: "IconType",
   },
   {
     name: "user",

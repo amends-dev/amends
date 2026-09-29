@@ -11,7 +11,7 @@ it("checks generated artifacts on Bun and exits without writing", () => {
     encoding: "utf8",
     timeout: 15_000,
   });
-  expect(output).toContain("Verified 52 icons");
+  expect(output).toContain("Verified 61 icons");
 });
 
 it.each(["one-icon", "catalog"])(

@@ -27,7 +27,7 @@ export const Reply = {
     await userEvent.click(canvas.getByRole("button", { name: "4 replies" }));
     const input = await canvas.findByRole("textbox", { name: "Reply in thread" });
     await userEvent.type(input, "On it{Enter}");
-    await expect(input).toHaveValue("");
+    await waitFor(() => expect(input).toHaveTextContent(""));
     await expect(canvas.getByText("On it")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Close thread" }));
     await waitFor(() =>
@@ -43,11 +43,12 @@ export const Send = {
     const canvas = within(canvasElement);
     const send = canvas.getByRole("button", { name: "Send" });
     await expect(send).toBeDisabled();
-    const input = canvas.getByRole("textbox", { name: "Message #general" });
+    const input = await canvas.findByRole("textbox", { name: "Message #general" });
     await userEvent.type(input, "Lunch at noon?{Shift>}{Enter}{/Shift}Anyone");
-    await expect(input).toHaveValue("Lunch at noon?\nAnyone");
+    await expect(input.querySelector("br")).not.toBeNull();
+    await expect(input).toHaveTextContent("Lunch at noon?Anyone");
     await userEvent.click(send);
-    await expect(input).toHaveValue("");
+    await waitFor(() => expect(input).toHaveTextContent(""));
     await expect(canvas.getByText(/Lunch at noon\?/)).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "🔥 3" }));
     await expect(canvas.getByRole("button", { name: "🔥 4" })).toHaveAttribute(

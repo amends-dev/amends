@@ -1,4 +1,4 @@
-import { style } from "@vanilla-extract/css";
+import { globalStyle, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { typeScale } from "../../foundations/typography/tokens.ts";
@@ -20,26 +20,101 @@ export const composer = style({
   },
 });
 
+// The editor's text, formatted as messages show it, scrolling past 40% of the viewport.
 export const input = style({
   ...typeScale.item,
+  position: "relative",
   display: "block",
   width: "100%",
   minHeight: "1.3125rem",
   maxHeight: "40vh",
+  overflowY: "auto",
   margin: 0,
   padding: 0,
-  border: "none",
   outline: "none",
-  resize: "none",
-  background: "transparent",
   color: vars.color.text.primary,
-  fontFamily: "inherit",
-  selectors: { "&::placeholder": { color: vars.color.text.muted, opacity: 1 } },
+  overflowWrap: "anywhere",
+  // What ProseMirror needs to place the caret: kept spaces and no ligatures.
+  whiteSpace: "break-spaces",
+  fontVariantLigatures: "none",
+  fontFeatureSettings: '"liga" 0',
   "@media": {
     [media.touch]: typeScale.body,
     [media.mobile]: typeScale.bodyTouch,
   },
 });
+
+export const host = style({ minWidth: 0 });
+
+// Blocks sit 8px apart, as in a message.
+globalStyle(`${input} > * + *`, { marginBlockStart: "0.5rem" });
+globalStyle(`${input} pre`, { whiteSpace: "pre-wrap" });
+globalStyle(`${input} [contenteditable="false"]`, { whiteSpace: "normal" });
+globalStyle(`${input} img.ProseMirror-separator`, {
+  display: "inline",
+  width: 0,
+  height: 0,
+  margin: 0,
+  border: "none",
+});
+globalStyle(`${input}.ProseMirror-hideselection *::selection`, { background: "transparent" });
+globalStyle(`${input} p.is-editor-empty:first-child::before`, {
+  content: "attr(data-placeholder)",
+  float: "left",
+  height: 0,
+  color: vars.color.text.muted,
+  pointerEvents: "none",
+});
+
+// Formatting sits above the text, its icons lined up with the text's edge like the toolbar's.
+export const formatting = style({
+  display: "flex",
+  alignItems: "center",
+  gap: "0.125rem",
+  marginInline: "-0.25rem",
+  marginBlockEnd: "0.5rem",
+  overflowX: "auto",
+  scrollbarWidth: "none",
+  selectors: { "&[hidden]": { display: "none" } },
+  "@media": { [media.touch]: { gap: 0, marginInline: "-0.5rem", marginBlockEnd: "0.25rem" } },
+});
+
+// A pressed format reads as the selected row does; a proposal, since the mocks draw none.
+export const format = style({
+  flex: "none",
+  selectors: {
+    "&[aria-pressed=true]": {
+      backgroundColor: vars.color.surface.selected,
+      color: vars.color.text.primary,
+    },
+    "&:disabled": { color: vars.color.text.disabled, cursor: "default" },
+  },
+});
+
+export const separator = style({
+  flex: "none",
+  width: "1px",
+  height: "1rem",
+  marginInline: "0.25rem",
+  backgroundColor: vars.color.border.divider,
+});
+
+// Where a link leads, floating above the text like the suggestions.
+export const linkForm = style({
+  position: "absolute",
+  insetInline: "-1px",
+  bottom: "calc(100% + 0.25rem)",
+  zIndex: 2,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+  padding: "0.5rem",
+  border: `1px solid ${vars.color.border.default}`,
+  backgroundColor: vars.color.surface.popover,
+  boxShadow: vars.shadow.popover,
+});
+
+export const linkAddress = style({ flex: 1, minWidth: 0 });
 
 // Icon buttons line their icons up with the text above; send sits at the far end.
 export const toolbar = style({
@@ -54,13 +129,11 @@ export const toolbar = style({
 
 export const send = style({ marginInlineStart: "auto" });
 
-export const field = style({ position: "relative" });
-
-// Suggestions open above the text, since the composer sits at the bottom of its pane.
+// Suggestions open above the composer, since it sits at the bottom of its pane.
 export const suggestions = style({
   position: "absolute",
-  insetInline: "-1rem",
-  bottom: "calc(100% + 1.25rem)",
+  insetInline: "-1px",
+  bottom: "calc(100% + 0.25rem)",
   zIndex: 2,
   display: "flex",
   flexDirection: "column",

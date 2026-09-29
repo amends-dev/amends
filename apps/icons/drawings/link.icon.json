@@ -1,0 +1,15 @@
+{
+  "name": "link",
+  "title": "Link",
+  "categories": ["content", "controls"],
+  "keywords": ["link", "url", "address", "chain"],
+  "shapes": [
+    { "line": [7, 8, 10, 8] },
+    { "arc": [7, 12, 4, 90, 270] },
+    { "line": [7, 16, 10, 16] },
+    { "line": [14, 8, 17, 8] },
+    { "arc": [17, 12, 4, 270, 90] },
+    { "line": [14, 16, 17, 16] },
+    { "line": [8, 12, 16, 12] }
+  ]
+}

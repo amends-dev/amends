@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
+import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createMemoryHistory, MemoryRouter } from "@solidjs/router";
 import { Layer, Schema } from "effect";
@@ -1149,7 +1150,7 @@ it("drafts a first message to someone new and opens the conversation it starts",
   expect(within(sidebar).getByRole("button", { name: "New message" })).toBeInTheDocument();
   await screen.findByText("Send the first message to start the conversation.");
   const composer = await screen.findByRole("combobox", { name: /^Message / });
-  fireEvent.input(composer, { target: { value: "Are you free?" } });
+  await userEvent.setup().type(composer, "Are you free?");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g9"));
   expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }]);
