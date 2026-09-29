@@ -37,12 +37,12 @@ export const PreviewAndJoin = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("link", { name: "launches" }));
     await expect(await canvas.findByText("You’re previewing #launches")).toBeVisible();
-    await expect(canvas.queryByRole("textbox", { name: "Message #launches" })).toBeNull();
+    await expect(canvas.queryByRole("combobox", { name: "Message #launches" })).toBeNull();
     await userEvent.click(canvas.getByRole("button", { name: "6 replies" }));
     const thread = await canvas.findByRole("complementary", { name: "Launch plan for next week" });
     await expect(within(thread).queryByRole("textbox")).toBeNull();
     await userEvent.click(canvas.getByRole("button", { name: "Join group" }));
-    await expect(await canvas.findByRole("textbox", { name: "Message #launches" })).toBeVisible();
+    await expect(await canvas.findByRole("combobox", { name: "Message #launches" })).toBeVisible();
     await expect(
       within(canvas.getByRole("list", { name: "Notifications" })).getByRole("status"),
     ).toHaveTextContent("Joined #launches");
@@ -66,6 +66,6 @@ export const JoinFromDiscover = {
       within(canvas.getByRole("list", { name: "Notifications" })).getByRole("status"),
     ).toHaveTextContent("Joined #launches");
     await userEvent.click(canvas.getByRole("button", { name: "Open" }));
-    await expect(await canvas.findByRole("textbox", { name: "Message #launches" })).toBeVisible();
+    await expect(await canvas.findByRole("combobox", { name: "Message #launches" })).toBeVisible();
   },
 } satisfies Story;

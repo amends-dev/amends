@@ -3,7 +3,11 @@ import { IconMarkAttach } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
-import { Composer, type MentionCandidate } from "../../components/composer/index.ts";
+import {
+  Composer,
+  type ComposerCommand,
+  type MentionCandidate,
+} from "../../components/composer/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Timeline, type TimelineEntry } from "../timeline/index.ts";
@@ -41,6 +45,10 @@ export interface ConversationProps {
   readonly onAttach?: () => void;
   /** People the draft can mention after "@", which also shows the Mention action. */
   readonly mentionCandidates?: readonly MentionCandidate[];
+  /** What typing "/" as the whole draft offers to do, such as following or renaming. */
+  readonly commands?: readonly ComposerCommand[];
+  /** Runs a command by name, in place of sending the "/name" typed. */
+  readonly onCommand?: (name: string) => void;
   /** In place of the timeline, while it loads or when it cannot. */
   readonly status?: ConversationStatus;
   readonly onRetry?: () => void;
@@ -91,6 +99,8 @@ export function ConversationComposer(props: ConversationProps) {
         onSend={props.onSend}
         disabled={props.sending}
         mentionCandidates={props.mentionCandidates}
+        commands={props.commands}
+        onCommand={props.onCommand}
       >
         <Composer.Formatting />
         <Composer.Input placeholder={props.placeholder} />

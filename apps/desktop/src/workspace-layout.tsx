@@ -498,6 +498,8 @@ function ThreadPanel(props: {
   const candidates = useMentionCandidates(props.workspaceId, props.groupId);
   const actions = useWorkspaceActions();
   const follow = useThreadFollow(props.workspaceId, props.groupId, props.threadId, {
+    changed: (following) =>
+      actions.toast(following ? "Following this thread" : "Unfollowed this thread"),
     failed: (following) =>
       actions.toast(
         following
@@ -568,6 +570,18 @@ function ThreadPanel(props: {
           }
           onClose={props.onClose}
           placeholder="Reply in thread"
+          commands={
+            follow.followable() && follow.following() !== undefined
+              ? [
+                  follow.following()
+                    ? { name: "unfollow", description: "Stop following this thread" }
+                    : { name: "follow", description: "Follow this thread to hear of its replies" },
+                ]
+              : []
+          }
+          onCommand={(command) => {
+            if ((command === "follow") !== follow.following()) follow.toggle();
+          }}
           draft={reply.draft()}
           onDraftChange={reply.setDraft}
           onSend={() => reply.send()}

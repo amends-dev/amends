@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { userEvent } from "storybook/test";
 import { Composer } from "../src/components/composer/index.ts";
@@ -10,6 +10,7 @@ afterEach(cleanup);
 async function mount(initial = "") {
   const [value, setValue] = createSignal(initial);
   const send = vi.fn<(value: string) => void>();
+  const command = vi.fn<(name: string) => void>();
   render(() => (
     <Theme mode="light">
       <Composer.Root
@@ -17,6 +18,11 @@ async function mount(initial = "") {
         onValueChange={setValue}
         onSend={send}
         mentionCandidates={[{ id: "ada", name: "Ada Lovelace" }]}
+        commands={[
+          { name: "follow", description: "Follow #general" },
+          { name: "rename", description: "Rename #general" },
+        ]}
+        onCommand={command}
       >
         <Composer.Formatting />
         <Composer.Input placeholder="Message #general" />
@@ -30,7 +36,7 @@ async function mount(initial = "") {
   const input = await screen.findByRole("combobox", { name: "Message #general" });
   const user = userEvent.setup();
   await user.click(input);
-  return { input, value, setValue, send, user };
+  return { input, value, setValue, send, command, user };
 }
 
 it("turns markdown into formatting as it is typed, and sends the draft as markdown", async () => {
@@ -144,4 +150,34 @@ it("reads pasted text as markdown, and keeps it as written inside code", async (
   await user.paste("**not bold**");
   expect(input.querySelector("strong")).toBeNull();
   expect(value()).toBe("```\n**not bold**\n```");
+});
+
+it("runs a command chosen after / in place of sending it", async () => {
+  const { input, value, send, command, user } = await mount();
+  await user.type(input, "/");
+  const commands = screen.getByRole("listbox", { name: "Commands" });
+  expect(
+    within(commands)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["/followFollow #general", "/renameRename #general"]);
+  await user.type(input, "re");
+  expect(within(commands).getAllByRole("option")).toHaveLength(1);
+  await user.keyboard("{Enter}");
+  expect(command).toHaveBeenCalledWith("rename");
+  expect(send).not.toHaveBeenCalled();
+  expect(value()).toBe("");
+  expect(screen.queryByRole("listbox")).toBeNull();
+});
+
+it("takes / as text anywhere but the start, and once the commands are closed", async () => {
+  const { input, send, command, user } = await mount();
+  await user.type(input, "see /re");
+  expect(screen.queryByRole("listbox")).toBeNull();
+  await user.keyboard("{Control>}a{/Control}{Backspace}");
+  await user.type(input, "/follow");
+  expect(screen.getByRole("listbox", { name: "Commands" })).toBeInTheDocument();
+  await user.keyboard("{Escape}{Enter}");
+  expect(command).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledWith("/follow");
 });

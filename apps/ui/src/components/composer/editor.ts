@@ -225,6 +225,30 @@ export function mentionQuery(editor: Editor) {
   return { from: $from.pos - query.length - 1, to: $from.pos, query };
 }
 
+/**
+ * The command being typed: the whole draft is "/" and a name so far, with the caret at its end, as
+ * `/rename`. Anything else, such as "/" later in the text, is text.
+ */
+export function commandQuery(editor: Editor) {
+  const { doc, selection } = editor.state;
+  if (!selection.empty) return undefined;
+  // The one block with anything in it; empty paragraphs around it send nothing.
+  const written: Array<{ readonly block: typeof doc; readonly at: number }> = [];
+  doc.forEach((block, at) => {
+    if (block.type.name !== "paragraph" || block.content.size > 0) written.push({ block, at });
+  });
+  const [only] = written;
+  if (written.length !== 1 || only!.block.type.name !== "paragraph") return undefined;
+  const { block, at } = only!;
+  // Only text: a mention or line break has no text of its own.
+  if (block.content.size !== block.textContent.length) return undefined;
+  const match = /^\/([\w-]*)$/u.exec(block.textContent);
+  const from = at + 1,
+    to = from + block.textContent.length;
+  if (!match || selection.from !== to) return undefined;
+  return { from, to, query: match[1]! };
+}
+
 /** The text before the caret in its block, where a mention would start. */
 export function textBeforeCaret(editor: Editor) {
   const $from = editor.state.selection.$from;

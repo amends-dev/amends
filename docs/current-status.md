@@ -105,7 +105,10 @@ streaming draft. The composer formats the draft as it is written, from its toolb
 shortcuts, or markdown typed or pasted as text, and sends it as markdown; a mention is chosen after
 `@` and deletes whole. It edits paragraphs, emphasis, strikethrough, code and code blocks, lists,
 quotes, headings, rules, and links: tables and task lists render in messages but pasted markdown
-loses them, and `/` commands do not exist yet. Its formatting toolbar starts hidden on phones.
+loses them. Typing "/" as the whole draft lists commands that act rather than post: a group's page
+offers `/follow` or `/unfollow` and, to those who may rename it, `/rename`, which opens its
+settings with the name selected; a thread's composer offers `/follow` or `/unfollow` for the thread,
+confirmed by a toast as the bell's changes are. There are no other commands yet. Its formatting toolbar starts hidden on phones.
 Links open in a new browser tab on the web; the desktop shell has no handler that opens them in
 the system browser. Code blocks have no syntax highlighting. Messages written before mention
 links, which held a plain `@name`, no longer highlight their mentions. An open thread is read through the newest activity it

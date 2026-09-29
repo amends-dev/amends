@@ -1,4 +1,4 @@
-import { Match, Show, Switch, createSignal, createUniqueId } from "solid-js";
+import { Match, Show, Switch, createEffect, createSignal, createUniqueId } from "solid-js";
 import { IconMarkNew } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
@@ -64,6 +64,8 @@ export interface GroupSettingsProps {
   readonly nameError?: string;
   /** The reader may rename the group. Default true. */
   readonly renamable?: boolean;
+  /** Opens with the name ready to edit, as when the reader asked to rename the group. */
+  readonly focusName?: boolean;
   /** Why the last save failed. */
   readonly saveError?: GroupChangeError;
   readonly visibility: GroupVisibility;
@@ -112,6 +114,16 @@ export function GroupSettings(props: GroupSettingsProps) {
   const formId = `group-settings-${createUniqueId()}`;
   const phone = createMediaQuery(media.mobile);
   const [addView, setAddView] = createSignal(false);
+  // Asked to rename, the dialog opens with the name selected, ready to type over.
+  const [nameField, setNameField] = createSignal<HTMLInputElement>();
+  createEffect(() => {
+    const field = nameField();
+    if (!props.open || !props.focusName || !field) return;
+    queueMicrotask(() => {
+      field.focus();
+      field.select();
+    });
+  });
   const addLabel = () => (props.selected.length > 0 ? `Add ${props.selected.length}` : "Add");
   const close = () => {
     setAddView(false);
@@ -212,6 +224,7 @@ export function GroupSettings(props: GroupSettingsProps) {
                   >
                     <Field.Label>Group name</Field.Label>
                     <Input
+                      ref={setNameField}
                       value={props.name}
                       onInput={(event) => props.onNameChange(event.currentTarget.value)}
                       autocomplete="off"

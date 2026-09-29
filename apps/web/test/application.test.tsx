@@ -1258,6 +1258,46 @@ it("follows a group from its bell, confirming each change with a toast", async (
   expect(changes).toEqual(["follow", "unfollow"]);
 });
 
+it("follows and renames a group from commands typed after /, posting nothing", async () => {
+  let following = false;
+  const writes: Array<string> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST") writes.push(path.split("/").at(-1)!);
+    if (request.method === "POST" && /\/groups\/g1\/(un)?follow$/.test(path)) {
+      following = path.endsWith("/follow");
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/workspaces/one/groups/g1/members") return response([]);
+    const answer = conversation(path);
+    return response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] });
+  });
+  mount("/workspaces/one/groups/g1", memoryStore(session("alice")).store, fetch, undefined, {
+    groups: () => [{ ...managed, following }],
+  });
+  await screen.findByRole("heading", { name: "Design" });
+  const composer = await screen.findByRole("combobox", { name: "Message #Design" });
+  const user = userEvent.setup();
+  await user.type(composer, "/fol{Enter}");
+  await screen.findByText("Following #Design");
+  // Following, the group offers to stop instead.
+  await user.type(composer, "/");
+  const commands = await screen.findByRole("listbox", { name: "Commands" });
+  expect(
+    within(commands)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["/unfollowStop following #Design", "/renameRename #Design"]);
+  await user.type(composer, "ren{Enter}");
+  const dialog = await screen.findByRole("dialog", { name: "Group settings" });
+  await waitFor(() =>
+    expect(within(dialog).getByRole("textbox", { name: "Group name" })).toHaveFocus(),
+  );
+  expect(composer).toHaveTextContent("");
+  expect(writes).toEqual(["follow"]);
+});
+
 /** A host with Anthropic installed, answering the Connections page's reads and writes. */
 function connectionsHost() {
   const anthropic = {

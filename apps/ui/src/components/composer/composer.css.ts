@@ -1,7 +1,7 @@
 import { globalStyle, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
-import { typeScale } from "../../foundations/typography/tokens.ts";
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
 
 // Reference minimum heights: 136px on desktop, 112px on tablets, and 92px on phones.
 export const composer = style({
@@ -167,6 +167,19 @@ export const suggestionName = style({
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
   selectors: { "&[data-agent]": { color: vars.color.text.agent } },
+});
+
+export const commandName = style({
+  flex: "none",
+  fontWeight: fontWeight.medium,
+});
+
+export const commandDescription = style({
+  minWidth: 0,
+  overflow: "hidden",
+  color: vars.color.text.secondary,
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 });
 
 export const error = style({

@@ -35,7 +35,14 @@ import { IconButton } from "../icon-button/index.ts";
 import { Input as TextInput } from "../input/index.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
-import { extensions, linkAddress, markdownOf, mentionQuery, textBeforeCaret } from "./editor.ts";
+import {
+  commandQuery,
+  extensions,
+  linkAddress,
+  markdownOf,
+  mentionQuery,
+  textBeforeCaret,
+} from "./editor.ts";
 import * as s from "./composer.css.ts";
 
 /** Someone the draft can mention after "@". */
@@ -44,6 +51,19 @@ export interface MentionCandidate {
   readonly name: string;
   readonly agent?: boolean;
 }
+
+/** Something the reader can do by typing "/" and its name in place of a message. */
+export interface ComposerCommand {
+  /** What follows "/", such as "rename". */
+  readonly name: string;
+  /** What it does, such as "Rename #general". */
+  readonly description: string;
+}
+
+/** A suggestion for what is being typed: a member after "@", or a command after "/". */
+type Choice =
+  | { readonly kind: "mention"; readonly candidate: MentionCandidate }
+  | { readonly kind: "command"; readonly command: ComposerCommand };
 
 /** The text a link is being written for: its range in the draft, and its address so far. */
 interface LinkTarget {
@@ -60,6 +80,8 @@ interface State {
   readonly submit: () => void;
   readonly disabled: Accessor<boolean>;
   readonly candidates: Accessor<readonly MentionCandidate[]>;
+  readonly commands: Accessor<readonly ComposerCommand[]>;
+  readonly runCommand: (name: string) => void;
   readonly editor: Accessor<Editor | undefined>;
   readonly setEditor: (editor: Editor | undefined) => void;
   /** Changes with every edit and caret move, for what reads the editor's state. */
@@ -79,7 +101,7 @@ function useState(part: string): State {
   return state;
 }
 
-export type RootProps = Omit<JSX.FormHTMLAttributes<HTMLFormElement>, "onSubmit"> & {
+export type RootProps = Omit<JSX.FormHTMLAttributes<HTMLFormElement>, "onSubmit" | "onCommand"> & {
   /** The draft, as markdown; the caller keeps it so it survives navigation. */
   value: string;
   onValueChange: (value: string) => void;
@@ -89,6 +111,10 @@ export type RootProps = Omit<JSX.FormHTMLAttributes<HTMLFormElement>, "onSubmit"
   disabled?: boolean;
   /** People the draft can mention; typing "@" suggests them. */
   mentionCandidates?: readonly MentionCandidate[];
+  /** What typing "/" as the whole draft suggests; choosing one runs it rather than sending. */
+  commands?: readonly ComposerCommand[];
+  /** Runs a command by name; the "/name" typed is cleared from the draft. */
+  onCommand?: (name: string) => void;
 };
 
 /**
@@ -102,6 +128,8 @@ export function Root(props: RootProps) {
     "onSend",
     "disabled",
     "mentionCandidates",
+    "commands",
+    "onCommand",
     "class",
     "children",
   ]);
@@ -118,6 +146,8 @@ export function Root(props: RootProps) {
     submit: () => form()?.requestSubmit(),
     disabled: () => local.disabled ?? false,
     candidates: () => local.mentionCandidates ?? [],
+    commands: () => local.commands ?? [],
+    runCommand: (name) => local.onCommand?.(name),
     editor,
     setEditor,
     revision,
@@ -167,7 +197,8 @@ export interface InputProps {
  * The draft, formatted as it is written, growing with its text up to 40% of the viewport. Enter
  * sends; Shift+Enter starts a new line, list item, or code line. Markdown typed as it is written,
  * such as `**bold**` or "- " at the start of a line, becomes its formatting. Typing "@" suggests the
- * Root's mention candidates: arrows move, Enter or Tab chooses, Escape closes.
+ * Root's mention candidates, and "/" as the whole draft its commands: arrows move, Enter or Tab
+ * chooses, Escape closes.
  */
 export function Input(props: InputProps) {
   const state = useState("Input");
@@ -175,13 +206,23 @@ export function Input(props: InputProps) {
   const [host, setHost] = createSignal<HTMLDivElement>();
   // The draft the editor last reported, so the caller's copy coming back is not reapplied.
   let reported: string | undefined;
-  const [query, setQuery] = createSignal<ReturnType<typeof mentionQuery>>();
+  const [query, setQuery] = createSignal<{
+    readonly kind: Choice["kind"];
+    readonly from: number;
+    readonly to: number;
+    readonly query: string;
+  }>();
   const [dismissed, setDismissed] = createSignal<number>();
   const [active, setActive] = createSignal(0);
-  const suggestions = createMemo(() => {
+  const suggestions = createMemo((): readonly Choice[] => {
     const current = query();
     if (!current || dismissed() === current.from) return [];
     const needle = current.query.toLocaleLowerCase();
+    if (current.kind === "command")
+      return state
+        .commands()
+        .filter((command) => command.name.toLocaleLowerCase().startsWith(needle))
+        .map((command) => ({ kind: "command", command }));
     return state
       .candidates()
       .filter((candidate) =>
@@ -190,22 +231,29 @@ export function Input(props: InputProps) {
           .split(/\s+/u)
           .some((word) => word.startsWith(needle)),
       )
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((candidate) => ({ kind: "mention", candidate }));
   });
   createEffect(() => {
     suggestions();
     setActive(0);
   });
   const open = () => suggestions().length > 0;
-  const choose = (candidate: MentionCandidate) => {
+  const choose = (choice: Choice) => {
     const current = query();
     const editor = state.editor();
     if (!current || !editor) return;
+    if (choice.kind === "command") {
+      // A command is done, not said: its "/name" leaves the draft.
+      editor.commands.clearContent(true);
+      state.runCommand(choice.command.name);
+      return;
+    }
     editor
       .chain()
       .focus()
       .insertContentAt({ from: current.from, to: current.to }, [
-        { type: "mention", attrs: { id: candidate.id, label: candidate.name } },
+        { type: "mention", attrs: { id: choice.candidate.id, label: choice.candidate.name } },
         { type: "text", text: " " },
       ])
       .run();
@@ -221,8 +269,8 @@ export function Input(props: InputProps) {
         return true;
       }
       if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
-        const candidate = suggestions()[active()];
-        if (candidate) choose(candidate);
+        const choice = suggestions()[active()];
+        if (choice) choose(choice);
         return true;
       }
       if (event.key === "Escape") {
@@ -252,7 +300,7 @@ export function Input(props: InputProps) {
       () => commands.setHardBreak(),
     ]);
   };
-  const combobox = () => state.candidates().length > 0;
+  const combobox = () => state.candidates().length > 0 || state.commands().length > 0;
   const attributes = (): Record<string, string> => {
     const named: Record<string, string> = {
       class: classes(s.input, props.class),
@@ -265,8 +313,8 @@ export function Input(props: InputProps) {
       named["aria-expanded"] = String(open());
     }
     if (open()) {
-      named["aria-controls"] = `${id}-mentions`;
-      named["aria-activedescendant"] = `${id}-mention-${active()}`;
+      named["aria-controls"] = `${id}-suggestions`;
+      named["aria-activedescendant"] = `${id}-suggestion-${active()}`;
     }
     return named;
   };
@@ -287,7 +335,11 @@ export function Input(props: InputProps) {
         state.change(reported);
       },
       onTransaction: ({ editor: current }) => {
-        setQuery(mentionQuery(current));
+        const command = commandQuery(current);
+        const mention = command ? undefined : mentionQuery(current);
+        setQuery(
+          command ? { kind: "command", ...command } : mention && { kind: "mention", ...mention },
+        );
         state.revise();
       },
       onFocus: () => setDismissed(undefined),
@@ -320,24 +372,45 @@ export function Input(props: InputProps) {
         <ul
           class={s.suggestions}
           role="listbox"
-          id={`${id}-mentions`}
-          aria-label="People to mention"
+          id={`${id}-suggestions`}
+          aria-label={query()?.kind === "command" ? "Commands" : "People to mention"}
         >
           <For each={suggestions()}>
-            {(candidate, index) => (
+            {(choice, index) => (
               <li
-                id={`${id}-mention-${index()}`}
+                id={`${id}-suggestion-${index()}`}
                 role="option"
                 aria-selected={active() === index()}
                 class={s.suggestion}
                 // Keep focus in the text while choosing with the pointer.
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(candidate)}
+                onClick={() => choose(choice)}
               >
-                <Avatar name={candidate.name} size={22} decorative />
-                <span class={s.suggestionName} data-agent={candidate.agent ? "" : undefined}>
-                  {candidate.name}
-                </span>
+                <Show
+                  when={choice.kind === "mention" && choice.candidate}
+                  fallback={
+                    <Show when={choice.kind === "command" && choice.command}>
+                      {(command) => (
+                        <>
+                          <span class={s.commandName}>/{command().name}</span>
+                          <span class={s.commandDescription}>{command().description}</span>
+                        </>
+                      )}
+                    </Show>
+                  }
+                >
+                  {(candidate) => (
+                    <>
+                      <Avatar name={candidate().name} size={22} decorative />
+                      <span
+                        class={s.suggestionName}
+                        data-agent={candidate().agent ? "" : undefined}
+                      >
+                        {candidate().name}
+                      </span>
+                    </>
+                  )}
+                </Show>
               </li>
             )}
           </For>

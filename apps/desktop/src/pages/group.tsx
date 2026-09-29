@@ -85,14 +85,36 @@ function Group(props: {
   });
   const people = useGroupPeople(workspaceId, members);
   const [settings, setSettings] = createSignal<GroupSettingsTab>();
+  // Settings opened by /rename start with the name ready to edit.
+  const [renaming, setRenaming] = createSignal(false);
   const rename = useRenameGroup(workspaceId, groupId, () => setSettings(undefined));
   const open = (tab: GroupSettingsTab) => {
     rename.reset();
     setSelected([]);
+    setRenaming(false);
     setSettings(tab);
   };
   const name = () => group()?.name ?? "";
   const direct = () => group()?.kind === "direct";
+  // What "/" offers in the composer: following the group, and renaming it for those who may.
+  const commands = () => [
+    ...(follow.followable() && follow.following() !== undefined
+      ? [
+          follow.following()
+            ? { name: "unfollow", description: `Stop following #${name()}` }
+            : { name: "follow", description: `Follow #${name()} to take part in its new threads` },
+        ]
+      : []),
+    ...(!direct() && rename.renamable()
+      ? [{ name: "rename", description: `Rename #${name()}` }]
+      : []),
+  ];
+  const command = (command: string) => {
+    if (command === "rename") {
+      open("general");
+      setRenaming(true);
+    } else if ((command === "follow") !== follow.following()) follow.toggle();
+  };
   return (
     <>
       <GroupPane
@@ -148,11 +170,14 @@ function Group(props: {
           sending={composer.pending()}
           sendError={composer.error()}
           mentionCandidates={candidates()}
+          commands={commands()}
+          onCommand={command}
         />
       </GroupPane>
       <GroupSettings
         open={settings() !== undefined}
         onClose={() => setSettings(undefined)}
+        focusName={renaming()}
         kind={group()?.kind}
         groupName={name()}
         tab={settings() ?? "general"}

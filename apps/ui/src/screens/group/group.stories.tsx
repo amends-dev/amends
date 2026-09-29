@@ -36,6 +36,24 @@ export const Reply = {
   },
 } satisfies Story;
 
+/** "/" as the whole draft offers commands; they act rather than post, as /rename opens settings. */
+export const Commands = {
+  render: () => <GroupWorkspace />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = await canvas.findByRole("combobox", { name: "Message #general" });
+    await userEvent.type(input, "/fol{Enter}");
+    await expect(await canvas.findByText("Following #general")).toBeVisible();
+    await userEvent.type(input, "/");
+    const commands = within(await canvas.findByRole("listbox", { name: "Commands" }));
+    await expect(commands.getByRole("option", { name: /unfollow/u })).toBeVisible();
+    await userEvent.type(input, "ren{Enter}");
+    const dialog = within(await canvas.findByRole("dialog", { name: "Group settings" }));
+    await waitFor(() => expect(dialog.getByRole("textbox", { name: "Group name" })).toHaveFocus());
+    await expect(input).toHaveTextContent("");
+  },
+} satisfies Story;
+
 /** Sending to the group and reacting. Shift+Enter keeps writing on a new line. */
 export const Send = {
   render: () => <GroupWorkspace />,
@@ -43,7 +61,7 @@ export const Send = {
     const canvas = within(canvasElement);
     const send = canvas.getByRole("button", { name: "Send" });
     await expect(send).toBeDisabled();
-    const input = await canvas.findByRole("textbox", { name: "Message #general" });
+    const input = await canvas.findByRole("combobox", { name: "Message #general" });
     await userEvent.type(input, "Lunch at noon?{Shift>}{Enter}{/Shift}Anyone");
     await expect(input.querySelector("br")).not.toBeNull();
     await expect(input).toHaveTextContent("Lunch at noon?Anyone");

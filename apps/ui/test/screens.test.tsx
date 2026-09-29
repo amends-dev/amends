@@ -9,6 +9,7 @@ import conversationMeta, {
   TaskStates,
 } from "../src/components/conversation.stories.tsx";
 import groupMeta, {
+  Commands,
   Reply,
   Send,
   ThreadOpen,
@@ -237,6 +238,10 @@ describe("group threads screen", () => {
   it("sends to the group and toggles a reaction", async () => {
     viewport(1600);
     await stories.story(Send).run();
+  });
+  it("runs commands typed after / in place of posting them", async () => {
+    viewport(1600);
+    await stories.story(Commands).run();
   });
 });
 

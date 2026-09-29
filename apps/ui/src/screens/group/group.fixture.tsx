@@ -129,6 +129,9 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
   const [directoryQuery, setDirectoryQuery] = createSignal("");
   const [settings, setSettings] = createSignal(props.settings !== undefined);
   const [settingsTab, setSettingsTab] = createSignal<GroupSettingsTab>(props.settings ?? "general");
+  // Settings opened by /rename start with the name ready to edit.
+  const [renaming, setRenaming] = createSignal(false);
+  const [followed, setFollowed] = createSignal<Record<string, boolean>>({});
   const [name, setName] = createSignal("general");
   const [visibility, setVisibility] = createSignal<GroupVisibility>("private");
   const [members, setMembers] = createSignal(
@@ -294,6 +297,28 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                       }
                       taskHref={(key) => `#${key}`}
                       placeholder={`Message #${group().name}`}
+                      commands={[
+                        followed()[group().id]
+                          ? { name: "unfollow", description: `Stop following #${group().name}` }
+                          : {
+                              name: "follow",
+                              description: `Follow #${group().name} to take part in its new threads`,
+                            },
+                        { name: "rename", description: `Rename #${group().name}` },
+                      ]}
+                      onCommand={(command) => {
+                        if (command === "rename") {
+                          setSettingsTab("general");
+                          setRenaming(true);
+                          setSettings(true);
+                          return;
+                        }
+                        const following = command === "follow";
+                        setFollowed({ ...followed(), [group().id]: following });
+                        toast(
+                          following ? `Following #${group().name}` : `Unfollowed #${group().name}`,
+                        );
+                      }}
                       draft={drafts()[group().id] ?? ""}
                       onDraftChange={(text) => setDrafts({ ...drafts(), [group().id]: text })}
                       onSend={(text) => {
@@ -405,8 +430,10 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
       </Show>
       <GroupSettings
         open={settings()}
+        focusName={renaming()}
         onClose={() => {
           setSettings(false);
+          setRenaming(false);
           setName(current()?.name ?? "general");
           setVisibility(current()?.visibility ?? "private");
         }}

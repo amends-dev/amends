@@ -1,6 +1,7 @@
 export * as Composer from "./composer.tsx";
 export type {
   AlertProps as ComposerAlertProps,
+  ComposerCommand,
   InputProps as ComposerInputProps,
   MentionCandidate,
   RootProps as ComposerRootProps,

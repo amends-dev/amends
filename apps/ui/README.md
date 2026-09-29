@@ -142,7 +142,9 @@ text pasted outside code reads as markdown. A link's address, from the toolbar o
 a form above the composer; web and email addresses link, and a bare domain is a web address. Given
 `mentionCandidates`, typing `@` opens suggestions above the composer: arrows move, Enter or Tab
 choose, inserting the member as one piece that deletes whole and is written as their mention link,
-and Escape closes; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a
+and Escape closes. Given `commands` (a name and what it does), typing "/" as the whole draft lists
+those starting with what follows it the same way; choosing one clears the draft and calls
+`onCommand` in place of sending, and "/" anywhere else, or after Escape, is text; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a
 send failed. Phones use 16px message and field text so the page does not zoom, and give reactions
 and the reply summary 44px targets.
 
@@ -249,7 +251,7 @@ it words notes such as "Sara followed this thread" or "You were removed from the
 (`IconBellFilled`) while following; `GroupPane` takes the tabs to show (with one, the tab row is
 left out) and optional settings, search, and member actions. `ThreadPane` can add a "N replies" divider after the first
 message. `GroupSettings` can lock visibility, disable renaming, hide adding and leaving, and
-report change errors; for a direct conversation it shows only members, and for the workspace's
+report change errors, and `focusName` opens it with the name selected for a rename; for a direct conversation it shows only members, and for the workspace's
 `general` group it says everyone belongs and offers no Leave; the apps hide adding there too. `GroupDirectory` takes
 optional member counts and links, `previews={false}` when unjoined groups cannot be read, a join
 error, and loading states. `InboxPane` is the Inbox from the Lunacy Inbox frames: All and
