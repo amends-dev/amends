@@ -1,5 +1,5 @@
-import { afterEach, expect, it } from "@effect/vitest";
-import { cleanup, render } from "@solidjs/testing-library";
+import { afterEach, expect, it, vi } from "@effect/vitest";
+import { cleanup, fireEvent, render, within } from "@solidjs/testing-library";
 import { Theme } from "../src/foundations/theme/index.ts";
 import { Timeline, type TimelineEntry } from "../src/screens/timeline/index.ts";
 
@@ -80,4 +80,25 @@ it("keeps a stacked message's author and time for assistive technology", () => {
   expect(second).toHaveAttribute("data-continued");
   expect(second!.textContent).toContain("ada");
   expect(second!.querySelector("time")?.getAttribute("dateTime")).toBe(minute(1).toISOString());
+});
+
+it("offers a thread's opening message Reply in thread among its actions", () => {
+  const open = vi.fn<(messageId: string) => void>();
+  const view = render(() => (
+    <Theme mode="light">
+      <Timeline
+        entries={[message("o1", "ada", minute(0), 0), message("o2", "bo", minute(1))]}
+        activeId="o1"
+        onOpenThread={open}
+      />
+    </Theme>
+  ));
+  const [opener, reply] = view.container.querySelectorAll("article");
+  const actions = within(opener!).getByRole("group", { name: "Message actions" });
+  const action = within(actions).getByRole("button", { name: "Reply in thread" });
+  expect(action).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(action);
+  expect(open).toHaveBeenCalledWith("o1");
+  // A message in a thread has nothing to reply in.
+  expect(within(reply!).queryByRole("group", { name: "Message actions" })).toBeNull();
 });

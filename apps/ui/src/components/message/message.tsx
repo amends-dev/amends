@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { Avatar, AvatarStack, type AvatarStackPerson } from "../avatar/index.ts";
+import { IconButton, type IconButtonProps } from "../icon-button/index.ts";
 import { TaskStatus, type TaskState } from "../task-status/index.ts";
 import { TurnActivity, type TurnState } from "../turn-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
@@ -133,6 +134,32 @@ export function Activity(props: ActivityProps) {
       {local.children}
     </div>
   );
+}
+
+export type ActionsProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "role">;
+
+/**
+ * What the reader can do with the message, such as reply in its thread, as Action buttons floating
+ * at its top right while the message is under the pointer or holds focus. It takes no room in the
+ * message, and touch screens, with no pointer to hover, do not show it.
+ */
+export function Actions(props: ActionsProps) {
+  const [local, native] = splitProps(props, ["class", "aria-label"]);
+  return (
+    <div
+      {...native}
+      role="group"
+      aria-label={local["aria-label"] ?? "Message actions"}
+      class={classes(s.actions, local.class)}
+    />
+  );
+}
+
+export type ActionProps = Omit<IconButtonProps, "size">;
+
+/** One of the message's Actions: an icon, named by its label and tooltip. */
+export function Action(props: ActionProps) {
+  return <IconButton {...props} />;
 }
 
 export type ReactionsProps = JSX.HTMLAttributes<HTMLDivElement>;
@@ -273,8 +300,9 @@ export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "chil
 };
 
 /**
- * Opens the thread of a message with no replies yet. It shows while the message is hovered or
- * focused, and always on touch screens.
+ * Opens the thread of a message with no replies yet. Where there is a pointer, the message's Actions
+ * offer the reply, so this shows only while someone is typing there or an agent is at work in it,
+ * saying so alone. Touch screens, with no Actions, always show it as "Reply in thread".
  */
 export function Reply(props: ReplyProps) {
   const [local, native] = splitProps(props, ["note", "activity", "class"]);

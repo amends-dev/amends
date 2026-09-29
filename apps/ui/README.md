@@ -160,8 +160,12 @@ keep their elements as streamed text grows.
 
 A message takes its time as text or as `at`, a `Date` it words as the time of day with the full
 date as its title. The reply summary adds an unread dot and a note such as who is typing; a
-message with no replies offers `Message.Reply` ("Reply in thread"), shown while the message is
-hovered or focused where there is a pointer, and always on touch screens. `focused` sets a
+message under the pointer, or holding focus, is lit and floats `Message.Actions` at its top right, a
+bordered row of `Message.Action` icon buttons that takes no room in the message; the timeline puts
+Reply in thread there for every thread's opening message. Touch screens, with nothing to hover,
+show no Actions: there a message with no replies offers `Message.Reply` ("Reply in thread") under
+it. Elsewhere it shows only while someone is typing or an agent is at work in the thread, and says
+just that, such as "Yumi working", which also opens the thread. `focused` sets a
 message apart and scrolls to it. `continued` stacks a message under its author's one before, 6px
 beneath it with no avatar or name, its time in the avatar's place while hovered or focused;
 assistive technology still hears the author and time. Screens word times, days, and typing through `internal/when.ts`,

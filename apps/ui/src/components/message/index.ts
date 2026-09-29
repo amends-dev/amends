@@ -1,5 +1,7 @@
 export * as Message from "./message.tsx";
 export type {
+  ActionProps as MessageActionProps,
+  ActionsProps as MessageActionsProps,
   ActivityProps as MessageActivityProps,
   Author as MessageAuthor,
   ReactionProps as MessageReactionProps,

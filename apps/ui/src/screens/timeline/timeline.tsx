@@ -1,6 +1,6 @@
 import { For, Match, Show, Switch, createMemo } from "solid-js";
 import { Keyed } from "../../internal/keyed.tsx";
-import { IconCheck, IconMarkNew, IconMarkResources } from "@amends/icons";
+import { IconCheck, IconMarkNew, IconMarkReply, IconMarkResources } from "@amends/icons";
 import type { AvatarStackPerson } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import {
@@ -293,6 +293,16 @@ export function Timeline(props: TimelineProps) {
                         />
                       </Show>
                     )}
+                  </Show>
+                  <Show when={props.onOpenThread && message().thread}>
+                    <Message.Actions>
+                      <Message.Action
+                        icon={IconMarkReply}
+                        label="Reply in thread"
+                        aria-expanded={props.activeId === message().id}
+                        onClick={() => props.onOpenThread?.(message().id)}
+                      />
+                    </Message.Actions>
                   </Show>
                 </Message.Root>
               )}

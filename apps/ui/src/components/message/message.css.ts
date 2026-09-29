@@ -6,6 +6,8 @@ import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
 // Avatar, then a column of author line, text, and extras 4px apart.
 export const message = style({
   position: "relative",
+  // Its own layer, so the hover band sits behind its content but in front of the pane.
+  isolation: "isolate",
   display: "grid",
   gridTemplateColumns: "2rem minmax(0, 1fr)",
   columnGap: "0.75rem",
@@ -41,7 +43,42 @@ export const message = style({
         "&[data-continued][data-active]": { marginBlockStart: "-1.5rem" },
       },
     },
+    // Under the pointer, a quiet band reaching as the open thread's does, behind the text.
+    "(hover: hover)": {
+      selectors: {
+        "&:hover:not([data-active])::after": {
+          content: '""',
+          position: "absolute",
+          inset: "-0.375rem -0.75rem",
+          zIndex: -1,
+          backgroundColor: vars.color.surface.hover,
+          pointerEvents: "none",
+        },
+      },
+    },
   },
+});
+
+// Actions float over the message's top right edge, as a popover does, while it is under the
+// pointer or holds focus. Touch screens reply from Reply instead.
+export const actions = style({
+  position: "absolute",
+  top: "-1.125rem",
+  insetInlineEnd: 0,
+  zIndex: 1,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.125rem",
+  padding: "0.125rem",
+  border: `1px solid ${vars.color.border.default}`,
+  backgroundColor: vars.color.surface.popover,
+  boxShadow: vars.shadow.popover,
+  opacity: 0,
+  pointerEvents: "none",
+  selectors: {
+    [`${message}:hover &, ${message}:focus-within &`]: { opacity: 1, pointerEvents: "auto" },
+  },
+  "@media": { "(hover: none)": { display: "none" } },
 });
 
 // A stacked message's time, in the avatar's place, while the pointer or focus is on it.
@@ -262,7 +299,7 @@ export const repliesNote = style({
   textOverflow: "ellipsis",
 });
 
-// "Reply in thread" waits for the message to be hovered or focused where there is a pointer.
+// "Reply in thread" shows where there is no pointer, or while it notes typing or an agent's work.
 export const reply = style({
   display: "inline-flex",
   alignItems: "center",
@@ -279,15 +316,12 @@ export const reply = style({
     "&:hover": { color: vars.color.text.primary },
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
   },
-  "@media": {
-    "(hover: hover)": {
-      selectors: {
-        [`${message}:not(:hover):not(:focus-within) &:not([data-noted])`]: {
-          opacity: 0,
-        },
-      },
-    },
-  },
+  "@media": { "(hover: hover)": { selectors: { "&:not([data-noted])": { display: "none" } } } },
 });
 
-export const replyLabel = style({ ...typeScale.control, fontWeight: fontWeight.medium });
+// Where there is a pointer, the message's Actions offer the reply, so only what it notes shows.
+export const replyLabel = style({
+  ...typeScale.control,
+  fontWeight: fontWeight.medium,
+  "@media": { "(hover: hover)": { display: "none" } },
+});
