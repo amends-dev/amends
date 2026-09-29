@@ -3,6 +3,7 @@ import { ConnectionId } from "../connection/id.ts";
 import { EnvironmentId } from "../environment/id.ts";
 import { GroupId } from "../group/id.ts";
 import { Identity } from "../identity/identity.ts";
+import { Log } from "../journal/log.ts";
 import { Notification } from "../notification/notification.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadMessageId } from "../thread/message/id.ts";
@@ -67,14 +68,17 @@ export const Record = Schema.Struct({
   /** The participation the attempt's input came through. */
   participationId: ThreadParticipationId.Id,
   /**
-   * The agent's turn before this one in the same participation, whose view this one continues
-   * from; fixed when the turn is created, and none for the first after joining.
+   * Where this turn's entries begin in the agent's log for the thread: after this position, or at
+   * the start of an empty log. Fixed when the turn is created, since only one turn of an agent
+   * writes there at a time.
    */
-  previousTurnId: Schema.NullOr(Id),
+  logAfter: Schema.NullOr(Log.Position),
   /**
-   * The failed or stopped turn this one runs again, which is also its previous turn: it asks for a
-   * fresh response in place of one that turn left unfinished.
+   * The checkpoint in that log the turn's history starts from, or none while the log has none:
+   * the latest when the turn was created, or one the turn recorded itself.
    */
+  historyFrom: Schema.NullOr(Log.Position),
+  /** The failed or stopped turn this one runs again, whose work it continues from. */
   retryOf: Schema.NullOr(Id),
   status: Status,
   inputAfterSequence: Sequence,

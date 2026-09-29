@@ -112,8 +112,9 @@ databases.
 `agents` holds agents' configuration, one row per agent with its model access as columns and a
 unique membership per workspace. `turns` holds agents' attempts, with a partial unique index that
 allows one active turn per agent and thread, and the selection a turn ran with as columns set all
-together or not at all. Each turn names the turn before it and the one it retries, and holds
-the replies it published as a text array in order. A notification an agent accepted into a turn is
+together or not at all. Each turn holds where it begins in its agent's log for the thread, the
+checkpoint its history starts from, the turn it retries, and the replies it published as a text
+array in order. A notification an agent accepted into a turn is
 `Accepted`, with its turn and time. Adding them replaced the development baseline too; recreate
 disposable PostgreSQL databases when adopting it.
 

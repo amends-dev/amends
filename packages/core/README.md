@@ -241,19 +241,19 @@ one thread: `queued` until execution takes it, `running`, `cancelling` once aske
 `completed`, `failed`, or `cancelled`, never reopening. An agent has at most one active turn per
 thread, which the stores enforce. Its input is tracked by timeline position: after
 `inputAfterSequence` is the attempt's to handle, through `acceptedThroughSequence` it has accepted,
-and through `incorporatedThroughSequence` the harness has confirmed taking in. It records the turn
-before it (`previousTurnId`), whose log it continues from, and the turn it retries (`retryOf`), the
-model access and environment it ran with when execution starts, the replies it published, and why
-it failed or was asked to stop.
+and through `incorporatedThroughSequence` the harness has confirmed taking in. It records where its
+entries begin in its agent's log for the thread (`logAfter`), the checkpoint its history starts from
+(`historyFrom`), the turn it retries (`retryOf`), the model access and environment it ran with when
+execution starts, the replies it published, and why it failed or was asked to stop.
 
 Agents handle their own notifications as people do theirs. `TurnAcceptance`, the `turn.accept`
 background process, acts as each agent: its pending work notifications on a thread join the
 active turn there, or start a new one, and the same commit settles them as `Acknowledged` with
 outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, and while
-the agent cannot open the thread. A new turn links to the agent's latest turn in the same
-participation, fixed when it is created, and its input starts where that turn stopped taking input
-in, so what a cancelled or failed turn accepted but never took in is the next turn's to handle.
-After joining or rejoining, a turn links to none. It wakes on activity that requests an agent's
+the agent cannot open the thread. A new turn's input starts where the agent's latest turn in the
+same participation stopped taking input in, so what a cancelled or failed turn accepted but never
+took in is the next turn's to handle; its entries follow what the agent's log holds when it is
+created, and its history starts from that log's latest checkpoint. It wakes on activity that requests an agent's
 work and on turns ending. Each run reads every active agent's pending work a page at a time,
 passing over work that must wait, and accepts work for at most a hundred threads before asking to
 run again; a run that finds only waiting work ends idle, so it never runs again at once without
@@ -261,17 +261,20 @@ progress. A second process, `turn.stop-departed`, stops the turns of agents whos
 ended: a queued one at once, a running one by asking. It wakes on participation and group
 departures and checks each agent's own active turns, including agents no longer members.
 
-Each turn has its own log apart from the journal, `TurnLog`: the input execution `Submitted` with
-the position it covers, each `Harness` event (a response block by block, its finish, tool starts
-and results), each `Environment` event such as becoming ready, and `Interrupted` stops. The agent's
-memory of a thread is the chain of these logs
-([core model](../../docs/core-model.md#agreed-an-agents-memory-in-a-thread-is-a-chain-of-turn-logs)).
-`TurnLog.read` is the one reading of a log: its harness events, how far input is taken in, the
-transcript execution continues from (an unfinished response left out), the view it hands the next
-turn (what an unfinished response wrote kept, pending calls answered), the replies it owes, and the
-items its readers see. `TurnExecution` is what a
+Each agent has one log for each participation in a thread, apart from the journal, `TurnLog`,
+and every entry names the turn that wrote it: the input execution `Submitted` with the position it
+covers, each `Harness` event (a response block by block, its finish, tool starts and results), each
+`Environment` event such as becoming ready, `Interrupted` stops, input `Requested` of a turn itself
+such as a retry, the thread's `History` before the first turn, and `Checkpoint`s that replace what
+came before them ([core model](../../docs/core-model.md#agreed-an-agents-memory-in-a-thread-is-one-log-of-its-turns)).
+Only one turn writes there at a time, so a turn's entries sit together after its `logAfter`.
+`TurnLog.read` is the one reading of a turn's entries: its harness events, how far input is taken
+in, its transcript and the view it leaves, the replies it owes, input asked of it, and the items its
+readers see. `TurnLog.context` reads the log for a turn from its latest checkpoint: earlier turns as
+the view each left, without reasoning, then the turn's own work. `TurnExecution` is what a
 host's runner drives, each step its own commit attributed to the turn's agent: `start` a queued
-turn with its selection, record `submitted` batches and what the environment and harness
+turn with its selection, which for a participation's first turn records the thread's history in
+the log, record a `checkpoint`, record `submitted` batches and what the environment and harness
 `report`, which advances incorporation once a batch is confirmed, and `close` it. Closing requires
 all accepted input taken in and no work still waiting for the agent on the thread, both checked in
 the closing commit; otherwise it reports `InputPending`. It then publishes every answer the turn
@@ -281,13 +284,15 @@ checks the agent may still open and post in the thread, and records completion w
 A turn can complete without a reply. `fail` and `stopped` end a turn and publish nothing. `prepare`
 assembles what a run needs from the stores: the agent's instructions, the model access and
 environment the turn started with or, before it starts, the agent's current ones, the connection's
-settings and key, the history, the accepted input not yet taken in, and the log. The history is
-the view the chain of earlier turns left, each log read over the one before it, starting from the
-messages among the hundred timeline entries before the chain began (the agent's own as
-responses); a retry replaces a response the turn it retries left unfinished. Until summaries
-exist, the chain is read back at most fifty turns or until it holds 300,000 characters, and the
-history keeps the newest exchanges that fit that many, starting at an input. Each message given
-as input or history is cut to 40,000 characters, saying how much was left out. It reports instead that the turn finished, is stopping, or can't run, as
+settings and key, the history and transcript read from the log, input asked of the turn and the
+thread's accepted input not yet taken in, and the turn's own entries. Before the first turn of a
+participation starts, its history is the thread's messages among the hundred timeline entries
+before its input (the agent's own as responses). When the transcript and waiting input would
+exceed 300,000 characters, `prepare` also proposes a checkpoint keeping the newest 75,000
+characters of exchanges, starting at an input, and the runner records it with a summary of the
+rest before working; `checkpoint` records it with `TurnFacts.Compacted`, from which the turn's and
+the next turn's history start. Each message given as input or history is cut to 40,000
+characters, saying how much was left out. It reports instead that the turn finished, is stopping, or can't run, as
 when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal, and `report` and
 `interrupted` publish `TurnLogged` after their commits, so readers read the log again.
@@ -308,8 +313,9 @@ the turn owes it as a reply, and interruptions, with when each was recorded, nev
 harness's own data. When they may also direct
 its agent (`agent.use`), `cancel` stops an active turn: a queued turn at once, a running one once
 execution confirms it. `retry` runs a failed or stopped turn again as a new queued turn, recorded
-as `TurnFacts.Retried`, for the same agent, participation, and input, continuing from the turn it
-retries with the input that turn took in, and running with the agent's current configuration. Only the agent's latest turn on
+as `TurnFacts.Retried`, for the same agent, participation, and input, continuing after the turn it
+retries in the agent's log with the input that turn took in, with who asked recorded as its new
+input, and running with the agent's current configuration. Only the agent's latest turn on
 the thread can be retried, while no other is active and the agent still takes part there;
 otherwise it is `NotRetryable` with the reason (`active`, `completed`, `superseded`, or
 `departed`). A retry is created after the turn it retries, even on a clock that has not moved, and

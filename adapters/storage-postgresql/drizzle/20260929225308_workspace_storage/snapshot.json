@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "3f3d5c3f-3daa-49a6-aa9a-1f448e235622",
+  "id": "441a467d-735f-4a9d-b722-cc4eb66e3a74",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -3061,14 +3061,27 @@
       "table": "turns"
     },
     {
-      "type": "text",
+      "type": "integer",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "previous_turn_id",
+      "name": "log_after",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turns"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "history_from",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"

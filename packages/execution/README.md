@@ -24,16 +24,21 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    reason `prepare` gives.
 2. Fail the turn if its environment has a sandbox, its harness is not among `harnesses`, or its
    connection's implementation is not among `models`. Otherwise `start` a queued turn with the
-   model access and environment it prepared with.
-3. Spawn the environment with a new session ID and the agent's instructions, and prepare the
-   harness with the history `prepare` gave, the view the agent's earlier turns in the thread left,
-   followed by what this turn's log recorded, so a run continuing an interrupted turn repeats no
-   input and asks for a fresh response in place of one left unfinished.
-4. Hand the harness the input the turn accepted and has not taken in, as one batch recorded as
-   `submitted` first. A batch is named by the position it reaches, so submitting the same input
-   again after a restart records it once. Without new input, `resume` a conversation that awaits
+   model access and environment it prepared with, and prepare again, since starting a
+   participation's first turn records the thread's history in the agent's log.
+3. When `prepare` proposes a checkpoint, record it first: the turn's model summarizes the older
+   history (`Compaction.summarize`), and if it fails or stays silent past `idleTimeout`, the
+   checkpoint keeps only the newest exchanges. Then prepare again.
+4. Spawn the environment with a new session ID and the agent's instructions, and prepare the
+   harness with the transcript `prepare` gave, read from the agent's log for the thread, so a run
+   continuing an interrupted turn repeats no input and asks for a fresh response in place of one
+   left unfinished.
+5. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
+   what it accepted from the thread, as one batch recorded as `submitted` first. A batch is named
+   by its turn and the position it reaches, so submitting the same input again after a restart
+   records it once. Without new input, `resume` a conversation that awaits
    a response.
-5. `report` what the environment and its harness report until the harness is idle: each completed
+6. `report` what the environment and its harness report until the harness is idle: each completed
    block, finished response, tool start and result, and the environment becoming ready; text and
    reasoning deltas are not recorded. Text deltas are shown to the thread's readers instead, as
    drafts: at most every 150 milliseconds, each block's new text in pieces of up to 1,500

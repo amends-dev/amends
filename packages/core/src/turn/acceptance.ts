@@ -9,7 +9,7 @@ import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { Performer } from "../identity/performer.ts";
 import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
+import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Notification } from "../notification/notification.ts";
@@ -22,6 +22,7 @@ import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { TurnFacts } from "./facts.ts";
+import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
@@ -41,6 +42,7 @@ export type Error =
   | TurnStore.Conflict
   | Schema.SchemaError
   | PlatformError.PlatformError
+  | Log.ReadError
   | Log.WriteError
   | Projection.Error
   | InvalidResponse;
@@ -74,6 +76,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   const access = yield* ThreadAccess.Service;
   const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
+  const log = yield* Log.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -174,10 +177,10 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       });
       return true;
     }
-    // The turn continues from this agent's previous turn in the same participation, fixed now so
-    // its history never changes: input starts where that turn stopped taking it in, and what it
-    // accepted but never took in is still this turn's to handle. After joining, input starts just
-    // before the participation began and history comes from the thread.
+    // Input starts where this agent's previous turn in the same participation stopped taking it
+    // in, so what it accepted but never took in is still this turn's to handle; after joining, just
+    // before the participation began. The turn's entries follow what the agent's log for the
+    // thread holds now, and its history starts from that log's latest checkpoint.
     const participationId = pending.at(-1)!.participationId!;
     const participation = yield* participations.get(participationId);
     if (Option.isNone(participation))
@@ -200,7 +203,8 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       agentId: agent.id,
       memberId: agent.memberId,
       participationId,
-      previousTurnId: Option.isSome(previous) ? previous.value.id : null,
+      logAfter: Option.getOrNull(yield* TurnLog.open(log, participationId).head),
+      historyFrom: Option.isSome(previous) ? previous.value.historyFrom : null,
       retryOf: null,
       status: "queued",
       inputAfterSequence,

@@ -484,7 +484,7 @@ export const turns = (harness: ConformanceHarness) => {
                 status: "queued",
                 agentId: agent.id,
                 participationId: failed!.participationId,
-                previousTurnId: failed!.id,
+                historyFrom: failed!.historyFrom,
                 retryOf: failed!.id,
                 inputAfterSequence: failed!.inputAfterSequence,
                 acceptedThroughSequence: failed!.acceptedThroughSequence,
@@ -506,23 +506,44 @@ export const turns = (harness: ConformanceHarness) => {
                 { status: "failed", stoppable: false, retryable: false },
               ]);
 
-              // It continues from the input the failed turn took in, with nothing left to submit.
-              const preparation = yield* execute(
-                workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) => execution.prepare(retried.id)),
-              );
-              expect(preparation).toMatchObject({
+              // It continues from what the failed turn took in, and its input is who asked again.
+              expect(
+                yield* execute(
+                  workspace.id,
+                  Effect.flatMap(TurnExecution.Service, (execution) =>
+                    execution.prepare(retried.id),
+                  ),
+                ),
+              ).toMatchObject({
                 _tag: "Ready",
-                plan: { history: [input("Scout, draft the notes.")] },
+                plan: {
+                  history: [input("Scout, draft the notes.")],
+                  pending: {
+                    throughSequence: failed!.incorporatedThroughSequence,
+                    items: [
+                      {
+                        _tag: "Input",
+                        content: [{ _tag: "Text", text: "Please try that again." }],
+                      },
+                    ],
+                  },
+                },
               });
-              expect(preparation._tag === "Ready" && preparation.plan.pending).toBeUndefined();
               // A turn that closed with its reply is done.
+              const request = batch(`${retried.id}/retry`, "Please try that again.");
               yield* execute(
                 workspace.id,
                 Effect.flatMap(TurnExecution.Service, (execution) =>
                   Effect.gen(function* () {
                     yield* execution.start(retried.id, selection);
-                    yield* execution.report(retried.id, reported(...answered("r1", "The notes.")));
+                    yield* execution.submitted(retried.id, {
+                      batchId: request.id,
+                      throughSequence: failed!.incorporatedThroughSequence,
+                    });
+                    yield* execution.report(
+                      retried.id,
+                      reported(took(request), ...answered("r1", "The notes.")),
+                    );
                     yield* execution.close(retried.id);
                   }),
                 ),
@@ -538,7 +559,7 @@ export const turns = (harness: ConformanceHarness) => {
     );
 
     it.effect(
-      "the next turn continues from the last one's log, taking in only what came after it",
+      "the next turn continues from the agent's log in the thread, taking in only what came after",
       () =>
         harness.withStorage((storage) =>
           runGateway(
@@ -561,7 +582,8 @@ export const turns = (harness: ConformanceHarness) => {
               };
               yield* accept(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
-              expect(first).toMatchObject({ previousTurnId: null, retryOf: null });
+              // The agent's log for the thread is empty, with no checkpoint yet.
+              expect(first).toMatchObject({ logAfter: null, historyFrom: null, retryOf: null });
               // The first turn records reasoning and an answer, then closes.
               const asked = batch("b1", "Scout, when is the deploy?");
               yield* execute(
@@ -594,15 +616,16 @@ export const turns = (harness: ConformanceHarness) => {
               yield* accept(workspace.id);
               const [second] = yield* turnsOf(workspace.id, threadId);
               expect(second).toMatchObject({
-                previousTurnId: first!.id,
+                historyFrom: null,
                 inputAfterSequence: started.activity.sequence,
               });
-              // Its history is the first turn's log, reasoning and all, rather than the thread's
-              // messages; the posted reply is not taken in again as input.
+              expect(second!.logAfter).not.toBeNull();
+              // Its history is what the agent's log holds, not the thread's messages: the posted
+              // reply is not taken in again, and the first turn's reasoning stayed with that turn.
               const answer = {
                 _tag: "Response",
                 id: Transcript.ResponseId.make("s1/1"),
-                parts: [reasoning, { _tag: "Text", text: "Thursday." }],
+                parts: [{ _tag: "Text", text: "Thursday." }],
               } satisfies Transcript.Response;
               expect(yield* prepare(second!.id)).toMatchObject({
                 _tag: "Ready",
@@ -654,7 +677,8 @@ export const turns = (harness: ConformanceHarness) => {
               const last = yield* reply(workspace.id, threadId, "Never mind, just the date.");
               yield* accept(workspace.id);
               const [third] = yield* turnsOf(workspace.id, threadId);
-              expect(third).toMatchObject({ previousTurnId: second!.id, retryOf: null });
+              expect(third).toMatchObject({ retryOf: null });
+              expect(third!.logAfter!).toBeGreaterThan(second!.logAfter!);
               expect(yield* prepare(third!.id)).toMatchObject({
                 _tag: "Ready",
                 plan: {
@@ -669,6 +693,59 @@ export const turns = (harness: ConformanceHarness) => {
                     },
                   ],
                   pending: { throughSequence: last.activity.sequence },
+                },
+              });
+
+              // A checkpoint replaces what came before it, for this turn and the next.
+              const summary = "Asked when the deploy is: Thursday. Then about the rollback plan.";
+              const dateOnly = batch("b3", "Never mind, just the date.");
+              const recorded = yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) =>
+                  Effect.gen(function* () {
+                    yield* execution.start(third!.id, selection);
+                    return yield* execution.checkpoint(third!.id, { summary, kept: [] });
+                  }),
+                ),
+              );
+              expect(recorded.historyFrom).not.toBeNull();
+              const opening = {
+                _tag: "Input",
+                author: { id: "checkpoint" },
+                content: [{ _tag: "Text", text: summary }],
+              };
+              expect(yield* prepare(third!.id)).toMatchObject({
+                _tag: "Ready",
+                plan: { history: [opening], transcript: [opening] },
+              });
+              yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) =>
+                  Effect.gen(function* () {
+                    yield* execution.submitted(third!.id, {
+                      batchId: dateOnly.id,
+                      throughSequence: last.activity.sequence,
+                    });
+                    yield* execution.report(
+                      third!.id,
+                      reported(took(dateOnly), ...answered("s3/1", "Thursday.")),
+                    );
+                    yield* execution.close(third!.id);
+                  }),
+                ),
+              );
+              yield* reply(workspace.id, threadId, "Thanks.");
+              yield* accept(workspace.id);
+              const [fourth] = yield* turnsOf(workspace.id, threadId);
+              expect(fourth).toMatchObject({ historyFrom: recorded.historyFrom });
+              expect(yield* prepare(fourth!.id)).toMatchObject({
+                _tag: "Ready",
+                plan: {
+                  history: [
+                    opening,
+                    input("Never mind, just the date."),
+                    { _tag: "Response", parts: [{ _tag: "Text", text: "Thursday." }] },
+                  ],
                 },
               });
             }),
@@ -719,7 +796,7 @@ export const turns = (harness: ConformanceHarness) => {
               );
               expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
               const [next] = yield* turnsOf(workspace.id, threadId);
-              expect(next).toMatchObject({ status: "queued", previousTurnId: first!.id });
+              expect(next).toMatchObject({ status: "queued", retryOf: null });
             }),
           ),
         ),

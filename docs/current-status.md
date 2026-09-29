@@ -20,10 +20,15 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   Turns are conversation only: agents have no tools, and environments with a sandbox fail their
   turns. A turn posts every answer it completed when it closes, one message each, so an answer
   given before more input arrived is posted after that input; a turn that fails or is stopped
-  posts nothing, even answers it completed. Each turn continues from the logs of the agent's
-  earlier turns in the thread, but nothing summarizes them yet: the chain is read back at most
-  fifty turns, the oldest exchanges beyond 300,000 characters are left out, and one message beyond
-  40,000 characters is cut, so a long thread's start is forgotten. A stopped response keeps only
+  posts nothing, even answers it completed. Each turn continues from the agent's log for the thread, read from its latest
+  checkpoint. When a turn's history and waiting input pass 300,000 characters, the agent's model
+  summarizes the older part before the turn works, keeping the newest 75,000 characters verbatim;
+  if summarizing fails, the older part is left out with a note. Size is counted in characters, not
+  the tokens providers report, and no model's own context window is known, so one budget serves
+  every model. Summaries happen before a turn rather than in the background after one, old tool
+  output is not shortened first, a provider that reports the context too long partway through a
+  turn fails it, and no tool lets an agent recall exact earlier content. One message beyond 40,000
+  characters is cut. A stopped response keeps only
   the blocks it completed. Its text streams to readers as signals, best effort: a draft missed
   while reconnecting shows once its block completes. A stop request is noticed by polling, within a
   second. A model that sends nothing for five minutes while a turn waits on it interrupts the run,

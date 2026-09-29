@@ -27,7 +27,8 @@ const queued = Schema.decodeUnknownSync(Turn.Record)({
   agentId: "agent-one",
   memberId: "member-agent",
   participationId: "participation-one",
-  previousTurnId: null,
+  logAfter: null,
+  historyFrom: null,
   retryOf: null,
   status: "queued",
   inputAfterSequence: 0,
@@ -89,6 +90,9 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     steps: [] as Array<string>,
     drafts: [] as Array<{ responseId: string; part: number; offset: number; text: string }>,
     replies: [] as Array<string>,
+    /** A checkpoint the next plan asks for, until one is recorded. */
+    compaction: undefined as TurnLog.Compaction | undefined,
+    checkpoints: [] as Array<{ summary: string | null; kept: ReadonlyArray<Transcript.Item> }>,
   };
   const change = (changes: Partial<Turn.Record>) => {
     state.turn = Turn.change(state.turn, changes);
@@ -105,18 +109,21 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
           message.sequence <= state.turn.acceptedThroughSequence,
       )
       .map((message) => input(message.text));
+    const context = TurnLog.context(state.log, turnId);
     return {
       turn: state.turn,
       instructions: "Be brief.",
       selection: state.turn.selection ?? selection,
       connection: { implementationId: "test", settings: {}, credential: undefined },
       environment: environment(options.sandbox ?? false),
-      history: [],
+      history: context.history,
+      transcript: context.transcript,
       pending:
         first === undefined
           ? undefined
           : { throughSequence: state.turn.acceptedThroughSequence, items: [first, ...rest] },
       log: [...state.log],
+      compaction: state.compaction,
     };
   };
   const execution: TurnExecution.Interface = {
@@ -143,12 +150,20 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
             ({ entry }) => entry._tag === "Submitted" && entry.batchId === batch.batchId,
           )
         )
-          state.log.push({ entry: { _tag: "Submitted", ...batch }, at });
+          state.log.push({ entry: { _tag: "Submitted", turnId, ...batch }, at });
       }),
     report: (_, events) =>
       Effect.sync(() => {
         for (const event of events) state.steps.push(`report ${event.event._tag}`);
-        state.log.push(...events.map((event) => ({ entry: event, at })));
+        state.log.push(
+          ...events.map((event): TurnLog.Recorded => ({
+            entry:
+              event._tag === "Harness"
+                ? { _tag: "Harness", turnId, event: event.event }
+                : { _tag: "Environment", turnId, event: event.event },
+            at,
+          })),
+        );
         change({
           incorporatedThroughSequence: TurnLog.read(state.log).incorporatedThrough(
             state.turn.inputAfterSequence,
@@ -163,7 +178,17 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     interrupted: (_, stop) =>
       Effect.sync(() => {
         state.steps.push(`interrupted ${stop.retryable ? "retryable" : "final"}`);
-        state.log.push({ entry: { _tag: "Interrupted", ...stop }, at });
+        state.log.push({ entry: { _tag: "Interrupted", turnId, ...stop }, at });
+      }),
+    checkpoint: (_, recorded) =>
+      Effect.sync(() => {
+        state.steps.push(
+          `checkpoint ${recorded.summary === null ? "without a summary" : "summarized"}`,
+        );
+        state.checkpoints.push({ ...recorded });
+        state.log.push({ entry: { _tag: "Checkpoint", turnId, ...recorded }, at });
+        state.compaction = undefined;
+        return state.turn;
       }),
     entries: () => Effect.sync(() => [...state.log]),
     close: () =>
@@ -205,10 +230,17 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
 };
 
 /** A model that answers each request with the next script and keeps every prompt it was sent. */
-const scripted = Effect.fnUntraced(function* (scripts: ReadonlyArray<Script>) {
+const scripted = Effect.fnUntraced(function* (
+  scripts: ReadonlyArray<Script>,
+  summary?: Effect.Effect<Array<Response.PartEncoded>, AiError.AiError>,
+) {
   const prompts: Array<Prompt.Prompt> = [];
+  const summarized: Array<Prompt.Prompt> = [];
   const model = yield* LanguageModel.make({
-    generateText: () => Effect.die(new Error("The harness streams.")),
+    generateText: (options) =>
+      summary === undefined
+        ? Effect.die(new Error("Only a checkpoint asks for a summary."))
+        : Effect.sync(() => summarized.push(options.prompt)).pipe(Effect.andThen(summary)),
     streamText: (options) =>
       Stream.suspend(() => {
         prompts.push(options.prompt);
@@ -231,7 +263,7 @@ const scripted = Effect.fnUntraced(function* (scripts: ReadonlyArray<Script>) {
         Layer.succeed(Model.ModelName, "test-model"),
       ),
   };
-  return { implementation, prompts };
+  return { implementation, prompts, summarized };
 });
 
 const reply = (value: string): Script =>
@@ -314,7 +346,7 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted through:1",
+        "submitted turn-one/through:1",
         "report Ready",
         "report InputIncorporated",
         "report BlockCompleted",
@@ -404,14 +436,14 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted through:1",
+        "submitted turn-one/through:1",
         "report Ready",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
         "report Idle",
         "close",
-        "submitted through:3",
+        "submitted turn-one/through:3",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -445,7 +477,7 @@ describe("TurnRunner", () => {
       yield* settle(fiber);
 
       expect(state.steps.slice(-6)).toEqual([
-        "submitted through:2",
+        "submitted turn-one/through:2",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -470,7 +502,7 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted through:1",
+        "submitted turn-one/through:1",
         "report Ready",
         "report InputIncorporated",
         "stopped",
@@ -493,7 +525,7 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted through:1",
+        "submitted turn-one/through:1",
         "report Ready",
         "report InputIncorporated",
         "interrupted retryable",
@@ -536,6 +568,68 @@ describe("TurnRunner", () => {
       ]);
       expect(state.steps.at(-1)).toBe("fail: The model sent nothing for 1 minute.");
       expect(state.turn.status).toBe("failed");
+    }),
+  );
+
+  it.effect("records a checkpoint with a summary before working when the history is too long", () =>
+    Effect.gen(function* () {
+      const { state, execution } = fakeExecution();
+      const older = [input("How was the launch?")];
+      const kept = [input("Anything else?")];
+      state.compaction = { summarize: older, kept };
+      const { implementation, prompts, summarized } = yield* scripted(
+        [reply("Noon is high tide.")],
+        Effect.succeed([
+          { type: "text", text: "The launch went well." },
+          {
+            type: "finish",
+            reason: "stop",
+            usage: { inputTokens: { total: 20 }, outputTokens: { total: 4 } },
+          },
+        ]),
+      );
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(state.steps.slice(0, 3)).toEqual([
+        "start",
+        "checkpoint summarized",
+        "submitted turn-one/through:1",
+      ]);
+      expect(state.checkpoints).toEqual([{ summary: "The launch went well.", kept }]);
+      expect(texts(summarized[0]).at(-1)).toContain("Alice: How was the launch?");
+      // The turn continues from the summary and the newest exchanges, then its input.
+      expect(texts(prompts[0])).toEqual([
+        "Be brief.",
+        "Summary of the earlier conversation: The launch went well.",
+        "Alice: Anything else?",
+        "Alice: What is the tide at noon?",
+      ]);
+      expect(state.replies).toEqual(["Noon is high tide."]);
+    }),
+  );
+
+  it.effect("keeps only the newest exchanges when the summary cannot be written", () =>
+    Effect.gen(function* () {
+      const { state, execution } = fakeExecution();
+      state.compaction = { summarize: [input("How was the launch?")], kept: [] };
+      const { implementation } = yield* scripted(
+        [reply("Noon is high tide.")],
+        Effect.fail(
+          AiError.make({
+            module: "Test",
+            method: "generateText",
+            reason: new AiError.RateLimitError({}),
+          }),
+        ),
+      );
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(state.steps[1]).toBe("checkpoint without a summary");
+      expect(state.turn.status).toBe("completed");
     }),
   );
 

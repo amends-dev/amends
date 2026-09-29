@@ -71,6 +71,13 @@ export const definition = Projection.make("turns", { version: 2 })
     }),
   )
   .on(
+    TurnFacts.Compacted,
+    Effect.fn("TurnProjection.compacted")(function* ({ payload }) {
+      const { store, turn } = yield* stored(payload);
+      yield* store.update(Turn.change(turn, { historyFrom: payload.historyFrom }));
+    }),
+  )
+  .on(
     TurnFacts.CancelRequested,
     Effect.fn("TurnProjection.cancelRequested")(function* ({ payload }) {
       const { store, turn } = yield* stored(payload);

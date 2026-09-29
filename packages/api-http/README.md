@@ -334,8 +334,9 @@ attempt at the work asked of it on a thread; the
 | `POST …/turns/:turnId/retry`    | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
 
 A turn reads as `Turn.View`: its status, input positions, the model access and environment it
-started with, the turn before it (`previousTurnId`) and the one it retries (`retryOf`), its replies'
-`messageIds` in order, `failure`, `cancelReason`, and times, with `stoppable` and
+started with, where it begins in its agent's log for the thread (`logAfter`) and the checkpoint its
+history starts from (`historyFrom`), the turn it retries (`retryOf`), its replies' `messageIds` in
+order, `failure`, `cancelReason`, and times, with `stoppable` and
 `retryable` for the caller. Stopping and retrying need permission to direct the agent (403
 otherwise). A turn in a thread the caller cannot open answers 404. `retry` takes an
 `Idempotency-Key`, so repeating it returns the turn it created.

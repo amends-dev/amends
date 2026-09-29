@@ -1023,7 +1023,7 @@ transcript can take it up.
 The transcript a harness continues from is the history the turn chose followed by the completed
 entries its events recorded: input the harness took in, the blocks of each response as they
 completed, and tool results. Streaming deltas and idleness add nothing to it. How a response that
-never finished counts is set by [the chain of turn logs](#agreed-an-agents-memory-in-a-thread-is-a-chain-of-turn-logs).
+never finished counts is set by [the log of its turns](#agreed-an-agents-memory-in-a-thread-is-one-log-of-its-turns).
 A tool call that was running when its execution stopped has no result, so it is never run again,
 consistent with [uncertain outcomes](#operation-deadlines-and-uncertain-outcomes). Incorporated
 input appears once, so continuation never submits it twice. Recovering after a failure,
@@ -1042,11 +1042,14 @@ The shared schema, the transcript rules, and amends's own in-process harness are
 [`@amends/harness`](../packages/harness/README.md) and
 [`@amends/harness-amends`](../packages/harness-amends/README.md).
 
-## Agreed: an agent's memory in a thread is a chain of turn logs
+## Agreed: an agent's memory in a thread is one log of its turns
 
-A turn's log is the record of everything its agent did in it, and the agent's memory of a thread
-is the chain of those logs. The thread's messages supply only what the agent has not taken in:
-the input since its last turn, and history from before its first.
+Each agent taking part in a thread has one log for that participation, holding everything its
+turns there did. Every entry names its turn, so the same log answers two questions: what one turn
+did, and what the agent knows in the thread. A turn starts from that log, not by reading the
+turns before it one by one, so starting a turn costs the same after two turns or two hundred. The
+thread's messages supply only what the agent has not taken in yet, and history from before its
+first turn.
 
 ### Harnesses report blocks as they complete
 
@@ -1063,34 +1066,50 @@ started did not happen and are dropped; one that started and has no result is an
 short, with its effect unknown, and is never run again. Within the turn, execution that continues
 asks for a fresh response and the unfinished one is left out of the transcript, unless it holds a
 call that started, which keeps it. When the turn ends with an unfinished response, as when
-someone stops it, the next turn sees what the agent had written before its new input.
+someone stops it, what the agent had written stays in its history.
 
-### A turn log links to the one before it
+### One log per participation, each entry naming its turn
 
-A turn records the agent's previous turn in the thread, fixed when the turn is created: the
-latest in the same participation, or none when the agent joined or rejoined since. A retry links
-to the turn it retries and carries over its input progress, so input that turn took in is not
-submitted again, and it asks for a fresh response in place of an unfinished one. The link is
-stored rather than looked up again, so a turn's history never changes after it is created, and a
-missing predecessor is an error instead of a quietly shorter memory. Only an ended turn can be
-linked, since new work waits for an active turn.
+Only one turn of an agent can be active in a thread, so a turn's entries sit together in the log,
+after the position the log had reached when the turn was created. The turn records that position,
+so reading one turn is a read from there until another turn's entries begin. Leaving and rejoining
+starts a new participation and so a new log: a rejoining agent starts fresh.
 
-### The next turn continues from the previous log's view
+Reading the log for the agent's history interprets its entries once, in order. Earlier turns'
+entries become the transcript they left, with what an unfinished response wrote kept and pending
+calls answered, and without reasoning, which is large, belongs to one provider, and is needed only
+within the turn that produced it. The current turn's entries continue that transcript, as the
+harness transcript rules above describe. Native data is used only by the harness, provider, and
+model that recorded it. The first turn of a participation records the thread's messages from before
+its input, others' as input and the agent's own as its responses, so later turns never read them
+from the thread again. A retry records who asked for it as new input in the retrying turn, after
+what the failed or stopped turn left, rather than rewriting that turn's history.
 
-A turn's view is its predecessor's view followed by its own log, read as a transcript: inputs,
-responses with their blocks and native data, and tool results. A turn continues from its
-predecessor's view, and from the thread's earlier messages when it has none. Its input is then
-the thread's activity after the input its predecessor took in, including messages not addressed
-to it and other agents' replies, attributed to their authors. Native data is used only by the
-harness, provider, and model that recorded it. An environment switch or a restart within a turn
-continues the same log; a new log starts only with a new turn.
+### Checkpoints bound what a turn reads
 
-### One reading of a log answers every question
+The history a turn continues from must fit a budget for its model. When the history and the input
+waiting for it would not fit, the turn records a checkpoint before working: a summary of the
+older history and, verbatim, the newest exchanges that fit a share of the budget, starting at an
+input so that no response is separated from its tool results. A checkpoint replaces everything
+before it, so each turn reads the log only from the latest checkpoint, which the turn records and
+the next turn starts from. A later checkpoint summarizes the earlier summary with what followed it,
+and the thread's opening request is part of every summary. When summarizing fails, the checkpoint
+keeps only the newest exchanges and says that earlier ones were left out, so a turn never fails for
+want of a summary. The model the turn runs with writes the summary. Between checkpoints the history
+only grows at its end, so the start of each request stays the same and providers' prompt caches
+keep working. The logs keep everything a summary replaced.
 
-One reading of a turn's log gives its transcript, the input it took in, the tool calls still
-pending, the replies it owes, and the entries its readers see. Nothing else interprets the log.
-The log also records what the environment reported, such as when it became ready and which
-sandbox it acquired, so recovery reacquires what the log names.
+Still to come: measuring size with the tokens providers report rather than characters, each model's
+own context window, summarizing in the background after a turn rather than before the next,
+shortening old tool output before summarizing, recovering when a provider reports the context too
+long partway through a turn, and a tool with which an agent recalls exact earlier content.
+
+### One reading of a turn's entries answers every question
+
+One reading of a turn's entries gives its transcript, the input it took in, the tool calls still
+pending, the replies it owes, and the entries its readers see. The log also records what the
+environment reported, such as when it became ready and which sandbox it acquired, so recovery
+reacquires what the log names.
 
 ### A turn posts every answer it completed
 
@@ -1099,15 +1118,6 @@ takes in more input, that answer is owed as a reply, since it answered what came
 last answer at closing is owed too. Closing publishes the owed replies in order, each as its own
 message, and records them with the turn. Text before a tool call stays in the log. A turn that
 fails or is stopped publishes nothing.
-
-### Compaction bounds the view
-
-The view a turn continues from fits a budget for its model. Until summaries exist, the oldest
-exchanges are left out, starting at an input so that no response is separated from its tool
-results, and a single input longer than a limit is shortened with a note saying so. A summary
-will be recorded in the log of the turn that makes it, as the point before which earlier logs are
-no longer read. Views stay verbatim until then, so the start of each request stays the same
-across turns.
 
 ## Agreed: agents start in an environment and execution can move
 
@@ -3297,9 +3307,9 @@ attempt. There is no requirement for separate turns or native prompt calls per m
 ### History and prompt are relative to each agent
 
 When a turn starts, its prompt consists of pending input for that agent. Already-handled
-input and other conversation supply history: the agent's own earlier turns through
-[their chained logs](#agreed-an-agents-memory-in-a-thread-is-a-chain-of-turn-logs), and the
-thread's messages from before its first. The relevant previous work is that agent's
+input and other conversation supply history: the agent's own
+[log of its turns](#agreed-an-agents-memory-in-a-thread-is-one-log-of-its-turns) in the thread,
+which begins with the thread's messages from before its first turn. The relevant previous work is that agent's
 own work: another agent answering a shared request does not mark the request handled on
 its behalf.
 

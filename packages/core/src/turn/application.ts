@@ -3,7 +3,7 @@ import type { PlatformError } from "effect";
 import { AgentPermissions } from "../agent/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
-import type { Actor } from "../identity/actor.ts";
+import { Actor } from "../identity/actor.ts";
 import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
@@ -13,6 +13,7 @@ import { RequestReceipts } from "../request/receipts.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
+import { MemberStore } from "../workspace/member/store.ts";
 import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
@@ -42,7 +43,12 @@ export type ChangeError =
   | Log.WriteError
   | Projection.Error;
 export type CancelError = ChangeError | NotActive;
-export type RetryError = ChangeError | NotRetryable | RequestReceipts.Error;
+export type RetryError =
+  | ChangeError
+  | NotRetryable
+  | RequestReceipts.Error
+  | MemberStore.Failure
+  | Log.ReadError;
 
 export interface Interface {
   readonly workspaceId: Turn.Record["workspaceId"];
@@ -70,8 +76,8 @@ export interface Interface {
   readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Service>;
   /**
    * Run a failed or stopped turn again, for a reader who may open its thread and direct its
-   * agent: a new turn for the same agent and input, which runs with the agent's current
-   * configuration. Only the agent's latest turn on the thread can be retried, while the agent
+   * agent: a new turn for the same agent and input, which continues from what that turn left and
+   * takes the request as new input, running with the agent's current configuration. Only the agent's latest turn on the thread can be retried, while the agent
    * still takes part there; otherwise it is NotRetryable. A request key makes a retry of it
    * return the turn it created.
    */
@@ -95,6 +101,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const access = yield* ThreadAccess.Service;
   const authorization = yield* Authorization.Service;
   const receipts = yield* RequestReceipts.Service;
+  const members = yield* MemberStore.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const crypto = yield* Crypto.Crypto;
@@ -105,6 +112,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       access.workspaceId,
       authorization.workspaceId,
       receipts.workspaceId,
+      members.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
@@ -219,17 +227,23 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
   const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
     const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
-    const handle = TurnLog.open(log, turn.id);
+    // The turn's entries sit together in its agent's log, from where it began until another turn's.
+    const handle = TurnLog.open(log, turn.participationId);
     const records: Array<TurnLog.Recorded> = [];
-    let after: Log.Position | undefined;
-    for (;;) {
+    let after = turn.logAfter ?? undefined;
+    reading: for (;;) {
       const batches = yield* handle.read(
         after === undefined ? { limit: 100 } : { after, limit: 100 },
       );
       if (batches.length === 0) break;
       for (const batch of batches) {
-        for (const entry of batch.entries)
+        for (const entry of batch.entries) {
+          if (entry.payload.turnId !== turn.id) {
+            if (records.length > 0) break reading;
+            continue;
+          }
           records.push({ entry: entry.payload, at: entry.recordedAt });
+        }
         after = batch.position;
       }
     }
@@ -290,8 +304,9 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
           yield* authorization.require([directs(turn)]);
           const reason = yield* retryBlock(turn);
           if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
-          // The same input, continuing from the failed or stopped turn with what it took in, and
-          // the agent's current model access and environment. It is created after the turn it
+          const handle = TurnLog.open(log, turn.participationId);
+          // The same input, continuing after the failed or stopped turn in the agent's log with what
+          // it took in, and the agent's current model access and environment. It is created after the turn it
           // retries, even on a clock that has not moved, so it is the agent's latest there.
           const now = yield* DateTime.now;
           const createdAt = DateTime.isGreaterThan(now, turn.createdAt)
@@ -305,7 +320,8 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             agentId: turn.agentId,
             memberId: turn.memberId,
             participationId: turn.participationId,
-            previousTurnId: turn.id,
+            logAfter: Option.getOrNull(yield* handle.head),
+            historyFrom: turn.historyFrom,
             retryOf: turn.id,
             status: "queued",
             inputAfterSequence: turn.inputAfterSequence,
@@ -320,6 +336,24 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             finishedAt: null,
           };
           yield* journal.publish(TurnFacts.Retried, created);
+          // Who asked is the retry's new input, after what the turn it retries left.
+          const actor = yield* Actor.Service;
+          const asker = yield* members.get(actor.memberId);
+          yield* handle.append({
+            _tag: "Requested",
+            turnId: created.id,
+            input: {
+              _tag: "Input",
+              author: {
+                id: actor.memberId,
+                name: Option.match(asker, {
+                  onNone: () => "A member",
+                  onSome: (member) => member.name ?? "A member",
+                }),
+              },
+              content: [{ _tag: "Text", text: "Please try that again." }],
+            },
+          });
           return created;
         }),
       );

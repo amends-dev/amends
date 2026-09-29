@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { Group } from "../group/group.ts";
 import { GroupId } from "../group/id.ts";
 import { Fact } from "../journal/fact.ts";
+import { Log } from "../journal/log.ts";
 import { Subject } from "../journal/subject.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadMessageId } from "../thread/message/id.ts";
@@ -73,6 +74,21 @@ export const InputIncorporated = Fact.make("turn.input-incorporated", {
     ...Where,
     turnId: Turn.Id,
     incorporatedThroughSequence: Turn.Record.fields.incorporatedThroughSequence,
+  }),
+});
+
+/**
+ * The turn recorded a checkpoint in its agent's log for the thread, from which its history, and
+ * the next turn's, now starts.
+ */
+export const Compacted = Fact.make("turn.compacted", {
+  version: 1,
+  audience,
+  subject,
+  payload: Schema.Struct({
+    ...Where,
+    turnId: Turn.Id,
+    historyFrom: Log.Position,
   }),
 });
 

@@ -13,8 +13,20 @@ import { Environment } from "@amends/environment";
 import { Gateway } from "@amends/gateway";
 import type { GatewayErrors } from "@amends/gateway";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
+import { Compaction } from "./compaction.ts";
 import type { Harness } from "@amends/harness";
-import { Clock, Context, Crypto, Duration, Effect, Layer, Pull, Result, Stream } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  Crypto,
+  Duration,
+  Effect,
+  Layer,
+  Pull,
+  Result,
+  Stream,
+} from "effect";
 import type { LanguageModel, Model } from "effect/unstable/ai";
 
 /** The model access an in-process harness takes: Effect AI's, from a connection's implementation. */
@@ -130,7 +142,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
     ) {
       // The same range of input always gets the same batch, so submitting it again after a
       // restart records it once.
-      const batchId = HarnessEvent.BatchId.make(`through:${pending.throughSequence}`);
+      const batchId = HarnessEvent.BatchId.make(`${turnId}/through:${pending.throughSequence}`);
       yield* step((execution) =>
         execution.submitted(turnId, { batchId, throughSequence: pending.throughSequence }),
       );
@@ -161,7 +173,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const running = spawned.success;
       yield* Effect.addFinalizer(() => Effect.ignore(running.release));
 
-      const transcript = TurnLog.read(plan.log).transcript(plan.history);
+      const transcript = plan.transcript;
       const summary = Transcript.summarize(transcript);
       if (Result.isFailure(summary))
         return unrunnable(`The conversation could not be continued: ${summary.failure}`);
@@ -286,6 +298,34 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       }
     });
 
+    /**
+     * Record a checkpoint before working: a summary of the older history from the turn's model, or,
+     * when that fails, only the newest exchanges, so a turn never fails for want of a summary.
+     */
+    const checkpoint = Effect.fnUntraced(function* (
+      plan: TurnExecution.Plan,
+      model: ModelInference.Implementation,
+      compaction: TurnLog.Compaction,
+    ) {
+      const summary = yield* Compaction.summarize(compaction.summarize).pipe(
+        Effect.provide(
+          model.languageModel(
+            { settings: plan.connection.settings, credential: plan.connection.credential },
+            { model: plan.selection.model },
+          ),
+        ),
+        Effect.timeout(idleTimeout),
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Summary not written; keeping the newest exchanges", {
+            workspaceId,
+            turnId,
+            cause: Cause.pretty(cause),
+          }).pipe(Effect.as(null)),
+        ),
+      );
+      yield* step((execution) => execution.checkpoint(turnId, { summary, kept: compaction.kept }));
+    });
+
     let retried = 0;
     for (;;) {
       const preparation = yield* prepare;
@@ -305,12 +345,16 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       if (model === undefined)
         return yield* fail(`${plan.connection.implementationId} models can't run on this server.`);
       if (plan.turn.status === "queued") {
-        const started = yield* step((execution) => execution.start(turnId, plan.selection)).pipe(
-          Effect.as(true),
-          // It was stopped before it started; preparing again finds it finished.
-          Effect.catchTag("TurnApplication.NotActive", () => Effect.succeed(false)),
+        // Starting may record the thread's history in the agent's log, so prepare again after it;
+        // a turn stopped before it started is found finished.
+        yield* step((execution) => execution.start(turnId, plan.selection)).pipe(
+          Effect.catchTag("TurnApplication.NotActive", () => Effect.void),
         );
-        if (!started) continue;
+        continue;
+      }
+      if (plan.compaction !== undefined) {
+        yield* checkpoint(plan, model, plan.compaction);
+        continue;
       }
 
       const ending = yield* session(plan, harness, model).pipe(

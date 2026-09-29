@@ -1,9 +1,11 @@
 import { HarnessEvent, Transcript } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
+import { TurnId } from "../../src/turn/id.ts";
 import { TurnLog } from "../../src/turn/log.ts";
 
 const at = DateTime.makeUnsafe("2026-09-29T12:00:00Z");
+const turnId = TurnId.Id.make("t1");
 const recorded = (...entries: ReadonlyArray<TurnLog.Entry>) =>
   entries.map((entry): TurnLog.Recorded => ({ entry, at }));
 const input = (text: string): Transcript.Input => ({
@@ -11,7 +13,11 @@ const input = (text: string): Transcript.Input => ({
   author: { id: "alice", name: "Alice" },
   content: [{ _tag: "Text", text }],
 });
-const harness = (event: HarnessEvent.Event): TurnLog.Entry => ({ _tag: "Harness", event });
+const harness = (event: HarnessEvent.Event, turn = turnId): TurnLog.Entry => ({
+  _tag: "Harness",
+  turnId: turn,
+  event,
+});
 const took = (id: string) =>
   harness({
     _tag: "InputIncorporated",
@@ -49,8 +55,8 @@ const replies = (...entries: ReadonlyArray<TurnLog.Entry>) =>
 describe("TurnLog.read", () => {
   it("counts input as taken in only through batches the harness incorporated", () => {
     const entries: ReadonlyArray<TurnLog.Entry> = [
-      { _tag: "Submitted", batchId: HarnessEvent.BatchId.make("b1"), throughSequence: 3 },
-      { _tag: "Submitted", batchId: HarnessEvent.BatchId.make("b2"), throughSequence: 5 },
+      { _tag: "Submitted", turnId, batchId: HarnessEvent.BatchId.make("b1"), throughSequence: 3 },
+      { _tag: "Submitted", turnId, batchId: HarnessEvent.BatchId.make("b2"), throughSequence: 5 },
       took("b1"),
     ];
     expect(TurnLog.read(recorded(...entries)).incorporatedThrough(1)).toBe(3);
@@ -104,6 +110,7 @@ describe("TurnLog.read", () => {
     const finished = TurnLog.read(
       recorded(took("b1"), ...responded("r1", [text("Done.")]), {
         _tag: "Interrupted",
+        turnId,
         reason: "Lost the connection.",
         retryable: true,
       }),
@@ -123,6 +130,141 @@ describe("TurnLog.read", () => {
       input("b1"),
       { _tag: "Response", id: "r1", parts: [text("Half an ans")] },
     ]);
+  });
+});
+
+describe("TurnLog.context", () => {
+  const earlier = TurnId.Id.make("t0");
+  const reasoning: Transcript.ResponsePart = { _tag: "Reasoning", text: "Thinking it over." };
+  const response = (id: string, ...parts: ReadonlyArray<Transcript.ResponsePart>) =>
+    ({ _tag: "Response", id: Transcript.ResponseId.make(id), parts }) satisfies Transcript.Response;
+  const tookFor = (turn: TurnId.Id, id: string) =>
+    harness(
+      {
+        _tag: "InputIncorporated",
+        batch: { id: HarnessEvent.BatchId.make(id), items: [input(id)] },
+      },
+      turn,
+    );
+  const block = (turn: TurnId.Id, id: string, part: number, value: Transcript.ResponsePart) =>
+    harness(
+      { _tag: "BlockCompleted", responseId: Transcript.ResponseId.make(id), part, block: value },
+      turn,
+    );
+  const finish = (turn: TurnId.Id, id: string) =>
+    harness(
+      { _tag: "ResponseFinished", responseId: Transcript.ResponseId.make(id), finish: "stop" },
+      turn,
+    );
+
+  it("reads earlier turns as they left the conversation, without their reasoning", () => {
+    const context = TurnLog.context(
+      recorded(
+        { _tag: "History", turnId: earlier, items: [input("before")] },
+        tookFor(earlier, "question"),
+        block(earlier, "r0", 0, reasoning),
+        block(earlier, "r0", 1, text("An answer.")),
+        finish(earlier, "r0"),
+        tookFor(turnId, "follow-up"),
+        block(turnId, "r1", 0, reasoning),
+      ),
+      turnId,
+    );
+    expect(context.begun).toBe(true);
+    expect(context.history).toEqual([
+      input("before"),
+      input("question"),
+      response("r0", text("An answer.")),
+    ]);
+    // The turn's own work continues; a response it has not finished is left out.
+    expect(context.transcript).toEqual([...context.history, input("follow-up")]);
+    expect(context.own.events).toHaveLength(2);
+  });
+
+  it("keeps what a stopped turn wrote, answering calls it left", () => {
+    const call = {
+      _tag: "ToolCall",
+      id: Transcript.ToolCallId.make("c1"),
+      name: "search",
+      params: {},
+    } satisfies Transcript.ToolCall;
+    const stopped = TurnLog.context(
+      recorded(
+        tookFor(earlier, "question"),
+        block(earlier, "r0", 0, text("Half an ans")),
+        tookFor(turnId, "again"),
+      ),
+      turnId,
+    );
+    expect(stopped.history).toEqual([input("question"), response("r0", text("Half an ans"))]);
+    const pending = TurnLog.context(
+      recorded(tookFor(earlier, "question"), block(earlier, "r0", 0, call), finish(earlier, "r0")),
+      turnId,
+    );
+    expect(pending.history.at(-1)).toEqual(HarnessEvent.notRun(call));
+  });
+
+  it("starts from the latest checkpoint, which replaces everything before it", () => {
+    const context = TurnLog.context(
+      recorded(
+        tookFor(earlier, "old"),
+        { _tag: "Checkpoint", turnId: earlier, summary: "They asked about the deploy.", kept: [] },
+        tookFor(earlier, "newer"),
+        { _tag: "Checkpoint", turnId, summary: "Deploy is Thursday.", kept: [input("latest")] },
+        tookFor(turnId, "now"),
+      ),
+      turnId,
+    );
+    expect(context.transcript).toEqual([
+      {
+        _tag: "Input",
+        author: TurnLog.checkpointAuthor,
+        content: [{ _tag: "Text", text: "Deploy is Thursday." }],
+      },
+      input("latest"),
+      input("now"),
+    ]);
+    // A checkpoint without a summary says that earlier messages were left out.
+    const trimmed = TurnLog.context(
+      recorded({ _tag: "Checkpoint", turnId: earlier, summary: null, kept: [input("latest")] }),
+      turnId,
+    );
+    expect(trimmed.history[0]).toMatchObject({ author: TurnLog.checkpointAuthor });
+    expect(trimmed.history.slice(1)).toEqual([input("latest")]);
+  });
+
+  it("finds the log empty before a participation's first turn", () => {
+    expect(TurnLog.context([], turnId).begun).toBe(false);
+    expect(
+      TurnLog.context(recorded({ _tag: "Requested", turnId, input: input("again") }), turnId),
+    ).toMatchObject({ begun: false, own: { requested: [input("again")] } });
+  });
+});
+
+describe("TurnLog.compaction", () => {
+  const exchange = (question: string, answer: string): ReadonlyArray<Transcript.Item> => [
+    input(question),
+    { _tag: "Response", id: Transcript.ResponseId.make(answer), parts: [text(answer)] },
+  ];
+  const items = [...exchange("aaaa", "bbbb"), ...exchange("cccc", "dddd")];
+
+  it("summarizes the older part only once the transcript and waiting input outgrow the budget", () => {
+    expect(TurnLog.compaction(items, 0, { budget: 100, keep: 10 })).toBeUndefined();
+    expect(TurnLog.compaction(items, 90, { budget: 100, keep: 10 })).toEqual({
+      summarize: items.slice(0, 2),
+      kept: items.slice(2),
+    });
+  });
+
+  it("proposes nothing when only an earlier summary would be summarized again", () => {
+    const summary: Transcript.Input = {
+      _tag: "Input",
+      author: TurnLog.checkpointAuthor,
+      content: [{ _tag: "Text", text: "Earlier: aaaa" }],
+    };
+    expect(
+      TurnLog.compaction([summary, ...exchange("cccc", "dddd")], 90, { budget: 20, keep: 10 }),
+    ).toBeUndefined();
   });
 });
 

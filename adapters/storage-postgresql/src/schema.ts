@@ -829,9 +829,9 @@ export const turnStatuses = [
 
 /**
  * Agents' attempts on threads, with how far each has accepted and taken in its thread's input, and
- * the turn before each, whose log it continues from. An agent has at most one active turn on a
- * thread; the model access and environment are recorded when execution starts, all together or not
- * at all.
+ * where each begins in its agent's log for the thread and the checkpoint its history starts from.
+ * An agent has at most one active turn on a thread; the model access and environment are recorded
+ * when execution starts, all together or not at all.
  */
 export const turns = pgTable(
   "turns",
@@ -843,7 +843,8 @@ export const turns = pgTable(
     agentId: text("agent_id").notNull(),
     memberId: text("member_id").notNull(),
     participationId: text("participation_id").notNull(),
-    previousTurnId: text("previous_turn_id"),
+    logAfter: integer("log_after"),
+    historyFrom: integer("history_from"),
     retryOf: text("retry_of"),
     status: text("status", { enum: turnStatuses }).notNull(),
     inputAfterSequence: integer("input_after_sequence").notNull(),
