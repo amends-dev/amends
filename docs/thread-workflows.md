@@ -31,6 +31,14 @@ text and preserves it verbatim, including indentation and newlines. NUL characte
 surrogate halves, which storage cannot keep as given, are rejected as invalid input. `mentions` is an explicit
 array of distinct workspace-member IDs; text such as `@Reviewer` does not itself address anyone.
 
+Message text is markdown, as people write it and as agents reply. A mention in the text is a link
+to the member, `[@Ada](member:<member ID>)`, which `ThreadMessage.mentionText` writes and
+`ThreadMessage.mentionedIn` reads back: its label records the name they had when mentioned, and
+readers show their current name. The text shows who was mentioned; `mentions` is whom the message
+addresses, and the operation does not compare the two. The apps render emphasis, strikethrough,
+code, lists, task lists, quotes, tables, and links; raw HTML shows as written, images show as
+links to them without loading, and only web and email addresses link. A newline breaks the line.
+
 Authorization and validation run in the same commit as the start:
 
 - The caller must be a human with active workspace and group membership and `thread.start` on

@@ -302,7 +302,8 @@ and `text` fields the screens' timeline takes.
 
 - `memberName(member)` is the name a member chose in the workspace, their identity until they
   choose one, or "Former member". `usePeople(workspaceId)` names members and message authors,
-  and splits a message's text into plain runs and `{ mention, memberId }` parts.
+  and `mentionsOf(text)` names the members a message's markdown mentions by id, as they are
+  called now; entries carry the text with those `mentions` for the screens to render.
 - `useWorkspaceGroups(workspaceId)` lists the reader's groups as `GroupEntry` values: teams by
   name, direct groups by their other people ("Only you" when alone), with pending counts, unseen
   activity, when they were last active, whether a team is the workspace's general group, and what
@@ -322,7 +323,7 @@ and `text` fields the screens' timeline takes.
   refresh says the reader lost access (their entries empty until access returns), or `failed`.
 - `useInboxView(workspaceId, filter, retain, events?)` gives the inbox, all or only what is unread, as
   `InboxEntry` values: why each came (`mention`, `reply`, or `thread`), its author, place, message
-  parts, and thread, or no reason once its thread is unavailable. `open(id)` marks one seen at
+  text and mentions, and thread, or no reason once its thread is unavailable. `open(id)` marks one seen at
   once, as the reader opens it. Unread keeps `retain`, the notification open beside the inbox, in
   place after it is seen. `unread` is the inbox's count, and `markAllSeen` marks everything
   through the newest notification listed. A notification whose seen mark fails shows unread
@@ -377,6 +378,8 @@ creating the group when they have none, and `started` receives the group.
 `mention(memberId, name)` records that the text mentions a member by `@name`. `mentions` and
 `send` count only the members whose `@name` the text still holds as a word of its own, so deleting
 a name drops its mention, and a retry reuses its key only when both text and mentions match.
+Sending writes each such `@name` as a mention link to the member (`withMentionLinks`), the form
+message text keeps mentions in; the composer's text is otherwise sent as the markdown typed.
 `useGroupRoster(workspaceId, groupId)` reads a group's current members, whom its messages can
 mention, live over membership and grant changes.
 

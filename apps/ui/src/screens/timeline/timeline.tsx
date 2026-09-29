@@ -8,12 +8,10 @@ import {
   type MessageAuthor,
   type MessageThreadActivity,
 } from "../../components/message/index.ts";
+import { RichText, type RichTextMention } from "../../components/rich-text/index.ts";
 import type { TaskState } from "../../components/task-status/index.ts";
 import { clockTime, dayLabel, dayOf, fullTime, typingText } from "../../internal/when.ts";
 import * as s from "./timeline.css.ts";
-
-/** Plain text, or a mentioned name such as "@Caleb". */
-export type MessagePart = string | { readonly mention: string };
 
 export interface TimelineMessage {
   readonly kind: "message";
@@ -23,7 +21,10 @@ export interface TimelineMessage {
   readonly time?: string;
   /** When it was sent: the time shown unless `time` is given, and its day seam. */
   readonly at?: Date;
-  readonly text: readonly MessagePart[];
+  /** Markdown, whose mentions link to members by id. */
+  readonly text: string;
+  /** The members its mentions name, as the reader knows them now. */
+  readonly mentions?: readonly RichTextMention[];
   /** A step an agent took, such as "Checked codebase". */
   readonly activity?: string;
   readonly reactions?: ReadonlyArray<{
@@ -186,15 +187,7 @@ export function Timeline(props: TimelineProps) {
                     )}
                   </Show>
                   <Message.Text>
-                    <For each={message().text}>
-                      {(part) =>
-                        typeof part === "string" ? (
-                          part
-                        ) : (
-                          <Message.Mention>{part.mention}</Message.Mention>
-                        )
-                      }
-                    </For>
+                    <RichText text={message().text} mentions={message().mentions} />
                   </Message.Text>
                   <Show when={message().reactions?.length}>
                     <Message.Reactions>

@@ -24,7 +24,8 @@ export const sampleInbox: readonly InboxItem[] = [
     reason: "mention",
     author: people.sara,
     place: { name: "general", direct: false },
-    text: [{ mention: "@Jamie" }, " can you check the composer fix before we ship?"],
+    text: "[@Jamie](member:jamie) can you check the composer fix before we ship?",
+    mentions: [{ id: "jamie", name: "Jamie" }],
     href: "#sara",
   },
   {
@@ -34,7 +35,7 @@ export const sampleInbox: readonly InboxItem[] = [
     reason: "reply",
     author: people.alex,
     place: { name: "engineering", direct: false },
-    text: ["The retry now keeps the original request. Ready for another look."],
+    text: "The retry now keeps the original request. Ready for another look.",
     href: "#alex",
   },
   {
@@ -44,7 +45,7 @@ export const sampleInbox: readonly InboxItem[] = [
     reason: "thread",
     author: people.graeme,
     place: { name: "design", direct: false },
-    text: ["Sharing the revised navigation icons for review."],
+    text: "Sharing the revised navigation icons for review.",
     href: "#graeme",
   },
   {
@@ -54,7 +55,7 @@ export const sampleInbox: readonly InboxItem[] = [
     reason: "reply",
     author: people.oliver,
     place: { name: "product", direct: false },
-    text: ["The empty state copy is updated. I’ve attached the latest version."],
+    text: "The empty state copy is updated. I’ve attached the latest version.",
     href: "#oliver",
   },
   {
@@ -64,7 +65,8 @@ export const sampleInbox: readonly InboxItem[] = [
     reason: "mention",
     author: { name: "Caleb", tone: "sage" },
     place: { name: "Caleb", direct: true },
-    text: [{ mention: "@Jamie" }, " let’s grab coffee after the rollout."],
+    text: "[@Jamie](member:jamie) let’s grab coffee after the rollout.",
+    mentions: [{ id: "jamie", name: "Jamie" }],
     href: "#caleb",
   },
   { id: "gone", at: yesterday(11), unread: false },

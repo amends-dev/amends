@@ -105,7 +105,7 @@ const notification = (
 
 function fixture(options: { readonly fail?: boolean } = {}) {
   const inbox = [
-    notification("n3", 3, 3, "Can @alice approve it?", ["owner"]),
+    notification("n3", 3, 3, "Can [@alice](member:owner) approve it?", ["owner"]),
     notification("n2", 2, 2, "Here is the draft."),
     notification("n1", 1, 1, "Starting the review."),
   ];
@@ -196,7 +196,8 @@ it("says why each notification came, from where, and what was said", async () =>
     id: "n3",
     unread: true,
     author: { name: "Ada" },
-    text: ["Can ", { mention: "@alice", memberId: "owner" }, " approve it?"],
+    text: "Can [@alice](member:owner) approve it?",
+    mentions: [{ id: "owner", name: "alice" }],
     thread: { groupId: "g1", threadId: "t1", sequence: 3 },
   });
   await waitFor(() => expect(f.view.unread()).toBe(3));

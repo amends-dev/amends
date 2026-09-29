@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createMemo } from "solid-js";
+import { Match, Show, Switch, createMemo } from "solid-js";
 import { IconMarkMail, IconMessage } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
@@ -6,13 +6,12 @@ import { Field } from "../../components/field/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import type { MessageAuthor } from "../../components/message/index.ts";
-import { Message } from "../../components/message/index.ts";
+import { RichText, type RichTextMention } from "../../components/rich-text/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { agoLabel, dayLabel, dayOf, fullTime } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
-import type { MessagePart } from "../timeline/index.ts";
 import * as s from "./inbox.css.ts";
 
 /** Why a notification came: the reader was mentioned, someone replied, or a thread started. */
@@ -29,7 +28,10 @@ export interface InboxItem {
   readonly author?: MessageAuthor;
   /** The group: a team by name, or a direct conversation by its people. */
   readonly place?: { readonly name: string; readonly direct: boolean };
-  readonly text?: readonly MessagePart[];
+  /** What was said: markdown, shown as one run of words. */
+  readonly text?: string;
+  /** The members its mentions name. */
+  readonly mentions?: readonly RichTextMention[];
   /** Opens its thread beside the inbox; absent while it is unavailable. */
   readonly href?: string;
 }
@@ -277,17 +279,7 @@ function Row(props: {
             when={props.item.href ? props.item.text : undefined}
             fallback="You can no longer see this thread."
           >
-            {(text) => (
-              <For each={text()}>
-                {(part) =>
-                  typeof part === "string" ? (
-                    part
-                  ) : (
-                    <Message.Mention>{part.mention}</Message.Mention>
-                  )
-                }
-              </For>
-            )}
+            {(text) => <RichText text={text()} mentions={props.item.mentions} inline />}
           </Show>
         </p>
       </div>

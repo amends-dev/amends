@@ -105,7 +105,7 @@ const openings = [
       createdBy: author("ada"),
       createdAt: at(1),
     },
-    message: message("m1", "t1", "ada", "Can @Scout check the terms?", ["scout"]),
+    message: message("m1", "t1", "ada", "Can [@Scout](member:scout) check the terms?", ["scout"]),
     replies: 2,
     latest: { threadId: "t1", sequence: 3, occurredAt: at(3) },
     readThrough: 1,
@@ -135,7 +135,7 @@ const participant = (id: string, memberId: string) => ({
 const timeline = [
   {
     activity: activity(1, "message.published", "message:m1", { messageId: "m1" }),
-    message: message("m1", "t1", "ada", "Can @Scout check the terms?", ["scout"]),
+    message: message("m1", "t1", "ada", "Can [@Scout](member:scout) check the terms?", ["scout"]),
   },
   {
     activity: activity(2, "participation.followed", "thread-participation:p1", {
@@ -239,7 +239,8 @@ it("shows a group's threads with their authors, mentions, and replies", async ()
     kind: "message",
     id: "t1",
     at: new Date(at(1)),
-    text: ["Can ", { mention: "@Scout", memberId: "scout" }, " check the terms?"],
+    text: "Can [@Scout](member:scout) check the terms?",
+    mentions: [{ id: "scout", name: "Scout" }],
     thread: { replies: 2, unread: true, typing: [] },
   });
 });

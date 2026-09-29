@@ -49,7 +49,7 @@ it("keeps each inbox row, and the focus in it, when the inbox changes", () => {
     reason: "reply",
     author: { name: id === "a" ? "Sara" : "Alex" },
     place: { name: "general", direct: false },
-    text: ["Ready for another look."],
+    text: "Ready for another look.",
     href: `#${id}`,
   });
   const [items, setItems] = createSignal([item("a", true), item("b", true)]);

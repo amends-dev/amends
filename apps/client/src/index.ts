@@ -167,7 +167,7 @@ export {
   type DirectEntry,
   type GroupEntry,
   type MentionCandidate,
-  type MessagePart,
+  type MentionedMember,
   type ParticipationChange,
   type RosterEntry,
   type StreamEntry,

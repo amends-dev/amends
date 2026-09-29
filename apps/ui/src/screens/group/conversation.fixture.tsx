@@ -36,7 +36,7 @@ const openings: readonly TimelineEntry[] = [
     id: "t1",
     author: people.alex,
     at: daysAgo(1, 16),
-    text: ["The preview is ready for another look."],
+    text: "The preview is ready for another look.",
     thread: { replies: 2, unread: true },
   },
   {
@@ -44,7 +44,8 @@ const openings: readonly TimelineEntry[] = [
     id: "t2",
     author: people.sara,
     at: minutesAgo(40),
-    text: ["Can ", { mention: "@Yumi" }, " check the release notes?"],
+    text: "Can [@Yumi](member:yumi) check the release notes?",
+    mentions: [{ id: "yumi", name: "Yumi" }],
     thread: { replies: 0, typing: ["Yumi"] },
   },
   {
@@ -52,7 +53,7 @@ const openings: readonly TimelineEntry[] = [
     id: "t3",
     author: people.aj,
     at: minutesAgo(12),
-    text: ["Lunch at noon?"],
+    text: "Lunch at noon?",
     thread: { replies: 0 },
   },
 ];
@@ -63,7 +64,7 @@ const thread: readonly TimelineEntry[] = [
     id: "r0",
     author: people.alex,
     at: daysAgo(1, 16),
-    text: ["The preview is ready for another look."],
+    text: "The preview is ready for another look.",
   },
   { kind: "note", id: "n1", at: daysAgo(1, 16), change: "followed", who: "Sara" },
   {
@@ -71,7 +72,7 @@ const thread: readonly TimelineEntry[] = [
     id: "r1",
     author: people.sara,
     at: daysAgo(1, 17),
-    text: ["Looks good to me."],
+    text: "Looks good to me.",
   },
   { kind: "note", id: "n2", at: minutesAgo(30), change: "unfollowed", who: "You", self: true },
   {
@@ -79,7 +80,7 @@ const thread: readonly TimelineEntry[] = [
     id: "r2",
     author: people.yumi,
     at: minutesAgo(5),
-    text: ["Checked the build: all green."],
+    text: "Checked the build: all green.",
   },
 ];
 
@@ -168,7 +169,7 @@ export function Conversation(props: ConversationProps) {
                   id: `sent-${entries().length}`,
                   author: people.jordan,
                   at: new Date(),
-                  text: [text],
+                  text: text,
                   thread: { replies: 0 },
                 },
               ]);

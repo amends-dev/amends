@@ -4,6 +4,7 @@ import {
   type GroupMembership,
   type Member,
   type Thread,
+  ThreadMessage,
   type ThreadTimeline,
 } from "../api/conversations.ts";
 import type { WorkspaceFailure } from "../api/failures.ts";
@@ -33,8 +34,11 @@ export interface Author {
   readonly name: string;
   readonly agent: boolean;
 }
-/** Plain text, or a member the message mentions by `@name`. */
-export type MessagePart = string | { readonly mention: string; readonly memberId: string };
+/** A member a message mentions, by the name the reader knows them by now. */
+export interface MentionedMember {
+  readonly id: string;
+  readonly name: string;
+}
 
 /** Why a conversation shows no entries: still loading, closed to the reader, or failed. */
 export type ConversationStatus = "loading" | "unavailable" | "failed";
@@ -89,30 +93,22 @@ export function usePeople(workspaceId: string) {
       agent: member?.identity._tag === "Agent",
     };
   };
-  const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  /** A message's text as plain runs and the `@name` of each member it mentions. */
-  const partsOf = (text: string, mentions: ReadonlyArray<string>): MessagePart[] => {
-    const tokens = new Map(mentions.map((id) => [`@${memberName(members.member(id))}`, id]));
-    if (tokens.size === 0) return [text];
-    const pattern = [...tokens.keys()]
-      .toSorted((left, right) => right.length - left.length)
-      .map(escape)
-      .join("|");
-    return text
-      .split(new RegExp(`(${pattern})`, "u"))
-      .filter(Boolean)
-      .map((part) => {
-        const memberId = tokens.get(part);
-        return memberId === undefined ? part : { mention: part, memberId };
-      });
-  };
+  /**
+   * The members a message's text mentions, named as they are now. Someone no longer in the
+   * workspace is left out, and shows by the name the text recorded.
+   */
+  const mentionsOf = (text: string): MentionedMember[] =>
+    ThreadMessage.mentionedIn(text).flatMap((id) => {
+      const member = members.member(id);
+      return member === undefined ? [] : [{ id, name: memberName(member) }];
+    });
   return {
     member: members.member,
     all: members.all,
     selfId,
     name: (memberId: string) => memberName(members.member(memberId)),
     authorOf,
-    partsOf,
+    mentionsOf,
   };
 }
 
@@ -211,7 +207,9 @@ export interface StreamEntry {
   readonly id: string;
   readonly author: Author;
   readonly at: Date;
-  readonly text: ReadonlyArray<MessagePart>;
+  /** Markdown, whose mentions link to members by id. */
+  readonly text: string;
+  readonly mentions: ReadonlyArray<MentionedMember>;
   readonly thread: {
     readonly replies: number;
     readonly unread: boolean;
@@ -242,7 +240,8 @@ export function useGroupConversation(workspaceId: string, groupId: string) {
     id: opening.thread.id,
     author: people.authorOf(opening.message.author),
     at: toDate(opening.message.publishedAt),
-    text: people.partsOf(opening.message.text, opening.message.mentions),
+    text: opening.message.text,
+    mentions: people.mentionsOf(opening.message.text),
     thread: {
       replies: opening.replies,
       unread: opening.unread,
@@ -268,7 +267,9 @@ export interface ThreadMessageEntry {
   readonly id: string;
   readonly author: Author;
   readonly at: Date;
-  readonly text: ReadonlyArray<MessagePart>;
+  /** Markdown, whose mentions link to members by id. */
+  readonly text: string;
+  readonly mentions: ReadonlyArray<MentionedMember>;
 }
 /** How someone's part in a thread changed. Joining by writing or a mention shows in the message. */
 export type ParticipationChange =
@@ -345,7 +346,8 @@ export function useThreadConversation(
                 id: item.message.id,
                 author: people.authorOf(item.message.author),
                 at: toDate(item.message.publishedAt),
-                text: people.partsOf(item.message.text, item.message.mentions),
+                text: item.message.text,
+                mentions: people.mentionsOf(item.message.text),
               }
             : noteOf(item),
         ),

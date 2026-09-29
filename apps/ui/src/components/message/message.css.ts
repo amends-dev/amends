@@ -67,17 +67,10 @@ export const time = style({
 
 export const text = style({
   ...typeScale.body,
-  margin: 0,
+  minWidth: 0,
   color: vars.color.text.primary,
   overflowWrap: "anywhere",
-  whiteSpace: "pre-wrap",
   "@media": { [media.mobile]: typeScale.bodyTouch },
-});
-
-export const mention = style({
-  paddingInline: "0.1875rem",
-  backgroundColor: vars.color.surface.mention,
-  fontWeight: fontWeight.semibold,
 });
 
 export const activity = style({

@@ -6,6 +6,10 @@
 export const fontFamily =
   '"Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
+/** The system's monospace, for code and values people copy exactly. */
+export const monoFamily =
+  'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+
 export const fontWeight = { regular: 400, medium: 500, semibold: 600 } as const;
 export type FontWeight = keyof typeof fontWeight;
 

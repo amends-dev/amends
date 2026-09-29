@@ -28,6 +28,7 @@
     "./components/menu": "./src/components/menu/index.ts",
     "./components/message": "./src/components/message/index.ts",
     "./components/notice": "./src/components/notice/index.ts",
+    "./components/rich-text": "./src/components/rich-text/index.ts",
     "./components/select": "./src/components/select/index.ts",
     "./components/state-art": "./src/components/state-art/index.ts",
     "./components/tabs": "./src/components/tabs/index.ts",
@@ -74,7 +75,9 @@
     "@amends/icons": "workspace:*",
     "@fontsource/inter": "^5.2.8",
     "@kobalte/core": "^0.13.14",
-    "@vanilla-extract/css": "^1.21.2"
+    "@vanilla-extract/css": "^1.21.2",
+    "marked": "^18.0.14",
+    "remend": "^1.3.1"
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.9",

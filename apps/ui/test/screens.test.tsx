@@ -4,6 +4,7 @@ import { definePreview } from "storybook-solidjs-vite/next";
 import preview from "../.storybook/preview.tsx";
 import conversationMeta, {
   Composing,
+  FormattedText,
   Messages,
   TaskStates,
 } from "../src/components/conversation.stories.tsx";
@@ -216,6 +217,9 @@ describe("conversation components", () => {
   });
   it("sends with Enter, keeps Shift+Enter lines, and refuses blank drafts", async () => {
     await stories.story(Composing).run();
+  });
+  it("formats markdown messages, a streaming draft, and a one-line preview", async () => {
+    await stories.story(FormattedText).run();
   });
 });
 

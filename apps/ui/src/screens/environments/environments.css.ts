@@ -1,7 +1,7 @@
 import { globalStyle, keyframes, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
 const ellipsis = {
   minWidth: 0,
@@ -415,7 +415,7 @@ export const commandInput = style({
   borderRadius: 0,
   backgroundColor: vars.color.surface.field,
   color: vars.color.text.primary,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontFamily: monoFamily,
   resize: "none",
   selectors: {
     "&:focus": { borderColor: vars.color.border.strong, outline: "none" },
@@ -507,7 +507,7 @@ export const readCommand = style({
   boxSizing: "border-box",
   backgroundColor: vars.color.surface.subtle,
   color: vars.color.text.primary,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontFamily: monoFamily,
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
 });

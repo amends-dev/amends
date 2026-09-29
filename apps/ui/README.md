@@ -124,7 +124,7 @@ empty otherwise.
 
 ## Conversation components
 
-`Message` shows an author's avatar beside the byline and text, with optional `Mention`,
+`Message` shows an author's avatar beside the byline and text, with optional
 `Reactions`, an agent's `Activity`, a `TaskReference`, and a `Replies` summary joined to the
 avatar by a stitched elbow; `active` highlights the message whose thread is open. `Divider` is
 the running stitch, optionally labelled ("Today", or "4 replies" leading). `TaskStatus` draws
@@ -135,6 +135,16 @@ field: arrows move, Enter or Tab choose (inserting `@name` and calling `onMentio
 closes; `Composer.Mention` starts a mention at the caret and `Composer.Alert` says why a send
 failed. Phones use 16px message and field text so the page does not zoom, and give reactions and
 the reply summary 44px targets.
+
+`RichText` renders markdown in the surrounding type, as `Message.Text` holds it: paragraphs with
+line breaks where the text has them, emphasis, strikethrough, inline code and code blocks, lists
+and task lists, quotes, tables that scroll sideways when wide, rules, and links. Mentions are links
+to `member:<id>`, named from its `mentions` as members are called now, or by the name the text
+recorded for anyone else. It never renders HTML: raw HTML shows as written, images show as links to
+them without loading, and only web and email addresses link, opening in a new tab. `inline`
+flattens it to one run of words and mentions for previews; `streaming` closes formatting left open
+at the end of text still arriving, and `caret` marks where it continues. Blocks that did not change
+keep their elements as streamed text grows.
 
 A message takes its time as text or as `at`, a `Date` it words as the time of day with the full
 date as its title. The reply summary adds an unread dot and a note such as who is typing; a

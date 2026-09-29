@@ -1,6 +1,5 @@
 export {
   Timeline,
-  type MessagePart,
   type ParticipationChange,
   type TimelineDivider,
   type TimelineEntry,

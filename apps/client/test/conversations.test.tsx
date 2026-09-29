@@ -41,7 +41,7 @@ import {
   type ThreadTimeline,
 } from "../src/index.ts";
 import { affectedKeys, signalKeys } from "../src/api/changes.ts";
-import { mentionsIn } from "../src/conversations/compose.ts";
+import { mentionsIn, withMentionLinks } from "../src/conversations/compose.ts";
 
 afterEach(cleanup);
 const json = (body: unknown) =>
@@ -1131,6 +1131,17 @@ it("a draft mentions the members whose @name its text still holds", () => {
   expect(mentionsIn("@Rae? @Rae.", mentioned)).toEqual(["rae"]);
 });
 
+it("a sent draft links each member it mentions by @name", () => {
+  const mentioned = [
+    { memberId: "jo", name: "Jo" },
+    { memberId: "jm", name: "Jo Mercer" },
+    { memberId: "odd", name: "[Odd]" },
+  ];
+  expect(withMentionLinks("@Jo Mercer, @Jo and @[Odd]: see email@Jo or @Joanna", mentioned)).toBe(
+    "[@Jo Mercer](member:jm), [@Jo](member:jo) and [@\\[Odd\\]](member:odd): see email@Jo or @Joanna",
+  );
+});
+
 it("a reply sends the mentions its text still holds", async () => {
   const bodies: Array<unknown> = [];
   let typed = 0;
@@ -1173,7 +1184,9 @@ it("a reply sends the mentions its text still holds", async () => {
   composer.setDraft("@Ada, look");
   expect(composer.mentions()).toEqual(["ada"]);
   composer.send();
-  await waitFor(() => expect(bodies).toEqual([{ text: "@Ada, look", mentions: ["ada"] }]));
+  await waitFor(() =>
+    expect(bodies).toEqual([{ text: "[@Ada](member:ada), look", mentions: ["ada"] }]),
+  );
   // A posted draft forgets its mentions.
   await waitFor(() => expect(composer.draft()).toBe(""));
   composer.setDraft("@Ada again");

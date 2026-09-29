@@ -6,6 +6,7 @@ import { Composer } from "./composer/index.ts";
 import { Divider } from "./divider/index.ts";
 import { IconButton } from "./icon-button/index.ts";
 import { Message } from "./message/index.ts";
+import { RichText } from "./rich-text/index.ts";
 import { TaskStatus, taskStateLabel } from "./task-status/index.ts";
 import * as s from "./components.stories.css.ts";
 
@@ -54,13 +55,86 @@ export const Messages = {
           </Message.Root>
           <Message.Root author={{ name: "Graeme", tone: "slate" }} time="10:08 AM">
             <Message.Text>
-              <Message.Mention>@Caleb</Message.Mention> Let’s grab some coffee
+              <RichText
+                text="[@Caleb](member:caleb) Let’s grab some coffee"
+                mentions={[{ id: "caleb", name: "Caleb" }]}
+              />
             </Message.Text>
           </Message.Root>
         </div>
       </section>
     </div>
   ),
+} satisfies Story;
+
+const caleb = { id: "caleb", name: "Caleb" };
+const formatted = `Reproduced it on **both platforms**. [@Caleb](member:caleb), the crash comes from \`readImage\`:
+
+1. Paste an image over _5 MB_
+2. The composer calls \`readImage\` with no size limit
+   - Safari stops the tab
+   - Chrome keeps going, ~~slowly~~ for a while
+
+\`\`\`ts
+const image = await readImage(clipboard);
+\`\`\`
+
+> Pasting smaller images works everywhere.
+
+| Platform | Crashes |
+| --- | :---: |
+| macOS | Yes |
+| Windows | Yes |
+
+- [x] Reproduced
+- [ ] Fixed
+
+Details in [the report](https://example.com/report). <b>Raw HTML</b> shows as written.`;
+
+export const FormattedText = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Formatted text</h2>
+        <p class={s.note}>
+          Messages are markdown: emphasis, code, lists, quotes, tables, and links, with mentions
+          naming members by id. Raw HTML shows as written, and only web and email links link.
+        </p>
+        <div class={s.stack}>
+          <Message.Root author={yumi} time="10:04 AM">
+            <Message.Text>
+              <RichText text={formatted} mentions={[caleb]} />
+            </Message.Text>
+          </Message.Root>
+          <Message.Root author={yumi} time="10:05 AM">
+            <Message.Text>
+              <RichText text={"The fix is in `readImage`, and **the paste han"} streaming caret />
+            </Message.Text>
+          </Message.Root>
+          <p class={s.note}>
+            <RichText
+              text={"[@Caleb](member:caleb) the crash:\n\n- comes from **paste**\n- `readImage`"}
+              mentions={[caleb]}
+              inline
+            />
+          </p>
+        </div>
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("both platforms").tagName).toBe("STRONG");
+    await expect(canvas.getAllByText("@Caleb")).toHaveLength(2);
+    await expect(canvas.getByRole("table")).toBeInTheDocument();
+    await expect(canvas.getByRole("link", { name: "the report" })).toHaveAttribute(
+      "href",
+      "https://example.com/report",
+    );
+    await expect(canvas.getByText(/<b>Raw HTML<\/b> shows as written/u)).toBeInTheDocument();
+    await expect(canvas.getByText("the paste han").tagName).toBe("STRONG");
+    await expect(canvas.getByText("the crash: comes from paste readImage")).toBeInTheDocument();
+  },
 } satisfies Story;
 
 export const TaskStates = {

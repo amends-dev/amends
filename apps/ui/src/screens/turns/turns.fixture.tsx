@@ -27,21 +27,22 @@ const messages = (replied: boolean): readonly TimelineEntry[] => [
     id: "m1",
     author: people.aj,
     at: at(12),
-    text: ["Can we review the rollout plan for Thursday?"],
+    text: "Can we review the rollout plan for Thursday?",
   },
   {
     kind: "message",
     id: "m2",
     author: people.sara,
     at: at(11),
-    text: ["API changes land first. Clients follow on Thursday."],
+    text: "API changes land first. Clients follow on Thursday.",
   },
   {
     kind: "message",
     id: "m3",
     author: people.aj,
     at: at(10),
-    text: [{ mention: "@Yumi" }, " summarize the risks and rollout order."],
+    text: "[@Yumi](member:yumi) summarize the risks and rollout order.",
+    mentions: [{ id: "yumi", name: "Yumi" }],
   },
   ...(replied
     ? [
@@ -50,7 +51,7 @@ const messages = (replied: boolean): readonly TimelineEntry[] => [
           id: "m4",
           author: people.yumi,
           at: at(9),
-          text: [reply],
+          text: reply,
           turn: { id: "turn-1" },
         },
       ]
@@ -203,7 +204,7 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
                 id: "t1",
                 author: people.aj,
                 at: at(12),
-                text: ["Can we review the rollout plan for Thursday?"],
+                text: "Can we review the rollout plan for Thursday?",
                 thread: {
                   replies: scenario() === "done" ? 3 : 2,
                   activity: active() ? [{ agent: "Yumi", state: active()! }] : undefined,

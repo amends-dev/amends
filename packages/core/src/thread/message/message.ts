@@ -8,13 +8,38 @@ import { ThreadMessageActivity } from "./activity.ts";
 import { Text as Characters } from "../../text/text.ts";
 export const Id = ThreadMessageId.Id;
 export type Id = ThreadMessageId.Id;
-/** Preserve the submitted text, including indentation; reject whitespace-only messages. */
+/**
+ * Markdown, preserved as submitted, including indentation; reject whitespace-only messages. A
+ * mention in it is a link to the member, written by `mentionText`.
+ */
 export const Text = Schema.NonEmptyString.check(
   Schema.makeFilter(
     (text) => /\S/u.test(text) || "Message text must contain non-whitespace content",
   ),
   Characters.isStorable,
 );
+// Backslash-escaped so a name reads as itself, not as markdown, inside the link's label.
+const labelMarks = /[\\[\]*_`~<>]/gu;
+/**
+ * A member mentioned in message text: `[@Ada](member:<id>)`. The label records the name they had
+ * when mentioned, and readers show their current one. The text shows who was mentioned; a
+ * message's `mentions` are whom it addresses.
+ */
+export const mentionText = (memberId: string, name: string) =>
+  `[@${name.replaceAll(labelMarks, "\\$&")}](member:${encodeURIComponent(memberId)})`;
+const mentionLinks = /\[@(?:\\.|[^\\\]])*\]\(member:([^)\s]+)\)/gu;
+/** The members a text mentions, each once, in the order first mentioned. */
+export const mentionedIn = (text: string): ReadonlyArray<string> => [
+  ...new Set(
+    [...text.matchAll(mentionLinks)].flatMap(([, id]) => {
+      try {
+        return [decodeURIComponent(id!)];
+      } catch {
+        return [];
+      }
+    }),
+  ),
+];
 /**
  * Who wrote a message: a member, human or agent, writing in a thread, or a contact whose message a
  * channel received. An agent's reply is its own message like anyone's; the turn that produced it

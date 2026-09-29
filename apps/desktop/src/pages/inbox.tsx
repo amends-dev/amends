@@ -54,6 +54,7 @@ export function InboxPage() {
         author: entry.author,
         place: entry.place,
         text: entry.text,
+        mentions: entry.mentions,
         href: entry.thread
           ? href(
               paths.inboxThread(

@@ -99,7 +99,14 @@ sidebar, show a group's stream of threads by their opening messages, and open a 
 in the side panel, all live over the change feed. A message with no replies offers "Reply in
 thread" while hovered or focused. The page composer starts a thread and the thread composer replies, keeping drafts per group
 and thread within the session, and both mention group members picked after `@`. A name typed
-without picking it addresses no one. An open thread is read through the newest activity it
+without picking it addresses no one. Messages render as markdown, with mentions naming members
+as they are called now, in the timeline, the inbox's one-line previews, and a turn log's reply and
+streaming draft. The composer is still a plain text field: formatting is typed as markdown, with
+no toolbar, shortcuts, or preview while writing, and `/` commands do not exist yet. Links open in
+a new browser tab on the web; the desktop shell has no handler that opens them in the system
+browser. Code blocks have no
+syntax highlighting. Messages written before mention links, which held a plain `@name`, no
+longer highlight their mentions. An open thread is read through the newest activity it
 shows, and a visible group's stream catches the reader up with the group, clearing the stream's
 unread dots, the sidebar's new-activity dot, and the pending counts of what was read, but only
 while the page is visible. A thread counts as read when it opens, however far back the reader has

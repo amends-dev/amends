@@ -13,7 +13,7 @@ import {
   useWorkspaceGroups,
   type Author,
   type ConversationStatus,
-  type MessagePart,
+  type MentionedMember,
 } from "./views.ts";
 
 /** Why a notification came: the reader was mentioned, someone replied, or a thread started. */
@@ -30,7 +30,9 @@ export interface InboxEntry {
   readonly author: Author | undefined;
   /** The group it came from: a team by name, or a direct group by its other people. */
   readonly place: { readonly name: string; readonly direct: boolean } | undefined;
-  readonly text: ReadonlyArray<MessagePart> | undefined;
+  /** What was said, as markdown whose mentions link to members by id. */
+  readonly text: string | undefined;
+  readonly mentions: ReadonlyArray<MentionedMember>;
   /** Where it points, at the timeline position that notified the reader. */
   readonly thread:
     | { readonly groupId: string; readonly threadId: string; readonly sequence: number }
@@ -125,7 +127,8 @@ export function useInboxView(
               : "reply",
       author: readable && people.authorOf(readable.message.author),
       place: readable ? placeOf(notification.thread?.groupId) : undefined,
-      text: readable && people.partsOf(readable.message.text, readable.message.mentions),
+      text: readable?.message.text,
+      mentions: readable ? people.mentionsOf(readable.message.text) : [],
       thread: readable ? notification.thread : undefined,
     };
   };

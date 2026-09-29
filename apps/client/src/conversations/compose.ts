@@ -3,7 +3,13 @@ import { Exit } from "effect";
 import { Atom } from "effect/unstable/reactivity";
 import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { isMessageText, newPostKey, postRequest, type Post } from "../api/conversations.ts";
+import {
+  ThreadMessage,
+  isMessageText,
+  newPostKey,
+  postRequest,
+  type Post,
+} from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { typingRequest } from "../api/typing.ts";
 import { useRequest } from "../request/use-request.ts";
@@ -30,16 +36,32 @@ const empty: Draft = { text: "", mentioned: [] };
 const typingInterval = 2500;
 /** One draft per composer target, kept in the credential scope's registry while it lasts. */
 const draftOf = Atom.family((_key: string) => Atom.make(empty).pipe(Atom.keepAlive));
+/** Where a draft still mentions a member by `@name`: after a space or the start, before a pause. */
+const mentionPattern = (entry: Mentioned, flags: string) =>
+  new RegExp(`(^|\\s)@${escape(entry.name)}(?=$|[\\s.,;:!?)])`, flags);
 /** The members whose `@name` a text still contains, each once, in the order first mentioned. */
 export const mentionsIn = (text: string, mentioned: ReadonlyArray<Mentioned>) => [
   ...new Set(
     mentioned
-      .filter((entry) =>
-        new RegExp(`(^|\\s)@${escape(entry.name)}(?=$|[\\s.,;:!?)])`, "u").test(text),
-      )
+      .filter((entry) => mentionPattern(entry, "u").test(text))
       .map((entry) => entry.memberId),
   ),
 ];
+/**
+ * The draft as a message: each `@name` it still mentions becomes a mention linking to the member,
+ * longer names first so one name is not taken for the start of another.
+ */
+export const withMentionLinks = (text: string, mentioned: ReadonlyArray<Mentioned>) =>
+  mentioned
+    .toSorted((left, right) => right.name.length - left.name.length)
+    .reduce(
+      (written, entry) =>
+        written.replace(
+          mentionPattern(entry, "gu"),
+          (_, before: string) => before + ThreadMessage.mentionText(entry.memberId, entry.name),
+        ),
+      text,
+    );
 const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 export interface ComposerController {
@@ -87,7 +109,7 @@ function compose(
         setError(workspaceFailure(exit.cause));
         return;
       }
-      if (draft().text === post.text) write(empty);
+      if (withMentionLinks(draft().text, draft().mentioned) === post.text) write(empty);
       else write({ text: draft().text, mentioned: draft().mentioned });
       if (exit.value.groupId !== undefined) posted?.(exit.value.groupId);
     },
@@ -131,7 +153,7 @@ function compose(
     error,
     send: () => {
       if (!ready()) return;
-      const text = draft().text,
+      const text = withMentionLinks(draft().text, draft().mentioned),
         addressed = mentions();
       const body = JSON.stringify([text, addressed]);
       // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.

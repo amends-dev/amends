@@ -4,6 +4,7 @@ import { Button, ButtonLink } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Logo } from "../../components/logo/index.ts";
+import { RichText } from "../../components/rich-text/index.ts";
 import { TurnStatus, type TurnState } from "../../components/turn-status/index.ts";
 import { clockTime, fullTime } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
@@ -254,7 +255,7 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                                     <span class={s.cardTitle}>{described().title}</span>
                                     <span class={s.cardLabel}>Complete</span>
                                   </div>
-                                  <p class={s.cardText}>{response().text}</p>
+                                  <RichText class={s.cardText} text={response().text} />
                                   <p class={s.cardNote}>
                                     {response().posted
                                       ? "This response was posted to the thread."
@@ -286,12 +287,12 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                             {props.reconnecting ? "Paused" : "Streaming"}
                           </span>
                         </div>
-                        <p class={s.cardText}>
-                          {draft().text}
-                          <Show when={!props.reconnecting && !draft().broken}>
-                            <span class={s.caret} aria-hidden="true" />
-                          </Show>
-                        </p>
+                        <RichText
+                          class={s.cardText}
+                          text={draft().text}
+                          streaming
+                          caret={!props.reconnecting && !draft().broken}
+                        />
                         <p class={s.cardNote}>
                           {draft().broken
                             ? "Some of this reply is still on its way; it shows in full once complete."

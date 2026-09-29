@@ -27,6 +27,7 @@ export {
   Notification,
   NotificationInbox,
   Thread,
+  ThreadMessage,
   ThreadParticipation,
   ThreadTimeline,
 };

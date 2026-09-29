@@ -82,20 +82,12 @@ export function Root(props: RootProps) {
   );
 }
 
-export type TextProps = JSX.HTMLAttributes<HTMLParagraphElement>;
+export type TextProps = JSX.HTMLAttributes<HTMLDivElement>;
 
-/** The message's words; may contain Mention. Line breaks are kept. */
+/** The message's words, in its reading type: plain text, or RichText for its formatting. */
 export function Text(props: TextProps) {
   const [local, native] = splitProps(props, ["class"]);
-  return <p {...native} class={classes(s.text, local.class)} />;
-}
-
-export type MentionProps = JSX.HTMLAttributes<HTMLSpanElement>;
-
-/** A mentioned person, such as "@Caleb", highlighted in the text. */
-export function Mention(props: MentionProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <span {...native} class={classes(s.mention, local.class)} />;
+  return <div {...native} class={classes(s.text, local.class)} />;
 }
 
 export type ActivityProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {

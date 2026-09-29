@@ -22,23 +22,23 @@ export const groupEntries: readonly TimelineEntry[] = [
     id: "m1",
     author: people.alex,
     time: "Yesterday",
-    text: ["The preview is ready for another look. I’ve linked the latest notes in the task."],
+    text: "The preview is ready for another look. I’ve linked the latest notes in the task.",
   },
   {
     kind: "message",
     id: "m2",
     author: people.sara,
     time: "Yesterday",
-    text: ["Looks good. I’ll keep an eye on the release this morning."],
+    text: "Looks good. I’ll keep an eye on the release this morning.",
   },
   { kind: "divider", id: "today", label: "Today" },
-  { kind: "message", id: "m3", author: people.oliver, time: "9:41 AM", text: ["morning all! ☕"] },
+  { kind: "message", id: "m3", author: people.oliver, time: "9:41 AM", text: "morning all! ☕" },
   {
     kind: "message",
     id: "m4",
     author: people.sara,
     time: "9:44 AM",
-    text: ["deploy went out clean last night! 🎉"],
+    text: "deploy went out clean last night! 🎉",
     reactions: [{ emoji: "🔥", count: 3 }],
   },
   {
@@ -46,7 +46,7 @@ export const groupEntries: readonly TimelineEntry[] = [
     id: "m5",
     author: people.aj,
     time: "10:02 AM",
-    text: ["found a bug. composer crashes when I paste an image from clipboard lol"],
+    text: "found a bug. composer crashes when I paste an image from clipboard lol",
     thread: { replies: 4, people: [people.alex, people.yumi, people.sara] },
   },
   {
@@ -54,7 +54,8 @@ export const groupEntries: readonly TimelineEntry[] = [
     id: "m6",
     author: people.graeme,
     time: "10:08 AM",
-    text: [{ mention: "@Caleb" }, " Let’s grab some coffee"],
+    text: "[@Caleb](member:caleb) Let’s grab some coffee",
+    mentions: [{ id: "caleb", name: "Caleb" }],
   },
 ];
 
@@ -63,7 +64,7 @@ export const threadEntries: readonly TimelineEntry[] = [
     kind: "message",
     id: "t0",
     author: people.aj,
-    text: ["found a bug. composer crashes when I paste an image from clipboard lol"],
+    text: "found a bug. composer crashes when I paste an image from clipboard lol",
   },
   { kind: "divider", id: "replies", label: "4 replies", align: "start" },
   {
@@ -71,16 +72,14 @@ export const threadEntries: readonly TimelineEntry[] = [
     id: "t1",
     author: people.alex,
     time: "10:03 AM",
-    text: ["uh oh — repro on mac or everywhere?"],
+    text: "uh oh — repro on mac or everywhere?",
   },
   {
     kind: "message",
     id: "t2",
     author: people.yumi,
     activity: "Checked codebase",
-    text: [
-      "Reproduced on both — images over 5 MB hit the crash. Filed it and tagged the composer team.",
-    ],
+    text: "Reproduced on both — images over **5 MB** hit the crash. Filed it and tagged the composer team.",
     task: { key: "AND-214", title: "Composer paste crash", state: "open" },
   },
   {
@@ -88,14 +87,14 @@ export const threadEntries: readonly TimelineEntry[] = [
     id: "t3",
     author: people.aj,
     time: "10:07 AM",
-    text: ["Thanks! I’ll attach the image to the task."],
+    text: "Thanks! I’ll attach the image to the task.",
   },
   {
     kind: "message",
     id: "t4",
     author: people.sara,
     time: "10:09 AM",
-    text: ["I can pick this up after the release check."],
+    text: "I can pick this up after the release check.",
   },
 ];
 
@@ -199,7 +198,7 @@ export const launchesEntries: readonly TimelineEntry[] = [
     id: "l1",
     author: people.sara,
     time: "9:10 AM",
-    text: ["Sharing the launch plan for next week. Please add questions here."],
+    text: "Sharing the launch plan for next week. Please add questions here.",
     thread: { replies: 6, people: [people.alex, people.graeme, people.yumi] },
   },
   {
@@ -207,28 +206,28 @@ export const launchesEntries: readonly TimelineEntry[] = [
     id: "l2",
     author: people.alex,
     time: "9:18 AM",
-    text: ["Docs are ready for review. I’ve added the rollout checklist."],
+    text: "Docs are ready for review. I’ve added the rollout checklist.",
   },
   {
     kind: "message",
     id: "l3",
     author: people.graeme,
     time: "9:26 AM",
-    text: ["I’ll coordinate the announcement after we confirm the date."],
+    text: "I’ll coordinate the announcement after we confirm the date.",
   },
   {
     kind: "message",
     id: "l4",
     author: people.yumi,
     time: "9:32 AM",
-    text: ["I can help check the release notes when they’re ready."],
+    text: "I can help check the release notes when they’re ready.",
   },
   {
     kind: "message",
     id: "l5",
     author: caleb,
     time: "9:40 AM",
-    text: ["I’ll review the checklist this afternoon."],
+    text: "I’ll review the checklist this afternoon.",
   },
 ];
 
@@ -238,7 +237,7 @@ export const launchesThread: readonly TimelineEntry[] = [
     id: "lt0",
     author: people.sara,
     time: "9:10 AM",
-    text: ["Sharing the launch plan for next week. Please add questions here."],
+    text: "Sharing the launch plan for next week. Please add questions here.",
   },
   { kind: "divider", id: "replies", label: "6 replies", align: "start" },
   {
@@ -246,42 +245,42 @@ export const launchesThread: readonly TimelineEntry[] = [
     id: "lt1",
     author: people.alex,
     time: "9:18 AM",
-    text: ["Docs are ready. I’ve added the rollout checklist."],
+    text: "Docs are ready. I’ve added the rollout checklist.",
   },
   {
     kind: "message",
     id: "lt2",
     author: people.graeme,
     time: "9:26 AM",
-    text: ["I’ll coordinate the announcement."],
+    text: "I’ll coordinate the announcement.",
   },
   {
     kind: "message",
     id: "lt3",
     author: people.yumi,
     time: "9:32 AM",
-    text: ["I can review the release notes."],
+    text: "I can review the release notes.",
   },
   {
     kind: "message",
     id: "lt4",
     author: people.oliver,
     time: "9:35 AM",
-    text: ["Support is covered for launch day."],
+    text: "Support is covered for launch day.",
   },
   {
     kind: "message",
     id: "lt5",
     author: people.aj,
     time: "9:38 AM",
-    text: ["I’ll check the final build."],
+    text: "I’ll check the final build.",
   },
   {
     kind: "message",
     id: "lt6",
     author: caleb,
     time: "9:40 AM",
-    text: ["Reviewing the checklist this afternoon."],
+    text: "Reviewing the checklist this afternoon.",
   },
 ];
 
@@ -400,14 +399,14 @@ export const taskEntries: readonly TimelineEntry[] = [
     id: "k1",
     author: people.sara,
     time: "10:09 AM",
-    text: ["I can reproduce it. I’m checking the image size handling before the paste completes."],
+    text: "I can reproduce it. I’m checking the image size handling before the paste completes.",
   },
   {
     kind: "message",
     id: "k2",
     author: people.yumi,
     time: "10:12 AM",
-    text: ["The crash starts when the preview is generated. I’ve added the reproduction steps."],
+    text: "The crash starts when the preview is generated. I’ve added the reproduction steps.",
   },
 ];
 

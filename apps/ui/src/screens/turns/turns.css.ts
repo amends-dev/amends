@@ -1,4 +1,4 @@
-import { keyframes, style } from "@vanilla-extract/css";
+import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
@@ -189,10 +189,7 @@ export const cardLabel = style({ ...typeScale.meta, color: vars.color.text.secon
 
 export const cardText = style({
   ...typeScale.body,
-  margin: 0,
   color: vars.color.text.primary,
-  whiteSpace: "pre-wrap",
-  overflowWrap: "anywhere",
 });
 
 export const cardNote = style({
@@ -201,20 +198,6 @@ export const cardNote = style({
   color: vars.color.text.secondary,
   // On the caution fill, secondary text falls short of contrast.
   selectors: { [`${cautionCard} &`]: { color: vars.color.text.primary } },
-});
-
-const blink = keyframes({ "0%, 49%": { opacity: 1 }, "50%, 100%": { opacity: 0 } });
-
-// The draft's caret, blinking while text arrives; still when the reader prefers less motion.
-export const caret = style({
-  display: "inline-block",
-  width: "0.5em",
-  height: "1em",
-  marginInlineStart: "0.125rem",
-  verticalAlign: "text-bottom",
-  backgroundColor: vars.color.text.secondary,
-  animation: `${blink} 1s steps(1) infinite`,
-  "@media": { "(prefers-reduced-motion: reduce)": { animation: "none" } },
 });
 
 // What follows the log at its foot: live, paused with new activity, reconnecting, or a next step.
