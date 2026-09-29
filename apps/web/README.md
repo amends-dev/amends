@@ -66,7 +66,9 @@ the workspace on the UI Shell: `WorkspaceNavigation` with the account menu aroun
 destination's sidebar (`HomeSidebar`, or `DestinationSidebar` for Agents, Environments,
 Connections, and Settings from the client list hooks), one pane per page in `Shell.Main`, the
 thread panel as `ThreadPane`, and the Create group, New message, and Change your name modals, over
-client view hooks. A sidebar's + asks its page to open the create modal through `?add=`. Group, directory, direct-draft, and placeholder pages compose
+client view hooks. `Profiles.Root` around the shell opens members' cards from `useMemberProfiles`:
+Message goes to the direct conversation with them or drafts a first message, Open agent goes to
+the agent's page, and Change name opens the modal. A sidebar's + asks its page to open the create modal through `?add=`. Group, directory, direct-draft, and placeholder pages compose
 UI screens, as do the Inbox with `useInboxView` and `InboxPane` and Settings with
 `useWorkspaceSettings` and the settings screens. A page may render a `Shell.Aside`, such as
 Settings' member details or an agent's turn log (`src/turn-log.tsx`, shared with the thread

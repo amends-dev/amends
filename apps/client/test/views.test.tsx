@@ -10,6 +10,7 @@ import {
   useGroupConversation,
   useGroupMembers,
   useGroupPeople,
+  useMemberProfiles,
   useMentionCandidates,
   useThreadConversation,
   useWorkspaceGroups,
@@ -35,6 +36,7 @@ const members = [
   member("owner", { _tag: "Human", id: "alice" }, "Alice"),
   member("ada", { _tag: "Human", id: "ada@example.test" }),
   member("scout", { _tag: "Agent", id: "scout" }, "Scout"),
+  { ...member("former", { _tag: "Human", id: "bo@example.test" }, "Bo"), status: "removed" },
 ];
 const listing = {
   memberships: [
@@ -185,6 +187,7 @@ function fixture(options: { readonly stream?: () => Response } = {}) {
     candidates: ReturnType<typeof useMentionCandidates>;
     people: ReturnType<typeof useGroupPeople>;
     workspace: ReturnType<typeof useWorkspacePeople>;
+    profile: ReturnType<typeof useMemberProfiles>;
   };
   function Consumer() {
     views.groups = useWorkspaceGroups("one");
@@ -193,6 +196,7 @@ function fixture(options: { readonly stream?: () => Response } = {}) {
     views.candidates = useMentionCandidates("one", "g1");
     views.people = useGroupPeople("one", useGroupMembers("one", "g1"));
     views.workspace = useWorkspacePeople("one");
+    views.profile = useMemberProfiles("one");
     return null;
   }
   render(() => (
@@ -292,4 +296,27 @@ it("offers the group's other members to mention, and the rest of the workspace t
   ]);
   expect(views.people.candidates()).toEqual([{ id: "scout", name: "Scout", agent: true }]);
   expect(views.workspace().map((person) => person.id)).toEqual(["ada", "scout"]);
+});
+
+it("shows members' profiles by ID: people, agents with their page, the reader, and former members", async () => {
+  const { views } = fixture();
+  await waitFor(() => expect(views.profile("owner")).toBeDefined());
+  expect(views.profile("owner")).toEqual({
+    id: "owner",
+    name: "Alice",
+    kind: "person",
+    you: true,
+    former: false,
+  });
+  expect(views.profile("ada")).toMatchObject({ name: "ada@example.test", you: false });
+  expect(views.profile("scout")).toEqual({
+    id: "scout",
+    name: "Scout",
+    kind: "agent",
+    you: false,
+    former: false,
+    agentId: "scout",
+  });
+  expect(views.profile("former")).toMatchObject({ name: "Bo", former: true });
+  expect(views.profile("unknown")).toBeUndefined();
 });

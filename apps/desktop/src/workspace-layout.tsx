@@ -5,6 +5,7 @@ import {
   useInboxPending,
   useLiveStatus,
   useMemberName,
+  useMemberProfiles,
   useMentionCandidates,
   useReply,
   useSession,
@@ -26,6 +27,7 @@ import {
 } from "@amends/client";
 import type { PickerPerson } from "@amends/ui/components/member-picker";
 import { LiveStatus } from "@amends/ui/components/live-status";
+import { Profiles } from "@amends/ui/components/profile-card";
 import { Toast } from "@amends/ui/components/toast";
 import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
@@ -163,6 +165,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const [recipients, setRecipients] = createSignal<string[]>([]);
   const existing = () => (recipients().length > 0 ? groups.directWith(recipients()) : undefined);
   const name = useMemberName(workspaceId, () => setDialog(undefined));
+  const profiles = useMemberProfiles(workspaceId);
 
   return (
     <WorkspaceActionsContext.Provider
@@ -174,193 +177,214 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         toast,
       }}
     >
-      <Shell.Root>
-        <WorkspaceNavigation
-          workspace={{ name: membership()?.workspace.name ?? "" }}
-          account={{
-            name: ownName(),
-            menu: {
-              identity: session.session?.humanId ?? "",
-              appearance: appearance.preference(),
-              onAppearanceChange: appearance.setPreference,
-              onOpenSettings: () => navigate(path("settings")),
-              onChangeName: () => {
-                name.reset();
-                setDialog("name");
+      <Profiles.Root
+        profile={profiles}
+        onMessage={(memberId) => {
+          // Their conversation with the reader, or a first message to them.
+          const existing = groups.directWith([memberId]);
+          navigate(
+            existing
+              ? paths.group(workspaceId, existing.id)
+              : paths.directDraft(workspaceId, [memberId]),
+          );
+        }}
+        onOpenAgent={(memberId) => {
+          const agentId = profiles(memberId)?.agentId;
+          if (agentId) navigate(paths.agent(workspaceId, agentId));
+        }}
+        onChangeName={() => {
+          name.reset();
+          setDialog("name");
+        }}
+      >
+        <Shell.Root>
+          <WorkspaceNavigation
+            workspace={{ name: membership()?.workspace.name ?? "" }}
+            account={{
+              name: ownName(),
+              menu: {
+                identity: session.session?.humanId ?? "",
+                appearance: appearance.preference(),
+                onAppearanceChange: appearance.setPreference,
+                onOpenSettings: () => navigate(path("settings")),
+                onChangeName: () => {
+                  name.reset();
+                  setDialog("name");
+                },
+                onSignOut: session.signOut,
               },
-              onSignOut: session.signOut,
-            },
-          }}
-          homeHref={href(path("home"))}
-          destinations={["home", "agents", "environments", "connections"]}
-          destination={destination()}
-          destinationHref={(target) => href(path(target))}
-          settings={{ href: href(path("settings")), current: at("settings") }}
-          onSearch={() => setDialog("jump")}
-          onSwitchWorkspace={() => navigate(paths.workspaces)}
-        >
-          <Switch
-            fallback={
-              <HomeSidebar
-                inbox={{ href: href(path("inbox")), current: at("inbox"), unread: pending() }}
-                triage={{ href: href(path("triage")), current: at("triage") }}
-                tasks={{ href: href(path("tasks")), current: at("tasks") }}
-                groupsDirectory={{
-                  href: href(paths.groups(workspaceId)),
-                  current: browsing() !== undefined,
-                }}
-                groups={groups.teams().map((group) => ({
-                  id: group.id,
-                  name: group.name,
-                  href: href(paths.group(workspaceId, group.id)),
-                  current: groupId() === group.id,
-                  pending: group.pending,
-                  unread: group.unread,
-                  activity: activity.inGroup(group.id),
-                }))}
-                groupsLoading={groups.all() === undefined}
-                directMessages={directs().map((entry) =>
-                  entry.kind === "conversation"
-                    ? {
-                        id: entry.id,
-                        name: entry.name,
-                        href: href(paths.group(workspaceId, entry.id)),
-                        current: groupId() === entry.id,
-                        pending: entry.pending,
-                        unread: entry.unread,
-                      }
-                    : {
-                        id: entry.id,
-                        name: entry.name,
-                        // A first message; the conversation starts when it is sent.
-                        href: href(paths.directDraft(workspaceId, entry.memberIds)),
-                        current: drafting() !== undefined && search.to === entry.id,
-                      },
-                )}
-                onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
-                onCreateGroup={creator() ? openCreate : undefined}
-                onNewMessage={() => {
-                  setRecipients([]);
-                  setDialog("new-message");
-                }}
-              />
-            }
+            }}
+            homeHref={href(path("home"))}
+            destinations={["home", "agents", "environments", "connections"]}
+            destination={destination()}
+            destinationHref={(target) => href(path(target))}
+            settings={{ href: href(path("settings")), current: at("settings") }}
+            onSearch={() => setDialog("jump")}
+            onSwitchWorkspace={() => navigate(paths.workspaces)}
           >
-            <Match when={at("settings")}>
-              <DestinationSidebar
-                sections={[
-                  {
-                    id: "settings",
-                    title: "Settings",
-                    entries: [
-                      {
-                        id: "workspace",
-                        name: "Workspace",
-                        href: href(paths.settingsSection(workspaceId, "workspace")),
-                        current: at("settings") && !location.pathname.endsWith("/members"),
-                        icon: IconMarkSettings,
-                      },
-                      {
-                        id: "members",
-                        name: "Members",
-                        href: href(paths.settingsSection(workspaceId, "members")),
-                        current: location.pathname.endsWith("/settings/members"),
-                        icon: IconUsers,
-                      },
-                    ],
-                  },
-                ]}
+            <Switch
+              fallback={
+                <HomeSidebar
+                  inbox={{ href: href(path("inbox")), current: at("inbox"), unread: pending() }}
+                  triage={{ href: href(path("triage")), current: at("triage") }}
+                  tasks={{ href: href(path("tasks")), current: at("tasks") }}
+                  groupsDirectory={{
+                    href: href(paths.groups(workspaceId)),
+                    current: browsing() !== undefined,
+                  }}
+                  groups={groups.teams().map((group) => ({
+                    id: group.id,
+                    name: group.name,
+                    href: href(paths.group(workspaceId, group.id)),
+                    current: groupId() === group.id,
+                    pending: group.pending,
+                    unread: group.unread,
+                    activity: activity.inGroup(group.id),
+                  }))}
+                  groupsLoading={groups.all() === undefined}
+                  directMessages={directs().map((entry) =>
+                    entry.kind === "conversation"
+                      ? {
+                          id: entry.id,
+                          name: entry.name,
+                          href: href(paths.group(workspaceId, entry.id)),
+                          current: groupId() === entry.id,
+                          pending: entry.pending,
+                          unread: entry.unread,
+                        }
+                      : {
+                          id: entry.id,
+                          name: entry.name,
+                          // A first message; the conversation starts when it is sent.
+                          href: href(paths.directDraft(workspaceId, entry.memberIds)),
+                          current: drafting() !== undefined && search.to === entry.id,
+                        },
+                  )}
+                  onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
+                  onCreateGroup={creator() ? openCreate : undefined}
+                  onNewMessage={() => {
+                    setRecipients([]);
+                    setDialog("new-message");
+                  }}
+                />
+              }
+            >
+              <Match when={at("settings")}>
+                <DestinationSidebar
+                  sections={[
+                    {
+                      id: "settings",
+                      title: "Settings",
+                      entries: [
+                        {
+                          id: "workspace",
+                          name: "Workspace",
+                          href: href(paths.settingsSection(workspaceId, "workspace")),
+                          current: at("settings") && !location.pathname.endsWith("/members"),
+                          icon: IconMarkSettings,
+                        },
+                        {
+                          id: "members",
+                          name: "Members",
+                          href: href(paths.settingsSection(workspaceId, "members")),
+                          current: location.pathname.endsWith("/settings/members"),
+                          icon: IconUsers,
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </Match>
+              <Match when={destination() === "agents"}>
+                <AgentsSidebar workspaceId={workspaceId} />
+              </Match>
+              <Match when={destination() === "environments"}>
+                <EnvironmentsSidebar workspaceId={workspaceId} />
+              </Match>
+              <Match when={destination() === "connections"}>
+                <ConnectionsSidebar workspaceId={workspaceId} />
+              </Match>
+            </Switch>
+          </WorkspaceNavigation>
+          <Shell.Main>{props.children}</Shell.Main>
+          <Show when={panel()} keyed>
+            {(thread) => (
+              <ThreadPanel
+                workspaceId={workspaceId}
+                groupId={thread.groupId}
+                threadId={thread.threadId}
+                // Opened from the inbox, the thread opens at the message that notified the reader.
+                focus={fromInbox() && search.at ? Number(search.at) || undefined : undefined}
+                fromInbox={fromInbox() !== undefined}
+                onClose={closePanel}
+                log={search.log}
+                onOpenLog={(turnId) => setSearch({ log: turnId })}
+                onCloseLog={() => setSearch({ log: undefined })}
               />
-            </Match>
-            <Match when={destination() === "agents"}>
-              <AgentsSidebar workspaceId={workspaceId} />
-            </Match>
-            <Match when={destination() === "environments"}>
-              <EnvironmentsSidebar workspaceId={workspaceId} />
-            </Match>
-            <Match when={destination() === "connections"}>
-              <ConnectionsSidebar workspaceId={workspaceId} />
-            </Match>
-          </Switch>
-        </WorkspaceNavigation>
-        <Shell.Main>{props.children}</Shell.Main>
-        <Show when={panel()} keyed>
-          {(thread) => (
-            <ThreadPanel
-              workspaceId={workspaceId}
-              groupId={thread.groupId}
-              threadId={thread.threadId}
-              // Opened from the inbox, the thread opens at the message that notified the reader.
-              focus={fromInbox() && search.at ? Number(search.at) || undefined : undefined}
-              fromInbox={fromInbox() !== undefined}
-              onClose={closePanel}
-              log={search.log}
-              onOpenLog={(turnId) => setSearch({ log: turnId })}
-              onCloseLog={() => setSearch({ log: undefined })}
-            />
-          )}
-        </Show>
-        <CreateGroup
-          open={dialog() === "create-group"}
-          onClose={() => setDialog(undefined)}
-          name={creation.name()}
-          onNameChange={creation.setName}
-          visibility={creation.visibility() === "Public" ? "public" : "private"}
-          onVisibilityChange={(value) =>
-            creation.setVisibility(value === "public" ? "Public" : "Private")
-          }
-          you={{ id: membership()?.member.id ?? "you", name: "You", kind: "Person" }}
-          candidates={people().map(pickerPerson)}
-          selected={[...creation.members()]}
-          onSelectedChange={creation.setMembers}
-          creating={creation.pending()}
-          error={creation.error()}
-          onCreate={creation.create}
-        />
-        <NewMessage
-          open={dialog() === "new-message"}
-          onClose={() => setDialog(undefined)}
-          candidates={people().map(pickerPerson)}
-          selected={recipients()}
-          onSelectedChange={setRecipients}
-          existing={existing() !== undefined}
-          onConfirm={() => {
-            const group = existing();
-            setDialog(undefined);
-            navigate(
-              group
-                ? paths.group(workspaceId, group.id)
-                : paths.directDraft(workspaceId, recipients()),
-            );
-          }}
-        />
-        <ChangeName
-          open={dialog() === "name"}
-          onClose={() => setDialog(undefined)}
-          workspaceName={membership()?.workspace.name ?? ""}
-          name={name.name()}
-          onNameChange={name.setName}
-          ready={name.ready()}
-          pending={name.pending()}
-          error={name.error()}
-          onSave={name.save}
-        />
-        <Show when={dialog() === "jump"}>
-          <JumpToDialog workspaceId={workspaceId} onClose={() => setDialog(undefined)} />
-        </Show>
-        <LiveStatus status={live()} />
-        <Toast.Region>
-          <For each={toasts()}>
-            {(item) => (
-              <Toast.Item
-                onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}
-              >
-                {item.text}
-              </Toast.Item>
             )}
-          </For>
-        </Toast.Region>
-      </Shell.Root>
+          </Show>
+          <CreateGroup
+            open={dialog() === "create-group"}
+            onClose={() => setDialog(undefined)}
+            name={creation.name()}
+            onNameChange={creation.setName}
+            visibility={creation.visibility() === "Public" ? "public" : "private"}
+            onVisibilityChange={(value) =>
+              creation.setVisibility(value === "public" ? "Public" : "Private")
+            }
+            you={{ id: membership()?.member.id ?? "you", name: "You", kind: "Person" }}
+            candidates={people().map(pickerPerson)}
+            selected={[...creation.members()]}
+            onSelectedChange={creation.setMembers}
+            creating={creation.pending()}
+            error={creation.error()}
+            onCreate={creation.create}
+          />
+          <NewMessage
+            open={dialog() === "new-message"}
+            onClose={() => setDialog(undefined)}
+            candidates={people().map(pickerPerson)}
+            selected={recipients()}
+            onSelectedChange={setRecipients}
+            existing={existing() !== undefined}
+            onConfirm={() => {
+              const group = existing();
+              setDialog(undefined);
+              navigate(
+                group
+                  ? paths.group(workspaceId, group.id)
+                  : paths.directDraft(workspaceId, recipients()),
+              );
+            }}
+          />
+          <ChangeName
+            open={dialog() === "name"}
+            onClose={() => setDialog(undefined)}
+            workspaceName={membership()?.workspace.name ?? ""}
+            name={name.name()}
+            onNameChange={name.setName}
+            ready={name.ready()}
+            pending={name.pending()}
+            error={name.error()}
+            onSave={name.save}
+          />
+          <Show when={dialog() === "jump"}>
+            <JumpToDialog workspaceId={workspaceId} onClose={() => setDialog(undefined)} />
+          </Show>
+          <LiveStatus status={live()} />
+          <Toast.Region>
+            <For each={toasts()}>
+              {(item) => (
+                <Toast.Item
+                  onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}
+                >
+                  {item.text}
+                </Toast.Item>
+              )}
+            </For>
+          </Toast.Region>
+        </Shell.Root>
+      </Profiles.Root>
     </WorkspaceActionsContext.Provider>
   );
 }

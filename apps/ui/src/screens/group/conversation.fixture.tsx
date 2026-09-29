@@ -2,8 +2,9 @@
 // messages, reply summaries, notes, mentions, and loading states. Not exported.
 import { Show, createSignal } from "solid-js";
 import type { MentionCandidate } from "../../components/composer/index.ts";
+import { Profiles } from "../../components/profile-card/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
-import { people } from "../sample.ts";
+import { people, profile } from "../sample.ts";
 import type { TimelineEntry } from "../timeline/index.ts";
 import {
   HomeSidebar,
@@ -114,96 +115,103 @@ export function Conversation(props: ConversationProps) {
     currentGroup: "general",
   });
   return (
-    <Shell.Root>
-      <WorkspaceNavigation
-        {...base}
-        destinations={["home", "environments", "connections"]}
-        account={{
-          ...base.account,
-          menu: props.menu
-            ? {
-                identity: "jordan@mercier.example",
-                appearance: appearance(),
-                onAppearanceChange: setAppearance,
-                onOpenSettings: () => {},
-                onChangeName: () => {},
-                onSignOut: () => {},
-              }
-            : undefined,
-        }}
-      >
-        <HomeSidebar
+    <Profiles.Root
+      profile={profile}
+      onMessage={() => {}}
+      onOpenAgent={() => {}}
+      onChangeName={() => {}}
+    >
+      <Shell.Root>
+        <WorkspaceNavigation
           {...base}
-          groups={[
-            { id: "general", name: "general", href: "#general", current: true },
-            { id: "design", name: "design", href: "#design", pending: 2 },
-            { id: "product", name: "product", href: "#product", unread: true },
-          ]}
-        />
-      </WorkspaceNavigation>
-      <Shell.Main>
-        <GroupPane
-          name="general"
-          workspaceName="Mercier & Co"
-          members={[people.alex, people.sara, people.yumi]}
-          memberCount={3}
-          tabs={["threads"]}
-          tab="threads"
-          tabHref={() => "#threads"}
-          onOpenMembers={() => {}}
-          follow={{ following: following(), onToggle: () => setFollowing(!following()) }}
-          onOpenSettings={() => {}}
+          destinations={["home", "environments", "connections"]}
+          account={{
+            ...base.account,
+            menu: props.menu
+              ? {
+                  identity: "jordan@mercier.example",
+                  appearance: appearance(),
+                  onAppearanceChange: setAppearance,
+                  onOpenSettings: () => {},
+                  onChangeName: () => {},
+                  onSignOut: () => {},
+                }
+              : undefined,
+          }}
         >
-          <GroupThreads
-            entries={entries()}
-            days
-            status={props.status}
-            onRetry={() => {}}
-            earlier={
-              props.earlier ? { failed: props.earlier === "failed", onLoad: () => {} } : undefined
-            }
-            openThreadId={open() ? "t1" : undefined}
-            onOpenThread={() => setOpen(true)}
-            placeholder="Message #general"
-            draft={draft()}
-            onDraftChange={setDraft}
-            mentionCandidates={candidates}
-            onSend={(text) => {
-              setEntries([
-                ...entries(),
-                {
-                  kind: "message",
-                  id: `sent-${entries().length}`,
-                  author: people.jordan,
-                  at: new Date(),
-                  text,
-                  mentions: candidates.filter((person) => text.includes(`(member:${person.id})`)),
-                  thread: { replies: 0 },
-                },
-              ]);
-              setDraft("");
-            }}
+          <HomeSidebar
+            {...base}
+            groups={[
+              { id: "general", name: "general", href: "#general", current: true },
+              { id: "design", name: "design", href: "#design", pending: 2 },
+              { id: "product", name: "product", href: "#product", unread: true },
+            ]}
           />
-        </GroupPane>
-      </Shell.Main>
-      <Show when={open()}>
-        <ThreadPane
-          title="Thread"
-          groupName="general"
-          entries={thread}
-          days
-          status={props.threadStatus}
-          typing={["Sara"]}
-          follow={{ following: false, onToggle: () => {} }}
-          onClose={() => setOpen(false)}
-          placeholder="Reply in thread"
-          draft={reply()}
-          onDraftChange={setReply}
-          mentionCandidates={candidates}
-          onSend={() => setReply("")}
-          sendError={reply() === "fail" ? "failed" : undefined}
-        />
-      </Show>
-    </Shell.Root>
+        </WorkspaceNavigation>
+        <Shell.Main>
+          <GroupPane
+            name="general"
+            workspaceName="Mercier & Co"
+            members={[people.alex, people.sara, people.yumi]}
+            memberCount={3}
+            tabs={["threads"]}
+            tab="threads"
+            tabHref={() => "#threads"}
+            onOpenMembers={() => {}}
+            follow={{ following: following(), onToggle: () => setFollowing(!following()) }}
+            onOpenSettings={() => {}}
+          >
+            <GroupThreads
+              entries={entries()}
+              days
+              status={props.status}
+              onRetry={() => {}}
+              earlier={
+                props.earlier ? { failed: props.earlier === "failed", onLoad: () => {} } : undefined
+              }
+              openThreadId={open() ? "t1" : undefined}
+              onOpenThread={() => setOpen(true)}
+              placeholder="Message #general"
+              draft={draft()}
+              onDraftChange={setDraft}
+              mentionCandidates={candidates}
+              onSend={(text) => {
+                setEntries([
+                  ...entries(),
+                  {
+                    kind: "message",
+                    id: `sent-${entries().length}`,
+                    author: people.jordan,
+                    at: new Date(),
+                    text,
+                    mentions: candidates.filter((person) => text.includes(`(member:${person.id})`)),
+                    thread: { replies: 0 },
+                  },
+                ]);
+                setDraft("");
+              }}
+            />
+          </GroupPane>
+        </Shell.Main>
+        <Show when={open()}>
+          <ThreadPane
+            title="Thread"
+            groupName="general"
+            entries={thread}
+            days
+            status={props.threadStatus}
+            typing={["Sara"]}
+            follow={{ following: false, onToggle: () => {} }}
+            onClose={() => setOpen(false)}
+            placeholder="Reply in thread"
+            draft={reply()}
+            onDraftChange={setReply}
+            mentionCandidates={candidates}
+            onSend={() => setReply("")}
+            sendError={reply() === "fail" ? "failed" : undefined}
+          />
+        </Show>
+      </Shell.Root>
+    </Profiles.Root>
   );
 }

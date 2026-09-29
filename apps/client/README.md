@@ -335,6 +335,8 @@ and `text` fields the screens' timeline takes.
   general group nobody can be removed, and `useGroupMembers` reports it `general` and not
   `leavable`.
   `useWorkspacePeople(workspaceId)` lists the workspace's other active members and agents.
+  `useMemberProfiles(workspaceId)` looks a member up by ID for their profile card: their name,
+  person or agent, whether they are the reader or were removed, and an agent's ID for its page.
 
 ## Conversations
 

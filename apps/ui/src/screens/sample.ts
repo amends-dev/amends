@@ -1,6 +1,7 @@
 // Workshop data matching the Lunacy group screens. Not exported.
 import type { MessageAuthor } from "../components/message/index.ts";
 import type { PickerPerson } from "../components/member-picker/index.ts";
+import type { Profile } from "../components/profile-card/index.ts";
 import type { SettingsMember, TaskPerson, TaskRow } from "./group/index.ts";
 import type { TimelineEntry } from "./timeline/index.ts";
 import type { HomeSidebarProps, WorkspaceNavigationProps } from "./workspace-navigation/index.ts";
@@ -14,6 +15,23 @@ export const people = {
   yumi: { id: "yumi", name: "Yumi", tone: "lilac", agent: true },
   jordan: { id: "jordan", name: "Jordan Mercier", initials: "JM", tone: "sage" },
 } as const satisfies Record<string, MessageAuthor>;
+
+/** The sample members' cards: Jordan is the reader, and Caleb has left the workspace. */
+export function profile(memberId: string): Profile | undefined {
+  if (memberId === "caleb") return { id: "caleb", name: "Caleb", kind: "person", former: true };
+  const person: MessageAuthor | undefined = Object.values(people).find(
+    (one) => one.id === memberId,
+  );
+  if (!person) return undefined;
+  return {
+    id: memberId,
+    name: person.name,
+    kind: person.agent ? "agent" : "person",
+    you: memberId === people.jordan.id,
+    initials: person.initials,
+    tone: person.tone,
+  };
+}
 
 export const groupEntries: readonly TimelineEntry[] = [
   { kind: "divider", id: "yesterday", label: "Yesterday" },

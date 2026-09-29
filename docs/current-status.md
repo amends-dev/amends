@@ -103,7 +103,9 @@ message for these. On touch screens a tap on the message shows its actions, and 
 replies also offers "Reply in thread" under it. Elsewhere, a thread with no replies notes under its message only who is typing or which
 agent is at work, such as "Yumi working", which opens the thread. The page composer starts a thread and the thread composer replies, keeping drafts per group
 and thread within the session, and both mention group members picked after `@`. A name typed
-without picking it addresses no one. A member's messages within five minutes of each other stack
+without picking it addresses no one. A member's name, avatar, or mention opens their profile card
+on hover, focus, or a tap, offering Message, Open agent for an agent, or Change name on the
+reader's own; cards show no photo, status, role, or local time, which the workspace does not hold. A member's messages within five minutes of each other stack
 under one avatar and name, as in Slack, unless a thread's replies summary comes between. Messages render as markdown, with mentions naming members
 as they are called now, in the timeline, the inbox's one-line previews, and a turn log's reply and
 streaming draft. The composer formats the draft as it is written, from its toolbar, Slack's

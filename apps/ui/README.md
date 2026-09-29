@@ -178,6 +178,22 @@ beneath it with no avatar or name, its time in the avatar's place while hovered 
 assistive technology still hears the author and time. Screens word times, days, and typing through `internal/when.ts`,
 and key rows by id through `internal/keyed.tsx`, so callers may pass freshly built arrays.
 
+`Profiles` draws the Lunacy "Profile cards / Compact" frames: a card naming a member, whether they
+are a person or an agent (and the reader, or a former member), and what the reader can do.
+`Profiles.Root` takes `profile`, which looks members up by ID, and the `onMessage`, `onOpenAgent`,
+and `onChangeName` actions; it shows one card at a time, fixed under its trigger or above it where
+there is no room below, and closes it if the trigger leaves the page or scrolls out of view.
+`Profiles.Trigger` opens its member's card after 250ms of hover, with 150ms to cross to the card
+before it closes, and at once on keyboard focus; a click, tap, Enter, or Space keeps it open until
+Escape or a click outside. Tab from the trigger reaches the card's actions, and Escape returns
+there. The reader's own card offers Change name, an agent's Message and Open agent, anyone else's
+Message, and a former member's nothing; an ID `profile` does not know shows "Profile unavailable".
+Inside a Root, a message whose author has an `id` makes the name and avatar triggers (the avatar is
+hidden from assistive technology, which meets the name), RichText's mentions are triggers except in
+`inline` previews, and a mention in the composer's draft opens its card on hover. Outside one,
+triggers are their contents. **Components / Conversation**'s Profile cards story walks them from
+the keyboard.
+
 ## Form components and the modal
 
 `Button` is primary, secondary, or quiet, with an optional icon or menu chevron. `Field` gives

@@ -6,6 +6,7 @@ import conversationMeta, {
   Composing,
   FormattedText,
   Messages,
+  ProfileCards,
   TaskStates,
 } from "../src/components/conversation.stories.tsx";
 import groupMeta, {
@@ -222,6 +223,9 @@ describe("conversation components", () => {
   });
   it("formats markdown messages, a streaming draft, and a one-line preview", async () => {
     await stories.story(FormattedText).run();
+  });
+  it("opens a member's card from their name or a mention, with what the reader can do", async () => {
+    await stories.story(ProfileCards).run();
   });
 });
 

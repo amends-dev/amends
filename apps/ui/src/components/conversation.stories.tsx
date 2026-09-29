@@ -6,6 +6,7 @@ import { Composer } from "./composer/index.ts";
 import { Divider } from "./divider/index.ts";
 import { IconButton } from "./icon-button/index.ts";
 import { Message } from "./message/index.ts";
+import { Profiles, type Profile } from "./profile-card/index.ts";
 import { RichText } from "./rich-text/index.ts";
 import { TaskStatus, taskStateLabel } from "./task-status/index.ts";
 import * as s from "./components.stories.css.ts";
@@ -211,5 +212,118 @@ export const Composing = {
       "first **bold** second",
     );
     await waitFor(() => expect(input).toHaveTextContent(""));
+  },
+} satisfies Story;
+
+const members: Readonly<Record<string, Profile>> = {
+  alex: { id: "alex", name: "Alex Morgan", kind: "person", initials: "AM", tone: "sand" },
+  yumi: { id: "yumi", name: "Yumi", kind: "agent", tone: "lilac" },
+  jordan: {
+    id: "jordan",
+    name: "Jordan Mercier",
+    kind: "person",
+    you: true,
+    initials: "JM",
+    tone: "sage",
+  },
+  bartholomew: {
+    id: "bartholomew",
+    name: "Bartholomew Fitzgerald-Ashworth",
+    kind: "person",
+    tone: "olive",
+  },
+  caleb: { id: "caleb", name: "Caleb", kind: "person", former: true },
+};
+
+function ProfilesExample() {
+  const [done, setDone] = createSignal("");
+  const name = (id: string) => members[id]?.name ?? id;
+  return (
+    <Profiles.Root
+      profile={(id) => members[id]}
+      onMessage={(id) => setDone(`Message ${name(id)}`)}
+      onOpenAgent={(id) => setDone(`Open ${name(id)}`)}
+      onChangeName={() => setDone("Change your name")}
+    >
+      <div class={s.stack}>
+        <Message.Root author={{ ...members.alex!, agent: false }} time="9:44 AM">
+          <Message.Text>
+            <RichText
+              text="[@Yumi](member:yumi) can you check the release notes? [@Jordan Mercier](member:jordan) and [@Bartholomew Fitzgerald-Ashworth](member:bartholomew) reviewed them; [@Caleb](member:caleb) started them, and [@Robin](member:robin) asked."
+              mentions={Object.values(members)}
+            />
+          </Message.Text>
+        </Message.Root>
+        <Message.Root author={{ ...members.yumi!, agent: true }} time="9:46 AM">
+          <Message.Text>On it.</Message.Text>
+        </Message.Root>
+      </div>
+      <p class={s.note} role="status" aria-label="Chosen">
+        {done()}
+      </p>
+    </Profiles.Root>
+  );
+}
+
+export const ProfileCards = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Profile cards</h2>
+        <p class={s.note}>
+          A member's name, avatar, or mention opens their card after a moment's hover, or at once
+          from the keyboard; a click, tap, Enter, or Space keeps it open until Escape or a click
+          outside. The card says whether they are a person or an agent and offers Message, Open
+          agent, or, on the reader's own card, Change name. A former member keeps their name with
+          nothing to do, and a member who cannot be shown says so.
+        </p>
+        <ProfilesExample />
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chosen = canvas.getByRole("status", { name: "Chosen" });
+    const mention = canvas.getByRole("button", { name: "@Yumi" });
+    mention.focus();
+    await userEvent.keyboard("{Enter}");
+    const yumi = within(await canvas.findByRole("dialog", { name: "Yumi" }));
+    await expect(yumi.getByText("Agent")).toBeInTheDocument();
+    await userEvent.tab();
+    await expect(yumi.getByRole("button", { name: "Message" })).toHaveFocus();
+    await userEvent.tab();
+    await userEvent.keyboard("{Enter}");
+    await expect(chosen).toHaveTextContent("Open Yumi");
+    await expect(canvas.queryByRole("dialog")).toBeNull();
+
+    canvas.getByRole("button", { name: "Alex Morgan" }).focus();
+    await userEvent.keyboard("{Enter}");
+    await expect(await canvas.findByRole("dialog", { name: "Alex Morgan" })).toHaveTextContent(
+      "Person",
+    );
+    await userEvent.keyboard("{Escape}");
+    await expect(canvas.queryByRole("dialog")).toBeNull();
+    await expect(canvas.getByRole("button", { name: "Alex Morgan" })).toHaveFocus();
+
+    canvas.getByRole("button", { name: "@Jordan Mercier" }).focus();
+    await userEvent.keyboard("{Enter}");
+    const you = within(await canvas.findByRole("dialog", { name: "Jordan Mercier" }));
+    await expect(you.getByText("Person · You")).toBeInTheDocument();
+    await expect(you.queryByRole("button", { name: "Message" })).toBeNull();
+    await userEvent.tab();
+    await userEvent.keyboard("{Enter}");
+    await expect(chosen).toHaveTextContent("Change your name");
+
+    canvas.getByRole("button", { name: "@Caleb" }).focus();
+    await userEvent.keyboard("{Enter}");
+    await expect(await canvas.findByRole("dialog", { name: "Caleb" })).toHaveTextContent(
+      "No longer in this workspace.",
+    );
+    canvas.getByRole("button", { name: "@Robin" }).focus();
+    await userEvent.keyboard("{Enter}");
+    await expect(
+      await canvas.findByRole("dialog", { name: "Profile unavailable" }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
   },
 } satisfies Story;

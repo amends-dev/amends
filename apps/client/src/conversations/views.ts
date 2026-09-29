@@ -475,6 +475,39 @@ export function useGroupPeople(
   return { roster, candidates };
 }
 
+/** A workspace member as their profile card shows them. */
+export interface MemberProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "person" | "agent";
+  /** The reader themself. */
+  readonly you: boolean;
+  /** Removed from the workspace; they keep their name. */
+  readonly former: boolean;
+  /** An agent's own ID, where its page is. */
+  readonly agentId?: string;
+}
+
+/**
+ * Members as their profile cards show them, by member ID and never by name, live while mounted.
+ * Undefined for someone the reader's workspace does not know.
+ */
+export function useMemberProfiles(workspaceId: string) {
+  const people = usePeople(workspaceId);
+  return (memberId: string): MemberProfile | undefined => {
+    const member = people.member(memberId);
+    if (member === undefined) return undefined;
+    return {
+      id: member.id,
+      name: memberName(member),
+      kind: member.identity._tag === "Agent" ? "agent" : "person",
+      you: member.id === people.selfId(),
+      former: member.status === "removed",
+      ...(member.identity._tag === "Agent" ? { agentId: member.identity.id } : {}),
+    };
+  };
+}
+
 /** The workspace's other active members and agents, whom the reader can message or add. */
 export function useWorkspacePeople(workspaceId: string): Accessor<ReadonlyArray<MentionCandidate>> {
   const people = usePeople(workspaceId);

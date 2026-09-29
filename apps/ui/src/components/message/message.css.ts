@@ -114,6 +114,8 @@ export const gutterTime = style({
   "@media": { [media.mobile]: { lineHeight: typeScale.bodyTouch.lineHeight } },
 });
 
+export const avatarTrigger = style({ display: "flex" });
+
 export const content = style({
   position: "relative",
   display: "flex",

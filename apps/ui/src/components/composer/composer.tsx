@@ -33,6 +33,7 @@ import { Avatar } from "../avatar/index.ts";
 import { Button } from "../button/index.ts";
 import { IconButton } from "../icon-button/index.ts";
 import { Input as TextInput } from "../input/index.ts";
+import { useProfiles } from "../profile-card/profile-card.tsx";
 import { media } from "../../foundations/layout/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import {
@@ -205,6 +206,11 @@ export function Input(props: InputProps) {
   const state = useState("Input");
   const id = createUniqueId();
   const [host, setHost] = createSignal<HTMLDivElement>();
+  // A mention in the draft opens its member's card on hover, leaving the draft, selection, and
+  // focus as they are; not while choosing whom to mention.
+  const profiles = useProfiles();
+  const mentionAt = (target: EventTarget | null) =>
+    target instanceof Element ? target.closest<HTMLElement>("[data-member]") : null;
   // The draft the editor last reported, so the caller's copy coming back is not reapplied.
   let reported: string | undefined;
   const [query, setQuery] = createSignal<{
@@ -420,7 +426,20 @@ export function Input(props: InputProps) {
         </ul>
       </Show>
       <Show when={state.link()}>{(target) => <LinkForm target={target()} />}</Show>
-      <div ref={setHost} class={s.host} />
+      <div
+        ref={setHost}
+        class={s.host}
+        onMouseOver={(event) => {
+          const mention = mentionAt(event.target);
+          if (profiles && mention?.dataset["member"] && !open())
+            profiles.hover(mention, mention.dataset["member"]);
+        }}
+        onMouseOut={(event) => {
+          const mention = mentionAt(event.target);
+          if (profiles && mention && !mention.contains(event.relatedTarget as Node | null))
+            profiles.leave();
+        }}
+      />
     </>
   );
 }

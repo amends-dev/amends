@@ -2,6 +2,7 @@ import { For, Show, createEffect, createSignal, splitProps, type JSX } from "sol
 import { Dynamic } from "solid-js/web";
 import { Avatar, AvatarStack, type AvatarStackPerson } from "../avatar/index.ts";
 import { IconButton, type IconButtonProps } from "../icon-button/index.ts";
+import { Profiles } from "../profile-card/index.ts";
 import { TaskStatus, type TaskState } from "../task-status/index.ts";
 import { TurnActivity, type TurnState } from "../turn-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
@@ -78,19 +79,52 @@ export function Root(props: RootProps) {
           </Show>
         }
       >
-        <Avatar
-          name={local.author.name}
-          initials={local.author.initials}
-          tone={local.author.tone}
-          size={32}
-          decorative
-        />
+        <Show
+          when={local.author.id}
+          fallback={
+            <Avatar
+              name={local.author.name}
+              initials={local.author.initials}
+              tone={local.author.tone}
+              size={32}
+              decorative
+            />
+          }
+        >
+          {(id) => (
+            // The name beside it is the one Tab reaches.
+            <Profiles.Trigger memberId={id()} focusable={false} class={s.avatarTrigger}>
+              <Avatar
+                name={local.author.name}
+                initials={local.author.initials}
+                tone={local.author.tone}
+                size={32}
+                decorative
+              />
+            </Profiles.Trigger>
+          )}
+        </Show>
       </Show>
       <div class={s.content}>
         <div class={local.continued ? s.hiddenByline : s.byline}>
-          <span class={s.author} data-agent={local.author.agent ? "" : undefined}>
-            {local.author.name}
-          </span>
+          <Show
+            when={!local.continued && local.author.id}
+            fallback={
+              <span class={s.author} data-agent={local.author.agent ? "" : undefined}>
+                {local.author.name}
+              </span>
+            }
+          >
+            {(id) => (
+              <Profiles.Trigger
+                memberId={id()}
+                class={s.author}
+                data-agent={local.author.agent ? "" : undefined}
+              >
+                {local.author.name}
+              </Profiles.Trigger>
+            )}
+          </Show>
           <Show when={shown()}>
             {(time) => (
               <time

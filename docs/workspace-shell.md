@@ -71,6 +71,15 @@ catches the reader up with it, and an open thread is read through its newest mes
 composer starts a thread; in the side panel it replies. Typing `@` suggests the group's other
 members.
 
+A member's name or avatar on a message, a mention in one, or a mention in the draft opens their
+profile card after a moment's hover, or at once from the keyboard; a click or tap keeps it open
+until Escape or a click outside, and Tab from the name reaches its actions. The card, from the
+Lunacy "Profile cards / Compact" frames, names them and says whether they are a person or an agent.
+Message opens the reader's direct conversation with them, or drafts a first message; an agent's
+card adds Open agent, for its page; the reader's own card offers Change name instead; and a former
+member's card keeps their name with "No longer in this workspace." and nothing to do. Mentions in
+the inbox's one-line previews open the notification, not a card.
+
 A team group's bell follows it, so new threads there include the reader, or stops: it is filled
 while the reader follows, and a toast confirms each change once it lands ("Following #design",
 "Unfollowed #design"); a change that fails puts the bell back and says so in a toast. In the side

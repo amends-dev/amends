@@ -3,6 +3,7 @@ import { Marked, type MarkedToken, type Token, type Tokens } from "marked";
 import remend from "remend";
 import { For, Show, createMemo, type JSX } from "solid-js";
 import { Keyed } from "../../internal/keyed.tsx";
+import { Profiles } from "../profile-card/index.ts";
 import { classes } from "../../internal/props.ts";
 import * as s from "./rich-text.css.ts";
 
@@ -208,12 +209,24 @@ function Mention(props: {
   readonly id: string;
   readonly label: string;
   readonly context: Context;
+  /** Opens the member's card; not in a preview, which a row's link already covers. */
+  readonly interactive?: boolean;
 }) {
   const member = () => props.context.member(props.id);
+  const label = () => (member() ? `@${member()!.name}` : props.label);
   return (
-    <span class={s.mention} data-member={props.id}>
-      {member() ? `@${member()!.name}` : props.label}
-    </span>
+    <Show
+      when={props.interactive}
+      fallback={
+        <span class={s.mention} data-member={props.id}>
+          {label()}
+        </span>
+      }
+    >
+      <Profiles.Trigger memberId={props.id} class={s.mention} data-member={props.id}>
+        {label()}
+      </Profiles.Trigger>
+    </Show>
   );
 }
 
@@ -241,7 +254,7 @@ function inline(token: Token, context: Context): JSX.Element {
     case "link": {
       const member = memberOf(current.href);
       if (member !== undefined)
-        return <Mention id={member} label={plain(current.tokens)} context={context} />;
+        return <Mention id={member} label={plain(current.tokens)} context={context} interactive />;
       const href = safeHref(current.href);
       if (!href) return inlines(current.tokens, context);
       return (
