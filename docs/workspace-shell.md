@@ -64,8 +64,9 @@ Client view hooks shape the conversation reads for the screens: `useWorkspaceGro
 name people and groups, resolve mentions, and report loading, unavailable, and failed states;
 the screens word them. A group's stream shows each thread's opening message, oldest first under
 day seams, with its reply count, an unread dot, and who is typing. A message under the pointer, or
-holding focus, is lit and floats its actions at its top right, starting with Reply in thread; on
-touch screens a message with no replies offers "Reply in thread" under it instead. Seeing a group
+holding focus, is lit and floats its actions at its top right: Reply in thread, and View turn log on
+an agent's reply. On touch screens a tap on the message shows them, and a message with no replies
+also offers "Reply in thread" under it. Seeing a group
 catches the reader up with it, and an open thread is read through its newest message. The
 composer starts a thread; in the side panel it replies. Typing `@` suggests the group's other
 members.

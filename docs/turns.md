@@ -11,7 +11,7 @@ states of a turn at work.
   Stop while it is active or Retry once it failed or stopped, for a reader who may direct the
   agent. A failure names its reason and links to the agent's page (`/agents/:agentId`); a turn stopped because its agent left the thread says so and offers no retry. A retry
   keeps the failed or stopped turn and notes it above the new attempt ("Previous turn failed ·
-  View log"). A turn that replied shows no row: its reply notes "Completed · View turn log".
+  View log"). A turn that replied shows no row: its reply's actions offer View turn log.
   Stop shows Stopping… at once and stays disabled until the turn stops; if it already finished,
   the row says so and shows what actually happened. Leaving the thread never stops a turn.
 - **Where agents work:** a thread's replies in its group's stream say "Yumi working", and the

@@ -167,10 +167,11 @@ keep their elements as streamed text grows.
 A message takes its time as text or as `at`, a `Date` it words as the time of day with the full
 date as its title. The reply summary adds an unread dot and a note such as who is typing; a
 message under the pointer, or holding focus, is lit and floats `Message.Actions` at its top right, a
-bordered row of `Message.Action` icon buttons that takes no room in the message; the timeline puts
-Reply in thread there for every thread's opening message. Touch screens, with nothing to hover,
-show no Actions: there a message with no replies offers `Message.Reply` ("Reply in thread") under
-it. Elsewhere it shows only while someone is typing or an agent is at work in the thread, and says
+bordered row of `Message.Action` icon buttons that takes no room in the message. The timeline puts
+Reply in thread there for every thread's opening message and View turn log for an agent's reply,
+noting nothing under the message. On touch screens, with nothing to hover, a tap focuses the
+message to show its Actions, and a message with no replies also offers `Message.Reply` ("Reply in
+thread") under it. Elsewhere it shows only while someone is typing or an agent is at work in the thread, and says
 just that, such as "Yumi working", which also opens the thread. `focused` sets a
 message apart and scrolls to it. `continued` stacks a message under its author's one before, 6px
 beneath it with no avatar or name, its time in the avatar's place while hovered or focused;
@@ -331,8 +332,8 @@ thread's messages as compact rows, from the Lunacy "Turn activity" frames: the a
 View log, and Stop or Retry for a reader who may direct it, with a failure's reason and Agent
 settings, the failed or stopped turn a retry follows, and a refused command worded from its
 `TurnProblem` code; rows key by turn so Stop keeps its focus, and move their actions under the
-name when too narrow. `ThreadPane` takes them as `turns`, and its timeline notes "Completed · View
-turn log" under an agent's reply; a thread's replies and a sidebar group mark where agents work.
+name when too narrow. `ThreadPane` takes them as `turns`, and its timeline offers View turn log in
+an agent's reply's actions; a thread's replies and a sidebar group mark where agents work.
 `TurnLogPane` shows a turn's log in place of its thread: where and with what it runs, its
 activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
 failure, and a footer that follows live, offers "New activity · Jump to latest" once the reader

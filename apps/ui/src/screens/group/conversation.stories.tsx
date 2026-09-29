@@ -47,13 +47,16 @@ export const OpenThread = {
   },
 } satisfies Story;
 
-/** A message with no replies offers to reply in its thread. */
+/** A message with no replies offers to reply in its thread among its actions, shown on hover. */
 export const ReplyInThread = {
   render: () => <Conversation />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const [first] = canvas.getAllByRole("button", { name: "Reply in thread" });
-    await userEvent.click(first!);
+    // Its actions show under the pointer, or to the keyboard, as here.
+    const message = canvas.getByText("Lunch at noon?").closest("article")!;
+    const actions = within(message).getByRole("group", { name: "Message actions" });
+    within(actions).getByRole("button", { name: "Reply in thread" }).focus();
+    await userEvent.keyboard("{Enter}");
     await expect(await canvas.findByRole("combobox", { name: "Reply in thread" })).toBeVisible();
   },
 } satisfies Story;

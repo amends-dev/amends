@@ -102,3 +102,22 @@ it("offers a thread's opening message Reply in thread among its actions", () => 
   // A message in a thread has nothing to reply in.
   expect(within(reply!).queryByRole("group", { name: "Message actions" })).toBeNull();
 });
+
+it("opens an agent's turn log from its reply's actions, with nothing noted under it", () => {
+  const log = vi.fn<(turnId: string) => void>();
+  const view = render(() => (
+    <Theme mode="light">
+      <Timeline
+        entries={[{ ...message("r1", "yumi", minute(0)), turn: { id: "turn-1" } }]}
+        onOpenTurnLog={log}
+      />
+    </Theme>
+  ));
+  const [reply] = view.container.querySelectorAll("article");
+  const actions = within(reply!).getByRole("group", { name: "Message actions" });
+  fireEvent.click(within(actions).getByRole("button", { name: "View turn log" }));
+  expect(log).toHaveBeenCalledWith("turn-1");
+  expect(reply!.textContent).not.toContain("Completed");
+  // A tap focuses the message, showing its actions on touch screens.
+  expect(reply).toHaveAttribute("tabindex", "-1");
+});

@@ -1,6 +1,6 @@
 import { For, Match, Show, Switch, createMemo } from "solid-js";
 import { Keyed } from "../../internal/keyed.tsx";
-import { IconCheck, IconMarkNew, IconMarkReply, IconMarkResources } from "@amends/icons";
+import { IconList, IconMarkNew, IconMarkReply, IconMarkResources } from "@amends/icons";
 import type { AvatarStackPerson } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import {
@@ -44,7 +44,7 @@ export interface TimelineMessage {
     /** Agents at work in the thread, such as "Yumi working". */
     readonly activity?: readonly MessageThreadActivity[];
   };
-  /** The agent's turn that posted it, whose log the note under it opens. */
+  /** The agent's turn that posted it, whose log its actions open. */
   readonly turn?: { readonly id: string };
 }
 
@@ -179,6 +179,9 @@ export interface TimelineProps {
 export function Timeline(props: TimelineProps) {
   const entries = createMemo(() => (props.days ? withDays(props.entries) : props.entries));
   const continued = createMemo(() => stacked(entries()));
+  /** The message has actions: replying in its thread, or opening the log of the turn that posted it. */
+  const actionable = (message: TimelineMessage) =>
+    Boolean((props.onOpenThread && message.thread) || (props.onOpenTurnLog && message.turn));
   return (
     <div class={s.timeline} data-anchor={props.anchor ?? "bottom"}>
       <Keyed each={entries()} by={(entry) => entry.id}>
@@ -218,6 +221,8 @@ export function Timeline(props: TimelineProps) {
                   active={props.activeId === message().id}
                   focused={props.focusId === message().id}
                   continued={continued().has(message().id)}
+                  // A tap on a touch screen focuses the message, which shows its actions.
+                  tabindex={actionable(message()) ? -1 : undefined}
                 >
                   <Show when={message().activity}>
                     {(activity) => (
@@ -252,21 +257,6 @@ export function Timeline(props: TimelineProps) {
                       </Message.TaskReference>
                     )}
                   </Show>
-                  <Show when={props.onOpenTurnLog && message().turn}>
-                    {(turn) => (
-                      <p class={s.turnNote}>
-                        <IconCheck class={s.eventIcon} aria-hidden="true" />
-                        Completed ·{" "}
-                        <button
-                          type="button"
-                          class={s.turnLink}
-                          onClick={() => props.onOpenTurnLog?.(turn().id)}
-                        >
-                          View turn log
-                        </button>
-                      </p>
-                    )}
-                  </Show>
                   <Show when={message().thread}>
                     {(thread) => (
                       <Show
@@ -294,14 +284,25 @@ export function Timeline(props: TimelineProps) {
                       </Show>
                     )}
                   </Show>
-                  <Show when={props.onOpenThread && message().thread}>
+                  <Show when={actionable(message())}>
                     <Message.Actions>
-                      <Message.Action
-                        icon={IconMarkReply}
-                        label="Reply in thread"
-                        aria-expanded={props.activeId === message().id}
-                        onClick={() => props.onOpenThread?.(message().id)}
-                      />
+                      <Show when={props.onOpenThread && message().thread}>
+                        <Message.Action
+                          icon={IconMarkReply}
+                          label="Reply in thread"
+                          aria-expanded={props.activeId === message().id}
+                          onClick={() => props.onOpenThread?.(message().id)}
+                        />
+                      </Show>
+                      <Show when={props.onOpenTurnLog && message().turn}>
+                        {(turn) => (
+                          <Message.Action
+                            icon={IconList}
+                            label="View turn log"
+                            onClick={() => props.onOpenTurnLog?.(turn().id)}
+                          />
+                        )}
+                      </Show>
                     </Message.Actions>
                   </Show>
                 </Message.Root>

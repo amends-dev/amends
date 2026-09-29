@@ -97,9 +97,10 @@ workspace-wide oversight of private groups or direct groups by design.
 Web and desktop run the workspace on the UI Shell: they list the reader's groups in the
 sidebar, show a group's stream of threads by their opening messages, and open a thread's messages
 in the side panel, all live over the change feed. A message under the pointer, or holding focus, is
-lit and floats its actions at its top right: Reply in thread, for now, with reactions and more to
-follow. Touch screens have no such actions; a message with no replies offers "Reply in thread" under
-it there. Elsewhere, a thread with no replies notes under its message only who is typing or which
+lit and floats its actions at its top right: Reply in thread on a thread's opening message, and
+View turn log on an agent's reply, with reactions and more to follow. Nothing is noted under a
+message for these. On touch screens a tap on the message shows its actions, and a message with no
+replies also offers "Reply in thread" under it. Elsewhere, a thread with no replies notes under its message only who is typing or which
 agent is at work, such as "Yumi working", which opens the thread. The page composer starts a thread and the thread composer replies, keeping drafts per group
 and thread within the session, and both mention group members picked after `@`. A name typed
 without picking it addresses no one. A member's messages within five minutes of each other stack

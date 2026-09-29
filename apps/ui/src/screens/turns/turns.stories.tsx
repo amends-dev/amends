@@ -66,7 +66,10 @@ export const Replied = {
   render: () => <TurnsWorkshop scenario="done" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "View turn log" }));
+    // The reply's actions show under the pointer, or to the keyboard, as here.
+    const reply = canvas.getByText(/Deploy the API first/u).closest("article")!;
+    within(reply).getByRole("button", { name: "View turn log" }).focus();
+    await userEvent.keyboard("{Enter}");
     await expect(await canvas.findByText("Reply posted")).toBeVisible();
     await expect(canvas.getByText("This response was posted to the thread.")).toBeVisible();
   },

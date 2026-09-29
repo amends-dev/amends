@@ -12,6 +12,8 @@ export const message = style({
   gridTemplateColumns: "2rem minmax(0, 1fr)",
   columnGap: "0.75rem",
   alignItems: "start",
+  // Focused by a tap to show its actions, it needs no outline of its own.
+  outline: "none",
   selectors: {
     // The message whose thread is open: a quiet band reaching 12px past the column, with the
     // current-item bar at its edge.
@@ -71,8 +73,8 @@ export const message = style({
   },
 });
 
-// Actions float over the message's top right edge, as a popover does, while it is under the
-// pointer or holds focus. Touch screens reply from Reply instead.
+// Actions float over the message's top right edge, as a popover does, while it is under the pointer
+// or the keyboard is in them; on touch screens, once a tap has focused the message.
 export const actions = style({
   position: "absolute",
   top: "-1.125rem",
@@ -88,9 +90,16 @@ export const actions = style({
   opacity: 0,
   pointerEvents: "none",
   selectors: {
-    [`${message}:hover &, ${message}:focus-within &`]: { opacity: 1, pointerEvents: "auto" },
+    [`${message}:hover &, ${message}:has(:focus-visible) &`]: {
+      opacity: 1,
+      pointerEvents: "auto",
+    },
   },
-  "@media": { "(hover: none)": { display: "none" } },
+  "@media": {
+    "(hover: none)": {
+      selectors: { [`${message}:focus-within &`]: { opacity: 1, pointerEvents: "auto" } },
+    },
+  },
 });
 
 // A stacked message's time, in the avatar's place, while the pointer or focus is on it.
