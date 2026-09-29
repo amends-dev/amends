@@ -365,10 +365,10 @@ does not incorporate input newly accepted through 12. The turn log records this 
 
 ### Closing and publication
 
-The turn log preserves intermediate and superseded assistant responses. When publishing a
-final response, the turn deterministically derives a message from the log: the last completed
-assistant response that accounts for the required input, preserved verbatim, plus separate
-resource attachments. The agent need not mention an attachment in its text. Resource creation
+The turn log preserves intermediate and superseded assistant responses. When closing, the turn
+deterministically derives its messages from the log: each answer it
+[owes](#a-turn-posts-every-answer-it-completed), preserved verbatim, plus separate resource
+attachments. The agent need not mention an attachment in its text. Resource creation
 remains detail in the turn log; the published message presents selected artifacts without
 requiring separate timeline items for their creation. Attachment selection remains open.
 The turn must have incorporated all accepted input before successful closure.
@@ -1021,14 +1021,14 @@ another host, leaves one log that reads the same throughout, and any harness abl
 transcript can take it up.
 
 The transcript a harness continues from is the history the turn chose followed by the completed
-entries its events recorded: input the harness took in, completed responses, and tool results.
-Streaming deltas and idleness add nothing to it. A response that never completed therefore leaves
-no entry and is requested again. A tool call that was running when its execution stopped has no
-result, so it stays pending rather than running again, consistent with
-[uncertain outcomes](#operation-deadlines-and-uncertain-outcomes). Incorporated input appears once,
-so continuation never submits it twice. Recovering after a failure, completing an environment
-switch, and retrying all prepare fresh execution from the same transcript; there is no separate
-restore path.
+entries its events recorded: input the harness took in, the blocks of each response as they
+completed, and tool results. Streaming deltas and idleness add nothing to it. How a response that
+never finished counts is set by [the chain of turn logs](#agreed-an-agents-memory-in-a-thread-is-a-chain-of-turn-logs).
+A tool call that was running when its execution stopped has no result, so it is never run again,
+consistent with [uncertain outcomes](#operation-deadlines-and-uncertain-outcomes). Incorporated
+input appears once, so continuation never submits it twice. Recovering after a failure,
+completing an environment switch, and retrying all prepare fresh execution from the same
+transcript; there is no separate restore path.
 
 An entry can carry native data that only the harness that recorded it can use, keyed by that
 harness: a provider's signature over its reasoning, for example, which the same provider requires
@@ -1040,8 +1040,74 @@ transcript it cannot continue.
 
 The shared schema, the transcript rules, and amends's own in-process harness are implemented in
 [`@amends/harness`](../packages/harness/README.md) and
-[`@amends/harness-amends`](../packages/harness-amends/README.md). The turn log's storage, the
-turn's history selection, and the environment's event envelope remain open.
+[`@amends/harness-amends`](../packages/harness-amends/README.md).
+
+## Agreed: an agent's memory in a thread is a chain of turn logs
+
+A turn's log is the record of everything its agent did in it, and the agent's memory of a thread
+is the chain of those logs. The thread's messages supply only what the agent has not taken in:
+the input since its last turn, and history from before its first.
+
+### Harnesses report blocks as they complete
+
+A response is recorded block by block: each block of text, reasoning, or tool call is recorded
+when it completes, with any native data it carries, and the response is recorded as finished
+with its finish reason, model, and usage. A harness reports when it starts running a tool call,
+since from then on the call may have had an effect. Deltas stay live-only: they show readers a
+block while it streams, and the completed block replaces them. A harness that runs its own loop
+inside a sandbox exposes blocks and tool updates rather than model requests, so the block is the
+unit every harness can report.
+
+A response that stops before it finishes keeps its completed blocks. Its tool calls that never
+started did not happen and are dropped; one that started and has no result is answered as cut
+short, with its effect unknown, and is never run again. Within the turn, execution that continues
+asks for a fresh response and the unfinished one is left out of the transcript, unless it holds a
+call that started, which keeps it. When the turn ends with an unfinished response, as when
+someone stops it, the next turn sees what the agent had written before its new input.
+
+### A turn log links to the one before it
+
+A turn records the agent's previous turn in the thread, fixed when the turn is created: the
+latest in the same participation, or none when the agent joined or rejoined since. A retry links
+to the turn it retries and carries over its input progress, so input that turn took in is not
+submitted again, and it asks for a fresh response in place of an unfinished one. The link is
+stored rather than looked up again, so a turn's history never changes after it is created, and a
+missing predecessor is an error instead of a quietly shorter memory. Only an ended turn can be
+linked, since new work waits for an active turn.
+
+### The next turn continues from the previous log's view
+
+A turn's view is its predecessor's view followed by its own log, read as a transcript: inputs,
+responses with their blocks and native data, and tool results. A turn continues from its
+predecessor's view, and from the thread's earlier messages when it has none. Its input is then
+the thread's activity after the input its predecessor took in, including messages not addressed
+to it and other agents' replies, attributed to their authors. Native data is used only by the
+harness, provider, and model that recorded it. An environment switch or a restart within a turn
+continues the same log; a new log starts only with a new turn.
+
+### One reading of a log answers every question
+
+One reading of a turn's log gives its transcript, the input it took in, the tool calls still
+pending, the replies it owes, and the entries its readers see. Nothing else interprets the log.
+The log also records what the environment reported, such as when it became ready and which
+sandbox it acquired, so recovery reacquires what the log names.
+
+### A turn posts every answer it completed
+
+An answer is a finished response with text and no tool calls. When the agent answers and then
+takes in more input, that answer is owed as a reply, since it answered what came before; the
+last answer at closing is owed too. Closing publishes the owed replies in order, each as its own
+message, and records them with the turn. Text before a tool call stays in the log. A turn that
+fails or is stopped publishes nothing.
+
+### Compaction bounds the view
+
+The view a turn continues from fits a budget for its model. Until summaries exist, the oldest
+exchanges are left out, starting at an input so that no response is separated from its tool
+results, and a single input longer than a limit is shortened with a note saying so. A summary
+will be recorded in the log of the turn that makes it, as the point before which earlier logs are
+no longer read. Views stay verbatim until then, so the start of each request stays the same
+across turns.
 
 ## Agreed: agents start in an environment and execution can move
 
@@ -2233,9 +2299,9 @@ assistant text remains verbatim.
 
 The derivation:
 
-1. Assembles assistant message content from its recorded deltas in order.
-2. Selects the last completed assistant message that accounts for the input required for
-   closure.
+1. Assembles assistant message content from its recorded blocks in order.
+2. Selects the answers the turn owes: each finished answer followed by more input, and the last
+   one, which accounts for the input required for closure.
 3. Collects the resource references to attach, according to the attachment-selection rule
    that remains to be defined.
 4. Builds a message containing the unchanged assistant text, separate attachments, and
@@ -2308,7 +2374,8 @@ The turn can publish that response and finish successfully only after incorporat
 messages and other actionable activity pending for it. If new input arrived while the
 response was being generated, the response remains in the turn log, the harness incorporates
 the additional input, and execution continues within the same turn. A later closing attempt
-selects the latest completed assistant message from the log.
+publishes the answers the turn owes, the latest completed one last; an earlier answer is
+published after the input that followed it, never inserted before it.
 
 For successful closure, `incorporatedThroughSequence` must reach
 `acceptedThroughSequence`. Each completed assistant response in the turn log is associated
@@ -3230,7 +3297,9 @@ attempt. There is no requirement for separate turns or native prompt calls per m
 ### History and prompt are relative to each agent
 
 When a turn starts, its prompt consists of pending input for that agent. Already-handled
-input and other conversation supply history. The relevant previous work is that agent's
+input and other conversation supply history: the agent's own earlier turns through
+[their chained logs](#agreed-an-agents-memory-in-a-thread-is-a-chain-of-turn-logs), and the
+thread's messages from before its first. The relevant previous work is that agent's
 own work: another agent answering a shared request does not mark the request handled on
 its behalf.
 

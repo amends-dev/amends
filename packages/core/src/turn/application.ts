@@ -220,7 +220,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
     const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
     const handle = TurnLog.open(log, turn.id);
-    const items: Array<Turn.LogItem> = [];
+    const records: Array<TurnLog.Recorded> = [];
     let after: Log.Position | undefined;
     for (;;) {
       const batches = yield* handle.read(
@@ -228,33 +228,15 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       );
       if (batches.length === 0) break;
       for (const batch of batches) {
-        for (const entry of batch.entries) {
-          const at = entry.recordedAt;
-          const payload = entry.payload;
-          if (payload._tag === "Interrupted")
-            items.push({
-              _tag: "Interrupted",
-              at,
-              reason: payload.reason,
-              retryable: payload.retryable,
-            });
-          else if (payload._tag === "Harness") {
-            const event = payload.event;
-            if (event._tag === "InputIncorporated")
-              items.push({ _tag: "InputTaken", at, messages: event.batch.items.length });
-            else if (event._tag === "ResponseCompleted") {
-              const text = event.response.parts
-                .flatMap((part) => (part._tag === "Text" ? [part.text] : []))
-                .join("");
-              if (/\S/u.test(text))
-                items.push({ _tag: "Responded", at, responseId: event.response.id, text });
-            }
-          }
-        }
+        for (const entry of batch.entries)
+          records.push({ entry: entry.payload, at: entry.recordedAt });
         after = batch.position;
       }
     }
-    return { turn: yield* presentOne(turn), items } satisfies Turn.LogView;
+    return {
+      turn: yield* presentOne(turn),
+      items: TurnLog.read(records).items,
+    } satisfies Turn.LogView;
   });
 
   const cancel = Effect.fn("TurnApplication.cancel")(
@@ -308,8 +290,8 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
           yield* authorization.require([directs(turn)]);
           const reason = yield* retryBlock(turn);
           if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
-          // The same input, from where the failed or stopped turn began, with nothing taken in
-          // and the agent's current model access and environment. It is created after the turn it
+          // The same input, continuing from the failed or stopped turn with what it took in, and
+          // the agent's current model access and environment. It is created after the turn it
           // retries, even on a clock that has not moved, so it is the agent's latest there.
           const now = yield* DateTime.now;
           const createdAt = DateTime.isGreaterThan(now, turn.createdAt)
@@ -323,22 +305,21 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             agentId: turn.agentId,
             memberId: turn.memberId,
             participationId: turn.participationId,
+            previousTurnId: turn.id,
+            retryOf: turn.id,
             status: "queued",
             inputAfterSequence: turn.inputAfterSequence,
             acceptedThroughSequence: turn.acceptedThroughSequence,
-            incorporatedThroughSequence: turn.inputAfterSequence,
+            incorporatedThroughSequence: turn.incorporatedThroughSequence,
             selection: null,
-            messageId: null,
+            messageIds: [],
             failure: null,
             cancelReason: null,
             createdAt,
             startedAt: null,
             finishedAt: null,
           };
-          yield* journal.publish(
-            TurnFacts.Retried,
-            Object.assign({}, created, { retryOf: turn.id }),
-          );
+          yield* journal.publish(TurnFacts.Retried, created);
           return created;
         }),
       );

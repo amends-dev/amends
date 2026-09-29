@@ -173,19 +173,20 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       });
       return;
     }
-    // Input starts where this agent's previous turn in the same participation stopped taking it
-    // in, or just before the participation began; what that turn accepted but never took in is
-    // still this turn's to handle.
+    // The turn continues from this agent's previous turn in the same participation, fixed now so
+    // its history never changes: input starts where that turn stopped taking it in, and what it
+    // accepted but never took in is still this turn's to handle. After joining, input starts just
+    // before the participation began and history comes from the thread.
     const participationId = pending.at(-1)!.participationId!;
     const participation = yield* participations.get(participationId);
     if (Option.isNone(participation))
       return yield* new InvalidResponse({ message: "Notification participation is missing" });
     const joined = yield* decodeParticipation(participation.value);
-    const previous = yield* turns.findLatest(agent.memberId, threadId);
-    const boundary =
-      Option.isSome(previous) && previous.value.participationId === participationId
-        ? previous.value.incorporatedThroughSequence
-        : joined.joinedAtSequence - 1;
+    const latest = yield* turns.findLatest(agent.memberId, threadId);
+    const previous = Option.filter(latest, (turn) => turn.participationId === participationId);
+    const boundary = Option.isSome(previous)
+      ? previous.value.incorporatedThroughSequence
+      : joined.joinedAtSequence - 1;
     const inputAfterSequence = Math.min(
       boundary,
       ...pending.map((record) => record.thread.sequence - 1),
@@ -198,12 +199,14 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       agentId: agent.id,
       memberId: agent.memberId,
       participationId,
+      previousTurnId: Option.isSome(previous) ? previous.value.id : null,
+      retryOf: null,
       status: "queued",
       inputAfterSequence,
       acceptedThroughSequence: through,
       incorporatedThroughSequence: inputAfterSequence,
       selection: null,
-      messageId: null,
+      messageIds: [],
       failure: null,
       cancelReason: null,
       createdAt: acceptedAt,

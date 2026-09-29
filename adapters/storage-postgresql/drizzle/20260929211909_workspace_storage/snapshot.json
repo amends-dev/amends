@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "f6544c79-a042-406a-a5eb-34a3a4c6cdd8",
+  "id": "3f3d5c3f-3daa-49a6-aa9a-1f448e235622",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -3063,6 +3063,32 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "previous_turn_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turns"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "retry_of",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turns"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -3167,12 +3193,12 @@
     {
       "type": "text",
       "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
+      "notNull": true,
+      "dimensions": 1,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "message_id",
+      "name": "message_ids",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"

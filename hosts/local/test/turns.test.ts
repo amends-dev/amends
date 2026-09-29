@@ -35,7 +35,7 @@ const server = (url: string) =>
 type Reply =
   | { readonly answer: string }
   | { readonly refuse: number }
-  | { readonly hold: Promise<void> };
+  | { readonly hold: Promise<void>; readonly answer?: string };
 
 /**
  * A model provider speaking OpenAI's chat completions, which handles each request with the next
@@ -173,13 +173,59 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(turn).toMatchObject({
             memberId: agent.memberId,
             status: "completed",
-            messageId: reply !== undefined && "message" in reply ? reply.message.id : undefined,
+            messageIds: [reply !== undefined && "message" in reply ? reply.message.id : undefined],
             stoppable: false,
             retryable: false,
           });
         }).pipe(Effect.scoped, Effect.provide(server(url))),
       ),
     30_000,
+  );
+
+  it.live(
+    "a question asked while the agent answers another gets its own answer, and both are posted",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const release = Promise.withResolvers<void>();
+          const models = yield* fakeModels(
+            { hold: release.promise, answer: "The deploy is on Thursday." },
+            { answer: "The budget is fine." },
+          );
+          const { asAlice, workspaceId, ask } = yield* workspaceWithScout(models.baseUrl);
+          const started = yield* ask("Scout, when is the deploy?");
+          const params = { workspaceId, threadId: started.thread.id };
+          const turnsNow = asAlice.turns.listByThread({ params, query: { limit: 10 } });
+          yield* until(turnsNow, () => models.requests.length === 1);
+          const asked = yield* asAlice.threads.publish({
+            params,
+            headers: {},
+            payload: { text: "Also, how is the budget?", mentions: [] },
+          });
+          // Scout takes the new question into the turn it is working on, then finishes the first.
+          yield* until(
+            turnsNow,
+            (turns) => (turns[0]?.acceptedThroughSequence ?? 0) >= asked.activity.sequence,
+          );
+          release.resolve();
+          const [done] = yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
+
+          const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+          expect(texts(timeline)).toEqual([
+            "Scout, when is the deploy?",
+            "Also, how is the budget?",
+            "The deploy is on Thursday.",
+            "The budget is fine.",
+          ]);
+          expect(done?.messageIds).toHaveLength(2);
+          // The second request continues from the first answer, then the new question.
+          expect(JSON.stringify(models.requests[1]?.at(-2))).toContain(
+            "The deploy is on Thursday.",
+          );
+          expect(JSON.stringify(models.requests[1]?.at(-1))).toContain("Also, how is the budget?");
+        }).pipe(Effect.scoped, Effect.provide(server(url))),
+      ),
+    40_000,
   );
 
   it.live(

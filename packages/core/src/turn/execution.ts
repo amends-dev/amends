@@ -1,3 +1,4 @@
+import type { Environment as EnvironmentRuntime } from "@amends/environment";
 import type { HarnessEvent, Transcript } from "@amends/harness";
 import type { Redacted } from "effect";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -70,8 +71,8 @@ export type CloseError =
 
 /**
  * Everything execution needs to run a turn: the agent's instructions, the model access it runs
- * with and the connection's settings and key to reach it, its environment, the conversation
- * before its input, the input the harness has not taken in yet as one batch, and its log so far.
+ * with and the connection's settings and key to reach it, its environment, the history it
+ * continues from, the input the harness has not taken in yet as one batch, and its log so far.
  * The key is only ever handed to execution, redacted.
  */
 export interface Plan {
@@ -84,7 +85,10 @@ export interface Plan {
     readonly credential: Redacted.Redacted<string> | undefined;
   };
   readonly environment: Environment.Record;
-  /** Thread messages before the turn's input: others' as input, the agent's own as responses. */
+  /**
+   * What the turn continues from, before its own log: the view its previous turns left, or the
+   * thread's messages before its input when it has none, fitted to the history budget.
+   */
   readonly history: ReadonlyArray<Transcript.Item>;
   /** Input after what the harness took in, through what the turn accepted, if any. */
   readonly pending:
@@ -93,7 +97,7 @@ export interface Plan {
         readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
       }
     | undefined;
-  readonly log: ReadonlyArray<TurnLog.Entry>;
+  readonly log: ReadonlyArray<TurnLog.Recorded>;
 }
 
 /**
@@ -106,8 +110,17 @@ export type Preparation =
   | { readonly _tag: "Unrunnable"; readonly reason: string }
   | { readonly _tag: "Ready"; readonly plan: Plan };
 
-/** How many earlier messages a turn's history holds, newest last. */
+/** How many of the thread's latest activities a turn's first history, or its input, reads. */
 const historyLimit = 100;
+/**
+ * How many characters of history a turn continues from, about 75,000 tokens: the oldest exchanges
+ * beyond it are left out until summaries exist.
+ */
+const historyBudget = 300_000;
+/** How many earlier turns a turn reads back through for its history, until summaries exist. */
+const chainLimit = 50;
+/** The most characters one message gives the model; the rest is left out with a note. */
+const inputLimit = 40_000;
 
 /**
  * How closing went: the turn closed, publishing the agent's reply if it had one; its input is not
@@ -115,7 +128,7 @@ const historyLimit = 100;
  * could no longer post where it worked, which failed it.
  */
 export type Closing =
-  | { readonly _tag: "Closed"; readonly messageId: ThreadMessage.Id | null }
+  | { readonly _tag: "Closed"; readonly messageIds: ReadonlyArray<ThreadMessage.Id> }
   | { readonly _tag: "InputPending" }
   | { readonly _tag: "Stopped" }
   | { readonly _tag: "Failed"; readonly reason: string };
@@ -142,12 +155,12 @@ export interface Interface {
     batch: { readonly batchId: HarnessEvent.BatchId; readonly throughSequence: number },
   ) => Effect.Effect<void, Error>;
   /**
-   * Record what the harness reported, in order, and how far the turn's input is now taken in: a
-   * batch counts once the harness confirms incorporating it.
+   * Record what the environment and its harness reported, in order, and how far the turn's input
+   * is now taken in: a batch counts once the harness confirms incorporating it.
    */
   readonly report: (
     turnId: Turn.Id,
-    events: ReadonlyArray<HarnessEvent.Event>,
+    events: ReadonlyArray<EnvironmentRuntime.Event>,
   ) => Effect.Effect<Turn.Record, Error>;
   /**
    * Show the turn's readers more of a response before it completes, as a signal: nothing is
@@ -168,11 +181,11 @@ export interface Interface {
     stop: { readonly reason: string; readonly retryable: boolean },
   ) => Effect.Effect<void, Error>;
   /** The turn's log, for execution to continue from. */
-  readonly entries: (turnId: Turn.Id) => Effect.Effect<ReadonlyArray<TurnLog.Entry>, Error>;
+  readonly entries: (turnId: Turn.Id) => Effect.Effect<ReadonlyArray<TurnLog.Recorded>, Error>;
   /**
    * Close a running turn once all its accepted input is taken in and no more work waits for its
-   * agent on the thread: publish the agent's reply from its log, if it has one, to the thread's
-   * current participants, and record completion, in one commit.
+   * agent on the thread: publish the replies its log owes, in order, each as its own message to
+   * the thread's current participants, and record completion, in one commit.
    */
   readonly close: (turnId: Turn.Id) => Effect.Effect<Closing, CloseError>;
   /** The turn could not continue. */
@@ -333,6 +346,32 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         : { id: author.contactId, name: "A contact" };
   });
 
+  /**
+   * The readings of a turn's previous turns' logs, oldest first, back until the chain starts, holds
+   * more than the history budget, or reaches the chain limit; and the turn that starts the chain,
+   * whose input boundary ends the thread history before it, when the chain was read to its start.
+   */
+  const chainOf = Effect.fnUntraced(function* (turn: Turn.Record) {
+    const readings: Array<TurnLog.Reading> = [];
+    let held = 0;
+    let current = turn;
+    while (current.previousTurnId !== null) {
+      if (held > historyBudget || readings.length >= chainLimit)
+        return { readings: readings.toReversed(), start: undefined };
+      const previousId = current.previousTurnId;
+      const previous = yield* load(previousId).pipe(
+        Effect.catchTag("TurnApplication.NotFound", () =>
+          Effect.fail(new InvalidResponse({ message: `The turn before ${current.id} is missing` })),
+        ),
+      );
+      const reading = TurnLog.read(yield* entries(previous.id));
+      readings.push(reading);
+      held += TurnLog.size(reading.view([]));
+      current = previous;
+    }
+    return { readings: readings.toReversed(), start: current };
+  });
+
   const prepare = Effect.fn("TurnExecution.prepare")(function* (turnId: Turn.Id) {
     const turn = yield* load(turnId);
     if (!Turn.active(turn.status)) return { _tag: "Finished" } as const;
@@ -368,7 +407,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       return unrunnable(
         `The ${environment.value.harnessId} harness is not installed on this server.`,
       );
-    const earlier = yield* messagesIn(turn, { through: turn.inputAfterSequence }, historyLimit);
     const waiting = (yield* messagesIn(
       turn,
       { after: turn.incorporatedThroughSequence, through: turn.acceptedThroughSequence },
@@ -377,13 +415,20 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       ({ message }) =>
         !(message.author._tag === "Member" && message.author.memberId === turn.memberId),
     );
+    const chain = yield* chainOf(turn);
+    const earlier =
+      chain.start === undefined
+        ? []
+        : yield* messagesIn(chain.start, { through: chain.start.inputAfterSequence }, historyLimit);
     const author = yield* authorsOf([...earlier, ...waiting]);
     const input = (message: ThreadMessage.Record): Transcript.Input => ({
       _tag: "Input",
       author: author(message.author),
-      content: [{ _tag: "Text", text: message.text }],
+      content: [{ _tag: "Text", text: TurnLog.shorten(message.text, inputLimit) }],
     });
-    const history = earlier.map(({ message }): Transcript.Item =>
+    // The thread's messages before the chain began, then each earlier turn's view in order. A
+    // retry asks for a fresh response in place of one the turn it retries left unfinished.
+    let history: ReadonlyArray<Transcript.Item> = earlier.map(({ message }): Transcript.Item =>
       message.author._tag === "Member" && message.author.memberId === turn.memberId
         ? {
             _tag: "Response",
@@ -392,6 +437,12 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           }
         : input(message),
     );
+    for (const [index, reading] of chain.readings.entries())
+      history =
+        index === chain.readings.length - 1 && turn.retryOf !== null
+          ? reading.transcript(history)
+          : reading.view(history);
+    history = TurnLog.fit(history, historyBudget);
     const [first, ...rest] = waiting.map(({ message }) => input(message));
     const plan: Plan = {
       turn,
@@ -455,18 +506,24 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const report = Effect.fn("TurnExecution.report")(function* (
     turnId: Turn.Id,
-    events: ReadonlyArray<HarnessEvent.Event>,
+    events: ReadonlyArray<EnvironmentRuntime.Event>,
   ) {
     const reported = yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running", "cancelling"]);
         const handle = TurnLog.open(log, turnId);
         if (events.length > 0)
-          yield* handle.appendAll(events.map((event) => ({ _tag: "Harness" as const, event })));
+          yield* handle.appendAll(
+            events.map((event): TurnLog.Entry =>
+              event._tag === "Harness"
+                ? { _tag: "Harness", event: event.event }
+                : { _tag: "Environment", event: event.event },
+            ),
+          );
         let through = turn.incorporatedThroughSequence;
         for (const event of events) {
-          if (event._tag !== "InputIncorporated") continue;
-          const found = yield* handle.getAppend(submittedKey(event.batch.id));
+          if (event._tag !== "Harness" || event.event._tag !== "InputIncorporated") continue;
+          const found = yield* handle.getAppend(submittedKey(event.event.batch.id));
           const entry = Option.getOrUndefined(found)?.[0]?.payload;
           if (entry?._tag !== "Submitted")
             return yield* new InvalidResponse({
@@ -532,7 +589,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const entries = Effect.fn("TurnExecution.entries")(function* (turnId: Turn.Id) {
     yield* load(turnId);
     const handle = TurnLog.open(log, turnId);
-    const all: Array<TurnLog.Entry> = [];
+    const all: Array<TurnLog.Recorded> = [];
     let after: Log.Position | undefined;
     for (;;) {
       const batches = yield* handle.read(
@@ -540,7 +597,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       );
       if (batches.length === 0) return all;
       for (const batch of batches) {
-        for (const entry of batch.entries) all.push(entry.payload);
+        for (const entry of batch.entries) all.push({ entry: entry.payload, at: entry.recordedAt });
         after = batch.position;
       }
     }
@@ -564,7 +621,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   const close = Effect.fn("TurnExecution.close")(function* (turnId: Turn.Id) {
-    const log = yield* entries(turnId);
+    const reading = TurnLog.read(yield* entries(turnId));
     return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         if (turn.status === "cancelling") {
@@ -582,9 +639,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           Number.MAX_SAFE_INTEGER,
         );
         if (waiting.length > 0) return { _tag: "InputPending" } as const;
-        const reply = TurnLog.finalResponse(log);
-        let messageId: ThreadMessage.Id | null = null;
-        if (reply !== undefined) {
+        const messageIds: Array<ThreadMessage.Id> = [];
+        if (reading.replies.length > 0) {
           const unable = (reason: string) =>
             Effect.gen(function* () {
               yield* finish(turn, { _tag: "Failed", reason });
@@ -616,26 +672,33 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             )
           )
             return yield* unable("The agent no longer takes part in this thread.");
-          const text = yield* Schema.decodeEffect(ThreadMessage.Text)(reply).pipe(
-            Effect.asSome,
-            Effect.catchTag("SchemaError", () => Effect.succeedNone),
-          );
-          if (Option.isNone(text)) return yield* unable("The agent's reply could not be posted.");
-          const published = yield* publication.publish({
-            threadId: turn.threadId,
-            author: { _tag: "Member", memberId: turn.memberId },
-            text: text.value,
-            mentions: [],
-            participants: current.map((p) => ThreadParticipation.referenceOf(p.participant)),
-            occurredAt: yield* DateTime.now,
-          });
-          messageId = published.message.id;
+          const texts: Array<typeof ThreadMessage.Text.Type> = [];
+          for (const reply of reading.replies) {
+            const text = yield* Schema.decodeEffect(ThreadMessage.Text)(reply.text).pipe(
+              Effect.asSome,
+              Effect.catchTag("SchemaError", () => Effect.succeedNone),
+            );
+            if (Option.isNone(text)) return yield* unable("The agent's reply could not be posted.");
+            texts.push(text.value);
+          }
+          // Each answer is its own message, in the order the agent gave them.
+          for (const text of texts) {
+            const published = yield* publication.publish({
+              threadId: turn.threadId,
+              author: { _tag: "Member", memberId: turn.memberId },
+              text,
+              mentions: [],
+              participants: current.map((p) => ThreadParticipation.referenceOf(p.participant)),
+              occurredAt: yield* DateTime.now,
+            });
+            messageIds.push(published.message.id);
+          }
         }
         yield* journal.publish(
           TurnFacts.Completed,
-          Object.assign(where(turn), { messageId, finishedAt: yield* DateTime.now }),
+          Object.assign(where(turn), { messageIds, finishedAt: yield* DateTime.now }),
         );
-        return { _tag: "Closed", messageId } as const;
+        return { _tag: "Closed", messageIds } as const;
       }),
     );
   });

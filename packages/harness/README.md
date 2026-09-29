@@ -9,26 +9,38 @@ runs harnesses.
 
 ## One recorded standard
 
-A turn's log will store `HarnessEvent.Event` values, whichever harness produced them and wherever
-it ran, so a log reads the same in process, in a sandbox, or after moving between them:
+A turn's log stores `HarnessEvent.Event` values, whichever harness produced them and wherever it
+ran, so a log reads the same in process, in a sandbox, or after moving between them. A response is
+reported block by block as each completes, the unit a harness running its own loop in a sandbox can
+also report:
 
 | Event               | What it records                                                                |
 | ------------------- | ------------------------------------------------------------------------------ |
 | `InputIncorporated` | A submitted batch the harness took into its context, after everything earlier. |
-| `TextDelta`         | More text for one part of a streaming response.                                |
-| `ReasoningDelta`    | More reasoning for one part of a streaming response.                           |
-| `ResponseCompleted` | A finished response with every part, its finish reason, model, and usage.      |
+| `TextDelta`         | More text for one block of a streaming response; live only.                    |
+| `ReasoningDelta`    | More reasoning for one block of a streaming response; live only.               |
+| `BlockCompleted`    | One completed block of a response, by position: text, reasoning, or tool call. |
+| `ResponseFinished`  | The response finished, with its finish reason, model, and usage.               |
+| `ToolCallStarted`   | The harness began running a call, which from now on may have had an effect.    |
 | `ToolCallCompleted` | A tool call's result, whether the session ran the call or was given it.        |
 | `Idle`              | Every input has its response, no call waits, and nothing waits to be taken in. |
 
-A harness continues from a `Transcript.Value`: the history the turn chose, then the completed
-entries its events recorded. `HarnessEvent.transcript(events, history)` builds it. It has three
-kinds of item: `Input` attributed to its author, `Response` with text, reasoning, and tool-call
-parts, and `ToolResult` answering one call. Deltas and `Idle` add nothing, so:
+A harness continues from a `Transcript.Value`: the history the turn chose, then what its events
+recorded. `HarnessEvent.transcript(events, history, { unfinished })` builds it. It has three kinds
+of item: `Input` attributed to its author, `Response` with text, reasoning, and tool-call parts, and
+`ToolResult` answering one call. Deltas, starts, and `Idle` add nothing, so:
 
-- a response that never completed leaves no item, and the next session asks again;
-- a call running when its session stopped has no result, so it stays pending rather than running
-  again, and whoever knows its outcome supplies it;
+- a finished response enters with its blocks in order, and results its calls got before it
+  finished follow it;
+- a response that stopped before finishing keeps only its completed blocks. Its calls that never
+  started did not happen and are dropped; one that started without a result is answered by
+  `cutShort`, its effect unknown, and never runs again. It stays in the transcript when it holds a
+  started call. Otherwise, with `unfinished: "omit"`, the default for execution that goes on, it is
+  left out and the next session asks for a fresh response; with `unfinished: "keep"`, for work that
+  ended, what it wrote stays;
+- when work ended, calls still pending are answered too, by `cutShort` or `notRun`, so later input
+  can follow; while execution goes on, a finished response's unanswered calls stay pending, and
+  whoever knows their outcome supplies it;
 - incorporated input appears once, so continuing never submits it twice.
 
 Recovering from a failure, moving to another environment, and retrying all prepare a fresh session

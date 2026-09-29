@@ -74,27 +74,44 @@ describe("Transcript.summarize", () => {
 });
 
 describe("HarnessEvent", () => {
+  const s1 = Transcript.ResponseId.make("s/1");
+  const s2 = Transcript.ResponseId.make("s/2");
+  const block = (
+    responseId: Transcript.ResponseId,
+    part: number,
+    block: Transcript.ResponsePart,
+  ): HarnessEvent.Event => ({ _tag: "BlockCompleted", responseId, part, block });
+  const finished = (responseId: Transcript.ResponseId): HarnessEvent.Event => ({
+    _tag: "ResponseFinished",
+    responseId,
+    finish: "stop",
+  });
+  const took = (text: string, id = text): HarnessEvent.Event => ({
+    _tag: "InputIncorporated",
+    batch: { id: HarnessEvent.BatchId.make(id), items: [input(text)] },
+  });
+  const reasoning: Transcript.ResponsePart = {
+    _tag: "Reasoning",
+    text: "Hm",
+    native: { amends: { anthropic: { signature: "sig" } } },
+  };
   const events: ReadonlyArray<HarnessEvent.Event> = [
+    took("hi", "b1"),
+    { _tag: "ReasoningDelta", responseId: s1, part: 0, delta: "Hm" },
+    block(s1, 0, reasoning),
+    { _tag: "TextDelta", responseId: s1, part: 1, delta: "Let me" },
+    block(s1, 1, { _tag: "Text", text: "Let me look." }),
+    block(s1, 2, call("c1")),
     {
-      _tag: "InputIncorporated",
-      batch: { id: HarnessEvent.BatchId.make("b1"), items: [input("hi")] },
-    },
-    { _tag: "ReasoningDelta", responseId: Transcript.ResponseId.make("s/1"), part: 0, delta: "Hm" },
-    { _tag: "TextDelta", responseId: Transcript.ResponseId.make("s/1"), part: 1, delta: "Let me" },
-    {
-      _tag: "ResponseCompleted",
-      response: response(
-        "s/1",
-        { _tag: "Reasoning", text: "Hm", native: { amends: { anthropic: { signature: "sig" } } } },
-        { _tag: "Text", text: "Let me look." },
-        call("c1"),
-      ),
+      _tag: "ResponseFinished",
+      responseId: s1,
       finish: "tool-calls",
       model: { provider: "anthropic", model: "claude" },
       usage: { inputTokens: 12, outputTokens: 7 },
     },
+    { _tag: "ToolCallStarted", callId: Transcript.ToolCallId.make("c1") },
     { _tag: "ToolCallCompleted", result: { ...result("c1"), structured: { rows: [1, 2] } } },
-    { _tag: "TextDelta", responseId: Transcript.ResponseId.make("s/2"), part: 0, delta: "Cut o" },
+    { _tag: "TextDelta", responseId: s2, part: 0, delta: "Cut o" },
     { _tag: "Idle" },
   ];
 
@@ -107,13 +124,100 @@ describe("HarnessEvent", () => {
     );
   });
 
-  it("builds the transcript from history and completed entries only", () => {
+  it("builds the transcript from history, finished responses' blocks in order, and results", () => {
     const history = [input("earlier"), response("h1", { _tag: "Text", text: "noted" })];
     expect(HarnessEvent.transcript(events, history)).toEqual([
       ...history,
       input("hi"),
-      (events[3] as HarnessEvent.Event & { _tag: "ResponseCompleted" }).response,
+      response("s/1", reasoning, { _tag: "Text", text: "Let me look." }, call("c1")),
       { ...result("c1"), structured: { rows: [1, 2] } },
     ]);
+  });
+
+  it("orders blocks by their part and puts results reported early after their response", () => {
+    expect(
+      HarnessEvent.transcript([
+        took("hi"),
+        block(s1, 1, call("c1")),
+        block(s1, 0, { _tag: "Text", text: "Checking." }),
+        { _tag: "ToolCallStarted", callId: Transcript.ToolCallId.make("c1") },
+        { _tag: "ToolCallCompleted", result: result("c1") },
+        finished(s1),
+      ]),
+    ).toEqual([
+      input("hi"),
+      response("s/1", { _tag: "Text", text: "Checking." }, call("c1")),
+      result("c1"),
+    ]);
+  });
+
+  it("leaves out an unfinished response that execution replaced or that the work goes on from", () => {
+    const cut = [took("hi"), block(s1, 0, { _tag: "Text", text: "Half an ans" })];
+    expect(HarnessEvent.transcript(cut)).toEqual([input("hi")]);
+    expect(
+      HarnessEvent.transcript([
+        ...cut,
+        block(s2, 0, { _tag: "Text", text: "A whole answer." }),
+        finished(s2),
+      ]),
+    ).toEqual([input("hi"), response("s/2", { _tag: "Text", text: "A whole answer." })]);
+    // Leaving it out when preparing means the model never saw it, even once more input follows.
+    expect(HarnessEvent.transcript([...cut, took("more")])).toEqual([input("hi"), input("more")]);
+  });
+
+  it("keeps what an unfinished last response wrote when the work ended there", () => {
+    expect(
+      HarnessEvent.transcript(
+        [took("hi"), block(s1, 0, reasoning), block(s1, 1, { _tag: "Text", text: "Half" })],
+        [],
+        { unfinished: "keep" },
+      ),
+    ).toEqual([input("hi"), response("s/1", reasoning, { _tag: "Text", text: "Half" })]);
+  });
+
+  it("drops calls that never started and answers started ones as cut short", () => {
+    const events = [
+      took("hi"),
+      block(s1, 0, call("c1")),
+      block(s1, 1, call("c2")),
+      block(s1, 2, call("c3")),
+      { _tag: "ToolCallStarted", callId: Transcript.ToolCallId.make("c1") },
+      { _tag: "ToolCallStarted", callId: Transcript.ToolCallId.make("c2") },
+      { _tag: "ToolCallCompleted", result: result("c2") },
+    ] satisfies ReadonlyArray<HarnessEvent.Event>;
+    const expected = [
+      input("hi"),
+      response("s/1", call("c1"), call("c2")),
+      HarnessEvent.cutShort(call("c1")),
+      result("c2"),
+    ];
+    // A started call may have had an effect, so it stays even when execution goes on.
+    expect(HarnessEvent.transcript(events)).toEqual(expected);
+    expect(HarnessEvent.transcript([...events, took("more")])).toEqual([
+      ...expected,
+      input("more"),
+    ]);
+    expect(Result.isSuccess(Transcript.summarize(HarnessEvent.transcript(events)))).toBe(true);
+  });
+
+  it("leaves a finished response's calls without results pending while the work goes on", () => {
+    const items = HarnessEvent.transcript([took("hi"), block(s1, 0, call("c1")), finished(s1)]);
+    expect(summary(items)).toEqual({ pending: [call("c1")], awaitsResponse: false });
+  });
+
+  it("answers calls still pending when the work ended, so later input can follow", () => {
+    const events: ReadonlyArray<HarnessEvent.Event> = [
+      took("hi"),
+      block(s1, 0, call("c1")),
+      block(s1, 1, call("c2")),
+      finished(s1),
+      { _tag: "ToolCallStarted", callId: Transcript.ToolCallId.make("c1") },
+    ];
+    const items = HarnessEvent.transcript(events, [], { unfinished: "keep" });
+    expect(items.slice(-2)).toEqual([
+      HarnessEvent.cutShort(call("c1")),
+      HarnessEvent.notRun(call("c2")),
+    ]);
+    expect(summary([...items, input("next")])).toEqual({ pending: [], awaitsResponse: true });
   });
 });

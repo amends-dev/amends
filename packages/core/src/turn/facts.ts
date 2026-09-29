@@ -27,14 +27,14 @@ export const Created = Fact.make("turn.created", {
 
 /**
  * Someone asked a failed or stopped turn to run again: a new turn for the same agent and input,
- * with the agent's current configuration.
+ * with the agent's current configuration, continuing from the turn it retries.
  */
 export const Retried = Fact.make("turn.retried", {
   version: 1,
   audience,
   subject: (payload) => Subject.make("turn", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Schema.Struct({ ...Turn.Record.fields, retryOf: Turn.Id }),
+  payload: Schema.Struct(Turn.Record.fields),
 });
 
 /** An active turn accepted more input, settling the notifications that asked for it. */
@@ -90,7 +90,7 @@ export const CancelRequested = Fact.make("turn.cancel-requested", {
   }),
 });
 
-/** The turn finished its work, with the reply it published, if any. */
+/** The turn finished its work, with the replies it published, in order. */
 export const Completed = Fact.make("turn.completed", {
   version: 1,
   audience,
@@ -99,7 +99,7 @@ export const Completed = Fact.make("turn.completed", {
   payload: Schema.Struct({
     ...Where,
     turnId: Turn.Id,
-    messageId: Schema.NullOr(ThreadMessageId.Id),
+    messageIds: Schema.Array(ThreadMessageId.Id),
     finishedAt: Schema.DateTimeUtcFromString,
   }),
 });

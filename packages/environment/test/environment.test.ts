@@ -161,7 +161,8 @@ describe("Environment.spawn", () => {
       expect(harnessEvents(events).map((event) => event._tag)).toEqual([
         "InputIncorporated",
         "TextDelta",
-        "ResponseCompleted",
+        "BlockCompleted",
+        "ResponseFinished",
         "Idle",
       ]);
 
@@ -340,10 +341,14 @@ describe("Environment.spawn", () => {
       yield* recovered.prepare(transcript);
       yield* recovered.resume;
       const events = harnessEvents(yield* untilIdle(recovered));
-      expect(events.at(-2)).toMatchObject({
-        _tag: "ResponseCompleted",
-        response: { id: "s2/1", parts: [{ _tag: "Text", text: "High tide is at noon." }] },
-      });
+      expect(events.slice(-3, -1)).toMatchObject([
+        {
+          _tag: "BlockCompleted",
+          responseId: "s2/1",
+          block: { _tag: "Text", text: "High tide is at noon." },
+        },
+        { _tag: "ResponseFinished", responseId: "s2/1" },
+      ]);
       expect(Transcript.summarize(HarnessEvent.transcript(events, transcript))).toMatchObject({
         success: { pending: [], awaitsResponse: false },
       });

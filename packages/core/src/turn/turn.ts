@@ -66,14 +66,24 @@ export const Record = Schema.Struct({
   memberId: MemberId.Id,
   /** The participation the attempt's input came through. */
   participationId: ThreadParticipationId.Id,
+  /**
+   * The agent's turn before this one in the same participation, whose view this one continues
+   * from; fixed when the turn is created, and none for the first after joining.
+   */
+  previousTurnId: Schema.NullOr(Id),
+  /**
+   * The failed or stopped turn this one runs again, which is also its previous turn: it asks for a
+   * fresh response in place of one that turn left unfinished.
+   */
+  retryOf: Schema.NullOr(Id),
   status: Status,
   inputAfterSequence: Sequence,
   acceptedThroughSequence: Sequence,
   incorporatedThroughSequence: Sequence,
   /** Recorded when execution starts. */
   selection: Schema.NullOr(Selection),
-  /** The agent's reply this attempt published, if it closed with one. */
-  messageId: Schema.NullOr(ThreadMessageId.Id),
+  /** The agent's replies this attempt published when it closed, in order. */
+  messageIds: Schema.Array(ThreadMessageId.Id),
   /** Why it failed. */
   failure: Schema.NullOr(Schema.String),
   /** Why it was asked to stop. */
@@ -127,7 +137,8 @@ export interface View extends Schema.Schema.Type<typeof View> {}
 /**
  * One entry of a turn's log as its thread's readers see it: the facts of its work, never private
  * reasoning or a harness's own data. The harness took in a batch of the thread's input; a response
- * completed with text, verbatim; or execution stopped short and continues the same turn.
+ * wrote text, verbatim, from its text blocks completed so far, and is a reply when the turn owes it
+ * to the thread; or execution stopped short and continues the same turn.
  */
 export const LogItem = Schema.TaggedUnion({
   InputTaken: { at: Schema.DateTimeUtcFromString, messages: Schema.Int },
@@ -135,6 +146,10 @@ export const LogItem = Schema.TaggedUnion({
     at: Schema.DateTimeUtcFromString,
     responseId: Schema.NonEmptyString,
     text: Schema.String,
+    /** The response's text blocks the text holds, by position. */
+    parts: Schema.Array(Schema.Int),
+    /** The turn owes this response to the thread as a reply, and posts it when it closes. */
+    reply: Schema.Boolean,
   },
   Interrupted: {
     at: Schema.DateTimeUtcFromString,

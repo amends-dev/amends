@@ -17,9 +17,13 @@ A session works whenever its transcript awaits a response:
 1. Once no tool call is waiting, it takes in every submitted batch, in order, reporting
    `InputIncorporated` for each. Input submitted while a response streams or tools run waits for
    the next such point, so it joins the following request rather than starting another.
-2. It streams one response, reporting text and reasoning deltas, then `ResponseCompleted`.
-3. It runs the response's tool calls concurrently through `Tools.invoke`, reporting each
-   `ToolCallCompleted` as it finishes, and goes back to step 1.
+2. It streams one response, reporting text and reasoning deltas, each block as `BlockCompleted`
+   when it ends (a tool call as soon as it arrives, and any block a provider never ends when the
+   response finishes), then `ResponseFinished`. If the provider fails partway, it first reports the
+   text written so far as blocks, leaving out unfinished reasoning, which carries no signature a
+   provider would accept back.
+3. It runs the response's tool calls concurrently through `Tools.invoke`, reporting
+   `ToolCallStarted` before each and `ToolCallCompleted` as each finishes, and goes back to step 1.
 4. When nothing is owed, it reports `Idle` once.
 
 The loop runs calls itself rather than letting Effect AI resolve them, so it records every outcome

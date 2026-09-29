@@ -65,13 +65,15 @@ const finished: Ending = { _tag: "Finished" };
 const again: Ending = { _tag: "Again" };
 const unrunnable = (reason: string): Ending => ({ _tag: "Unrunnable", reason });
 
-/** Streaming deltas are not recorded: only completed entries build the transcript. */
-const recorded = (event: Environment.Event): ReadonlyArray<HarnessEvent.Event> =>
+/**
+ * What the log records: everything the environment and its harness report except streaming
+ * deltas, which only show readers a block while it streams.
+ */
+const recorded = (event: Environment.Event): ReadonlyArray<Environment.Event> =>
   event._tag === "Harness" &&
-  event.event._tag !== "TextDelta" &&
-  event.event._tag !== "ReasoningDelta"
-    ? [event.event]
-    : [];
+  (event.event._tag === "TextDelta" || event.event._tag === "ReasoningDelta")
+    ? []
+    : [event];
 
 /** The session was prepared and is not released while the run works in it. */
 const unexpected = {
@@ -140,7 +142,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const running = spawned.success;
       yield* Effect.addFinalizer(() => Effect.ignore(running.release));
 
-      const transcript = HarnessEvent.transcript(TurnLog.events(plan.log), plan.history);
+      const transcript = TurnLog.read(plan.log).transcript(plan.history);
       const summary = Transcript.summarize(transcript);
       if (Result.isFailure(summary))
         return unrunnable(`The conversation could not be continued: ${summary.failure}`);
@@ -151,7 +153,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         return unrunnable(`The conversation could not be continued: ${prepared.failure._tag}.`);
 
       const pull = yield* Stream.toPull(running.events);
-      /** Text of each response part not yet shown to readers, and how much of it they have. */
+      /** Text of each response block not yet shown to readers, and how much of it they have. */
       const drafts = new Map<
         string,
         { readonly responseId: string; readonly part: number; offset: number; pending: string }
@@ -203,15 +205,15 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
               };
               draft.pending += event.delta;
               drafts.set(key, draft);
-            } else if (event._tag === "ResponseCompleted")
-              // The completed response replaces its draft in the log.
-              for (const [key, draft] of drafts)
-                if (draft.responseId === event.response.id) drafts.delete(key);
+            } else if (event._tag === "BlockCompleted")
+              // The completed block replaces its draft in the log.
+              drafts.delete(`${event.responseId}\u0000${event.part}`);
           }
           if ((yield* Clock.currentTimeMillis) - shownAt >= draftInterval) yield* showDrafts;
           const events = chunk.flatMap(recorded);
           if (events.length > 0) yield* step((execution) => execution.report(turnId, events));
-          if (events.at(-1)?._tag === "Idle") return;
+          const last = events.at(-1);
+          if (last?._tag === "Harness" && last.event._tag === "Idle") return;
         }
       });
 

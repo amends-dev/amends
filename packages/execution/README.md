@@ -26,17 +26,19 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    connection's implementation is not among `models`. Otherwise `start` a queued turn with the
    model access and environment it prepared with.
 3. Spawn the environment with a new session ID and the agent's instructions, and prepare the
-   harness with the thread's history before the turn followed by what the turn's log recorded, so
-   a run continuing an interrupted turn repeats no input.
+   harness with the history `prepare` gave, the view the agent's earlier turns in the thread left,
+   followed by what this turn's log recorded, so a run continuing an interrupted turn repeats no
+   input and asks for a fresh response in place of one left unfinished.
 4. Hand the harness the input the turn accepted and has not taken in, as one batch recorded as
    `submitted` first. A batch is named by the position it reaches, so submitting the same input
    again after a restart records it once. Without new input, `resume` a conversation that awaits
    a response.
-5. `report` each completed harness event until the harness is idle; text and reasoning deltas are
-   not recorded. Text deltas are shown to the thread's readers instead, as drafts: at most every
-   150 milliseconds, each response part's new text in pieces of up to 1,500 characters, at the
-   offset it continues. A response that completes first replaces its draft, and a draft that
-   fails is not retried. Then `close` the turn, which publishes the agent's reply. When closing finds
+5. `report` what the environment and its harness report until the harness is idle: each completed
+   block, finished response, tool start and result, and the environment becoming ready; text and
+   reasoning deltas are not recorded. Text deltas are shown to the thread's readers instead, as
+   drafts: at most every 150 milliseconds, each block's new text in pieces of up to 1,500
+   characters, at the offset it continues. A block that completes first replaces its draft, and a
+   draft that fails is not retried. Then `close` the turn, which publishes the replies it owes. When closing finds
    more input, the run submits what the agent accepted and continues in the same session, or
    waits while the agent is still accepting it, checking every second (`checkInterval`) for up to
    a minute (`inputWait`) before failing the turn.
@@ -72,10 +74,10 @@ Handled runs are pruned with background wakes when the host passes `TurnEntity.t
 ## Limits
 
 Turns are conversation only. Agents have no tools, so a turn left waiting on a tool call fails,
-and environments with a sandbox fail their turns. A turn records completed responses and shows
-its text to readers only as best-effort drafts. It posts one reply, the last response after the last input, so a turn that
-takes in more input while it works answers all of it at once. Stop requests are noticed by
-polling, within `checkInterval`.
+and environments with a sandbox fail their turns. A turn records each completed block and what
+the environment reported, and shows text still streaming to readers only as best-effort drafts,
+each giving way to its block once logged. Stop requests are noticed by polling, within
+`checkInterval`; a stopped response keeps only the blocks it completed.
 
 ## Verify
 
@@ -85,7 +87,7 @@ bun run test
 ```
 
 `test/runner.test.ts` runs the runner over turn execution in memory, amends's own harness, and a
-scripted model: drafts as a response streams, a queued turn from start to reply, input accepted while it works and while it
-waits, stopping, retrying from the log, failing without retry, a sandbox environment, and turns
+scripted model: drafts as a response streams, a queued turn from start to reply with what the
+environment reported, input accepted while it works and while it waits, each answer owed, stopping, retrying from the log, failing without retry, a sandbox environment, and turns
 already finished or stopping. The [local host's](../../hosts/local/README.md#verify) `turns.test.ts`
 runs a turn end to end over PostgreSQL and Cluster against a local chat-completions server.

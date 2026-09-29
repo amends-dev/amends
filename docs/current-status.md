@@ -18,9 +18,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
   local host [runs them](../packages/execution/README.md), each closing with the agent's reply.
   Turns are conversation only: agents have no tools, and environments with a sandbox fail their
-  turns. A turn posts only its last response after its last input, so input taken in while it
-  works gets one reply. Its text streams to readers as signals, best effort: a draft missed while
-  reconnecting shows once the response completes. A stop request is noticed by polling, within a
+  turns. A turn posts every answer it completed when it closes, one message each, so an answer
+  given before more input arrived is posted after that input; a turn that fails or is stopped
+  posts nothing, even answers it completed. Each turn continues from the logs of the agent's
+  earlier turns in the thread, but nothing summarizes them yet: the chain is read back at most
+  fifty turns, the oldest exchanges beyond 300,000 characters are left out, and one message beyond
+  40,000 characters is cut, so a long thread's start is forgotten. A stopped response keeps only
+  the blocks it completed. Its text streams to readers as signals, best effort: a draft missed
+  while reconnecting shows once its block completes. A stop request is noticed by polling, within a
   second. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each
   turn's log; threads have no titles, so the log names a thread by its group. No environment
   transfer or turn timeline activity exists, and the active turns read covers at most a hundred
@@ -135,8 +140,8 @@ from a group shows in its members, not in its threads or stream, though threads 
 recorded before departures stopped writing to them.
 
 Every workspace starts with a general group that every member joins with the workspace and leaves
-only by leaving the workspace; workspaces created before it existed have none. Agents join no
-workspace through the apps yet, so none join it. The sidebar lists teammates the reader has
+only by leaving the workspace; workspaces created before it existed have none. Agents created on the
+Agents page join it as every member does. The sidebar lists teammates the reader has
 not messaged under Direct messages, capped at six, and opens a first message to them. There is no
 conversation with oneself, since a direct group needs another member.
 

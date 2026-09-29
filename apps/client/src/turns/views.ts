@@ -41,8 +41,10 @@ export interface TurnEntry {
   readonly failure: string | undefined;
   /** Why it stopped: someone asked, or its agent stopped taking part in the thread. */
   readonly stoppedBy: "request" | "departure" | undefined;
-  /** The reply it posted, when it closed with one. */
+  /** The last reply it posted when it closed, if any. */
   readonly replyId: string | undefined;
+  /** Every reply it posted when it closed, in order. */
+  readonly replyIds: ReadonlyArray<string>;
   /** The timeline position of the latest message it took on. */
   readonly throughSequence: number;
   readonly createdAt: Date;
@@ -89,7 +91,8 @@ function useEntries(workspaceId: string) {
         : turn.cancelReason === "participation-ended"
           ? "departure"
           : "request",
-    replyId: turn.messageId ?? undefined,
+    replyId: turn.messageIds.at(-1),
+    replyIds: turn.messageIds,
     throughSequence: turn.acceptedThroughSequence,
     createdAt: toDate(turn.createdAt),
     startedAt: turn.startedAt === null ? undefined : toDate(turn.startedAt),
@@ -274,9 +277,7 @@ export function useThreadTurns(workspaceId: string, threadId: string): ThreadTur
     active: createMemo(() => latest().filter((turn) => activeState(turn.state))),
     replies: createMemo(
       () =>
-        new Map(
-          all().flatMap((turn) => (turn.replyId === undefined ? [] : [[turn.replyId, turn]])),
-        ),
+        new Map(all().flatMap((turn) => turn.replyIds.map((replyId) => [replyId, turn] as const))),
     ),
     loading: read.loading,
     failure: read.failure,
@@ -296,7 +297,7 @@ export type TurnActivity =
       readonly messages: number;
       readonly first: boolean;
     }
-  /** A response completed; the last, when the turn closed with a reply, is what it posted. */
+  /** A response wrote text; those the turn owes are posted as replies when it closes. */
   | {
       readonly kind: "response";
       readonly at: Date;
@@ -390,8 +391,6 @@ export function useTurnLog(
     if (log === undefined || current === undefined) return [];
     const items: Array<TurnActivity> = [{ kind: "accepted", at: current.createdAt }];
     if (current.startedAt !== undefined) items.push({ kind: "started", at: current.startedAt });
-    const responses = log.items.filter((item) => item._tag === "Responded");
-    const last = responses.at(-1);
     for (const item of log.items) {
       const at = toDate(item.at);
       if (item._tag === "InputTaken")
@@ -407,7 +406,7 @@ export function useTurnLog(
           at,
           id: item.responseId,
           text: item.text,
-          posted: current.replyId !== undefined && item === last,
+          posted: item.reply && current.state === "done",
         });
       else
         items.push({
@@ -435,9 +434,12 @@ export function useTurnLog(
   const draft = createMemo(() => {
     const current = turn();
     if (current === undefined || current.state !== "working") return undefined;
+    // A block's draft gives way to the block once the log holds it.
     const logged = new Set(
       (read.value()?.items ?? []).flatMap((item) =>
-        item._tag === "Responded" ? [item.responseId] : [],
+        item._tag === "Responded"
+          ? item.parts.map((part) => `${item.responseId}\u0000${part}`)
+          : [],
       ),
     );
     return writing(drafts(), turnId, logged);

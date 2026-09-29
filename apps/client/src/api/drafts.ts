@@ -60,8 +60,9 @@ export const settled = (drafts: Drafts, turnId: string): Drafts => {
 };
 
 /**
- * The response a turn is writing now: the newest one its log does not hold yet, its parts in order,
- * and whether any of it went missing on the way.
+ * The response a turn is writing now: the newest one with blocks its log does not hold yet, those
+ * blocks in order, and whether any of it went missing on the way. `logged` holds the blocks the
+ * log has, each as its response ID and position joined by a NUL character.
  */
 export const writing = (
   drafts: Drafts,
@@ -69,7 +70,7 @@ export const writing = (
   logged: ReadonlySet<string>,
 ): { readonly text: string; readonly broken: boolean } | undefined => {
   const parts = [...(drafts.get(turnId)?.values() ?? [])].filter(
-    (part) => !logged.has(part.responseId),
+    (part) => !logged.has(`${part.responseId}\u0000${part.part}`),
   );
   const responseId = parts.at(-1)?.responseId;
   const current = parts

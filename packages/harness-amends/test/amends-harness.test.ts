@@ -94,10 +94,17 @@ describe("AmendsHarness", () => {
       expect(events.map((event) => event._tag)).toEqual([
         "InputIncorporated",
         "TextDelta",
-        "ResponseCompleted",
+        "BlockCompleted",
+        "ResponseFinished",
         "Idle",
       ]);
       expect(events[2]).toMatchObject({
+        responseId: "s1/1",
+        part: 0,
+        block: { _tag: "Text", text: "Hello" },
+      });
+      expect(events[3]).toMatchObject({
+        responseId: "s1/1",
         finish: "stop",
         usage: { inputTokens: 20, outputTokens: 4 },
       });
@@ -129,10 +136,13 @@ describe("AmendsHarness", () => {
 
       expect(events.map((event) => event._tag)).toEqual([
         "InputIncorporated",
-        "ResponseCompleted",
+        "BlockCompleted",
+        "ResponseFinished",
+        "ToolCallStarted",
         "ToolCallCompleted",
         "TextDelta",
-        "ResponseCompleted",
+        "BlockCompleted",
+        "ResponseFinished",
         "Idle",
       ]);
       expect(HarnessEvent.transcript(events).map((item) => item._tag)).toEqual([
@@ -187,10 +197,18 @@ describe("AmendsHarness", () => {
       );
       expect(failure).toBeInstanceOf(HarnessErrors.ExecutionFailed);
       expect(failure).toMatchObject({ retryable: true });
-      expect(recorded.at(-1)).toMatchObject({ _tag: "TextDelta", responseId: "s1/2" });
+      // The text written before the failure is reported as a block of the unfinished response.
+      expect(recorded.slice(-2)).toMatchObject([
+        { _tag: "TextDelta", responseId: "s1/2" },
+        { _tag: "BlockCompleted", responseId: "s1/2", part: 0, block: { text: "Hi" } },
+      ]);
 
+      // Execution going on asks for a fresh response; the work ending keeps what was written.
       const transcript = HarnessEvent.transcript(stored(recorded));
       expect(transcript.map((item) => item._tag)).toEqual(["Input", "Response", "ToolResult"]);
+      expect(
+        HarnessEvent.transcript(stored(recorded), [], { unfinished: "keep" }).at(-1),
+      ).toMatchObject({ _tag: "Response", id: "s1/2", parts: [{ _tag: "Text", text: "Hi" }] });
 
       const second = yield* scripted([parts(...text("t1", "Noon."), finish("stop"))]);
       const continuing = yield* start(second.model, {
@@ -210,8 +228,13 @@ describe("AmendsHarness", () => {
           { type: "tool-call", id: "c1" },
         ],
       });
-      expect(events.map((event) => event._tag)).toEqual(["TextDelta", "ResponseCompleted", "Idle"]);
-      expect(events[1]).toMatchObject({ response: { id: "s2/1" } });
+      expect(events.map((event) => event._tag)).toEqual([
+        "TextDelta",
+        "BlockCompleted",
+        "ResponseFinished",
+        "Idle",
+      ]);
+      expect(events[2]).toMatchObject({ responseId: "s2/1" });
       expect(yield* Ref.get(invocations)).toBe(1);
     }),
   );
@@ -234,7 +257,7 @@ describe("AmendsHarness", () => {
           yield* source.prepare([]);
           yield* source.submit(batch("b1", "Move to the sandbox and build."));
           const events = yield* source.events.pipe(
-            Stream.takeUntil((event) => event._tag === "ResponseCompleted"),
+            Stream.takeUntil((event) => event._tag === "ResponseFinished"),
             Stream.runCollect,
           );
           yield* Deferred.await(started);
@@ -259,7 +282,8 @@ describe("AmendsHarness", () => {
       expect(events.map((event) => event._tag)).toEqual([
         "ToolCallCompleted",
         "TextDelta",
-        "ResponseCompleted",
+        "BlockCompleted",
+        "ResponseFinished",
         "Idle",
       ]);
       expect(encoded(second.prompts[0]!).content.at(-1)).toMatchObject({

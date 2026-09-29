@@ -36,8 +36,7 @@ export const definition = Projection.make("turns", { version: 2 })
       const store = yield* TurnStore.Service;
       if (store.workspaceId !== payload.workspaceId)
         return yield* conflict("Fact belongs to another workspace");
-      const { retryOf: _, ...record } = payload;
-      yield* store.insert(record);
+      yield* store.insert(payload);
     }),
   )
   .on(
@@ -87,7 +86,7 @@ export const definition = Projection.make("turns", { version: 2 })
       yield* store.update(
         Turn.change(turn, {
           status: "completed",
-          messageId: payload.messageId,
+          messageIds: payload.messageIds,
           finishedAt: payload.finishedAt,
         }),
       );

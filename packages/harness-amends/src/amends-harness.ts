@@ -183,16 +183,41 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     return false;
   });
 
-  /** Streams one response to the transcript, then records it with its calls marked running. */
+  /**
+   * Streams one response, reporting each block as it completes, then records the response with its
+   * calls marked running. A provider failure first reports the text written so far, so readers
+   * and the next turn keep what the agent wrote.
+   */
   const respond = Effect.gen(function* () {
     const current = yield* Ref.get(state);
     const responseId = Transcript.ResponseId.make(`${options.sessionId}/${current.responses + 1}`);
     const parts: Array<Streamed | Transcript.ToolCall> = [];
     const streaming = new Map<string, number>();
+    const completed = new Set<number>();
     let finish: HarnessEvent.FinishReason = "unknown";
     let usage: HarnessEvent.Usage | undefined;
     let modelId = modelName;
 
+    const blockOf = (part: Streamed | Transcript.ToolCall): Transcript.ResponsePart =>
+      part._tag === "ToolCall"
+        ? part
+        : { _tag: part._tag, text: part.text, ...withNative(part.metadata) };
+    /** Report the block at `index` as completed, once. */
+    const complete = (index: number) => {
+      const part = parts[index];
+      if (part === undefined || completed.has(index)) return Effect.void;
+      completed.add(index);
+      return emit({ _tag: "BlockCompleted", responseId, part: index, block: blockOf(part) });
+    };
+    /** Complete every block still open, in order, as when a provider sends no end for them. */
+    const completeAll = (only?: Streamed["_tag"]) =>
+      Effect.forEach(
+        parts.flatMap((part, index) =>
+          completed.has(index) || (only !== undefined && part._tag !== only) ? [] : [index],
+        ),
+        complete,
+        { discard: true },
+      );
     const open = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) => {
       const index = parts.push({ _tag: kind, text: "", metadata }) - 1;
       streaming.set(`${kind}:${id}`, index);
@@ -219,6 +244,8 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
         delta: text,
       });
     };
+    const end = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) =>
+      complete(streamed(kind, id, metadata).index);
 
     yield* model
       .streamText({
@@ -236,16 +263,14 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
             case "text-delta":
               return delta("Text", part.id, part.delta, part.metadata);
             case "text-end":
-              streamed("Text", part.id, part.metadata);
-              return Effect.void;
+              return end("Text", part.id, part.metadata);
             case "reasoning-start":
               open("Reasoning", part.id, part.metadata);
               return Effect.void;
             case "reasoning-delta":
               return delta("Reasoning", part.id, part.delta, part.metadata);
             case "reasoning-end":
-              streamed("Reasoning", part.id, part.metadata);
-              return Effect.void;
+              return end("Reasoning", part.id, part.metadata);
             case "tool-params-start":
             case "tool-params-delta":
             case "tool-params-end":
@@ -254,15 +279,17 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
               if (part.providerExecuted) return Effect.fail(unsupported("a call its provider ran"));
               return Schema.decodeUnknownEffect(Schema.Json)(part.params).pipe(
                 Effect.mapError(executionFailed),
-                Effect.map((params) => {
-                  parts.push({
-                    _tag: "ToolCall",
-                    id: Transcript.ToolCallId.make(part.id),
-                    name: part.name,
-                    params,
-                    ...withNative(part.metadata),
-                  });
-                }),
+                Effect.flatMap((params) =>
+                  complete(
+                    parts.push({
+                      _tag: "ToolCall",
+                      id: Transcript.ToolCallId.make(part.id),
+                      name: part.name,
+                      params,
+                      ...withNative(part.metadata),
+                    }) - 1,
+                  ),
+                ),
               );
             case "response-metadata":
               modelId = part.modelId ?? modelId;
@@ -277,16 +304,15 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
               return Effect.fail(unsupported(`a ${part.type} part`));
           }
         }),
+        // Partial reasoning carries no signature a provider would accept back, so only text stays.
+        Effect.tapError(() => completeAll("Text")),
       );
+    yield* completeAll();
 
     const response: Transcript.Response = {
       _tag: "Response",
       id: responseId,
-      parts: parts.map((part) =>
-        part._tag === "ToolCall"
-          ? part
-          : { _tag: part._tag, text: part.text, ...withNative(part.metadata) },
-      ),
+      parts: parts.map(blockOf),
     };
     const reference: HarnessEvent.ModelReference = {
       ...(provider !== undefined && { provider }),
@@ -304,8 +330,8 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
           idle: false,
         });
         yield* emit({
-          _tag: "ResponseCompleted",
-          response,
+          _tag: "ResponseFinished",
+          responseId,
           finish,
           ...(Object.keys(reference).length > 0 && { model: reference }),
           ...(usage !== undefined && { usage }),
@@ -332,10 +358,14 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     );
 
   const execute = (call: Transcript.ToolCall) =>
-    (tools === undefined
-      ? Effect.succeed(HarnessTool.failure(`No tool is named ${call.name}.`))
-      : tools.invoke(call)
-    ).pipe(Effect.flatMap((outcome) => record(Transcript.toolResult(call, outcome))));
+    emit({ _tag: "ToolCallStarted", callId: call.id }).pipe(
+      Effect.andThen(
+        tools === undefined
+          ? Effect.succeed(HarnessTool.failure(`No tool is named ${call.name}.`))
+          : tools.invoke(call),
+      ),
+      Effect.flatMap((outcome) => record(Transcript.toolResult(call, outcome))),
+    );
 
   /** One pass: take in input, then answer it and run the calls the answer asks for. */
   const step = Effect.gen(function* () {

@@ -329,12 +329,13 @@ attempt at the work asked of it on a thread; the
 | `GET …/threads/:threadId/turns` | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
 | `GET …/active-turns`            | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
 | `GET …/turns/:turnId`           | One turn.                                                                                     |
-| `GET …/turns/:turnId/log`       | The turn with its log: input taken in, responses' text, and interruptions, oldest first.      |
+| `GET …/turns/:turnId/log`       | The turn with its log: input taken in, responses' text and replies, interruptions, in order.  |
 | `POST …/turns/:turnId/cancel`   | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
 | `POST …/turns/:turnId/retry`    | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
 
 A turn reads as `Turn.View`: its status, input positions, the model access and environment it
-started with, its reply's `messageId`, `failure`, `cancelReason`, and times, with `stoppable` and
+started with, the turn before it (`previousTurnId`) and the one it retries (`retryOf`), its replies'
+`messageIds` in order, `failure`, `cancelReason`, and times, with `stoppable` and
 `retryable` for the caller. Stopping and retrying need permission to direct the agent (403
 otherwise). A turn in a thread the caller cannot open answers 404. `retry` takes an
 `Idempotency-Key`, so repeating it returns the turn it created.

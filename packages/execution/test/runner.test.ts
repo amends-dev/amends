@@ -8,7 +8,7 @@ import { Gateway } from "@amends/gateway";
 import type { HarnessEvent, Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect";
+import { Crypto, DateTime, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { AiError, LanguageModel, Model } from "effect/unstable/ai";
 import type { Prompt, Response } from "effect/unstable/ai";
@@ -27,12 +27,14 @@ const queued = Schema.decodeUnknownSync(Turn.Record)({
   agentId: "agent-one",
   memberId: "member-agent",
   participationId: "participation-one",
+  previousTurnId: null,
+  retryOf: null,
   status: "queued",
   inputAfterSequence: 0,
   acceptedThroughSequence: 1,
   incorporatedThroughSequence: 0,
   selection: null,
-  messageId: null,
+  messageIds: [],
   failure: null,
   cancelReason: null,
   createdAt,
@@ -67,6 +69,7 @@ const environment = (sandbox: boolean) =>
     createdAt,
   });
 
+const at = DateTime.makeUnsafe(createdAt);
 const input = (text: string): Transcript.Input => ({
   _tag: "Input",
   author: { id: "member-alice", name: "Alice" },
@@ -80,12 +83,12 @@ const input = (text: string): Transcript.Input => ({
 const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
   const state = {
     turn: queued,
-    log: [] as Array<TurnLog.Entry>,
+    log: [] as Array<TurnLog.Recorded>,
     messages: [{ sequence: 1, text: "What is the tide at noon?" }],
     unaccepted: false,
     steps: [] as Array<string>,
     drafts: [] as Array<{ responseId: string; part: number; offset: number; text: string }>,
-    reply: undefined as string | undefined,
+    replies: [] as Array<string>,
   };
   const change = (changes: Partial<Turn.Record>) => {
     state.turn = Turn.change(state.turn, changes);
@@ -136,17 +139,18 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       Effect.sync(() => {
         state.steps.push(`submitted ${batch.batchId}`);
         if (
-          !state.log.some((entry) => entry._tag === "Submitted" && entry.batchId === batch.batchId)
+          !state.log.some(
+            ({ entry }) => entry._tag === "Submitted" && entry.batchId === batch.batchId,
+          )
         )
-          state.log.push({ _tag: "Submitted", ...batch });
+          state.log.push({ entry: { _tag: "Submitted", ...batch }, at });
       }),
     report: (_, events) =>
       Effect.sync(() => {
-        for (const event of events) state.steps.push(`report ${event._tag}`);
-        state.log.push(...events.map((event) => ({ _tag: "Harness" as const, event })));
+        for (const event of events) state.steps.push(`report ${event.event._tag}`);
+        state.log.push(...events.map((event) => ({ entry: event, at })));
         change({
-          incorporatedThroughSequence: TurnLog.incorporatedThrough(
-            state.log,
+          incorporatedThroughSequence: TurnLog.read(state.log).incorporatedThrough(
             state.turn.inputAfterSequence,
           ),
         });
@@ -159,7 +163,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     interrupted: (_, stop) =>
       Effect.sync(() => {
         state.steps.push(`interrupted ${stop.retryable ? "retryable" : "final"}`);
-        state.log.push({ _tag: "Interrupted", ...stop });
+        state.log.push({ entry: { _tag: "Interrupted", ...stop }, at });
       }),
     entries: () => Effect.sync(() => [...state.log]),
     close: () =>
@@ -175,9 +179,9 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
           state.unaccepted
         )
           return { _tag: "InputPending" } as const;
-        state.reply = TurnLog.finalResponse(state.log);
+        state.replies = TurnLog.read(state.log).replies.map((reply) => reply.text);
         change({ status: "completed" });
-        return { _tag: "Closed", messageId: null } as const;
+        return { _tag: "Closed", messageIds: [] } as const;
       }),
     fail: (_, reason) =>
       Effect.gen(function* () {
@@ -292,8 +296,8 @@ const texts = (prompt: Prompt.Prompt | undefined) =>
       : message.content.map((part) => (part.type === "text" ? part.text : part.type)).join(""),
   );
 const harnessEvents = (
-  log: ReadonlyArray<TurnLog.Entry>,
-): ReadonlyArray<HarnessEvent.Event["_tag"]> => TurnLog.events(log).map((event) => event._tag);
+  log: ReadonlyArray<TurnLog.Recorded>,
+): ReadonlyArray<HarnessEvent.Event["_tag"]> => TurnLog.read(log).events.map((event) => event._tag);
 
 describe("TurnRunner", () => {
   it.effect("starts a queued turn, hands the harness its input, and closes it with the reply", () =>
@@ -307,15 +311,24 @@ describe("TurnRunner", () => {
       expect(state.steps).toEqual([
         "start",
         "submitted through:1",
+        "report Ready",
         "report InputIncorporated",
-        "report ResponseCompleted",
+        "report BlockCompleted",
+        "report ResponseFinished",
         "report Idle",
         "close",
       ]);
       expect(state.turn).toMatchObject({ status: "completed", selection });
-      expect(state.reply).toBe("Noon is high tide.");
-      // Deltas show a response while it streams; the log keeps completed entries.
-      expect(harnessEvents(state.log)).toEqual(["InputIncorporated", "ResponseCompleted", "Idle"]);
+      expect(state.replies).toEqual(["Noon is high tide."]);
+      // Deltas show a block while it streams; the log keeps completed blocks and what the
+      // environment reported.
+      expect(harnessEvents(state.log)).toEqual([
+        "InputIncorporated",
+        "BlockCompleted",
+        "ResponseFinished",
+        "Idle",
+      ]);
+      expect(state.log[1]?.entry).toMatchObject({ _tag: "Environment", event: { _tag: "Ready" } });
       expect(texts(prompts[0])).toEqual(["Be brief.", "Alice: What is the tide at noon?"]);
     }),
   );
@@ -366,12 +379,12 @@ describe("TurnRunner", () => {
       yield* Deferred.succeed(rest, undefined);
       yield* Fiber.join(fiber);
 
-      expect(state.reply).toBe("Noon is high tide.");
+      expect(state.replies).toEqual(["Noon is high tide."]);
       expect(harnessEvents(state.log)).not.toContain("TextDelta");
     }),
   );
 
-  it.effect("takes in input accepted while it worked before closing", () =>
+  it.effect("takes in input accepted while it worked, and owes both answers when closing", () =>
     Effect.gen(function* () {
       const { state, execution, accept } = fakeExecution();
       const { implementation, prompts } = yield* scripted([
@@ -388,17 +401,21 @@ describe("TurnRunner", () => {
       expect(state.steps).toEqual([
         "start",
         "submitted through:1",
+        "report Ready",
         "report InputIncorporated",
-        "report ResponseCompleted",
+        "report BlockCompleted",
+        "report ResponseFinished",
         "report Idle",
         "close",
         "submitted through:3",
         "report InputIncorporated",
-        "report ResponseCompleted",
+        "report BlockCompleted",
+        "report ResponseFinished",
         "report Idle",
         "close",
       ]);
-      expect(state.reply).toBe("Noon, and again just after midnight.");
+      // The first answer came before the second question was taken in, so it is owed too.
+      expect(state.replies).toEqual(["Noon.", "Noon, and again just after midnight."]);
       expect(texts(prompts[1])).toEqual([
         "Be brief.",
         "Alice: What is the tide at noon?",
@@ -423,14 +440,15 @@ describe("TurnRunner", () => {
       state.unaccepted = false;
       yield* settle(fiber);
 
-      expect(state.steps.slice(-5)).toEqual([
+      expect(state.steps.slice(-6)).toEqual([
         "submitted through:2",
         "report InputIncorporated",
-        "report ResponseCompleted",
+        "report BlockCompleted",
+        "report ResponseFinished",
         "report Idle",
         "close",
       ]);
-      expect(state.reply).toBe("Midnight too.");
+      expect(state.replies).toEqual(["Noon.", "Midnight too."]);
     }),
   );
 
@@ -449,6 +467,7 @@ describe("TurnRunner", () => {
       expect(state.steps).toEqual([
         "start",
         "submitted through:1",
+        "report Ready",
         "report InputIncorporated",
         "stopped",
       ]);
@@ -471,15 +490,18 @@ describe("TurnRunner", () => {
       expect(state.steps).toEqual([
         "start",
         "submitted through:1",
+        "report Ready",
         "report InputIncorporated",
         "interrupted retryable",
-        "report ResponseCompleted",
+        "report Ready",
+        "report BlockCompleted",
+        "report ResponseFinished",
         "report Idle",
         "close",
       ]);
       // The second session continues the conversation rather than submitting the input again.
       expect(texts(prompts[1])).toEqual(texts(prompts[0]));
-      expect(state.reply).toBe("Noon.");
+      expect(state.replies).toEqual(["Noon."]);
     }),
   );
 

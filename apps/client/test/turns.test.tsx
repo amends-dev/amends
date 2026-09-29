@@ -53,12 +53,14 @@ const viewOf = (turn: Stored) => ({
   agentId: turn.memberId.replace("member-", ""),
   memberId: turn.memberId,
   participationId: `participation-${turn.memberId}`,
+  previousTurnId: null,
+  retryOf: null,
   status: turn.status,
   inputAfterSequence: 0,
   acceptedThroughSequence: 3,
   incorporatedThroughSequence: 0,
   selection: null,
-  messageId: turn.messageId ?? null,
+  messageIds: turn.messageId === undefined ? [] : [turn.messageId],
   failure: turn.failure ?? null,
   cancelReason: turn.cancelReason ?? null,
   createdAt: turn.createdAt,
@@ -283,10 +285,11 @@ it("drafts continue their part in order, marking a gap rather than showing text 
     text: "Deploy the API first",
     broken: true,
   });
-  // A response the log holds is no longer drafted; nor is anything of a turn that ended.
-  expect(writing(drafts, "turn-1", new Set(["r1"]))).toBeUndefined();
+  // A block the log holds is no longer drafted; nor is anything of a turn that ended.
+  expect(writing(drafts, "turn-1", new Set(["r1\u00000"]))).toBeUndefined();
   expect(writing(settled(drafts, "turn-1"), "turn-1", new Set())).toBeUndefined();
-  // Parts of the response being written join in order.
+  // Parts of the response being written join in order, leaving out blocks the log holds.
   const two = drafted(drafted(new Map(), draft(0, "b", 1)), draft(0, "a", 0));
   expect(writing(two, "turn-1", new Set())?.text).toBe("ab");
+  expect(writing(two, "turn-1", new Set(["r1\u00000"]))?.text).toBe("b");
 });
