@@ -12,6 +12,14 @@ const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(),
 
 /** Such as "10:02 AM". */
 export const clockTime = (at: Date) => clock.format(at);
+/** Such as "10:02": the time of day without AM or PM, where there is little room. */
+export const shortClockTime = (at: Date) =>
+  clock
+    .formatToParts(at)
+    .filter((part) => part.type !== "dayPeriod")
+    .map((part) => part.value)
+    .join("")
+    .trim();
 /** Such as "Sunday, September 27, 2026 at 10:02 AM", for a tooltip. */
 export const fullTime = (at: Date) => full.format(at);
 /** The local calendar day, to group entries under day seams. */

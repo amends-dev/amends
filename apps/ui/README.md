@@ -162,7 +162,9 @@ A message takes its time as text or as `at`, a `Date` it words as the time of da
 date as its title. The reply summary adds an unread dot and a note such as who is typing; a
 message with no replies offers `Message.Reply` ("Reply in thread"), shown while the message is
 hovered or focused where there is a pointer, and always on touch screens. `focused` sets a
-message apart and scrolls to it. Screens word times, days, and typing through `internal/when.ts`,
+message apart and scrolls to it. `continued` stacks a message under its author's one before, 6px
+beneath it with no avatar or name, its time in the avatar's place while hovered or focused;
+assistive technology still hears the author and time. Screens word times, days, and typing through `internal/when.ts`,
 and key rows by id through `internal/keyed.tsx`, so callers may pass freshly built arrays.
 
 ## Form components and the modal
@@ -245,7 +247,11 @@ Members (add and remove people); on phones, adding members opens its own full-sc
 `TimelineEntry` data, and conversations read from the bottom: they open at the newest message
 and follow new ones while the reader is at the end. With `days` it puts a seam (Today,
 Yesterday, a weekday within the week, then the date) before each new day of dated entries, and
-it words notes such as "Sara followed this thread" or "You were removed from the group".
+it words notes such as "Sara followed this thread" or "You were removed from the group". An
+author's messages in a row stack, as in Slack: one by the same author `id` within five minutes of
+the one before, with nothing between them, continues it. A thread's replies summary ends a stack
+and starts its own, since its elbow hangs from the avatar, and messages without an author id or
+`at` never stack.
 `GroupThreads` and `ThreadPane` take a `status` (loading, unavailable, failed with Try again),
 `earlier` to load older entries, a `sendError` code, and a `follow` bell, filled
 (`IconBellFilled`) while following; `GroupPane` takes the tabs to show (with one, the tab row is
@@ -257,7 +263,8 @@ optional member counts and links, `previews={false}` when unjoined groups cannot
 error, and loading states. `InboxPane` is the Inbox from the Lunacy Inbox frames: All and
 Unread tabs with the unread count, Mark all seen while anything is unread, and notifications
 under day seams with who mentioned the reader, replied, or started a thread, where, what was
-said, how long ago, and an unread dot; the open one is set apart. Opening one calls `onOpen`.
+said on one line that ends in an ellipsis when there is more, how long ago, and an unread dot; the
+open one is set apart. Opening one calls `onOpen`.
 Unread's empty state is "You're all caught up" with View all activity; All's is "No activity yet".
 `ThreadPane` takes a notification `reason` for its subtitle ("Mention · #general") and a
 `backLabel` for phones. **Screens / Inbox** walks the mocks' selection flow.

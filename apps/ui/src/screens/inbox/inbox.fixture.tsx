@@ -35,7 +35,7 @@ export const sampleInbox: readonly InboxItem[] = [
     reason: "reply",
     author: people.alex,
     place: { name: "engineering", direct: false },
-    text: "The retry now keeps the original request. Ready for another look.",
+    text: "The retry now keeps the original request, so a send cut off by closing the thread is not posted twice. **Ready for another look:**\n\n- retries reuse the key\n- drafts keep it across remounts",
     href: "#alex",
   },
   {

@@ -121,6 +121,39 @@ function withDays(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
   return out;
 }
 
+/** How soon after its author's message another stacks under it. */
+const stackWithin = 5 * 60_000;
+
+/**
+ * The messages that stack under the one before, as chat does: by the same author, within five
+ * minutes, with nothing between them. A thread's replies summary ends a stack and starts its own,
+ * since its elbow hangs from the avatar. Messages without an author id or a time never stack.
+ */
+function stacked(entries: readonly TimelineEntry[]): ReadonlySet<string> {
+  const out = new Set<string>();
+  const replied = (message: TimelineMessage) => (message.thread?.replies ?? 0) > 0;
+  let previous: TimelineMessage | undefined;
+  for (const entry of entries) {
+    if (entry.kind !== "message") {
+      previous = undefined;
+      continue;
+    }
+    const gap = previous?.at && entry.at ? entry.at.getTime() - previous.at.getTime() : Number.NaN;
+    if (
+      previous &&
+      entry.author.id !== undefined &&
+      entry.author.id === previous.author.id &&
+      gap >= 0 &&
+      gap < stackWithin &&
+      !replied(previous) &&
+      !replied(entry)
+    )
+      out.add(entry.id);
+    previous = entry;
+  }
+  return out;
+}
+
 export interface TimelineProps {
   readonly entries: readonly TimelineEntry[];
   /** The message whose thread is open. */
@@ -139,9 +172,13 @@ export interface TimelineProps {
   readonly onOpenTurnLog?: (turnId: string) => void;
 }
 
-/** Messages, dividers, and events, oldest first. */
+/**
+ * Messages, dividers, and events, oldest first. An author's messages in a row stack under the first
+ * without its avatar or name again.
+ */
 export function Timeline(props: TimelineProps) {
   const entries = createMemo(() => (props.days ? withDays(props.entries) : props.entries));
+  const continued = createMemo(() => stacked(entries()));
   return (
     <div class={s.timeline} data-anchor={props.anchor ?? "bottom"}>
       <Keyed each={entries()} by={(entry) => entry.id}>
@@ -180,6 +217,7 @@ export function Timeline(props: TimelineProps) {
                   at={message().at}
                   active={props.activeId === message().id}
                   focused={props.focusId === message().id}
+                  continued={continued().has(message().id)}
                 >
                   <Show when={message().activity}>
                     {(activity) => (

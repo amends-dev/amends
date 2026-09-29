@@ -6,13 +6,13 @@ import type { TimelineEntry } from "./timeline/index.ts";
 import type { HomeSidebarProps, WorkspaceNavigationProps } from "./workspace-navigation/index.ts";
 
 export const people = {
-  alex: { name: "Alex", initials: "AM", tone: "sand" },
-  sara: { name: "Sara", tone: "clay" },
-  oliver: { name: "Oliver", tone: "olive" },
-  aj: { name: "AJ", tone: "ink" },
-  graeme: { name: "Graeme", tone: "slate" },
-  yumi: { name: "Yumi", tone: "lilac", agent: true },
-  jordan: { name: "Jordan Mercier", initials: "JM", tone: "sage" },
+  alex: { id: "alex", name: "Alex", initials: "AM", tone: "sand" },
+  sara: { id: "sara", name: "Sara", tone: "clay" },
+  oliver: { id: "oliver", name: "Oliver", tone: "olive" },
+  aj: { id: "aj", name: "AJ", tone: "ink" },
+  graeme: { id: "graeme", name: "Graeme", tone: "slate" },
+  yumi: { id: "yumi", name: "Yumi", tone: "lilac", agent: true },
+  jordan: { id: "jordan", name: "Jordan Mercier", initials: "JM", tone: "sage" },
 } as const satisfies Record<string, MessageAuthor>;
 
 export const groupEntries: readonly TimelineEntry[] = [

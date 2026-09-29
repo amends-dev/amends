@@ -29,8 +29,8 @@ export const memberName = (member: Member.Record | undefined) =>
 
 /** Someone who wrote a message, as a timeline shows them. */
 export interface Author {
-  /** Absent for a contact outside the workspace. */
-  readonly memberId?: string;
+  /** Their member ID; absent for a contact outside the workspace. */
+  readonly id?: string;
   readonly name: string;
   readonly agent: boolean;
 }
@@ -88,7 +88,7 @@ export function usePeople(workspaceId: string) {
     if (author._tag === "Contact") return { name: "Contact", agent: false };
     const member = members.member(author.memberId);
     return {
-      memberId: author.memberId,
+      id: author.memberId,
       name: memberName(member),
       agent: member?.identity._tag === "Agent",
     };

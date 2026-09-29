@@ -115,13 +115,15 @@ export const place = style({
   color: vars.color.text.secondary,
 });
 
-// What was said: in full while unread, quieter once seen.
+// What was said, on one line ending in an ellipsis when there is more; quieter once seen.
 export const preview = style({
   ...typeScale.body,
   margin: 0,
   marginBlockStart: "0.375rem",
+  overflow: "hidden",
   color: vars.color.text.secondary,
-  overflowWrap: "anywhere",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
   selectors: { [`${row}[data-unread] &`]: { color: vars.color.text.primary } },
   "@media": { [media.mobile]: typeScale.bodyTouch },
 });

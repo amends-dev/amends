@@ -82,6 +82,14 @@ const thread: readonly TimelineEntry[] = [
     at: minutesAgo(5),
     text: "Checked the build: all green.",
   },
+  // Soon after by the same author, so it stacks under the one before.
+  {
+    kind: "message",
+    id: "r3",
+    author: people.yumi,
+    at: minutesAgo(4),
+    text: "The release notes are ready too; they cover the paste fix.",
+  },
 ];
 
 export interface ConversationProps {

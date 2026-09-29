@@ -8,6 +8,7 @@ import { TaskStatus, type TaskState } from "../../components/task-status/index.t
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./sidebar.css.ts";
+import { stitch } from "../../internal/stitch.ts";
 
 export type RootProps = JSX.HTMLAttributes<HTMLElement> & {
   /** Names the navigation, such as "Workspace". */
@@ -211,8 +212,8 @@ export function SubItem(props: SubItemProps) {
           <path
             d="M1 0 V36 Q1 40 5 40 H18"
             stroke="currentColor"
-            stroke-width="1.4"
-            stroke-dasharray="7 6"
+            stroke-width={stitch.width}
+            stroke-dasharray={stitch.dashes}
             stroke-linecap="round"
           />
         </svg>

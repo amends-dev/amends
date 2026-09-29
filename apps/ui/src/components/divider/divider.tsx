@@ -1,6 +1,7 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { classes } from "../../internal/props.ts";
 import * as s from "./divider.css.ts";
+import { stitch } from "../../internal/stitch.ts";
 
 function Stitch() {
   return (
@@ -11,8 +12,8 @@ function Stitch() {
         y1="1"
         y2="1"
         stroke="currentColor"
-        stroke-width="1.4"
-        stroke-dasharray="7 6"
+        stroke-width={stitch.width}
+        stroke-dasharray={stitch.dashes}
         stroke-linecap="round"
       />
     </svg>

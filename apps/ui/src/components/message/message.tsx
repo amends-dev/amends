@@ -5,10 +5,13 @@ import { TaskStatus, type TaskState } from "../task-status/index.ts";
 import { TurnActivity, type TurnState } from "../turn-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
-import { clockTime, fullTime } from "../../internal/when.ts";
+import { clockTime, fullTime, shortClockTime } from "../../internal/when.ts";
 import * as s from "./message.css.ts";
+import { stitch } from "../../internal/stitch.ts";
 
 export interface Author {
+  /** Who they are, so their messages in a row can stack; without it, messages never stack. */
+  readonly id?: string;
   readonly name: string;
   readonly initials?: string;
   readonly tone?: AvatarToneName;
@@ -26,9 +29,17 @@ export type RootProps = JSX.HTMLAttributes<HTMLElement> & {
   active?: boolean;
   /** The message the reader came to see, such as one that notified them: set apart and scrolled to. */
   focused?: boolean;
+  /**
+   * It follows its author's message just before, so it stacks under it: no avatar or name, and
+   * its time beside it while hovered or focused. Assistive technology still hears both.
+   */
+  continued?: boolean;
 };
 
-/** One message: the author's avatar beside a column of the byline, text, and any extras. */
+/**
+ * One message: the author's avatar beside a column of the byline, text, and any extras, or, when
+ * `continued`, the text alone under the author's message before.
+ */
 export function Root(props: RootProps) {
   const [local, native] = splitProps(props, [
     "author",
@@ -36,6 +47,7 @@ export function Root(props: RootProps) {
     "at",
     "active",
     "focused",
+    "continued",
     "children",
     "class",
   ]);
@@ -50,17 +62,31 @@ export function Root(props: RootProps) {
       ref={setElement}
       class={classes(s.message, local.class)}
       data-active={local.active || local.focused ? "" : undefined}
+      data-continued={local.continued ? "" : undefined}
       aria-current={local.active ? "true" : undefined}
     >
-      <Avatar
-        name={local.author.name}
-        initials={local.author.initials}
-        tone={local.author.tone}
-        size={32}
-        decorative
-      />
+      <Show
+        when={!local.continued}
+        fallback={
+          <Show when={local.at} fallback={<span />}>
+            {(at) => (
+              <span class={s.gutterTime} aria-hidden="true">
+                {shortClockTime(at())}
+              </span>
+            )}
+          </Show>
+        }
+      >
+        <Avatar
+          name={local.author.name}
+          initials={local.author.initials}
+          tone={local.author.tone}
+          size={32}
+          decorative
+        />
+      </Show>
       <div class={s.content}>
-        <div class={s.byline}>
+        <div class={local.continued ? s.hiddenByline : s.byline}>
           <span class={s.author} data-agent={local.author.agent ? "" : undefined}>
             {local.author.name}
           </span>
@@ -211,8 +237,8 @@ export function Replies(props: RepliesProps) {
         <path
           d="M1 1 V18 Q1 22 5 22 H18"
           stroke="currentColor"
-          stroke-width="1.4"
-          stroke-dasharray="7 6"
+          stroke-width={stitch.width}
+          stroke-dasharray={stitch.dashes}
           stroke-linecap="round"
         />
       </svg>

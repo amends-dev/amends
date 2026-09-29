@@ -20,6 +20,10 @@ export const message = style({
       paddingBlock: "0.5rem",
       backgroundColor: vars.color.surface.active,
     },
+    // A message stacked under its author's one before sits 6px beneath it, inside the
+    // timeline's 24px gap (22px on phones); marked out, its band reaches up 8px more.
+    "&[data-continued]": { marginBlockStart: "-1.125rem" },
+    "&[data-continued][data-active]": { marginBlockStart: "-1.625rem" },
     "&[data-active]::before": {
       content: '""',
       position: "absolute",
@@ -30,6 +34,26 @@ export const message = style({
       backgroundColor: vars.color.action.indicator,
     },
   },
+  "@media": {
+    [media.mobile]: {
+      selectors: {
+        "&[data-continued]": { marginBlockStart: "-1rem" },
+        "&[data-continued][data-active]": { marginBlockStart: "-1.5rem" },
+      },
+    },
+  },
+});
+
+// A stacked message's time, in the avatar's place, while the pointer or focus is on it.
+export const gutterTime = style({
+  ...typeScale.meta,
+  lineHeight: typeScale.body.lineHeight,
+  justifySelf: "end",
+  color: vars.color.text.muted,
+  whiteSpace: "nowrap",
+  visibility: "hidden",
+  selectors: { [`${message}:hover &, ${message}:focus-within &`]: { visibility: "visible" } },
+  "@media": { [media.mobile]: { lineHeight: typeScale.bodyTouch.lineHeight } },
 });
 
 export const content = style({
@@ -46,6 +70,16 @@ export const byline = style({
   gap: "0.625rem",
   minWidth: 0,
   "@media": { [media.touch]: { gap: "0.5rem" } },
+});
+
+// A stacked message's byline, for assistive technology only.
+export const hiddenByline = style({
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
 });
 
 export const author = style({

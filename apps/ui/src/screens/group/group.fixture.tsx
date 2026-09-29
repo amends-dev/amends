@@ -60,8 +60,8 @@ function append(entries: readonly TimelineEntry[], id: string, text: string): Ti
     kind: "message",
     id,
     author: people.jordan,
-    time: "10:12 AM",
-    text: text,
+    at: new Date(),
+    text,
   };
   return [...entries, message];
 }

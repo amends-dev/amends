@@ -99,7 +99,8 @@ sidebar, show a group's stream of threads by their opening messages, and open a 
 in the side panel, all live over the change feed. A message with no replies offers "Reply in
 thread" while hovered or focused. The page composer starts a thread and the thread composer replies, keeping drafts per group
 and thread within the session, and both mention group members picked after `@`. A name typed
-without picking it addresses no one. Messages render as markdown, with mentions naming members
+without picking it addresses no one. A member's messages within five minutes of each other stack
+under one avatar and name, as in Slack, unless a thread's replies summary comes between. Messages render as markdown, with mentions naming members
 as they are called now, in the timeline, the inbox's one-line previews, and a turn log's reply and
 streaming draft. The composer formats the draft as it is written, from its toolbar, Slack's
 shortcuts, or markdown typed or pasted as text, and sends it as markdown; a mention is chosen after

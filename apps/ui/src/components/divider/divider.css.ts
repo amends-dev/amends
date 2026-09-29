@@ -12,8 +12,7 @@ export const divider = style({
   color: vars.color.border.stitch,
 });
 
-// The running stitch: 1.4px, 7px dashes with 6px gaps and round caps. Drawn as SVG because
-// dashed CSS borders cannot set dash length or caps.
+// The running stitch, as internal/stitch.ts draws it.
 export const stitch = style({ flex: 1, minWidth: "1rem", height: "2px", overflow: "visible" });
 
 export const label = style({
