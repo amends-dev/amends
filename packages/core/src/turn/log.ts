@@ -34,13 +34,15 @@ export const Entry = Schema.TaggedUnion({
   /** The thread's conversation before the agent's first turn, recorded by that turn. */
   History: { ...Of, items: Schema.Array(Transcript.Item) },
   /**
-   * Everything before this entry, replaced: a summary of the older history, if one was written, and
-   * the newest exchanges verbatim.
+   * Everything before this entry, replaced: a summary of the older history and the newest exchanges
+   * verbatim. When the summary also took in thread input the turn had not taken in yet, `through`
+   * is the thread position it reaches, and that input counts as taken in.
    */
   Checkpoint: {
     ...Of,
-    summary: Schema.NullOr(Schema.NonEmptyString),
+    summary: Schema.NonEmptyString,
     kept: Schema.Array(Transcript.Item),
+    through: Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0))),
   },
 });
 export type Entry = typeof Entry.Type;
@@ -126,9 +128,15 @@ export const read = (records: Iterable<Recorded>): Reading => {
       case "Requested":
         requested.push(entry.input);
         break;
+      case "Checkpoint":
+        // Input a summary took in counts as taken in, after any answer given before it.
+        if (entry.through === null) break;
+        through = Math.max(through ?? entry.through, entry.through);
+        if (answer !== undefined) replies.push(answer);
+        answer = undefined;
+        break;
       case "Environment":
       case "History":
-      case "Checkpoint":
         break;
       case "Harness": {
         const event = entry.event;
@@ -200,20 +208,13 @@ export const checkpointAuthor: Transcript.Author = {
 
 /** What a checkpoint puts in place of the history before it. */
 export const opening = (checkpoint: {
-  readonly summary: string | null;
+  readonly summary: string;
   readonly kept: ReadonlyArray<Transcript.Item>;
 }): ReadonlyArray<Transcript.Item> => [
   {
     _tag: "Input",
     author: checkpointAuthor,
-    content: [
-      {
-        _tag: "Text",
-        text:
-          checkpoint.summary ??
-          "Earlier messages in this thread were left out to fit the conversation; what follows is the most recent part.",
-      },
-    ],
+    content: [{ _tag: "Text", text: checkpoint.summary }],
   },
   ...checkpoint.kept,
 ];
@@ -340,35 +341,59 @@ export const fit = (
   return start === undefined ? [] : items.slice(start);
 };
 
-/** What a checkpoint would do: summarize the older part of a transcript and keep the rest. */
-export interface Compaction {
-  readonly summarize: ReadonlyArray<Transcript.Item>;
-  readonly kept: ReadonlyArray<Transcript.Item>;
+/** Thread input a turn has not taken in yet, each piece with the timeline position it came from. */
+export interface Waiting {
+  readonly sequence: number;
+  readonly item: Transcript.Input;
 }
 
 /**
- * Whether a transcript and the input waiting for it outgrow `budget` characters, and if so what a
- * checkpoint keeps: the newest exchanges within `keep` characters. Nothing is proposed when all
- * that would be summarized is an earlier summary, since summarizing it again frees nothing.
+ * What a checkpoint would do: summarize the older part of the transcript and the waiting input
+ * together, keep the newest history verbatim, and take in the waiting input the summary covers,
+ * through `through`, which the rest of that input follows as the turn's next batch.
+ */
+export interface Compaction {
+  readonly summarize: ReadonlyArray<Transcript.Item>;
+  readonly kept: ReadonlyArray<Transcript.Item>;
+  readonly through: number | null;
+}
+
+/**
+ * Whether a transcript and the input waiting for it, with `fixed` characters of input that is
+ * always sent, outgrow `budget` characters, and if so what a checkpoint keeps: the newest
+ * exchanges within `keep` characters, across history and waiting input alike, so the newest input
+ * always stays verbatim. Nothing is proposed when all that would be summarized is an earlier
+ * summary, since summarizing it again frees nothing.
  */
 export const compaction = (
   transcript: ReadonlyArray<Transcript.Item>,
-  waiting: number,
-  limits: { readonly budget: number; readonly keep: number },
+  waiting: ReadonlyArray<Waiting>,
+  limits: { readonly budget: number; readonly keep: number; readonly fixed?: number | undefined },
 ): Compaction | undefined => {
-  if (size(transcript) + waiting <= limits.budget) return undefined;
-  const kept = fit(transcript, limits.keep);
-  const summarize = transcript.slice(0, transcript.length - kept.length);
-  const onlySummary = summarize.every(
-    (item) => item._tag === "Input" && item.author.id === checkpointAuthor.id,
-  );
-  return onlySummary ? undefined : { summarize, kept };
+  const all = [...transcript, ...waiting.map((piece) => piece.item)];
+  if (size(all) + (limits.fixed ?? 0) <= limits.budget) return undefined;
+  const cut = all.length - fit(all, limits.keep).length;
+  const summarize = all.slice(0, cut);
+  if (summarize.every((item) => item._tag === "Input" && item.author.id === checkpointAuthor.id))
+    return undefined;
+  const taken = cut - transcript.length;
+  return {
+    summarize,
+    kept: taken >= 0 ? [] : transcript.slice(cut),
+    through: taken > 0 ? waiting[taken - 1]!.sequence : null,
+  };
 };
 
-/** An input's text cut to `limit` characters, saying how much was left out. */
-export const shorten = (text: string, limit: number): string =>
-  text.length <= limit
-    ? text
-    : `${text.slice(0, limit)}\n\n[${text.length - limit} more characters were left out.]`;
+/**
+ * A text in pieces of at most `size` characters, so a long message can be summarized in part
+ * rather than cut: when everything fits, every piece is given verbatim.
+ */
+export const pieces = (text: string, size: number): readonly [string, ...Array<string>] => {
+  const [first = "", ...rest] = Array.from(
+    { length: Math.max(1, Math.ceil(text.length / size)) },
+    (_, index) => text.slice(index * size, (index + 1) * size),
+  );
+  return [first, ...rest];
+};
 
 export * as TurnLog from "./log.ts";

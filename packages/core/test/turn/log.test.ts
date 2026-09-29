@@ -208,9 +208,21 @@ describe("TurnLog.context", () => {
     const context = TurnLog.context(
       recorded(
         tookFor(earlier, "old"),
-        { _tag: "Checkpoint", turnId: earlier, summary: "They asked about the deploy.", kept: [] },
+        {
+          _tag: "Checkpoint",
+          turnId: earlier,
+          summary: "They asked about the deploy.",
+          kept: [],
+          through: null,
+        },
         tookFor(earlier, "newer"),
-        { _tag: "Checkpoint", turnId, summary: "Deploy is Thursday.", kept: [input("latest")] },
+        {
+          _tag: "Checkpoint",
+          turnId,
+          summary: "Deploy is Thursday.",
+          kept: [input("latest")],
+          through: null,
+        },
         tookFor(turnId, "now"),
       ),
       turnId,
@@ -224,13 +236,20 @@ describe("TurnLog.context", () => {
       input("latest"),
       input("now"),
     ]);
-    // A checkpoint without a summary says that earlier messages were left out.
-    const trimmed = TurnLog.context(
-      recorded({ _tag: "Checkpoint", turnId: earlier, summary: null, kept: [input("latest")] }),
-      turnId,
+  });
+
+  it("counts input a checkpoint's summary took in as taken in, owing the answer before it", () => {
+    const reading = TurnLog.read(
+      recorded(
+        { _tag: "Submitted", turnId, batchId: HarnessEvent.BatchId.make("b1"), throughSequence: 3 },
+        tookFor(turnId, "b1"),
+        block(turnId, "r1", 0, text("First answer.")),
+        finish(turnId, "r1"),
+        { _tag: "Checkpoint", turnId, summary: "Earlier talk.", kept: [], through: 9 },
+      ),
     );
-    expect(trimmed.history[0]).toMatchObject({ author: TurnLog.checkpointAuthor });
-    expect(trimmed.history.slice(1)).toEqual([input("latest")]);
+    expect(reading.incorporatedThrough(1)).toBe(9);
+    expect(reading.replies.map((reply) => reply.text)).toEqual(["First answer."]);
   });
 
   it("finds the log empty before a participation's first turn", () => {
@@ -248,11 +267,26 @@ describe("TurnLog.compaction", () => {
   ];
   const items = [...exchange("aaaa", "bbbb"), ...exchange("cccc", "dddd")];
 
+  const waiting = (sequence: number, value: string): TurnLog.Waiting => ({
+    sequence,
+    item: input(value),
+  });
+
   it("summarizes the older part only once the transcript and waiting input outgrow the budget", () => {
-    expect(TurnLog.compaction(items, 0, { budget: 100, keep: 10 })).toBeUndefined();
-    expect(TurnLog.compaction(items, 90, { budget: 100, keep: 10 })).toEqual({
+    expect(TurnLog.compaction(items, [], { budget: 100, keep: 10 })).toBeUndefined();
+    expect(TurnLog.compaction(items, [], { budget: 100, keep: 10, fixed: 90 })).toEqual({
       summarize: items.slice(0, 2),
       kept: items.slice(2),
+      through: null,
+    });
+  });
+
+  it("summarizes waiting input too when it alone outgrows the budget, keeping the newest", () => {
+    const backlog = [waiting(5, "eeee"), waiting(6, "ffff"), waiting(7, "gggg")];
+    expect(TurnLog.compaction(items, backlog, { budget: 20, keep: 8 })).toEqual({
+      summarize: [...items, backlog[0]!.item],
+      kept: [],
+      through: 5,
     });
   });
 
@@ -263,7 +297,11 @@ describe("TurnLog.compaction", () => {
       content: [{ _tag: "Text", text: "Earlier: aaaa" }],
     };
     expect(
-      TurnLog.compaction([summary, ...exchange("cccc", "dddd")], 90, { budget: 20, keep: 10 }),
+      TurnLog.compaction([summary, ...exchange("cccc", "dddd")], [], {
+        budget: 20,
+        keep: 10,
+        fixed: 90,
+      }),
     ).toBeUndefined();
   });
 });
@@ -282,10 +320,9 @@ describe("TurnLog.fit", () => {
     expect(TurnLog.fit(items, 3)).toEqual(items.slice(2));
   });
 
-  it("shortens long text, saying how much was left out", () => {
-    expect(TurnLog.shorten("short", 10)).toBe("short");
-    expect(TurnLog.shorten("0123456789abc", 10)).toBe(
-      "0123456789\n\n[3 more characters were left out.]",
-    );
+  it("gives long text in pieces rather than cutting it", () => {
+    expect(TurnLog.pieces("short", 10)).toEqual(["short"]);
+    expect(TurnLog.pieces("", 10)).toEqual([""]);
+    expect(TurnLog.pieces("0123456789abc", 5)).toEqual(["01234", "56789", "abc"]);
   });
 });

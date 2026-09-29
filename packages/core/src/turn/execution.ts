@@ -11,6 +11,7 @@ import { EnvironmentCatalog } from "../environment/catalog.ts";
 import { Environment } from "../environment/environment.ts";
 import { EnvironmentStore } from "../environment/store.ts";
 import { ThreadActivityKind } from "../thread/activity/kind.ts";
+import type { ThreadActivity } from "../thread/activity/activity.ts";
 import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadMessageActivity } from "../thread/message/activity.ts";
 import { ThreadMessageStore } from "../thread/message/store.ts";
@@ -119,8 +120,8 @@ export type Preparation =
   | { readonly _tag: "Unrunnable"; readonly reason: string }
   | { readonly _tag: "Ready"; readonly plan: Plan };
 
-/** How many of the thread's latest activities a turn's first history, or its input, reads. */
-const historyLimit = 100;
+/** How many activities or log batches one read takes; reads go on until the range is done. */
+const pageSize = 100;
 /**
  * How many characters a turn's transcript and waiting input may hold, about 75,000 tokens, before a
  * checkpoint summarizes the older part.
@@ -128,8 +129,13 @@ const historyLimit = 100;
 const historyBudget = 300_000;
 /** How many characters of the newest exchanges a checkpoint keeps verbatim, a quarter of the budget. */
 const keptBudget = 75_000;
-/** The most characters one message gives the model; the rest is left out with a note. */
-const inputLimit = 40_000;
+/**
+ * How many characters of a message one piece holds: a longer message is given in pieces, so that
+ * the older ones can be summarized when not everything fits, rather than the message cut.
+ */
+const pieceSize = 40_000;
+/** How many characters of the thread's history one entry of the agent's log holds. */
+const historyEntrySize = 200_000;
 
 /**
  * How closing went: the turn closed, publishing the agent's reply if it had one; its input is not
@@ -165,14 +171,16 @@ export interface Interface {
     selection: Turn.Selection,
   ) => Effect.Effect<Turn.Record, PrepareError>;
   /**
-   * Record a checkpoint for a running turn: the summary of the older history, if one was written,
-   * and the newest exchanges verbatim. The turn's history, and the next turn's, starts from it.
+   * Record a checkpoint for a running turn: the summary of the older history, the newest exchanges
+   * verbatim, and how far through the thread the summary took in input the turn had not taken in.
+   * The turn's history, and the next turn's, starts from it.
    */
   readonly checkpoint: (
     turnId: Turn.Id,
     checkpoint: {
-      readonly summary: string | null;
+      readonly summary: string;
       readonly kept: ReadonlyArray<Transcript.Item>;
+      readonly through: number | null;
     },
   ) => Effect.Effect<Turn.Record, Error>;
   /**
@@ -320,20 +328,27 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       turnId: turn.id,
     });
 
-  /** Thread messages in a sequence range, oldest first, at most `limit` of the newest. */
+  /** Every thread message in a sequence range, oldest first, read a page at a time. */
   const messagesIn = Effect.fnUntraced(function* (
     turn: Turn.Record,
     range: { readonly after?: number; readonly through: number },
-    limit: number,
   ) {
     if (range.through < 1 || (range.after !== undefined && range.after >= range.through)) return [];
-    const page = yield* activities.readPage(turn.threadId, {
-      ...(range.after === undefined ? {} : { afterSequence: range.after }),
-      beforeSequence: range.through + 1,
-      from: "newest",
-      limit,
-    });
-    const published = page
+    const all: Array<ThreadActivity.Record> = [];
+    let after = range.after ?? 0;
+    for (;;) {
+      const page = yield* activities.readPage(turn.threadId, {
+        afterSequence: after,
+        beforeSequence: range.through + 1,
+        from: "oldest",
+        limit: pageSize,
+      });
+      all.push(...page);
+      const last = page.at(-1);
+      if (last === undefined || page.length < pageSize || last.sequence >= range.through) break;
+      after = last.sequence;
+    }
+    const published = all
       .filter(ThreadActivityKind.is(ThreadMessageActivity.Published))
       .toSorted((left, right) => left.sequence - right.sequence);
     const ids = yield* Effect.forEach(published, (activity) =>
@@ -426,29 +441,31 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     // A log that held entries when the turn was created has begun, whether or not they were read.
     return turn.logAfter === null ? context : { ...context, begun: true };
   });
+  /** A message as the model is told it: from its author, in pieces when it is long. */
+  const inputsOf = (
+    message: ThreadMessage.Record,
+    author: (author: ThreadMessage.Author) => Transcript.Author,
+  ) =>
+    TurnLog.pieces(message.text, pieceSize).map((text): Transcript.Input => ({
+      _tag: "Input",
+      author: author(message.author),
+      content: [{ _tag: "Text", text }],
+    }));
   /**
    * The thread's messages before a turn's input, as its agent's first history there: others' as
-   * input and the agent's own as its responses, each message cut to the input limit and the whole
-   * fitted to the history budget.
+   * input and the agent's own as its responses, every message, in pieces when long.
    */
   const threadHistory = Effect.fnUntraced(function* (turn: Turn.Record) {
-    const earlier = yield* messagesIn(turn, { through: turn.inputAfterSequence }, historyLimit);
+    const earlier = yield* messagesIn(turn, { through: turn.inputAfterSequence });
     const author = yield* authorsOf(earlier);
-    return TurnLog.fit(
-      earlier.map(({ message }): Transcript.Item =>
-        message.author._tag === "Member" && message.author.memberId === turn.memberId
-          ? {
-              _tag: "Response",
-              id: `message:${message.id}` as Transcript.ResponseId,
-              parts: [{ _tag: "Text", text: TurnLog.shorten(message.text, inputLimit) }],
-            }
-          : {
-              _tag: "Input",
-              author: author(message.author),
-              content: [{ _tag: "Text", text: TurnLog.shorten(message.text, inputLimit) }],
-            },
-      ),
-      historyBudget,
+    return earlier.flatMap(({ message }): ReadonlyArray<Transcript.Item> =>
+      message.author._tag === "Member" && message.author.memberId === turn.memberId
+        ? TurnLog.pieces(message.text, pieceSize).map((text, index) => ({
+            _tag: "Response",
+            id: `message:${message.id}${index === 0 ? "" : `/${index}`}` as Transcript.ResponseId,
+            parts: [{ _tag: "Text", text }],
+          }))
+        : inputsOf(message, author),
     );
   });
 
@@ -487,29 +504,24 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       return unrunnable(
         `The ${environment.value.harnessId} harness is not installed on this server.`,
       );
-    const waiting = (yield* messagesIn(
-      turn,
-      { after: turn.incorporatedThroughSequence, through: turn.acceptedThroughSequence },
-      historyLimit,
-    )).filter(
+    const messages = (yield* messagesIn(turn, {
+      after: turn.incorporatedThroughSequence,
+      through: turn.acceptedThroughSequence,
+    })).filter(
       ({ message }) =>
         !(message.author._tag === "Member" && message.author.memberId === turn.memberId),
     );
-    const author = yield* authorsOf(waiting);
+    const author = yield* authorsOf(messages);
+    const waiting = messages.flatMap(({ sequence, message }) =>
+      inputsOf(message, author).map((item): TurnLog.Waiting => ({ sequence, item })),
+    );
     const context = yield* contextOf(turn);
     // Until the first turn of a participation starts, its history is the thread's, which starting
     // records in the agent's log.
     const seeded = context.begun ? undefined : yield* threadHistory(turn);
     const history = seeded ?? context.history;
     const transcript = seeded === undefined ? context.transcript : context.own.transcript(seeded);
-    const [first, ...rest] = [
-      ...context.own.requested,
-      ...waiting.map(({ message }): Transcript.Input => ({
-        _tag: "Input",
-        author: author(message.author),
-        content: [{ _tag: "Text", text: TurnLog.shorten(message.text, inputLimit) }],
-      })),
-    ];
+    const [first, ...rest] = [...context.own.requested, ...waiting.map(({ item }) => item)];
     const plan: Plan = {
       turn,
       instructions: agent.value.instructions,
@@ -533,11 +545,13 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
               items: [first, ...rest],
             },
       log: context.entries,
-      compaction: TurnLog.compaction(
-        transcript,
-        TurnLog.size(first === undefined ? [] : [first, ...rest]),
-        { budget: historyBudget, keep: keptBudget },
-      ),
+      // One budget covers the history and the input waiting for it; what a request asks of the
+      // turn itself is always given.
+      compaction: TurnLog.compaction(transcript, waiting, {
+        budget: historyBudget,
+        keep: keptBudget,
+        fixed: TurnLog.size(context.own.requested),
+      }),
     };
     return { _tag: "Ready", plan } as const;
   });
@@ -551,13 +565,22 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       Effect.gen(function* () {
         yield* require(turn, ["queued"]);
         // The first turn of a participation records the thread's history before its input, so
-        // later turns read it from the agent's log rather than from the thread.
-        if (!(yield* contextOf(turn)).begun)
-          yield* logOf(turn).append({
-            _tag: "History",
-            turnId: turn.id,
-            items: yield* threadHistory(turn),
-          });
+        // later turns read it from the agent's log rather than from the thread, in entries of a
+        // bounded size however long the thread.
+        if (!(yield* contextOf(turn)).begun) {
+          const items = yield* threadHistory(turn);
+          const entries: Array<TurnLog.Entry> = [];
+          let held: Array<Transcript.Item> = [];
+          for (const item of items) {
+            if (held.length > 0 && TurnLog.size([...held, item]) > historyEntrySize) {
+              entries.push({ _tag: "History", turnId: turn.id, items: held });
+              held = [];
+            }
+            held.push(item);
+          }
+          entries.push({ _tag: "History", turnId: turn.id, items: held });
+          yield* logOf(turn).appendAll(entries);
+        }
         const startedAt = yield* DateTime.now;
         yield* journal.publish(
           TurnFacts.Started,
@@ -570,24 +593,45 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const checkpoint = Effect.fn("TurnExecution.checkpoint")(function* (
     turnId: Turn.Id,
-    recorded: { readonly summary: string | null; readonly kept: ReadonlyArray<Transcript.Item> },
+    recorded: {
+      readonly summary: string;
+      readonly kept: ReadonlyArray<Transcript.Item>;
+      readonly through: number | null;
+    },
   ) {
     const turn = yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running"]);
-        const summary =
-          recorded.summary === null || !/\S/u.test(recorded.summary) ? null : recorded.summary;
+        const summary = yield* Schema.decodeEffect(Schema.NonEmptyString)(recorded.summary);
+        const through = recorded.through;
+        if (
+          through !== null &&
+          (through <= turn.incorporatedThroughSequence || through > turn.acceptedThroughSequence)
+        )
+          return yield* new InvalidResponse({
+            message: "A checkpoint can take in only input the turn accepted and has not taken in",
+          });
         const entry = yield* logOf(turn).append({
           _tag: "Checkpoint",
           turnId: turn.id,
           summary,
           kept: recorded.kept,
+          through,
         });
         yield* journal.publish(
           TurnFacts.Compacted,
           Object.assign(where(turn), { historyFrom: entry.position }),
         );
-        return Turn.change(turn, { historyFrom: entry.position });
+        if (through === null) return Turn.change(turn, { historyFrom: entry.position });
+        // The input the summary took in counts as taken in.
+        yield* journal.publish(
+          TurnFacts.InputIncorporated,
+          Object.assign(where(turn), { incorporatedThroughSequence: through }),
+        );
+        return Turn.change(turn, {
+          historyFrom: entry.position,
+          incorporatedThroughSequence: through,
+        });
       }),
     );
     yield* logged(turn);

@@ -1087,17 +1087,27 @@ what the failed or stopped turn left, rather than rewriting that turn's history.
 
 ### Checkpoints bound what a turn reads
 
-The history a turn continues from must fit a budget for its model. When the history and the input
-waiting for it would not fit, the turn records a checkpoint before working: a summary of the
-older history and, verbatim, the newest exchanges that fit a share of the budget, starting at an
-input so that no response is separated from its tool results. A checkpoint replaces everything
-before it, so each turn reads the log only from the latest checkpoint, which the turn records and
-the next turn starts from. A later checkpoint summarizes the earlier summary with what followed it,
-and the thread's opening request is part of every summary. When summarizing fails, the checkpoint
-keeps only the newest exchanges and says that earlier ones were left out, so a turn never fails for
-want of a summary. The model the turn runs with writes the summary. Between checkpoints the history
-only grows at its end, so the start of each request stays the same and providers' prompt caches
-keep working. The logs keep everything a summary replaced.
+Nothing a turn has not seen is skipped or cut: its history before its first turn is every earlier
+message in the thread, and its input is every message since it last took input in, each read in
+full. A message longer than a piece is given in pieces, so that when not everything fits, its
+older pieces are summarized rather than the message cut.
+
+One budget for its model covers the history a turn continues from and the input waiting for it
+together. When they would not fit, the turn records a checkpoint before working: a summary of the
+older part and, verbatim, the newest exchanges that fit a share of the budget, starting at an
+input so that no response is separated from its tool results, and always holding the newest
+input. The older part can include input the turn had not taken in yet, such as a long backlog;
+the checkpoint then records how far through the thread its summary reaches, that input counts as
+taken in, and the rest follows as the turn's next batch. The model writes the summary in passes
+that each fit a request, oldest first, each reading the summary so far with the next part, so a
+thread of any length is summarized rather than truncated. A checkpoint replaces everything before
+it, so each turn reads the log only from the latest checkpoint, which the turn records and the next
+turn starts from. A later checkpoint summarizes the earlier summary with what followed it, and the
+thread's opening request is part of every summary. The model the turn runs with writes the
+summary; when it fails, the turn is interrupted and runs again like any other interruption, and
+fails once its retries are spent, rather than leaving anything out. Between checkpoints the
+history only grows at its end, so the start of each request stays the same and providers' prompt
+caches keep working. The thread and the logs keep everything a summary replaced.
 
 Still to come: measuring size with the tokens providers report rather than characters, each model's
 own context window, summarizing in the background after a turn rather than before the next,

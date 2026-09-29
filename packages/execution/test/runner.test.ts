@@ -92,7 +92,11 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     replies: [] as Array<string>,
     /** A checkpoint the next plan asks for, until one is recorded. */
     compaction: undefined as TurnLog.Compaction | undefined,
-    checkpoints: [] as Array<{ summary: string | null; kept: ReadonlyArray<Transcript.Item> }>,
+    checkpoints: [] as Array<{
+      summary: string;
+      kept: ReadonlyArray<Transcript.Item>;
+      through: number | null;
+    }>,
   };
   const change = (changes: Partial<Turn.Record>) => {
     state.turn = Turn.change(state.turn, changes);
@@ -182,9 +186,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       }),
     checkpoint: (_, recorded) =>
       Effect.sync(() => {
-        state.steps.push(
-          `checkpoint ${recorded.summary === null ? "without a summary" : "summarized"}`,
-        );
+        state.steps.push("checkpoint");
         state.checkpoints.push({ ...recorded });
         state.log.push({ entry: { _tag: "Checkpoint", turnId, ...recorded }, at });
         state.compaction = undefined;
@@ -576,7 +578,7 @@ describe("TurnRunner", () => {
       const { state, execution } = fakeExecution();
       const older = [input("How was the launch?")];
       const kept = [input("Anything else?")];
-      state.compaction = { summarize: older, kept };
+      state.compaction = { summarize: older, kept, through: null };
       const { implementation, prompts, summarized } = yield* scripted(
         [reply("Noon is high tide.")],
         Effect.succeed([
@@ -594,10 +596,12 @@ describe("TurnRunner", () => {
 
       expect(state.steps.slice(0, 3)).toEqual([
         "start",
-        "checkpoint summarized",
+        "checkpoint",
         "submitted turn-one/through:1",
       ]);
-      expect(state.checkpoints).toEqual([{ summary: "The launch went well.", kept }]);
+      expect(state.checkpoints).toEqual([
+        { summary: "The launch went well.", kept, through: null },
+      ]);
       expect(texts(summarized[0]).at(-1)).toContain("Alice: How was the launch?");
       // The turn continues from the summary and the newest exchanges, then its input.
       expect(texts(prompts[0])).toEqual([
@@ -610,11 +614,38 @@ describe("TurnRunner", () => {
     }),
   );
 
-  it.effect("keeps only the newest exchanges when the summary cannot be written", () =>
+  it.effect("summarizes a large history in passes, each reading the summary so far", () =>
     Effect.gen(function* () {
       const { state, execution } = fakeExecution();
-      state.compaction = { summarize: [input("How was the launch?")], kept: [] };
-      const { implementation } = yield* scripted(
+      const long = (label: string) => input(`${label} ${"detail ".repeat(20_000)}`);
+      state.compaction = { summarize: [long("First"), long("Second")], kept: [], through: null };
+      const { implementation, summarized } = yield* scripted(
+        [reply("Noon is high tide.")],
+        Effect.succeed([
+          { type: "text", text: "Running summary." },
+          {
+            type: "finish",
+            reason: "stop",
+            usage: { inputTokens: { total: 20 }, outputTokens: { total: 4 } },
+          },
+        ]),
+      );
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(summarized).toHaveLength(2);
+      expect(texts(summarized[0]).at(-1)).not.toContain("<prior-summary>");
+      expect(texts(summarized[1]).at(-1)).toContain("<prior-summary>\nRunning summary.");
+      expect(state.checkpoints).toEqual([{ summary: "Running summary.", kept: [], through: null }]);
+    }),
+  );
+
+  it.effect("interrupts a run whose summary cannot be written, and fails the turn in the end", () =>
+    Effect.gen(function* () {
+      const { state, execution } = fakeExecution();
+      state.compaction = { summarize: [input("How was the launch?")], kept: [], through: null };
+      const { implementation, prompts } = yield* scripted(
         [reply("Noon is high tide.")],
         Effect.fail(
           AiError.make({
@@ -624,12 +655,20 @@ describe("TurnRunner", () => {
           }),
         ),
       );
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(execution, implementation, { retries: 1 });
 
-      yield* runner.run(workspaceId, turnId);
+      yield* settle(yield* Effect.forkChild(runner.run(workspaceId, turnId)));
 
-      expect(state.steps[1]).toBe("checkpoint without a summary");
-      expect(state.turn.status).toBe("completed");
+      // Nothing is left out for want of a summary: the turn is retried, then fails, unanswered.
+      expect(state.checkpoints).toEqual([]);
+      expect(prompts).toEqual([]);
+      expect(state.steps.filter((step) => step.startsWith("interrupted"))).toEqual([
+        "interrupted retryable",
+        "interrupted retryable",
+      ]);
+      expect(state.steps.at(-1)).toMatch(
+        /^fail: The earlier conversation could not be summarized/u,
+      );
     }),
   );
 

@@ -704,7 +704,11 @@ export const turns = (harness: ConformanceHarness) => {
                 Effect.flatMap(TurnExecution.Service, (execution) =>
                   Effect.gen(function* () {
                     yield* execution.start(third!.id, selection);
-                    return yield* execution.checkpoint(third!.id, { summary, kept: [] });
+                    return yield* execution.checkpoint(third!.id, {
+                      summary,
+                      kept: [],
+                      through: null,
+                    });
                   }),
                 ),
               );
@@ -801,6 +805,90 @@ export const turns = (harness: ConformanceHarness) => {
           ),
         ),
       60_000,
+    );
+
+    it.effect(
+      "a turn reads every message it has not seen, however many, before and after it joined",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent, selection } = yield* workspaceWithAgent;
+              // A long conversation happens before the agent is asked anything.
+              const started = yield* start(workspace.id, "Planning the launch.", []);
+              const threadId = started.thread.id;
+              const talk = (count: number, label: string) =>
+                Effect.forEach(
+                  Array.from({ length: count }, (_, index) => `${label} ${index + 1}.`),
+                  (text) => reply(workspace.id, threadId, text),
+                  { discard: true },
+                );
+              yield* talk(110, "Earlier note");
+              const asked = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
+                  messages.publish({
+                    threadId,
+                    text: "Scout, catch up and summarize.",
+                    mentions: [agent.memberId],
+                  }),
+                ),
+              );
+              yield* accept(workspace.id);
+              const [first] = yield* turnsOf(workspace.id, threadId);
+              const prepare = (turnId: Turn.Id) =>
+                execute(
+                  workspace.id,
+                  Effect.flatMap(TurnExecution.Service, (execution) => execution.prepare(turnId)),
+                );
+              const joined = yield* prepare(first!.id);
+              expect(joined._tag).toBe("Ready");
+              if (joined._tag !== "Ready") return;
+              // Every earlier message is its history, not only the newest hundred activities.
+              expect(joined.plan.history).toHaveLength(111);
+              expect(joined.plan.history[0]).toMatchObject({
+                content: [{ text: "Planning the launch." }],
+              });
+              expect(joined.plan.pending?.items).toHaveLength(1);
+              // The turn answers, then more than a hundred messages arrive before it is asked again.
+              const took = batch("b1", "Scout, catch up and summarize.");
+              yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) =>
+                  Effect.gen(function* () {
+                    yield* execution.start(first!.id, selection);
+                    yield* execution.submitted(first!.id, {
+                      batchId: took.id,
+                      throughSequence: asked.activity.sequence,
+                    });
+                    yield* execution.report(
+                      first!.id,
+                      reported(
+                        { _tag: "InputIncorporated", batch: took },
+                        ...answered("s1/1", "Here is the summary."),
+                      ),
+                    );
+                    yield* execution.close(first!.id);
+                  }),
+                ),
+              );
+              yield* talk(120, "Later note");
+              yield* accept(workspace.id);
+              const [second] = yield* turnsOf(workspace.id, threadId);
+              const backlog = yield* prepare(second!.id);
+              expect(backlog._tag).toBe("Ready");
+              if (backlog._tag !== "Ready") return;
+              expect(backlog.plan.pending?.items).toHaveLength(120);
+              expect(backlog.plan.pending?.items[0]).toMatchObject({
+                content: [{ text: "Later note 1." }],
+              });
+              expect(backlog.plan.compaction).toBeUndefined();
+            }),
+          ),
+        ),
+      120_000,
     );
 
     it.effect("an agent that stops taking part in a thread has its turn there stopped", () =>

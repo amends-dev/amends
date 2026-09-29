@@ -285,14 +285,15 @@ A turn can complete without a reply. `fail` and `stopped` end a turn and publish
 assembles what a run needs from the stores: the agent's instructions, the model access and
 environment the turn started with or, before it starts, the agent's current ones, the connection's
 settings and key, the history and transcript read from the log, input asked of the turn and the
-thread's accepted input not yet taken in, and the turn's own entries. Before the first turn of a
-participation starts, its history is the thread's messages among the hundred timeline entries
-before its input (the agent's own as responses). When the transcript and waiting input would
-exceed 300,000 characters, `prepare` also proposes a checkpoint keeping the newest 75,000
-characters of exchanges, starting at an input, and the runner records it with a summary of the
-rest before working; `checkpoint` records it with `TurnFacts.Compacted`, from which the turn's and
-the next turn's history start. Each message given as input or history is cut to 40,000
-characters, saying how much was left out. It reports instead that the turn finished, is stopping, or can't run, as
+thread's accepted input not yet taken in, all of it however long the backlog, and the turn's own
+entries. Before the first turn of a participation starts, its history is every thread message
+before its input (the agent's own as responses), which starting records in the log in entries of a
+bounded size. A message longer than 40,000 characters is given in pieces. When the transcript and
+waiting input would exceed 300,000 characters, `prepare` also proposes a checkpoint keeping the
+newest 75,000 characters of exchanges across both, starting at an input, which the runner records
+with a summary of the rest before working; `checkpoint` records it with `TurnFacts.Compacted`,
+from which the turn's and the next turn's history start, and when the summary covered waiting
+input, the position it reaches, which counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
 when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal, and `report` and
 `interrupted` publish `TurnLogged` after their commits, so readers read the log again.

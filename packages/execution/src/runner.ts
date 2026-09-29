@@ -15,18 +15,7 @@ import type { GatewayErrors } from "@amends/gateway";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
 import { Compaction } from "./compaction.ts";
 import type { Harness } from "@amends/harness";
-import {
-  Cause,
-  Clock,
-  Context,
-  Crypto,
-  Duration,
-  Effect,
-  Layer,
-  Pull,
-  Result,
-  Stream,
-} from "effect";
+import { Clock, Context, Crypto, Duration, Effect, Layer, Pull, Result, Stream } from "effect";
 import type { LanguageModel, Model } from "effect/unstable/ai";
 
 /** The model access an in-process harness takes: Effect AI's, from a connection's implementation. */
@@ -111,6 +100,9 @@ const inWords = (duration: Duration.Duration) => {
     ? `${seconds / 60} minute${seconds === 60 ? "" : "s"}`
     : `${seconds} second${seconds === 1 ? "" : "s"}`;
 };
+
+/** How many characters of conversation one summary request reads. */
+const summaryPass = 200_000;
 
 /** How long a turn waits before running again after its `attempt`th failure: 2, 4, then 8 seconds. */
 const backoff = (attempt: number) => Duration.seconds(2 ** Math.min(attempt, 6));
@@ -299,31 +291,42 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
     });
 
     /**
-     * Record a checkpoint before working: a summary of the older history from the turn's model, or,
-     * when that fails, only the newest exchanges, so a turn never fails for want of a summary.
+     * Record a checkpoint before working: the turn's model summarizes the older history and any
+     * input it covers, in passes that each fit a request. A summary that fails or stays silent
+     * past the idle timeout stops the run as an interruption, which is retried like any other, so
+     * nothing is left out for want of a summary.
      */
     const checkpoint = Effect.fnUntraced(function* (
       plan: TurnExecution.Plan,
       model: ModelInference.Implementation,
       compaction: TurnLog.Compaction,
     ) {
-      const summary = yield* Compaction.summarize(compaction.summarize).pipe(
+      const summary = yield* Compaction.summarize(compaction.summarize, {
+        passSize: summaryPass,
+        timeout: idleTimeout,
+      }).pipe(
         Effect.provide(
           model.languageModel(
             { settings: plan.connection.settings, credential: plan.connection.credential },
             { model: plan.selection.model },
           ),
         ),
-        Effect.timeout(idleTimeout),
-        Effect.catchCause((cause) =>
-          Effect.logWarning("Summary not written; keeping the newest exchanges", {
-            workspaceId,
-            turnId,
-            cause: Cause.pretty(cause),
-          }).pipe(Effect.as(null)),
+        Effect.mapError(
+          (failure) =>
+            new HarnessErrors.ExecutionFailed({
+              reason: `The earlier conversation could not be summarized: ${failure.reason}`,
+              retryable: failure.retryable,
+            }),
         ),
       );
-      yield* step((execution) => execution.checkpoint(turnId, { summary, kept: compaction.kept }));
+      yield* step((execution) =>
+        execution.checkpoint(turnId, {
+          summary,
+          kept: compaction.kept,
+          through: compaction.through,
+        }),
+      );
+      return again;
     });
 
     let retried = 0;
@@ -352,12 +355,13 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         );
         continue;
       }
-      if (plan.compaction !== undefined) {
-        yield* checkpoint(plan, model, plan.compaction);
-        continue;
-      }
-
-      const ending = yield* session(plan, harness, model).pipe(
+      // A checkpoint the history needs comes first; either stops the same way when interrupted.
+      const compaction = plan.compaction;
+      const ending = yield* Effect.suspend(() =>
+        compaction === undefined
+          ? session(plan, harness, model)
+          : checkpoint(plan, model, compaction),
+      ).pipe(
         Effect.raceFirst(stopped),
         Effect.scoped,
         Effect.catchTag("Harness.ExecutionFailed", (failure) =>

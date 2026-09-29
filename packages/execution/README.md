@@ -27,8 +27,10 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    model access and environment it prepared with, and prepare again, since starting a
    participation's first turn records the thread's history in the agent's log.
 3. When `prepare` proposes a checkpoint, record it first: the turn's model summarizes the older
-   history (`Compaction.summarize`), and if it fails or stays silent past `idleTimeout`, the
-   checkpoint keeps only the newest exchanges. Then prepare again.
+   history and input (`Compaction.summarize`) in passes of up to 200,000 characters, each reading
+   the summary so far, and the run prepares again. A pass that fails or stays silent past
+   `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
+   turn; nothing is left out instead.
 4. Spawn the environment with a new session ID and the agent's instructions, and prepare the
    harness with the transcript `prepare` gave, read from the agent's log for the thread, so a run
    continuing an interrupted turn repeats no input and asks for a fresh response in place of one
