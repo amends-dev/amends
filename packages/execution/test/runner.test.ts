@@ -266,8 +266,12 @@ const settle = <A, E>(fiber: Fiber.Fiber<A, E>) =>
   });
 
 const unexpected = () => Effect.die(new Error("Only turn execution is expected"));
-const runnerOver = (execution: TurnExecution.Interface, model: ModelInference.Implementation) =>
-  TurnRunner.make({ harnesses: [AmendsHarness.make()], models: [model] }).pipe(
+const runnerOver = (
+  execution: TurnExecution.Interface,
+  model: ModelInference.Implementation,
+  options: Partial<TurnRunner.Options> = {},
+) =>
+  TurnRunner.make({ harnesses: [AmendsHarness.make()], models: [model], ...options }).pipe(
     Effect.provideService(
       Gateway.Service,
       Gateway.Service.of({
@@ -502,6 +506,36 @@ describe("TurnRunner", () => {
       // The second session continues the conversation rather than submitting the input again.
       expect(texts(prompts[1])).toEqual(texts(prompts[0]));
       expect(state.replies).toEqual(["Noon."]);
+    }),
+  );
+
+  it.effect("interrupts a run whose model goes silent, and fails once retries run out", () =>
+    Effect.gen(function* () {
+      const { state, execution } = fakeExecution();
+      const first = yield* Deferred.make<void>();
+      const second = yield* Deferred.make<void>();
+      const { implementation, prompts } = yield* scripted([hanging(first), hanging(second)]);
+      const runner = yield* runnerOver(execution, implementation, {
+        idleTimeout: "1 minute",
+        retries: 1,
+      });
+
+      const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
+      yield* Deferred.await(first);
+      // Silence shorter than the timeout is waiting, not a failure.
+      yield* TestClock.adjust("50 seconds");
+      expect(state.steps).not.toContain("interrupted retryable");
+      for (let step = 0; step < 30 && fiber.pollUnsafe() === undefined; step += 1)
+        yield* TestClock.adjust("10 seconds");
+      yield* Fiber.join(fiber);
+
+      expect(prompts).toHaveLength(2);
+      expect(state.steps.filter((step) => step.startsWith("interrupted"))).toEqual([
+        "interrupted retryable",
+        "interrupted retryable",
+      ]);
+      expect(state.steps.at(-1)).toBe("fail: The model sent nothing for 1 minute.");
+      expect(state.turn.status).toBe("failed");
     }),
   );
 

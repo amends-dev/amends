@@ -166,7 +166,7 @@ export const journalLog = Log.Id.make("journal");
  * a commit that publishes a fact it wakes on asks for it to run in that same commit. A domain that
  * adds background work registers its process here.
  */
-export const processes = [TurnAcceptance.process] as const;
+export const processes = [TurnAcceptance.process, TurnAcceptance.departures] as const;
 
 /** The domain journal and its log, over host storage; its commits ask for background work. */
 const journal = Journal.layer({

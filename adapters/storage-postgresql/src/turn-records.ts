@@ -137,6 +137,25 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       },
       Effect.mapError(storeFailure(TurnStore, "listActive")),
     ),
+    listActiveByMember: Effect.fn("TurnRecords.listActiveByMember")(
+      function* (memberInput) {
+        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+        return yield* guard(
+          db
+            .select()
+            .from(turns)
+            .where(
+              and(
+                inWorkspace,
+                eq(turns.memberId, memberId),
+                inArray(turns.status, [...activeStatuses]),
+              ),
+            )
+            .orderBy(asc(turns.createdAt), asc(turns.acceptedThroughSequence), asc(orderedId)),
+        ).pipe(Effect.flatMap(decode));
+      },
+      Effect.mapError(storeFailure(TurnStore, "listActiveByMember")),
+    ),
     listByThread: Effect.fn("TurnRecords.listByThread")(
       function* (threadInput, limit) {
         const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);

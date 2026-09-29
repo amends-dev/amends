@@ -50,17 +50,18 @@ export interface Interface {
   /**
    * Handle every agent's pending work, as that agent: accept each thread's notifications into its
    * active turn there, or into a new one, settling them in the same commit, and leave them waiting
-   * while an earlier turn there is still stopping. Stop the turns of agents that no longer take
-   * part in their thread. Reports whether more is outstanding.
+   * while an earlier turn there is still stopping. Reports whether more is outstanding.
    */
   readonly run: Effect.Effect<BackgroundProcess.Outcome, Error, Publication.Service>;
+  /** Stop the turns of agents that no longer take part in their thread. */
+  readonly stopDeparted: Effect.Effect<BackgroundProcess.Outcome, Error, Publication.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/turn/acceptance/Service",
 ) {}
 
-/** How many notifications each agent's inbox is read by, per run. */
+/** How many notifications an agent's inbox is read by at a time, and threads accepted per run. */
 const page = 100;
 
 /** @category constructors */
@@ -142,7 +143,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
         pending.push(Object.assign(record, { thread: record.thread }));
     }
     const [first] = pending;
-    if (first === undefined || recipient._tag !== "Agent") return;
+    if (first === undefined || recipient._tag !== "Agent") return false;
     // The agent must still be able to open the thread; otherwise its work waits, as a person's
     // notification waits in their inbox, until its access or participation is settled.
     const thread = yield* access.require(threadId).pipe(
@@ -152,16 +153,16 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
         "Authorization.Denied": () => Effect.succeedNone,
       }),
     );
-    if (Option.isNone(thread)) return;
+    if (Option.isNone(thread)) return false;
     const through = Math.max(...pending.map((record) => record.thread.sequence));
     const notificationIds = pending.map((record) => record.id);
     const [head, ...rest] = notificationIds;
-    if (head === undefined) return;
+    if (head === undefined) return false;
     const acceptedAt = yield* DateTime.now;
     const active = yield* turns.findActive(agent.memberId, threadId);
     if (Option.isSome(active)) {
       // A turn still stopping takes no more; the work waits for the next one.
-      if (active.value.status === "cancelling") return;
+      if (active.value.status === "cancelling") return false;
       yield* journal.publish(TurnFacts.InputAccepted, {
         workspaceId,
         groupId: active.value.groupId,
@@ -171,7 +172,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
         notificationIds: [head, ...rest],
         acceptedAt,
       });
-      return;
+      return true;
     }
     // The turn continues from this agent's previous turn in the same participation, fixed now so
     // its history never changes: input starts where that turn stopped taking it in, and what it
@@ -217,64 +218,97 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       TurnFacts.Created,
       Object.assign({}, created, { notificationIds: [head, ...rest] as const }),
     );
+    return true;
   });
 
   /**
    * Stop the active turns of agents whose participation ended: a queued one at once, since nothing
-   * runs it yet; a running one by asking, which execution confirms once it has stopped.
+   * runs it yet; a running one by asking, which execution confirms once it has stopped. Each
+   * agent's own active turns are checked, including agents no longer members, since leaving the
+   * workspace ends their participation too. Every run handles all of them.
    */
   const stopDeparted = Effect.gen(function* () {
-    const active = yield* turns.listActive(page);
-    for (const turn of active) {
-      if (turn.status === "cancelling") continue;
-      const found = yield* participations.get(turn.participationId);
-      const participating =
-        Option.isSome(found) && (yield* decodeParticipation(found.value)).status === "active";
-      if (participating) continue;
-      yield* Effect.gen(function* () {
-        const current = yield* turns.get(turn.id);
-        if (Option.isNone(current) || !Turn.active(current.value.status)) return;
-        if (current.value.status === "cancelling") return;
-        const at = yield* DateTime.now;
-        const where = {
-          workspaceId,
-          groupId: turn.groupId,
-          threadId: turn.threadId,
-          turnId: turn.id,
-        };
-        yield* journal.publish(
-          TurnFacts.CancelRequested,
-          Object.assign({}, where, { reason: "participation-ended" as const, requestedAt: at }),
-        );
-        if (current.value.status === "queued")
-          yield* journal.publish(TurnFacts.Cancelled, Object.assign({}, where, { finishedAt: at }));
-      }).pipe(journal.commit);
+    for (const agent of yield* agents.list) {
+      const active = (yield* turns.listActiveByMember(agent.memberId)).filter(
+        (turn) => turn.status !== "cancelling",
+      );
+      if (active.length === 0) continue;
+      const current = new Map(
+        (yield* participations.getMany(active.map((turn) => turn.participationId))).map(
+          (participation) => [participation.id as string, participation.status],
+        ),
+      );
+      for (const turn of active) {
+        if (current.get(turn.participationId) === "active") continue;
+        yield* Effect.gen(function* () {
+          const found = yield* turns.get(turn.id);
+          if (Option.isNone(found) || !Turn.active(found.value.status)) return;
+          if (found.value.status === "cancelling") return;
+          const at = yield* DateTime.now;
+          const where = {
+            workspaceId,
+            groupId: turn.groupId,
+            threadId: turn.threadId,
+            turnId: turn.id,
+          };
+          yield* journal.publish(
+            TurnFacts.CancelRequested,
+            Object.assign({}, where, { reason: "participation-ended" as const, requestedAt: at }),
+          );
+          if (found.value.status === "queued")
+            yield* journal.publish(
+              TurnFacts.Cancelled,
+              Object.assign({}, where, { finishedAt: at }),
+            );
+        }).pipe(journal.commit);
+      }
     }
-    return active.length === page;
+    return BackgroundProcess.idle;
   });
 
+  /**
+   * Accept every active agent's pending work, reading each agent's inbox a page at a time. Work
+   * that waits is passed over, not read again in the same run. After accepting work for `page`
+   * threads the run stops and reports more outstanding, which only accepting can cause, so a run
+   * that finds only waiting work ends idle rather than running again at once.
+   */
   const run = Effect.gen(function* () {
-    let more = yield* stopDeparted;
+    let accepted = 0;
     for (const agent of yield* activeAgents) {
       const recipient = Notification.ofMember(
         agent.memberId,
         Identity.MemberReference.cases.Agent.make({ id: agent.id }),
       );
-      const listed = yield* notifications.listPendingByRecipient(recipient, { limit: page });
-      if (listed.length === page) more = true;
-      const byThread = new Map<Turn.Record["threadId"], Array<Notification.Id>>();
-      for (const stored of listed) {
-        const threadId = stored.thread?.threadId;
-        if (threadId === undefined) continue;
-        byThread.set(threadId, [...(byThread.get(threadId) ?? []), stored.id]);
+      let after: NotificationStore.Cursor | undefined;
+      for (;;) {
+        const listed = yield* notifications.listPendingByRecipient(
+          recipient,
+          after === undefined ? { limit: page } : { after, limit: page },
+        );
+        const byThread = new Map<Turn.Record["threadId"], Array<Notification.Id>>();
+        for (const stored of listed) {
+          const threadId = stored.thread?.threadId;
+          if (threadId === undefined) continue;
+          byThread.set(threadId, [...(byThread.get(threadId) ?? []), stored.id]);
+        }
+        for (const [threadId, ids] of byThread) {
+          if (yield* acceptThread(agent, threadId, ids).pipe(asAgent(agent), journal.commit))
+            accepted += 1;
+          if (accepted >= page) return BackgroundProcess.continuing;
+        }
+        const last = listed.at(-1);
+        if (last === undefined || listed.length < page) break;
+        after = { recordedAt: last.recordedAt, id: last.id };
       }
-      for (const [threadId, ids] of byThread)
-        yield* acceptThread(agent, threadId, ids).pipe(asAgent(agent), journal.commit);
     }
-    return more ? BackgroundProcess.continuing : BackgroundProcess.idle;
+    return BackgroundProcess.idle;
   }).pipe(Effect.provideService(Crypto.Crypto, crypto));
 
-  return Service.of({ workspaceId, run });
+  return Service.of({
+    workspaceId,
+    run,
+    stopDeparted: stopDeparted.pipe(Effect.provideService(Crypto.Crypto, crypto)),
+  });
 });
 
 /** @category layers */
@@ -292,10 +326,17 @@ export const process = BackgroundProcess.make("turn.accept", {
     BackgroundProcess.on(TurnFacts.Completed),
     BackgroundProcess.on(TurnFacts.Failed),
     BackgroundProcess.on(TurnFacts.Cancelled),
+  ],
+  run: Effect.flatMap(Service, (acceptance) => acceptance.run),
+});
+
+/** Agents stop working where they no longer take part: after they unfollow a thread or leave a group. */
+export const departures = BackgroundProcess.make("turn.stop-departed", {
+  wakesOn: [
     BackgroundProcess.on(ThreadParticipationFacts.Ended),
     BackgroundProcess.on(GroupMembershipFacts.Removed),
   ],
-  run: Effect.flatMap(Service, (acceptance) => acceptance.run),
+  run: Effect.flatMap(Service, (acceptance) => acceptance.stopDeparted),
 });
 
 export * as TurnAcceptance from "./acceptance.ts";

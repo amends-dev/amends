@@ -37,6 +37,8 @@ const execute = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, TurnExecut
   Effect.flatMap(Gateway.Service, (gateway) => gateway.executeTurns(id, program));
 const accept = (id: Workspace.Id) =>
   Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackground(id, "turn.accept"));
+const stopDeparted = (id: Workspace.Id) =>
+  Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackground(id, "turn.stop-departed"));
 
 /** A workspace owned by alice with an agent, Scout, that has a ready model connection. */
 const workspaceWithAgent = Effect.gen(function* () {
@@ -675,6 +677,55 @@ export const turns = (harness: ConformanceHarness) => {
       60_000,
     );
 
+    it.effect(
+      "a full page of work that must wait ends the run idle, and is taken once the turn stops",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent, selection } = yield* workspaceWithAgent;
+              const started = yield* start(workspace.id, "Scout, draft the notes.", [
+                agent.memberId,
+              ]);
+              const threadId = started.thread.id;
+              yield* accept(workspace.id);
+              const [first] = yield* turnsOf(workspace.id, threadId);
+              yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) =>
+                  execution.start(first!.id, selection),
+                ),
+              );
+              yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(TurnApplication.Service, (turns) => turns.cancel(first!.id)),
+              );
+              // A hundred messages ask for the agent's work while its turn is still stopping.
+              yield* Effect.forEach(
+                Array.from({ length: 100 }, (_, index) => `Update ${index + 1}.`),
+                (text) => reply(workspace.id, threadId, text),
+                { discard: true },
+              );
+              // None can be accepted yet, so the run does not ask to run again at once.
+              expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
+              expect((yield* turnsOf(workspace.id, threadId)).map(({ status }) => status)).toEqual([
+                "cancelling",
+              ]);
+              yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) => execution.stopped(first!.id)),
+              );
+              expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
+              const [next] = yield* turnsOf(workspace.id, threadId);
+              expect(next).toMatchObject({ status: "queued", previousTurnId: first!.id });
+            }),
+          ),
+        ),
+      60_000,
+    );
+
     it.effect("an agent that stops taking part in a thread has its turn there stopped", () =>
       harness.withStorage((storage) =>
         runGateway(
@@ -703,7 +754,10 @@ export const turns = (harness: ConformanceHarness) => {
                 participation.unfollow({ threadId, participationId: mine!.id }),
               ),
             );
+            // Taking work in does not look for departures; the process that stops them does.
             yield* accept(workspace.id);
+            expect((yield* turnsOf(workspace.id, threadId))[0]?.status).toBe("queued");
+            expect(yield* stopDeparted(workspace.id)).toEqual({ _tag: "Idle" });
             const [stopped] = yield* turnsOf(workspace.id, threadId);
             expect(stopped).toMatchObject({
               status: "cancelled",

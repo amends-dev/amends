@@ -34,6 +34,10 @@ export interface Interface {
   ) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
   /** Every active turn in the workspace, oldest first, at most `limit`. */
   readonly listActive: (limit: number) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
+  /** The agent's active turns, one at most per thread, oldest first. */
+  readonly listActiveByMember: (
+    memberId: MemberId.Id,
+  ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
   /** A thread's turns, newest first, at most `limit`. */
   readonly listByThread: (
     threadId: ThreadId.Id,

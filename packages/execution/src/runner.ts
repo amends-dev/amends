@@ -31,6 +31,12 @@ export interface Options {
   readonly retries?: number | undefined;
   /** How long a turn waits for input its agent is still accepting: a minute by default. */
   readonly inputWait?: Duration.Input | undefined;
+  /**
+   * How long a turn waits on its model with nothing reported before the run counts as interrupted,
+   * which it recovers from as from any interruption worth retrying: five minutes by default. Time
+   * a tool call the harness started spends running does not count.
+   */
+  readonly idleTimeout?: Duration.Input | undefined;
 }
 
 /** A step through the gateway failed; the turn stays as its last commit left it. */
@@ -86,6 +92,14 @@ const draftInterval = 150;
 /** The most text one draft carries, so a signal stays small wherever it is relayed. */
 const draftPiece = 1500;
 
+/** A duration in words, as the turn's readers see it in an interruption. */
+const inWords = (duration: Duration.Duration) => {
+  const seconds = Math.round(Duration.toSeconds(duration));
+  return seconds % 60 === 0
+    ? `${seconds / 60} minute${seconds === 60 ? "" : "s"}`
+    : `${seconds} second${seconds === 1 ? "" : "s"}`;
+};
+
 /** How long a turn waits before running again after its `attempt`th failure: 2, 4, then 8 seconds. */
 const backoff = (attempt: number) => Duration.seconds(2 ** Math.min(attempt, 6));
 
@@ -98,6 +112,11 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
   const checkInterval = Duration.fromInputUnsafe(options.checkInterval ?? "1 second");
   const retries = options.retries ?? 3;
   const inputWait = Duration.fromInputUnsafe(options.inputWait ?? "1 minute");
+  const idleTimeout = Duration.fromInputUnsafe(options.idleTimeout ?? "5 minutes");
+  const silent = new HarnessErrors.ExecutionFailed({
+    reason: `The model sent nothing for ${inWords(idleTimeout)}.`,
+    retryable: true,
+  });
 
   const run = Effect.fn("TurnRunner.run")(function* (workspaceId: Workspace.Id, turnId: Turn.Id) {
     const step = <A, E>(use: (execution: TurnExecution.Interface) => Effect.Effect<A, E>) =>
@@ -179,23 +198,36 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
           }
         }
       });
-      /** Record what the harness reports until it is idle. */
+      /** Calls the harness started that have no result yet: while one runs, silence is its. */
+      const started = new Set<string>();
+      const next = pull.pipe(
+        Pull.catchDone(() =>
+          Effect.fail(
+            new HarnessErrors.ExecutionFailed({
+              reason: "The environment ended before the turn finished.",
+              retryable: true,
+            }),
+          ),
+        ),
+      );
+      /**
+       * Record what the harness reports until it is idle. While it waits on the model, a silence
+       * longer than the idle timeout interrupts the run, so a model that stops answering does not
+       * hold the turn.
+       */
       const untilIdle = Effect.gen(function* () {
         for (;;) {
-          const chunk = yield* pull.pipe(
-            Pull.catchDone(() =>
-              Effect.fail(
-                new HarnessErrors.ExecutionFailed({
-                  reason: "The environment ended before the turn finished.",
-                  retryable: true,
-                }),
-              ),
-            ),
-          );
+          const chunk = yield* started.size > 0
+            ? next
+            : next.pipe(
+                Effect.timeoutOrElse({ duration: idleTimeout, orElse: () => Effect.fail(silent) }),
+              );
           for (const item of chunk) {
             if (item._tag !== "Harness") continue;
             const event = item.event;
-            if (event._tag === "TextDelta") {
+            if (event._tag === "ToolCallStarted") started.add(event.callId);
+            else if (event._tag === "ToolCallCompleted") started.delete(event.result.callId);
+            else if (event._tag === "TextDelta") {
               const key = `${event.responseId}\u0000${event.part}`;
               const draft = drafts.get(key) ?? {
                 responseId: event.responseId,

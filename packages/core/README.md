@@ -253,9 +253,13 @@ outcome `Accepted` and the turn's ID. Work waits while a turn there is still sto
 the agent cannot open the thread. A new turn links to the agent's latest turn in the same
 participation, fixed when it is created, and its input starts where that turn stopped taking input
 in, so what a cancelled or failed turn accepted but never took in is the next turn's to handle.
-After joining or rejoining, a turn links to none. The process also stops the turns of agents whose
-participation ended: a queued one at once, a running one by asking. It wakes on activity that
-requests an agent's work, on turns ending, and on participation and group departures.
+After joining or rejoining, a turn links to none. It wakes on activity that requests an agent's
+work and on turns ending. Each run reads every active agent's pending work a page at a time,
+passing over work that must wait, and accepts work for at most a hundred threads before asking to
+run again; a run that finds only waiting work ends idle, so it never runs again at once without
+progress. A second process, `turn.stop-departed`, stops the turns of agents whose participation
+ended: a queued one at once, a running one by asking. It wakes on participation and group
+departures and checks each agent's own active turns, including agents no longer members.
 
 Each turn has its own log apart from the journal, `TurnLog`: the input execution `Submitted` with
 the position it covers, each `Harness` event (a response block by block, its finish, tool starts

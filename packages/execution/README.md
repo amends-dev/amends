@@ -45,9 +45,12 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
 
 While a session runs, the runner reads the turn every `checkInterval` and ends the session once
 the turn is no longer running, as when someone asks it to stop; preparing again then confirms the
-stop. A harness that stops is recorded as `interrupted` in the turn's log. When its failure is
-worth retrying, the runner waits 2, 4, then 8 seconds and runs a new session from the log, up to
-`retries` (three) times; otherwise it fails the turn with the harness's reason. `abandon` fails a
+stop. While the harness waits on its model, a silence longer than `idleTimeout` (five minutes)
+counts as the harness stopping, with a failure worth retrying, so a model that stops answering does
+not hold the turn; time a tool call the harness started spends running does not count. A harness
+that stops is recorded as `interrupted` in the turn's log. When its failure is worth retrying, the
+runner waits 2, 4, then 8 seconds and runs a new session from the log, up to `retries` (three)
+times; otherwise it fails the turn with the harness's reason. `abandon` fails a
 turn that runs could not finish.
 
 ## Turns on Effect Cluster
@@ -87,7 +90,7 @@ bun run test
 ```
 
 `test/runner.test.ts` runs the runner over turn execution in memory, amends's own harness, and a
-scripted model: drafts as a response streams, a queued turn from start to reply with what the
+scripted model: drafts as a response streams, a model gone silent interrupted until retries run out, a queued turn from start to reply with what the
 environment reported, input accepted while it works and while it waits, each answer owed, stopping, retrying from the log, failing without retry, a sandbox environment, and turns
 already finished or stopping. The [local host's](../../hosts/local/README.md#verify) `turns.test.ts`
 runs a turn end to end over PostgreSQL and Cluster against a local chat-completions server.

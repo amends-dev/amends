@@ -26,7 +26,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   40,000 characters is cut, so a long thread's start is forgotten. A stopped response keeps only
   the blocks it completed. Its text streams to readers as signals, best effort: a draft missed
   while reconnecting shows once its block completes. A stop request is noticed by polling, within a
-  second. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each
+  second. A model that sends nothing for five minutes while a turn waits on it interrupts the run,
+  which runs again as other interruptions do, so a turn whose model keeps hanging fails after about
+  twenty minutes; no deadline bounds a turn's whole length. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each
   turn's log; threads have no titles, so the log names a thread by its group. No environment
   transfer or turn timeline activity exists, and the active turns read covers at most a hundred
   active turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox outside
@@ -69,7 +71,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   turn to override, and no profile photos. Agents run only when their work arrives in a thread, and a removed agent's membership
   cannot be reactivated, as a person's cannot.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them on an Effect Cluster runner; `turn.accept` is the one registered. Turns run
+  local host runs them on an Effect Cluster runner; `turn.accept` and `turn.stop-departed` are the
+  ones registered. Turns run
   on the same runner, each as its own entity. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
   the takeover time, 35 seconds by default. Cluster's socket transport, which delivers wakes

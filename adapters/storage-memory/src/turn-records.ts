@@ -87,6 +87,14 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
         .toSorted(byCreated)
         .slice(0, limit);
     }),
+    listActiveByMember: Effect.fn("TurnRecords.listActiveByMember")(function* (memberInput) {
+      const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput).pipe(
+        Effect.mapError(storeFailure(TurnStore, "listActiveByMember")),
+      );
+      return (yield* all("listActiveByMember"))
+        .filter((record) => record.memberId === memberId && Turn.active(record.status))
+        .toSorted(byCreated);
+    }),
     listByThread: Effect.fn("TurnRecords.listByThread")(function* (threadInput, limit) {
       const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput).pipe(
         Effect.mapError(storeFailure(TurnStore, "listByThread")),
