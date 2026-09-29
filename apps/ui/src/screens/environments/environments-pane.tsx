@@ -4,13 +4,15 @@ import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { SearchField } from "../../components/input/index.ts";
+import { StatusMark, markTone } from "../../components/status-mark/index.ts";
+import { Tooltip } from "../../components/tooltip/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
   EnvironmentsAlert,
-  ReadinessStatus,
+  environmentStatus,
   providerName,
   runtimeLine,
   type EnvironmentSummary,
@@ -157,9 +159,10 @@ export interface EnvironmentListProps {
 }
 
 /**
- * The environment list: search, then each environment with its harness, sandbox, and readiness,
- * each row opening the environment's page. With room it shows the harness and sandbox as columns;
- * in a narrow pane or on phones, under the name. Place it in EnvironmentsPane.
+ * The environment list: search, then each environment with its harness and sandbox, and a mark on
+ * its tile when something keeps it from running, each row opening the environment's page. With
+ * room it shows the harness and sandbox as columns; in a narrow pane or on phones, under the name.
+ * Place it in EnvironmentsPane.
  */
 export function EnvironmentList(props: EnvironmentListProps) {
   const search = () => props.query.trim();
@@ -213,7 +216,6 @@ export function EnvironmentList(props: EnvironmentListProps) {
         <span class={s.headingEnvironment}>Environment</span>
         <span class={s.wideColumn}>Harness</span>
         <span class={s.wideColumn}>Sandbox</span>
-        <span>Setup</span>
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
@@ -243,34 +245,48 @@ export function EnvironmentList(props: EnvironmentListProps) {
               }
             >
               <Keyed each={props.environments} by={(environment) => environment.id}>
-                {(environment) => (
-                  <li>
-                    <a href={props.environmentHref(environment().id)} class={s.row}>
-                      <span class={s.tile} aria-hidden="true">
-                        <IconMarkEnvironments class={s.tileIcon} />
-                      </span>
-                      <span class={s.rowText}>
-                        <span class={s.rowName}>{environment().name}</span>
-                        <span class={s.rowRuntime}>{runtimeLine(environment())}</span>
-                      </span>
-                      <span class={s.rowColumn}>
-                        {environment().harness?.name ?? environment().harnessId}
-                      </span>
-                      <span class={s.rowColumn}>
-                        {environment().sandbox ? providerName(environment()) : "No sandbox"}
-                      </span>
-                      <span class={s.rowSetup}>
-                        <ReadinessStatus issues={environment().issues} />
-                      </span>
-                    </a>
-                  </li>
-                )}
+                {(environment) => {
+                  const status = () => environmentStatus(environment().issues);
+                  return (
+                    <li>
+                      <a href={props.environmentHref(environment().id)} class={s.row}>
+                        <span class={s.tile} aria-hidden="true">
+                          <IconMarkEnvironments class={s.tileIcon} />
+                          <Show when={status()}>
+                            {(status) => (
+                              <Tooltip
+                                title={status().label}
+                                detail={status().detail}
+                                tone={markTone(status().mark)}
+                                class={s.tileStatus}
+                              >
+                                <StatusMark mark={status().mark} size={9} cutout />
+                              </Tooltip>
+                            )}
+                          </Show>
+                        </span>
+                        <span class={s.rowText}>
+                          <span class={s.rowName}>
+                            {environment().name}
+                            <Show when={status()}>
+                              {(status) => <span class={s.visuallyHidden}>, {status().label}</span>}
+                            </Show>
+                          </span>
+                          <span class={s.rowRuntime}>{runtimeLine(environment())}</span>
+                        </span>
+                        <span class={s.rowColumn}>
+                          {environment().harness?.name ?? environment().harnessId}
+                        </span>
+                        <span class={s.rowColumn}>
+                          {environment().sandbox ? providerName(environment()) : "No sandbox"}
+                        </span>
+                      </a>
+                    </li>
+                  );
+                }}
               </Keyed>
             </ul>
           </Show>
-          <p class={s.footnote}>
-            Ready reflects the saved setup. Provider access has not been tested.
-          </p>
         </div>
       </Pane.Body>
     </Show>

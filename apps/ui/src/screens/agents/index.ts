@@ -27,11 +27,13 @@ export {
   type ModelFieldsProps,
 } from "./configuration-fields.tsx";
 export {
+  agentStatus,
   agentsMessage,
   agentsToast,
   issueMessage,
   problemMessage,
   setupLabel,
+  type AgentActivity,
   type AgentBlocker,
   type AgentEnvironmentOption,
   type AgentIssue,

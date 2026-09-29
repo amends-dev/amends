@@ -84,9 +84,9 @@ export const DaytonaAccountOptions = {
   play: async ({ canvasElement }) => {
     const dialog = await body(canvasElement).findByRole("dialog", { name: "Add environment" });
     await userEvent.click(within(dialog).getByRole("button", { name: /Daytona account/ }));
-    await expect(
-      await body(canvasElement).findByRole("option", { name: /Daytona · Backup/ }),
-    ).toHaveTextContent("Needs API key · Can finish setup later");
+    const backup = await body(canvasElement).findByRole("option", { name: /Daytona · Backup/ });
+    await expect(backup).toHaveTextContent("Needs API key");
+    await expect(within(backup).getByRole("img", { name: "Needs setup" })).toBeVisible();
     await expect(
       body(canvasElement).getByRole("button", { name: "Create Daytona connection" }),
     ).toBeVisible();
@@ -205,7 +205,8 @@ export const AddWithAccountDetour = {
     await expect(within(dialog).getByRole("button", { name: /Daytona account/ })).toHaveTextContent(
       "Daytona · Builds",
     );
-    await expect(within(dialog).getByText("Sandbox account · Configured")).toBeVisible();
+    // The key is saved, so the account shows no setup hint.
+    await expect(within(dialog).queryByText(/Needs API key/)).toBeNull();
     await userEvent.click(within(dialog).getByRole("button", { name: "Create environment" }));
     await waitFor(() => expect(page.queryByRole("dialog", { name: "Add environment" })).toBeNull());
     await expect(canvas.getByRole("heading", { name: "Release sandbox" })).toBeVisible();

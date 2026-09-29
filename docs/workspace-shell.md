@@ -29,11 +29,13 @@ The destinations' sidebars:
   lists the reader's direct groups by their other people, the most recently active first, then up
   to six teammates, people and agents, they have no one-to-one conversation with yet, by name,
   with New message. A teammate's row opens a first message to them; the conversation starts when
-  it is sent. The reader is not listed: a direct group needs at least one other member.
-- **Agents**: each agent by name with its avatar, marked while one of its turns is queued or
-  running, and with a caution mark when it needs setup; + is Add agent (`?add=agent`). See
-  [agents](agents.md).
-- **Environments**: each environment, marked when it needs setup; + is Add environment
+  it is sent. The reader is not listed: a direct group needs at least one other member. A
+  one-to-one row with an agent carries the agent's status patch, and the logo while it works;
+  people's rows gain theirs with presence, which is not implemented yet.
+- **Agents**: each agent by name with its avatar and status patch, and the logo while one of its
+  turns is queued or running; + is Add agent (`?add=agent`). See [agents](agents.md).
+- **Environments**: each environment, marked at the row's end when it needs setup or is
+  unavailable; + is Add environment
   (`?add=environment`). One section: every environment serves the same use, and the sandbox is a
   field of one creation flow. See [environments](environments.md).
 - **Connections**: Model providers, then Sandbox accounts, each with its own Browse (the list of

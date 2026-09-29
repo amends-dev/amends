@@ -1,8 +1,11 @@
 import { Show } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { IconAlertTriangle, IconCheck } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
+import {
+  StatusMark,
+  type Status,
+  type StatusMarkKind,
+} from "../../components/status-mark/index.ts";
 import type { EnvironmentIssue } from "../environments/wording.tsx";
 import * as s from "./agents.css.ts";
 
@@ -57,6 +60,9 @@ export interface AgentSummary {
     readonly places: readonly string[];
   };
 }
+
+/** Where an agent is at work: its most pressing turn state, and each thread, such as "#general". */
+export type AgentActivity = NonNullable<AgentSummary["activity"]>;
 
 /** An agent's current activity in a few words: "Working · 2" and "#general + 1 more". */
 export const activityWords = (activity: NonNullable<AgentSummary["activity"]>) => {
@@ -142,6 +148,39 @@ export const blocker = (issue: AgentIssue): issue is AgentBlocker =>
 /** "Ready", "Needs setup", or "Can’t run" when anything stops it outright. */
 export const setupLabel = (issues: readonly AgentIssue[]) =>
   issues.length === 0 ? "Ready" : issues.some(blocker) ? "Can’t run" : "Needs setup";
+
+/** What each issue means in a sentence without names, for a hover or a profile card. */
+const issueSummaries = {
+  "connection-not-ready": "Its model connection needs an API key.",
+  "connection-unavailable": "Its model connection is no longer available.",
+  "environment-unavailable": "Its environment is no longer available.",
+  "environment-not-ready": "Its environment needs setup.",
+  "no-model-inference": "Its connection doesn’t provide model access.",
+  "interface-unsupported": "Its harness doesn’t support the model provider.",
+  "reasoning-unsupported": "Its harness doesn’t support the saved reasoning level.",
+} as const satisfies Record<AgentIssue, string>;
+
+/**
+ * An agent's state as one status: what keeps it from running, else where it is at work, else
+ * ready. The mark stays the setup's while it works; the logo shows the work where there is room.
+ */
+export function agentStatus(issues: readonly AgentIssue[], activity?: AgentActivity): Status {
+  const first = issues.find(blocker) ?? issues[0];
+  if (first !== undefined)
+    return {
+      mark: blocker(first) ? "blocked" : "attention",
+      label: setupLabel(issues),
+      detail: issueSummaries[first],
+    };
+  if (activity === undefined) return { mark: "available", label: "Ready" };
+  const { where } = activityWords(activity);
+  const state = { queued: "Queued", working: "Working", stopping: "Stopping" }[activity.state];
+  return {
+    mark: "available",
+    label: where === "" ? state : `${state} in ${where}`,
+    activity: activity.state,
+  };
+}
 
 /** "Anthropic · Team · claude-sonnet-5": the connection and the model. */
 export const modelLine = (agent: AgentSummary) =>
@@ -304,17 +343,12 @@ export function AgentsAlert(props: AgentsAlertProps) {
   );
 }
 
-/** A state with a check, or a warning in the caution color. */
-export function StatusLabel(props: { readonly label: string; readonly ready: boolean }) {
+/** A state beside its field: its mark and its words, such as "Needs setup". */
+export function StatusLabel(props: { readonly label: string; readonly mark: StatusMarkKind }) {
   return (
-    <span class={s.readiness} data-ready={props.ready ? "" : undefined}>
-      <Dynamic component={props.ready ? IconCheck : IconAlertTriangle} class={s.readinessIcon} />
+    <span class={s.readiness} data-mark={props.mark}>
+      <StatusMark mark={props.mark} size={9} />
       {props.label}
     </span>
   );
-}
-
-/** An agent's setup: Ready, Needs setup, or Can’t run. */
-export function SetupStatus(props: { readonly issues: readonly AgentIssue[] }) {
-  return <StatusLabel label={setupLabel(props.issues)} ready={props.issues.length === 0} />;
 }

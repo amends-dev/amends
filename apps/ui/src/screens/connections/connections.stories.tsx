@@ -194,7 +194,8 @@ export const AddConnectionFlow = {
       ).toBe(true),
     );
     await expect(canvas.getByRole("heading", { name: "Anthropic · Research" })).toBeVisible();
-    await expect(within(canvas.getByRole("main")).getByText("Configured")).toBeVisible();
+    // Configured shows no status: the setup notice is gone.
+    await expect(within(canvas.getByRole("main")).queryByText(/to finish setting up/)).toBeNull();
     await expect(
       sidebar(canvasElement).getByRole("link", { name: /Anthropic · Research/ }),
     ).toHaveAttribute("aria-current", "page");

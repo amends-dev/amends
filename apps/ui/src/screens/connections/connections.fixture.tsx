@@ -11,6 +11,7 @@ import {
   type NavigationSection,
 } from "../workspace-navigation/index.ts";
 import {
+  connectionStatus,
   ChooseProvider,
   ConfigureConnection,
   ConfirmRemoveConnection,
@@ -312,7 +313,7 @@ export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
             href: `#connection-${connection.id}`,
             current: selected() === connection.id,
             icon: IconMarkConnections,
-            attention: connection.setup === "configured" ? undefined : "Needs setup",
+            status: connectionStatus(connection),
           })),
     loading: props.status === "loading",
     empty: "None yet",

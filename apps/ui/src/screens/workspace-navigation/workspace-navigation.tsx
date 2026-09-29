@@ -15,6 +15,7 @@ import {
   IconMessage,
 } from "@amends/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
+import type { Status } from "../../components/status-mark/index.ts";
 import { Menu } from "../../components/menu/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import type { IconComponent } from "../../internal/props.ts";
@@ -63,6 +64,8 @@ export interface NavigationDirect extends NavigationLink {
   readonly name: string;
   readonly initials?: string;
   readonly tone?: AvatarToneName;
+  /** The other member's state, as a patch on their avatar, such as an agent that needs setup. */
+  readonly status?: Status;
   /** Notifications addressed to the reader from the conversation. */
   readonly pending?: number;
   /** Activity the reader has not seen. */
@@ -332,6 +335,8 @@ export function HomeSidebar(props: HomeSidebarProps) {
                   initials: direct().initials,
                   tone: direct().tone,
                 }}
+                status={direct().status}
+                activity={direct().status?.activity}
                 count={direct().pending || undefined}
                 countLabel={`${direct().pending ?? 0} for you`}
                 unread={direct().unread}
@@ -360,8 +365,11 @@ export interface NavigationEntry extends NavigationLink {
   };
   /** Agents at work: the most pressing turn state. */
   readonly activity?: "queued" | "working" | "stopping";
-  /** What needs attention, such as "Needs setup", shown as a caution mark. */
-  readonly attention?: string;
+  /**
+   * Its state: a patch on the avatar, or a mark at the row's end for an item without one, such
+   * as an environment that needs setup. Word it with the destination's status helpers.
+   */
+  readonly status?: Status;
 }
 
 /** A titled list of a destination's items, with Browse and Create beside the title. */
@@ -439,7 +447,7 @@ export function DestinationSidebar(props: DestinationSidebarProps) {
                   icon={entry().icon}
                   person={entry().person}
                   activity={entry().activity}
-                  attention={entry().attention}
+                  status={entry().status}
                 >
                   {entry().name}
                 </Sidebar.Item>

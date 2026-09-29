@@ -25,6 +25,7 @@ export {
   type VariableRowView,
 } from "./sandbox-fields.tsx";
 export {
+  environmentStatus,
   environmentsMessage,
   environmentsToast,
   issueMessage,

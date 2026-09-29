@@ -23,7 +23,7 @@ export const AllAgents = {
   play: async ({ canvasElement }) => {
     const nav = sidebar(canvasElement);
     await expect(nav.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
-    await expect(nav.getByRole("img", { name: "Needs setup" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Review helper, Needs setup" })).toBeVisible();
     await userEvent.click(nav.getByRole("link", { name: /Atlas/ }));
     await expect(mainPane(canvasElement).getByRole("heading", { name: "Atlas" })).toBeVisible();
     await expect(nav.getByRole("link", { name: /Atlas/ })).toHaveAttribute("aria-current", "page");

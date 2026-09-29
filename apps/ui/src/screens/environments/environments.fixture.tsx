@@ -8,6 +8,7 @@ import { ConfigureConnection, ConnectionKey } from "../connections/index.ts";
 import { navigation } from "../sample.ts";
 import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
+  environmentStatus,
   AddEnvironment,
   ConfirmRemoveEnvironment,
   EnvironmentPane,
@@ -360,7 +361,7 @@ export function EnvironmentsWorkspace(props: EnvironmentsWorkspaceProps) {
                     href: `#environment-${environment.id}`,
                     current: selected() === environment.id,
                     icon: IconMarkEnvironments,
-                    attention: environment.issues.length > 0 ? "Needs setup" : undefined,
+                    status: environmentStatus(environment.issues),
                   })),
               loading: props.status === "loading",
               empty: "No environments yet",

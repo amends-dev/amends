@@ -1,5 +1,6 @@
 import { globalStyle, keyframes, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
+import { knockoutVar } from "../../components/status-mark/status-mark.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
@@ -31,9 +32,10 @@ export const phoneOnly = style({
   "@media": { [media.mobile]: { display: "inline" } },
 });
 
-// Columns: a 32px tile, the environment, and setup; with room, harness and sandbox between.
-const compactColumns = "2rem minmax(0, 1fr) 8.75rem";
-const wideColumns = "2rem minmax(0, 1fr) 9.5rem 11.625rem 10rem";
+// Columns: a 32px tile, marked when something keeps it from running, then the environment; with
+// room, its harness and sandbox after it.
+const compactColumns = "2rem minmax(0, 1fr)";
+const wideColumns = "2rem minmax(0, 1fr) 9.5rem 11.625rem";
 
 export const search = style({
   width: "20rem",
@@ -101,7 +103,10 @@ export const row = style({
   color: vars.color.text.secondary,
   textDecoration: "none",
   selectors: {
-    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:hover": {
+      backgroundColor: vars.color.surface.hover,
+      vars: { [knockoutVar]: vars.color.surface.hover },
+    },
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
   },
   "@container": { [wide]: { gridTemplateColumns: wideColumns, alignItems: "center" } },
@@ -111,6 +116,7 @@ export const row = style({
 });
 
 export const tile = style({
+  position: "relative",
   display: "grid",
   placeItems: "center",
   width: "2rem",
@@ -122,6 +128,13 @@ export const tile = style({
 });
 
 export const tileIcon = style({ width: "1.125rem", height: "1.125rem" });
+
+// A status patch over the tile's bottom-right corner, as on an avatar.
+export const tileStatus = style({
+  position: "absolute",
+  insetInlineEnd: "-0.25rem",
+  insetBlockEnd: "-0.25rem",
+});
 
 export const rowText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
 
@@ -144,35 +157,6 @@ export const rowColumn = style([
   wideColumn,
   { ...typeScale.control, ...ellipsis, color: vars.color.text.secondary },
 ]);
-
-export const rowSetup = style({
-  display: "flex",
-  alignItems: "center",
-  minHeight: "1.5rem",
-  "@media": { [media.mobile]: { gridColumn: 2, marginBlockStart: "0.5rem" } },
-});
-
-// Readiness: Ready with a check, or an issue in the caution color, and how many more follow.
-export const readiness = style({
-  ...typeScale.hint,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "0.4375rem",
-  minHeight: "1.5rem",
-  color: vars.color.text.caution,
-  fontWeight: fontWeight.medium,
-  selectors: { "&[data-ready]": { color: vars.color.text.secondary } },
-});
-
-export const readinessIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
-
-export const more = style({ color: vars.color.text.secondary, fontWeight: fontWeight.regular });
-
-export const footnote = style({
-  ...typeScale.control,
-  margin: 0,
-  color: vars.color.text.secondary,
-});
 
 export const empty = style({
   display: "flex",
@@ -235,13 +219,6 @@ export const alertMessages = style({
 });
 
 export const alertAction = style({ flex: "none", marginBlockStart: "-0.375rem" });
-
-export const status = style({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-start",
-  gap: "0.75rem",
-});
 
 export const note = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary });
 

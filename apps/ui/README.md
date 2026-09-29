@@ -28,10 +28,12 @@ patterns, and screens as they are introduced.
 ## Foundations
 
 - **Color** ([tokens](src/foundations/color/tokens.ts)): semantic roles for surfaces, text,
-  borders, actions, the modal scrim, and eight avatar tones. Every value is the exact light or
-  dark color the mocks use. The dark error colors are proposals; the mocks have no dark error
-  state yet. Caution (text, a notice surface, and its outline) comes from the Connections frames,
-  in light mode only; its dark values follow the sand avatar tone.
+  borders, actions, the modal scrim, eight avatar tones, and three status tones. Every value is
+  the exact light or dark color the mocks use. The status tones (`status.success`, `caution`, and
+  `danger`, each a `mark`, `text`, `surface`, and `border`) come from the Lunacy "Status v01"
+  board: a mark is the only saturated color, and text, surface, and border make a notice in the
+  tone. Offline has no tone; its mark is a ring in `text.muted`. `border.danger` stays the strong
+  outline of invalid input, whose dark value is a proposal.
 - **Typography** ([tokens](src/foundations/typography/tokens.ts)): Figtree at 400, 500, and 600
   (the mocks draw Inter; Figtree was chosen for the app),
   in eight roles from `meta` (11/16) to `display` (28/36). The mocks' half-pixel sizes round to
@@ -59,8 +61,14 @@ reduced motion; done, failed, and stopped are still, a failure outlined in the c
 `StateArt` (the board's turn-7 empty and error states, drawn from the mark's parts: `sew-in`,
 `reach`, `fill`, `caret`, `rest`, `came-apart`, `lost-thread`, `nothing-here`, and `held-back`,
 each still for readers who prefer reduced motion), `IconButton` (32px or 24px compact), `Avatar` and `AvatarStack`
-(square initials in eight tones), `Count` (badge or plain), and `Tabs` (links or buttons, one
-scrolling row, underlined current tab). Below 64rem icon buttons, tabs, and navigation rows grow
+(square initials in eight tones; `status` adds a patch over the corner and joins its label to the
+accessible name), `StatusMark` (a state as a shape, so it reads without color: a filled square for
+online or ready, a hollow one for offline, a triangle for needs setup, and a square with a bar for
+can't run or unavailable, cut into the surface behind it where `--amends-status-knockout` says;
+`Status` carries its words and why), `Tooltip` (a state's words on hovering a mark with no room for
+them; a span trigger, so it sits inside links, and never the only way to reach the words),
+`Count` (badge or plain), and `Tabs` (links or buttons, one scrolling row, underlined current
+tab). Below 64rem icon buttons, tabs, and navigation rows grow
 to 44px touch targets.
 
 ## The shell
@@ -113,8 +121,9 @@ the shell inert, and close on Escape or a click on the scrim, returning focus. F
 link in the drawer closes it; a rail link switches the sidebar and leaves the drawer open. On phones the pane runs edge to edge and respects safe-area insets. The
 desktop app's title bar is not modelled yet. A rail destination is a section, so the current one
 is marked `aria-current="true"`; the sidebar marks the page within it. Sidebar items take a count
-or, for unseen activity, a dot; `activity` marks agents at work there and `attention` a caution
-mark, such as "Needs setup", named for assistive technology. `Sidebar.Empty` is a quiet line in a
+or, for unseen activity, a dot; `activity` shows the logo moving where agents work, and `status`
+puts a status patch on the item's avatar, or at the end of an item without one, with its words on
+hover and after the label in the link's accessible name. `Sidebar.Empty` is a quiet line in a
 section with no items, and a destination's first section starts where Home's first items do.
 
 Every destination uses the patterns the same way: the rail picks it, its sidebar lists its items
@@ -192,7 +201,9 @@ Inside a Root, a message whose author has an `id` makes the name and avatar trig
 hidden from assistive technology, which meets the name), RichText's mentions are triggers except in
 `inline` previews, and a mention in the composer's draft opens its card on hover. Outside one,
 triggers are their contents. **Components / Conversation**'s Profile cards story walks them from
-the keyboard.
+the keyboard. A profile's `status` puts its patch on the card's avatar and its words after the
+kind, such as "Agent · Working in #design" with the logo moving or "Agent · Needs setup" in the
+caution tone, with why under them.
 
 ## Form components and the modal
 
@@ -215,7 +226,7 @@ the list, arrows and Enter pick, and Backspace removes the last chip. It is a dr
 layouts and an always-shown list on phones.
 
 `Badge` labels a property such as visibility, `EmptyState` centers a note where content will
-appear, over the `StateArt` its `art` names, or the working mark while something is awaited, `Notice` boxes a caution for a whole form, such as a key that was not saved, and `Toast` shows a short confirmation with an optional action at the bottom of the
+appear, over the `StateArt` its `art` names, or the working mark while something is awaited, `Notice` boxes a caution or danger for a whole form or page, such as a key that was not saved or an agent that cannot run, with its mark and at most one action that fixes it, and `Toast` shows a short confirmation with an optional action at the bottom of the
 viewport, dismissing itself after five seconds.
 
 `CodeInput` takes a six-digit code in one native field drawn as six cells, so typing, pasting,
@@ -311,9 +322,9 @@ the wording, with Refresh when the values are out of date; `settingsToast` words
 completed change. `ConnectionsPane` is Connections from the Lunacy "Connections" frames, with All
 and Needs setup tabs, Add connection, quiet placeholder rows while loading, and a failed state
 with Retry. `ConnectionList` searches the connections and lists each with its provider, endpoint,
-setup (Configured, or Needs setup and Unavailable in the caution color), and how it
-authenticates, with an empty state that offers adding one; each row opens the connection's page.
-`ConnectionPane` is that page in one column: its setup, the name and the provider's settings as
+and how it authenticates, marking the tile of one that needs setup or is unavailable, with an
+empty state that offers adding one; each row opens the connection's page. `ConnectionPane` is that
+page in one column: a notice with what setup still needs when it cannot be used, the name and the provider's settings as
 separate saves, its key, which is only ever replaced or removed, its details, and removal. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
 setup, adding, and replacing), `ConfirmRemoveConnection`, and `ConfirmRemoveKey` are its modals;
 they take client's codes (`ConnectionsError`) and own the wording, and `connectionsToast` words the
@@ -321,29 +332,33 @@ toasts. `ConfigureConnection` and `ConnectionKey` take `returnTo` for creating a
 the way to another form, such as a sandbox account while adding an environment. **Screens / Connections** walks adding a connection and its key, a host without key
 storage, an unavailable provider, a read-only member, search, and a stale rename.
 `EnvironmentsPane` and `EnvironmentList` are Environments from the Lunacy "Environments" frames:
-All and Needs setup, and each environment's harness, sandbox, and readiness, as columns when the
-pane has room and under the name when narrow or on phones; each row opens its page. `EnvironmentPane`
-is that page: an Overview in one column, with readiness and its recovery, the name, the fixed
+All and Needs setup, and each environment's harness and sandbox, as columns when the pane has room
+and under the name when narrow or on phones, with a mark on the tile of one that cannot run; each
+row opens its page. `EnvironmentPane` is that page: an Overview in one column, with a notice and
+its recovery when it cannot run, the name, the fixed
 runtime, its details, and removal, and a Sandbox tab, whose `SandboxFields` edit the account, template, variables, commands, and retention,
 or whose `SandboxSummary` shows them to members. `AddEnvironment` takes the basics, then the
 sandbox settings, and `ConfirmRemoveEnvironment` confirms removal; the wording, including the
 mocks' exact error and readiness copy, lives beside them. **Screens / Environments** walks adding
 with the account detour, editing variables and commands, a refused account, readiness, and
 members' view. `AgentsPane` and `AgentList` are Agents from the Lunacy "Agents" frames: All and
-Needs setup, and each agent's model (connection and model) and environment, as columns with room
-and under the name otherwise, with lilac one-letter avatars; each row opens its page. `AgentPane`
-is that page, from the v02 navigation frames: an Overview in one column, with readiness and its
-recovery, the name as its own save, the saved configuration with Edit configuration, details (its
+Needs setup, and each agent's model (connection and model), environment, and activity, as columns
+with room and under the name otherwise, with lilac one-letter avatars carrying their status
+patches; each row opens its page. `AgentPane` is that page, from the v02 navigation frames: its
+title avatar carries the patch, and an Overview in one column, with a notice and its recovery when
+it cannot run, the name as its own save, the saved configuration with Edit configuration, details (its
 role, its turns in progress, each opening its log beside the page, and who created it), and
 Membership with Remove agent, and a Configuration tab whose `InstructionsField` and `ModelFields` (the model connection,
-the suggested or entered model, and each environment with whether it works, needs setup, or
-can't run the model) save together, or whose `ConfigurationSummary` shows them to members.
+the suggested or entered model, and each environment marked with whether it works, needs setup,
+or can't run the model) save together, or whose `ConfigurationSummary` shows them to members.
 `AddAgent` takes the name and initial role beside the same fields, and `ConfirmRemoveAgent`
 confirms removal. `ChooseProvider`, `ConfigureConnection`, and `ConnectionKey` take `returnTo`
 with `returnKind="agent"` for the model-connection detour. **Screens / Agents** walks the detour,
 roles, suggestions, fitting environments, a refused connection, stale reasoning, and members'
-view. Agents also shows each agent's current activity apart from its setup: Idle, or its most
-pressing turn state with the threads it works in. `ThreadTurns` puts the agents' turns under a
+view. Agents also shows each agent's current activity apart from its setup: nothing while idle,
+or its most pressing turn state with the threads it works in. `agentStatus`,
+`environmentStatus`, and `connectionStatus` word each one's state as a `Status` for the sidebar,
+profile cards, and rows the apps compose; an environment or connection that is ready has none. `ThreadTurns` puts the agents' turns under a
 thread's messages as compact rows, from the Lunacy "Turn activity" frames: the agent, its state,
 View log, and Stop or Retry for a reader who may direct it, with a failure's reason and Agent
 settings, the failed or stopped turn a retry follows, and a refused command worded from its

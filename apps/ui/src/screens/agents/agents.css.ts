@@ -1,5 +1,6 @@
 import { globalStyle, keyframes, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
+import { knockoutVar } from "../../components/status-mark/status-mark.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
@@ -31,10 +32,10 @@ export const phoneOnly = style({
   "@media": { [media.mobile]: { display: "inline" } },
 });
 
-// Columns: a 32px avatar, the agent, and setup; with room, the model and environment between.
-const compactColumns = "2rem minmax(0, 1fr) 8.75rem";
-const wideColumns =
-  "2rem minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.95fr) 7.5rem minmax(0, 1fr)";
+// Columns: a 32px avatar with its status patch, then the agent; with room, its model,
+// environment, and activity after it.
+const compactColumns = "2rem minmax(0, 1fr)";
+const wideColumns = "2rem minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.95fr) minmax(0, 1fr)";
 
 export const search = style({
   width: "20rem",
@@ -102,7 +103,10 @@ export const row = style({
   color: vars.color.text.secondary,
   textDecoration: "none",
   selectors: {
-    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:hover": {
+      backgroundColor: vars.color.surface.hover,
+      vars: { [knockoutVar]: vars.color.surface.hover },
+    },
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
   },
   "@container": { [wide]: { gridTemplateColumns: wideColumns, alignItems: "center" } },
@@ -140,19 +144,11 @@ export const rowColumn = style([
   { ...typeScale.control, ...ellipsis, color: vars.color.text.secondary },
 ]);
 
-// Current activity, apart from setup: the turn state, then where it works.
+// Where it is at work: the turn state, then the thread; blank while it is idle.
 export const rowActivity = style([
   wideColumn,
   { ...typeScale.control, minWidth: 0, color: vars.color.text.secondary },
 ]);
-
-export const idle = style({
-  ...typeScale.hint,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "0.3125rem",
-  color: vars.color.text.muted,
-});
 
 export const activityWhere = style({
   ...typeScale.hint,
@@ -162,31 +158,19 @@ export const activityWhere = style({
   color: vars.color.text.secondary,
 });
 
-export const rowSetup = style({
-  display: "flex",
-  alignItems: "center",
-  minHeight: "1.5rem",
-  "@media": { [media.mobile]: { gridColumn: 2, marginBlockStart: "0.5rem" } },
-});
-
-// Readiness: a check, or a warning in the caution color.
+// A state beside its field: its mark, then its words in the mark's tone.
 export const readiness = style({
   ...typeScale.hint,
   display: "inline-flex",
   alignItems: "center",
   gap: "0.4375rem",
   minHeight: "1.5rem",
-  color: vars.color.text.caution,
-  fontWeight: fontWeight.medium,
-  selectors: { "&[data-ready]": { color: vars.color.text.secondary } },
-});
-
-export const readinessIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
-
-export const footnote = style({
-  ...typeScale.control,
-  margin: 0,
   color: vars.color.text.secondary,
+  fontWeight: fontWeight.medium,
+  selectors: {
+    "&[data-mark=attention]": { color: vars.color.status.caution.text },
+    "&[data-mark=blocked]": { color: vars.color.status.danger.text },
+  },
 });
 
 export const empty = style({
@@ -243,13 +227,6 @@ export const alert = style({
 globalStyle(`${alert} > p`, { flex: 1 });
 
 export const alertAction = style({ flex: "none", marginBlockStart: "-0.375rem" });
-
-export const status = style({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-start",
-  gap: "0.75rem",
-});
 
 export const note = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary });
 
@@ -376,8 +353,8 @@ export const repair = style({
   alignItems: "flex-start",
   gap: "0.75rem",
   padding: "1rem",
-  backgroundColor: vars.color.surface.caution,
-  border: `1px solid ${vars.color.border.caution}`,
+  backgroundColor: vars.color.status.caution.surface,
+  border: `1px solid ${vars.color.status.caution.border}`,
 });
 
 export const repairTitle = style({

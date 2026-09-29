@@ -239,18 +239,26 @@ it("resolves active workspace scope from the directory and updates it during nav
 it("revalidates and replaces cached directory data when credentials change", async () => {
   const fixture = memoryStore(session("alice"));
   const pending = deferred<Response>();
-  const fetch = vi
+  const directoryReads = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(
       response({ memberships: [membership("one", "Alice workspace")], invitations: [] }),
     )
     .mockImplementationOnce(() => pending.promise);
+  // The layout also reads the workspace's agents, whose status its sidebar and cards show.
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
+    new URL(new Request(input, init).url).pathname.endsWith("/agents")
+      ? new Promise<Response>(() => {})
+      : directoryReads(input, init),
+  );
   mount("/workspaces/one", fixture.store, fetch);
   await screen.findByText("Alice workspace");
   fixture.change(session("bob"));
   expect(screen.queryByText("Alice workspace")).not.toBeInTheDocument();
-  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-  expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("authorization")).toBe("Bearer bob");
+  await waitFor(() => expect(directoryReads).toHaveBeenCalledTimes(2));
+  expect(new Headers(directoryReads.mock.calls[1]?.[1]?.headers).get("authorization")).toBe(
+    "Bearer bob",
+  );
   pending.resolve(response(directory));
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
 });
@@ -445,10 +453,11 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   expect(screen.getByRole("navigation", { name: "Workspace" })).toHaveTextContent("Other studio");
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
-  // The directory; the first workspace's environments with their harnesses and providers, and
-  // its connections, whose providers the Connections page adds; then the second workspace's
-  // settings and ownership. The feed stays separate.
-  expect(fetch).toHaveBeenCalledTimes(7);
+  // The directory; each workspace's agents, whose status the layout shows; the first
+  // workspace's environments with their harnesses and providers, and its connections, whose
+  // providers the Connections page adds; then the second workspace's settings and ownership.
+  // The feed stays separate.
+  expect(fetch).toHaveBeenCalledTimes(9);
   expect(feed.streams.map((stream) => new URL(stream.request.url).pathname)).toEqual([
     "/workspaces/one/changes",
     "/workspaces/two/changes",
@@ -1414,11 +1423,10 @@ async function addAnthropicWithKey() {
   );
   // The new connection opens as its page.
   await screen.findByRole("heading", { name: "Anthropic" });
+  // Configured, it shows no status: no setup notice.
   expect(
-    within(screen.getByRole("main")).getByText(
-      "Setup is complete. Provider access has not been tested.",
-    ),
-  ).toBeInTheDocument();
+    within(screen.getByRole("main")).queryByText(/to finish setting up/),
+  ).not.toBeInTheDocument();
 }
 
 it("adds a connection, then its key, from the Connections page, opening its page", async () => {
@@ -1528,9 +1536,10 @@ it("lists agents in the sidebar, opens each as its page with tabs, and adds from
   );
   const sidebar = within(await screen.findByRole("navigation", { name: "Workspace" }));
   await sidebar.findByRole("link", { name: /Atlas/ });
-  // The list shows, so the section is current; an agent that needs setup is marked.
+  // The list shows, so the section is current; each agent's row carries its status.
   expect(sidebar.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
-  expect(sidebar.getByRole("img", { name: "Needs setup" })).toBeInTheDocument();
+  expect(sidebar.getByRole("link", { name: "Atlas, Ready" })).toBeInTheDocument();
+  expect(sidebar.getByRole("link", { name: /, Needs setup$/ })).toBeInTheDocument();
   expect(sidebar.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
   fireEvent.click(sidebar.getByRole("link", { name: /Atlas/ }));
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/agents/a1"));

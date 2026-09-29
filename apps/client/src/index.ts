@@ -86,6 +86,7 @@ export type { CommandRow, Retention, SandboxDraft, VariableRow } from "./environ
 export type { EnvironmentProblem, SandboxIssue } from "./api/environments.ts";
 export {
   useAgentList,
+  useAgentStates,
   useAgents,
   type AgentAction,
   type AgentBlocker,
@@ -94,6 +95,7 @@ export {
   type AgentIssue,
   type AgentListEntry,
   type AgentRole,
+  type AgentState,
   type AgentsDone,
   type AgentsError,
   type AgentsFailure,

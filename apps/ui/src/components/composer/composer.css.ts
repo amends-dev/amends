@@ -189,7 +189,7 @@ export const error = style({
   gap: "0.375rem",
   margin: 0,
   paddingBlockStart: "0.375rem",
-  color: vars.color.text.danger,
+  color: vars.color.status.danger.text,
 });
 
 export const errorIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });

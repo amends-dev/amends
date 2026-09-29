@@ -137,6 +137,16 @@ export const titleAvatar = style({
   "@media": { [media.touch]: { display: "none" } },
 });
 
+// Words for assistive technology only, such as the title avatar's status.
+export const hidden = style({
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+});
+
 export const titleText = style({
   display: "flex",
   flexDirection: "column",

@@ -1,5 +1,6 @@
 import { globalStyle, keyframes, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
+import { knockoutVar } from "../../components/status-mark/status-mark.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
 
@@ -28,8 +29,8 @@ export const phoneOnly = style({
   "@media": { [media.mobile]: { display: "inline" } },
 });
 
-// Columns: a 32px provider tile, the connection, and its setup in a 140px column. Phones move the
-// setup under the connection.
+// Columns: a 32px provider tile, marked when the connection cannot be used, the connection, and
+// how it authenticates in a 140px column. Phones leave out the authentication.
 const columns = {
   gridTemplateColumns: "2rem minmax(0, 1fr) 8.75rem",
   columnGap: "0.75rem",
@@ -95,7 +96,10 @@ export const row = style({
   color: vars.color.text.secondary,
   textDecoration: "none",
   selectors: {
-    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:hover": {
+      backgroundColor: vars.color.surface.hover,
+      vars: { [knockoutVar]: vars.color.surface.hover },
+    },
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
   },
   "@media": {
@@ -105,6 +109,7 @@ export const row = style({
 });
 
 export const tile = style({
+  position: "relative",
   display: "grid",
   placeItems: "center",
   width: "2rem",
@@ -112,6 +117,13 @@ export const tile = style({
   marginBlockStart: "0.25rem",
   backgroundColor: vars.color.surface.subtle,
   color: vars.color.text.primary,
+});
+
+// A status patch over the tile's bottom-right corner, as on an avatar.
+export const tileStatus = style({
+  position: "absolute",
+  insetInlineEnd: "-0.25rem",
+  insetBlockEnd: "-0.25rem",
 });
 
 export const tileIcon = style({ width: "1.125rem", height: "1.125rem" });
@@ -139,38 +151,13 @@ export const rowEndpoint = style({
   color: vars.color.text.muted,
 });
 
-export const rowSetup = style({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-start",
-  gap: "0.625rem",
-  "@media": { [media.mobile]: { gridColumn: 2, marginBlockStart: "0.5rem" } },
-});
-
 export const rowMethod = style({
   ...typeScale.hint,
-  color: vars.color.text.secondary,
-  "@media": { [media.mobile]: { display: "none" } },
-});
-
-// Setup: a 14px icon and a medium label, in the caution color unless configured.
-export const setup = style({
-  ...typeScale.hint,
-  display: "inline-flex",
+  display: "flex",
   alignItems: "center",
-  gap: "0.4375rem",
   minHeight: "1.5rem",
   color: vars.color.text.secondary,
-  fontWeight: fontWeight.medium,
-  selectors: { "&:not([data-setup=configured])": { color: vars.color.text.caution } },
-});
-
-export const setupIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
-
-export const footnote = style({
-  ...typeScale.control,
-  margin: 0,
-  color: vars.color.text.secondary,
+  "@media": { [media.mobile]: { display: "none" } },
 });
 
 export const empty = style({
@@ -237,13 +224,6 @@ export const alert = style({
 globalStyle(`${alert} > p`, { flex: 1 });
 
 export const alertAction = style({ flex: "none", marginBlockStart: "-0.375rem" });
-
-export const status = style({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-start",
-  gap: "0.75rem",
-});
 
 export const note = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary });
 

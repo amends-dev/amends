@@ -1,8 +1,7 @@
 import { Show } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { IconAlertTriangle, IconCheck, IconCircleFrame } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
+import type { Status } from "../../components/status-mark/index.ts";
 import * as s from "./connections.css.ts";
 
 /**
@@ -92,12 +91,6 @@ export const capabilityLabels = {
   sandboxes: "Sandboxes",
 } as const satisfies Record<ConnectionCapability, string>;
 
-export const setupLabels = {
-  configured: "Configured",
-  "needs-setup": "Needs setup",
-  unavailable: "Unavailable",
-} as const satisfies Record<ConnectionSetup, string>;
-
 export const methodLabels = {
   "api-key": "API key",
   none: "No authentication",
@@ -122,18 +115,46 @@ export const providerLine = (connection: ConnectionSummary) =>
         .join(" · ")
     : "Provider unavailable";
 
-/** What setup still needs, or that it is complete. */
+/** What setup still needs, for a connection that is not configured. */
 export function setupNote(connection: ConnectionSummary) {
   if (connection.setup === "unavailable")
     return "This provider is unavailable on this server. An administrator needs to restore it.";
-  if (connection.setup === "configured")
-    return "Setup is complete. Provider access has not been tested.";
   const needs = [...connection.missing.settings, ...(connection.missing.key ? ["an API key"] : [])];
   const listed =
     needs.length > 1 ? `${needs.slice(0, -1).join(", ")} and ${needs.at(-1)}` : needs[0];
   return listed
     ? `Add ${listed} to finish setting up this connection.`
     : "Finish setting up this connection.";
+}
+
+/**
+ * A connection's state when it cannot be used: Unavailable when this server lacks its provider,
+ * else Needs setup with what is missing. Undefined while it is configured, which shows nothing.
+ */
+export function connectionStatus(connection: {
+  readonly setup: ConnectionSetup;
+  readonly missing: { readonly settings: readonly string[]; readonly key: boolean };
+}): Status | undefined {
+  if (connection.setup === "configured") return undefined;
+  if (connection.setup === "unavailable")
+    return {
+      mark: "blocked",
+      label: "Unavailable",
+      detail: "Its provider isn’t installed on this server.",
+    };
+  const { settings, key } = connection.missing;
+  return {
+    mark: "attention",
+    label: "Needs setup",
+    detail:
+      settings.length > 0
+        ? key
+          ? "It needs its required settings and an API key."
+          : "It needs its required settings."
+        : key
+          ? "It needs an API key."
+          : "Its setup isn’t finished.",
+  };
 }
 
 const changed: { readonly [Action in ConnectionsAction]: string } = {
@@ -233,21 +254,5 @@ export function ConnectionsAlert(props: ConnectionsAlertProps) {
         </Button>
       </Show>
     </div>
-  );
-}
-
-const setupIcons = {
-  configured: IconCheck,
-  "needs-setup": IconCircleFrame,
-  unavailable: IconAlertTriangle,
-} as const;
-
-/** "Configured" with a check, or "Needs setup" and "Unavailable" in the caution color. */
-export function SetupStatus(props: { readonly setup: ConnectionSetup }) {
-  return (
-    <span class={s.setup} data-setup={props.setup}>
-      <Dynamic component={setupIcons[props.setup]} class={s.setupIcon} />
-      {setupLabels[props.setup]}
-    </span>
   );
 }

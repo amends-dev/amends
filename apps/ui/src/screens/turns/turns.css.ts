@@ -63,7 +63,7 @@ export const detail = style({
 export const problem = style({
   ...typeScale.control,
   gridColumn: "2 / -1",
-  color: vars.color.text.caution,
+  color: vars.color.status.caution.text,
 });
 
 // "Previous turn failed · View log": a quiet line above the attempt that followed it.
@@ -167,8 +167,8 @@ export const card = style({
 export const cautionCard = style([
   card,
   {
-    borderColor: vars.color.border.caution,
-    backgroundColor: vars.color.surface.caution,
+    borderColor: vars.color.status.caution.border,
+    backgroundColor: vars.color.status.caution.surface,
   },
 ]);
 

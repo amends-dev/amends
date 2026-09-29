@@ -1,7 +1,8 @@
 import * as Primitive from "@kobalte/core/select";
 import { Show, createMemo, createSignal } from "solid-js";
-import { IconAlertTriangle, IconCheck, IconChevronDown } from "@amends/icons";
+import { IconCheck, IconChevronDown } from "@amends/icons";
 import { useField } from "../field/index.ts";
+import { StatusMark, type StatusMarkKind } from "../status-mark/index.ts";
 import { classes } from "../../internal/props.ts";
 import { overlayMount } from "../../internal/overlay.ts";
 import * as s from "./select.css.ts";
@@ -13,8 +14,8 @@ export interface SelectOption {
   readonly description?: string;
   /** A third line, such as why it needs setup. */
   readonly detail?: string;
-  /** A state at its end: `ready` with a check, or `caution` with a warning. */
-  readonly status?: { readonly label: string; readonly tone: "ready" | "caution" };
+  /** A state at its end as a status mark, such as whether it works; the detail says why not. */
+  readonly status?: { readonly mark: StatusMarkKind; readonly label: string };
   /** Shown, with its reasons, but not chosen. */
   readonly disabled?: boolean;
 }
@@ -55,7 +56,7 @@ export function Select(props: SelectProps) {
           option.description === next[index]?.description &&
           option.detail === next[index]?.detail &&
           option.status?.label === next[index]?.status?.label &&
-          option.status?.tone === next[index]?.status?.tone &&
+          option.status?.mark === next[index]?.status?.mark &&
           option.disabled === next[index]?.disabled,
       ),
   });
@@ -103,15 +104,7 @@ export function Select(props: SelectProps) {
           </Show>
           <Show when={item.item.rawValue.status}>
             {(status) => (
-              <span class={s.status} data-tone={status().tone}>
-                <Show
-                  when={status().tone === "ready"}
-                  fallback={<IconAlertTriangle class={s.statusIcon} />}
-                >
-                  <IconCheck class={s.statusIcon} />
-                </Show>
-                {status().label}
-              </span>
+              <StatusMark mark={status().mark} label={status().label} size={9} class={s.status} />
             )}
           </Show>
           <Primitive.ItemIndicator>

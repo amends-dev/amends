@@ -5,7 +5,8 @@ import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { SearchField } from "../../components/input/index.ts";
-import { Logo } from "../../components/logo/index.ts";
+import { markTone, type Status } from "../../components/status-mark/index.ts";
+import { Tooltip } from "../../components/tooltip/index.ts";
 import { TurnActivity } from "../../components/turn-status/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
@@ -13,7 +14,7 @@ import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
   AgentsAlert,
-  SetupStatus,
+  agentStatus,
   modelLine,
   activityWords,
   type AgentSummary,
@@ -167,24 +168,42 @@ export interface AgentListProps {
 export function AgentAvatar(props: {
   readonly name: string;
   readonly size: 32 | 40;
+  /** A patch on its corner, with its words on hover; the text beside it names the state. */
+  readonly status?: Status;
   readonly class?: string;
 }) {
-  return (
+  const avatar = (className?: string) => (
     <Avatar
       name={props.name}
       initials={props.name.trim().charAt(0).toUpperCase()}
       tone="lilac"
       size={props.size}
-      class={props.class}
+      status={props.status}
+      class={className}
       decorative
     />
+  );
+  return (
+    <Show when={props.status} fallback={avatar(props.class)}>
+      {(status) => (
+        <Tooltip
+          title={status().label}
+          detail={status().detail}
+          tone={markTone(status().mark)}
+          class={props.class}
+        >
+          {avatar()}
+        </Tooltip>
+      )}
+    </Show>
   );
 }
 
 /**
- * The agent list: search, then each agent with its model, environment, and setup, each row
- * opening the agent's page. With room it shows the model and environment as columns; in a narrow
- * pane or on phones, under the name. Place it in AgentsPane.
+ * The agent list: search, then each agent with its state as a patch on its avatar, its model,
+ * environment, and where it is at work, each row opening the agent's page. With room it shows
+ * the model, environment, and activity as columns; in a narrow pane or on phones, under the name.
+ * An idle agent's activity is blank. Place it in AgentsPane.
  */
 export function AgentList(props: AgentListProps) {
   const search = () => props.query.trim();
@@ -261,8 +280,7 @@ export function AgentList(props: AgentListProps) {
         <span class={s.headingAgent}>Agent</span>
         <span class={s.wideColumn}>Model</span>
         <span class={s.wideColumn}>Environment</span>
-        <span>Setup</span>
-        <span class={s.wideColumn}>Current activity</span>
+        <span class={s.wideColumn}>Activity</span>
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
@@ -288,62 +306,61 @@ export function AgentList(props: AgentListProps) {
               aria-label={props.tab === "needs-setup" ? "Agents that need setup" : "Agents"}
             >
               <Keyed each={props.agents} by={(agent) => agent.id}>
-                {(agent) => (
-                  <li>
-                    <a href={props.agentHref(agent().id)} class={s.row}>
-                      <AgentAvatar name={agent().name} size={32} class={s.avatar} />
-                      <span class={s.rowText}>
-                        <span class={s.rowName}>{agent().name}</span>
-                        <span class={s.rowLine}>{modelLine(agent())}</span>
-                        <span class={s.rowLine}>
+                {(agent) => {
+                  const status = () => agentStatus(agent().issues, agent().activity);
+                  return (
+                    <li>
+                      <a href={props.agentHref(agent().id)} class={s.row}>
+                        <AgentAvatar
+                          name={agent().name}
+                          size={32}
+                          status={status()}
+                          class={s.avatar}
+                        />
+                        <span class={s.rowText}>
+                          <span class={s.rowName}>
+                            {agent().name}
+                            <span class={s.visuallyHidden}>, {status().label}</span>
+                          </span>
+                          <span class={s.rowLine}>{modelLine(agent())}</span>
+                          <span class={s.rowLine}>
+                            {agent().environment.name ?? "Unavailable environment"}
+                          </span>
+                          <Show when={agent().activity}>
+                            {(activity) => (
+                              <span class={s.rowLine}>
+                                <TurnActivity state={activity().state}>
+                                  {`${activityWords(activity()).status} · ${activityWords(activity()).where}`}
+                                </TurnActivity>
+                              </span>
+                            )}
+                          </Show>
+                        </span>
+                        <span class={s.rowColumn}>{modelLine(agent())}</span>
+                        <span class={s.rowColumn}>
                           {agent().environment.name ?? "Unavailable environment"}
                         </span>
-                        <Show when={agent().activity}>
-                          {(activity) => (
-                            <span class={s.rowLine}>
-                              <TurnActivity state={activity().state}>
-                                {`${activityWords(activity()).status} · ${activityWords(activity()).where}`}
-                              </TurnActivity>
-                            </span>
-                          )}
-                        </Show>
-                      </span>
-                      <span class={s.rowColumn}>{modelLine(agent())}</span>
-                      <span class={s.rowColumn}>
-                        {agent().environment.name ?? "Unavailable environment"}
-                      </span>
-                      <span class={s.rowSetup}>
-                        <SetupStatus issues={agent().issues} />
-                      </span>
-                      <span class={s.rowActivity}>
-                        <Show
-                          when={agent().activity}
-                          fallback={
-                            <span class={s.idle}>
-                              <Logo size="0.875rem" />
-                              Idle
-                            </span>
-                          }
-                        >
-                          {(activity) => (
-                            <>
-                              <TurnActivity state={activity().state}>
-                                {activityWords(activity()).status}
-                              </TurnActivity>
-                              <span class={s.activityWhere}>{activityWords(activity()).where}</span>
-                            </>
-                          )}
-                        </Show>
-                      </span>
-                    </a>
-                  </li>
-                )}
+                        <span class={s.rowActivity}>
+                          <Show when={agent().activity}>
+                            {(activity) => (
+                              <>
+                                <TurnActivity state={activity().state}>
+                                  {activityWords(activity()).status}
+                                </TurnActivity>
+                                <span class={s.activityWhere}>
+                                  {activityWords(activity()).where}
+                                </span>
+                              </>
+                            )}
+                          </Show>
+                        </span>
+                      </a>
+                    </li>
+                  );
+                }}
               </Keyed>
             </ul>
           </Show>
-          <p class={s.footnote}>
-            Setup and current activity are separate: an agent can work on more than one thread.
-          </p>
         </div>
       </Pane.Body>
     </Show>

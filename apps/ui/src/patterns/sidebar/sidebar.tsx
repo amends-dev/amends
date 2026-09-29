@@ -1,9 +1,11 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { IconAlertTriangle, IconChevronDown, IconMarkSearch } from "@amends/icons";
+import { IconChevronDown, IconMarkSearch } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Count } from "../../components/count/index.ts";
-import { TurnActivity, turnStateLabels } from "../../components/turn-status/index.ts";
+import { StatusMark, markTone, type Status } from "../../components/status-mark/index.ts";
+import { Tooltip } from "../../components/tooltip/index.ts";
+import { TurnMark, turnStateLabels } from "../../components/turn-status/index.ts";
 import { TaskStatus, type TaskState } from "../../components/task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
@@ -115,10 +117,13 @@ export type ItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "child
   /** A dot for activity the reader has not seen, when there is no count. */
   unread?: boolean;
   current?: boolean;
-  /** Agents at work there: the most pressing turn state, as a quiet mark before any count. */
+  /** Agents at work there: the most pressing turn state, as the logo moving before any count. */
   activity?: "queued" | "working" | "stopping";
-  /** Something needs attention, such as setup, named for assistive technology: a caution mark. */
-  attention?: string;
+  /**
+   * Its state: a patch on the person's avatar, or a mark at the row's end for an item without
+   * one. Its words show on hovering the mark and follow the label for assistive technology.
+   */
+  status?: Status;
 };
 
 /** A destination in a List. */
@@ -132,40 +137,63 @@ export function Item(props: ItemProps) {
     "unread",
     "current",
     "activity",
-    "attention",
+    "status",
     "class",
   ]);
+  // Its state follows the label for assistive technology, which the marks only show.
+  const name = () => {
+    const state = local.status?.label ?? (local.activity && turnStateLabels[local.activity]);
+    if (!state) return undefined;
+    const count = local.count ? (local.countLabel ?? String(local.count)) : undefined;
+    return [local.children, state, count ?? (local.unread ? "new activity" : undefined)]
+      .filter(Boolean)
+      .join(", ");
+  };
+  const tip = (status: Status, mark: JSX.Element) => (
+    <Tooltip title={status.label} detail={status.detail} tone={markTone(status.mark)}>
+      {mark}
+    </Tooltip>
+  );
   return (
     <li>
       <a
         {...native}
+        aria-label={name()}
         aria-current={local.current ? "page" : undefined}
         class={classes(s.item, local.class)}
         data-unread={local.unread ? "" : undefined}
       >
         <Show when={local.icon}>{(icon) => <Dynamic component={icon()} class={s.itemIcon} />}</Show>
         <Show when={local.person}>
-          {(person) => (
-            <Avatar
-              name={person().name}
-              initials={person().initials}
-              tone={person().tone}
-              size={24}
-              class={s.itemAvatar}
-              decorative
-            />
-          )}
+          {(person) => {
+            const avatar = () => (
+              <Avatar
+                name={person().name}
+                initials={person().initials}
+                tone={person().tone}
+                size={24}
+                status={local.status}
+                class={s.itemAvatar}
+                decorative
+              />
+            );
+            return (
+              <Show when={local.status} fallback={avatar()}>
+                {(status) => tip(status(), avatar())}
+              </Show>
+            );
+          }}
         </Show>
         <span class={s.itemLabel}>{local.children}</span>
         <Show when={local.activity}>
           {(activity) => (
-            <TurnActivity state={activity()} class={s.itemActivity}>
-              {turnStateLabels[activity()]}
-            </TurnActivity>
+            <span class={s.itemActivity}>
+              <TurnMark state={activity()} />
+            </span>
           )}
         </Show>
-        <Show when={local.attention}>
-          {(attention) => <IconAlertTriangle label={attention()} class={s.itemAttention} />}
+        <Show when={!local.person && local.status}>
+          {(status) => tip(status(), <StatusMark mark={status().mark} size={9} />)}
         </Show>
         <Show
           when={local.count}

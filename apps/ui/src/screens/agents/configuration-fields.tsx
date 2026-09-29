@@ -6,6 +6,7 @@ import { TextArea } from "../../components/input/index.ts";
 import { Select, type SelectOption } from "../../components/select/index.ts";
 import {
   StatusLabel,
+  blocker,
   blockerMessages,
   problemMessage,
   setupLabel,
@@ -79,11 +80,16 @@ export function ModelFields(props: ModelFieldsProps) {
   const problem = (kind: AgentProblem["kind"]) =>
     (props.problems ?? []).find((candidate) => candidate.kind === kind);
   const connectionOptions = (): readonly SelectOption[] => [
-    ...props.connections.map((option) => ({
-      value: option.id,
-      label: option.name,
-      description: option.ready ? "Configured" : "Needs API key",
-    })),
+    ...props.connections.map((option) =>
+      option.ready
+        ? { value: option.id, label: option.name }
+        : {
+            value: option.id,
+            label: option.name,
+            description: "Needs API key",
+            status: { mark: "attention" as const, label: "Needs setup" },
+          },
+    ),
     ...(props.connectionId !== undefined && connection() === undefined
       ? [unavailable(props.connectionId, "Previous connection · Unavailable")]
       : []),
@@ -110,7 +116,7 @@ export function ModelFields(props: ModelFieldsProps) {
         hint={
           connection()
             ? connection()!.ready
-              ? "Configured · Model access"
+              ? undefined
               : "Needs API key · Can finish setup later"
             : props.connectionId === undefined
               ? undefined
@@ -214,22 +220,22 @@ function fitOption(option: AgentEnvironmentOption): Partial<SelectOption> {
   if (fit === undefined) return {};
   switch (fit.kind) {
     case "works":
-      return { status: { label: "Works", tone: "ready" } };
+      return { status: { mark: "available", label: "Works" } };
     case "needs-setup":
       return {
-        status: { label: "Needs setup", tone: "caution" },
+        status: { mark: "attention", label: "Needs setup" },
         detail: setupMessages(fit, option.provider).join(" "),
       };
     case "cant-run":
       return {
-        status: { label: "Can’t run this model", tone: "caution" },
+        status: { mark: "blocked", label: "Can’t run this model" },
         detail: fit.reasons.map((reason) => blockerMessages[reason]).join(" "),
         disabled: true,
       };
   }
 }
 
-/** Under the environment field: whether the chosen one works, what it still needs, or why not. */
+/** Under the environment field: its runtime, and what it still needs or why it cannot run. */
 function FitState(props: {
   readonly environment: AgentEnvironmentOption;
   readonly purpose: "create" | "configure";
@@ -248,7 +254,6 @@ function FitState(props: {
     <div class={s.fieldState}>
       <Switch fallback={<p class={s.note}>{props.environment.runtime}</p>}>
         <Match when={props.environment.fit?.kind === "works"}>
-          <StatusLabel label="Works" ready />
           <p class={s.note}>{props.environment.runtime}</p>
         </Match>
         <Match when={props.environment.fit?.kind === "needs-setup" && props.environment.fit}>
@@ -256,7 +261,7 @@ function FitState(props: {
             const pending = fit() as EnvironmentFit & { readonly kind: "needs-setup" };
             return (
               <>
-                <StatusLabel label="Needs setup" ready={false} />
+                <StatusLabel label="Needs setup" mark="attention" />
                 <For
                   each={
                     pending.issues.length > 0
@@ -274,7 +279,7 @@ function FitState(props: {
         <Match when={props.environment.fit?.kind === "cant-run" && props.environment.fit}>
           {(fit) => (
             <>
-              <StatusLabel label="Can’t run this model" ready={false} />
+              <StatusLabel label="Can’t run this model" mark="blocked" />
               <For each={(fit() as EnvironmentFit & { readonly kind: "cant-run" }).reasons}>
                 {(reason) => <p class={s.note}>{blockerMessages[reason]}</p>}
               </For>
@@ -308,10 +313,8 @@ export function ConfigurationSummary(props: ConfigurationSummaryProps) {
       <div class={s.field}>
         <span class={s.factLabel}>Model connection</span>
         <p class={s.note}>{props.connection ?? "Unavailable connection"}</p>
-        <Show when={props.connectionReady !== undefined}>
-          <p class={s.note}>
-            {props.connectionReady ? "Configured · Model access" : "Needs API key"}
-          </p>
+        <Show when={props.connectionReady === false}>
+          <StatusLabel label="Needs API key" mark="attention" />
         </Show>
       </div>
       <div class={s.field}>
@@ -321,10 +324,12 @@ export function ConfigurationSummary(props: ConfigurationSummaryProps) {
       <div class={s.field}>
         <span class={s.factLabel}>Environment</span>
         <p class={s.note}>{props.environment ?? "Unavailable environment"}</p>
-        <StatusLabel
-          label={props.issues.length === 0 ? "Works" : setupLabel(props.issues)}
-          ready={props.issues.length === 0}
-        />
+        <Show when={props.issues.length > 0}>
+          <StatusLabel
+            label={setupLabel(props.issues)}
+            mark={props.issues.some(blocker) ? "blocked" : "attention"}
+          />
+        </Show>
         <Show when={props.runtime}>{(runtime) => <p class={s.note}>{runtime()}</p>}</Show>
       </div>
       <p class={s.note}>You can view this configuration.</p>

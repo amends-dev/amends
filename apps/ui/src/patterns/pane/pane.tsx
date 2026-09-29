@@ -4,6 +4,8 @@ import { IconMarkBack, IconMarkClose } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Badge } from "../../components/badge/index.ts";
 import { IconButton, type IconButtonProps } from "../../components/icon-button/index.ts";
+import { markTone, type Status } from "../../components/status-mark/index.ts";
+import { Tooltip } from "../../components/tooltip/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./pane.css.ts";
@@ -49,6 +51,8 @@ export type TitleProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & 
   icon?: IconComponent;
   /** An avatar before the title on desktop, in place of an icon, for a page about someone. */
   person?: { readonly name: string; readonly initials?: string; readonly tone?: AvatarToneName };
+  /** The person's state, as a patch on their avatar with its words on hover. */
+  status?: Status;
   /** A second line on phones, such as the workspace name. */
   context?: string;
   /** A short label after the title, such as "Public". */
@@ -62,6 +66,7 @@ export function Title(props: TitleProps) {
     "children",
     "icon",
     "person",
+    "status",
     "context",
     "badge",
     "level",
@@ -73,21 +78,41 @@ export function Title(props: TitleProps) {
     <div {...native} class={classes(s.title, local.class)}>
       <Show when={local.icon}>{(icon) => <Dynamic component={icon()} class={s.titleIcon} />}</Show>
       <Show when={local.person}>
-        {(person) => (
-          <Avatar
-            name={person().name}
-            initials={person().initials}
-            tone={person().tone}
-            size={28}
-            class={s.titleAvatar}
-            decorative
-          />
-        )}
+        {(person) => {
+          const avatar = (className?: string) => (
+            <Avatar
+              name={person().name}
+              initials={person().initials}
+              tone={person().tone}
+              size={28}
+              status={local.status}
+              class={className}
+              decorative
+            />
+          );
+          return (
+            <Show when={local.status} fallback={avatar(s.titleAvatar)}>
+              {(status) => (
+                <Tooltip
+                  title={status().label}
+                  detail={status().detail}
+                  tone={markTone(status().mark)}
+                  class={s.titleAvatar}
+                >
+                  {avatar()}
+                </Tooltip>
+              )}
+            </Show>
+          );
+        }}
       </Show>
       <div class={s.titleText}>
         <Dynamic component={`h${level()}`} class={s.heading}>
           {local.children}
         </Dynamic>
+        <Show when={local.person && local.status}>
+          {(status) => <span class={s.hidden}>{status().label}</span>}
+        </Show>
         <Show when={local.context}>
           <span class={s.context}>{local.context}</span>
         </Show>

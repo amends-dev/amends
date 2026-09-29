@@ -770,11 +770,10 @@ async function addAnthropicWithKey() {
   );
   // The new connection opens as its page.
   await screen.findByRole("heading", { name: "Anthropic" });
+  // Configured, it shows no status: no setup notice.
   expect(
-    within(screen.getByRole("main")).getByText(
-      "Setup is complete. Provider access has not been tested.",
-    ),
-  ).toBeInTheDocument();
+    within(screen.getByRole("main")).queryByText(/to finish setting up/),
+  ).not.toBeInTheDocument();
 }
 
 it("adds a connection, then its key, at its hash route", async () => {
@@ -851,9 +850,10 @@ it("lists agents in the sidebar, opens each as its page with tabs, and adds from
   mount("/workspaces/one/agents", "alice", agentsHost(), { permissions: ["agent.create"] });
   const sidebar = within(await screen.findByRole("navigation", { name: "Workspace" }));
   await sidebar.findByRole("link", { name: /Atlas/ });
-  // The list shows, so the section is current; an agent that needs setup is marked.
+  // The list shows, so the section is current; each agent's row carries its status.
   expect(sidebar.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
-  expect(sidebar.getByRole("img", { name: "Needs setup" })).toBeInTheDocument();
+  expect(sidebar.getByRole("link", { name: "Atlas, Ready" })).toBeInTheDocument();
+  expect(sidebar.getByRole("link", { name: /, Needs setup$/ })).toBeInTheDocument();
   expect(sidebar.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
   fireEvent.click(sidebar.getByRole("link", { name: /Atlas/ }));
   await waitFor(() => expect(window.location.hash).toBe("#/workspaces/one/agents/a1"));

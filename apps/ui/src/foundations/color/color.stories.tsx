@@ -60,6 +60,9 @@ function Swatch(props: { group: Group; role: string }) {
   );
 }
 
+const statusTones = ["success", "caution", "danger"] as const;
+const statusRoles = ["mark", "text", "surface", "border"] as const;
+
 const meta = { title: "Foundations/Color" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -80,6 +83,44 @@ export const Roles = {
           </section>
         )}
       </For>
+      <section class={s.section}>
+        <h2 class={s.heading}>Status</h2>
+        <p class={s.note}>
+          Marks are the only saturated color. Text, surfaces, and borders make a notice in the tone.
+          Offline has no tone: its mark is a ring in text.muted.
+        </p>
+        <ul class={s.grid}>
+          <For each={statusTones}>
+            {(tone) => (
+              <For each={statusRoles}>
+                {(role) => (
+                  <li class={s.swatch}>
+                    <span
+                      class={s.chip}
+                      style={
+                        role === "text"
+                          ? { color: vars.color.status[tone].text }
+                          : { "background-color": vars.color.status[tone][role] }
+                      }
+                      aria-hidden="true"
+                    >
+                      {role === "text" ? "Aa" : ""}
+                    </span>
+                    <span>
+                      <span class={s.name}>
+                        status.{tone}.{role}
+                      </span>
+                      <span class={s.value}>
+                        {light.status[tone][role]} / {dark.status[tone][role]}
+                      </span>
+                    </span>
+                  </li>
+                )}
+              </For>
+            )}
+          </For>
+        </ul>
+      </section>
       <section class={s.section}>
         <h2 class={s.heading}>Avatar tones</h2>
         <p class={s.note}>

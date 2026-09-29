@@ -63,8 +63,12 @@ portable backend packages under `packages/*` remain Effect-only.
   environment, role, and readiness, the model connections and roles to choose from, and each
   environment's fit for a model; see [Agents](#agents).
 - `useAgentList`, `useEnvironmentList`, and `useConnectionList` give each destination's sidebar
-  its items by name, whether each needs setup (and, for connections, what it gives), and whether
-  the reader may add one. Each shares its page's read, so both show the same items.
+  its items by name, what keeps each from running as codes (issues, or a connection's setup and
+  what it is missing; and, for connections, what it gives), and whether the reader may add one.
+  Each shares its page's read, so both show the same items.
+- `useAgentStates(workspaceId)` gives each agent's issues and current activity by member ID, from
+  the agents read and the active turns, for the status patches on profile cards and one-to-one
+  conversations. The workspace layout mounts it, so every workspace page reads the agents.
 - `useThreadTurns(workspaceId, threadId)` follows the agents' turns on a thread, with stopping and
   retrying; see [Turns](#turns).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live

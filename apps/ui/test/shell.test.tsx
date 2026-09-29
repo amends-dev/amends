@@ -17,6 +17,7 @@ import componentsMeta, {
   LogoMark,
   LogoMotions,
   StateArtStates,
+  StatusMarks,
   TabRow,
 } from "../src/components/components.stories.tsx";
 import shellMeta, {
@@ -156,6 +157,7 @@ describe("stories", () => {
     await components.story(LogoMotions).run();
     await components.story(StateArtStates).run();
     await components.story(Avatars).run();
+    await components.story(StatusMarks).run();
     await components.story(Counts).run();
   });
   it("runs the icon button and tabs stories", async () => {

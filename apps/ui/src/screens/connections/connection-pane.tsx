@@ -5,12 +5,12 @@ import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { Input } from "../../components/input/index.ts";
+import { Notice } from "../../components/notice/index.ts";
 import { calendarDate } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
   ConnectionsAlert,
-  SetupStatus,
   providerLine,
   setupNote,
   type ConnectionSettingField,
@@ -65,8 +65,8 @@ export interface ConnectionPaneProps {
 }
 
 /**
- * A connection's page in the main content, in one column: its setup, its name and settings as
- * separate saves, its key, which is only ever replaced or removed, never shown, its details, and
+ * A connection's page in the main content, in one column: a notice with what setup still needs
+ * when it cannot be used, then its name and settings as separate saves, its key, which is only ever replaced or removed, never shown, its details, and
  * removal. A reader who may not manage it sees the same values without the actions.
  */
 export function ConnectionPane(props: ConnectionPaneProps) {
@@ -142,12 +142,14 @@ export function ConnectionPane(props: ConnectionPaneProps) {
           {(connection) => (
             <Pane.Body>
               <Pane.Column>
-                <div class={s.status}>
-                  <SetupStatus setup={connection().setup} />
-                  <p class={s.note}>{setupNote(connection())}</p>
-                  {alert("refresh")}
-                  {alert("remove")}
-                </div>
+                <Show when={connection().setup !== "configured"}>
+                  <Notice
+                    tone={connection().setup === "unavailable" ? "danger" : "caution"}
+                    title={setupNote(connection())}
+                  />
+                </Show>
+                {alert("refresh")}
+                {alert("remove")}
                 <form
                   id={nameForm}
                   class={s.form}

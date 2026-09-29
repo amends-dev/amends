@@ -32,6 +32,7 @@ import type { EnvironmentIssue } from "../environments/views.ts";
 
 export type { AgentIssue };
 import { useRequest } from "../request/use-request.ts";
+import { useTurnActivity } from "../turns/views.ts";
 
 /** The reasons an environment cannot run a model access at all; the others are setup. */
 export type AgentBlocker = Extract<
@@ -188,8 +189,8 @@ export interface AgentListEntry {
   readonly id: string;
   readonly memberId: string;
   readonly name: string;
-  /** Something keeps it from running now. */
-  readonly needsSetup: boolean;
+  /** What keeps it from running now; empty when it is ready. */
+  readonly issues: readonly AgentIssue[];
 }
 
 /**
@@ -207,7 +208,7 @@ export function useAgentList(workspaceId: string) {
           id: view.id,
           memberId: view.memberId,
           name: view.name,
-          needsSetup: view.readiness._tag === "Incomplete",
+          issues: view.readiness._tag === "Incomplete" ? view.readiness.issues.map(issueCode) : [],
         })),
   );
   return {
@@ -215,6 +216,36 @@ export function useAgentList(workspaceId: string) {
     /** Nothing has loaded yet, so an empty list says nothing. */
     loading: () => agents() === undefined,
     canCreate,
+  };
+}
+
+/** An agent's state, as its status marks show it: its setup, and where it is at work. */
+export interface AgentState {
+  /** What keeps it from running now; empty when it is ready. */
+  readonly issues: readonly AgentIssue[];
+  /** Its most pressing turn state, and each thread it works on; unset while it is idle. */
+  readonly activity?: {
+    readonly state: "queued" | "working" | "stopping";
+    readonly places: readonly string[];
+  };
+}
+
+/**
+ * Each agent's state by its member ID, live while mounted: its setup from the agents read it
+ * shares with the Agents pages, and where it is at work from the active turns. Undefined for a
+ * member who is not an agent, or before the agents load.
+ */
+export function useAgentStates(workspaceId: string) {
+  const list = useAgentList(workspaceId);
+  const activity = useTurnActivity(workspaceId);
+  const byMember = createMemo(
+    () => new Map(list.agents().map((agent) => [agent.memberId, agent] as const)),
+  );
+  return (memberId: string): AgentState | undefined => {
+    const agent = byMember().get(memberId);
+    if (agent === undefined) return undefined;
+    const now = activity.agentActivity(memberId);
+    return now === undefined ? { issues: agent.issues } : { issues: agent.issues, activity: now };
   };
 }
 

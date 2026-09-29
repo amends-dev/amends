@@ -42,7 +42,11 @@ function Frame(props: {
   );
 }
 
-/** The general group first, then the rest by name; conversations, then teammates to message. */
+/**
+ * The general group first, then the rest by name; conversations, then teammates to message. An
+ * agent's row carries its status patch, as its profile card does; people's rows gain theirs with
+ * presence.
+ */
 export const Home = {
   render: () => (
     <Frame
@@ -56,11 +60,34 @@ export const Home = {
         directMessages: [
           { id: "alex", name: "Alex Morgan", tone: "sand", href: "#alex" },
           { id: "sara", name: "Sara", tone: "clay", href: "#sara" },
-          { id: "yumi", name: "Yumi", tone: "lilac", href: "#yumi" },
+          {
+            id: "review",
+            name: "Review helper",
+            tone: "lilac",
+            href: "#review",
+            status: {
+              mark: "attention",
+              label: "Needs setup",
+              detail: "Its model connection needs an API key.",
+            },
+          },
+          {
+            id: "yumi",
+            name: "Yumi",
+            tone: "lilac",
+            href: "#yumi",
+            status: { mark: "available", label: "Working in #design", activity: "working" },
+          },
         ],
       }}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const sidebar = within(within(canvasElement).getByRole("navigation", { name: "Workspace" }));
+    await expect(sidebar.getByRole("link", { name: "Yumi, Working in #design" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Review helper, Needs setup" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Alex Morgan" })).toBeVisible();
+  },
 } satisfies Story;
 
 /** A reader in no group yet, such as in a workspace made before general groups existed. */
@@ -96,20 +123,35 @@ const agents = (current?: string): NavigationSection => ({
   browse: { label: "Browse agents", onBrowse: () => {} },
   create: { label: "Add agent", onCreate: () => {} },
   entries: [
-    agent("atlas", "Atlas", { activity: "queued", current: current === "atlas" }),
-    agent("nora", "Nora", { current: current === "nora" }),
+    agent("atlas", "Atlas", {
+      activity: "queued",
+      status: { mark: "available", label: "Queued in #design", activity: "queued" },
+      current: current === "atlas",
+    }),
+    agent("nora", "Nora", {
+      status: { mark: "available", label: "Ready" },
+      current: current === "nora",
+    }),
     agent("review-helper", "Review helper", {
-      attention: "Needs setup",
+      status: {
+        mark: "attention",
+        label: "Needs setup",
+        detail: "Its model connection needs an API key.",
+      },
       current: current === "review-helper",
     }),
-    agent("yumi", "Yumi", { activity: "working", current: current === "yumi" }),
+    agent("yumi", "Yumi", {
+      activity: "working",
+      status: { mark: "available", label: "Working in #general", activity: "working" },
+      current: current === "yumi",
+    }),
   ],
   empty: "No agents yet",
 });
 
 /**
- * The Lunacy "Agents v02 / 01" frame: Agents in the rail lists the agents in the sidebar, marking
- * those at work and those that need setup, with Browse and Add agent beside the title.
+ * The Lunacy "Status v01 / 03" frame: Agents in the rail lists the agents in the sidebar, each with
+ * its status patch and the logo on those at work, with Browse and Add agent beside the title.
  */
 export const AgentsSidebar = {
   render: () => (
@@ -125,7 +167,8 @@ export const AgentsSidebar = {
     );
     await expect(sidebar.getByRole("button", { name: "Browse agents" })).toBeVisible();
     await expect(sidebar.getByRole("button", { name: "Add agent" })).toBeVisible();
-    await expect(sidebar.getByRole("img", { name: "Needs setup" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Review helper, Needs setup" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Nora, Ready" })).toBeVisible();
     await expect(sidebar.queryByText("Inbox")).toBeNull();
   },
 } satisfies Story;

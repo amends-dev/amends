@@ -9,10 +9,10 @@ export type AvatarSize = (typeof sizes)[number];
 const rem = (px: number) => `${px / 16}rem`;
 
 export const avatar = style({
+  position: "relative",
   display: "inline-grid",
   placeItems: "center",
   flex: "none",
-  overflow: "hidden",
   fontWeight: fontWeight.semibold,
   lineHeight: 1,
   userSelect: "none",
@@ -40,6 +40,13 @@ export const tone = styleVariants(
     color: vars.color.avatar[name].foreground,
   }),
 );
+
+// A status patch over the bottom-right corner, overhanging it by 2px beyond its cut-out.
+export const status = style({
+  position: "absolute",
+  insetInlineEnd: "-0.25rem",
+  insetBlockEnd: "-0.25rem",
+});
 
 export const stack = style({ display: "inline-flex", alignItems: "center" });
 

@@ -13,6 +13,8 @@ import { IconMarkClose } from "@amends/icons";
 import { Avatar } from "../avatar/index.ts";
 import { Button } from "../button/index.ts";
 import { IconButton } from "../icon-button/index.ts";
+import { markTone, type Status } from "../status-mark/index.ts";
+import { TurnMark } from "../turn-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
 import { classes } from "../../internal/props.ts";
 import * as s from "./profile-card.css.ts";
@@ -28,6 +30,11 @@ export interface Profile {
   readonly former?: boolean;
   readonly initials?: string;
   readonly tone?: AvatarToneName;
+  /**
+   * Their state, such as an agent's setup or what it is working on: a patch on the avatar, words
+   * after the kind, and why for what needs attention.
+   */
+  readonly status?: Status;
 }
 
 export interface RootProps {
@@ -220,6 +227,10 @@ function place(anchor: DOMRect, width: number, height: number) {
   return { top: `${top}px`, left: `${left}px` };
 }
 
+/** The tone a member's state reads in, for one that needs attention. */
+const stateTone = (profile: Profile) =>
+  profile.former || profile.status === undefined ? undefined : markTone(profile.status.mark);
+
 function Card(props: CardProps) {
   const [element, setElement] = createSignal<HTMLDivElement>();
   const [position, setPosition] = createSignal<JSX.CSSProperties>({ visibility: "hidden" });
@@ -255,6 +266,7 @@ function Card(props: CardProps) {
       profile.kind === "agent" ? "Agent" : "Person",
       profile.you && "You",
       profile.former && "Former member",
+      !profile.former && profile.status?.label,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -297,11 +309,17 @@ function Card(props: CardProps) {
                 initials={profile().initials}
                 tone={profile().tone}
                 size={40}
+                status={profile().former ? undefined : profile().status}
                 decorative
               />
               <div class={s.names}>
                 <p class={s.name}>{profile().name}</p>
-                <p class={s.detail}>{detail()}</p>
+                <p class={s.detail} data-tone={stateTone(profile())}>
+                  <Show when={!profile().former && profile().status?.activity}>
+                    {(activity) => <TurnMark state={activity()} />}
+                  </Show>
+                  {detail()}
+                </p>
               </div>
               <IconButton
                 icon={IconMarkClose}
@@ -311,7 +329,14 @@ function Card(props: CardProps) {
                 onClick={() => props.onClose()}
               />
             </div>
-            <Show when={profile().former}>
+            <Show
+              when={profile().former}
+              fallback={
+                <Show when={profile().status?.detail}>
+                  {(why) => <p class={s.note}>{why()}</p>}
+                </Show>
+              }
+            >
               <p class={s.note}>No longer in this workspace.</p>
             </Show>
             <Show when={actions().length > 0}>

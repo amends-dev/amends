@@ -4,13 +4,15 @@ import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { SearchField } from "../../components/input/index.ts";
+import { StatusMark, markTone } from "../../components/status-mark/index.ts";
+import { Tooltip } from "../../components/tooltip/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
   ConnectionsAlert,
-  SetupStatus,
+  connectionStatus,
   methodLabels,
   type ConnectionSummary,
   type ConnectionsAction,
@@ -167,8 +169,9 @@ const startWith = (names: readonly string[]) =>
     : `Start with ${names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names[0]}.`;
 
 /**
- * The connection list: search, then each connection with its provider, endpoint, setup, and how
- * it authenticates. With no connections yet it offers adding one. Place it in ConnectionsPane.
+ * The connection list: search, then each connection with its provider, endpoint, and how it
+ * authenticates, and a mark on its tile when it cannot be used. With no connections yet it offers
+ * adding one. Place it in ConnectionsPane.
  */
 export function ConnectionList(props: ConnectionListProps) {
   const search = () => props.query.trim();
@@ -222,7 +225,7 @@ export function ConnectionList(props: ConnectionListProps) {
       </Pane.Toolbar>
       <div class={s.headings} aria-hidden="true">
         <span class={s.headingConnection}>Connection</span>
-        <span>Setup</span>
+        <span class={s.wideOnly}>Authentication</span>
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
@@ -261,34 +264,48 @@ export function ConnectionList(props: ConnectionListProps) {
               }
             >
               <Keyed each={props.connections} by={(connection) => connection.id}>
-                {(connection) => (
-                  <li>
-                    <a href={props.connectionHref(connection().id)} class={s.row}>
-                      <span class={s.tile} aria-hidden="true">
-                        <IconMarkConnections class={s.tileIcon} />
-                      </span>
-                      <span class={s.rowText}>
-                        <span class={s.rowName}>{connection().name}</span>
-                        <span class={s.rowProvider}>
-                          {connection().provider?.name ?? connection().providerId}
+                {(connection) => {
+                  const status = () => connectionStatus(connection());
+                  return (
+                    <li>
+                      <a href={props.connectionHref(connection().id)} class={s.row}>
+                        <span class={s.tile} aria-hidden="true">
+                          <IconMarkConnections class={s.tileIcon} />
+                          <Show when={status()}>
+                            {(status) => (
+                              <Tooltip
+                                title={status().label}
+                                detail={status().detail}
+                                tone={markTone(status().mark)}
+                                class={s.tileStatus}
+                              >
+                                <StatusMark mark={status().mark} size={9} cutout />
+                              </Tooltip>
+                            )}
+                          </Show>
                         </span>
-                        <span class={s.rowEndpoint}>
-                          {connection().endpoint ?? "Default API endpoint"}
+                        <span class={s.rowText}>
+                          <span class={s.rowName}>
+                            {connection().name}
+                            <Show when={status()}>
+                              {(status) => <span class={s.visuallyHidden}>, {status().label}</span>}
+                            </Show>
+                          </span>
+                          <span class={s.rowProvider}>
+                            {connection().provider?.name ?? connection().providerId}
+                          </span>
+                          <span class={s.rowEndpoint}>
+                            {connection().endpoint ?? "Default API endpoint"}
+                          </span>
                         </span>
-                      </span>
-                      <span class={s.rowSetup}>
-                        <SetupStatus setup={connection().setup} />
                         <span class={s.rowMethod}>{methodLabels[connection().method]}</span>
-                      </span>
-                    </a>
-                  </li>
-                )}
+                      </a>
+                    </li>
+                  );
+                }}
               </Keyed>
             </ul>
           </Show>
-          <p class={s.footnote}>
-            Configured means setup is complete. Provider access has not been tested.
-          </p>
         </div>
       </Pane.Body>
     </Show>

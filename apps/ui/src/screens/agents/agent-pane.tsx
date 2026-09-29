@@ -3,6 +3,7 @@ import { Button, ButtonLink } from "../../components/button/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { Input } from "../../components/input/index.ts";
+import { Notice } from "../../components/notice/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { TurnActivity } from "../../components/turn-status/index.ts";
 import { calendarDate } from "../../internal/when.ts";
@@ -18,7 +19,8 @@ import {
 } from "./configuration-fields.tsx";
 import {
   AgentsAlert,
-  SetupStatus,
+  agentStatus,
+  blocker,
   issueMessage,
   type AgentIssue,
   type AgentProblem,
@@ -98,8 +100,9 @@ const tabs = [
 const turnStates = { queued: "Queued", working: "Working", stopping: "Stopping" } as const;
 
 /**
- * An agent's page in the main content. Overview reads in one column: its readiness and what brings
- * it back, its name, its saved configuration, its details, and removal. Configuration holds its
+ * An agent's page in the main content. Overview reads in one column: a notice with the fix when
+ * something keeps it from running, then its name, its saved configuration, its details, and
+ * removal. A ready agent shows no status there; its title avatar carries the patch. Configuration holds its
  * instructions, model access, and environment, saved together from the bar under them. A reader
  * who may not configure it sees the same values without inputs.
  */
@@ -155,6 +158,20 @@ export function AgentPane(props: AgentPaneProps) {
         return configure("Change configuration");
     }
   };
+  /** The first issue's recovery, as its notice's action. */
+  const fix = (issue: AgentIssue) => {
+    const action = recovery(issue);
+    return action && { label: action.label, onClick: action.run, disabled: busy() };
+  };
+  /** Where it is at work: from the list's summary, or from its turns in progress here. */
+  const activity = () => {
+    const turns = props.turns ?? [];
+    const [first] = turns;
+    return (
+      props.agent?.activity ??
+      (first && { state: first.state, places: turns.map((turn) => turn.where) })
+    );
+  };
   return (
     <Pane.Root class={s.pane}>
       <Pane.Header>
@@ -167,6 +184,7 @@ export function AgentPane(props: AgentPaneProps) {
               tone: "lilac",
             }
           }
+          status={props.agent && agentStatus(props.agent.issues, activity())}
           context={props.workspaceName}
         >
           {props.agent?.name ?? "Agent"}
@@ -300,25 +318,21 @@ export function AgentPane(props: AgentPaneProps) {
           {(agent) => (
             <Pane.Body>
               <Pane.Column>
-                <div class={s.status}>
-                  <SetupStatus issues={agent().issues} />
-                  <Show
-                    when={agent().issues.length > 0}
-                    fallback={<p class={s.note}>The saved model and environment work together.</p>}
-                  >
-                    <For each={agent().issues}>
-                      {(issue) => <p class={s.note}>{issueMessage(issue, agent())}</p>}
-                    </For>
-                  </Show>
-                  <Show when={recovery(agent().issues[0])}>
-                    {(action) => (
-                      <Button disabled={busy()} onClick={() => action().run()}>
-                        {action().label}
-                      </Button>
-                    )}
-                  </Show>
-                  {alert("refresh", "remove")}
-                </div>
+                <Show when={agent().issues[0]}>
+                  {(first) => (
+                    <Notice
+                      tone={agent().issues.some(blocker) ? "danger" : "caution"}
+                      title={issueMessage(first(), agent())}
+                      action={fix(first())}
+                    >
+                      {agent()
+                        .issues.slice(1)
+                        .map((issue) => issueMessage(issue, agent()))
+                        .join(" ")}
+                    </Notice>
+                  )}
+                </Show>
+                {alert("refresh", "remove")}
                 <Show
                   when={configurable()}
                   fallback={

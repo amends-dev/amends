@@ -166,8 +166,8 @@ const editor = (
 export interface EnvironmentListEntry {
   readonly id: string;
   readonly name: string;
-  /** Something keeps it from running now. */
-  readonly needsSetup: boolean;
+  /** What keeps it from running now; empty when it is ready. */
+  readonly issues: readonly EnvironmentIssue[];
 }
 
 /**
@@ -184,7 +184,7 @@ export function useEnvironmentList(workspaceId: string) {
       : Option.getOrUndefined(AsyncResult.value(read()))?.map((view) => ({
           id: view.id,
           name: view.name,
-          needsSetup: view.readiness._tag === "Incomplete",
+          issues: view.readiness._tag === "Incomplete" ? view.readiness.issues : [],
         })),
   );
   return {

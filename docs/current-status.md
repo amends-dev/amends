@@ -229,7 +229,11 @@ touch, and desktop widths. Right-to-left layouts and forced colors are not revie
 navigation pattern (a sidebar per rail destination, items as pages in the main content) has Lunacy
 frames only for Agents ("Agents / Light mode / v02 · Navigation"); Environments, Connections, and
 Settings follow it without frames of their own, and their v01 frames still draw the Home sidebar
-and details in the side panel, as the Settings frames still draw Workspace in two columns.
+and details in the side panel, as the Settings frames still draw Workspace in two columns. Status
+marks and the status color tones follow "Status / Light mode / v01", which draws the Agents
+screens only; the environment and connection tiles, the Direct messages rows, the tooltip, and the
+dark status values follow its rules without frames of their own, and the older frames still draw
+"Ready" and "Configured" labels.
 
 ## Shared client foundation
 
@@ -338,7 +342,10 @@ commits on the same stream. They are best effort by design, with these consequen
   commits and limited to 8000 bytes per payload. Behind a transaction-pooling proxy, signals are
   unavailable.
 - Presence, such as who is online or viewing a thread, is not implemented; it would be another
-  signal with an expiry, like typing. Typing over HTTP is the only signal clients send.
+  signal with an expiry, like typing, and a stream's start would need who is online, since signals
+  are not replayed. Typing over HTTP is the only signal clients send. The UI's status marks
+  already have online and offline shapes, but only agents carry a status today: people's avatars,
+  rows under Direct messages, and profile cards show none until presence exists.
 
 ## Projection sets across hosts
 

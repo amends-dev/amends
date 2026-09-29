@@ -12,6 +12,7 @@ import {
   useThreadConversation,
   useThreadFollow,
   useAgentList,
+  useAgentStates,
   useConnectionList,
   useEnvironmentList,
   useThreadTurns,
@@ -31,6 +32,9 @@ import { Profiles } from "@amends/ui/components/profile-card";
 import { Toast } from "@amends/ui/components/toast";
 import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
+import { agentStatus } from "@amends/ui/screens/agents";
+import { connectionStatus } from "@amends/ui/screens/connections";
+import { environmentStatus } from "@amends/ui/screens/environments";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
 import { JumpTo, type JumpToItem } from "@amends/ui/screens/jump-to";
@@ -166,6 +170,17 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const existing = () => (recipients().length > 0 ? groups.directWith(recipients()) : undefined);
   const name = useMemberName(workspaceId, () => setDialog(undefined));
   const profiles = useMemberProfiles(workspaceId);
+  const agentStates = useAgentStates(workspaceId);
+  /** An agent's state as its status, for its profile card and its direct message row. */
+  const agentStatusOf = (memberId: string) => {
+    const state = agentStates(memberId);
+    return state && agentStatus(state.issues, state.activity);
+  };
+  /** A one-to-one conversation's status: the other member's. People have none until presence. */
+  const soleStatus = (memberIds: readonly string[]) => {
+    const [only, ...others] = memberIds;
+    return only !== undefined && others.length === 0 ? agentStatusOf(only) : undefined;
+  };
 
   return (
     <WorkspaceActionsContext.Provider
@@ -178,7 +193,11 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
       }}
     >
       <Profiles.Root
-        profile={profiles}
+        profile={(memberId) => {
+          const profile = profiles(memberId);
+          const status = agentStatusOf(memberId);
+          return profile && status ? { ...profile, status } : profile;
+        }}
         onMessage={(memberId) => {
           // Their conversation with the reader, or a first message to them.
           const existing = groups.directWith([memberId]);
@@ -251,6 +270,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                           current: groupId() === entry.id,
                           pending: entry.pending,
                           unread: entry.unread,
+                          status: soleStatus(entry.memberIds),
                         }
                       : {
                           id: entry.id,
@@ -258,6 +278,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                           // A first message; the conversation starts when it is sent.
                           href: href(paths.directDraft(workspaceId, entry.memberIds)),
                           current: drafting() !== undefined && search.to === entry.id,
+                          status: soleStatus(entry.memberIds),
                         },
                   )}
                   onBrowseGroups={() => navigate(`${paths.groups(workspaceId)}?tab=discover`)}
@@ -535,7 +556,7 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
 }
 
 /**
- * The Agents sidebar: each agent, marked while at work or when it needs setup. The title and Browse
+ * The Agents sidebar: each agent with its status patch, and the logo while it is at work. The title and Browse
  * open the list; + opens Add agent over the current page, by `?add=agent`.
  */
 function AgentsSidebar(props: { readonly workspaceId: string }) {
@@ -568,7 +589,7 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
               tone: "lilac" as const,
             },
             activity: activity.agentActivity(agent.memberId)?.state,
-            attention: agent.needsSetup ? "Needs setup" : undefined,
+            status: agentStatus(agent.issues, activity.agentActivity(agent.memberId)),
           })),
           loading: list.loading(),
           empty: "No agents yet",
@@ -606,7 +627,7 @@ function EnvironmentsSidebar(props: { readonly workspaceId: string }) {
             href: href(paths.environment(props.workspaceId, environment.id)),
             current: open()?.params.environmentId === environment.id,
             icon: IconMarkEnvironments,
-            attention: environment.needsSetup ? "Needs setup" : undefined,
+            status: environmentStatus(environment.issues),
           })),
           loading: list.loading(),
           empty: "No environments yet",
@@ -654,7 +675,7 @@ function ConnectionsSidebar(props: { readonly workspaceId: string }) {
         href: href(paths.connection(props.workspaceId, connection.id)),
         current: open()?.params.connectionId === connection.id,
         icon: IconMarkConnections,
-        attention: connection.needsSetup ? "Needs setup" : undefined,
+        status: connectionStatus(connection),
       })),
     loading: list.loading(),
     empty: kind && "None yet",

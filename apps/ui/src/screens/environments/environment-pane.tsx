@@ -1,9 +1,10 @@
-import { For, Match, Show, Switch, createUniqueId } from "solid-js";
+import { Match, Show, Switch, createUniqueId } from "solid-js";
 import { IconMarkEnvironments } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { Input } from "../../components/input/index.ts";
+import { Notice } from "../../components/notice/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { calendarDate } from "../../internal/when.ts";
 import { Modal } from "../../patterns/modal/index.ts";
@@ -17,7 +18,7 @@ import {
 } from "./sandbox-fields.tsx";
 import {
   EnvironmentsAlert,
-  ReadinessStatus,
+  environmentStatus,
   issueMessage,
   placementLabels,
   providerName,
@@ -77,8 +78,8 @@ export interface EnvironmentPaneProps {
 }
 
 /**
- * An environment's page in the main content. Overview reads in one column: its readiness, its
- * name, its runtime, which is fixed once created, its details, and removal. Sandbox holds its
+ * An environment's page in the main content. Overview reads in one column: a notice with the fix
+ * when something keeps it from running, then its name, its runtime, which is fixed once created, its details, and removal. Sandbox holds its
  * sandbox settings, saved together from the bar under them; an environment without a sandbox has
  * no Sandbox tab. A reader who may not manage it sees the same values without inputs or actions.
  */
@@ -123,6 +124,11 @@ export function EnvironmentPane(props: EnvironmentPaneProps) {
         ? { label: "Choose account", run: () => props.onTabChange?.("sandbox") }
         : undefined;
     return props.onOpenAccount && { label: "Open connection", run: props.onOpenAccount };
+  };
+  /** The first issue's recovery, as its notice's action. */
+  const fix = (issue: EnvironmentIssue) => {
+    const action = recovery(issue);
+    return action && { label: action.label, onClick: action.run, disabled: busy() };
   };
   return (
     <Pane.Root class={s.pane}>
@@ -270,26 +276,26 @@ export function EnvironmentPane(props: EnvironmentPaneProps) {
           {(environment) => (
             <Pane.Body>
               <Pane.Column>
-                <div class={s.status}>
-                  <ReadinessStatus issues={environment().issues} />
-                  <Show
-                    when={environment().issues.length > 0}
-                    fallback={<p class={s.note}>Setup is complete.</p>}
-                  >
-                    <For each={environment().issues}>
-                      {(issue) => <p class={s.note}>{issueMessage(issue, environment())}</p>}
-                    </For>
-                  </Show>
-                  <Show when={recovery(environment().issues[0])}>
-                    {(action) => (
-                      <Button class={s.start} disabled={busy()} onClick={() => action().run()}>
-                        {action().label}
-                      </Button>
-                    )}
-                  </Show>
-                  {alert(environment(), "refresh")}
-                  {alert(environment(), "remove")}
-                </div>
+                <Show when={environment().issues[0]}>
+                  {(first) => (
+                    <Notice
+                      tone={
+                        environmentStatus(environment().issues)?.mark === "blocked"
+                          ? "danger"
+                          : "caution"
+                      }
+                      title={issueMessage(first(), environment())}
+                      action={fix(first())}
+                    >
+                      {environment()
+                        .issues.slice(1)
+                        .map((issue) => issueMessage(issue, environment()))
+                        .join(" ")}
+                    </Notice>
+                  )}
+                </Show>
+                {alert(environment(), "refresh")}
+                {alert(environment(), "remove")}
                 <form
                   id={nameForm}
                   class={s.form}

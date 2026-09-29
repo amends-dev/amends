@@ -28,7 +28,7 @@ export const error = style({
   gap: "0.5rem",
   margin: 0,
   marginBlockStart: "0.25rem",
-  color: vars.color.text.danger,
+  color: vars.color.status.danger.text,
 });
 
 export const errorIcon = style({

@@ -33,11 +33,17 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 it("retains the shell and an open account menu through directory refresh and recovery", async () => {
   const held = Promise.withResolvers<Response>();
-  const fetch = vi
+  const directoryReads = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(json(listing("Studio")))
     .mockImplementationOnce(() => held.promise)
     .mockResolvedValueOnce(json(listing("Renamed studio")));
+  // The layout also reads the workspace's agents, whose status its sidebar and cards show.
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
+    new URL(new Request(input, init).url).pathname.endsWith("/agents")
+      ? new Promise<Response>(() => {})
+      : directoryReads(input, init),
+  );
   let directory!: DirectoryScope;
   function Probe() {
     directory = useDirectory();
@@ -79,7 +85,7 @@ it("retains the shell and an open account menu through directory refresh and rec
   const choice = await screen.findByRole("menuitemradio", { name: "System" });
   expect(choice).toHaveAttribute("aria-checked", "true");
   directory.retry();
-  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(directoryReads).toHaveBeenCalledTimes(2));
   held.resolve(json({}, 503));
   await waitFor(() =>
     expect(directory.state()).toMatchObject({ _tag: "Ready", refreshFailed: true }),

@@ -2,8 +2,9 @@
  * Color roles for the neutral design mocked in `design-system/Amends Group Exploration.free`.
  * Values are the exact light and dark fills and strokes the Lunacy screens use; components
  * consume roles, never raw values. Everything is a shade of gray except the avatar tones, the
- * agent name, danger, and caution, which the screens use for identity, errors, and things that
- * need attention before they work, such as a connection that needs setup.
+ * agent name, and the status tones, which the screens use for identity and for state: whether a
+ * member can respond, and what needs attention before it works, such as a connection that needs
+ * setup. A status mark is the only saturated color; status text and surfaces stay muted.
  */
 export interface AvatarTone {
   readonly background: string;
@@ -21,6 +22,15 @@ export const avatarTones = [
   "ink",
 ] as const;
 export type AvatarToneName = (typeof avatarTones)[number];
+
+/** One status tone: the mark's fill, and the text, fill, and outline of a notice in that tone. */
+export interface StatusTone {
+  /** A status mark, such as the patch on an avatar's corner. */
+  readonly mark: string;
+  readonly text: string;
+  readonly surface: string;
+  readonly border: string;
+}
 
 export interface ColorTokens {
   readonly surface: {
@@ -48,8 +58,6 @@ export interface ColorTokens {
     readonly subtle: string;
     /** An inline mention and the workspace mark. */
     readonly mention: string;
-    /** A notice about something that needs attention, such as a key that was not saved. */
-    readonly caution: string;
   };
   readonly text: {
     readonly primary: string;
@@ -60,9 +68,6 @@ export interface ColorTokens {
     readonly disabled: string;
     /** An agent's name. */
     readonly agent: string;
-    readonly danger: string;
-    /** A state that needs attention, such as "Needs setup", and invalid field input. */
-    readonly caution: string;
     /** Text and icons on the primary action. */
     readonly onPrimary: string;
   };
@@ -75,9 +80,8 @@ export interface ColorTokens {
     readonly strong: string;
     /** The outline of a chosen option. */
     readonly selected: string;
+    /** The outline of invalid field input. */
     readonly danger: string;
-    /** The outline of a caution notice. */
-    readonly caution: string;
     /** The dashed running stitch; decorative only. */
     readonly stitch: string;
   };
@@ -86,6 +90,15 @@ export interface ColorTokens {
     readonly secondary: string;
     /** The 2px bar beside the current item and under the current tab. */
     readonly indicator: string;
+  };
+  /**
+   * Success for online, ready, and saved; caution for what needs setup or attention; danger for
+   * what cannot run or failed. Offline has no tone: its mark is a ring in `text.muted`.
+   */
+  readonly status: {
+    readonly success: StatusTone;
+    readonly caution: StatusTone;
+    readonly danger: StatusTone;
   };
   /** The dimming layer behind a modal or a floating side panel. */
   readonly scrim: string;
@@ -108,7 +121,6 @@ export const light = {
     railSelected: "#E9E9EC",
     subtle: "#F3F3F5",
     mention: "#ECEEF1",
-    caution: "#F7F4EE",
   },
   text: {
     primary: "#242528",
@@ -116,8 +128,6 @@ export const light = {
     muted: "#9C9EA4",
     disabled: "#9C9EA4",
     agent: "#8755DD",
-    danger: "#89221C",
-    caution: "#8A7251",
     onPrimary: "#FFFFFF",
   },
   border: {
@@ -126,10 +136,14 @@ export const light = {
     strong: "#73757B",
     selected: "#9C9EA4",
     danger: "#B32F28",
-    caution: "#E8E1D5",
     stitch: "#BCB7AC",
   },
   action: { primary: "#242528", secondary: "#FFFFFF", indicator: "#242528" },
+  status: {
+    success: { mark: "#2E9E68", text: "#2A7550", surface: "#EFF6F1", border: "#D2E7D9" },
+    caution: { mark: "#D49A3A", text: "#8A7251", surface: "#F7F4EE", border: "#E8E1D5" },
+    danger: { mark: "#CF4336", text: "#89221C", surface: "#FBEFEE", border: "#F1D3D0" },
+  },
   scrim: "#24252833",
   scrimStrong: "#24252866",
   avatar: {
@@ -158,8 +172,6 @@ export const dark = {
     railSelected: "#30353D",
     subtle: "#262A30",
     mention: "#353A44",
-    // The mocks show caution in light mode only; the dark values follow the sand avatar tone.
-    caution: "#2B2720",
   },
   text: {
     primary: "#ECEEF2",
@@ -167,9 +179,6 @@ export const dark = {
     muted: "#959CA8",
     disabled: "#777E8A",
     agent: "#C2A1FA",
-    // The mocks have no dark error state yet; these are proposals.
-    danger: "#F0A8A0",
-    caution: "#D5B68C",
     onPrimary: "#191B20",
   },
   border: {
@@ -177,11 +186,17 @@ export const dark = {
     default: "#4B515C",
     strong: "#9CA5B5",
     selected: "#727D8F",
+    // The mocks have no dark error state yet; this is a proposal.
     danger: "#E58A80",
-    caution: "#4D4336",
     stitch: "#626B79",
   },
   action: { primary: "#ECEEF2", secondary: "#25292F", indicator: "#ECEEF2" },
+  // Lunacy "Status v01 / 01 / Status colors"; dark caution follows the sand avatar tone.
+  status: {
+    success: { mark: "#4CC38A", text: "#8FD6AE", surface: "#1D2A23", border: "#2D4638" },
+    caution: { mark: "#E2B25E", text: "#D5B68C", surface: "#2B2720", border: "#4D4336" },
+    danger: { mark: "#F07065", text: "#F0A8A0", surface: "#2E1E1D", border: "#553330" },
+  },
   scrim: "#00000080",
   // The mocks show the drawer in light mode only; this dark value is a proposal.
   scrimStrong: "#000000A6",

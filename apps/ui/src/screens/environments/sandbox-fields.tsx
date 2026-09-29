@@ -136,8 +136,8 @@ export function SandboxFields(props: SandboxFieldsProps) {
         >
           <Field.Root
             hint={
-              selected()
-                ? `Sandbox account · ${selected()!.ready ? "Configured" : "Needs API key"}`
+              selected() && !selected()!.ready
+                ? "Needs API key · Can finish setup later"
                 : undefined
             }
           >
@@ -157,13 +157,16 @@ export function SandboxFields(props: SandboxFieldsProps) {
               </Show>
             </div>
             <Select
-              options={props.accounts.map((account) => ({
-                value: account.id,
-                label: account.name,
-                description: account.ready
-                  ? "Configured"
-                  : "Needs API key · Can finish setup later",
-              }))}
+              options={props.accounts.map((account) =>
+                account.ready
+                  ? { value: account.id, label: account.name }
+                  : {
+                      value: account.id,
+                      label: account.name,
+                      description: "Needs API key",
+                      status: { mark: "attention" as const, label: "Needs setup" },
+                    },
+              )}
               value={props.accountId}
               onChange={props.onAccountChange}
               placeholder={`Choose a ${props.provider.name} account`}

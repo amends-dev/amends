@@ -13,6 +13,7 @@ import {
 import { navigation } from "../sample.ts";
 import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
+  agentStatus,
   AddAgent,
   AgentList,
   AgentPane,
@@ -392,7 +393,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
                     current: selected() === agent.id,
                     person: { name: agent.name, initials: agent.name.charAt(0), tone: "lilac" },
                     activity: agent.activity?.state,
-                    attention: agent.issues.length > 0 ? "Needs setup" : undefined,
+                    status: agentStatus(agent.issues, agent.activity),
                   })),
               loading: props.status === "loading",
               empty: "No agents yet",

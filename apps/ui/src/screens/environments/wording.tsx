@@ -1,8 +1,7 @@
 import { Show } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { IconAlertTriangle, IconCheck } from "@amends/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
+import type { Status } from "../../components/status-mark/index.ts";
 import * as s from "./environments.css.ts";
 
 /** Where a harness's loop runs: in amends, or as a program inside the sandbox. */
@@ -115,12 +114,30 @@ export const retentionDescriptions = {
   destroy: "Delete the sandbox and its files when released.",
 } as const satisfies Record<Retention, string>;
 
-export const issueLabels = {
-  "harness-unavailable": "Harness not installed",
-  "sandbox-unavailable": "Provider not installed",
-  "connection-unavailable": "Account unavailable",
-  "connection-incomplete": "Account needs key",
+/** An issue this server cannot fix by setup: its harness or provider is not installed. */
+const unavailable = (issue: EnvironmentIssue) =>
+  issue === "harness-unavailable" || issue === "sandbox-unavailable";
+
+/** What each issue means in a sentence without names, for a hover. */
+const issueSummaries = {
+  "harness-unavailable": "Its harness isn’t installed on this server.",
+  "sandbox-unavailable": "Its sandbox provider isn’t installed on this server.",
+  "connection-unavailable": "Its sandbox account is no longer available.",
+  "connection-incomplete": "Its sandbox account needs an API key.",
 } as const satisfies Record<EnvironmentIssue, string>;
+
+/**
+ * An environment's state when anything keeps it from running: Unavailable when this server
+ * lacks its harness or provider, else Needs setup. Undefined while it is ready, which shows
+ * nothing.
+ */
+export function environmentStatus(issues: readonly EnvironmentIssue[]): Status | undefined {
+  const first = issues.find(unavailable) ?? issues[0];
+  if (first === undefined) return undefined;
+  return unavailable(first)
+    ? { mark: "blocked", label: "Unavailable", detail: issueSummaries[first] }
+    : { mark: "attention", label: "Needs setup", detail: issueSummaries[first] };
+}
 
 /** "Daytona", or the provider's ID when the server no longer installs it. */
 export const providerName = (environment: EnvironmentSummary) =>
@@ -278,22 +295,5 @@ export function EnvironmentsAlert(props: EnvironmentsAlertProps) {
         </Button>
       </Show>
     </div>
-  );
-}
-
-/** "Ready" with a check, or the first issue in the caution color, with how many more follow. */
-export function ReadinessStatus(props: { readonly issues: readonly EnvironmentIssue[] }) {
-  const first = () => props.issues[0];
-  return (
-    <span class={s.readiness} data-ready={first() === undefined ? "" : undefined}>
-      <Dynamic
-        component={first() === undefined ? IconCheck : IconAlertTriangle}
-        class={s.readinessIcon}
-      />
-      {first() === undefined ? "Ready" : issueLabels[first()!]}
-      <Show when={props.issues.length > 1}>
-        <span class={s.more}>+{props.issues.length - 1}</span>
-      </Show>
-    </span>
   );
 }

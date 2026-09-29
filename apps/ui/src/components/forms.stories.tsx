@@ -123,22 +123,35 @@ export const Fields = {
   },
 } satisfies Story;
 
-/** The caution notice from the Lunacy "Connections / 08 / Credential storage unavailable" frame. */
+/**
+ * Notices from the Lunacy "Status v01" board: caution for what needs setup, danger for what cannot
+ * work, each with its mark, and at most one action that fixes it.
+ */
 export const Notices = {
-  render: () => (
-    <div class={s.page}>
-      <section class={s.section}>
-        <h2 class={s.heading}>Notices</h2>
-        <Notice title="API key wasn’t saved" alert>
-          Credential storage is unavailable. Ask your administrator to enable it, then try again.
-        </Notice>
-        <Notice title="Provider unavailable" />
-      </section>
-    </div>
-  ),
+  render: () => {
+    const [opened, setOpened] = createSignal(0);
+    return (
+      <div class={s.page}>
+        <section class={s.section}>
+          <h2 class={s.heading}>Notices</h2>
+          <Notice title="API key wasn’t saved" alert>
+            Credential storage is unavailable. Ask your administrator to enable it, then try again.
+          </Notice>
+          <Notice
+            title="Anthropic · Backup needs an API key before this agent can run."
+            action={{ label: "Open connection", onClick: () => setOpened((count) => count + 1) }}
+          />
+          <Notice tone="danger" title="This harness doesn’t support the connection’s provider." />
+          <p class={s.note}>Opened {opened()} times</p>
+        </section>
+      </div>
+    );
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("alert")).toHaveTextContent("API key wasn’t saved");
+    await userEvent.click(canvas.getByRole("button", { name: "Open connection" }));
+    await expect(canvas.getByText("Opened 1 times")).toBeVisible();
   },
 } satisfies Story;
 
@@ -163,11 +176,12 @@ function CardChoiceExample() {
         <Field.Label>Daytona account</Field.Label>
         <Select
           options={[
-            { value: "team", label: "Daytona · Team", description: "Configured" },
+            { value: "team", label: "Daytona · Team" },
             {
               value: "backup",
               label: "Daytona · Backup",
               description: "Needs API key · Can finish setup later",
+              status: { mark: "attention", label: "Needs setup" },
             },
           ]}
           value={account()}
@@ -239,26 +253,26 @@ function ModelFieldsExample() {
               value: "in-process",
               label: "In-process",
               description: "Amends · No sandbox",
-              status: { label: "Works", tone: "ready" },
+              status: { mark: "available", label: "Works" },
             },
             {
               value: "remote",
               label: "Remote development",
               description: "Amends · Daytona",
-              status: { label: "Works", tone: "ready" },
+              status: { mark: "available", label: "Works" },
             },
             {
               value: "review",
               label: "Review sandbox",
               description: "Amends · Daytona",
               detail: "Daytona account needs its API key.",
-              status: { label: "Needs setup", tone: "caution" },
+              status: { mark: "attention", label: "Needs setup" },
             },
             {
               value: "boxed",
               label: "Boxed",
               description: "The harness doesn’t support this connection’s model provider.",
-              status: { label: "Can’t run this model", tone: "caution" },
+              status: { mark: "blocked", label: "Can’t run this model" },
               disabled: true,
             },
           ]}
@@ -298,9 +312,9 @@ export const SuggestionsAndStatuses = {
     await userEvent.keyboard("{Enter}");
     await expect(canvas.getByText("Model: my-model-alias")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: /Environment/ }));
-    await expect(await body.findByRole("option", { name: /Review sandbox/ })).toHaveTextContent(
-      "Needs setup",
-    );
+    const review = await body.findByRole("option", { name: /Review sandbox/ });
+    await expect(within(review).getByRole("img", { name: "Needs setup" })).toBeVisible();
+    await expect(review).toHaveTextContent("Daytona account needs its API key.");
     await expect(body.getByRole("option", { name: /Boxed/ })).toHaveAttribute(
       "aria-disabled",
       "true",

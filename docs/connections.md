@@ -8,20 +8,24 @@ each sidebar section's title and Browse open it; `/connections/:connectionId` is
 `?add=` opens Add connection over either: `connection` for any provider, from the list's Add
 connection, or a kind, from that section's +, offering only its providers. Rows and sidebar items
 are links, so browser and hash history work. The screens follow the Lunacy "Connections" mocks for
-the list, forms, and modals, and the navigation pattern of the Agents v02 frames.
+the list, forms, and modals, the navigation pattern of the Agents v02 frames, and "Status v01" for
+how state shows.
 
-- **The list:** each connection with its provider, its API URL or "Default API endpoint", its
-  setup, and how it authenticates, with search. Configured means setup is complete; it never
-  means the provider accepted the key, since nothing checks it until an agent's turn uses it. Needs setup
-  names what is missing: required settings or the key. Unavailable is a connection whose provider
-  this server no longer installs; it stays, with its saved settings and key, until someone
+- **The list:** each connection with its provider, its API URL or "Default API endpoint", and
+  how it authenticates, with search. A configured connection shows no status: configured means
+  setup is complete, never that the provider accepted the key, since nothing checks it until an
+  agent's turn uses it. One that cannot be used is marked on its tile and at its sidebar row's
+  end: a triangle when it needs setup, whose hover names what is missing (required settings or
+  the key), and a square with a bar when it is unavailable, its provider no longer installed on
+  this server. An unavailable connection stays, with its saved settings and key, until someone
   removes it.
 - **Adding** starts from the providers this server installed: Anthropic and OpenAI-compatible for
   model access, and Daytona, an account that environments run their sandboxes under. The provider's declaration decides the settings asked for and
   the ways of authenticating offered. Creating takes two steps. The first creates the connection
   without its key; the second saves the key against it. Finish later leaves the connection under
   Needs setup, and a failed key save retries only the key.
-- **The connection's page** reads in one column: its setup, then the name and the provider's
+- **The connection's page** reads in one column: a notice with what setup still needs when it
+  cannot be used, then the name and the provider's
   settings as separate saves, authentication, Details (the provider and who created it), and
   Removal. A saved key reads "API key saved" and is never shown again: it can
   only be replaced, which keeps the old key until the new one saves, or removed. A connection

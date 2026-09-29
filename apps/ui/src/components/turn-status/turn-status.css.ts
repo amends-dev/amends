@@ -23,8 +23,8 @@ export const tone = styleVariants({
   quiet: {},
   caution: {
     backgroundColor: "transparent",
-    boxShadow: `inset 0 0 0 1px ${vars.color.border.caution}`,
-    color: vars.color.text.caution,
+    boxShadow: `inset 0 0 0 1px ${vars.color.status.caution.border}`,
+    color: vars.color.status.caution.text,
   },
 });
 

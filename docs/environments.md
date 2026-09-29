@@ -6,14 +6,17 @@ whose sidebar lists the environments; see the [workspace shell](workspace-shell.
 `/environments/:environmentId` is an environment's page, and `…/sandbox` its Sandbox tab.
 `?add=environment`, from the sidebar's + or the list's Add environment, opens Add environment over
 either. Tabs, rows, and sidebar items are links, so browser and hash history work. The screens
-follow the Lunacy "Environments" mocks for the list, forms, and modals, and the navigation pattern
-of the Agents v02 frames.
+follow the Lunacy "Environments" mocks for the list, forms, and modals, the navigation pattern
+of the Agents v02 frames, and "Status v01" for how state shows.
 
-- **The list:** each environment with its harness, its sandbox or "No sandbox", and its setup:
-  Ready, or its first issue with how many more follow. With room, harness and sandbox are columns;
-  in a narrow pane and on phones they sit under the name. Ready reflects the saved setup;
+- **The list:** each environment with its harness and its sandbox or "No sandbox". With room,
+  harness and sandbox are columns; in a narrow pane and on phones they sit under the name. An
+  environment that cannot run is marked on its tile, and at its sidebar row's end: a triangle when
+  it needs setup, a square with a bar when this server lacks its harness or provider. Hovering the
+  mark shows why. A ready environment shows nothing; readiness reflects the saved setup, and
   nothing starts a sandbox or contacts a provider to decide it.
-- **Readiness issues:** the harness or the sandbox provider is no longer installed on this server
+- **Readiness issues** show as one notice at the top of the Overview, with the first one's fix
+  beside it: the harness or the sandbox provider is no longer installed on this server
   (Refresh), the account connection is gone (Choose account, on the Sandbox tab), or the account
   still needs its key (Open connection, which opens it on the Connections page).
 - **Adding** takes the basics first: a name, a harness, and No sandbox or one of the providers the
@@ -22,12 +25,12 @@ of the Agents v02 frames.
   with a sandbox then takes its sandbox settings: its account when the provider runs under one, a
   snapshot when it takes one, non-secret variables, ordered setup commands, and retention.
 - **The account detour:** a Daytona sandbox runs under a Daytona connection. The account field
-  lists the reader's Daytona connections with their state, and Create connection opens the
+  lists the reader's Daytona connections, marking those still needing their key, and Create connection opens the
   connection's own two steps, name and settings, then its key. Saving the key, or finishing later,
   returns to the environment's draft with the new account chosen; an account still needing its
   key can be saved, and the environment shows that it needs setup.
-- **The environment's page:** Overview reads in one column: the readiness with its recovery, the
-  name as its own save, the runtime, harness and sandbox and where the harness runs, fixed once
+- **The environment's page:** Overview reads in one column: the readiness notice when one is
+  needed, the name as its own save, the runtime, harness and sandbox and where the harness runs, fixed once
   created, then Details, where Created by shows who added it, or "Created with this workspace" for
   the in-process environment every workspace starts with, and Removal. Sandbox holds the sandbox
   settings, saved together from the bar under them; an environment without a sandbox has no

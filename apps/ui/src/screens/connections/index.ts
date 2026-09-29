@@ -19,6 +19,7 @@ export {
   type ConnectionsTab,
 } from "./connections-pane.tsx";
 export {
+  connectionStatus,
   connectionsMessage,
   connectionsToast,
   type ConnectionCapability,

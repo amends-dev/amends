@@ -2,6 +2,9 @@ import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media, shell } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { knockoutVar } from "../../components/status-mark/status-mark.css.ts";
+
+const logoKnockout = "--amends-logo-knockout";
 
 const ellipsis = {
   minWidth: 0,
@@ -163,13 +166,22 @@ export const item = style({
   paddingInline: "0.75rem",
   color: vars.color.text.secondary,
   textDecoration: "none",
+  // Status marks and the logo cut their notch from the row's own surface.
+  vars: { [knockoutVar]: vars.color.surface.panel, [logoKnockout]: vars.color.surface.panel },
   selectors: {
     ...focusInset,
-    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:hover": {
+      backgroundColor: vars.color.surface.hover,
+      vars: { [knockoutVar]: vars.color.surface.hover, [logoKnockout]: vars.color.surface.hover },
+    },
     "&[aria-current]": {
       backgroundColor: vars.color.surface.selected,
       color: vars.color.text.primary,
       fontWeight: fontWeight.medium,
+      vars: {
+        [knockoutVar]: vars.color.surface.selected,
+        [logoKnockout]: vars.color.surface.selected,
+      },
     },
     "&[aria-current]::before": indicator,
   },
@@ -313,13 +325,9 @@ export const subItemIcon = style({
   color: vars.color.text.secondary,
 });
 
-// Where agents are at work, quiet beside the label and apart from unread counts.
-export const itemActivity = style({ flex: "none" });
-
-// Needs attention, such as setup: a small warning in the caution color.
-export const itemAttention = style({
+// Where agents are at work: the logo alone, quiet beside the label and apart from unread counts.
+export const itemActivity = style({
+  display: "inline-flex",
   flex: "none",
-  width: "0.875rem",
-  height: "0.875rem",
-  color: vars.color.text.caution,
+  color: vars.color.text.secondary,
 });

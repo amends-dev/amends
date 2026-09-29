@@ -2,6 +2,7 @@ import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { knockoutVar } from "../status-mark/status-mark.css.ts";
 
 // A name, avatar, or mention that opens a card: it keeps its own look and shows it can be opened.
 export const trigger = style({
@@ -27,6 +28,10 @@ export const card = style({
   backgroundColor: vars.color.surface.popover,
   boxShadow: vars.shadow.popover,
   color: vars.color.text.primary,
+  vars: {
+    [knockoutVar]: vars.color.surface.popover,
+    "--amends-logo-knockout": vars.color.surface.popover,
+  },
   "@media": { [media.mobile]: { width: "min(calc(100vw - 2rem), 22.375rem)" } },
 });
 
@@ -52,7 +57,20 @@ export const name = style({
   overflowWrap: "anywhere",
 });
 
-export const detail = style({ ...typeScale.hint, margin: 0, color: vars.color.text.secondary });
+// The kind, then the state; an agent at work shows the logo first, and a state that needs
+// attention takes its tone.
+export const detail = style({
+  ...typeScale.hint,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.3125rem",
+  margin: 0,
+  color: vars.color.text.secondary,
+  selectors: {
+    "&[data-tone=caution]": { color: vars.color.status.caution.text },
+    "&[data-tone=danger]": { color: vars.color.status.danger.text },
+  },
+});
 
 // Touch screens dismiss with Close; elsewhere moving away or Escape does.
 export const close = style({

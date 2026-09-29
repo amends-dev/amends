@@ -2,6 +2,7 @@ import { style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { knockoutVar } from "../status-mark/status-mark.css.ts";
 
 // Shaped like the Input: 42px, bordered, reading-size text; 44px on touch, 16px text on phones.
 export const trigger = style({
@@ -63,6 +64,7 @@ export const content = style({
   boxShadow: vars.shadow.popover,
   outline: "none",
   color: vars.color.text.primary,
+  vars: { [knockoutVar]: vars.color.surface.popover },
 });
 
 export const listbox = style({ margin: 0, padding: 0, listStyle: "none", outline: "none" });
@@ -106,21 +108,8 @@ export const itemDescription = style({
 
 export const itemDetail = style({ display: "block" });
 
-// A state at the option's end, such as Works or Needs setup.
-export const status = style({
-  ...typeScale.hint,
-  display: "inline-flex",
-  alignItems: "center",
-  alignSelf: "flex-start",
-  flex: "none",
-  gap: "0.375rem",
-  marginBlockStart: "0.5rem",
-  color: vars.color.text.secondary,
-  fontWeight: fontWeight.medium,
-  selectors: { "&[data-tone=caution]": { color: vars.color.text.caution } },
-});
-
-export const statusIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+// A state at the option's end, on its first line: a status mark, such as whether it works.
+export const status = style({ alignSelf: "flex-start", marginBlockStart: "0.8125rem" });
 
 // A label naming the options, above them.
 export const heading = style({

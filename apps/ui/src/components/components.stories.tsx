@@ -14,6 +14,8 @@ import { Count } from "./count/index.ts";
 import { IconButton } from "./icon-button/index.ts";
 import { Logo, type LogoMotion } from "./logo/index.ts";
 import { StateArt, type StateArtKind } from "./state-art/index.ts";
+import { StatusMark, markTone, type Status } from "./status-mark/index.ts";
+import { Tooltip } from "./tooltip/index.ts";
 import { Tabs } from "./tabs/index.ts";
 import * as s from "./components.stories.css.ts";
 
@@ -192,6 +194,80 @@ export const Avatars = {
       </section>
     </div>
   ),
+} satisfies Story;
+
+const statuses: ReadonlyArray<{ readonly name: string; readonly status: Status }> = [
+  { name: "Alex Morgan", status: { mark: "available", label: "Online" } },
+  { name: "Priya Shah", status: { mark: "offline", label: "Offline" } },
+  {
+    name: "Review helper",
+    status: {
+      mark: "attention",
+      label: "Needs setup",
+      detail: "Its model connection needs an API key.",
+    },
+  },
+  {
+    name: "Scout",
+    status: {
+      mark: "blocked",
+      label: "Can’t run",
+      detail: "Its harness doesn’t support the model provider.",
+    },
+  },
+];
+
+/**
+ * The Lunacy "Status v01 / 02 / Status marks" board: each state as a shape, so it reads without
+ * color, alone and as a patch over an avatar's corner, with its words on hover.
+ */
+export const StatusMarks = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Status marks</h2>
+        <p class={s.note}>
+          Filled for online or ready, hollow for offline, a triangle for needs setup, and a bar for
+          can’t run or unavailable.
+        </p>
+        <div class={s.panel}>
+          <For each={statuses}>
+            {(state) => (
+              <span class={s.labelled}>
+                <StatusMark mark={state.status.mark} label={state.status.label} />
+                {state.status.label}
+              </span>
+            )}
+          </For>
+        </div>
+        <For each={[24, 32, 40] as const}>
+          {(size) => (
+            <div class={s.panel}>
+              <For each={statuses}>
+                {(state) => (
+                  <span class={s.labelled}>
+                    <Tooltip
+                      title={state.status.label}
+                      detail={state.status.detail}
+                      tone={markTone(state.status.mark)}
+                    >
+                      <Avatar name={state.name} tone="lilac" size={size} status={state.status} />
+                    </Tooltip>
+                    {size}
+                  </span>
+                )}
+              </For>
+            </div>
+          )}
+        </For>
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole("img", { name: "Scout, Can’t run" })).toHaveLength(3);
+    await expect(canvas.getByRole("img", { name: "Needs setup" })).toBeVisible();
+  },
 } satisfies Story;
 
 export const Counts = {

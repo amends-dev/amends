@@ -17,6 +17,16 @@ const people: Record<string, Profile> = {
   yumi: { id: "yumi", name: "Yumi", kind: "agent" },
   jamie: { id: "jamie", name: "Jamie Morgan", kind: "person", you: true },
   casey: { id: "casey", name: "Casey", kind: "person", former: true },
+  review: {
+    id: "review",
+    name: "Review helper",
+    kind: "agent",
+    status: {
+      mark: "attention",
+      label: "Needs setup",
+      detail: "Its model connection needs an API key.",
+    },
+  },
 };
 
 function mount() {
@@ -34,7 +44,7 @@ function mount() {
         onChangeName={actions.rename}
       >
         <p>
-          {["alex", "yumi", "jamie", "casey", "gone"].map((id) => (
+          {["alex", "yumi", "jamie", "casey", "review", "gone"].map((id) => (
             <Profiles.Trigger memberId={id}>{id}</Profiles.Trigger>
           ))}
         </p>
@@ -102,6 +112,15 @@ it("offers what the reader can do: message, open an agent, or change their own n
   expect(you.queryByRole("button", { name: "Message" })).toBeNull();
   fireEvent.click(you.getByRole("button", { name: "Change name" }));
   expect(actions.rename).toHaveBeenCalled();
+});
+
+it("says an agent's state after its kind, why it needs attention, and marks its avatar", () => {
+  const { trigger } = mount();
+  fireEvent.click(trigger("review"));
+  const card = screen.getByRole("dialog", { name: "Review helper" });
+  expect(within(card).getByText("Agent · Needs setup")).toHaveAttribute("data-tone", "caution");
+  expect(within(card).getByText("Its model connection needs an API key.")).toBeInTheDocument();
+  expect(card.querySelector("[data-mark=attention]")).not.toBeNull();
 });
 
 it("keeps a former member's name with nothing to do, and says when a profile is unavailable", () => {

@@ -142,9 +142,33 @@ export interface ConnectionListEntry {
   readonly name: string;
   /** What it gives: model access for agents, or an account sandboxes run under. */
   readonly capability: ConnectionCapability | undefined;
-  /** It needs settings or its key, or its provider is no longer installed. */
-  readonly needsSetup: boolean;
+  /**
+   * `needs-setup` when it lacks required settings or its key, and `unavailable` when this server
+   * no longer installs its provider.
+   */
+  readonly setup: "configured" | "needs-setup" | "unavailable";
+  /** What setup still needs: required settings by key, and whether its key is missing. */
+  readonly missing: { readonly settings: readonly string[]; readonly key: boolean };
 }
+
+/** A connection's setup from its readiness, as its list entry gives it. */
+const listSetup = (view: Connection.View): Pick<ConnectionListEntry, "setup" | "missing"> => {
+  const readiness = [view.readiness.modelInference, view.readiness.sandbox].find(
+    (entry) => entry?._tag === "Incomplete",
+  );
+  const missing =
+    readiness?._tag === "Incomplete"
+      ? { settings: readiness.settings, key: readiness.credential }
+      : { settings: [], key: false };
+  return {
+    setup: !view.installed
+      ? "unavailable"
+      : readiness?._tag === "Incomplete"
+        ? "needs-setup"
+        : "configured",
+    missing,
+  };
+};
 
 /**
  * A workspace's connections by name, for navigation, live while mounted. It shares the
@@ -166,11 +190,7 @@ export function useConnectionList(workspaceId: string) {
               : view.capabilities.sandbox !== undefined
                 ? "sandboxes"
                 : undefined,
-          needsSetup:
-            !view.installed ||
-            [view.readiness.modelInference, view.readiness.sandbox].some(
-              (entry) => entry?._tag === "Incomplete",
-            ),
+          ...listSetup(view),
         })),
   );
   return {

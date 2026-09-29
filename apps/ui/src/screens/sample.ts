@@ -164,7 +164,13 @@ export function navigation(state: NavigationState): NavigationSample {
     })),
     directMessages: [
       { id: "alex", name: "Alex Morgan", tone: "sand", href: "#alex" },
-      { id: "yumi", name: "Yumi", tone: "lilac", href: "#yumi" },
+      {
+        id: "yumi",
+        name: "Yumi",
+        tone: "lilac",
+        href: "#yumi",
+        status: { mark: "available", label: "Working in #design", activity: "working" },
+      },
     ],
     onSearch: noop,
     onSwitchWorkspace: noop,
