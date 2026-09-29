@@ -106,7 +106,8 @@ without picking it addresses no one. A member's messages within five minutes of 
 under one avatar and name, as in Slack, unless a thread's replies summary comes between. Messages render as markdown, with mentions naming members
 as they are called now, in the timeline, the inbox's one-line previews, and a turn log's reply and
 streaming draft. The composer formats the draft as it is written, from its toolbar, Slack's
-shortcuts, or markdown typed or pasted as text, and sends it as markdown; a mention is chosen after
+shortcuts, or markdown typed or pasted as text (` ``` ` then Shift+Enter opens a code block),
+and sends it as markdown; a mention is chosen after
 `@` and deletes whole. It edits paragraphs, emphasis, strikethrough, code and code blocks, lists,
 quotes, headings, rules, and links: tables and task lists render in messages but pasted markdown
 loses them. Typing "/" as the whole draft lists commands that act rather than post: a group's page

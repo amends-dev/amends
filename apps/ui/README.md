@@ -135,13 +135,16 @@ triage, open, in-progress, and done. `Composer` is a form around a Tiptap (Prose
 that formats the draft as it is written, with RichText's element styles, so the draft reads as the
 message will. The caller owns the draft, as markdown, so it survives navigation; the editor reads
 it in and writes it back with Tiptap's markdown extension over the same `marked` as RichText.
-Enter sends and Shift+Enter starts a new line, list item, or code line; Send waits for non-blank
+Enter sends and Shift+Enter starts a new line, list item, or code line, or, ending a line of only
+` ``` ` (or ` ```ts `), a code block; Send waits for non-blank
 text. `Composer.Formatting` is a toolbar of bold, italic, strikethrough, link, numbered and
 bulleted lists, quote, code, and code block, each pressed while it applies and unavailable where it
 cannot, with Slack's shortcuts (⌘B, ⌘I, ⌘⇧X, ⌘⇧U, ⌘⇧7, ⌘⇧8, ⌘⇧9, ⌘⇧C, ⌘⌥⇧C) beside Tiptap's own.
 `Composer.FormattingToggle` shows or hides it; phones start with it hidden. Markdown typed as it is
 written becomes its formatting, at the start of a block or of a line after a line break, and plain
-text pasted outside code reads as markdown. A link's address, from the toolbar or ⌘⇧U, is written in
+text pasted outside code reads as markdown. Text that only looks like markdown is escaped when the
+draft is written out, including a line starting with "#", "-", "+", or "1.", or of only "-" or "=",
+so the message shows it as typed. A link's address, from the toolbar or ⌘⇧U, is written in
 a form above the composer; web and email addresses link, and a bare domain is a web address. Given
 `mentionCandidates`, typing `@` opens suggestions above the composer: arrows move, Enter or Tab
 choose, inserting the member as one piece that deletes whole and is written as their mention link,

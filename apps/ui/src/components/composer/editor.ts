@@ -1,7 +1,15 @@
-import { Extension, Node, mergeAttributes, type Editor, type MarkdownToken } from "@tiptap/core";
+import {
+  Extension,
+  Node,
+  mergeAttributes,
+  type ChainedCommands,
+  type Editor,
+  type MarkdownToken,
+} from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
 import { HardBreak } from "@tiptap/extension-hard-break";
 import { Link } from "@tiptap/extension-link";
+import { Paragraph } from "@tiptap/extension-paragraph";
 import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
 import { StarterKit } from "@tiptap/starter-kit";
@@ -74,8 +82,92 @@ const MessageLink = Link.extend({
   },
 });
 
+/**
+ * A paragraph's lines, each escaped where it starts with what markdown would read as a heading, a
+ * list, or the underline that makes the line above a heading: "#", "-", "+", "1.", or only "-" or
+ * "=". The serializer already escapes "*", backticks, and "~", and writes ">" and "<" as entities.
+ */
+function escapeLineStarts(markdown: string) {
+  return markdown
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^( {0,3})(#{1,6}|[-+])(?=\s|$)/u, "$1\\$2")
+        .replace(/^( {0,3})(\d{1,9})([.)])(?=\s|$)/u, "$1$2\\$3")
+        .replace(/^( {0,3})([=-]+[ \t]*)$/u, "$1\\$2"),
+    )
+    .join("\n");
+}
+
+/** A paragraph whose text reads as itself in the message, not as block markdown. */
+const MessageParagraph = Paragraph.extend({
+  renderMarkdown: (node, helpers, context) =>
+    escapeLineStarts(Paragraph.config.renderMarkdown!(node, helpers, context)),
+});
+
 /** A line break inside a paragraph: a newline, which messages read as a break. */
 const LineBreak = HardBreak.extend({ renderMarkdown: () => "\n" });
+
+/** The line `pos` ends within its paragraph: its text so far, and whether a line break starts it. */
+function lineBefore(editor: Editor, pos: number) {
+  const $pos = editor.state.doc.resolve(pos);
+  if ($pos.parent.type.name !== "paragraph") return undefined;
+  const before = $pos.parent.textBetween(0, $pos.parentOffset, undefined, (node) =>
+    node.type.name === "hardBreak" ? "\n" : "\uFFFC",
+  );
+  const breakAt = before.lastIndexOf("\n");
+  return {
+    text: before.slice(breakAt + 1),
+    afterBreak: breakAt >= 0,
+    /** Nothing follows in the paragraph. */
+    atEnd: $pos.parentOffset === $pos.parent.content.size,
+  };
+}
+
+type Opening =
+  | { readonly kind: "bullet" | "quote" }
+  | { readonly kind: "ordered"; readonly start: number }
+  | { readonly kind: "code"; readonly language: string | undefined };
+
+/** The block a line of only its marker opens, such as "-", "1.", ">", or "```ts". */
+function openingOf(line: string): Opening | undefined {
+  const ordered = /^(\d{1,9})\.$/u.exec(line);
+  if (ordered) return { kind: "ordered", start: Number(ordered[1]) };
+  const fence = /^```([\w+-]*)$/u.exec(line);
+  if (fence) return { kind: "code", language: fence[1] || undefined };
+  if (line === ">") return { kind: "quote" };
+  return /^[-+*]$/u.test(line) ? { kind: "bullet" } : undefined;
+}
+
+/**
+ * Replaces the marker line ending at `pos` with the block it opens, splitting the paragraph at the
+ * line break before it, if any. Nothing changes unless all of it can.
+ */
+function open(
+  editor: Editor,
+  pos: number,
+  line: { readonly text: string; readonly afterBreak: boolean },
+  opening: Opening,
+) {
+  const build = (chain: ChainedCommands) => {
+    let next = chain.deleteRange({
+      from: pos - line.text.length - (line.afterBreak ? 1 : 0),
+      to: pos,
+    });
+    if (line.afterBreak) next = next.splitBlock();
+    switch (opening.kind) {
+      case "ordered":
+        return next.toggleOrderedList().updateAttributes("orderedList", { start: opening.start });
+      case "code":
+        return next.setCodeBlock(opening.language ? { language: opening.language } : undefined);
+      case "quote":
+        return next.toggleBlockquote();
+      case "bullet":
+        return next.toggleBulletList();
+    }
+  };
+  return build(editor.can().chain()).run() && build(editor.chain()).run();
+}
 
 /**
  * Markdown typed at the start of a line after a line break, as it is at the start of a block: "- ",
@@ -89,37 +181,29 @@ const LineStarts = Extension.create({
       new Plugin({
         props: {
           handleTextInput: (_view, from, to, typed) => {
-            const $from = editor.state.doc.resolve(from);
-            if (typed !== " " || from !== to || $from.parent.type.name !== "paragraph")
-              return false;
-            const before = $from.parent.textBetween(0, $from.parentOffset, undefined, (node) =>
-              node.type.name === "hardBreak" ? "\n" : "\uFFFC",
-            );
-            const lineAt = before.lastIndexOf("\n");
-            if (lineAt < 0) return false;
-            const line = before.slice(lineAt + 1);
-            const ordered = /^(\d{1,9})\.$/u.exec(line);
-            const fence = /^```([\w+-]*)$/u.exec(line);
-            if (!/^[-+*>]$/u.test(line) && !ordered && !fence) return false;
-            // Remove the break and the marker, and begin a new block where the line began.
-            const chain = editor
-              .chain()
-              .deleteRange({ from: from - line.length - 1, to: from })
-              .splitBlock();
-            if (ordered)
-              chain
-                .toggleOrderedList()
-                .updateAttributes("orderedList", { start: Number(ordered[1]) });
-            else if (fence) chain.setCodeBlock(fence[1] ? { language: fence[1] } : undefined);
-            else if (line === ">") chain.toggleBlockquote();
-            else chain.toggleBulletList();
-            return chain.run();
+            if (typed !== " " || from !== to) return false;
+            // A marker opening its block is the editor's own input rule.
+            const line = lineBefore(editor, from);
+            const opening = line?.afterBreak ? openingOf(line.text) : undefined;
+            return opening !== undefined && open(editor, from, line!, opening);
           },
         },
       }),
     ];
   },
 });
+
+/**
+ * Where the caret ends a paragraph on a line of only a code fence, such as "```" or "```ts", starts a
+ * code block in its place, as Shift+Enter does. False, changing nothing, for any other line.
+ */
+export function openCodeFence(editor: Editor) {
+  const { selection } = editor.state;
+  if (!selection.empty) return false;
+  const line = lineBefore(editor, selection.from);
+  const opening = line?.atEnd ? openingOf(line.text) : undefined;
+  return opening?.kind === "code" && open(editor, selection.from, line!, opening);
+}
 
 /**
  * Plain text pasted outside code reads as markdown, as a message would, so a reply copied as text
@@ -176,7 +260,7 @@ export function extensions(options: { placeholder: () => string; openLink: () =>
       trailingNode: false,
       link: false,
       hardBreak: false,
-      paragraph: { HTMLAttributes: { class: text.paragraph } },
+      paragraph: false,
       heading: { levels: [1, 2, 3], HTMLAttributes: { class: text.heading } },
       blockquote: { HTMLAttributes: { class: text.quote } },
       bulletList: { HTMLAttributes: { class: text.list } },
@@ -186,6 +270,7 @@ export function extensions(options: { placeholder: () => string; openLink: () =>
       codeBlock: { HTMLAttributes: { class: text.pre } },
       horizontalRule: { HTMLAttributes: { class: text.rule } },
     }),
+    MessageParagraph.configure({ HTMLAttributes: { class: text.paragraph } }),
     LineBreak,
     MessageLink.configure({
       openOnClick: false,

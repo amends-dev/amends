@@ -41,6 +41,7 @@ import {
   linkAddress,
   markdownOf,
   mentionQuery,
+  openCodeFence,
   textBeforeCaret,
 } from "./editor.ts";
 import * as s from "./composer.css.ts";
@@ -195,7 +196,7 @@ export interface InputProps {
 
 /**
  * The draft, formatted as it is written, growing with its text up to 40% of the viewport. Enter
- * sends; Shift+Enter starts a new line, list item, or code line. Markdown typed as it is written,
+ * sends; Shift+Enter starts a new line, list item, or code line, or after "```" a code block. Markdown typed as it is written,
  * such as `**bold**` or "- " at the start of a line, becomes its formatting. Typing "@" suggests the
  * Root's mention candidates, and "/" as the whole draft its commands: arrows move, Enter or Tab
  * chooses, Escape closes.
@@ -294,6 +295,8 @@ export function Input(props: InputProps) {
       state.submit();
       return true;
     }
+    // "```" ending the draft's last line opens a code block, as it does in Slack.
+    if (openCodeFence(editor)) return true;
     return editor.commands.first(({ commands }) => [
       () => commands.newlineInCode(),
       () => commands.splitListItem("listItem"),

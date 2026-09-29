@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/te
 import { createSignal } from "solid-js";
 import { userEvent } from "storybook/test";
 import { Composer } from "../src/components/composer/index.ts";
+import { RichText } from "../src/components/rich-text/index.ts";
 import { Theme } from "../src/foundations/theme/index.ts";
 
 afterEach(cleanup);
@@ -180,4 +181,37 @@ it("takes / as text anywhere but the start, and once the commands are closed", a
   await user.keyboard("{Escape}{Enter}");
   expect(command).not.toHaveBeenCalled();
   expect(send).toHaveBeenCalledWith("/follow");
+});
+
+it("opens a code block from ``` and Shift+Enter, at the start or after a line", async () => {
+  const { input, value, user } = await mount();
+  await user.type(input, "```");
+  await user.keyboard("{Shift>}{Enter}{/Shift}const a = 1;");
+  expect(input.querySelector("pre")).toHaveTextContent("const a = 1;");
+  expect(value()).toBe("```\nconst a = 1;\n```");
+  await user.keyboard("{Control>}a{/Control}{Backspace}");
+  await user.type(input, "Try this:");
+  await user.keyboard("{Shift>}{Enter}{/Shift}```ts{Shift>}{Enter}{/Shift}let b;");
+  expect(value()).toBe("Try this:\n\n```ts\nlet b;\n```");
+  // Other markers only break the line.
+  await user.keyboard("{Control>}a{/Control}{Backspace}");
+  await user.type(input, "-");
+  await user.keyboard("{Shift>}{Enter}{/Shift}next");
+  expect(input.querySelectorAll("ul, pre")).toHaveLength(0);
+  expect(value()).toBe("\\-\nnext");
+});
+
+it("sends lines that look like markdown blocks as the text they are", async () => {
+  const { input, value, user } = await mount();
+  await user.type(input, "a");
+  for (const line of ["-", "# b", "2) c", "=="])
+    await user.keyboard(`{Shift>}{Enter}{/Shift}${line}`);
+  expect(value()).toBe("a\n\\-\n\\# b\n2\\) c\n\\==");
+  // Read back as a message, it is one paragraph of those lines, with no heading or list.
+  cleanup();
+  const view = render(() => <RichText text={value()} />);
+  const paragraphs = view.container.querySelectorAll("p");
+  expect(paragraphs).toHaveLength(1);
+  expect(paragraphs[0]!.innerHTML.split("<br>")).toEqual(["a", "-", "# b", "2) c", "=="]);
+  expect(view.container.querySelector("ul, ol, li")).toBeNull();
 });
