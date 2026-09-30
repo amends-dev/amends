@@ -249,6 +249,17 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     };
     const end = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) =>
       complete(streamed(kind, id, metadata).index);
+    /**
+     * Reasoning its provider ended, which completes once the response moves on to text, a tool
+     * call, other reasoning, or its end: a provider may end a reasoning block and go on with it
+     * under the same ID, as one that sends empty text between reasoning does.
+     */
+    const ended = new Set<number>();
+    const settle = Effect.suspend(() => {
+      const indices = [...ended];
+      ended.clear();
+      return Effect.forEach(indices, complete, { discard: true });
+    });
 
     yield* model
       .streamText({
@@ -264,16 +275,31 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
               open("Text", part.id, part.metadata);
               return Effect.void;
             case "text-delta":
-              return delta("Text", part.id, part.delta, part.metadata);
+              return part.delta === ""
+                ? delta("Text", part.id, part.delta, part.metadata)
+                : Effect.andThen(settle, delta("Text", part.id, part.delta, part.metadata));
             case "text-end":
               return end("Text", part.id, part.metadata);
-            case "reasoning-start":
-              open("Reasoning", part.id, part.metadata);
-              return Effect.void;
+            case "reasoning-start": {
+              // Reasoning that goes on under the ID it ended with continues its block.
+              const index = streaming.get(`Reasoning:${part.id}`);
+              if (index !== undefined && ended.delete(index)) {
+                streamed("Reasoning", part.id, part.metadata);
+                return Effect.void;
+              }
+              return Effect.andThen(
+                settle,
+                Effect.sync(() => {
+                  open("Reasoning", part.id, part.metadata);
+                }),
+              );
+            }
             case "reasoning-delta":
               return delta("Reasoning", part.id, part.delta, part.metadata);
             case "reasoning-end":
-              return end("Reasoning", part.id, part.metadata);
+              return Effect.sync(() => {
+                ended.add(streamed("Reasoning", part.id, part.metadata).index);
+              });
             case "tool-params-start":
             case "tool-params-delta":
             case "tool-params-end":
@@ -282,6 +308,7 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
               if (part.providerExecuted) return Effect.fail(unsupported("a call its provider ran"));
               return Schema.decodeUnknownEffect(Schema.Json)(part.params).pipe(
                 Effect.mapError(executionFailed),
+                Effect.tap(() => settle),
                 Effect.flatMap((params) =>
                   complete(
                     parts.push({

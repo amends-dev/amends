@@ -77,9 +77,12 @@ A turn's context can prove full partway through: the harness reports `ContextFul
 request over its limit, as after a long tool result, or the provider refuses a request longer than
 its model's window (`model-context`), which is recorded as an interruption worth retrying. Either
 ends the session without closing the turn, and the next preparation records a checkpoint whatever
-the estimate says, then continues in a new session. A context that proves full again before the
-model answered, or a checkpoint that would free nothing, fails the turn: the conversation no
-longer fits in the model's context window, even summarized. Readers are told the failure's `problem` in words that name
+the estimate says, then continues in a new session. Each time the context proves full again
+before the model answers, as when a provider counts more tokens than four characters make, the
+checkpoint keeps half as much verbatim, up to three times (`shrinks`); past that, or when a
+checkpoint would free nothing, the turn fails: the conversation no longer fits in the model's
+context window, even summarized. A summary pass its model refuses as too long is summarized again
+in halves, down to 1,000 characters. Readers are told the failure's `problem` in words that name
 the connection and model, such as "Anthropic didn't accept its API key." or "claude-sonnet-5 sent
 nothing for 5 minutes."; a summary that fails says the earlier conversation couldn't be
 summarized, and why. The harness's own reason, and a provider's message, which can name addresses

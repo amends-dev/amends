@@ -255,7 +255,9 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
 /** A model that answers each request with the next script and keeps every prompt it was sent. */
 const scripted = Effect.fnUntraced(function* (
   scripts: ReadonlyArray<Script>,
-  summary?: Effect.Effect<Array<Response.PartEncoded>, AiError.AiError>,
+  summary?:
+    | Effect.Effect<Array<Response.PartEncoded>, AiError.AiError>
+    | ((prompt: Prompt.Prompt) => Effect.Effect<Array<Response.PartEncoded>, AiError.AiError>),
   limits: ModelInference.Limits = { contextTokens: 1_000_000, outputTokens: 128_000 },
 ) {
   const prompts: Array<Prompt.Prompt> = [];
@@ -264,7 +266,9 @@ const scripted = Effect.fnUntraced(function* (
     generateText: (options) =>
       summary === undefined
         ? Effect.die(new Error("Only a checkpoint asks for a summary."))
-        : Effect.sync(() => summarized.push(options.prompt)).pipe(Effect.andThen(summary)),
+        : Effect.sync(() => summarized.push(options.prompt)).pipe(
+            Effect.andThen(typeof summary === "function" ? summary(options.prompt) : summary),
+          ),
     streamText: (options) =>
       Stream.suspend(() => {
         prompts.push(options.prompt);
@@ -855,6 +859,70 @@ describe("TurnRunner", () => {
         );
         expect(state.replies).toEqual(["Noon."]);
       }),
+  );
+
+  it.effect("summarizes in smaller passes when its model refuses a pass as too long", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      record({
+        _tag: "History",
+        turnId,
+        items: [input(`How was the launch? ${"We shipped it. ".repeat(300)}`), input("And now?")],
+      });
+      // The summarizer reads fewer tokens than four characters make of this text.
+      const {
+        implementation,
+        summarized: asked,
+        prompts,
+      } = yield* scripted(
+        [reply("Noon.")],
+        (prompt) =>
+          texts(prompt).join("").length > 3_000
+            ? Effect.fail(
+                AiError.make({
+                  module: "Test",
+                  method: "generateText",
+                  reason: new AiError.InvalidRequestError({
+                    description: "This endpoint's maximum context length is 1000 tokens.",
+                  }),
+                }),
+              )
+            : summarized("They asked about the launch."),
+        { contextTokens: 1_000, outputTokens: undefined },
+      );
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      // The pass it refused was summarized again in halves, each reading the summary so far.
+      expect(asked.length).toBeGreaterThan(2);
+      expect(state.checkpoints).toHaveLength(1);
+      expect(texts(prompts[0])[1]).toBe(
+        "Summary of the earlier conversation: They asked about the launch.",
+      );
+    }),
+  );
+
+  it.effect("keeps less at each checkpoint while its provider still refuses, then carries on", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      const notes = Array.from({ length: 6 }, (_, index) =>
+        input(`Note ${index + 1}: ${"the launch is on track ".repeat(9)}`),
+      );
+      record({ _tag: "History", turnId, items: notes });
+      const { implementation } = yield* scripted(
+        [tooLong, tooLong, reply("Noon.")],
+        summarized("They sent notes about the launch."),
+        { contextTokens: 1_000, outputTokens: undefined },
+      );
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(state.checkpoints).toHaveLength(2);
+      expect(state.checkpoints[1]!.kept.length).toBeLessThan(state.checkpoints[0]!.kept.length);
+      expect(state.replies).toEqual(["Noon."]);
+    }),
   );
 
   it.effect("fails a turn whose context is full again before its model answers", () =>

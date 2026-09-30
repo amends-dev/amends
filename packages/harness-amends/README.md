@@ -19,7 +19,9 @@ A session works whenever its transcript awaits a response:
    the next such point, so it joins the following request rather than starting another.
 2. When the session has a context limit, it estimates the next request from what its provider last
    measured and what followed, and over the limit reports `ContextFull` and does nothing more.
-   Otherwise it streams one response, reporting text and reasoning deltas, each block as `BlockCompleted`
+   Otherwise it streams one response, reporting text and reasoning deltas, and reasoning a provider
+   ends and goes on with under the same ID as one block, as a provider that sends empty text
+   between pieces of reasoning does, each block as `BlockCompleted`
    when it ends (a tool call as soon as it arrives, and any block a provider never ends when the
    response finishes), then `ResponseFinished`. If the provider fails partway, it first reports the
    text written so far as blocks, leaving out unfinished reasoning, which carries no signature a

@@ -231,6 +231,38 @@ describe("AmendsHarness", () => {
     }),
   );
 
+  it.effect("keeps reasoning a provider ends and goes on with as one block", () =>
+    Effect.gen(function* () {
+      // As a provider that sends empty text between pieces of reasoning streams it.
+      const { model } = yield* scripted([
+        parts(
+          { type: "reasoning-start", id: "r" },
+          { type: "reasoning-delta", id: "r", delta: "Seventeen " },
+          { type: "reasoning-end", id: "r" },
+          { type: "text-start", id: "t" },
+          { type: "text-delta", id: "t", delta: "" },
+          { type: "reasoning-start", id: "r" },
+          { type: "reasoning-delta", id: "r", delta: "times 23." },
+          { type: "reasoning-end", id: "r" },
+          { type: "text-delta", id: "t", delta: "391" },
+          { type: "text-end", id: "t" },
+          finish("stop"),
+        ),
+      ]);
+      const session = yield* start(model, { sessionId: "s1" });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "What is 17 times 23?"));
+      const events = yield* untilIdle(session);
+
+      expect(
+        events.flatMap((event) => (event._tag === "BlockCompleted" ? [event.block] : [])),
+      ).toEqual([
+        { _tag: "Reasoning", text: "Seventeen times 23." },
+        { _tag: "Text", text: "391" },
+      ]);
+    }),
+  );
+
   it.effect("continues from stored events exactly where a failed session stopped", () =>
     Effect.gen(function* () {
       const signature = { anthropic: { info: { type: "thinking", signature: "sig-1" } } };

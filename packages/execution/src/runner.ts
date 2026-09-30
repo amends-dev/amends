@@ -50,13 +50,16 @@ export interface Options {
  * How a turn's conversation is kept within its model's context window. A turn may use `share` of
  * the window, less the room its model may need to write (at most `outputReserve` tokens), and at
  * most `cap` tokens, which bounds what one request costs however large the window; a checkpoint
- * then keeps `keep` of that budget verbatim and summarizes the rest.
+ * then keeps `keep` of that budget verbatim and summarizes the rest. When the context proves full
+ * anyway, as when a provider counts more tokens than four characters make, each checkpoint for it
+ * keeps half as much, up to `shrinks` times before the turn fails.
  */
 export interface ContextPolicy {
   readonly share: number;
   readonly outputReserve: number;
   readonly cap: number;
   readonly keep: number;
+  readonly shrinks: number;
 }
 
 /** The context policy a runner applies unless it is given another. */
@@ -65,6 +68,7 @@ export const defaultContextPolicy: ContextPolicy = {
   outputReserve: 32_000,
   cap: 200_000,
   keep: 0.4,
+  shrinks: 3,
 };
 
 /** The tokens a turn may use of a model with these limits, and what a checkpoint keeps. */
@@ -210,7 +214,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
   const compactionFor = (
     plan: TurnExecution.Plan,
     model: ModelInference.Implementation,
-    options: { readonly force?: boolean } = {},
+    options: { readonly force?: boolean; readonly shrink?: number } = {},
   ) => {
     const limits = contextBudget(
       model.limits(
@@ -223,6 +227,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       ...limits,
       compaction: TurnLog.compaction(plan.transcript, plan.waiting, {
         ...limits,
+        keep: Math.floor(limits.keep / 2 ** (options.shrink ?? 0)),
         fixed: plan.fixed,
         measured: plan.measured,
         instructions: plan.instructions,
@@ -566,11 +571,16 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         continue;
       }
       // A checkpoint the history needs comes first; either stops the same way when interrupted.
-      // A context that proved full owes a checkpoint however the estimate stands; one that proves
-      // full again before the model answered means even a summary does not make it fit.
+      // A context that proved full owes a checkpoint however the estimate stands, which keeps less
+      // each time it proves full again before the model answers; past that, or when a checkpoint
+      // would free nothing, even a summary does not make it fit.
       const tooLong = `The conversation no longer fits in ${plan.selection.model}'s context window, even summarized.`;
-      if (plan.overflow.pending && plan.overflow.count > 1) return yield* fail(tooLong);
-      const { compaction, budget } = compactionFor(plan, model, { force: plan.overflow.pending });
+      if (plan.overflow.pending && plan.overflow.count > policy.shrinks)
+        return yield* fail(tooLong);
+      const { compaction, budget } = compactionFor(plan, model, {
+        force: plan.overflow.pending,
+        shrink: plan.overflow.pending ? plan.overflow.count - 1 : 0,
+      });
       if (plan.overflow.pending && compaction === undefined) return yield* fail(tooLong);
       yield* step((execution) =>
         execution.attempt(turnId, compaction === undefined ? "session" : "summary"),

@@ -5,7 +5,7 @@
  */
 import { TurnLog } from "@amends/core/turn";
 import { HarnessErrors, type Transcript } from "@amends/harness";
-import { Duration, Effect, Schema } from "effect";
+import { Duration, Effect, Result, Schema } from "effect";
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai";
 
 /**
@@ -113,43 +113,66 @@ export const passes = (items: ReadonlyArray<Transcript.Item>, size: number): Arr
  * oldest first, until the whole is covered. A pass that fails, or sends nothing within `timeout`,
  * fails the summary.
  */
+/** One summary request over a conversation, which fails or stays silent past `timeout` as `Failed`. */
+const ask = (conversation: string, timeout: Duration.Input) =>
+  LanguageModel.generateText({
+    prompt: Prompt.fromMessages([
+      Prompt.systemMessage({ content: instructions }),
+      Prompt.userMessage({
+        content: [Prompt.textPart({ text: `<conversation>\n${conversation}\n</conversation>` })],
+      }),
+    ]),
+  }).pipe(
+    Effect.map((response) => response.text),
+    Effect.mapError(
+      (error) =>
+        new Failed({
+          reason: error.message,
+          retryable: AiError.isAiError(error) && error.isRetryable,
+          problem: HarnessErrors.modelProblem(error),
+        }),
+    ),
+    Effect.timeoutOrElse({
+      duration: timeout,
+      orElse: () =>
+        Effect.fail(
+          new Failed({
+            reason: `The model sent nothing for ${Duration.format(Duration.fromInputUnsafe(timeout))}.`,
+            retryable: true,
+            problem: "model-silent",
+          }),
+        ),
+    }),
+  );
+
+/**
+ * The fewest characters a pass is split down to when its model refuses it as too long, as text
+ * denser than four characters a token makes a pass larger than it looks.
+ */
+export const smallestPass = 1_000;
+
 export const summarize = Effect.fn("Compaction.summarize")(function* (
   items: ReadonlyArray<Transcript.Item>,
   options: { readonly passSize: number; readonly timeout: Duration.Input },
 ) {
   let summary: string | undefined;
-  for (const part of passes(items, options.passSize)) {
+  const queue = passes(items, options.passSize);
+  for (let part = queue.shift(); part !== undefined; part = queue.shift()) {
     const conversation =
       summary === undefined ? part : `<prior-summary>\n${summary}\n</prior-summary>\n\n${part}`;
-    const written: string = yield* LanguageModel.generateText({
-      prompt: Prompt.fromMessages([
-        Prompt.systemMessage({ content: instructions }),
-        Prompt.userMessage({
-          content: [Prompt.textPart({ text: `<conversation>\n${conversation}\n</conversation>` })],
-        }),
-      ]),
-    }).pipe(
-      Effect.map((response) => response.text),
-      Effect.mapError(
-        (error) =>
-          new Failed({
-            reason: error.message,
-            retryable: AiError.isAiError(error) && error.isRetryable,
-            problem: HarnessErrors.modelProblem(error),
-          }),
-      ),
-      Effect.timeoutOrElse({
-        duration: options.timeout,
-        orElse: () =>
-          Effect.fail(
-            new Failed({
-              reason: `The model sent nothing for ${Duration.format(Duration.fromInputUnsafe(options.timeout))}.`,
-              retryable: true,
-              problem: "model-silent",
-            }),
-          ),
-      }),
-    );
+    const attempt = yield* Effect.result(ask(conversation, options.timeout));
+    // A pass its model refuses as too long is summarized in halves instead.
+    if (
+      Result.isFailure(attempt) &&
+      attempt.failure.problem === "model-context" &&
+      part.length > smallestPass
+    ) {
+      const half = Math.ceil(part.length / 2);
+      queue.unshift(part.slice(0, half), part.slice(half));
+      continue;
+    }
+    if (Result.isFailure(attempt)) return yield* attempt.failure;
+    const written = attempt.success;
     if (!/\S/u.test(written))
       return yield* new Failed({
         reason: "The model wrote an empty summary.",

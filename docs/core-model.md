@@ -1132,7 +1132,9 @@ sent with its middle left out, saying how much, and counted as sent; the log kee
 A turn's context can also prove full partway through its work, as a long tool result arrives: a
 harness that knows its session's limit says so before a request over it, and a provider refuses a
 request longer than its model's window. Either way the turn records a checkpoint then and goes on
-in a new session; when even a summary does not make the conversation fit, the turn fails saying
+in a new session, keeping half as much verbatim each time the context proves full again, since a
+provider may count more tokens than the estimate did; a summary request refused as too long is
+split in halves. When even a summary does not make the conversation fit, the turn fails saying
 so.
 
 Still to come: summarizing in the background after a turn rather than before the next, shortening
