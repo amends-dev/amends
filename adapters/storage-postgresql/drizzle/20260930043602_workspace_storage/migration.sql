@@ -359,7 +359,6 @@ CREATE TABLE "turns" (
 	"status" text NOT NULL,
 	"input_after_sequence" integer NOT NULL,
 	"accepted_through_sequence" integer NOT NULL,
-	"incorporated_through_sequence" integer NOT NULL,
 	"connection_id" text,
 	"model" text,
 	"reasoning" text,
@@ -371,7 +370,7 @@ CREATE TABLE "turns" (
 	"started_at" timestamp with time zone,
 	"finished_at" timestamp with time zone,
 	CONSTRAINT "turns_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "turn_input_order" CHECK ("input_after_sequence" <= "incorporated_through_sequence" AND "incorporated_through_sequence" <= "accepted_through_sequence" AND "input_after_sequence" < "accepted_through_sequence"),
+	CONSTRAINT "turn_input_order" CHECK ("input_after_sequence" <= "accepted_through_sequence"),
 	CONSTRAINT "turn_selection_complete" CHECK (("connection_id" IS NULL AND "model" IS NULL AND "reasoning" IS NULL AND "environment_id" IS NULL) OR ("connection_id" IS NOT NULL AND "model" IS NOT NULL AND "environment_id" IS NOT NULL))
 );
 --> statement-breakpoint

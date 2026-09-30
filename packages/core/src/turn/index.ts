@@ -5,6 +5,7 @@ export { TurnActivityRecorder } from "./activity-recorder.ts";
 export { TurnDrafts } from "./drafts.ts";
 export { TurnApplication } from "./application.ts";
 export { TurnDispatch } from "./dispatch.ts";
+export { TurnEnding } from "./ending.ts";
 export { TurnErrors } from "./errors.ts";
 export { TurnExecution } from "./execution.ts";
 export { TurnFacts } from "./facts.ts";

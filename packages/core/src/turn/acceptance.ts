@@ -23,6 +23,7 @@ import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnActivityRecorder } from "./activity-recorder.ts";
+import { TurnEnding } from "./ending.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -47,6 +48,7 @@ export type Error =
   | Log.ReadError
   | Log.WriteError
   | TurnActivityRecorder.Error
+  | TurnEnding.Error
   | Projection.Error
   | InvalidResponse;
 
@@ -81,6 +83,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const activity = yield* TurnActivityRecorder.Service;
+  const ending = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -182,9 +185,10 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       return true;
     }
     // Input starts where this agent's previous turn in the same participation stopped taking it
-    // in, so what it accepted but never took in is still this turn's to handle; after joining, just
-    // before the participation began. The turn's entries follow what the agent's log for the
-    // thread holds now, and its history starts from that log's latest checkpoint.
+    // in, as its entries say, so what it accepted but never took in is still this turn's to
+    // handle; after joining, just before the participation began. The turn's entries follow what
+    // the agent's log for the thread holds now, and its history starts from that log's latest
+    // checkpoint: the previous turn's own, or the one it started from.
     const participationId = pending.at(-1)!.participationId!;
     const participation = yield* participations.get(participationId);
     if (Option.isNone(participation))
@@ -192,8 +196,11 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     const joined = yield* decodeParticipation(participation.value);
     const latest = yield* turns.findLatest(agent.memberId, threadId);
     const previous = Option.filter(latest, (turn) => turn.participationId === participationId);
+    const prior = Option.isSome(previous)
+      ? TurnLog.read(yield* TurnLog.entriesOf(log, previous.value))
+      : undefined;
     const boundary = Option.isSome(previous)
-      ? previous.value.incorporatedThroughSequence
+      ? prior!.incorporatedThrough(previous.value.inputAfterSequence)
       : joined.joinedAtSequence - 1;
     const inputAfterSequence = Math.min(
       boundary,
@@ -208,12 +215,13 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       memberId: agent.memberId,
       participationId,
       logAfter: Option.getOrNull(yield* TurnLog.open(log, participationId).head),
-      historyFrom: Option.isSome(previous) ? previous.value.historyFrom : null,
+      historyFrom: Option.isSome(previous)
+        ? (prior!.checkpoint ?? previous.value.historyFrom)
+        : null,
       retryOf: null,
       status: "queued",
       inputAfterSequence,
       acceptedThroughSequence: through,
-      incorporatedThroughSequence: inputAfterSequence,
       selection: null,
       messageIds: [],
       failure: null,
@@ -276,24 +284,11 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
               { turnId: turn.id, cancelReason: "participation-ended" },
               requested,
             );
-          else {
-            const event = yield* journal.publish(
-              TurnFacts.Cancelled,
-              Object.assign({}, where, { finishedAt: at }),
-            );
-            yield* activity.record(
-              turn.threadId,
-              TurnActivity.Ended,
-              {
-                turnId: turn.id,
-                outcome: "cancelled",
-                messageIds: [],
-                reason: null,
-                cancelReason: "participation-ended",
-              },
-              event,
-            );
-          }
+          else
+            yield* ending.end(found.value, {
+              outcome: "cancelled",
+              cancelReason: "participation-ended",
+            });
         }).pipe(journal.commit);
       }
     }

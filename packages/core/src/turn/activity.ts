@@ -41,10 +41,6 @@ export const Stopping = ThreadActivityKind.make("turn.stopping", {
 });
 export type Stopping = ThreadActivityKind.Activity<typeof Stopping>;
 
-/** How a turn ended. */
-export const Outcome = Schema.Literals(["completed", "failed", "cancelled"]);
-export type Outcome = typeof Outcome.Type;
-
 /**
  * The turn ended: completed, with the replies it posted, if any; failed, and why; or stopped, and
  * why it was asked to.
@@ -52,7 +48,7 @@ export type Outcome = typeof Outcome.Type;
 export const Ended = ThreadActivityKind.make("turn.ended", {
   details: Schema.Struct({
     turnId: TurnId.Id,
-    outcome: Outcome,
+    outcome: Turn.Outcome,
     messageIds: Schema.Array(ThreadMessageId.Id),
     reason: Schema.NullOr(Schema.String),
     cancelReason: Schema.NullOr(Turn.CancelReason),

@@ -1072,7 +1072,14 @@ someone stops it, what the agent had written stays in its history.
 
 Only one turn of an agent can be active in a thread, so a turn's entries sit together in the log,
 after the position the log had reached when the turn was created. The turn records that position,
-so reading one turn is a read from there until another turn's entries begin. Leaving and rejoining
+so reading one turn is a read from there until its end or another turn's entries begin. The log
+says everything about each turn there: when it started, with the model access and environment it
+runs with and the agent's instructions then, which it keeps however the agent changes meanwhile;
+each attempt to run it; the input submitted to it, as the batch it was; what its harness and
+environment reported; and how it ended, with the replies it posted or why it failed or stopped,
+recorded in the same commit as the turn's fact in the journal. A turn's row holds only what queries
+across turns need, such as its status; how far it has taken its input in, and anything else about
+its progress, is the log's to say. Leaving and rejoining
 starts a new participation and so a new log: a rejoining agent starts fresh.
 
 Reading the log for the agent's history interprets its entries once, in order. Earlier turns'
@@ -1117,9 +1124,21 @@ long partway through a turn, and a tool with which an agent recalls exact earlie
 ### One reading of a turn's entries answers every question
 
 One reading of a turn's entries gives its transcript, the input it took in, the tool calls still
-pending, the replies it owes, and the entries its readers see. The log also records what the
-environment reported, such as when it became ready and which sandbox it acquired, so recovery
-reacquires what the log names.
+pending, the replies it owes, the entries its readers see, what it started with, how it ended, and
+how its attempts have gone. The log also records what the environment reported, such as when it
+became ready and which sandbox it acquired, so recovery reacquires what the log names. A reader
+following a turn's log learns it ended from the log itself.
+
+Each attempt to run a turn, a harness session or a summary, is recorded before it begins. Getting
+further is a response finishing, a tool call completing, or a checkpoint; taking input in is not,
+since it happens before the model answers. A turn whose attempts since it last got further pass a
+bound is given up, whether they were interrupted or died with their process, and a turn waits
+before each new attempt, since the count lives in the log and a restart does not reset it.
+
+When the agent reads its history, an earlier turn that started and then failed, or was stopped by
+someone, is followed by a note saying so, with why it failed, so the agent knows its earlier work
+there stopped short. A turn that stopped because its agent left needs none, and one that ended
+before it started left nothing to read, so its log still starts from the thread's history.
 
 ### A turn posts every answer it completed
 

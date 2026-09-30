@@ -52,10 +52,14 @@ export interface Selection extends Schema.Schema.Type<typeof Selection> {}
 export const CancelReason = Schema.Literals(["requested", "participation-ended"]);
 export type CancelReason = typeof CancelReason.Type;
 
+/** How a turn ended. */
+export const Outcome = Schema.Literals(["completed", "failed", "cancelled"]);
+export type Outcome = typeof Outcome.Type;
+
 /**
  * One agent's attempt on one thread. Input is tracked by thread timeline position: after
- * `inputAfterSequence` is this attempt's to handle, through `acceptedThroughSequence` it has
- * accepted, and through `incorporatedThroughSequence` the harness has confirmed taking in.
+ * `inputAfterSequence` is this attempt's to handle, and through `acceptedThroughSequence` it has
+ * accepted. How far the harness has taken that input in is its agent's log's to say.
  */
 export const Record = Schema.Struct({
   id: Id,
@@ -74,8 +78,9 @@ export const Record = Schema.Struct({
    */
   logAfter: Schema.NullOr(Log.Position),
   /**
-   * The checkpoint in that log the turn's history starts from, or none while the log has none:
-   * the latest when the turn was created, or one the turn recorded itself.
+   * The latest checkpoint in that log when the turn was created, which its history starts from,
+   * or none while the log had none. Fixed when the turn is created: reading on from it finds any
+   * checkpoint the turn records itself.
    */
   historyFrom: Schema.NullOr(Log.Position),
   /** The failed or stopped turn this one runs again, whose work it continues from. */
@@ -83,7 +88,6 @@ export const Record = Schema.Struct({
   status: Status,
   inputAfterSequence: Sequence,
   acceptedThroughSequence: Sequence,
-  incorporatedThroughSequence: Sequence,
   /** Recorded when execution starts. */
   selection: Schema.NullOr(Selection),
   /** The agent's replies this attempt published when it closed, in order. */
@@ -98,10 +102,8 @@ export const Record = Schema.Struct({
 }).check(
   Schema.makeFilter(
     (record) =>
-      (record.inputAfterSequence <= record.incorporatedThroughSequence &&
-        record.incorporatedThroughSequence <= record.acceptedThroughSequence &&
-        record.inputAfterSequence < record.acceptedThroughSequence) ||
-      "Input positions must be ordered, with accepted input after the boundary",
+      record.inputAfterSequence <= record.acceptedThroughSequence ||
+      "Input positions must be ordered, with accepted input at or after the boundary",
   ),
 );
 export interface Record extends Schema.Schema.Type<typeof Record> {}

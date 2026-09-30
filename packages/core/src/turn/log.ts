@@ -1,34 +1,52 @@
 import { Environment } from "@amends/environment";
-import { HarnessEvent, Transcript } from "@amends/harness";
+import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
 import type { DateTime } from "effect";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { Log } from "../journal/log.ts";
+import { ThreadMessageId } from "../thread/message/id.ts";
 import type { ThreadParticipationId } from "../thread/participation/id.ts";
 import { TurnId } from "./id.ts";
-import type { Turn } from "./turn.ts";
+import { Turn } from "./turn.ts";
 
 const Of = { turnId: TurnId.Id };
 
 /**
  * One entry of an agent's log for a thread, naming the turn that wrote it. Together the entries
- * are everything the agent did there: the input execution submitted, with the timeline position it
- * covers; what the harness reported, block by block, whichever harness ran it and wherever; what
- * the environment reported about itself; interruptions; input asked of a turn directly, such as a
- * retry; the thread's history before the first turn; and checkpoints that replace what came before.
+ * are everything the agent did there: each turn's start and end, the input execution submitted,
+ * with the timeline position it covers; each attempt to run it; what the harness reported, block
+ * by block, whichever harness ran it and wherever; what the environment reported about itself;
+ * interruptions; input asked of a turn directly, such as a retry; the thread's history before the
+ * first turn; and checkpoints that replace what came before.
  */
 export const Entry = Schema.TaggedUnion({
+  /**
+   * Execution took the turn, with the model access and environment it runs with and the agent's
+   * instructions then, which the turn keeps however the agent changes meanwhile.
+   */
+  Started: { ...Of, selection: Turn.Selection, instructions: Schema.String },
+  /** Execution began a harness session for the turn, or a summary for its checkpoint. */
+  Attempt: { ...Of, kind: Schema.Literals(["session", "summary"]) },
   /** Input submitted as one batch, covering the thread's relevant input through a position. */
   Submitted: {
     ...Of,
     batchId: HarnessEvent.BatchId,
     throughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    items: Schema.NonEmptyArray(Transcript.Input),
   },
   /** An event the harness reported. */
   Harness: { ...Of, event: HarnessEvent.Event },
   /** An event the environment reported about itself, such as becoming ready. */
   Environment: { ...Of, event: Environment.Lifecycle },
-  /** Execution stopped before the turn finished; a retryable stop continues the same turn. */
-  Interrupted: { ...Of, reason: Schema.NonEmptyString, retryable: Schema.Boolean },
+  /**
+   * Execution stopped before the turn finished, and why, in words and as a kind; a retryable stop
+   * continues the same turn.
+   */
+  Interrupted: {
+    ...Of,
+    reason: Schema.NonEmptyString,
+    retryable: Schema.Boolean,
+    problem: HarnessErrors.Problem,
+  },
   /** Input asked of the turn itself rather than through the thread, such as who retried it. */
   Requested: { ...Of, input: Transcript.Input },
   /** The thread's conversation before the agent's first turn, recorded by that turn. */
@@ -44,13 +62,23 @@ export const Entry = Schema.TaggedUnion({
     kept: Schema.Array(Transcript.Item),
     through: Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0))),
   },
+  /** The turn ended: completed with the replies it posted, failed and why, or stopped and why. */
+  Ended: {
+    ...Of,
+    outcome: Turn.Outcome,
+    reason: Schema.NullOr(Schema.String),
+    cancelReason: Schema.NullOr(Turn.CancelReason),
+    messageIds: Schema.Array(ThreadMessageId.Id),
+  },
 });
 export type Entry = typeof Entry.Type;
+export type Ended = typeof Entry.cases.Ended.Type;
 
-/** An entry as the log recorded it, with when. */
+/** An entry as the log recorded it: when, and at which position. */
 export interface Recorded {
   readonly entry: Entry;
   readonly at: DateTime.Utc;
+  readonly position: Log.Position;
 }
 
 /** An agent's log for one participation in a thread, apart from the workspace's journal. */
@@ -61,10 +89,62 @@ export const logId = (participationId: ThreadParticipationId.Id): Log.Id =>
 export const open = (log: Log.Interface, participationId: ThreadParticipationId.Id) =>
   log.open({ id: logId(participationId), schema: Entry });
 
+/** How many batches one read of a log takes; reads go on until the range is done. */
+const readPage = 100;
+
+/**
+ * Every entry of an agent's log for a thread after a position, oldest first, or from the start
+ * without one, stopping before the first entry `until` accepts.
+ */
+export const recordsAfter = Effect.fnUntraced(function* (
+  log: Log.Interface,
+  participationId: ThreadParticipationId.Id,
+  from: Log.Position | undefined,
+  until?: (entry: Entry) => boolean,
+) {
+  const handle = open(log, participationId);
+  const records: Array<Recorded> = [];
+  let after = from;
+  for (;;) {
+    const batches = yield* handle.read(
+      after === undefined ? { limit: readPage } : { after, limit: readPage },
+    );
+    if (batches.length === 0) return records;
+    for (const batch of batches) {
+      for (const entry of batch.entries) {
+        if (until?.(entry.payload) === true) return records;
+        records.push({ entry: entry.payload, at: entry.recordedAt, position: batch.position });
+      }
+      after = batch.position;
+    }
+  }
+});
+
+/**
+ * A turn's own entries, which sit together in its agent's log after `logAfter`: only one turn of
+ * an agent writes there at a time, so another turn's entry means this one's are over.
+ */
+export const entriesOf = (
+  log: Log.Interface,
+  turn: Pick<Turn.Record, "id" | "participationId" | "logAfter">,
+) => {
+  let began = false;
+  return recordsAfter(log, turn.participationId, turn.logAfter ?? undefined, (entry) => {
+    if (entry.turnId === turn.id) began = true;
+    return began && entry.turnId !== turn.id;
+  });
+};
+
 /** An answer the turn owes its thread: the text of a finished response, verbatim. */
 export interface Reply {
   readonly responseId: Transcript.ResponseId;
   readonly text: string;
+}
+
+/** Why execution last stopped short without the turn getting further. */
+export interface Interruption {
+  readonly reason: string;
+  readonly problem: HarnessErrors.Problem;
 }
 
 /** Everything one turn's entries say, from one reading of them. */
@@ -73,7 +153,8 @@ export interface Reading {
   readonly events: ReadonlyArray<HarnessEvent.Event>;
   /**
    * How far the harness has confirmed taking in the thread's input: the furthest position of a
-   * submitted batch it incorporated, or `after` when it has taken none.
+   * submitted batch it incorporated, or of input a checkpoint's summary took in, or `after` when
+   * it has taken none.
    */
   readonly incorporatedThrough: (after: number) => number;
   /** The transcript execution continues from, after `history`: an unfinished response is left out. */
@@ -92,12 +173,39 @@ export interface Reading {
   readonly requested: ReadonlyArray<Transcript.Input>;
   /** The entries the thread's readers see, oldest first. */
   readonly items: ReadonlyArray<Turn.LogItem>;
+  /** What the turn started with, once execution took it. */
+  readonly started:
+    | { readonly selection: Turn.Selection; readonly instructions: string }
+    | undefined;
+  /** How the turn ended, once it has. */
+  readonly ended: Ended | undefined;
+  /** Where the latest checkpoint the turn recorded sits in the log. */
+  readonly checkpoint: Log.Position | undefined;
+  /**
+   * Attempts to run the turn since it last got further: since a response finished, a tool call
+   * completed, or a checkpoint was recorded. Taking input in happens before the model answers, so
+   * it is not getting further.
+   */
+  readonly attempts: number;
+  /** The latest interruption since the turn last got further. */
+  readonly interruption: Interruption | undefined;
+  /**
+   * The latest attempt got no further and recorded no interruption: its run died, as when its
+   * process did, rather than stopping short.
+   */
+  readonly diedLast: boolean;
+}
+
+/** Reads one turn's entries as they come: `add` each in order, and `reading` says what they hold. */
+export interface Reader {
+  readonly add: (record: Recorded) => void;
+  readonly reading: () => Reading;
 }
 
 const hasText = (text: string) => /\S/u.test(text);
 
-/** Read one turn's entries once: what they hold for execution, for closing, and for its readers. */
-export const read = (records: Iterable<Recorded>): Reading => {
+/** A reader of one turn's entries, empty to begin with. */
+export const reader = (): Reader => {
   const events: Array<HarnessEvent.Event> = [];
   const covers = new Map<string, number>();
   let through: number | undefined;
@@ -114,21 +222,47 @@ export const read = (records: Iterable<Recorded>): Reading => {
   const requested: Array<Transcript.Input> = [];
   let takenIn = false;
   let answer: Reply | undefined;
+  let started: Reading["started"];
+  let ended: Ended | undefined;
+  let checkpoint: Log.Position | undefined;
+  let attempts = 0;
+  let interruption: Interruption | undefined;
+  /** Whether the latest attempt recorded why it stopped. */
+  let accounted = true;
   const partsOf = (blocks: Map<number, Transcript.ResponsePart>) =>
     [...blocks.entries()].toSorted(([left], [right]) => left - right);
+  /** The turn got further: its attempts so far no longer count against it. */
+  const progressed = () => {
+    attempts = 0;
+    interruption = undefined;
+  };
 
-  for (const { entry, at } of records) {
+  const add = ({ entry, at, position }: Recorded) => {
     switch (entry._tag) {
+      case "Started":
+        started = { selection: entry.selection, instructions: entry.instructions };
+        break;
+      case "Attempt":
+        attempts += 1;
+        accounted = false;
+        break;
+      case "Ended":
+        ended = entry;
+        break;
       case "Submitted":
         covers.set(entry.batchId, entry.throughSequence);
         break;
       case "Interrupted":
+        interruption = { reason: entry.reason, problem: entry.problem };
+        accounted = true;
         items.push({ _tag: "Interrupted", at, reason: entry.reason, retryable: entry.retryable });
         break;
       case "Requested":
         requested.push(entry.input);
         break;
       case "Checkpoint":
+        checkpoint = position;
+        progressed();
         // Input a summary took in counts as taken in, after any answer given before it.
         if (entry.through === null) break;
         through = Math.max(through ?? entry.through, entry.through);
@@ -171,6 +305,7 @@ export const read = (records: Iterable<Recorded>): Reading => {
           else items[items.indexOf(response.item)] = updated;
           response.item = updated;
         } else if (event._tag === "ResponseFinished") {
+          progressed();
           const parts = partsOf(responses.get(event.responseId)?.blocks ?? new Map()).map(
             ([, part]) => part,
           );
@@ -179,25 +314,43 @@ export const read = (records: Iterable<Recorded>): Reading => {
             parts.some((part) => part._tag === "ToolCall") || !hasText(text)
               ? undefined
               : { responseId: event.responseId, text };
-        }
+        } else if (event._tag === "ToolCallCompleted") progressed();
         break;
       }
     }
-  }
-  if (answer !== undefined) replies.push(answer);
-  const owed = new Set<string>(replies.map((reply) => reply.responseId));
-  return {
-    events,
-    incorporatedThrough: (after) => Math.max(after, through ?? after),
-    transcript: (history) => HarnessEvent.transcript(events, history, { unfinished: "omit" }),
-    view: (history) => HarnessEvent.transcript(events, history, { unfinished: "keep" }),
-    replies,
-    // A turn's requests go with the first batch it submits.
-    requested: takenIn ? [] : requested,
-    items: items.map((item) =>
-      item._tag === "Responded" && owed.has(item.responseId) ? { ...item, reply: true } : item,
-    ),
   };
+
+  const reading = (): Reading => {
+    const owedReplies = answer === undefined ? [...replies] : [...replies, answer];
+    const owed = new Set<string>(owedReplies.map((reply) => reply.responseId));
+    const recorded = [...events];
+    return {
+      events: recorded,
+      incorporatedThrough: (after) => Math.max(after, through ?? after),
+      transcript: (history) => HarnessEvent.transcript(recorded, history, { unfinished: "omit" }),
+      view: (history) => HarnessEvent.transcript(recorded, history, { unfinished: "keep" }),
+      replies: owedReplies,
+      // A turn's requests go with the first batch it submits.
+      requested: takenIn ? [] : [...requested],
+      items: items.map((item) =>
+        item._tag === "Responded" && owed.has(item.responseId) ? { ...item, reply: true } : item,
+      ),
+      started,
+      ended,
+      checkpoint,
+      attempts,
+      interruption,
+      diedLast: attempts > 0 && !accounted,
+    };
+  };
+  return { add, reading };
+};
+
+/** Read one turn's entries once: what they hold for execution, for closing, and for its readers. */
+export const read = (records: Iterable<Recorded>): Reading => {
+  const turn = reader();
+  for (const record of records) turn.add(record);
+  return turn.reading();
 };
 
 /** Who a checkpoint's summary speaks as, so the model reads it apart from what people said. */
@@ -205,6 +358,9 @@ export const checkpointAuthor: Transcript.Author = {
   id: "checkpoint",
   name: "Summary of the earlier conversation",
 };
+
+/** Who tells the agent how an earlier turn of its own ended short. */
+export const noteAuthor: Transcript.Author = { id: "amends", name: "Amends" };
 
 /** What a checkpoint puts in place of the history before it. */
 export const opening = (checkpoint: {
@@ -219,8 +375,25 @@ export const opening = (checkpoint: {
   ...checkpoint.kept,
 ];
 
+/**
+ * What the agent is told after an earlier turn of its own that it started and that did not
+ * finish: why it stopped, when it failed or someone stopped it. A turn that completed, or that
+ * stopped because the agent no longer took part, needs no note.
+ */
+const noteOf = (ended: Ended | undefined): ReadonlyArray<Transcript.Input> => {
+  const text =
+    ended?.outcome === "failed"
+      ? `Your work here stopped: ${ended.reason ?? "something went wrong."}`
+      : ended?.outcome === "cancelled" && ended.cancelReason === "requested"
+        ? "Your work here was stopped before it finished, as someone asked."
+        : undefined;
+  return text === undefined
+    ? []
+    : [{ _tag: "Input", author: noteAuthor, content: [{ _tag: "Text", text }] }];
+};
+
 /** A response without its reasoning, which serves only the turn that produced it. */
-const withoutReasoning = (item: Transcript.Item): Transcript.Item =>
+export const withoutReasoning = (item: Transcript.Item): Transcript.Item =>
   item._tag === "Response"
     ? { ...item, parts: item.parts.filter((part) => part._tag !== "Reasoning") }
     : item;
@@ -235,32 +408,51 @@ export interface Context {
   readonly own: Reading;
   /** The turn's own entries, as recorded. */
   readonly entries: ReadonlyArray<Recorded>;
-  /** Whether the log held anything before the turn, such as the thread's earlier history. */
+  /**
+   * Whether the agent's log for the thread has begun: some turn recorded the thread's history,
+   * started, or recorded a checkpoint. Until then a turn's history is the thread's.
+   */
   readonly begun: boolean;
 }
 
 /**
  * Read an agent's log for a thread for one of its turns: from the latest checkpoint, if any, each
- * earlier turn's entries as the view it left, without reasoning, then this turn's own work, which
- * continues. `records` must reach back to the latest checkpoint and to the turn's first entry.
+ * earlier turn's entries as the view it left, without reasoning, and with a note when it stopped
+ * short, then this turn's own work, which continues. `records` must reach back to the latest
+ * checkpoint and to the turn's first entry.
  */
 export const context = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Context => {
   let items: ReadonlyArray<Transcript.Item> = [];
-  let segment: { readonly turnId: string; readonly events: Array<HarnessEvent.Event> } | undefined;
+  /** An earlier turn's entries since the latest checkpoint, read as they come. */
+  let segment: { readonly turnId: string; readonly reader: Reader } | undefined;
+  const startedTurns = new Set<string>();
   const flush = () => {
-    if (segment === undefined || segment.turnId === turnId) return;
+    if (segment === undefined) return;
+    const reading = segment.reader.reading();
     const before = items.length;
-    const folded = HarnessEvent.transcript(segment.events, items, { unfinished: "keep" });
-    items = [...folded.slice(0, before), ...folded.slice(before).map(withoutReasoning)];
+    const folded = reading.view(items);
+    items = [
+      ...folded.slice(0, before),
+      ...folded.slice(before).map(withoutReasoning),
+      ...(startedTurns.has(segment.turnId) ? noteOf(reading.ended) : []),
+    ];
     segment = undefined;
   };
   let current: Array<HarnessEvent.Event> = [];
-  const own: Array<Recorded> = [];
+  const own = reader();
+  const entries: Array<Recorded> = [];
   let begun = false;
   for (const record of records) {
     const entry = record.entry;
-    if (entry.turnId === turnId) own.push(record);
-    else begun = true;
+    const mine = entry.turnId === turnId;
+    if (mine) {
+      own.add(record);
+      entries.push(record);
+    }
+    if (entry._tag === "Started") {
+      startedTurns.add(entry.turnId);
+      begun = true;
+    }
     switch (entry._tag) {
       case "Checkpoint":
         items = opening(entry);
@@ -271,31 +463,26 @@ export const context = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Cont
       case "History":
         flush();
         items = [...items, ...entry.items];
-        if (entry.turnId === turnId) begun = true;
+        begun = true;
         break;
-      case "Harness":
-        if (entry.turnId === turnId) {
+      default:
+        if (mine) {
+          if (entry._tag !== "Harness") break;
           flush();
           current.push(entry.event);
-        } else {
-          if (segment !== undefined && segment.turnId !== entry.turnId) flush();
-          segment ??= { turnId: entry.turnId, events: [] };
-          segment.events.push(entry.event);
+          break;
         }
-        break;
-      case "Submitted":
-      case "Environment":
-      case "Interrupted":
-      case "Requested":
-        break;
+        if (segment !== undefined && segment.turnId !== entry.turnId) flush();
+        segment ??= { turnId: entry.turnId, reader: reader() };
+        segment.reader.add(record);
     }
   }
   flush();
   return {
     history: items,
     transcript: HarnessEvent.transcript(current, items, { unfinished: "omit" }),
-    own: read(own),
-    entries: own,
+    own: own.reading(),
+    entries,
     begun,
   };
 };

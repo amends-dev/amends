@@ -24,23 +24,29 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    reason `prepare` gives.
 2. Fail the turn if its environment has a sandbox, its harness is not among `harnesses`, or its
    connection's implementation is not among `models`. Otherwise `start` a queued turn with the
-   model access and environment it prepared with, and prepare again, since starting a
-   participation's first turn records the thread's history in the agent's log.
-3. When `prepare` proposes a checkpoint, record it first: the turn's model summarizes the older
+   model access and environment it prepared with, which records them with the agent's
+   instructions in the agent's log, and prepare again, since starting a participation's first turn
+   records the thread's history there first.
+3. Count the turn's attempts since it last got further, as its log records them: past `retries`
+   (three), fail the turn with its latest interruption, or say it kept stopping. After an
+   interruption worth retrying, and when a run begins after an attempt that died without recording
+   why, as when its process did, wait 2, 4, then 8 seconds first and prepare again. Then record the
+   `attempt`, a harness session or a summary.
+4. When `prepare` proposes a checkpoint, record it first: the turn's model summarizes the older
    history and input (`Compaction.summarize`) in passes of up to 200,000 characters, each reading
    the summary so far, and the run prepares again. A pass that fails or stays silent past
    `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
    turn; nothing is left out instead.
-4. Spawn the environment with a new session ID and the agent's instructions, and prepare the
+5. Spawn the environment with a new session ID and the instructions the turn started with, and prepare the
    harness with the transcript `prepare` gave, read from the agent's log for the thread, so a run
    continuing an interrupted turn repeats no input and asks for a fresh response in place of one
    left unfinished.
-5. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
+6. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
    what it accepted from the thread, as one batch recorded as `submitted` first. A batch is named
-   by its turn and the position it reaches, so submitting the same input again after a restart
-   records it once. Without new input, `resume` a conversation that awaits
+   by its turn and the positions it follows and reaches, and its first record stands: submitting
+   the same input again after a restart hands the harness the batch as recorded. Without new input, `resume` a conversation that awaits
    a response.
-6. `report` what the environment and its harness report until the harness is idle: each completed
+7. `report` what the environment and its harness report until the harness is idle: each completed
    block, finished response, tool start and result, and the environment becoming ready; text and
    reasoning deltas are not recorded. Text deltas are shown to the thread's readers instead, as
    drafts: at most every 150 milliseconds, each block's new text in pieces of up to 1,500
@@ -55,9 +61,10 @@ the turn is no longer running, as when someone asks it to stop; preparing again 
 stop. While the harness waits on its model, a silence longer than `idleTimeout` (five minutes)
 counts as the harness stopping, with a failure worth retrying, so a model that stops answering does
 not hold the turn; time a tool call the harness started spends running does not count. A harness
-that stops is recorded as `interrupted` in the turn's log. When its failure is worth retrying, the
-runner waits 2, 4, then 8 seconds and runs a new session from the log, up to `retries` (three)
-times; otherwise it fails the turn. Readers are told the failure's `problem` in words that name
+that stops is recorded as `interrupted` in the turn's log, with its `problem`. When its failure is
+worth retrying, the run prepares again and counts it as above, so a new session continues from the
+log after a wait; otherwise it fails the turn. The count lives in the log, so a restart does not
+reset it, and a turn whose runs keep dying with their process is given up too. Readers are told the failure's `problem` in words that name
 the connection and model, such as "Anthropic didn't accept its API key." or "claude-sonnet-5 sent
 nothing for 5 minutes."; a summary that fails says the earlier conversation couldn't be
 summarized, and why. The harness's own reason, and a provider's message, which can name addresses

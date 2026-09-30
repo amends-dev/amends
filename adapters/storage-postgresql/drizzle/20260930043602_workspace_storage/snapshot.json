@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "f246241d-69ba-4283-9f3a-d6754b4cf353",
+  "id": "e5856eb1-8a98-4c27-b8f2-330e4428b0e4",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -3152,19 +3152,6 @@
       "table": "turns"
     },
     {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "incorporated_through_sequence",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "turns"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -5317,7 +5304,7 @@
       "table": "threads"
     },
     {
-      "value": "\"input_after_sequence\" <= \"incorporated_through_sequence\" AND \"incorporated_through_sequence\" <= \"accepted_through_sequence\" AND \"input_after_sequence\" < \"accepted_through_sequence\"",
+      "value": "\"input_after_sequence\" <= \"accepted_through_sequence\"",
       "name": "turn_input_order",
       "entityType": "checks",
       "schema": "public",

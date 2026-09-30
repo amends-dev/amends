@@ -13,7 +13,7 @@ import {
   ThreadParticipationApplication,
   type ThreadTimeline,
 } from "@amends/core/thread";
-import { Turn, TurnApplication, TurnExecution } from "@amends/core/turn";
+import { Turn, TurnApplication, TurnExecution, TurnLog } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { HarnessEvent, Transcript } from "@amends/harness";
@@ -169,6 +169,12 @@ const input = (text: string): Transcript.Input => ({
   author: { id: "alice", name: "Alice" },
   content: [{ _tag: "Text", text }],
 });
+/** What the agent is told after one of its turns stopped short. */
+const note = (text: string) => ({
+  _tag: "Input",
+  author: { id: "amends", name: "Amends" },
+  content: [{ _tag: "Text", text }],
+});
 const batch = (id: string, text: string) => ({
   id: HarnessEvent.BatchId.make(id),
   items: [input(text)] as const,
@@ -226,7 +232,6 @@ export const turns = (harness: ConformanceHarness) => {
                 status: "queued",
                 inputAfterSequence: started.activity.sequence - 1,
                 acceptedThroughSequence: started.activity.sequence,
-                incorporatedThroughSequence: started.activity.sequence - 1,
                 selection: null,
               });
               expect(yield* bound.notifications.get(asked!.id)).toEqual(
@@ -298,22 +303,28 @@ export const turns = (harness: ConformanceHarness) => {
                 ),
               ).toEqual({ _tag: "InputPending" });
               const first = batch("b1", "Scout, summarize the plan.");
-              const progressed = yield* execute(
+              yield* execute(
                 workspace.id,
                 Effect.flatMap(TurnExecution.Service, (execution) =>
                   Effect.gen(function* () {
                     yield* execution.submitted(turnId, {
                       batchId: first.id,
                       throughSequence: started.activity.sequence,
+                      items: first.items,
                     });
-                    return yield* execution.report(
+                    yield* execution.report(
                       turnId,
                       reported(took(first), ...answered("r1", "An early answer.")),
                     );
                   }),
                 ),
               );
-              expect(progressed.incorporatedThroughSequence).toBe(started.activity.sequence);
+              // How far the turn's input is taken in is its log's to say.
+              const taken = yield* execute(
+                workspace.id,
+                Effect.flatMap(TurnExecution.Service, (execution) => execution.entries(turnId)),
+              );
+              expect(TurnLog.read(taken).incorporatedThrough(0)).toBe(started.activity.sequence);
               // New work that has not been accepted yet keeps the turn open.
               const more = yield* reply(workspace.id, threadId, "Include the risks too.");
               expect(
@@ -331,6 +342,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(turnId, {
                       batchId: second.id,
                       throughSequence: more.activity.sequence,
+                      items: second.items,
                     });
                     yield* execution.report(
                       turnId,
@@ -342,10 +354,7 @@ export const turns = (harness: ConformanceHarness) => {
               );
               expect(closing._tag).toBe("Closed");
               const [closed] = yield* turnsOf(workspace.id, threadId);
-              expect(closed).toMatchObject({
-                status: "completed",
-                incorporatedThroughSequence: more.activity.sequence,
-              });
+              expect(closed).toMatchObject({ status: "completed" });
               expect(closed?.messageIds).toHaveLength(2);
               // The early answer came before more input was taken in, so it is owed too: each is
               // the agent's own message, verbatim, in order, after the input that followed it.
@@ -404,6 +413,17 @@ export const turns = (harness: ConformanceHarness) => {
                 Effect.flatMap(TurnExecution.Service, (execution) => execution.entries(turnId)),
               );
               expect(entries.filter(({ entry }) => entry._tag === "Submitted")).toHaveLength(2);
+              // The log says how the turn began and ended, as its facts do.
+              expect(entries.find(({ entry }) => entry._tag === "Started")?.entry).toMatchObject({
+                selection,
+                instructions: "Help the team.",
+              });
+              expect(entries.at(-1)?.entry).toMatchObject({
+                _tag: "Ended",
+                outcome: "completed",
+                messageIds: closed!.messageIds,
+              });
+              expect(TurnLog.read(entries).incorporatedThrough(0)).toBe(more.activity.sequence);
               // The agent's reply asks nothing of it: no new turn follows.
               const bound = yield* boundTo(workspace.id);
               expect(
@@ -440,7 +460,7 @@ export const turns = (harness: ConformanceHarness) => {
                   step: (execution: TurnExecution.Interface) => Effect.Effect<A, E>,
                 ) => execute(workspace.id, Effect.flatMap(TurnExecution.Service, step));
 
-                // A queued turn has written nothing yet.
+                // A queued turn has written nothing yet, so following it waits for its entries.
                 const next = yield* followLog(workspace.id, turnId);
                 expect(brief(yield* next)).toBe("opened ");
                 const first = batch("b1", "Scout, summarize the plan.");
@@ -450,6 +470,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(turnId, {
                       batchId: first.id,
                       throughSequence: started.activity.sequence,
+                      items: first.items,
                     });
                     yield* execution.report(turnId, reported(took(first)));
                   }),
@@ -470,7 +491,7 @@ export const turns = (harness: ConformanceHarness) => {
                 );
                 expect(brief(yield* next)).toBe("changed 1:The plan is on track. (reply)");
                 expect(brief(yield* late)).toBe("changed 1:The plan is on track. (reply)");
-                // Closing records nothing more in the log; the turn's end says every item arrived.
+                // Closing records the turn's end in its log, after every item it wrote.
                 yield* run((execution) => execution.close(turnId));
                 expect(brief(yield* next)).toBe("ended");
                 expect(yield* next).toBe("done");
@@ -486,6 +507,34 @@ export const turns = (harness: ConformanceHarness) => {
           ),
         ),
       60_000,
+    );
+
+    it.effect("following a queued turn ends when it is stopped before it starts", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.scoped(
+            Effect.gen(function* () {
+              const { workspace, agent } = yield* workspaceWithAgent;
+              const started = yield* start(workspace.id, "Scout, draft the notes.", [
+                agent.memberId,
+              ]);
+              yield* accept(workspace.id);
+              const [queued] = yield* turnsOf(workspace.id, started.thread.id);
+              const next = yield* followLog(workspace.id, queued!.id);
+              expect(brief(yield* next)).toBe("opened ");
+              yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(TurnApplication.Service, (turns) => turns.cancel(queued!.id)),
+              );
+              // Its end is in its agent's log, which is all a reader follows.
+              expect(brief(yield* next)).toBe("ended");
+              expect(yield* next).toBe("done");
+            }),
+          ),
+        ),
+      ),
     );
 
     it.effect(
@@ -518,15 +567,36 @@ export const turns = (harness: ConformanceHarness) => {
               const [second] = yield* turnsOf(workspace.id, threadId);
               expect(second).toMatchObject({
                 status: "queued",
-                inputAfterSequence: first!.incorporatedThroughSequence,
+                inputAfterSequence: first!.inputAfterSequence,
                 acceptedThroughSequence: again.activity.sequence,
               });
+              const entriesOf = (turnId: Turn.Id) =>
+                execute(
+                  workspace.id,
+                  Effect.flatMap(TurnExecution.Service, (execution) => execution.entries(turnId)),
+                );
+              // The turn stopped before it started leaves only its end in the agent's log, so the
+              // next turn still records the thread's history before it starts.
+              expect((yield* entriesOf(first!.id)).map(({ entry }) => entry)).toEqual([
+                {
+                  _tag: "Ended",
+                  turnId: first!.id,
+                  outcome: "cancelled",
+                  reason: null,
+                  cancelReason: "requested",
+                  messageIds: [],
+                },
+              ]);
               yield* execute(
                 workspace.id,
                 Effect.flatMap(TurnExecution.Service, (execution) =>
                   execution.start(second!.id, selection),
                 ),
               );
+              expect((yield* entriesOf(second!.id)).map(({ entry }) => entry._tag)).toEqual([
+                "History",
+                "Started",
+              ]);
               // A running turn stops once execution confirms it; meanwhile new work waits.
               expect(yield* cancel(second!.id)).toMatchObject({ status: "cancelling" });
               yield* reply(workspace.id, threadId, "Actually, just the summary.");
@@ -626,6 +696,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(queued!.id, {
                       batchId: first.id,
                       throughSequence: started.activity.sequence,
+                      items: first.items,
                     });
                     yield* execution.report(queued!.id, reported(took(first)));
                     yield* execution.fail(queued!.id, "The model provider is unavailable.");
@@ -646,9 +717,8 @@ export const turns = (harness: ConformanceHarness) => {
                 participationId: failed!.participationId,
                 historyFrom: failed!.historyFrom,
                 retryOf: failed!.id,
-                inputAfterSequence: failed!.inputAfterSequence,
+                inputAfterSequence: started.activity.sequence,
                 acceptedThroughSequence: failed!.acceptedThroughSequence,
-                incorporatedThroughSequence: failed!.incorporatedThroughSequence,
                 selection: null,
                 failure: null,
                 stoppable: true,
@@ -685,9 +755,14 @@ export const turns = (harness: ConformanceHarness) => {
               ).toMatchObject({
                 _tag: "Ready",
                 plan: {
-                  history: [input("Scout, draft the notes.")],
+                  // The retry knows how the turn it retries ended.
+                  history: [
+                    input("Scout, draft the notes."),
+                    note("Your work here stopped: The model provider is unavailable."),
+                  ],
                   pending: {
-                    throughSequence: failed!.incorporatedThroughSequence,
+                    afterSequence: started.activity.sequence,
+                    throughSequence: started.activity.sequence,
                     items: [
                       {
                         _tag: "Input",
@@ -706,7 +781,8 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.start(retried.id, selection);
                     yield* execution.submitted(retried.id, {
                       batchId: request.id,
-                      throughSequence: failed!.incorporatedThroughSequence,
+                      throughSequence: started.activity.sequence,
+                      items: request.items,
                     });
                     yield* execution.report(
                       retried.id,
@@ -762,6 +838,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(first!.id, {
                       batchId: asked.id,
                       throughSequence: started.activity.sequence,
+                      items: asked.items,
                     });
                     yield* execution.report(
                       first!.id,
@@ -820,6 +897,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(second!.id, {
                       batchId: followUp.id,
                       throughSequence: more.activity.sequence,
+                      items: followUp.items,
                     });
                     yield* execution.report(
                       second!.id,
@@ -859,6 +937,7 @@ export const turns = (harness: ConformanceHarness) => {
                       id: "s2/1",
                       parts: [{ _tag: "Text", text: "The rollback plan is" }],
                     },
+                    note("Your work here was stopped before it finished, as someone asked."),
                   ],
                   pending: { throughSequence: last.activity.sequence },
                 },
@@ -880,7 +959,8 @@ export const turns = (harness: ConformanceHarness) => {
                   }),
                 ),
               );
-              expect(recorded.historyFrom).not.toBeNull();
+              // The next turn's history starts from it, where it sits in the agent's log.
+              expect(recorded).toBeGreaterThan(third!.logAfter!);
               const opening = {
                 _tag: "Input",
                 author: { id: "checkpoint" },
@@ -897,6 +977,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(third!.id, {
                       batchId: dateOnly.id,
                       throughSequence: last.activity.sequence,
+                      items: dateOnly.items,
                     });
                     yield* execution.report(
                       third!.id,
@@ -909,7 +990,7 @@ export const turns = (harness: ConformanceHarness) => {
               yield* reply(workspace.id, threadId, "Thanks.");
               yield* accept(workspace.id);
               const [fourth] = yield* turnsOf(workspace.id, threadId);
-              expect(fourth).toMatchObject({ historyFrom: recorded.historyFrom });
+              expect(fourth).toMatchObject({ historyFrom: recorded });
               expect(yield* prepare(fourth!.id)).toMatchObject({
                 _tag: "Ready",
                 plan: {
@@ -1030,6 +1111,7 @@ export const turns = (harness: ConformanceHarness) => {
                     yield* execution.submitted(first!.id, {
                       batchId: took.id,
                       throughSequence: asked.activity.sequence,
+                      items: took.items,
                     });
                     yield* execution.report(
                       first!.id,

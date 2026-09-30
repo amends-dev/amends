@@ -276,12 +276,6 @@ const registry: ReadonlyArray<Registered> = [
   register(TurnFacts.Started, {
     requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
   }),
-  register(TurnFacts.InputIncorporated, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
-  }),
-  register(TurnFacts.Compacted, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
-  }),
   register(TurnFacts.CancelRequested, {
     requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
   }),

@@ -1,6 +1,7 @@
 import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { Environment } from "@amends/core/environment";
+import { Log } from "@amends/core/journal";
 import { Turn, TurnErrors, TurnExecution, TurnLog } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { TurnRunner } from "@amends/execution";
@@ -33,7 +34,6 @@ const queued = Schema.decodeUnknownSync(Turn.Record)({
   status: "queued",
   inputAfterSequence: 0,
   acceptedThroughSequence: 1,
-  incorporatedThroughSequence: 0,
   selection: null,
   messageIds: [],
   failure: null,
@@ -79,7 +79,8 @@ const input = (text: string): Transcript.Input => ({
 
 /**
  * Turn execution over one turn in memory, as core records it: the thread's messages by position,
- * notifications its agent has yet to accept, and every step execution takes, in order.
+ * notifications its agent has yet to accept, the agent's instructions, the turn's own log, and every
+ * step execution takes, in order.
  */
 const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
   const state = {
@@ -87,6 +88,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     log: [] as Array<TurnLog.Recorded>,
     messages: [{ sequence: 1, text: "What is the tide at noon?" }],
     unaccepted: false,
+    instructions: "Be brief.",
     steps: [] as Array<string>,
     drafts: [] as Array<{ responseId: string; part: number; offset: number; text: string }>,
     replies: [] as Array<string>,
@@ -101,22 +103,28 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
   const change = (changes: Partial<Turn.Record>) => {
     state.turn = Turn.change(state.turn, changes);
   };
+  /** Record an entry of the turn's own, at the log's next position. */
+  const record = (entry: TurnLog.Entry) => {
+    state.log.push({ entry, at, position: Log.Position.make(state.log.length) });
+  };
+  const incorporated = () =>
+    TurnLog.read(state.log).incorporatedThrough(state.turn.inputAfterSequence);
   const require = (statuses: ReadonlyArray<Turn.Status>) =>
     statuses.includes(state.turn.status)
       ? Effect.void
       : Effect.fail(new TurnErrors.NotActive({ turnId, status: state.turn.status }));
   const plan = (): TurnExecution.Plan => {
+    const after = incorporated();
     const [first, ...rest] = state.messages
       .filter(
         (message) =>
-          message.sequence > state.turn.incorporatedThroughSequence &&
-          message.sequence <= state.turn.acceptedThroughSequence,
+          message.sequence > after && message.sequence <= state.turn.acceptedThroughSequence,
       )
       .map((message) => input(message.text));
     const context = TurnLog.context(state.log, turnId);
     return {
       turn: state.turn,
-      instructions: "Be brief.",
+      instructions: context.own.started?.instructions ?? state.instructions,
       selection: state.turn.selection ?? selection,
       connection: {
         name: "Test models",
@@ -130,8 +138,15 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       pending:
         first === undefined
           ? undefined
-          : { throughSequence: state.turn.acceptedThroughSequence, items: [first, ...rest] },
+          : {
+              afterSequence: after,
+              throughSequence: state.turn.acceptedThroughSequence,
+              items: [first, ...rest],
+            },
       log: [...state.log],
+      attempts: context.own.attempts,
+      interruption: context.own.interruption,
+      diedLast: context.own.diedLast,
       compaction: state.compaction,
     };
   };
@@ -148,37 +163,36 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       Effect.gen(function* () {
         yield* require(["queued"]);
         state.steps.push("start");
+        record({ _tag: "Started", turnId, selection: chosen, instructions: state.instructions });
         change({ status: "running", selection: chosen });
         return state.turn;
+      }),
+    attempt: (_, kind) =>
+      Effect.gen(function* () {
+        yield* require(["running", "cancelling"]);
+        state.steps.push(`attempt ${kind}`);
+        record({ _tag: "Attempt", turnId, kind });
       }),
     submitted: (_, batch) =>
       Effect.sync(() => {
         state.steps.push(`submitted ${batch.batchId}`);
-        if (
-          !state.log.some(
-            ({ entry }) => entry._tag === "Submitted" && entry.batchId === batch.batchId,
-          )
-        )
-          state.log.push({ entry: { _tag: "Submitted", turnId, ...batch }, at });
+        const found = state.log.find(
+          ({ entry }) => entry._tag === "Submitted" && entry.batchId === batch.batchId,
+        )?.entry;
+        if (found?._tag === "Submitted") return found.items;
+        record({ _tag: "Submitted", turnId, ...batch });
+        return batch.items;
       }),
     report: (_, events) =>
       Effect.sync(() => {
-        for (const event of events) state.steps.push(`report ${event.event._tag}`);
-        state.log.push(
-          ...events.map((event): TurnLog.Recorded => ({
-            entry:
-              event._tag === "Harness"
-                ? { _tag: "Harness", turnId, event: event.event }
-                : { _tag: "Environment", turnId, event: event.event },
-            at,
-          })),
-        );
-        change({
-          incorporatedThroughSequence: TurnLog.read(state.log).incorporatedThrough(
-            state.turn.inputAfterSequence,
-          ),
-        });
-        return state.turn;
+        for (const event of events) {
+          state.steps.push(`report ${event.event._tag}`);
+          record(
+            event._tag === "Harness"
+              ? { _tag: "Harness", turnId, event: event.event }
+              : { _tag: "Environment", turnId, event: event.event },
+          );
+        }
       }),
     draft: (_, piece) =>
       Effect.sync(() => {
@@ -187,15 +201,15 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     interrupted: (_, stop) =>
       Effect.sync(() => {
         state.steps.push(`interrupted ${stop.retryable ? "retryable" : "final"}`);
-        state.log.push({ entry: { _tag: "Interrupted", turnId, ...stop }, at });
+        record({ _tag: "Interrupted", turnId, ...stop });
       }),
     checkpoint: (_, recorded) =>
       Effect.sync(() => {
         state.steps.push("checkpoint");
         state.checkpoints.push({ ...recorded });
-        state.log.push({ entry: { _tag: "Checkpoint", turnId, ...recorded }, at });
+        record({ _tag: "Checkpoint", turnId, ...recorded });
         state.compaction = undefined;
-        return state.turn;
+        return Log.Position.make(state.log.length - 1);
       }),
     entries: () => Effect.sync(() => [...state.log]),
     close: () =>
@@ -206,10 +220,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
           return { _tag: "Stopped" } as const;
         }
         yield* require(["running"]);
-        if (
-          state.turn.incorporatedThroughSequence < state.turn.acceptedThroughSequence ||
-          state.unaccepted
-        )
+        if (incorporated() < state.turn.acceptedThroughSequence || state.unaccepted)
           return { _tag: "InputPending" } as const;
         state.replies = TurnLog.read(state.log).replies.map((reply) => reply.text);
         change({ status: "completed" });
@@ -233,7 +244,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     state.messages.push({ sequence, text });
     change({ acceptedThroughSequence: sequence });
   };
-  return { state, execution, accept };
+  return { state, execution, accept, record };
 };
 
 /** A model that answers each request with the next script and keeps every prompt it was sent. */
@@ -353,7 +364,8 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted turn-one/through:1",
+        "attempt session",
+        "submitted turn-one/after:0/through:1",
         "report Ready",
         "report InputIncorporated",
         "report BlockCompleted",
@@ -371,7 +383,9 @@ describe("TurnRunner", () => {
         "ResponseFinished",
         "Idle",
       ]);
-      expect(state.log[1]?.entry).toMatchObject({ _tag: "Environment", event: { _tag: "Ready" } });
+      expect(state.log.find(({ entry }) => entry._tag === "Environment")?.entry).toMatchObject({
+        event: { _tag: "Ready" },
+      });
       expect(texts(prompts[0])).toEqual(["Be brief.", "Alice: What is the tide at noon?"]);
     }),
   );
@@ -443,14 +457,15 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted turn-one/through:1",
+        "attempt session",
+        "submitted turn-one/after:0/through:1",
         "report Ready",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
         "report Idle",
         "close",
-        "submitted turn-one/through:3",
+        "submitted turn-one/after:1/through:3",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -484,7 +499,7 @@ describe("TurnRunner", () => {
       yield* settle(fiber);
 
       expect(state.steps.slice(-6)).toEqual([
-        "submitted turn-one/through:2",
+        "submitted turn-one/after:1/through:2",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -509,7 +524,8 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted turn-one/through:1",
+        "attempt session",
+        "submitted turn-one/after:0/through:1",
         "report Ready",
         "report InputIncorporated",
         "stopped",
@@ -532,10 +548,12 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
-        "submitted turn-one/through:1",
+        "attempt session",
+        "submitted turn-one/after:0/through:1",
         "report Ready",
         "report InputIncorporated",
         "interrupted retryable",
+        "attempt session",
         "report Ready",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -578,6 +596,58 @@ describe("TurnRunner", () => {
     }),
   );
 
+  it.effect("gives up a turn whose attempts, as its log counts them, keep getting nowhere", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      const { implementation, prompts } = yield* scripted([]);
+      const runner = yield* runnerOver(execution, implementation, { retries: 2 });
+      // Earlier runs died, as when their process did: the log still counts them.
+      state.turn = Turn.change(state.turn, { status: "running", selection });
+      record({ _tag: "Started", turnId, selection, instructions: "Be brief." });
+      for (let attempt = 0; attempt < 3; attempt += 1)
+        record({ _tag: "Attempt", turnId, kind: "session" });
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(state.steps).toEqual(["fail: The turn kept stopping before it got anywhere."]);
+      expect(prompts).toEqual([]);
+    }),
+  );
+
+  it.effect("waits before running again after an attempt that died, then carries on", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      const { implementation } = yield* scripted([reply("Noon.")]);
+      const runner = yield* runnerOver(execution, implementation);
+      state.turn = Turn.change(state.turn, { status: "running", selection });
+      record({ _tag: "Started", turnId, selection, instructions: "Be brief." });
+      record({ _tag: "Attempt", turnId, kind: "session" });
+
+      const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
+      yield* TestClock.adjust("1 second");
+      expect(state.steps).toEqual([]);
+      yield* settle(fiber);
+
+      expect(state.steps[0]).toBe("attempt session");
+      expect(state.replies).toEqual(["Noon."]);
+    }),
+  );
+
+  it.effect("keeps the instructions its agent had when the turn started", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      const { implementation, prompts } = yield* scripted([reply("Midi.")]);
+      const runner = yield* runnerOver(execution, implementation);
+      state.turn = Turn.change(state.turn, { status: "running", selection });
+      record({ _tag: "Started", turnId, selection, instructions: "Answer in French." });
+      state.instructions = "Be brief.";
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(texts(prompts[0])[0]).toBe("Answer in French.");
+    }),
+  );
+
   it.effect("records a checkpoint with a summary before working when the history is too long", () =>
     Effect.gen(function* () {
       const { state, execution } = fakeExecution();
@@ -599,10 +669,12 @@ describe("TurnRunner", () => {
 
       yield* runner.run(workspaceId, turnId);
 
-      expect(state.steps.slice(0, 3)).toEqual([
+      expect(state.steps.slice(0, 5)).toEqual([
         "start",
+        "attempt summary",
         "checkpoint",
-        "submitted turn-one/through:1",
+        "attempt session",
+        "submitted turn-one/after:0/through:1",
       ]);
       expect(state.checkpoints).toEqual([
         { summary: "The launch went well.", kept, through: null },

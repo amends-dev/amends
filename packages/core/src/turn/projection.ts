@@ -19,7 +19,7 @@ const stored = Effect.fnUntraced(function* (payload: {
   return { store, turn: found.value };
 });
 
-export const definition = Projection.make("turns", { version: 2 })
+export const definition = Projection.make("turns", { version: 3 })
   .on(
     TurnFacts.Created,
     Effect.fn("TurnProjection.created")(function* ({ payload }) {
@@ -59,22 +59,6 @@ export const definition = Projection.make("turns", { version: 2 })
           startedAt: payload.startedAt,
         }),
       );
-    }),
-  )
-  .on(
-    TurnFacts.InputIncorporated,
-    Effect.fn("TurnProjection.inputIncorporated")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, { incorporatedThroughSequence: payload.incorporatedThroughSequence }),
-      );
-    }),
-  )
-  .on(
-    TurnFacts.Compacted,
-    Effect.fn("TurnProjection.compacted")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(Turn.change(turn, { historyFrom: payload.historyFrom }));
     }),
   )
   .on(

@@ -3,7 +3,6 @@ import type { PlatformError, Scope } from "effect";
 import { AgentPermissions } from "../agent/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
-import { ChangeFeedSource } from "../change-feed/source.ts";
 import { Actor } from "../identity/actor.ts";
 import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
@@ -21,6 +20,7 @@ import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnActivityRecorder } from "./activity-recorder.ts";
 import { TurnDrafts } from "./drafts.ts";
+import { TurnEnding } from "./ending.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -49,7 +49,8 @@ export type ChangeError =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | TurnActivityRecorder.Error;
+  | TurnActivityRecorder.Error
+  | TurnEnding.Error;
 export type CancelError = ChangeError | NotActive;
 export type RetryError =
   | ChangeError
@@ -113,12 +114,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/turn/application/Service",
 ) {}
 
-/** The facts that end a turn. */
-const endings: ReadonlySet<string> = new Set([
-  TurnFacts.Completed.name,
-  TurnFacts.Failed.name,
-  TurnFacts.Cancelled.name,
-]);
 /** Batches of a turn's log read at a time. */
 const logPage = 100;
 
@@ -134,9 +129,9 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const receipts = yield* RequestReceipts.Service;
   const members = yield* MemberStore.Service;
   const activity = yield* TurnActivityRecorder.Service;
+  const ending = yield* TurnEnding.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
-  const source = yield* ChangeFeedSource.Service;
   const signals = yield* Signals.Service;
   const drafts = yield* TurnDrafts.Service;
   const crypto = yield* Crypto.Crypto;
@@ -264,29 +259,9 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
   const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
     const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
-    // The turn's entries sit together in its agent's log, from where it began until another turn's.
-    const handle = TurnLog.open(log, turn.participationId);
-    const records: Array<TurnLog.Recorded> = [];
-    let after = turn.logAfter ?? undefined;
-    reading: for (;;) {
-      const batches = yield* handle.read(
-        after === undefined ? { limit: 100 } : { after, limit: 100 },
-      );
-      if (batches.length === 0) break;
-      for (const batch of batches) {
-        for (const entry of batch.entries) {
-          if (entry.payload.turnId !== turn.id) {
-            if (records.length > 0) break reading;
-            continue;
-          }
-          records.push({ entry: entry.payload, at: entry.recordedAt });
-        }
-        after = batch.position;
-      }
-    }
     return {
       turn: yield* presentOne(turn),
-      items: TurnLog.read(records).items,
+      items: TurnLog.read(yield* TurnLog.entriesOf(log, turn)).items,
     } satisfies Turn.LogView;
   });
 
@@ -295,18 +270,17 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
   const watchLog = Effect.fn("TurnApplication.watchLog")(function* (turnId: Turn.Id) {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
-    // Register for drafts and for the journal before reading, so neither misses what follows:
-    // the turn ends by a fact in the journal, which its agent's log does not record.
+    // Register for drafts before reading, so none that follows is missed.
     const live = yield* signals.subscribe;
-    const journalled = yield* source.subscribe(Option.none()).pipe(Effect.mapError(unavailable));
     const turn = yield* readable(id);
     const handle = TurnLog.open(log, turn.participationId);
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Service;
 
-    // The turn's entries sit together in its agent's log after `logAfter`: only one turn writes
-    // there at a time, so another turn's entry means this one's are over.
-    const records: Array<TurnLog.Recorded> = [];
+    // The turn's entries sit together in its agent's log after `logAfter`, read as they come, and
+    // end with its end: only one turn writes there at a time, so another turn's entry also means
+    // this one's are over.
+    const reader = TurnLog.reader();
     let after = turn.logAfter ?? undefined;
     let over = false;
     const take = (batches: ReadonlyArray<Log.Batch<TurnLog.Entry>>) => {
@@ -316,9 +290,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             over = true;
             return;
           }
-          records.push({ entry: entry.payload, at: entry.recordedAt });
+          reader.add({ entry: entry.payload, at: entry.recordedAt, position: batch.position });
+          if (entry.payload._tag === "Ended") over = true;
         }
         after = batch.position;
+        if (over) return;
       }
     };
     /** Read what the log holds past what was taken, until the turn's entries are over. */
@@ -334,7 +310,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     // The items as sent, so a change is told apart from what the reader has.
     let sent: ReadonlyArray<Turn.LogItem> = [];
     const changes = (): ReadonlyArray<Turn.LogChange> => {
-      const items = TurnLog.read(records).items;
+      const items = reader.reading().items;
       const changed = items.flatMap((item, index) => {
         const before = sent[index];
         return before !== undefined && sameItem(before, item) ? [] : [{ index, item }];
@@ -348,11 +324,10 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     };
     const ended = Turn.LogMessage.cases.Ended.make({});
 
-    // A turn that never started wrote nothing.
-    if (turn.startedAt !== null) yield* catchUp;
-    sent = TurnLog.read(records).items;
+    yield* catchUp;
+    sent = reader.reading().items;
     const opened = Turn.LogMessage.cases.Opened.make({ items: sent });
-    if (!Turn.active(turn.status)) return Stream.make(opened, ended);
+    if (over || !Turn.active(turn.status)) return Stream.make(opened, ended);
     // What the response being written holds so far, since drafts carry only what follows it.
     const written = (yield* drafts.current(turn.id)).map((draft) =>
       Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
@@ -360,27 +335,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
     type Input =
       | { readonly _tag: "Logged"; readonly batch: Log.Batch<TurnLog.Entry> }
-      | { readonly _tag: "Finished" }
       | { readonly _tag: "Drafted"; readonly draft: Turn.LogMessage };
     const logged = Stream.suspend(() =>
       handle.tail(after === undefined ? { limit: logPage } : { after, limit: logPage }),
     ).pipe(
       Stream.map((batch): Input => ({ _tag: "Logged", batch })),
-      Stream.mapError(unavailable),
-    );
-    const finished = journalled.deliveries.pipe(
-      Stream.filter((delivery) =>
-        delivery.events.some(
-          ({ event }) =>
-            endings.has(event.name) &&
-            typeof event.payload === "object" &&
-            event.payload !== null &&
-            "turnId" in event.payload &&
-            event.payload.turnId === turn.id,
-        ),
-      ),
-      Stream.take(1),
-      Stream.map((): Input => ({ _tag: "Finished" })),
       Stream.mapError(unavailable),
     );
     const drafted = live.pipe(
@@ -411,21 +370,16 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             Effect.provideService(Actor.Service, actor),
             Effect.map(() => {
               take([input.batch]);
+              // The turn's end is in its log, committed with everything it wrote.
               return over ? [...changed(), ended] : changed();
             }),
-            Effect.mapError(unavailable),
-          );
-        case "Finished":
-          // Everything the turn wrote was committed before it ended.
-          return catchUp.pipe(
-            Effect.map(() => [...changed(), ended]),
             Effect.mapError(unavailable),
           );
       }
     };
     return Stream.make(opened, ...written).pipe(
       Stream.concat(
-        Stream.mergeAll([logged, finished, drafted], { concurrency: "unbounded" }).pipe(
+        Stream.mergeAll([logged, drafted], { concurrency: "unbounded" }).pipe(
           Stream.mapEffect(step),
           Stream.flattenIterable,
           Stream.takeUntil((message) => message._tag === "Ended"),
@@ -453,22 +407,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         Object.assign({}, where, { reason: "requested" as const, requestedAt: at }),
       );
       if (turn.status === "queued") {
-        const event = yield* journal.publish(
-          TurnFacts.Cancelled,
-          Object.assign({}, where, { finishedAt: at }),
-        );
-        yield* activity.record(
-          turn.threadId,
-          TurnActivity.Ended,
-          {
-            turnId: turn.id,
-            outcome: "cancelled",
-            messageIds: [],
-            reason: null,
-            cancelReason: "requested",
-          },
-          event,
-        );
+        yield* ending.end(turn, { outcome: "cancelled", cancelReason: "requested" });
         return yield* presentOne(
           Turn.change(turn, { status: "cancelled", cancelReason: "requested", finishedAt: at }),
         );
@@ -507,9 +446,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
           const reason = yield* retryBlock(turn);
           if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
           const handle = TurnLog.open(log, turn.participationId);
-          // The same input, continuing after the failed or stopped turn in the agent's log with what
-          // it took in, and the agent's current model access and environment. It is created after the turn it
-          // retries, even on a clock that has not moved, so it is the agent's latest there.
+          // The same input, continuing after the failed or stopped turn in the agent's log: its
+          // input starts after what that turn took in, from the latest checkpoint the log holds,
+          // with the agent's current model access and environment. It is created after the turn
+          // it retries, even on a clock that has not moved, so it is the agent's latest there.
+          const retried = TurnLog.read(yield* TurnLog.entriesOf(log, turn));
           const now = yield* DateTime.now;
           const createdAt = DateTime.isGreaterThan(now, turn.createdAt)
             ? now
@@ -523,12 +464,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             memberId: turn.memberId,
             participationId: turn.participationId,
             logAfter: Option.getOrNull(yield* handle.head),
-            historyFrom: turn.historyFrom,
+            historyFrom: retried.checkpoint ?? turn.historyFrom,
             retryOf: turn.id,
             status: "queued",
-            inputAfterSequence: turn.inputAfterSequence,
+            inputAfterSequence: retried.incorporatedThrough(turn.inputAfterSequence),
             acceptedThroughSequence: turn.acceptedThroughSequence,
-            incorporatedThroughSequence: turn.incorporatedThroughSequence,
             selection: null,
             messageIds: [],
             failure: null,

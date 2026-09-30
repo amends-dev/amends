@@ -28,7 +28,11 @@ export interface Options {
   readonly models: ReadonlyArray<ModelInference.Implementation>;
   /** How often a running turn looks for a request to stop: every second by default. */
   readonly checkInterval?: Duration.Input | undefined;
-  /** How many times a turn runs again after a failure worth retrying: three by default. */
+  /**
+   * How many times a turn runs again when it stopped short without getting further, whether by a
+   * failure worth retrying or by its run dying: three by default. Its log counts the attempts, so
+   * a restart does not reset them.
+   */
   readonly retries?: number | undefined;
   /** How long a turn waits for input its agent is still accepting: a minute by default. */
   readonly inputWait?: Duration.Input | undefined;
@@ -62,14 +66,17 @@ export class Service extends Context.Service<Service, Interface>()(
 
 /**
  * How a session with the harness ended: the turn finished; its state changed under it, so the
- * run prepares it again; or it can't run, for this reason.
+ * run prepares it again; it stopped short in a way worth retrying, so the run prepares it again
+ * after a wait; or it can't run, for this reason.
  */
 type Ending =
   | { readonly _tag: "Finished" }
   | { readonly _tag: "Again" }
+  | { readonly _tag: "Interrupted" }
   | { readonly _tag: "Unrunnable"; readonly reason: string };
 const finished: Ending = { _tag: "Finished" };
 const again: Ending = { _tag: "Again" };
+const interrupted: Ending = { _tag: "Interrupted" };
 const unrunnable = (reason: string): Ending => ({ _tag: "Unrunnable", reason });
 
 /**
@@ -166,20 +173,27 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       gateway.executeTurns(workspaceId, Effect.flatMap(TurnExecution.Service, use));
     const prepare = step((execution) => execution.prepare(turnId));
 
-    /** Hand the harness input the turn accepted, recorded first so its incorporation counts. */
+    /**
+     * Hand the harness input the turn accepted, recorded first so its incorporation counts: the
+     * batch as the log recorded it, which a restart submits again unchanged.
+     */
     const submit = Effect.fnUntraced(function* (
       running: Environment.Running,
       pending: NonNullable<TurnExecution.Plan["pending"]>,
     ) {
       // The same range of input always gets the same batch, so submitting it again after a
       // restart records it once.
-      const batchId = HarnessEvent.BatchId.make(`${turnId}/through:${pending.throughSequence}`);
-      yield* step((execution) =>
-        execution.submitted(turnId, { batchId, throughSequence: pending.throughSequence }),
+      const batchId = HarnessEvent.BatchId.make(
+        `${turnId}/after:${pending.afterSequence}/through:${pending.throughSequence}`,
       );
-      yield* running
-        .submit({ id: batchId, items: pending.items })
-        .pipe(Effect.catchTags(unexpected));
+      const items = yield* step((execution) =>
+        execution.submitted(turnId, {
+          batchId,
+          throughSequence: pending.throughSequence,
+          items: pending.items,
+        }),
+      );
+      yield* running.submit({ id: batchId, items }).pipe(Effect.catchTags(unexpected));
     });
 
     /** One harness session: from the plan's conversation until the turn closes or can't go on. */
@@ -380,7 +394,11 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       return again;
     });
 
-    let retried = 0;
+    /**
+     * Whether to wait before the next attempt: after an interruption worth retrying, and, when the
+     * run begins, after an attempt that died, as the turn's log shows.
+     */
+    let rest: boolean | undefined;
     for (;;) {
       const preparation = yield* prepare;
       if (preparation._tag === "Finished") return;
@@ -392,8 +410,8 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const fail = (reason: string) => step((execution) => execution.fail(turnId, reason));
       const named = { connection: plan.connection.name, model: plan.selection.model };
       /**
-       * Record why the run stopped, in words, and run it again when that may help; the detail goes
-       * to the logs only.
+       * Record why the run stopped, in words and as a problem, and run it again when that may
+       * help, after a wait; the detail goes to the logs only.
        */
       const interrupt = (
         failure: HarnessErrors.ExecutionFailed | Compaction.Failed,
@@ -401,25 +419,25 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       ) =>
         Effect.gen(function* () {
           yield* step((execution) =>
-            execution.interrupted(turnId, { reason: text, retryable: failure.retryable }),
+            execution.interrupted(turnId, {
+              reason: text,
+              retryable: failure.retryable,
+              problem: failure.problem,
+            }),
           );
           const detail = {
             workspaceId,
             turnId,
             problem: failure.problem,
             reason: failure.reason,
+            attempt: plan.attempts + 1,
           };
-          if (!failure.retryable || retried >= retries) {
+          if (!failure.retryable) {
             yield* Effect.logWarning("Turn failed", detail);
             return unrunnable(text);
           }
-          retried += 1;
-          yield* Effect.logWarning("Turn interrupted; running it again", {
-            ...detail,
-            attempt: retried,
-          });
-          yield* Effect.sleep(backoff(retried));
-          return again;
+          yield* Effect.logWarning("Turn interrupted", detail);
+          return interrupted;
         });
       if (plan.environment.sandbox !== null)
         return yield* fail("Environments with a sandbox can't run turns yet.");
@@ -437,8 +455,30 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         );
         continue;
       }
+      // A turn that keeps stopping without getting further is given up; before running it again,
+      // it waits longer each time, whether its last run was interrupted or died.
+      if (plan.attempts > retries) {
+        yield* Effect.logWarning("Turn given up", {
+          workspaceId,
+          turnId,
+          attempts: plan.attempts,
+          problem: plan.interruption?.problem,
+        });
+        return yield* fail(
+          plan.interruption?.reason ?? "The turn kept stopping before it got anywhere.",
+        ).pipe(Effect.catchTag("TurnApplication.NotActive", () => Effect.void));
+      }
+      const waits = rest ?? plan.diedLast;
+      rest = false;
+      if (waits) {
+        yield* Effect.sleep(backoff(plan.attempts));
+        continue;
+      }
       // A checkpoint the history needs comes first; either stops the same way when interrupted.
       const compaction = plan.compaction;
+      yield* step((execution) =>
+        execution.attempt(turnId, compaction === undefined ? "session" : "summary"),
+      );
       type Work = ReturnType<typeof session> | ReturnType<typeof checkpoint>;
       const ending = yield* Effect.suspend(
         (): Effect.Effect<Effect.Success<Work>, Effect.Error<Work>, Effect.Services<Work>> =>
@@ -459,6 +499,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         }),
       );
       if (ending._tag === "Finished") return;
+      rest = ending._tag === "Interrupted";
       if (ending._tag === "Unrunnable")
         return yield* fail(ending.reason).pipe(
           Effect.catchTag("TurnApplication.NotActive", () => Effect.void),

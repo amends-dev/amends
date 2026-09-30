@@ -47,7 +47,6 @@ const toRow = ({ selection, ...record }: Turn.Record): typeof turns.$inferInsert
   status: record.status,
   inputAfterSequence: record.inputAfterSequence,
   acceptedThroughSequence: record.acceptedThroughSequence,
-  incorporatedThroughSequence: record.incorporatedThroughSequence,
   connectionId: selection?.connectionId ?? null,
   model: selection?.model ?? null,
   reasoning: selection?.reasoning ?? null,

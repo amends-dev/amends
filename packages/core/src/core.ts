@@ -34,6 +34,7 @@ import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
 import { TurnActivityRecorder } from "./turn/activity-recorder.ts";
 import { TurnDrafts } from "./turn/drafts.ts";
+import { TurnEnding } from "./turn/ending.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { NotificationSource } from "./notification/source.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
@@ -193,6 +194,7 @@ const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(publish
 const groupDeparture = GroupMembershipDeparture.layer;
 const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(publisher));
 const turnActivity = TurnActivityRecorder.layer.pipe(Layer.provide(publisher));
+const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivity));
 const threadStart = ThreadStart.layer.pipe(
   Layer.provide(Layer.mergeAll(ThreadCreation.layer, messagePublication)),
 );
@@ -202,10 +204,7 @@ const activityReading = ThreadActivityReading.layer.pipe(
 );
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
 const threadReading = ThreadReading.layer;
-/**
- * One journal follower per workspace runtime, shared by its change-feed subscribers and by readers
- * following a turn's log, who learn from it when the turn ends.
- */
+/** One journal follower per workspace runtime, shared by its change-feed subscribers. */
 const changeSource = ChangeFeedSource.layer();
 const changeFeed = ChangeFeedApplication.layer.pipe(
   Layer.provide(Layer.mergeAll(changeSource, GrantResolver.layer)),
@@ -254,7 +253,7 @@ const operations = Layer.mergeAll(
       groupDeparture,
       messagePublication,
       turnActivity,
-      changeSource,
+      turnEnding,
       TurnDrafts.layer,
       RequestReceipts.layer,
     ),
@@ -268,7 +267,7 @@ const operations = Layer.mergeAll(
 const background = Layer.mergeAll(
   BackgroundRuns.layer(processes).pipe(Layer.provide(TurnAcceptance.layer)),
   TurnExecution.layer.pipe(Layer.provide(messagePublication)),
-).pipe(Layer.provide(Layer.mergeAll(threadAccess, admissions, turnActivity)));
+).pipe(Layer.provide(Layer.mergeAll(threadAccess, admissions, turnActivity, turnEnding)));
 
 /**
  * Complete core for one workspace: application operations, background runs, and turn execution over the

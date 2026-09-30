@@ -1,13 +1,20 @@
 import { HarnessEvent, Transcript } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
+import { ConnectionId } from "../../src/connection/id.ts";
+import { EnvironmentId } from "../../src/environment/id.ts";
+import { Log } from "../../src/journal/log.ts";
 import { TurnId } from "../../src/turn/id.ts";
 import { TurnLog } from "../../src/turn/log.ts";
 
 const at = DateTime.makeUnsafe("2026-09-29T12:00:00Z");
 const turnId = TurnId.Id.make("t1");
 const recorded = (...entries: ReadonlyArray<TurnLog.Entry>) =>
-  entries.map((entry): TurnLog.Recorded => ({ entry, at }));
+  entries.map((entry, index): TurnLog.Recorded => ({
+    entry,
+    at,
+    position: Log.Position.make(index),
+  }));
 const input = (text: string): Transcript.Input => ({
   _tag: "Input",
   author: { id: "alice", name: "Alice" },
@@ -17,6 +24,19 @@ const harness = (event: HarnessEvent.Event, turn = turnId): TurnLog.Entry => ({
   _tag: "Harness",
   turnId: turn,
   event,
+});
+const selection = {
+  connectionId: ConnectionId.Id.make("connection"),
+  model: "model-x",
+  reasoning: null,
+  environmentId: EnvironmentId.Id.make("environment"),
+};
+const submitted = (id: string, throughSequence: number): TurnLog.Entry => ({
+  _tag: "Submitted",
+  turnId,
+  batchId: HarnessEvent.BatchId.make(id),
+  throughSequence,
+  items: [input(id)],
 });
 const took = (id: string) =>
   harness({
@@ -55,8 +75,8 @@ const replies = (...entries: ReadonlyArray<TurnLog.Entry>) =>
 describe("TurnLog.read", () => {
   it("counts input as taken in only through batches the harness incorporated", () => {
     const entries: ReadonlyArray<TurnLog.Entry> = [
-      { _tag: "Submitted", turnId, batchId: HarnessEvent.BatchId.make("b1"), throughSequence: 3 },
-      { _tag: "Submitted", turnId, batchId: HarnessEvent.BatchId.make("b2"), throughSequence: 5 },
+      submitted("b1", 3),
+      submitted("b2", 5),
       took("b1"),
     ];
     expect(TurnLog.read(recorded(...entries)).incorporatedThrough(1)).toBe(3);
@@ -113,6 +133,7 @@ describe("TurnLog.read", () => {
         turnId,
         reason: "Lost the connection.",
         retryable: true,
+        problem: "model-unreachable",
       }),
     );
     expect(finished.items.slice(1)).toEqual([
@@ -241,7 +262,7 @@ describe("TurnLog.context", () => {
   it("counts input a checkpoint's summary took in as taken in, owing the answer before it", () => {
     const reading = TurnLog.read(
       recorded(
-        { _tag: "Submitted", turnId, batchId: HarnessEvent.BatchId.make("b1"), throughSequence: 3 },
+        submitted("b1", 3),
         tookFor(turnId, "b1"),
         block(turnId, "r1", 0, text("First answer.")),
         finish(turnId, "r1"),
@@ -252,11 +273,119 @@ describe("TurnLog.context", () => {
     expect(reading.replies.map((reply) => reply.text)).toEqual(["First answer."]);
   });
 
+  const started = (turn: TurnId.Id): TurnLog.Entry => ({
+    _tag: "Started",
+    turnId: turn,
+    selection,
+    instructions: "Help the team.",
+  });
+  const ended = (
+    turn: TurnId.Id,
+    ending: Pick<TurnLog.Ended, "outcome" | "reason" | "cancelReason">,
+  ): TurnLog.Entry => ({ _tag: "Ended", turnId: turn, messageIds: [], ...ending });
+
+  it("tells the agent when an earlier turn it started failed or was stopped", () => {
+    const note = (text: string): Transcript.Input => ({
+      _tag: "Input",
+      author: TurnLog.noteAuthor,
+      content: [{ _tag: "Text", text }],
+    });
+    const after = (ending: Pick<TurnLog.Ended, "outcome" | "reason" | "cancelReason">) =>
+      TurnLog.context(
+        recorded(
+          started(earlier),
+          tookFor(earlier, "question"),
+          block(earlier, "r0", 0, text("Half an ans")),
+          ended(earlier, ending),
+          tookFor(turnId, "again"),
+        ),
+        turnId,
+      ).history;
+    const left = [input("question"), response("r0", text("Half an ans"))];
+    expect(
+      after({ outcome: "failed", reason: "Models couldn't be reached.", cancelReason: null }),
+    ).toEqual([...left, note("Your work here stopped: Models couldn't be reached.")]);
+    expect(after({ outcome: "cancelled", reason: null, cancelReason: "requested" })).toEqual([
+      ...left,
+      note("Your work here was stopped before it finished, as someone asked."),
+    ]);
+    // Leaving the thread and finishing need no note.
+    expect(
+      after({ outcome: "cancelled", reason: null, cancelReason: "participation-ended" }),
+    ).toEqual(left);
+    expect(after({ outcome: "completed", reason: null, cancelReason: null })).toEqual(left);
+  });
+
+  it("begins the log with history, a start, or a checkpoint, not with a turn that never ran", () => {
+    const unstarted = recorded(
+      { _tag: "Requested", turnId: earlier, input: input("again") },
+      ended(earlier, { outcome: "cancelled", reason: null, cancelReason: "requested" }),
+    );
+    const context = TurnLog.context(unstarted, turnId);
+    expect(context).toMatchObject({ begun: false, history: [] });
+    expect(TurnLog.context(recorded(started(earlier)), turnId).begun).toBe(true);
+  });
+
   it("finds the log empty before a participation's first turn", () => {
     expect(TurnLog.context([], turnId).begun).toBe(false);
     expect(
       TurnLog.context(recorded({ _tag: "Requested", turnId, input: input("again") }), turnId),
     ).toMatchObject({ begun: false, own: { requested: [input("again")] } });
+  });
+});
+
+describe("TurnLog.read attempts", () => {
+  const attempt: TurnLog.Entry = { _tag: "Attempt", turnId, kind: "session" };
+  const interrupted: TurnLog.Entry = {
+    _tag: "Interrupted",
+    turnId,
+    reason: "Models are limiting requests.",
+    retryable: true,
+    problem: "model-rate-limit",
+  };
+
+  it("counts attempts since the turn last got further, and whether the last one died", () => {
+    // Taking input in comes before the model answers, so it is not getting further.
+    const stuck = TurnLog.read(recorded(attempt, took("b1"), interrupted, attempt, took("b1")));
+    expect(stuck).toMatchObject({
+      attempts: 2,
+      interruption: { reason: "Models are limiting requests.", problem: "model-rate-limit" },
+      diedLast: true,
+    });
+    expect(TurnLog.read(recorded(attempt, interrupted))).toMatchObject({
+      attempts: 1,
+      diedLast: false,
+    });
+    // A finished response is getting further: earlier attempts no longer count.
+    const moved = TurnLog.read(
+      recorded(attempt, interrupted, attempt, took("b1"), ...responded("r1", [text("Done.")])),
+    );
+    expect(moved).toMatchObject({ attempts: 0, interruption: undefined, diedLast: false });
+  });
+
+  it("says what the turn started with, how it ended, and where its checkpoint sits", () => {
+    const reading = TurnLog.read(
+      recorded(
+        {
+          _tag: "Started",
+          turnId,
+          selection,
+          instructions: "Be brief.",
+        },
+        { _tag: "Checkpoint", turnId, summary: "Earlier talk.", kept: [], through: null },
+        {
+          _tag: "Ended",
+          turnId,
+          outcome: "failed",
+          reason: "Stopped.",
+          cancelReason: null,
+          messageIds: [],
+        },
+      ),
+    );
+    expect(reading.started?.instructions).toBe("Be brief.");
+    expect(reading.checkpoint).toBe(1);
+    expect(reading.ended).toMatchObject({ outcome: "failed", reason: "Stopped." });
   });
 });
 

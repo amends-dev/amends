@@ -850,7 +850,6 @@ export const turns = pgTable(
     status: text("status", { enum: turnStatuses }).notNull(),
     inputAfterSequence: integer("input_after_sequence").notNull(),
     acceptedThroughSequence: integer("accepted_through_sequence").notNull(),
-    incorporatedThroughSequence: integer("incorporated_through_sequence").notNull(),
     connectionId: text("connection_id"),
     model: text("model"),
     reasoning: text("reasoning"),
@@ -871,10 +870,7 @@ export const turns = pgTable(
     index("active_turns")
       .on(t.workspaceId, t.createdAt)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
-    check(
-      "turn_input_order",
-      sql`${t.inputAfterSequence} <= ${t.incorporatedThroughSequence} AND ${t.incorporatedThroughSequence} <= ${t.acceptedThroughSequence} AND ${t.inputAfterSequence} < ${t.acceptedThroughSequence}`,
-    ),
+    check("turn_input_order", sql`${t.inputAfterSequence} <= ${t.acceptedThroughSequence}`),
     check(
       "turn_selection_complete",
       sql`(${t.connectionId} IS NULL AND ${t.model} IS NULL AND ${t.reasoning} IS NULL AND ${t.environmentId} IS NULL) OR (${t.connectionId} IS NOT NULL AND ${t.model} IS NOT NULL AND ${t.environmentId} IS NOT NULL)`,

@@ -1,5 +1,6 @@
 import type { Environment as EnvironmentRuntime } from "@amends/environment";
-import type { HarnessEvent, Transcript } from "@amends/harness";
+import type { HarnessErrors, HarnessEvent } from "@amends/harness";
+import { Transcript } from "@amends/harness";
 import type { Redacted } from "effect";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -36,6 +37,7 @@ import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { NotActive, NotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnActivityRecorder } from "./activity-recorder.ts";
+import { TurnEnding } from "./ending.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -57,7 +59,8 @@ export type Error =
   | InvalidResponse
   | NotFound
   | NotActive
-  | TurnActivityRecorder.Error;
+  | TurnActivityRecorder.Error
+  | TurnEnding.Error;
 export type PrepareError =
   | Error
   | AgentStore.Failure
@@ -76,12 +79,13 @@ export type CloseError =
 /**
  * Everything execution needs to run a turn: the agent's instructions, the model access it runs
  * with and the connection's settings and key to reach it, its environment, the transcript it
- * continues, the input the harness has not taken in yet as one batch, its own entries so far, and
- * a checkpoint to record first when the history has outgrown its budget. The key is only ever
- * handed to execution, redacted.
+ * continues, the input the harness has not taken in yet as one batch, its own entries so far, how
+ * its attempts have gone, and a checkpoint to record first when the history has outgrown its
+ * budget. The key is only ever handed to execution, redacted.
  */
 export interface Plan {
   readonly turn: Turn.Record;
+  /** The agent's instructions: as they were when the turn started, once it has. */
   readonly instructions: string;
   readonly selection: Turn.Selection;
   readonly connection: {
@@ -105,12 +109,20 @@ export interface Plan {
    */
   readonly pending:
     | {
+        /** How far the turn's input is taken in, which the batch follows. */
+        readonly afterSequence: number;
         readonly throughSequence: number;
         readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
       }
     | undefined;
   /** The turn's own entries. */
   readonly log: ReadonlyArray<TurnLog.Recorded>;
+  /** Attempts to run the turn since it last got further. */
+  readonly attempts: number;
+  /** Why the turn last stopped short since it last got further. */
+  readonly interruption: TurnLog.Interruption | undefined;
+  /** The latest attempt died without recording why, as when its process did. */
+  readonly diedLast: boolean;
   /** When the transcript and pending input outgrow the budget: what a checkpoint would do first. */
   readonly compaction: TurnLog.Compaction | undefined;
 }
@@ -125,7 +137,7 @@ export type Preparation =
   | { readonly _tag: "Unrunnable"; readonly reason: string }
   | { readonly _tag: "Ready"; readonly plan: Plan };
 
-/** How many activities or log batches one read takes; reads go on until the range is done. */
+/** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
 /**
  * How many characters a turn's transcript and waiting input may hold, about 75,000 tokens, before a
@@ -168,17 +180,20 @@ export interface Interface {
    */
   readonly prepare: (turnId: Turn.Id) => Effect.Effect<Preparation, PrepareError>;
   /**
-   * Take a queued turn to run with this selection; any other turn is NotActive. The first turn of
-   * a participation records the thread's history before its input in the agent's log.
+   * Take a queued turn to run with this selection and the agent's instructions now, which the turn
+   * keeps; any other turn is NotActive. The first turn of a participation records the thread's
+   * history before its input in the agent's log.
    */
   readonly start: (
     turnId: Turn.Id,
     selection: Turn.Selection,
   ) => Effect.Effect<Turn.Record, PrepareError>;
+  /** Record that execution begins a harness session for a running turn, or a summary for it. */
+  readonly attempt: (turnId: Turn.Id, kind: "session" | "summary") => Effect.Effect<void, Error>;
   /**
    * Record a checkpoint for a running turn: the summary of the older history, the newest exchanges
    * verbatim, and how far through the thread the summary took in input the turn had not taken in.
-   * The turn's history, and the next turn's, starts from it.
+   * The turn's history, and the next turn's, starts from it, at the position returned.
    */
   readonly checkpoint: (
     turnId: Turn.Id,
@@ -187,24 +202,29 @@ export interface Interface {
       readonly kept: ReadonlyArray<Transcript.Item>;
       readonly through: number | null;
     },
-  ) => Effect.Effect<Turn.Record, Error>;
+  ) => Effect.Effect<Log.Position, Error>;
   /**
    * Record a batch of input submitted through a position of the thread, once per batch: the
    * position its thread input reaches, or where the turn's input stands when it holds only what was
-   * asked of the turn itself.
+   * asked of the turn itself. The first record of a batch stands: the items returned are what the
+   * batch holds, which execution hands the harness.
    */
   readonly submitted: (
     turnId: Turn.Id,
-    batch: { readonly batchId: HarnessEvent.BatchId; readonly throughSequence: number },
-  ) => Effect.Effect<void, Error>;
+    batch: {
+      readonly batchId: HarnessEvent.BatchId;
+      readonly throughSequence: number;
+      readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
+    },
+  ) => Effect.Effect<readonly [Transcript.Input, ...Array<Transcript.Input>], Error>;
   /**
-   * Record what the environment and its harness reported, in order, and how far the turn's input
-   * is now taken in: a batch counts once the harness confirms incorporating it.
+   * Record what the environment and its harness reported, in order. A batch the harness says it
+   * took in must be one submitted, as it was recorded; it counts as taken in from then on.
    */
   readonly report: (
     turnId: Turn.Id,
     events: ReadonlyArray<EnvironmentRuntime.Event>,
-  ) => Effect.Effect<Turn.Record, Error>;
+  ) => Effect.Effect<void, Error>;
   /**
    * Show the turn's readers more of a response before it completes, as a signal: nothing is
    * recorded, and a turn no longer running shows nothing.
@@ -218,10 +238,14 @@ export interface Interface {
       readonly text: string;
     },
   ) => Effect.Effect<void, Error>;
-  /** Record that execution stopped before the turn finished, and why. */
+  /** Record that execution stopped before the turn finished, why in words, and what went wrong. */
   readonly interrupted: (
     turnId: Turn.Id,
-    stop: { readonly reason: string; readonly retryable: boolean },
+    stop: {
+      readonly reason: string;
+      readonly retryable: boolean;
+      readonly problem: HarnessErrors.Problem;
+    },
   ) => Effect.Effect<void, Error>;
   /** The turn's own entries in its agent's log for the thread. */
   readonly entries: (turnId: Turn.Id) => Effect.Effect<ReadonlyArray<TurnLog.Recorded>, Error>;
@@ -261,6 +285,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const members = yield* MemberStore.Service;
   const signals = yield* Signals.Service;
   const activity = yield* TurnActivityRecorder.Service;
+  const ending = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -393,50 +418,23 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   /** The position just before one, to read from it: none before the first. */
   const before = (position: Log.Position | null): Log.Position | undefined =>
     position === null || position === 0 ? undefined : Log.Position.make(position - 1);
-  /** Every entry of a log after a position, oldest first. */
-  const recordsAfter = Effect.fnUntraced(function* (
-    turn: Turn.Record,
-    from: Log.Position | undefined,
-    until?: (entry: TurnLog.Entry) => boolean,
-  ) {
-    const handle = logOf(turn);
-    const records: Array<TurnLog.Recorded> = [];
-    let after = from;
-    for (;;) {
-      const batches = yield* handle.read(
-        after === undefined ? { limit: 100 } : { after, limit: 100 },
-      );
-      if (batches.length === 0) return records;
-      for (const batch of batches) {
-        for (const entry of batch.entries) {
-          if (until?.(entry.payload) === true) return records;
-          records.push({ entry: entry.payload, at: entry.recordedAt });
-        }
-        after = batch.position;
-      }
-    }
-  });
   /** A turn's own entries: from where it began until another turn's. */
-  const ownRecords = Effect.fnUntraced(function* (turn: Turn.Record) {
-    let began = false;
-    return yield* recordsAfter(turn, turn.logAfter ?? undefined, (entry) => {
-      if (entry.turnId === turn.id) began = true;
-      return began && entry.turnId !== turn.id;
-    });
+  const ownRecords = (turn: Turn.Record) => TurnLog.entriesOf(log, turn);
+  /** How far a turn's input is taken in, as its own entries say. */
+  const incorporatedOf = Effect.fnUntraced(function* (turn: Turn.Record) {
+    return TurnLog.read(yield* ownRecords(turn)).incorporatedThrough(turn.inputAfterSequence);
   });
   /**
    * What a turn continues from: its agent's log for the thread read from the latest checkpoint the
-   * turn knows, or from the start while there is none, and far enough back for the turn's own
-   * entries.
+   * turn knew when it was created, or from the start while there was none, and far enough back
+   * for the turn's own entries. Reading on finds any checkpoint the turn recorded since.
    */
   const contextOf = Effect.fnUntraced(function* (turn: Turn.Record) {
     const from =
       turn.historyFrom === null || turn.logAfter === null
         ? undefined
         : before(Log.Position.make(Math.min(turn.historyFrom, turn.logAfter + 1)));
-    const context = TurnLog.context(yield* recordsAfter(turn, from), turn.id);
-    // A log that held entries when the turn was created has begun, whether or not they were read.
-    return turn.logAfter === null ? context : { ...context, begun: true };
+    return TurnLog.context(yield* TurnLog.recordsAfter(log, turn.participationId, from), turn.id);
   });
   /** A message as the model is told it: from its author, in pieces when it is long. */
   const inputsOf = (
@@ -501,8 +499,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       return unrunnable(
         `The ${environment.value.harnessId} harness is not installed on this server.`,
       );
+    const context = yield* contextOf(turn);
+    const incorporated = context.own.incorporatedThrough(turn.inputAfterSequence);
     const messages = (yield* messagesIn(turn, {
-      after: turn.incorporatedThroughSequence,
+      after: incorporated,
       through: turn.acceptedThroughSequence,
     })).filter(
       ({ message }) =>
@@ -512,7 +512,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const waiting = messages.flatMap(({ sequence, message }) =>
       inputsOf(message, author).map((item): TurnLog.Waiting => ({ sequence, item })),
     );
-    const context = yield* contextOf(turn);
     // Until the first turn of a participation starts, its history is the thread's, which starting
     // records in the agent's log.
     const seeded = context.begun ? undefined : yield* threadHistory(turn);
@@ -521,7 +520,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const [first, ...rest] = [...context.own.requested, ...waiting.map(({ item }) => item)];
     const plan: Plan = {
       turn,
-      instructions: agent.value.instructions,
+      instructions: context.own.started?.instructions ?? agent.value.instructions,
       selection,
       connection: {
         name: connection.value.name,
@@ -536,13 +535,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         first === undefined
           ? undefined
           : {
-              throughSequence:
-                waiting.length > 0
-                  ? turn.acceptedThroughSequence
-                  : turn.incorporatedThroughSequence,
+              afterSequence: incorporated,
+              throughSequence: waiting.length > 0 ? turn.acceptedThroughSequence : incorporated,
               items: [first, ...rest],
             },
       log: context.entries,
+      attempts: context.own.attempts,
+      interruption: context.own.interruption,
+      diedLast: context.own.diedLast,
       // One budget covers the history and the input waiting for it; what a request asks of the
       // turn itself is always given.
       compaction: TurnLog.compaction(transcript, waiting, {
@@ -562,12 +562,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["queued"]);
+        const agent = yield* agents.get(turn.agentId);
+        if (Option.isNone(agent))
+          return yield* new InvalidResponse({ message: "The turn's agent no longer exists" });
         // The first turn of a participation records the thread's history before its input, so
         // later turns read it from the agent's log rather than from the thread, in entries of a
         // bounded size however long the thread.
+        const entries: Array<TurnLog.Entry> = [];
         if (!(yield* contextOf(turn)).begun) {
           const items = yield* threadHistory(turn);
-          const entries: Array<TurnLog.Entry> = [];
           let held: Array<Transcript.Item> = [];
           for (const item of items) {
             if (held.length > 0 && TurnLog.size([...held, item]) > historyEntrySize) {
@@ -577,8 +580,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             held.push(item);
           }
           entries.push({ _tag: "History", turnId: turn.id, items: held });
-          yield* logOf(turn).appendAll(entries);
         }
+        entries.push({
+          _tag: "Started",
+          turnId: turn.id,
+          selection: chosen,
+          instructions: agent.value.instructions,
+        });
+        yield* logOf(turn).appendAll(entries);
         const startedAt = yield* DateTime.now;
         const event = yield* journal.publish(
           TurnFacts.Started,
@@ -598,18 +607,19 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       readonly through: number | null;
     },
   ) {
-    const turn = yield* asAgent(turnId)((turn) =>
+    return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running"]);
         const summary = yield* Schema.decodeEffect(Schema.NonEmptyString)(recorded.summary);
         const through = recorded.through;
         if (
           through !== null &&
-          (through <= turn.incorporatedThroughSequence || through > turn.acceptedThroughSequence)
+          (through <= (yield* incorporatedOf(turn)) || through > turn.acceptedThroughSequence)
         )
           return yield* new InvalidResponse({
             message: "A checkpoint can take in only input the turn accepted and has not taken in",
           });
+        // The input the summary takes in counts as taken in from here on.
         const entry = yield* logOf(turn).append({
           _tag: "Checkpoint",
           turnId: turn.id,
@@ -617,34 +627,37 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           kept: recorded.kept,
           through,
         });
-        yield* journal.publish(
-          TurnFacts.Compacted,
-          Object.assign(where(turn), { historyFrom: entry.position }),
-        );
-        if (through === null) return Turn.change(turn, { historyFrom: entry.position });
-        // The input the summary took in counts as taken in.
-        yield* journal.publish(
-          TurnFacts.InputIncorporated,
-          Object.assign(where(turn), { incorporatedThroughSequence: through }),
-        );
-        return Turn.change(turn, {
-          historyFrom: entry.position,
-          incorporatedThroughSequence: through,
-        });
+        return entry.position;
       }),
     );
-    return turn;
+  });
+
+  /** The batch as the turn's log recorded it, if it did. */
+  const submittedBatch = Effect.fnUntraced(function* (
+    turn: Turn.Record,
+    batchId: HarnessEvent.BatchId,
+  ) {
+    const found = yield* logOf(turn).getAppend(submittedKey(batchId));
+    const entry = Option.getOrUndefined(found)?.[0]?.payload;
+    return entry?._tag === "Submitted" ? entry : undefined;
   });
 
   const submitted = Effect.fn("TurnExecution.submitted")(function* (
     turnId: Turn.Id,
-    batch: { readonly batchId: HarnessEvent.BatchId; readonly throughSequence: number },
+    batch: {
+      readonly batchId: HarnessEvent.BatchId;
+      readonly throughSequence: number;
+      readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
+    },
   ) {
-    yield* asAgent(turnId)((turn) =>
+    return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running", "cancelling"]);
+        // A batch submitted again, as after a restart, holds what it held the first time.
+        const recorded = yield* submittedBatch(turn, batch.batchId);
+        if (recorded !== undefined) return recorded.items;
         if (
-          batch.throughSequence < turn.incorporatedThroughSequence ||
+          batch.throughSequence < (yield* incorporatedOf(turn)) ||
           batch.throughSequence > turn.acceptedThroughSequence
         )
           return yield* new InvalidResponse({
@@ -656,54 +669,68 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             turnId: turn.id,
             batchId: batch.batchId,
             throughSequence: batch.throughSequence,
+            items: batch.items,
           },
           { idempotencyKey: submittedKey(batch.batchId) },
         );
+        return batch.items;
       }),
     );
   });
+
+  const sameInput = Schema.toEquivalence(Schema.Array(Transcript.Input));
 
   const report = Effect.fn("TurnExecution.report")(function* (
     turnId: Turn.Id,
     events: ReadonlyArray<EnvironmentRuntime.Event>,
   ) {
-    const reported = yield* asAgent(turnId)((turn) =>
+    yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running", "cancelling"]);
-        const handle = logOf(turn);
+        // Input the harness took in is a batch execution submitted, exactly as recorded.
+        for (const event of events) {
+          if (event._tag !== "Harness" || event.event._tag !== "InputIncorporated") continue;
+          const recorded = yield* submittedBatch(turn, event.event.batch.id);
+          if (recorded === undefined)
+            return yield* new InvalidResponse({
+              message: "Incorporated input was never submitted",
+            });
+          if (!sameInput(recorded.items, event.event.batch.items))
+            return yield* new InvalidResponse({
+              message: "The harness took in other input than it was given",
+            });
+        }
         if (events.length > 0)
-          yield* handle.appendAll(
+          yield* logOf(turn).appendAll(
             events.map((event): TurnLog.Entry =>
               event._tag === "Harness"
                 ? { _tag: "Harness", turnId: turn.id, event: event.event }
                 : { _tag: "Environment", turnId: turn.id, event: event.event },
             ),
           );
-        let through = turn.incorporatedThroughSequence;
-        for (const event of events) {
-          if (event._tag !== "Harness" || event.event._tag !== "InputIncorporated") continue;
-          const found = yield* handle.getAppend(submittedKey(event.event.batch.id));
-          const entry = Option.getOrUndefined(found)?.[0]?.payload;
-          if (entry?._tag !== "Submitted")
-            return yield* new InvalidResponse({
-              message: "Incorporated input was never submitted",
-            });
-          through = Math.max(through, entry.throughSequence);
-        }
-        if (through === turn.incorporatedThroughSequence) return turn;
-        yield* journal.publish(
-          TurnFacts.InputIncorporated,
-          Object.assign(where(turn), { incorporatedThroughSequence: through }),
-        );
-        return Turn.change(turn, { incorporatedThroughSequence: through });
       }),
     );
-    return reported;
+  });
+
+  const attempt = Effect.fn("TurnExecution.attempt")(function* (
+    turnId: Turn.Id,
+    kind: "session" | "summary",
+  ) {
+    yield* asAgent(turnId)((turn) =>
+      Effect.gen(function* () {
+        yield* require(turn, ["running", "cancelling"]);
+        yield* logOf(turn).append({ _tag: "Attempt", turnId: turn.id, kind });
+      }),
+    );
   });
 
   const interrupted = Effect.fn("TurnExecution.interrupted")(function* (
     turnId: Turn.Id,
-    stop: { readonly reason: string; readonly retryable: boolean },
+    stop: {
+      readonly reason: string;
+      readonly retryable: boolean;
+      readonly problem: HarnessErrors.Problem;
+    },
   ) {
     yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
@@ -714,6 +741,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           turnId: turn.id,
           reason,
           retryable: stop.retryable,
+          problem: stop.problem,
         });
         return turn;
       }),
@@ -748,53 +776,16 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return yield* ownRecords(yield* load(turnId));
   });
 
-  const finish = Effect.fnUntraced(function* (
-    turn: Turn.Record,
-    outcome: { readonly _tag: "Failed"; readonly reason: string } | { readonly _tag: "Cancelled" },
-  ) {
-    const finishedAt = yield* DateTime.now;
-    if (outcome._tag === "Cancelled") {
-      const event = yield* journal.publish(
-        TurnFacts.Cancelled,
-        Object.assign(where(turn), { finishedAt }),
-      );
-      yield* activity.record(
-        turn.threadId,
-        TurnActivity.Ended,
-        {
-          turnId: turn.id,
-          outcome: "cancelled",
-          messageIds: [],
-          reason: null,
-          cancelReason: turn.cancelReason,
-        },
-        event,
-      );
-      return;
-    }
-    const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(outcome.reason);
-    const event = yield* journal.publish(
-      TurnFacts.Failed,
-      Object.assign(where(turn), { reason, finishedAt }),
-    );
-    yield* activity.record(
-      turn.threadId,
-      TurnActivity.Ended,
-      { turnId: turn.id, outcome: "failed", messageIds: [], reason, cancelReason: null },
-      event,
-    );
-  });
-
   const close = Effect.fn("TurnExecution.close")(function* (turnId: Turn.Id) {
-    const reading = TurnLog.read(yield* entries(turnId));
     return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         if (turn.status === "cancelling") {
-          yield* finish(turn, { _tag: "Cancelled" });
+          yield* ending.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
           return { _tag: "Stopped" } as const;
         }
         yield* require(turn, ["running"]);
-        if (turn.incorporatedThroughSequence < turn.acceptedThroughSequence)
+        const reading = TurnLog.read(yield* ownRecords(turn));
+        if (reading.incorporatedThrough(turn.inputAfterSequence) < turn.acceptedThroughSequence)
           return { _tag: "InputPending" } as const;
         // Work its agent has not accepted yet is still this turn's to consider before closing;
         // accepting it extends the turn, and execution takes it in.
@@ -808,7 +799,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         if (reading.replies.length > 0) {
           const unable = (reason: string) =>
             Effect.gen(function* () {
-              yield* finish(turn, { _tag: "Failed", reason });
+              yield* ending.end(turn, { outcome: "failed", reason });
               return { _tag: "Failed", reason } as const;
             });
           const thread = yield* access.require(turn.threadId).pipe(
@@ -860,16 +851,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             messageIds.push(published.message.id);
           }
         }
-        const event = yield* journal.publish(
-          TurnFacts.Completed,
-          Object.assign(where(turn), { messageIds, finishedAt: yield* DateTime.now }),
-        );
-        yield* activity.record(
-          turn.threadId,
-          TurnActivity.Ended,
-          { turnId: turn.id, outcome: "completed", messageIds, reason: null, cancelReason: null },
-          event,
-        );
+        yield* ending.end(turn, { outcome: "completed", messageIds });
         return { _tag: "Closed", messageIds } as const;
       }),
     );
@@ -879,7 +861,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["queued", "running", "cancelling"]);
-        yield* finish(turn, { _tag: "Failed", reason });
+        const failure = yield* Schema.decodeEffect(Schema.NonEmptyString)(reason);
+        yield* ending.end(turn, { outcome: "failed", reason: failure });
       }),
     );
   });
@@ -888,7 +871,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["cancelling"]);
-        yield* finish(turn, { _tag: "Cancelled" });
+        yield* ending.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
       }),
     );
   });
@@ -902,6 +885,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     get,
     prepare,
     start,
+    attempt,
     checkpoint,
     submitted,
     report,
