@@ -499,11 +499,13 @@ export function useThreadConversation(
       ];
     });
   });
-  // Read back until the position to show is loaded, one page at a time.
+  // Read back until the position to show is loaded, one page at a time. After a page fails, or
+  // once access is lost, it waits for the reader to ask again.
   createEffect(() => {
     const target = focus?.(),
       first = timeline.value()?.[0];
     if (target === undefined || first === undefined || timeline.complete()) return;
+    if (lost() || timeline.earlierFailed()) return;
     if (first.activity.sequence > target && !timeline.loadingEarlier()) timeline.loadEarlier();
   });
   return {

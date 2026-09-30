@@ -340,8 +340,15 @@ function eventStream(request: Request) {
   };
 }
 
-/** A turn's log followed over its stream, with the turn read beside it. */
-function followed(status: string, failure: string | null = null) {
+/**
+ * A turn's log followed over its stream, with the turn read beside it. `refuse` answers a
+ * subscription in place of opening its stream, by how many came before it.
+ */
+function followed(
+  status: string,
+  failure: string | null = null,
+  refuse: (subscription: number) => Response | undefined = () => undefined,
+) {
   const turn = {
     id: "atlas-1",
     workspaceId: "one",
@@ -368,6 +375,7 @@ function followed(status: string, failure: string | null = null) {
     retryable: status === "failed",
   };
   const streams: Array<ReturnType<typeof eventStream>> = [];
+  let subscriptions = 0;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
@@ -376,6 +384,8 @@ function followed(status: string, failure: string | null = null) {
     if (path === "/workspaces/one/members") return json(members);
     if (path === "/workspaces/one/turns/atlas-1") return json(turn);
     if (path === "/workspaces/one/turns/atlas-1/log/events") {
+      const refused = refuse(subscriptions++);
+      if (refused !== undefined) return refused;
       const created = eventStream(request);
       streams.push(created);
       return created.response;
@@ -471,6 +481,39 @@ it("follows a turn's log again after it drops, opening with the items as they st
   });
   await waitFor(() => expect(kinds(f.view)).toEqual(["accepted", "started", "input", "input"]));
 });
+
+const refusals = {
+  gone: () => json({ _tag: "TurnApplication.NotFound", turnId: "atlas-1" }, 404),
+  denied: () =>
+    json(
+      {
+        _tag: "Authorization.Denied",
+        memberId: "owner",
+        requirement: {
+          permission: { name: "thread.read", targetKind: "Thread" },
+          target: { _tag: "Thread", workspaceId: "one", threadId: "thread" },
+        },
+      },
+      403,
+    ),
+};
+for (const [failure, refusal] of Object.entries(refusals))
+  it(`shows nothing of a turn it may no longer follow, once refused as ${failure}`, async () => {
+    const f = followed("running", null, (subscription) =>
+      subscription > 0 ? refusal() : undefined,
+    );
+    const stream = await f.connected(0);
+    stream.send({ _tag: "Opened", items: [{ _tag: "InputTaken", at: at(3), messages: 1 }] });
+    stream.send({ _tag: "Drafted", responseId: "r1", part: 0, offset: 0, text: "Deploy the " });
+    await waitFor(() => expect(f.view.draft()).toEqual({ text: "Deploy the ", broken: false }));
+    // Following ends, and subscribing again is refused: what it showed goes, with the turn.
+    stream.unavailable();
+    await waitFor(() => expect(f.view.failure()).toBe(failure), { timeout: 3000 });
+    expect(f.view.turn()).toBeUndefined();
+    expect(f.view.activity()).toEqual([]);
+    expect(f.view.draft()).toBeUndefined();
+    expect(f.view.loading()).toBe(false);
+  });
 
 it("tells a failed turn's end once, rather than as an interruption and again as its failure", async () => {
   const f = followed("failed", "Anthropic is limiting requests.");

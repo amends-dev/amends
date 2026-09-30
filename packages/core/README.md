@@ -252,9 +252,11 @@ log.
 Agents handle their own notifications as people do theirs. `TurnAcceptance`, the `turn.accept`
 background process, acts as each agent: its pending work notifications on a thread join the
 active turn there, or start a new one, and the same commit settles them as `Acknowledged` with
-outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, and while
-the agent cannot open the thread. A new turn's input starts where the agent's latest turn in the
-same participation stopped taking input in, as that turn's entries say, so what a cancelled or
+outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, while the
+active turn belongs to a participation that ended, so an agent that left and came back is not
+handed work by the turn being stopped as departed, and while the agent cannot open the thread.
+A new turn's input starts where the agent's latest turn in the same participation stopped taking
+input in, as that turn's entries say, so what a cancelled or
 failed turn accepted but never took in is the next turn's to handle; its entries follow what the
 agent's log holds when it is created, and its history starts from that log's latest checkpoint:
 the latest turn's own, or the one that turn started from. It wakes on activity that requests an agent's
@@ -322,7 +324,7 @@ counts that input as taken in. It reports instead that the turn finished, is sto
 when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal.
 
-`TurnApplication.watchLog` follows a turn's log for a reader who may open its thread, as a stream
+`TurnApplication.watchLog` follows a turn's log for a reader who may read its thread, as a stream
 of `Turn.LogMessage`s. It tails the agent's log with `Log.tail`, from the turn's `logAfter`, taking
 the turn's entries into one `TurnLog.reader` until its `Ended` entry or another turn's, the reading
 `log` returns: `Opened` carries the items as they stand, `Changed` the items each new batch adds or
@@ -332,8 +334,12 @@ what the response being written holds so far: a draft carries only what follows 
 it, so `TurnDrafts` holds each turn's drafts in memory as they reach the process, forgetting a
 turn's ten minutes after its last, and a reader who starts following mid-response begins with
 them. The drafts subscription registers before the turn and its log are read, so nothing published
-in between is missed. Each batch checks that the reader still may open the thread; a stream that cannot go on
-fails with `Turn.LogUnavailable`.
+in between is missed. Each batch checks that the reader still may read the thread, and so does
+each commit that changes the reader's groups or grants, or a role's permissions, which it follows
+through `ChangeFeedSource` as the change feed does; its subscription registers before the turn is
+read too. Drafts are not checked one by one: following ends once the commit that took the
+reader's access is delivered, so a reader who lost it sees at most the drafts sent while that
+delivery was on its way. A stream that cannot go on fails with `Turn.LogUnavailable`.
 
 A turn's changes also show in its thread's timeline, recorded as thread activity in the commits
 that make them (the `TurnActivity` kinds, which `TurnActivityRecorder` records): `turn.created` where the agent took on the work, or where a retry
@@ -349,10 +355,12 @@ the turn. The gateway binds
 `TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
 and environments.
 
-`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, as
+`TurnApplication` lets a reader who may read a thread `get` and `listByThread` its turns, as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
-(`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. `listActive` gives the
-workspace's active turns in threads the reader may open, among at most `limit` active turns, and
+(`retryable`) now. Every turn read requires what the thread's timeline does: the group's audience
+and `thread.read` on the thread. A thread outside the reader's audience is `ThreadNotFound`, and
+one they may not read is `Authorization.Denied`. `listActive` gives the workspace's active turns
+in threads the reader may read, among at most `limit` active turns, and
 `log` a turn with its log as its readers see it (`Turn.LogView`): each batch of input taken in,
 each response's text from its text blocks completed so far, with the blocks it holds and whether
 the turn owes it as a reply, and interruptions, with when each was recorded, never reasoning or a

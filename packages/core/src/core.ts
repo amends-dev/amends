@@ -204,7 +204,10 @@ const activityReading = ThreadActivityReading.layer.pipe(
 );
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
 const threadReading = ThreadReading.layer;
-/** One journal follower per workspace runtime, shared by its change-feed subscribers. */
+/**
+ * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
+ * following a turn's log, who stop when their access changes.
+ */
 const changeSource = ChangeFeedSource.layer();
 const changeFeed = ChangeFeedApplication.layer.pipe(
   Layer.provide(Layer.mergeAll(changeSource, GrantResolver.layer)),
@@ -256,6 +259,7 @@ const operations = Layer.mergeAll(
       turnEnding,
       TurnDrafts.layer,
       RequestReceipts.layer,
+      changeSource,
     ),
   ),
 );

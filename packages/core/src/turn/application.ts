@@ -3,6 +3,7 @@ import type { PlatformError, Scope } from "effect";
 import { AgentPermissions } from "../agent/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
+import { ChangeFeedSource } from "../change-feed/source.ts";
 import { Actor } from "../identity/actor.ts";
 import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
@@ -15,6 +16,7 @@ import { Signals } from "../signal/signals.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
+import { ThreadPermissions } from "../thread/permissions.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
@@ -61,28 +63,32 @@ export type RetryError =
 
 export interface Interface {
   readonly workspaceId: Turn.Record["workspaceId"];
-  /** A turn in a thread the reader may open; any other is NotFound. */
+  /**
+   * A turn in a thread the reader may read: in its group's audience, with `thread.read` on it, as
+   * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
+   */
   readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Service>;
-  /** A thread's turns, newest first, at most `limit`, for a reader who may open the thread. */
+  /** A thread's turns, newest first, at most `limit`, for a reader who may read the thread. */
   readonly listByThread: (
     threadId: ThreadId.Id,
     limit: number,
   ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
   /**
-   * The workspace's active turns in threads the reader may open, oldest first, among at most
+   * The workspace's active turns in threads the reader may read, oldest first, among at most
    * `limit` active turns in the workspace.
    */
   readonly listActive: (
     limit: number,
   ) => Effect.Effect<ReadonlyArray<Turn.View>, ActiveError, Actor.Service>;
-  /** A turn with its log, for a reader who may open its thread. */
+  /** A turn with its log, for a reader who may read its thread. */
   readonly log: (turnId: Turn.Id) => Effect.Effect<Turn.LogView, LogError, Actor.Service>;
   /**
-   * Follow a turn's log, for a reader who may open its thread: its items as they stand, then
+   * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
    * those its agent's log adds or changes as the turn works, with the response it is writing, until
    * the turn ends and every item is delivered. The caller owns the subscription scope. The stream
-   * fails with LogUnavailable when following cannot go on, including once the reader can no longer
-   * open the thread; following again starts from the items as they stand.
+   * fails with LogUnavailable when following cannot go on, including once the reader may no longer
+   * read the thread, which it checks with each batch and whenever a commit changes their groups or
+   * grants; following again starts from the items as they stand.
    */
   readonly watchLog: (
     turnId: Turn.Id,
@@ -134,6 +140,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const log = yield* Log.Service;
   const signals = yield* Signals.Service;
   const drafts = yield* TurnDrafts.Service;
+  const commits = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -150,16 +157,27 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
 
   const decode = Schema.decodeEffect(Schema.toType(Turn.Record));
-  /** The turn, when the reader may open its thread; otherwise it is missing to them. */
+  const readThread = (threadId: ThreadId.Id) =>
+    Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
+  /**
+   * The thread, when the reader may open it and read it, as its timeline requires: every read of
+   * its turns checks this. Outside its audience, it is missing to them.
+   */
+  const readableThread = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
+    const thread = yield* access.require(threadId);
+    yield* authorization.require([readThread(thread.id)]);
+    return thread;
+  });
+  /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
   const readable = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turns.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
     const turn = yield* decode(found.value);
     if (turn.workspaceId !== workspaceId || turn.id !== turnId)
       return yield* new InvalidResponse({ message: "Turn store returned another turn" });
-    yield* access
-      .require(turn.threadId)
-      .pipe(Effect.catchTag("ThreadAccess.NotFound", () => Effect.fail(new NotFound({ turnId }))));
+    yield* readableThread(turn.threadId).pipe(
+      Effect.catchTag("ThreadAccess.NotFound", () => Effect.fail(new NotFound({ turnId }))),
+    );
     return turn;
   });
   const directs = (turn: Turn.Record) =>
@@ -220,13 +238,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   ) {
     const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
     const count = yield* bounded(limit);
-    const thread = yield* access
-      .require(id)
-      .pipe(
-        Effect.catchTag("ThreadAccess.NotFound", () =>
-          Effect.fail(new ThreadNotFound({ threadId: id })),
-        ),
-      );
+    const thread = yield* readableThread(id).pipe(
+      Effect.catchTag("ThreadAccess.NotFound", () =>
+        Effect.fail(new ThreadNotFound({ threadId: id })),
+      ),
+    );
     const listed = yield* Effect.forEach(yield* turns.listByThread(thread.id, count), (turn) =>
       decode(turn),
     );
@@ -241,10 +257,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const active = yield* Effect.forEach(yield* turns.listActive(yield* bounded(limit)), (turn) =>
       decode(turn),
     );
-    // Each thread's access is checked once, whatever number of its turns are active.
-    const readable = new Map<string, boolean>();
+    // Each thread's audience is checked once, whatever number of its turns are active, then the
+    // permission to read the threads in it, together.
+    const opened = new Map<ThreadId.Id, boolean>();
     for (const turn of active) {
-      if (readable.has(turn.threadId)) continue;
+      if (opened.has(turn.threadId)) continue;
       const may = yield* access.require(turn.threadId).pipe(
         Effect.as(true),
         Effect.catchTags({
@@ -252,9 +269,12 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
           "Authorization.Denied": () => Effect.succeed(false),
         }),
       );
-      readable.set(turn.threadId, may);
+      opened.set(turn.threadId, may);
     }
-    return yield* present(active.filter((turn) => readable.get(turn.threadId) === true));
+    const threads = [...opened].flatMap(([threadId, may]) => (may ? [threadId] : []));
+    const permitted = yield* authorization.permitted(threads.map(readThread));
+    const readable = new Set(threads.filter((_, index) => permitted[index] === true));
+    return yield* present(active.filter((turn) => readable.has(turn.threadId)));
   });
 
   const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
@@ -270,12 +290,19 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
   const watchLog = Effect.fn("TurnApplication.watchLog")(function* (turnId: Turn.Id) {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
-    // Register for drafts before reading, so none that follows is missed.
+    // Register for drafts and commits before reading, so none that follows is missed: a change to
+    // the reader's access committed after the read below is delivered, and rechecked.
     const live = yield* signals.subscribe;
+    const committed = yield* commits.subscribe(Option.none()).pipe(Effect.mapError(unavailable));
     const turn = yield* readable(id);
     const handle = TurnLog.open(log, turn.participationId);
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Service;
+    /** The reader still may read the thread, or following ends. */
+    const stillReadable = readableThread(turn.threadId).pipe(
+      Effect.provideService(Actor.Service, actor),
+      Effect.mapError(unavailable),
+    );
 
     // The turn's entries sit together in its agent's log after `logAfter`, read as they come, and
     // end with its end: only one turn writes there at a time, so another turn's entry also means
@@ -335,7 +362,8 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
     type Input =
       | { readonly _tag: "Logged"; readonly batch: Log.Batch<TurnLog.Entry> }
-      | { readonly _tag: "Drafted"; readonly draft: Turn.LogMessage };
+      | { readonly _tag: "Drafted"; readonly draft: Turn.LogMessage }
+      | { readonly _tag: "AccessChanged" };
     const logged = Stream.suspend(() =>
       handle.tail(after === undefined ? { limit: logPage } : { after, limit: logPage }),
     ).pipe(
@@ -357,29 +385,43 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         }),
       })),
     );
-    /** What each input tells the reader, one at a time, so reads and what was sent agree. */
+    // Commits that change the reader's groups or grants, or everyone's, as a role's permissions do.
+    const accessChanged = committed.deliveries.pipe(
+      Stream.filter((delivery) =>
+        delivery.events.some(
+          ({ access }) =>
+            access !== undefined &&
+            (access.memberId === undefined || access.memberId === actor.memberId),
+        ),
+      ),
+      Stream.map((): Input => ({ _tag: "AccessChanged" })),
+      Stream.mapError(unavailable),
+    );
+    /**
+     * What each input tells the reader, one at a time, so reads and what was sent agree. Once the
+     * reader's access changes, it is checked before anything more is sent, drafts included.
+     */
     const step = (
       input: Input,
     ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> => {
       switch (input._tag) {
         case "Drafted":
           return Effect.succeed([input.draft]);
+        case "AccessChanged":
+          return Effect.as(stillReadable, []);
         case "Logged":
-          // The reader still may open the thread, or following ends.
-          return access.require(turn.threadId).pipe(
-            Effect.provideService(Actor.Service, actor),
+          return stillReadable.pipe(
             Effect.map(() => {
               take([input.batch]);
               // The turn's end is in its log, committed with everything it wrote.
               return over ? [...changed(), ended] : changed();
             }),
-            Effect.mapError(unavailable),
           );
       }
     };
     return Stream.make(opened, ...written).pipe(
       Stream.concat(
-        Stream.mergeAll([logged, drafted], { concurrency: "unbounded" }).pipe(
+        Stream.mergeAll([logged, drafted, accessChanged], { concurrency: "unbounded" }).pipe(
           Stream.mapEffect(step),
           Stream.flattenIterable,
           Stream.takeUntil((message) => message._tag === "Ended"),

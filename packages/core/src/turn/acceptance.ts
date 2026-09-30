@@ -57,7 +57,8 @@ export interface Interface {
   /**
    * Handle every agent's pending work, as that agent: accept each thread's notifications into its
    * active turn there, or into a new one, settling them in the same commit, and leave them waiting
-   * while an earlier turn there is still stopping. Reports whether more is outstanding.
+   * while an earlier turn there is still stopping or belongs to a participation that ended.
+   * Reports whether more is outstanding.
    */
   readonly run: Effect.Effect<BackgroundProcess.Outcome, Error, Publication.Service>;
   /** Stop the turns of agents that no longer take part in their thread. */
@@ -171,8 +172,14 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     const acceptedAt = yield* DateTime.now;
     const active = yield* turns.findActive(agent.memberId, threadId);
     if (Option.isSome(active)) {
-      // A turn still stopping takes no more; the work waits for the next one.
+      // A turn still stopping takes no more, nor does one whose participation ended, which is
+      // stopped as departed: work asked of the agent since it took part anew belongs to that
+      // participation. The work waits for the next turn, which the turn's end wakes this for.
       if (active.value.status === "cancelling") return false;
+      const participationId = active.value.participationId;
+      if (pending.some((record) => record.participationId !== participationId)) return false;
+      const current = yield* participations.get(participationId);
+      if (Option.isNone(current) || current.value.status !== "active") return false;
       yield* journal.publish(TurnFacts.InputAccepted, {
         workspaceId,
         groupId: active.value.groupId,

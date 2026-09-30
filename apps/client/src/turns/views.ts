@@ -332,10 +332,21 @@ export function useTurnLog(
   const environments = useRead(setup?.environments);
   const live = useLiveStatus();
   const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
+  const failure = (): WorkspaceFailure | undefined => {
+    const connection = feed()?.connection;
+    return (
+      read.failure() ?? (connection === "gone" || connection === "denied" ? connection : undefined)
+    );
+  };
+  /** The turn left the reader's reach: none of it shows, however recently it did. */
+  const lost = () => {
+    const current = failure();
+    return current === "gone" || current === "denied";
+  };
 
   const turn = createMemo((): TurnDetail | undefined => {
     const view = read.value();
-    if (view === undefined) return undefined;
+    if (view === undefined || lost()) return undefined;
     const entry = entryOf(view);
     const selection = view.selection;
     const connection = connections.value()?.find((item) => item.id === selection?.connectionId);
@@ -427,8 +438,8 @@ export function useTurnLog(
     turn,
     activity,
     draft,
-    loading: () => read.loading() || (feed()?.items === undefined && feed()?.connection !== "gone"),
-    failure: () => read.failure() ?? (feed()?.connection === "gone" ? "gone" : undefined),
+    loading: () => !lost() && (read.loading() || feed()?.items === undefined),
+    failure,
     reconnecting: () => live() !== undefined || followingDown(),
     updatedAt: () => feed()?.updatedAt,
     refresh: () => {

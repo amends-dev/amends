@@ -19,9 +19,9 @@ export interface TurnLogFeed {
   readonly ended: boolean;
   /**
    * Opening the first subscription, following, reconnecting after a drop, or stopped: the turn is
-   * gone to the reader, or their credentials were rejected.
+   * gone to the reader, they may no longer read its thread, or their credentials were rejected.
    */
-  readonly connection: "connecting" | "live" | "reconnecting" | "gone" | "unauthorized";
+  readonly connection: "connecting" | "live" | "reconnecting" | "gone" | "denied" | "unauthorized";
   /** When the log last arrived. */
   readonly updatedAt: Date | undefined;
 }
@@ -42,6 +42,12 @@ const gone = (cause: Cause.Cause<unknown>) =>
       (Schema.is(ApiErrors.TurnNotFound)(reason.error) ||
         Schema.is(ApiErrors.NotMember)(reason.error) ||
         Schema.is(ApiErrors.WorkspaceNotFound)(reason.error)),
+  );
+
+/** The reader is in the turn's thread's group, but may no longer read the thread. */
+const denied = (cause: Cause.Cause<unknown>) =>
+  cause.reasons.some(
+    (reason) => Cause.isFailReason(reason) && Schema.is(ApiErrors.Denied)(reason.error),
   );
 
 /** The items with each change put in its place. */
@@ -114,6 +120,7 @@ const run = Effect.fnUntraced(function* (
     const cause = Exit.isFailure(outcome) ? outcome.cause : Cause.empty;
     if (isUnauthorized(cause)) return set({ connection: "unauthorized" });
     if (gone(cause)) return set({ connection: "gone" });
+    if (denied(cause)) return set({ connection: "denied" });
     attempt += 1;
     set({ connection: "reconnecting" });
     yield* Effect.raceFirst(

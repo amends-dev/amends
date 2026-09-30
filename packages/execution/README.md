@@ -104,8 +104,10 @@ restart.
   [background wakes](../gateway/README.md#background-work-on-effect-cluster).
 - `layerWorker` registers the entity over a `TurnRunner.Service`. A run that fails before its
   turn finishes, such as when storage fails, asks to run again after a backoff that doubles from
-  two seconds up to five minutes. After eight failed runs the worker abandons the turn, and a
-  turn whose workspace was never created is dropped. Failures are logged.
+  two seconds up to five minutes. After eight failed runs the worker abandons the turn; while
+  recording that fails too, as when storage stays down, it asks again after the same backoff
+  without running the turn, so a turn is never left active with nothing to run it. A turn whose
+  workspace was never created is dropped. Failures are logged.
 - `layer` provides both. Every runner over the same storage runs the worker.
 
 Handled runs are pruned with background wakes when the host passes `TurnEntity.type` to

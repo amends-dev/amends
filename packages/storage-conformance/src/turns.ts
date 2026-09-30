@@ -3,8 +3,8 @@ import { AgentApplication } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { ConnectionApplication } from "@amends/core/connection";
 import { Environment } from "@amends/core/environment";
-import { Group } from "@amends/core/group";
-import { Identity, type Actor } from "@amends/core/identity";
+import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
 import { Request } from "@amends/core/request";
 import {
@@ -14,14 +14,14 @@ import {
   type ThreadTimeline,
 } from "@amends/core/thread";
 import { Turn, TurnApplication, TurnExecution, TurnLog } from "@amends/core/turn";
-import type { Workspace } from "@amends/core/workspace";
+import type { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { HarnessEvent, Transcript } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Stream } from "effect";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
-import { alice, boundTo, Support, testImplementation } from "./support.ts";
+import { alice, bob, boundTo, future, request, Support, testImplementation } from "./support.ts";
 
 const as = <A, E, R extends Core.Operations | Actor.Service>(
   id: Workspace.Id,
@@ -49,28 +49,29 @@ const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
     ),
   );
 /**
- * Follow a turn's log as alice, for the enclosing scope: each message as it arrives, and whether the
- * stream has finished.
+ * Follow a turn's log, as alice unless another reader is named, for the enclosing scope: each
+ * message as it arrives, and whether the stream has finished or failed as unavailable.
  */
-const followLog = (id: Workspace.Id, turnId: Turn.Id) =>
+const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberReference = alice) =>
   Effect.gen(function* () {
     const gateway = yield* Gateway.Service;
     const stream = yield* gateway.asMemberScoped(
       id,
-      alice,
+      reader,
       Effect.flatMap(TurnApplication.Service, (turns) => turns.watchLog(turnId)),
     );
-    const queue = yield* Queue.unbounded<Turn.LogMessage | "done">();
+    const queue = yield* Queue.unbounded<Turn.LogMessage | "done" | "unavailable">();
     yield* stream.pipe(
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.andThen(Queue.offer(queue, "done")),
+      Effect.catchTag("Turn.LogUnavailable", () => Queue.offer(queue, "unavailable")),
       Effect.forkScoped,
     );
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"));
   });
 /** A log message in brief: its kind, and the items or text it carries. */
-const brief = (message: Turn.LogMessage | "done") => {
-  if (message === "done") return "done";
+const brief = (message: Turn.LogMessage | "done" | "unavailable") => {
+  if (message === "done" || message === "unavailable") return message;
   switch (message._tag) {
     case "Opened":
       return `opened ${message.items.map((item) => item._tag).join(",")}`;
@@ -147,6 +148,19 @@ const workspaceWithAgent = Effect.gen(function* () {
   };
   return { workspace, agent, identity, selection };
 });
+/** Bob joins the workspace as an ordinary member, and so its general group. */
+const joinAsBob = (id: Workspace.Id) =>
+  Effect.gen(function* () {
+    const invitation = yield* Operations.invite(id, alice, request(yield* future));
+    return yield* Operations.acceptInvitation(id, bob.id, invitation.details.id);
+  });
+/** Alice revokes every role the member holds, leaving their memberships as they are. */
+const revokeRoles = (id: Workspace.Id, memberId: Member.Id) =>
+  Effect.gen(function* () {
+    const access = yield* Operations.access(id, alice, memberId);
+    for (const assignment of access.assignments)
+      yield* Operations.revokeAssignment(id, alice, memberId, assignment.id);
+  });
 const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Turn.Record["memberId"]>) =>
   as(
     id,
@@ -1200,6 +1214,230 @@ export const turns = (harness: ConformanceHarness) => {
               ),
             ).toMatchObject({ _tag: "TurnApplication.NotRetryable", reason: "departed" });
           }),
+        ),
+      ),
+    );
+
+    it.effect(
+      "work asked of an agent that left and came back waits for its departed turn, then runs",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent, identity } = yield* workspaceWithAgent;
+              const started = yield* start(workspace.id, "Scout, look into this.", [
+                agent.memberId,
+              ]);
+              const threadId = started.thread.id;
+              yield* accept(workspace.id);
+              const [departed] = yield* turnsOf(workspace.id, threadId);
+              const participants = yield* as(
+                workspace.id,
+                identity,
+                Effect.flatMap(ThreadApplication.Service, (threads) =>
+                  threads.listParticipants(threadId, { limit: 10 }),
+                ),
+              );
+              const mine = participants.find(
+                (participant) =>
+                  participant.participant._tag === "Member" &&
+                  participant.participant.memberId === agent.memberId,
+              );
+              yield* as(
+                workspace.id,
+                identity,
+                Effect.flatMap(ThreadParticipationApplication.Service, (participation) =>
+                  participation.unfollow({ threadId, participationId: mine!.id }),
+                ),
+              );
+              // Asked again before its turn there is stopped, the agent takes part anew.
+              const asked = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
+                  messages.publish({
+                    threadId,
+                    text: "Scout, come back to this.",
+                    mentions: [agent.memberId],
+                  }),
+                ),
+              );
+              const bound = yield* boundTo(workspace.id);
+              const recipient = Notification.ofMember(agent.memberId, identity);
+              const [request] = yield* bound.notifications.listPendingByRecipient(recipient, {
+                limit: 10,
+              });
+              expect(request?.participationId).not.toBe(departed!.participationId);
+              // The departed turn takes none of it: it waits until that turn has stopped.
+              yield* accept(workspace.id);
+              expect(yield* turnsOf(workspace.id, threadId)).toMatchObject([
+                {
+                  id: departed!.id,
+                  status: "queued",
+                  acceptedThroughSequence: started.activity.sequence,
+                },
+              ]);
+              expect(
+                yield* bound.notifications.listPendingByRecipient(recipient, { limit: 10 }),
+              ).toEqual([request]);
+              yield* stopDeparted(workspace.id);
+              yield* accept(workspace.id);
+              const [next, stopped] = yield* turnsOf(workspace.id, threadId);
+              expect(stopped).toMatchObject({
+                id: departed!.id,
+                status: "cancelled",
+                cancelReason: "participation-ended",
+              });
+              expect(next).toMatchObject({
+                status: "queued",
+                participationId: request!.participationId,
+                acceptedThroughSequence: asked.activity.sequence,
+              });
+              expect(
+                yield* bound.notifications.listPendingByRecipient(recipient, { limit: 10 }),
+              ).toEqual([]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "a member who may not read a thread may not read its turns or follow their logs",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent } = yield* workspaceWithAgent;
+              const reader = yield* joinAsBob(workspace.id);
+              const started = yield* start(workspace.id, "Scout, look into this.", [
+                agent.memberId,
+              ]);
+              const threadId = started.thread.id;
+              yield* accept(workspace.id);
+              const [queued] = yield* turnsOf(workspace.id, threadId);
+              const turnId = queued!.id;
+              const reads: ReadonlyArray<
+                (turns: TurnApplication.Interface) => Effect.Effect<unknown, unknown, Actor.Service>
+              > = [
+                (turns) => turns.get(turnId),
+                (turns) => turns.listByThread(threadId, 10),
+                (turns) => turns.log(turnId),
+                (turns) => Effect.scoped(turns.watchLog(turnId)),
+              ];
+              const asBob = <A, E>(
+                read: (turns: TurnApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+              ) => as(workspace.id, bob, Effect.flatMap(TurnApplication.Service, read));
+              for (const read of reads) yield* asBob(read);
+              expect(
+                (yield* asBob((turns) => turns.listActive(10))).map((turn) => turn.id),
+              ).toEqual([turnId]);
+
+              // Without a role, bob still belongs to the thread's group, but may not read it.
+              yield* revokeRoles(workspace.id, reader.id);
+              expect(
+                yield* Effect.flip(
+                  as(
+                    workspace.id,
+                    bob,
+                    Effect.flatMap(ThreadApplication.Service, (threads) =>
+                      threads.readTimeline(threadId, { limit: 50 }),
+                    ),
+                  ),
+                ),
+              ).toMatchObject({ _tag: "Authorization.Denied" });
+              for (const read of reads)
+                expect(yield* Effect.flip(asBob(read))).toMatchObject({
+                  _tag: "Authorization.Denied",
+                  requirement: { permission: { name: "thread.read" } },
+                });
+              expect(yield* asBob((turns) => turns.listActive(10))).toEqual([]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect("following a turn's log ends once the reader may no longer read its thread", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.scoped(
+            Effect.gen(function* () {
+              const { workspace, agent, selection } = yield* workspaceWithAgent;
+              const reader = yield* joinAsBob(workspace.id);
+              const team = yield* as(
+                workspace.id,
+                alice,
+                Effect.gen(function* () {
+                  const { memberId } = yield* Actor.Service;
+                  const groups = yield* GroupApplication.Service;
+                  return yield* groups.createTeam({
+                    name: "Planning",
+                    memberIds: [memberId, reader.id, agent.memberId],
+                  });
+                }),
+              );
+              /** A running turn in a new thread of `groupId`, which bob follows. */
+              const following = Effect.fnUntraced(function* (groupId: Group.Id) {
+                const started = yield* as(
+                  workspace.id,
+                  alice,
+                  Effect.flatMap(ThreadApplication.Service, (threads) =>
+                    threads.startInGroup({
+                      groupId,
+                      text: "Scout, draft the plan.",
+                      mentions: [agent.memberId],
+                    }),
+                  ),
+                );
+                yield* accept(workspace.id);
+                const [queued] = yield* turnsOf(workspace.id, started.thread.id);
+                const turnId = queued!.id;
+                const draft = (text: string, offset: number) =>
+                  execute(
+                    workspace.id,
+                    Effect.flatMap(TurnExecution.Service, (execution) =>
+                      execution.draft(turnId, { responseId: "r1", part: 0, offset, text }),
+                    ),
+                  );
+                yield* execute(
+                  workspace.id,
+                  Effect.flatMap(TurnExecution.Service, (execution) =>
+                    execution.start(turnId, selection),
+                  ),
+                );
+                const next = yield* followLog(workspace.id, turnId, bob);
+                expect(brief(yield* next)).toBe("opened ");
+                yield* draft("The ", 0);
+                expect(brief(yield* next)).toBe("drafted The ");
+                return { next, draft };
+              });
+
+              // Leaving the thread's group ends following, with nothing more of the response.
+              const left = yield* following(team.id);
+              const [membership] = (yield* as(
+                workspace.id,
+                bob,
+                Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
+                  memberships.listCurrent(team.id, { limit: 10 }),
+                ),
+              )).filter((admission) => admission.memberId === reader.id);
+              yield* as(
+                workspace.id,
+                bob,
+                Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
+                  memberships.leave({ groupId: team.id, membershipId: membership!.id }),
+                ),
+              );
+              expect(yield* left.next).toBe("unavailable");
+
+              // So does losing the permission to read it, while still in its group.
+              const revoked = yield* following(Group.GeneralId);
+              yield* revokeRoles(workspace.id, reader.id);
+              expect(yield* revoked.next).toBe("unavailable");
+            }),
+          ),
         ),
       ),
     );
